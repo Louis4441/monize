@@ -102,6 +102,10 @@ transactionDate: string;
 
 This class of bug is invisible to unit tests, which construct payloads by hand and never send what the form sends. It surfaces in E2E or in production.
 
+### A request-supplied array declares an upper bound
+
+Every `@IsArray()` DTO property carries `@ArrayMaxSize(n)` beside it -- an unbounded array turns any per-element work downstream (one UPDATE per id inside a transaction) into a denial-of-service lever, and CodeQL flags the loop as `js/loop-bound-injection` (CWE-834). `src/common/array-bound-dto.spec.ts` sweeps validator metadata and fails on a new unbounded property; properties older than the guard are grandfathered there, and that list may only shrink. Relatedly, never use a request value's `.length` as a loop bound inside a `withScopedDb` callback: CodeQL cannot track an outer `Array.isArray` guard through the closure, so iterate `for (const [i, v] of xs.entries())` instead of `for (let i = 0; i < xs.length; i++)`.
+
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock when concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.

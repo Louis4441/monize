@@ -1,4 +1,4 @@
-import { IsArray, IsUUID } from "class-validator";
+import { ArrayMaxSize, IsArray, IsUUID } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class ReorderFavouriteAccountsDto {
@@ -11,6 +11,7 @@ export class ReorderFavouriteAccountsDto {
     ],
   })
   @IsArray()
+  @ArrayMaxSize(500)
   @IsUUID("4", { each: true })
   accountIds: string[];
 }

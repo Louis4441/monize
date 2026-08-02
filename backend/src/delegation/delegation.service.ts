@@ -384,9 +384,8 @@ export class DelegationService {
   ): Promise<void> {
     // Defensive: reject anything that isn't a proper array. An attacker
     // could submit {length: 1e100} and force an unbounded loop (CWE-834).
-    // The DTO layer already validates this via @IsArray, but re-check here
-    // so the bound is visible to static analysis. Keep the guard and the
-    // loop in the same scope (no closure) so the barrier is tracked.
+    // The DTO layer already validates this via @IsArray + @ArrayMaxSize, but
+    // re-check here so the invariant holds for any caller.
     if (!Array.isArray(accountIds)) {
       throw new BadRequestException(
         tr(
@@ -398,10 +397,14 @@ export class DelegationService {
     // One transaction around the whole reorder, as the QueryRunner block was:
     // a partially applied order would leave duplicate sort positions.
     await withScopedDb(this.dataSource, async (manager) => {
-      for (let i = 0; i < accountIds.length; i++) {
+      // for...of over .entries(), never `i < accountIds.length`: a request
+      // value's .length must not bound a loop inside this closure (CWE-834,
+      // CodeQL js/loop-bound-injection cannot see the isArray guard above
+      // through the withScopedDb callback).
+      for (const [i, accountId] of accountIds.entries()) {
         await manager.update(
           DelegateAccountFavourite,
-          { delegateUserId, accountId: accountIds[i] },
+          { delegateUserId, accountId },
           { sortOrder: i },
         );
       }
