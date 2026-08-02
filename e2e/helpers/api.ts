@@ -1,4 +1,4 @@
-import { APIRequestContext, expect } from '@playwright/test';
+import { APIRequestContext, APIResponse, expect } from '@playwright/test';
 import { randomBytes, randomInt } from 'crypto';
 
 const API_PREFIX = '/api/v1';
@@ -92,6 +92,27 @@ export interface ApiClient {
   put<T = unknown>(path: string, body?: unknown): Promise<T>;
   patch<T = unknown>(path: string, body?: unknown): Promise<T>;
   delete(path: string): Promise<void>;
+}
+
+/**
+ * Send one CSRF-aware request and return the RAW response, so a test can
+ * assert an expected failure status (e.g. the frozen-transfer 400) --
+ * createApiClient's methods assert res.ok() and cannot express that.
+ */
+export async function rawApiRequest(
+  request: APIRequestContext,
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<APIResponse> {
+  const token = await csrfToken(request);
+  const headers: Record<string, string> = {};
+  if (token) headers['X-CSRF-Token'] = token;
+  return request.fetch(withPrefix(path), {
+    method,
+    headers,
+    ...(body !== undefined ? { data: body } : {}),
+  });
 }
 
 // A thin CSRF-aware client over the page's APIRequestContext. Mirrors the
