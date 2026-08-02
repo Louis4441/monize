@@ -247,6 +247,7 @@
       "executedNotApplicable": "[XX-Nothing to do-XX]",
       "noChange": "[XX-No change-XX]",
       "changeTo": "[XX-changes to-XX]",
+      "instrumentUnavailable": "[XX-Instrument no longer available-XX]",
       "toggleDetails": "[XX-Show evaluation detail-XX]",
       "showAll": "[XX-See full history ({count})-XX]",
       "emptyTitle": "[XX-No evaluations yet-XX]",

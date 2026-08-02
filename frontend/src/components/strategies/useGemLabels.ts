@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
+import { useTranslations } from "next-intl";
 import {
   GemAssetRole,
   GemCompositionDimension,
   GemCadence,
   GemHistoryAction,
   GemSignalState,
-} from '@/types/gem-strategy';
+} from "@/types/gem-strategy";
 
 /**
  * Anything the labels can name: a strategy role's instrument or a holding that
@@ -30,7 +30,7 @@ type GemNamedAsset = {
  * the same way.
  */
 export function useGemLabels() {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
 
   const roleLabel = (role: GemAssetRole): string =>
     t(`gem.roles.${role}` as Parameters<typeof t>[0]);
@@ -48,11 +48,9 @@ export function useGemLabels() {
     t(`gem.cadences.${cadence}` as Parameters<typeof t>[0]);
 
   /** The breakdown a compliance comparison ran on ("country", "asset class"). */
-  const dimensionLabel = (
-    dimension: GemCompositionDimension | null,
-  ): string =>
+  const dimensionLabel = (dimension: GemCompositionDimension | null): string =>
     dimension === null
-      ? t('gem.common.unknown')
+      ? t("gem.common.unknown")
       : t(`gem.dimensions.${dimension}` as Parameters<typeof t>[0]);
 
   /**
@@ -60,15 +58,32 @@ export function useGemLabels() {
    * no ETF assigned yet (so a legend or table cell never renders empty).
    */
   const assetLabel = (asset: GemNamedAsset | null | undefined): string => {
-    if (!asset) return t('gem.common.unassigned');
-    if (asset.isCash) return t('gem.portfolioPanel.workingCash');
-    return asset.symbol ?? t('gem.common.unassigned');
+    if (!asset) return t("gem.common.unassigned");
+    if (asset.isCash) return t("gem.portfolioPanel.workingCash");
+    return asset.symbol ?? t("gem.common.unassigned");
+  };
+
+  /**
+   * The same, for a row that records a decision already made.
+   *
+   * "Not assigned" is the wrong word in the history: the role *was* assigned,
+   * and the instrument it named has since been deleted. The backend refuses to
+   * substitute today's assignment there -- that would date the current fund to
+   * a decision taken before it -- so the cell says what is true, that the
+   * instrument is no longer available.
+   */
+  const historicalAssetLabel = (
+    asset: GemNamedAsset | null | undefined,
+  ): string => {
+    if (!asset) return t("gem.common.unassigned");
+    if (asset.isCash) return t("gem.portfolioPanel.workingCash");
+    return asset.symbol ?? t("gem.history.instrumentUnavailable");
   };
 
   /** "SPY -- SPDR S&P 500 ETF" when both parts are known, otherwise the ticker. */
   const assetFullLabel = (asset: GemNamedAsset | null | undefined): string => {
-    if (asset?.isCash) return t('gem.portfolioPanel.workingCash');
-    if (!asset?.symbol) return t('gem.common.unassigned');
+    if (asset?.isCash) return t("gem.portfolioPanel.workingCash");
+    if (!asset?.symbol) return t("gem.common.unassigned");
     return asset.name ? `${asset.name} (${asset.symbol})` : asset.symbol;
   };
 
@@ -81,6 +96,7 @@ export function useGemLabels() {
     cadenceLabel,
     dimensionLabel,
     assetLabel,
+    historicalAssetLabel,
     assetFullLabel,
   };
 }

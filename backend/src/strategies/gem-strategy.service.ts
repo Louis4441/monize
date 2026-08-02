@@ -250,7 +250,6 @@ export class GemStrategyService {
   private storedRef(
     role: GemAssetRole | null,
     securityId: string | null,
-    refs: Map<GemAssetRole, GemAssetRef>,
     securities: Map<string, { symbol: string | null; name: string | null }>,
   ): GemAssetRef | null {
     if (!role) return null;
@@ -263,7 +262,16 @@ export class GemStrategyService {
         name: stored.name,
       };
     }
-    return refs.get(role) ?? null;
+    // The instrument this decision actually named is gone, and today's
+    // assignment for the role is not a stand-in for it.
+    //
+    // A March signal that selected EEM, after EEM is deleted and the role
+    // reassigned to EMIM, rendered as "March selected EMIM" -- a historical
+    // falsehood, and one nothing on the page marked as a guess. The role is
+    // what the row records and is kept; the instrument is unknown and says so.
+    // `buildAssetRefs` stays the source for the *current* signal, where the
+    // assignment is the answer rather than a substitute for one.
+    return { role, securityId: null, symbol: null, name: null };
   }
 
   private toHistoryEntry(
@@ -277,7 +285,6 @@ export class GemStrategyService {
     const winner = this.storedRef(
       signal.targetRole,
       signal.targetSecurityId,
-      refs,
       securities,
     );
     return {
@@ -291,12 +298,20 @@ export class GemStrategyService {
       change:
         action === "SWITCH"
           ? {
-              // What it moved out of is the previous period's own target, not
-              // whatever that role points at today.
+              // What it moved out of is the previous period's own target,
+              // not whatever that role points at today -- and role and
+              // instrument must come from the same place. This row's
+              // `previousRole` and the predecessor row's target can disagree
+              // (a period materialized out of order after a backfill leaves
+              // one of them behind), and pairing them produced a ref naming
+              // one role with another role's security: "switched from SPY to
+              // SPY". Where they disagree the instrument is unknown, not
+              // guessed.
               from: this.storedRef(
                 signal.previousRole,
-                previous?.targetSecurityId ?? null,
-                refs,
+                previous && previous.targetRole === signal.previousRole
+                  ? previous.targetSecurityId
+                  : null,
                 securities,
               ),
               to: winner,

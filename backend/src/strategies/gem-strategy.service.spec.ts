@@ -265,8 +265,17 @@ describe("GemStrategyService", () => {
         action: "SWITCH",
         executed: false,
       });
+      // The predecessor row is not in hand -- this is the oldest period the
+      // history holds -- so what the switch came out of is a role without an
+      // instrument. Naming the role's *current* fund here would date today's
+      // assignment to a decision made before it.
       expect(report.history[0].change).toEqual({
-        from: expect.objectContaining({ symbol: "SPY" }),
+        from: {
+          role: "US_EQUITY",
+          securityId: null,
+          symbol: null,
+          name: null,
+        },
         to: expect.objectContaining({ symbol: "EMIM" }),
       });
     });
@@ -345,24 +354,71 @@ describe("GemStrategyService", () => {
       ).toBe("EMIM");
     });
 
-    it("falls back to the role's instrument when the stored one is gone", async () => {
-      // ON DELETE SET NULL leaves the signal without a security; naming the
-      // role's current fund is better than showing an empty row, and the
-      // momentum figures beside it are still what was decided on.
+    it("will not name today's instrument as a deleted one's replacement", async () => {
+      // ON DELETE SET NULL leaves the signal without a security. The role is
+      // still what the row recorded and is kept; the instrument is gone and
+      // unknowable. Naming the role's *current* fund read as "March selected
+      // EMIM" for a March that selected EEM -- a historical falsehood with
+      // nothing on the page marking it as a substitution.
       signalService.materialize.mockResolvedValue({
         signals: [storedSignal({ targetSecurityId: null })],
         legacyPeriods: 0,
+        configChanged: false,
+        strategyMissing: false,
       });
 
       const report = await service.getReport(userId);
 
-      expect(report.history[0].winner).toMatchObject({
+      expect(report.history[0].winner).toEqual({
         role: "EM_EQUITY",
-        symbol: "EMIM",
+        securityId: null,
+        symbol: null,
+        name: null,
       });
+      // The stored momentum snapshot is untouched: what was decided on is
+      // still what is shown beside the row.
+      expect(report.history[0].momentum).toMatchObject({ EM_EQUITY: 29.87 });
+      // ...and the current role mapping is unaffected -- EMIM is still the
+      // instrument the strategy holds today.
+      expect(report.signal?.target?.symbol).toBe("EMIM");
       // A backtest needs a cost model the configuration does not carry yet.
       expect(report.backtest).toBeNull();
       expect(report.warnings).toEqual([]);
+    });
+
+    it("names the predecessor's own instrument when the chain is intact", async () => {
+      // Two periods in hand and their roles agree, so the switch can say what
+      // it actually moved out of.
+      signalService.materialize.mockResolvedValue({
+        signals: [
+          storedSignal(),
+          storedSignal({
+            id: "sig-0",
+            evaluatedOn: "2025-06-30",
+            effectiveFrom: "2025-07-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+            previousRole: null,
+          }),
+        ],
+        legacyPeriods: 0,
+        configChanged: false,
+        strategyMissing: false,
+      });
+      securityRepo.find.mockResolvedValue([
+        { id: "sec-emim", symbol: "EMIM", name: "EM IMI ETF" },
+        { id: "sec-spy", symbol: "SPY", name: "S&P 500 ETF" },
+      ]);
+
+      const report = await service.getReport(userId);
+
+      expect(report.history[0].change).toEqual({
+        from: expect.objectContaining({
+          role: "US_EQUITY",
+          securityId: "sec-spy",
+        }),
+        to: expect.objectContaining({ securityId: "sec-emim" }),
+      });
     });
 
     it("marks the equity ranking as not applied while RISK-OFF", async () => {

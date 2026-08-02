@@ -1,18 +1,22 @@
-'use client';
+"use client";
 
-import { Fragment, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { ArrowRightIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { useDateFormat } from '@/hooks/useDateFormat';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { GemAssetRole, GemHistoryEntry } from '@/types/gem-strategy';
+import { Fragment, useState } from "react";
+import { useTranslations } from "next-intl";
+import {
+  ArrowRightIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/outline";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { useDateFormat } from "@/hooks/useDateFormat";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { GemAssetRole, GemHistoryEntry } from "@/types/gem-strategy";
 import {
   GEM_ROLE_COLOURS,
   GEM_ROLE_ORDER,
   sortHistoryNewestFirst,
-} from '@/lib/gem-strategy-view';
-import { cn } from '@/lib/utils';
+} from "@/lib/gem-strategy-view";
+import { cn } from "@/lib/utils";
 import {
   GemBadge,
   GemCard,
@@ -21,8 +25,8 @@ import {
   GemSigned,
   GemSwatch,
   GemUnknown,
-} from './GemPrimitives';
-import { useGemLabels } from './useGemLabels';
+} from "./GemPrimitives";
+import { useGemLabels } from "./useGemLabels";
 
 interface GemSignalHistoryTableProps {
   history: GemHistoryEntry[];
@@ -49,9 +53,14 @@ export function GemSignalHistoryTable({
   symbolByRole,
   lookbackMonths,
 }: GemSignalHistoryTableProps) {
-  const t = useTranslations('strategies');
-  const { roleLabel, roleDescription, stateLabel, actionLabel, assetLabel } =
-    useGemLabels();
+  const t = useTranslations("strategies");
+  const {
+    roleLabel,
+    roleDescription,
+    stateLabel,
+    actionLabel,
+    historicalAssetLabel,
+  } = useGemLabels();
   const { formatDate } = useDateFormat();
   const { formatSignedPercent } = useNumberFormat();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -60,37 +69,43 @@ export function GemSignalHistoryTable({
   const rows = limit ? ordered.slice(0, limit) : ordered;
   const hasMore = limit !== undefined && ordered.length > limit;
 
-  const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id));
+  const toggle = (id: string) =>
+    setExpandedId((current) => (current === id ? null : id));
 
-  const columnLabel = (role: GemAssetRole): string => symbolByRole.get(role) ?? roleLabel(role);
+  const columnLabel = (role: GemAssetRole): string =>
+    symbolByRole.get(role) ?? roleLabel(role);
 
   const executedCell = (executed: boolean | null) => {
     if (executed === null) {
-      return <GemUnknown label={t('gem.history.executedNotApplicable')} />;
+      return <GemUnknown label={t("gem.history.executedNotApplicable")} />;
     }
     return (
-      <GemBadge tone={executed ? 'green' : 'gray'}>
-        {executed ? t('gem.history.executedYes') : t('gem.history.executedNo')}
+      <GemBadge tone={executed ? "green" : "gray"}>
+        {executed ? t("gem.history.executedYes") : t("gem.history.executedNo")}
       </GemBadge>
     );
   };
 
   const changeCell = (entry: GemHistoryEntry) => {
     if (!entry.change) {
-      return <span className="text-gray-500 dark:text-gray-400">{t('gem.history.noChange')}</span>;
+      return (
+        <span className="text-gray-500 dark:text-gray-400">
+          {t("gem.history.noChange")}
+        </span>
+      );
     }
     return (
       <span className="inline-flex items-center gap-1 whitespace-nowrap">
         <GemSecurityLink securityId={entry.change.from?.securityId}>
-          {assetLabel(entry.change.from)}
+          {historicalAssetLabel(entry.change.from)}
         </GemSecurityLink>
         <ArrowRightIcon className="h-3 w-3 text-gray-400" aria-hidden="true" />
-        <span className="sr-only">{t('gem.history.changeTo')}</span>
+        <span className="sr-only">{t("gem.history.changeTo")}</span>
         <GemSecurityLink
           securityId={entry.change.to?.securityId}
           className="font-medium"
         >
-          {assetLabel(entry.change.to)}
+          {historicalAssetLabel(entry.change.to)}
         </GemSecurityLink>
       </span>
     );
@@ -99,11 +114,15 @@ export function GemSignalHistoryTable({
   const detail = (entry: GemHistoryEntry) => (
     <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
       <div className="flex justify-between gap-3">
-        <dt className="text-gray-500 dark:text-gray-400">{t('gem.history.colState')}</dt>
+        <dt className="text-gray-500 dark:text-gray-400">
+          {t("gem.history.colState")}
+        </dt>
         <dd>{stateLabel(entry.state)}</dd>
       </div>
       <div className="flex justify-between gap-3">
-        <dt className="text-gray-500 dark:text-gray-400">{t('gem.history.colEffectiveFrom')}</dt>
+        <dt className="text-gray-500 dark:text-gray-400">
+          {t("gem.history.colEffectiveFrom")}
+        </dt>
         <dd>{formatDate(entry.effectiveFrom)}</dd>
       </div>
       {GEM_ROLE_ORDER.map((role) => (
@@ -121,11 +140,15 @@ export function GemSignalHistoryTable({
         </div>
       ))}
       <div className="flex justify-between gap-3">
-        <dt className="text-gray-500 dark:text-gray-400">{t('gem.history.colChange')}</dt>
+        <dt className="text-gray-500 dark:text-gray-400">
+          {t("gem.history.colChange")}
+        </dt>
         <dd>{changeCell(entry)}</dd>
       </div>
       <div className="flex justify-between gap-3">
-        <dt className="text-gray-500 dark:text-gray-400">{t('gem.history.colExecuted')}</dt>
+        <dt className="text-gray-500 dark:text-gray-400">
+          {t("gem.history.colExecuted")}
+        </dt>
         <dd>{executedCell(entry.executed)}</dd>
       </div>
     </dl>
@@ -133,15 +156,15 @@ export function GemSignalHistoryTable({
 
   return (
     <GemCard
-      title={t('gem.history.title')}
-      hint={t('gem.history.hint')}
+      title={t("gem.history.title")}
+      hint={t("gem.history.hint")}
       bodyClassName="px-0 pb-0"
     >
       {rows.length === 0 ? (
         <div className="px-4">
           <GemEmptyState
-            title={t('gem.history.emptyTitle')}
-            description={t('gem.history.emptyDescription')}
+            title={t("gem.history.emptyTitle")}
+            description={t("gem.history.emptyDescription")}
           />
         </div>
       ) : (
@@ -150,30 +173,34 @@ export function GemSignalHistoryTable({
           <div className="hidden overflow-x-auto md:block">
             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
               <caption className="sr-only">
-                {t('gem.history.caption', { months: lookbackMonths })}
+                {t("gem.history.caption", { months: lookbackMonths })}
               </caption>
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   <th scope="col" className="px-4 py-2 font-medium">
-                    {t('gem.history.colEvaluatedOn')}
+                    {t("gem.history.colEvaluatedOn")}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    {t('gem.history.colEffectiveFrom')}
+                    {t("gem.history.colEffectiveFrom")}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    {t('gem.history.colWinner')}
+                    {t("gem.history.colWinner")}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    {t('gem.history.colSignal')}
+                    {t("gem.history.colSignal")}
                   </th>
                   {GEM_ROLE_ORDER.map((role) => (
-                    <th key={role} scope="col" className="px-3 py-2 text-right font-medium">
+                    <th
+                      key={role}
+                      scope="col"
+                      className="px-3 py-2 text-right font-medium"
+                    >
                       <span className="inline-flex items-center justify-end">
                         {columnLabel(role)}
                         {/* The header is a ticker; the tooltip names the role it
                             fills, as the strategy-assets card does. */}
                         <InfoTooltip
-                          text={t('gem.history.colMomentumHint', {
+                          text={t("gem.history.colMomentumHint", {
                             role: roleLabel(role),
                             description: roleDescription(role),
                           })}
@@ -184,17 +211,19 @@ export function GemSignalHistoryTable({
                     </th>
                   ))}
                   <th scope="col" className="px-3 py-2 font-medium">
-                    {t('gem.history.colChange')}
+                    {t("gem.history.colChange")}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    {t('gem.history.colExecuted')}
+                    {t("gem.history.colExecuted")}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
                 {rows.map((entry) => {
                   const isExpanded = expandedId === entry.id;
-                  const Chevron = isExpanded ? ChevronDownIcon : ChevronRightIcon;
+                  const Chevron = isExpanded
+                    ? ChevronDownIcon
+                    : ChevronRightIcon;
                   return (
                     <Fragment key={entry.id}>
                       <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/40">
@@ -206,9 +235,14 @@ export function GemSignalHistoryTable({
                             aria-controls={`gem-history-detail-${entry.id}`}
                             className="inline-flex items-center gap-1 rounded font-medium text-gray-900 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-100 dark:hover:text-blue-400"
                           >
-                            <Chevron className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <Chevron
+                              className="h-3.5 w-3.5 shrink-0"
+                              aria-hidden="true"
+                            />
                             {formatDate(entry.evaluatedOn)}
-                            <span className="sr-only">{t('gem.history.toggleDetails')}</span>
+                            <span className="sr-only">
+                              {t("gem.history.toggleDetails")}
+                            </span>
                           </button>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-gray-300">
@@ -216,11 +250,17 @@ export function GemSignalHistoryTable({
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5">
-                            {entry.winner && <GemSwatch colour={GEM_ROLE_COLOURS[entry.winner.role]} />}
+                            {entry.winner && (
+                              <GemSwatch
+                                colour={GEM_ROLE_COLOURS[entry.winner.role]}
+                              />
+                            )}
                             <span className="text-gray-900 dark:text-gray-100">
                               {entry.winner ? (
-                                <GemSecurityLink securityId={entry.winner.securityId}>
-                                  {assetLabel(entry.winner)}
+                                <GemSecurityLink
+                                  securityId={entry.winner.securityId}
+                                >
+                                  {historicalAssetLabel(entry.winner)}
                                 </GemSecurityLink>
                               ) : (
                                 <GemUnknown />
@@ -229,7 +269,9 @@ export function GemSignalHistoryTable({
                           </span>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <GemBadge tone={entry.state === 'RISK_ON' ? 'green' : 'gray'}>
+                          <GemBadge
+                            tone={entry.state === "RISK_ON" ? "green" : "gray"}
+                          >
                             {actionLabel(entry.action)}
                           </GemBadge>
                         </td>
@@ -237,8 +279,8 @@ export function GemSignalHistoryTable({
                           <td
                             key={role}
                             className={cn(
-                              'px-3 py-2 text-right tabular-nums whitespace-nowrap',
-                              entry.winner?.role === role && 'font-semibold',
+                              "px-3 py-2 text-right tabular-nums whitespace-nowrap",
+                              entry.winner?.role === role && "font-semibold",
                             )}
                           >
                             <GemSigned
@@ -250,14 +292,19 @@ export function GemSignalHistoryTable({
                         <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
                           {changeCell(entry)}
                         </td>
-                        <td className="px-3 py-2">{executedCell(entry.executed)}</td>
+                        <td className="px-3 py-2">
+                          {executedCell(entry.executed)}
+                        </td>
                       </tr>
                       {isExpanded && (
                         <tr
                           id={`gem-history-detail-${entry.id}`}
                           className="bg-gray-50 dark:bg-gray-700/30"
                         >
-                          <td colSpan={6 + GEM_ROLE_ORDER.length} className="px-4 py-3">
+                          <td
+                            colSpan={6 + GEM_ROLE_ORDER.length}
+                            className="px-4 py-3"
+                          >
                             {detail(entry)}
                           </td>
                         </tr>
@@ -288,15 +335,26 @@ export function GemSignalHistoryTable({
                         {formatDate(entry.evaluatedOn)}
                       </span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        {entry.winner && <GemSwatch colour={GEM_ROLE_COLOURS[entry.winner.role]} />}
-                        {entry.winner ? assetLabel(entry.winner) : <GemUnknown />}
+                        {entry.winner && (
+                          <GemSwatch
+                            colour={GEM_ROLE_COLOURS[entry.winner.role]}
+                          />
+                        )}
+                        {entry.winner ? (
+                          historicalAssetLabel(entry.winner)
+                        ) : (
+                          <GemUnknown />
+                        )}
                         <span aria-hidden="true">&middot;</span>
                         {actionLabel(entry.action)}
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
                       {executedCell(entry.executed)}
-                      <Chevron className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                      <Chevron
+                        className="h-4 w-4 text-gray-400"
+                        aria-hidden="true"
+                      />
                     </span>
                   </button>
                   {isExpanded && (
@@ -316,7 +374,7 @@ export function GemSignalHistoryTable({
                 onClick={onShowAll}
                 className="rounded text-sm font-medium text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-400"
               >
-                {t('gem.history.showAll', { count: ordered.length })}
+                {t("gem.history.showAll", { count: ordered.length })}
               </button>
             </div>
           )}
