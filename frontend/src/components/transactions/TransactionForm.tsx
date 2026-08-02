@@ -44,7 +44,7 @@ import { tagsApi } from '@/lib/tags';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 import { Payee } from '@/types/payee';
 import { Category } from '@/types/category';
-import { Account } from '@/types/account';
+import { Account, TransferCandidate } from '@/types/account';
 import { Tag } from '@/types/tag';
 import { ReactivatePayeeDialog } from '@/components/payees/ReactivatePayeeDialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -146,6 +146,9 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
   // uploaded once it has been created. Empty (and unused) when editing.
   const [stagedAttachments, setStagedAttachments] = useState<File[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transferCandidates, setTransferCandidates] = useState<
+    TransferCandidate[]
+  >([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [payees, setPayees] = useState<Payee[]>([]); // Full list of active payees
   const [payeeAliasMap, setPayeeAliasMap] = useState<Record<string, string[]>>({}); // payeeId -> alias strings
@@ -451,9 +454,12 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
       payeesApi.getAll('active'),
       tagsApi.getAll(),
       payeesApi.getAllAliases(),
+      // Cross-owner transfer targets; a failure only hides the extra group.
+      accountsApi.getTransferCandidates().catch(() => []),
     ])
-      .then(async ([accountsData, categoriesData, payeesData, tagsData, aliasesData]) => {
+      .then(async ([accountsData, categoriesData, payeesData, tagsData, aliasesData, candidatesData]) => {
         setAccounts(accountsData);
+        setTransferCandidates(candidatesData);
         setCategories(categoriesData);
         setTags(tagsData);
 
@@ -1399,6 +1405,7 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           watchedAmount={watchedAmount}
           watchedCurrencyCode={watchedCurrencyCode}
           accounts={accounts}
+          transferCandidates={transferCandidates}
           setValue={setValue}
           transferToAccountId={transferToAccountId}
           setTransferToAccountId={setTransferToAccountId}

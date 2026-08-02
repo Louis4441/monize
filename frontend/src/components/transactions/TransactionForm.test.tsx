@@ -225,6 +225,7 @@ const mockAccountsGetAll = vi.fn();
 vi.mock('@/lib/accounts', () => ({
   accountsApi: {
     getAll: (...args: any[]) => mockAccountsGetAll(...args),
+    getTransferCandidates: () => Promise.resolve([]),
   },
 }));
 

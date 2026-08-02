@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { TransferTransactionFields } from './TransferTransactionFields';
-import { Account } from '@/types/account';
+import { Account, TransferCandidate } from '@/types/account';
 import { Payee } from '@/types/payee';
+
+let mockActingAsUserId: string | null = null;
+vi.mock('@/store/authStore', () => ({
+  useAuthStore: (selector: (state: { actingAsUserId: string | null }) => unknown) =>
+    selector({ actingAsUserId: mockActingAsUserId }),
+}));
 
 vi.mock('@/lib/format', () => ({
   getCurrencySymbol: (code: string) => {
@@ -144,7 +150,26 @@ describe('TransferTransactionFields', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockActingAsUserId = null;
   });
+
+  function createCandidate(
+    overrides: Partial<TransferCandidate> = {},
+  ): TransferCandidate {
+    return {
+      id: 'cand-1',
+      name: 'Owner Chequing',
+      currencyCode: 'CAD',
+      accountType: 'CHEQUING',
+      accountSubType: null,
+      isClosed: false,
+      ownerLabel: 'Alice Owner',
+      canCreate: true,
+      canEdit: true,
+      canDelete: false,
+      ...overrides,
+    };
+  }
 
   it('renders Date input', () => {
     render(<TransferTransactionFields {...defaultProps} />);
@@ -561,5 +586,141 @@ describe('TransferTransactionFields', () => {
       (o) => o.textContent,
     );
     expect(labels).toContain('Hidden account');
+  });
+
+  describe('cross-owner transfer candidates', () => {
+    it('renders a grouped "Shared with you" section with owner-labelled options', () => {
+      render(
+        <TransferTransactionFields
+          {...defaultProps}
+          accounts={[createAccount({ id: 'acc-1', name: 'Chequing' })]}
+          transferCandidates={[createCandidate()]}
+        />,
+      );
+
+      const toSelect = screen.getByLabelText('To Account');
+      const labels = Array.from(toSelect.querySelectorAll('option')).map(
+        (o) => o.textContent,
+      );
+      expect(labels).toContain('Shared with you');
+      expect(labels).toContain('Owner Chequing (CAD) — Alice Owner');
+    });
+
+    it('labels the group "Your accounts" while acting as an owner', () => {
+      mockActingAsUserId = 'owner-1';
+      render(
+        <TransferTransactionFields
+          {...defaultProps}
+          accounts={[createAccount({ id: 'acc-1', name: 'Chequing' })]}
+          transferCandidates={[createCandidate({ ownerLabel: 'Me' })]}
+        />,
+      );
+
+      const toSelect = screen.getByLabelText('To Account');
+      const labels = Array.from(toSelect.querySelectorAll('option')).map(
+        (o) => o.textContent,
+      );
+      expect(labels).toContain('Your accounts');
+    });
+
+    it('filters candidates by canCreate when creating', () => {
+      render(
+        <TransferTransactionFields
+          {...defaultProps}
+          accounts={[createAccount({ id: 'acc-1', name: 'Chequing' })]}
+          transferCandidates={[
+            createCandidate({ id: 'c-yes', name: 'Creatable', canCreate: true }),
+            createCandidate({ id: 'c-no', name: 'ReadOnly', canCreate: false }),
+          ]}
+        />,
+      );
+
+      const toSelect = screen.getByLabelText('To Account');
+      const labels = Array.from(toSelect.querySelectorAll('option')).map(
+        (o) => o.textContent,
+      );
+      expect(labels).toContain('Creatable (CAD) — Alice Owner');
+      expect(labels).not.toContain('ReadOnly (CAD) — Alice Owner');
+    });
+
+    it('filters candidates by canEdit when editing', () => {
+      render(
+        <TransferTransactionFields
+          {...defaultProps}
+          accounts={[createAccount({ id: 'acc-1', name: 'Chequing' })]}
+          transferCandidates={[
+            createCandidate({
+              id: 'c-no-edit',
+              name: 'NoEdit',
+              canCreate: true,
+              canEdit: false,
+            }),
+          ]}
+          transaction={{ id: 'tx-1' } as never}
+        />,
+      );
+
+      const toSelect = screen.getByLabelText('To Account');
+      const labels = Array.from(toSelect.querySelectorAll('option')).map(
+        (o) => o.textContent,
+      );
+      expect(labels).not.toContain('NoEdit (CAD) — Alice Owner');
+    });
+
+    it('does not treat a candidate counterpart as a hidden account', () => {
+      render(
+        <TransferTransactionFields
+          {...defaultProps}
+          accounts={[createAccount({ id: 'acc-1', name: 'Chequing' })]}
+          transferCandidates={[createCandidate({ id: 'cand-1' })]}
+          transferToAccountId="cand-1"
+        />,
+      );
+
+      const toSelect = screen.getByLabelText('To Account');
+      const labels = Array.from(toSelect.querySelectorAll('option')).map(
+        (o) => o.textContent,
+      );
+      expect(labels).not.toContain('Hidden account');
+      expect(labels).toContain('Owner Chequing (CAD) — Alice Owner');
+    });
+
+    it('locks From/To/Amount/Date when editing a frozen (hidden-counterpart) transfer', () => {
+      render(
+        <TransferTransactionFields
+          {...defaultProps}
+          accounts={[createAccount({ id: 'acc-1', name: 'Chequing' })]}
+          watchedAccountId="acc-1"
+          transferToAccountId="acc-hidden"
+          transaction={
+            {
+              id: 'tx-1',
+              linkedTransaction: { account: { name: 'Hidden account' } },
+            } as never
+          }
+        />,
+      );
+
+      expect(screen.getByLabelText('From Account')).toBeDisabled();
+      expect(screen.getByLabelText('To Account')).toBeDisabled();
+      expect(
+        screen.getByText(/no longer shared with you/i),
+      ).toBeInTheDocument();
+    });
+
+    it('does not lock anything while creating', () => {
+      render(
+        <TransferTransactionFields
+          {...defaultProps}
+          accounts={[createAccount({ id: 'acc-1', name: 'Chequing' })]}
+        />,
+      );
+
+      expect(screen.getByLabelText('From Account')).not.toBeDisabled();
+      expect(screen.getByLabelText('To Account')).not.toBeDisabled();
+      expect(
+        screen.queryByText(/no longer shared with you/i),
+      ).not.toBeInTheDocument();
+    });
   });
 });

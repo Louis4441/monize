@@ -35,7 +35,7 @@ Every task is safe to merge and deploy in any order that respects the dependency
 | M1 | Mask util extraction + interceptor generalized to all users (fast path) + `/linked` endpoint | A1, T2 | neutral | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | M2 | CSV export masking + AI/MCP read masking | M1 | neutral | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | F1 | `GET /accounts/transfer-candidates` endpoint | A1 | inert | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
-| F2 | Frontend: transfer form candidate groups, grant-filtered options, frozen-lock UI | F1, T1, T2 | inert | [ ] |
+| F2 | Frontend: transfer form candidate groups, grant-filtered options, frozen-lock UI | F1, T1, T2 | inert | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | D1 | Migration: delegate-read policy arm on `transactions` + `idx_adg_account` index | -- | inert* | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | Q1 | Integration suite: `cross-owner-transfers.integration.spec.ts` (incl. stateless reshare-reconnect proof) | T1-T3, M1-M2 | none | [ ] |
 | Q2 | Playwright e2e journey in `delegation.spec.ts` (share -> transfer -> unshare -> mask -> reshare -> reconnect) | F2, Q1 | none | [ ] |
