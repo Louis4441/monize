@@ -142,6 +142,55 @@ calculation needs:
   fails on it. If the naive implementation would pass the whole suite, the
   suite is missing its most important case.
 
+### 7.1 A green suite after a behaviour change is a finding
+
+If you changed what a calculation produces and **nothing failed**, exactly one
+of two things is true: the change is a no-op, or the suite had no case for
+that behaviour. Say which, in the change description, before moving on -- and
+if it is the second, add the case in the same commit.
+
+This is the cheapest check in this document and the one that catches the most.
+A rule can be written down, read, agreed with, and violated in code all the
+same; a suite that stays green while the arithmetic changes underneath it is
+evidence rather than opinion.
+
+### 7.2 A test you have never seen fail protects nothing
+
+For each invariant you add, break it on purpose before trusting the test:
+revert the fix in your working tree, run the named test, watch it fail,
+restore the fix. Record in the change description **which test fails on which
+input**.
+
+Doing this is also how you discover that the guard you just wrote is testing a
+misspelled symbol, an interface that no longer exists, or a branch nothing can
+reach.
+
+### 7.3 A fixture is a claim about production data
+
+Before writing one, find the code that *produces* the data and check that your
+fixture is a shape it can actually emit. Two failure modes, both of which
+leave a suite passing over a defect:
+
+- **A fixture the producer could never emit** -- a mock returning a field
+  combination the driver or the collaborator never returns. Every branch that
+  reads it is then green and unreachable.
+- **A fixture that omits a shape the producer *can* emit** -- weightings that
+  always sum to 1 where the storage format explicitly allows a remainder, a
+  price series far sparser or denser than the query supplies, an identifier
+  always present where the column is nullable. The formula is then only ever
+  exercised on the easy half of its input domain.
+
+Where the language can enforce this, let it: type mocked collaborators so the
+compiler rejects a return shape the real method cannot produce.
+
+### 7.4 A second figure inherits the first one's denominator
+
+Adding a new reported number over an existing base -- another percentage over
+the same total, another total over the same conversion -- adopts every known
+defect of that base and republishes it under a new name the reader has no
+reason to distrust. A pre-existing problem you decided not to fix stops being
+pre-existing the moment you build on it. Fix it, or do not add the figure.
+
 ## 8. Specification before implementation
 
 A financial feature of any substance starts from a short written design
@@ -151,3 +200,31 @@ versioning and recomputation rules, concurrency behaviour, and the test
 matrix. A specification written after the code -- or grown out of review
 findings -- documents decisions; it does not guide them. This is the
 domain-level counterpart of the propose-first workflow in `CONTRIBUTING.md`.
+
+**"Of any substance" means**: it computes or reports money, it materializes a
+derived result, or it reads a time series. Not the size of the diff -- a
+twenty-line change that puts a new percentage on a page is in scope, and a
+large mechanical rename is not.
+
+**The specification is the first commit of the change**, so its date is on the
+record and a reviewer can read the invariants before the code meant to
+implement them. A design document appended at the end is a summary, and a
+summary cannot be wrong in the way a specification can -- which is the whole
+reason for writing one.
+
+## 9. Keep the prose and the code in step
+
+These rules are worth only what the code and the documents agree on.
+
+- A document that names an identifier -- a field, a flag, a helper -- is
+  making a claim about the source. When you rename or remove one, grep the
+  `docs/` tree and every `CLAUDE.md` in the same commit. A document describing
+  a model that no longer exists is worse than no document: it gets read,
+  believed, and built on.
+- A comment or docstring asserting that **every** call site does something --
+  "all writes take this lock", "every read goes through this helper" -- is a
+  test, not a comment. Write the scanning test that enumerates them
+  (`backend/src/backup/backup.service.spec.ts` and
+  `frontend/src/test/ui-conventions.test.ts` are the worked examples). Such a
+  claim is true when written and silently false at the first call site added
+  afterwards, which is exactly when nobody re-reads the comment.

@@ -62,6 +62,12 @@ Before writing a UI control, a data access path, or anything a user interacts wi
 
 The point is that the next agent inherits the correction. A fix that lives only in one file will be re-broken in the next one.
 
+**Prefer the rule the machine can check.** A rule in prose gets read, agreed with, and violated anyway; the financial contracts in `docs/` have been all three more than once. Ranked by how well they hold: a type the compiler enforces, a lint rule, a test that scans the source, a paragraph in a `CLAUDE.md`. Reach for the highest one the mistake allows, and use prose for the part that genuinely needs judgement rather than as the first resort.
+
+**A green suite after a behaviour change is a finding.** If you changed what the code produces and nothing failed, either the change is a no-op or the suite had no case for it. Say which, in the change description, and if it is the second, add the case in the same commit. `docs/financial-calculation-contract.md` section 7.1 has the long form; it applies everywhere, not only to money.
+
+**A doc that names an identifier is making a claim about the source.** Renaming or deleting a field, flag or helper means grepping `docs/` and every `CLAUDE.md` in the same commit. A document describing a model that no longer exists is worse than none: it gets read, believed, and built on. The same goes for a comment asserting that *every* call site does something -- that is a scanning test, not a comment.
+
 ### Running the suites locally -- two ways a green branch reads as red
 
 CI runs in UTC with one Playwright worker. A local run does neither, and both differences produce failures that look like regressions and are not.
@@ -171,7 +177,9 @@ Balance updates use atomic SQL: `UPDATE accounts SET current_balance = current_b
 
 A field named `total*`, `portfolioValue`, `transferValue`, `gain`, `tax`, or `estimated*` may only carry a value when **every** component of the calculation is known. Filtering out `null` components and summing the rest produces a subtotal, not a total -- if any component is unknown, the total is `null`, and the partial sum, if returned at all, goes in a separate explicitly named field (`knownMarketValueSubtotal`), never in the total's field. Never default an unknown price, cost basis, or rate to `0` (or an exchange rate to `1`) to keep a formula running, and never treat a missing period price as a 0% return.
 
-The full rules -- cost basis and tax truth table, cash, valuation, materialized-result versioning, stale quotes, backtests over incomplete history, and the required adversarial test matrix -- live in `docs/financial-calculation-contract.md` and `docs/time-series-contract.md`. Read both before writing or changing any financial calculation. A financial feature of any substance starts from a short approved spec (invariants, truth tables, numerical examples, missing-data policy, test matrix) before implementation, not from code.
+**`null` is not the safe answer either.** It means "not known", so a state that *is* known must not use it: empty accounts hold zero, move zero, realize zero and owe zero, and reporting those as unknown tells the user a settled question could not be worked out -- while making "nothing to do" indistinguishable from "cannot compute". Decide which of the two each branch is in before writing it.
+
+The full rules -- cost basis and tax truth table, cash, valuation, materialized-result versioning, stale quotes, backtests over incomplete history, and the required adversarial test matrix -- live in `docs/financial-calculation-contract.md` and `docs/time-series-contract.md`. Read both **before** writing or changing any financial calculation, not when a review asks about them: every rule those documents contain has been read, agreed with and broken anyway by someone who reached them afterwards. A financial feature of any substance -- it computes money, materializes a derived result, or reads a time series -- starts from a short approved spec (invariants, truth tables, numerical examples, missing-data policy, test matrix), committed *before* the implementation it guides.
 
 ## Environment
 

@@ -153,6 +153,30 @@ it in the catalog, not in JSX. `"{units} ({share})"` is one string a translator
 can reorder; `{value}{' ('}{share}{')'}` in a component is three fragments they
 cannot reach.
 
+### An unknown value must not render as a measured zero
+
+The server goes to real trouble to send `null` rather than `0` for anything it
+could not work out (`docs/financial-calculation-contract.md`), and the last
+hundred pixels are where that gets thrown away:
+
+- **`connectNulls` on a line chart** draws a straight segment through the gap.
+  It is indistinguishable from measured data, and a tooltip saying "unknown"
+  under the cursor does not undo it. Default to `connectNulls={false}`.
+- **A bar, gauge or meter at zero width** beside an "unknown" label reads as a
+  measured zero to everyone who looks at the shape rather than the number.
+  Draw a distinct no-data treatment, or nothing at all -- not an empty fill.
+- **A row that disappears** when its value is `null` conflates "not
+  applicable" with "could not be computed". Where the payload can tell those
+  apart -- a configured tax rate with an uncomputable tax, say -- render the
+  row with an unknown marker rather than dropping it.
+- **`?? 0`, `|| 0`, `?? 1` on an API value** is the same mistake in arithmetic
+  form. Guard with an `isKnown()`-style check first; a fallback inside a
+  `reduce` that a guard already covers is dead code at best and a silent
+  subtotal at worst.
+
+Whoever adds the `null` on the server owns how it looks. A component test
+asserting the gap, the marker or the absent fill is what keeps it.
+
 ## Form Patterns
 
 `useFormModal<T>` (`hooks/useFormModal.ts`) manages create/edit modal state with browser-history integration (back button closes), unsaved-changes detection via `UnsavedChangesDialog`, and form submit exposed via ref. Returns `showForm`, `editingItem`, `openCreate()`, `openEdit(item)`, `close()`, `modalProps`, `unsavedChangesDialog`.
