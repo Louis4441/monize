@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { Select } from '@/components/ui/Select';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Combobox } from '@/components/ui/Combobox';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Account, DetectedLoanPayment, SetupLoanPaymentsData } from '@/types/account';
@@ -392,15 +392,13 @@ export function LoanPaymentSetupDialog({
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('loanPaymentSetup.annualInterestRate')}
                 </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={interestRate ?? ''}
-                  onChange={(e) =>
-                    setInterestRate(e.target.value ? Number(e.target.value) : undefined)
-                  }
+                <NumericInput
+                  decimalPlaces={2}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  value={interestRate}
+                  onChange={setInterestRate}
                   placeholder={t('loanPaymentSetup.interestRatePlaceholder')}
                 />
                 {detected?.estimatedInterestRate && (
@@ -481,16 +479,12 @@ export function LoanPaymentSetupDialog({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {t('loanPaymentSetup.amortizationMonths')}
                         </label>
-                        <Input
-                          type="number"
-                          min="1"
-                          max="600"
-                          value={amortizationMonths ?? ''}
-                          onChange={(e) =>
-                            setAmortizationMonths(
-                              e.target.value ? Number(e.target.value) : undefined,
-                            )
-                          }
+                        <NumericInput
+                          decimalPlaces={0}
+                          min={1}
+                          max={600}
+                          value={amortizationMonths}
+                          onChange={setAmortizationMonths}
                           placeholder="e.g., 300"
                         />
                       </div>
@@ -498,16 +492,12 @@ export function LoanPaymentSetupDialog({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {t('loanPaymentSetup.termMonths')}
                         </label>
-                        <Input
-                          type="number"
-                          min="1"
-                          max="600"
-                          value={termMonths ?? ''}
-                          onChange={(e) =>
-                            setTermMonths(
-                              e.target.value ? Number(e.target.value) : undefined,
-                            )
-                          }
+                        <NumericInput
+                          decimalPlaces={0}
+                          min={1}
+                          max={600}
+                          value={termMonths}
+                          onChange={setTermMonths}
                           placeholder="e.g., 60"
                         />
                       </div>

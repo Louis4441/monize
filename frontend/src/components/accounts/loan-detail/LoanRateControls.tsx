@@ -3,6 +3,8 @@
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { DateInput } from '@/components/ui/DateInput';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -23,7 +25,7 @@ interface LoanRateControlsProps {
 export function LoanRateControls({ editing }: LoanRateControlsProps) {
   const t = useTranslations('accounts');
   const { formatDate } = useDateFormat();
-  const { form, setForm, formModal, isMortgage } = editing;
+  const { form, setForm, formModal, isMortgage, currencySymbol } = editing;
 
   return (
     <div className="flex items-center gap-2">
@@ -46,15 +48,15 @@ export function LoanRateControls({ editing }: LoanRateControlsProps) {
                 setForm((f) => ({ ...f, effectiveDate: date }))
               }
             />
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
+            <NumericInput
+              decimalPlaces={2}
+              min={0}
+              max={100}
+              suffix="%"
               label={t('loanDetail.rateHistory.rateLabel')}
               value={form.annualRate}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, annualRate: e.target.value }))
+              onChange={(value) =>
+                setForm((f) => ({ ...f, annualRate: value }))
               }
             />
 
@@ -98,14 +100,13 @@ export function LoanRateControls({ editing }: LoanRateControlsProps) {
             </fieldset>
 
             {form.paymentMode === 'set' && (
-              <Input
-                type="number"
-                step="0.01"
-                min="0.01"
+              <CurrencyInput
                 label={t('loanDetail.rateHistory.newPaymentLabel')}
+                prefix={currencySymbol}
+                allowNegative={false}
                 value={form.newPaymentAmount}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, newPaymentAmount: e.target.value }))
+                onChange={(value) =>
+                  setForm((f) => ({ ...f, newPaymentAmount: value }))
                 }
               />
             )}

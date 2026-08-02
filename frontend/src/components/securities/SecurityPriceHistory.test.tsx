@@ -360,7 +360,7 @@ describe('SecurityPriceHistory', () => {
       fireEvent.click(screen.getAllByText('Edit')[0]);
     });
     expect(screen.getByText('Edit Price')).toBeInTheDocument();
-    expect(screen.getByLabelText('Close Price')).toHaveValue(193.5);
+    expect(screen.getByLabelText('Close Price')).toHaveValue('193.500000');
 
     fireEvent.change(screen.getByLabelText('Close Price'), {
       target: { value: '200' },

@@ -411,7 +411,7 @@ describe('ScheduledTransactionForm', () => {
     fireEvent.click(occurrencesCheckbox);
     const numberInput = screen.getByPlaceholderText('# remaining');
     expect(numberInput).toBeInTheDocument();
-    expect(numberInput).toHaveAttribute('type', 'number');
+    expect(numberInput).toHaveAttribute('inputmode', 'decimal');
   });
 
   it('unchecks end date when occurrences is checked (mutual exclusion)', async () => {
@@ -485,7 +485,7 @@ describe('ScheduledTransactionForm', () => {
       expect(screen.getByLabelText('Remind Days Before')).toBeInTheDocument();
     });
     const reminderInput = screen.getByLabelText('Remind Days Before');
-    expect(reminderInput).toHaveAttribute('type', 'number');
+    expect(reminderInput).toHaveAttribute('inputmode', 'decimal');
   });
 
   it('defaults remind days before to 3', async () => {
@@ -2308,7 +2308,7 @@ describe('ScheduledTransactionForm', () => {
       });
       await waitFor(() => {
         const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
-        expect(priceInput.value).toBe('500');
+        expect(priceInput.value).toBe('500.000000');
       });
     });
 
@@ -2323,14 +2323,14 @@ describe('ScheduledTransactionForm', () => {
       // Wait for price to auto-populate
       await waitFor(() => {
         const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
-        expect(priceInput.value).toBe('500');
+        expect(priceInput.value).toBe('500.000000');
       });
       const totalInput = screen.getByLabelText('Total Value') as HTMLInputElement;
       // 1000 / 500 = 2 shares
       fireEvent.change(totalInput, { target: { value: '1000' } });
       await waitFor(() => {
         const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
-        expect(qtyInput.value).toBe('2');
+        expect(qtyInput.value).toBe('2.00000000');
       });
     });
 
@@ -2344,7 +2344,7 @@ describe('ScheduledTransactionForm', () => {
       });
       await waitFor(() => {
         const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
-        expect(priceInput.value).toBe('500');
+        expect(priceInput.value).toBe('500.000000');
       });
       fireEvent.change(screen.getByLabelText('Quantity (shares)'), {
         target: { value: '3' },
@@ -2428,7 +2428,7 @@ describe('ScheduledTransactionForm', () => {
       });
       await waitFor(() => {
         const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
-        expect(priceInput.value).toBe('500');
+        expect(priceInput.value).toBe('500.000000');
       });
       fireEvent.change(screen.getByLabelText('Quantity (shares)'), {
         target: { value: '1' },

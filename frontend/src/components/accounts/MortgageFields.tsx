@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { UseFormRegister, UseFormSetValue, FieldErrors } from 'react-hook-form';
-import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { DateInput } from '@/components/ui/DateInput';
 import { Select } from '@/components/ui/Select';
 import { Account, MortgageAmortizationPreview, MortgagePaymentFrequency, InterestBookingMode } from '@/types/account';
@@ -85,36 +85,34 @@ export function MortgageFields({
   const [mortgagePreview, setMortgagePreview] = useState<MortgageAmortizationPreview | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  // Local string state for years+months inputs
-  const [termYears, setTermYears] = useState<string>(() => {
-    if (termMonths != null && termMonths > 0) return String(Math.floor(termMonths / 12));
-    return '';
-  });
-  const [termRemainder, setTermRemainder] = useState<string>(() => {
-    if (termMonths != null && termMonths > 0) return String(termMonths % 12);
-    return '';
-  });
-  const [amortYears, setAmortYears] = useState<string>(() => {
-    if (amortizationMonths != null && amortizationMonths > 0) return String(Math.floor(amortizationMonths / 12));
-    return '';
-  });
-  const [amortRemainder, setAmortRemainder] = useState<string>(() => {
-    if (amortizationMonths != null && amortizationMonths > 0) return String(amortizationMonths % 12);
-    return '';
-  });
+  // Local state for the years+months pairs the form stores as a month total
+  const [termYears, setTermYears] = useState<number | undefined>(() =>
+    termMonths != null && termMonths > 0 ? Math.floor(termMonths / 12) : undefined,
+  );
+  const [termRemainder, setTermRemainder] = useState<number | undefined>(() =>
+    termMonths != null && termMonths > 0 ? termMonths % 12 : undefined,
+  );
+  const [amortYears, setAmortYears] = useState<number | undefined>(() =>
+    amortizationMonths != null && amortizationMonths > 0
+      ? Math.floor(amortizationMonths / 12)
+      : undefined,
+  );
+  const [amortRemainder, setAmortRemainder] = useState<number | undefined>(() =>
+    amortizationMonths != null && amortizationMonths > 0 ? amortizationMonths % 12 : undefined,
+  );
 
   // Sync local state when termMonths/amortizationMonths change externally (e.g. form reset)
   useEffect(() => {
     if (termMonths != null && termMonths > 0) {
-      setTermYears(String(Math.floor(termMonths / 12)));
-      setTermRemainder(String(termMonths % 12));
+      setTermYears(Math.floor(termMonths / 12));
+      setTermRemainder(termMonths % 12);
     }
   }, [termMonths]);
 
   useEffect(() => {
     if (amortizationMonths != null && amortizationMonths > 0) {
-      setAmortYears(String(Math.floor(amortizationMonths / 12)));
-      setAmortRemainder(String(amortizationMonths % 12));
+      setAmortYears(Math.floor(amortizationMonths / 12));
+      setAmortRemainder(amortizationMonths % 12);
     }
   }, [amortizationMonths]);
 
@@ -130,48 +128,46 @@ export function MortgageFields({
     }
   }, [isCanadianMortgage, termMonths, setValue]);
 
-  const updateTermMonths = (years: string, months: string) => {
-    const y = years === '' ? 0 : parseInt(years, 10);
-    const m = months === '' ? 0 : parseInt(months, 10);
-    if (isNaN(y) || isNaN(m)) return;
-    const total = y * 12 + m;
+  const updateTermMonths = (years: number | undefined, months: number | undefined) => {
+    const total = (years ?? 0) * 12 + (months ?? 0);
     setValue('termMonths', total, { shouldValidate: true, shouldDirty: true });
   };
 
-  const updateAmortizationMonths = (years: string, months: string) => {
-    const y = years === '' ? 0 : parseInt(years, 10);
-    const m = months === '' ? 0 : parseInt(months, 10);
-    if (isNaN(y) || isNaN(m)) return;
-    const total = y * 12 + m;
+  const updateAmortizationMonths = (years: number | undefined, months: number | undefined) => {
+    const total = (years ?? 0) * 12 + (months ?? 0);
     setValue('amortizationMonths', total > 0 ? total : undefined, { shouldValidate: true, shouldDirty: true });
   };
 
-  const handleTermYearsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val !== '' && (parseInt(val, 10) < 0 || parseInt(val, 10) > 99)) return;
-    setTermYears(val);
-    updateTermMonths(val, termRemainder);
+  // Each pair is a years/months split of one month total, so an out-of-range
+  // entry is discarded rather than clamped: the months half only carries the
+  // remainder (0-11) and rolling 12 into the years half silently is worse than
+  // ignoring the keystroke. NumericInput's own `max` trims on blur; this
+  // rejects the value while it is being typed.
+  const inRange = (value: number | undefined, max: number) =>
+    value === undefined || (value >= 0 && value <= max);
+
+  const handleTermYearsChange = (value: number | undefined) => {
+    if (!inRange(value, 99)) return;
+    setTermYears(value);
+    updateTermMonths(value, termRemainder);
   };
 
-  const handleTermMonthsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val !== '' && (parseInt(val, 10) < 0 || parseInt(val, 10) > 11)) return;
-    setTermRemainder(val);
-    updateTermMonths(termYears, val);
+  const handleTermMonthsChange = (value: number | undefined) => {
+    if (!inRange(value, 11)) return;
+    setTermRemainder(value);
+    updateTermMonths(termYears, value);
   };
 
-  const handleAmortYearsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val !== '' && (parseInt(val, 10) < 0 || parseInt(val, 10) > 99)) return;
-    setAmortYears(val);
-    updateAmortizationMonths(val, amortRemainder);
+  const handleAmortYearsChange = (value: number | undefined) => {
+    if (!inRange(value, 99)) return;
+    setAmortYears(value);
+    updateAmortizationMonths(value, amortRemainder);
   };
 
-  const handleAmortMonthsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val !== '' && (parseInt(val, 10) < 0 || parseInt(val, 10) > 11)) return;
-    setAmortRemainder(val);
-    updateAmortizationMonths(amortYears, val);
+  const handleAmortMonthsChange = (value: number | undefined) => {
+    if (!inRange(value, 11)) return;
+    setAmortRemainder(value);
+    updateAmortizationMonths(amortYears, value);
   };
 
   const calculateMortgagePreview = useCallback(async () => {
@@ -279,18 +275,20 @@ export function MortgageFields({
             {t('mortgageFields.termLength')}
           </label>
           <div className="grid grid-cols-2 gap-4">
-            <Input
+            <NumericInput
+              id="mortgage-term-years"
               label={t('mortgageFields.years')}
-              type="number"
+              decimalPlaces={0}
               min={0}
               max={99}
               value={termYears}
               onChange={handleTermYearsChange}
               error={errors.termMonths?.message as string | undefined}
             />
-            <Input
+            <NumericInput
+              id="mortgage-term-months"
               label={t('mortgageFields.months')}
-              type="number"
+              decimalPlaces={0}
               min={0}
               max={11}
               value={termRemainder}
@@ -309,18 +307,20 @@ export function MortgageFields({
           {t('mortgageFields.amortizationPeriod')}
         </label>
         <div className="grid grid-cols-2 gap-4">
-          <Input
+          <NumericInput
+            id="mortgage-amortization-years"
             label={t('mortgageFields.years')}
-            type="number"
+            decimalPlaces={0}
             min={0}
             max={99}
             value={amortYears}
             onChange={handleAmortYearsChange}
             error={errors.amortizationMonths?.message as string | undefined}
           />
-          <Input
+          <NumericInput
+            id="mortgage-amortization-months"
             label={t('mortgageFields.months')}
-            type="number"
+            decimalPlaces={0}
             min={0}
             max={11}
             value={amortRemainder}

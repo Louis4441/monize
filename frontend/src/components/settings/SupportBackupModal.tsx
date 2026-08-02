@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { DateInput } from '@/components/ui/DateInput';
 import { JsonDiff } from '@/components/ui/JsonDiff';
 import { downloadBlob } from '@/lib/download';
@@ -37,10 +38,10 @@ export function SupportBackupModal({ isOpen, onClose }: SupportBackupModalProps)
   const [enabledSections, setEnabledSections] = useState<Set<SupportBackupSection>>(
     new Set(SUPPORT_BACKUP_SECTIONS),
   );
-  // Raw input string so typing intermediate states ('', '1.') doesn't fight
-  // a number round-trip; the numeric value is derived below.
-  const [multiplierText, setMultiplierText] = useState<string>(() =>
-    String(randomSupportMultiplier()),
+  // NumericInput owns the in-progress text, so the modal only holds the parsed
+  // number; undefined while the field is empty.
+  const [multiplier, setMultiplier] = useState<number | undefined>(() =>
+    randomSupportMultiplier(),
   );
   const [password, setPassword] = useState<string>(() => randomSupportPassword());
   const [dateFrom, setDateFrom] = useState('');
@@ -57,8 +58,6 @@ export function SupportBackupModal({ isOpen, onClose }: SupportBackupModalProps)
   // Generate first asks whether the password was saved somewhere -- the file
   // is unreadable without it and it cannot be recovered later.
   const [confirmPasswordSaved, setConfirmPasswordSaved] = useState(false);
-
-  const multiplier = Number(multiplierText);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,7 +76,7 @@ export function SupportBackupModal({ isOpen, onClose }: SupportBackupModalProps)
   }, [isOpen]);
 
   const buildInput = (): SupportBackupInput => ({
-    multiplier,
+    multiplier: multiplier ?? 0,
     sections: SUPPORT_BACKUP_SECTIONS.filter((s) => enabledSections.has(s)),
     accountIds: selectedAccountIds.length > 0 ? selectedAccountIds : undefined,
     dateFrom: dateFrom || undefined,
@@ -105,7 +104,7 @@ export function SupportBackupModal({ isOpen, onClose }: SupportBackupModalProps)
   };
 
   const multiplierValid =
-    Number.isFinite(multiplier) && multiplier > 1 && !Number.isInteger(multiplier);
+    multiplier !== undefined && multiplier > 1 && !Number.isInteger(multiplier);
   const passwordValid = password.trim().length >= 8;
   const canRun = multiplierValid && passwordValid;
 
@@ -245,18 +244,17 @@ export function SupportBackupModal({ isOpen, onClose }: SupportBackupModalProps)
           </label>
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <Input
-                type="number"
-                step="0.00001"
-                min="1.00001"
-                value={multiplierText}
-                onChange={(e) => setMultiplierText(e.target.value)}
+              <NumericInput
+                decimalPlaces={5}
+                aria-label={t('multiplierLabel')}
+                value={multiplier}
+                onChange={setMultiplier}
                 error={!multiplierValid ? t('multiplierInvalid') : undefined}
               />
             </div>
             <Button
               variant="outline"
-              onClick={() => setMultiplierText(String(randomSupportMultiplier()))}
+              onClick={() => setMultiplier(randomSupportMultiplier())}
             >
               {t('regenerate')}
             </Button>

@@ -123,6 +123,36 @@ describe('NumericInput', () => {
     expect(onChange).toHaveBeenLastCalledWith(1);
   });
 
+  it('enforces max value on blur', () => {
+    const onChange = vi.fn();
+    render(<NumericInput label="Qty" value={5} onChange={onChange} max={31} />);
+    const input = screen.getByLabelText('Qty');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '50' } });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenLastCalledWith(31);
+  });
+
+  it('does not clamp to max while typing', () => {
+    // Every prefix of a number is smaller than the number, so a ceiling must
+    // not fire mid-word: typing "500" past max={31} would otherwise hand the
+    // parent 31 for a field the user has not finished.
+    const onChange = vi.fn();
+    render(<NumericInput label="Qty" value={undefined} onChange={onChange} max={31} />);
+    fireEvent.change(screen.getByLabelText('Qty'), { target: { value: '50' } });
+    expect(onChange).toHaveBeenLastCalledWith(50);
+  });
+
+  it('leaves an in-range value alone when both bounds are set', () => {
+    const onChange = vi.fn();
+    render(<NumericInput label="Qty" value={undefined} onChange={onChange} min={1} max={31} />);
+    const input = screen.getByLabelText('Qty');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '15' } });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenLastCalledWith(15);
+  });
+
   it('calls onFocus callback', () => {
     const onFocus = vi.fn();
     render(<NumericInput label="Qty" value={0} onChange={vi.fn()} onFocus={onFocus} />);

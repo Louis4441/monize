@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { getCurrencySymbol } from '@/lib/format';
 import type {
   BudgetCategory,
@@ -102,6 +103,7 @@ export function BudgetCategoryForm({
             label={t('categoryForm.budgetAmount')}
             value={field.value}
             onChange={field.onChange}
+            name={field.name}
             onBlur={field.onBlur}
             allowNegative={false}
             prefix={getCurrencySymbol(currencyCode)}
@@ -128,14 +130,22 @@ export function BudgetCategoryForm({
       </div>
 
       {watchedRolloverType !== 'NONE' && (
-        <Input
-          label={t('categoryForm.rolloverCap')}
-          type="number"
-          {...register('rolloverCap')}
-          error={errors.rolloverCap?.message}
-          min="0"
-          step="0.01"
-          placeholder={t('categoryForm.rolloverCapPlaceholder')}
+        <Controller
+          name="rolloverCap"
+          control={control}
+          render={({ field }) => (
+            <CurrencyInput
+              label={t('categoryForm.rolloverCap')}
+              value={field.value === '' || field.value === undefined ? undefined : Number(field.value)}
+              onChange={(value) => field.onChange(value === undefined ? '' : String(value))}
+              name={field.name}
+              onBlur={field.onBlur}
+              allowNegative={false}
+              prefix={getCurrencySymbol(currencyCode)}
+              error={errors.rolloverCap?.message}
+              placeholder={t('categoryForm.rolloverCapPlaceholder')}
+            />
+          )}
         />
       )}
 
@@ -163,21 +173,41 @@ export function BudgetCategoryForm({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label={t('categoryForm.warningAt')}
-          type="number"
-          {...register('alertWarnPercent')}
-          error={errors.alertWarnPercent?.message}
-          min="0"
-          max="100"
+        <Controller
+          name="alertWarnPercent"
+          control={control}
+          render={({ field }) => (
+            <NumericInput
+              label={t('categoryForm.warningAt')}
+              decimalPlaces={0}
+              min={0}
+              max={100}
+              suffix="%"
+              value={field.value === '' ? undefined : Number(field.value)}
+              onChange={(value) => field.onChange(value === undefined ? '' : String(value))}
+              name={field.name}
+              onBlur={field.onBlur}
+              error={errors.alertWarnPercent?.message}
+            />
+          )}
         />
-        <Input
-          label={t('categoryForm.criticalAt')}
-          type="number"
-          {...register('alertCriticalPercent')}
-          error={errors.alertCriticalPercent?.message}
-          min="0"
-          max="100"
+        <Controller
+          name="alertCriticalPercent"
+          control={control}
+          render={({ field }) => (
+            <NumericInput
+              label={t('categoryForm.criticalAt')}
+              decimalPlaces={0}
+              min={0}
+              max={100}
+              suffix="%"
+              value={field.value === '' ? undefined : Number(field.value)}
+              onChange={(value) => field.onChange(value === undefined ? '' : String(value))}
+              name={field.name}
+              onBlur={field.onBlur}
+              error={errors.alertCriticalPercent?.message}
+            />
+          )}
         />
       </div>
 

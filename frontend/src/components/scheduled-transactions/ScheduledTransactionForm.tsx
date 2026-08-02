@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, MutableRefObject } from 'react';
-import { useForm, Resolver } from 'react-hook-form';
+import { useForm, Controller, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { Input } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -215,6 +216,7 @@ export function ScheduledTransactionForm({
     handleSubmit,
     setValue,
     watch,
+    control,
     formState: { errors, isDirty },
   } = useForm<ScheduledTransactionFormData>({
     resolver: zodResolver(buildScheduledTransactionSchema(t)) as Resolver<ScheduledTransactionFormData>,
@@ -586,8 +588,8 @@ export function ScheduledTransactionForm({
     }
   };
 
-  const handleQuantityChange = (raw: string) => {
-    const qty = raw === '' ? '' : Number(raw);
+  const handleQuantityChange = (raw: number | undefined) => {
+    const qty = raw ?? '';
     setInvestmentQuantity(qty);
     if (qty !== '' && effectiveInvestmentPrice > 0) {
       const commission =
@@ -597,8 +599,8 @@ export function ScheduledTransactionForm({
     }
   };
 
-  const handlePriceChange = (raw: string) => {
-    const price = raw === '' ? '' : Number(raw);
+  const handlePriceChange = (raw: number | undefined) => {
+    const price = raw ?? '';
     setInvestmentPrice(price);
     if (price !== '' && Number(price) > 0) {
       const commission =
@@ -1098,12 +1100,22 @@ export function ScheduledTransactionForm({
               </span>
             </label>
             {useOccurrences && (
-              <Input
-                type="number"
-                min={1}
-                placeholder={t('form.occurrencesPlaceholder')}
-                error={errors.occurrencesRemaining?.message}
-                {...register('occurrencesRemaining', { valueAsNumber: true })}
+              <Controller
+                name="occurrencesRemaining"
+                control={control}
+                render={({ field }) => (
+                  <NumericInput
+                    decimalPlaces={0}
+                    min={1}
+                    placeholder={t('form.occurrencesPlaceholder')}
+                    error={errors.occurrencesRemaining?.message}
+                    value={field.value}
+                    onChange={field.onChange}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
             )}
           </div>
@@ -1344,12 +1356,22 @@ export function ScheduledTransactionForm({
               options={frequencyOptions}
               {...register('frequency')}
             />
-            <Input
-              label={t('form.remindDaysBeforeLabel')}
-              type="number"
-              min={0}
-              error={errors.reminderDaysBefore?.message}
-              {...register('reminderDaysBefore', { valueAsNumber: true })}
+            <Controller
+              name="reminderDaysBefore"
+              control={control}
+              render={({ field }) => (
+                <NumericInput
+                  label={t('form.remindDaysBeforeLabel')}
+                  decimalPlaces={0}
+                  min={0}
+                  error={errors.reminderDaysBefore?.message}
+                  value={field.value}
+                  onChange={field.onChange}
+                  name={field.name}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </div>
 
@@ -1482,12 +1504,22 @@ export function ScheduledTransactionForm({
               options={frequencyOptions}
               {...register('frequency')}
             />
-            <Input
-              label={t('form.remindDaysBeforeLabel')}
-              type="number"
-              min={0}
-              error={errors.reminderDaysBefore?.message}
-              {...register('reminderDaysBefore', { valueAsNumber: true })}
+            <Controller
+              name="reminderDaysBefore"
+              control={control}
+              render={({ field }) => (
+                <NumericInput
+                  label={t('form.remindDaysBeforeLabel')}
+                  decimalPlaces={0}
+                  min={0}
+                  error={errors.reminderDaysBefore?.message}
+                  value={field.value}
+                  onChange={field.onChange}
+                  name={field.name}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </div>
 
@@ -1608,12 +1640,22 @@ export function ScheduledTransactionForm({
               options={frequencyOptions}
               {...register('frequency')}
             />
-            <Input
-              label={t('form.remindDaysBeforeLabel')}
-              type="number"
-              min={0}
-              error={errors.reminderDaysBefore?.message}
-              {...register('reminderDaysBefore', { valueAsNumber: true })}
+            <Controller
+              name="reminderDaysBefore"
+              control={control}
+              render={({ field }) => (
+                <NumericInput
+                  label={t('form.remindDaysBeforeLabel')}
+                  decimalPlaces={0}
+                  min={0}
+                  error={errors.reminderDaysBefore?.message}
+                  value={field.value}
+                  onChange={field.onChange}
+                  name={field.name}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </div>
 
@@ -1691,36 +1733,29 @@ export function ScheduledTransactionForm({
           {QUANTITY_PRICE_ACTIONS.includes(investmentAction) && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
+                <NumericInput
                   label={t('form.quantityLabel')}
-                  type="number"
-                  step="0.00000001"
+                  decimalPlaces={8}
                   min={0}
-                  value={investmentQuantity}
-                  onChange={(e) => handleQuantityChange(e.target.value)}
+                  value={investmentQuantity === '' ? undefined : investmentQuantity}
+                  onChange={handleQuantityChange}
                 />
-                <Input
+                <NumericInput
                   label={t('form.pricePerShareLabel')}
-                  type="number"
-                  step="0.000001"
+                  decimalPlaces={6}
                   min={0}
                   placeholder={
                     marketPrice != null ? `Latest: ${marketPrice}` : undefined
                   }
-                  value={investmentPrice}
-                  onChange={(e) => handlePriceChange(e.target.value)}
+                  value={investmentPrice === '' ? undefined : investmentPrice}
+                  onChange={handlePriceChange}
                 />
-                <Input
+                <NumericInput
                   label={t('form.commissionLabel')}
-                  type="number"
-                  step="0.0001"
+                  decimalPlaces={4}
                   min={0}
-                  value={investmentCommission}
-                  onChange={(e) =>
-                    setInvestmentCommission(
-                      e.target.value === '' ? '' : Number(e.target.value),
-                    )
-                  }
+                  value={investmentCommission === '' ? undefined : investmentCommission}
+                  onChange={(value) => setInvestmentCommission(value ?? '')}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1761,13 +1796,12 @@ export function ScheduledTransactionForm({
 
           {QUANTITY_ONLY_ACTIONS.includes(investmentAction) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
+              <NumericInput
                 label={t('form.quantityLabel')}
-                type="number"
-                step="0.00000001"
+                decimalPlaces={8}
                 min={0}
-                value={investmentQuantity}
-                onChange={(e) => setInvestmentQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+                value={investmentQuantity === '' ? undefined : investmentQuantity}
+                onChange={(value) => setInvestmentQuantity(value ?? '')}
               />
             </div>
           )}
@@ -1792,12 +1826,22 @@ export function ScheduledTransactionForm({
               options={frequencyOptions}
               {...register('frequency')}
             />
-            <Input
-              label={t('form.remindDaysBeforeLabel')}
-              type="number"
-              min={0}
-              error={errors.reminderDaysBefore?.message}
-              {...register('reminderDaysBefore', { valueAsNumber: true })}
+            <Controller
+              name="reminderDaysBefore"
+              control={control}
+              render={({ field }) => (
+                <NumericInput
+                  label={t('form.remindDaysBeforeLabel')}
+                  decimalPlaces={0}
+                  min={0}
+                  error={errors.reminderDaysBefore?.message}
+                  value={field.value}
+                  onChange={field.onChange}
+                  name={field.name}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </div>
 

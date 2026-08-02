@@ -1583,8 +1583,8 @@ describe('TransactionFilterPanel', () => {
         />
       );
 
-      expect(screen.getByLabelText('Amount From')).toHaveValue(10.5);
-      expect(screen.getByLabelText('Amount To')).toHaveValue(99.99);
+      expect(screen.getByLabelText('Amount From')).toHaveValue('10.50');
+      expect(screen.getByLabelText('Amount To')).toHaveValue('99.99');
     });
 
     it('calls handleFilterChange with setFilterAmountFrom when Amount From changes', () => {

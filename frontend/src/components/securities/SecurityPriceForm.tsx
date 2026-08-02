@@ -2,11 +2,11 @@
 
 import { MutableRefObject } from 'react';
 import { useTranslations } from 'next-intl';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { DateInput } from '@/components/ui/DateInput';
 import { SecurityPrice, CreateSecurityPriceData } from '@/types/investment';
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
@@ -15,14 +15,13 @@ import { FormActions } from '@/components/ui/FormActions';
 
 const buildPriceSchema = (t: (key: string) => string) => z.object({
   priceDate: z.string().min(1, t('priceValidation.dateRequired')),
-  closePrice: z.string().min(1, t('priceValidation.priceRequired')).refine(
-    (val) => !isNaN(Number(val)) && Number(val) >= 0,
-    t('priceValidation.priceNonNegative'),
-  ),
-  openPrice: z.string().optional(),
-  highPrice: z.string().optional(),
-  lowPrice: z.string().optional(),
-  volume: z.string().optional(),
+  closePrice: z
+    .number({ error: t('priceValidation.priceRequired') })
+    .min(0, t('priceValidation.priceNonNegative')),
+  openPrice: z.number().min(0, t('priceValidation.priceNonNegative')).optional(),
+  highPrice: z.number().min(0, t('priceValidation.priceNonNegative')).optional(),
+  lowPrice: z.number().min(0, t('priceValidation.priceNonNegative')).optional(),
+  volume: z.number().min(0, t('priceValidation.priceNonNegative')).optional(),
 });
 
 type PriceFormData = z.infer<ReturnType<typeof buildPriceSchema>>;
@@ -41,27 +40,28 @@ export function SecurityPriceForm({ price, onSubmit, onCancel, onDirtyChange, su
     register,
     handleSubmit,
     setValue,
+    control,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<PriceFormData>({
     resolver: zodResolver(buildPriceSchema(t)),
     defaultValues: {
       priceDate: price?.priceDate || new Date().toISOString().substring(0, 10),
-      closePrice: price?.closePrice != null ? String(price.closePrice) : '',
-      openPrice: price?.openPrice != null ? String(price.openPrice) : '',
-      highPrice: price?.highPrice != null ? String(price.highPrice) : '',
-      lowPrice: price?.lowPrice != null ? String(price.lowPrice) : '',
-      volume: price?.volume != null ? String(price.volume) : '',
+      closePrice: price?.closePrice != null ? Number(price.closePrice) : undefined,
+      openPrice: price?.openPrice != null ? Number(price.openPrice) : undefined,
+      highPrice: price?.highPrice != null ? Number(price.highPrice) : undefined,
+      lowPrice: price?.lowPrice != null ? Number(price.lowPrice) : undefined,
+      volume: price?.volume != null ? Number(price.volume) : undefined,
     },
   });
 
   const onFormSubmit = async (data: PriceFormData) => {
     const cleanedData: CreateSecurityPriceData = {
       priceDate: data.priceDate,
-      closePrice: Number(data.closePrice),
-      ...(data.openPrice && { openPrice: Number(data.openPrice) }),
-      ...(data.highPrice && { highPrice: Number(data.highPrice) }),
-      ...(data.lowPrice && { lowPrice: Number(data.lowPrice) }),
-      ...(data.volume && { volume: Number(data.volume) }),
+      closePrice: data.closePrice,
+      ...(data.openPrice !== undefined && { openPrice: data.openPrice }),
+      ...(data.highPrice !== undefined && { highPrice: data.highPrice }),
+      ...(data.lowPrice !== undefined && { lowPrice: data.lowPrice }),
+      ...(data.volume !== undefined && { volume: data.volume }),
     };
     // onSubmit may re-throw after surfacing its own error toast (so the parent
     // keeps the form open). Swallow it here: react-hook-form's handleSubmit
@@ -87,47 +87,96 @@ export function SecurityPriceForm({ price, onSubmit, onCancel, onDirtyChange, su
         {...register('priceDate')}
       />
 
-      <Input
-        label={t('priceForm.closePriceLabel')}
-        type="number"
-        step="any"
-        {...register('closePrice')}
-        error={errors.closePrice?.message}
-        placeholder="0.00"
+      <Controller
+        name="closePrice"
+        control={control}
+        render={({ field }) => (
+          <NumericInput
+            label={t('priceForm.closePriceLabel')}
+            decimalPlaces={6}
+            min={0}
+            error={errors.closePrice?.message}
+            value={field.value}
+            onChange={field.onChange}
+            name={field.name}
+            onBlur={field.onBlur}
+            ref={field.ref}
+          />
+        )}
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <Input
-          label={t('priceForm.openPriceLabel')}
-          type="number"
-          step="any"
-          {...register('openPrice')}
-          error={errors.openPrice?.message}
-          placeholder={t('priceForm.optionalPlaceholder')}
+        <Controller
+          name="openPrice"
+          control={control}
+          render={({ field }) => (
+            <NumericInput
+              label={t('priceForm.openPriceLabel')}
+              decimalPlaces={6}
+              min={0}
+              error={errors.openPrice?.message}
+              placeholder={t('priceForm.optionalPlaceholder')}
+              value={field.value}
+              onChange={field.onChange}
+              name={field.name}
+              onBlur={field.onBlur}
+              ref={field.ref}
+            />
+          )}
         />
-        <Input
-          label={t('priceForm.highPriceLabel')}
-          type="number"
-          step="any"
-          {...register('highPrice')}
-          error={errors.highPrice?.message}
-          placeholder={t('priceForm.optionalPlaceholder')}
+        <Controller
+          name="highPrice"
+          control={control}
+          render={({ field }) => (
+            <NumericInput
+              label={t('priceForm.highPriceLabel')}
+              decimalPlaces={6}
+              min={0}
+              error={errors.highPrice?.message}
+              placeholder={t('priceForm.optionalPlaceholder')}
+              value={field.value}
+              onChange={field.onChange}
+              name={field.name}
+              onBlur={field.onBlur}
+              ref={field.ref}
+            />
+          )}
         />
-        <Input
-          label={t('priceForm.lowPriceLabel')}
-          type="number"
-          step="any"
-          {...register('lowPrice')}
-          error={errors.lowPrice?.message}
-          placeholder={t('priceForm.optionalPlaceholder')}
+        <Controller
+          name="lowPrice"
+          control={control}
+          render={({ field }) => (
+            <NumericInput
+              label={t('priceForm.lowPriceLabel')}
+              decimalPlaces={6}
+              min={0}
+              error={errors.lowPrice?.message}
+              placeholder={t('priceForm.optionalPlaceholder')}
+              value={field.value}
+              onChange={field.onChange}
+              name={field.name}
+              onBlur={field.onBlur}
+              ref={field.ref}
+            />
+          )}
         />
-        <Input
-          label={t('priceForm.volumeLabel')}
-          type="number"
-          step="1"
-          {...register('volume')}
-          error={errors.volume?.message}
-          placeholder={t('priceForm.optionalPlaceholder')}
+        <Controller
+          name="volume"
+          control={control}
+          render={({ field }) => (
+            <NumericInput
+              label={t('priceForm.volumeLabel')}
+              decimalPlaces={0}
+              min={0}
+              error={errors.volume?.message}
+              placeholder={t('priceForm.optionalPlaceholder')}
+              value={field.value}
+              onChange={field.onChange}
+              name={field.name}
+              onBlur={field.onBlur}
+              ref={field.ref}
+            />
+          )}
         />
       </div>
 

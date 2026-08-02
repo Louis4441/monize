@@ -69,7 +69,7 @@ describe('SecurityPriceForm', () => {
     render(<SecurityPriceForm price={price} onSubmit={onSubmit} onCancel={onCancel} />);
 
     expect(screen.getByLabelText('Date')).toHaveValue('2025-06-01');
-    expect(screen.getByLabelText('Close Price')).toHaveValue(193.5);
+    expect(screen.getByLabelText('Close Price')).toHaveValue('193.500000');
   });
 
   it('calls onCancel when cancel is clicked', () => {

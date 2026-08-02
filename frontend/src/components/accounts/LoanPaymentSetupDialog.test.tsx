@@ -343,6 +343,9 @@ describe('LoanPaymentSetupDialog', () => {
     await renderDialog();
 
     const input = screen.getByPlaceholderText('e.g. 5.5') as HTMLInputElement;
+    // Focus first: NumericInput only reformats the text while the field is not
+    // focused, so a change without one would come back as "4.50" mid-typing.
+    fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '4.5' } });
     expect(input.value).toBe('4.5');
 
