@@ -2489,20 +2489,21 @@ export class TransactionsService {
     );
 
     if (createTransferDto.tagIds && createTransferDto.tagIds.length > 0) {
-      await this.tagsService.setTransactionTags(
-        result.fromTransaction.id,
-        createTransferDto.tagIds,
-        userId,
-      );
-      await this.tagsService.setTransactionTags(
-        result.toTransaction.id,
-        createTransferDto.tagIds,
-        userId,
-      );
+      // Tags are per-user reference data: never write the effective user's
+      // tag ids onto a cross-owner counterpart leg.
+      const refresh = async (leg: Transaction) => {
+        if (leg.userId !== userId) return leg;
+        await this.tagsService.setTransactionTags(
+          leg.id,
+          createTransferDto.tagIds!,
+          userId,
+        );
+        return this.findOne(userId, leg.id);
+      };
 
       return {
-        fromTransaction: await this.findOne(userId, result.fromTransaction.id),
-        toTransaction: await this.findOne(userId, result.toTransaction.id),
+        fromTransaction: await refresh(result.fromTransaction),
+        toTransaction: await refresh(result.toTransaction),
       };
     }
 
@@ -2592,16 +2593,19 @@ export class TransactionsService {
     );
 
     if (updateDto.tagIds !== undefined) {
-      await this.tagsService.setTransactionTags(
-        result.fromTransaction.id,
-        updateDto.tagIds,
-        userId,
-      );
-      await this.tagsService.setTransactionTags(
-        result.toTransaction.id,
-        updateDto.tagIds,
-        userId,
-      );
+      // Tags are per-user reference data: cross-owner counterpart legs keep
+      // their own owner's tags, so only effective-user legs are synced.
+      for (const legId of new Set(
+        [result.fromTransaction, result.toTransaction]
+          .filter((leg) => leg.userId === userId)
+          .map((leg) => leg.id),
+      )) {
+        await this.tagsService.setTransactionTags(
+          legId,
+          updateDto.tagIds,
+          userId,
+        );
+      }
 
       // When the edited leg belongs to a split transfer, mirror the tags onto
       // the owning split so the source transaction's split reflects them too
@@ -2619,9 +2623,11 @@ export class TransactionsService {
         );
       }
 
+      const refresh = (leg: Transaction) =>
+        leg.userId === userId ? this.findOne(userId, leg.id) : leg;
       return {
-        fromTransaction: await this.findOne(userId, result.fromTransaction.id),
-        toTransaction: await this.findOne(userId, result.toTransaction.id),
+        fromTransaction: await refresh(result.fromTransaction),
+        toTransaction: await refresh(result.toTransaction),
       };
     }
 

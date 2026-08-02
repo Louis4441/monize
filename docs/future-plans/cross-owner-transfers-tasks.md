@@ -31,7 +31,7 @@ Every task is safe to merge and deploy in any order that respects the dependency
 | A2 | Guard relaxation (transfer/scheduled decorator blocks only) + actor plumbing through transfer endpoints | A1 | neutral | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | T1 | `createTransfer` cross-owner: per-leg `user_id`, per-owner balances/net-worth/action-history, reference-data gating | A1, A2 | inert | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | T2 | `updateTransfer` / `removeTransfer` / `getLinkedTransaction` cross-owner: `loadLegById`, sync-policy matrix, frozen-link lock, own-leg delete | T1 | inert | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
-| T3 | Wrappers + bulk + AI prep: tag-sync gating, `syncTransferTags` filter, AI/MCP cross-owner edit block | T2 | neutral | [ ] |
+| T3 | Wrappers + bulk + AI prep: tag-sync gating, `syncTransferTags` filter, AI/MCP cross-owner edit block | T2 | neutral | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | M1 | Mask util extraction + interceptor generalized to all users (fast path) + `/linked` endpoint | A1, T2 | neutral | [ ] |
 | M2 | CSV export masking + AI/MCP read masking | M1 | neutral | [ ] |
 | F1 | `GET /accounts/transfer-candidates` endpoint | A1 | inert | [ ] |

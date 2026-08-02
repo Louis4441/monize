@@ -1444,6 +1444,62 @@ describe("TransactionsService", () => {
     });
   });
 
+  describe("transfer wrapper tag gating (cross-owner)", () => {
+    const ownLeg = { id: "own-leg", userId: "user-1" } as any;
+    const foreignLeg = { id: "foreign-leg", userId: "owner-2" } as any;
+
+    it("createTransfer applies tags to effective-user legs only", async () => {
+      jest
+        .spyOn((service as any).transferService, "createTransfer")
+        .mockResolvedValue({
+          fromTransaction: ownLeg,
+          toTransaction: foreignLeg,
+        });
+      transactionsRepository.findOne.mockResolvedValue(ownLeg);
+
+      const result = await service.createTransfer("user-1", {
+        fromAccountId: "account-1",
+        toAccountId: "account-2",
+        transactionDate: "2026-01-15",
+        amount: 200,
+        fromCurrencyCode: "USD",
+        tagIds: ["tag-1"],
+      } as any);
+
+      expect(tagsService.setTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
+        "own-leg",
+        ["tag-1"],
+        "user-1",
+      );
+      // The foreign leg is passed through untouched, not re-fetched as user-1.
+      expect(result.toTransaction).toBe(foreignLeg);
+    });
+
+    it("updateTransfer syncs tags to effective-user legs only", async () => {
+      jest
+        .spyOn((service as any).transferService, "updateTransfer")
+        .mockResolvedValue({
+          fromTransaction: ownLeg,
+          toTransaction: foreignLeg,
+        });
+      transactionsRepository.findOne.mockResolvedValue(ownLeg);
+      splitsRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.updateTransfer("user-1", "own-leg", {
+        tagIds: ["tag-1"],
+      } as any);
+
+      expect(tagsService.setTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
+        "own-leg",
+        ["tag-1"],
+        "user-1",
+      );
+      expect(result.toTransaction).toBe(foreignLeg);
+    });
+  });
+
   describe("createTransfer", () => {
     it("creates two linked transactions", async () => {
       const mockToAccount = {
