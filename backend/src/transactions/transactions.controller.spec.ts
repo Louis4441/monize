@@ -57,6 +57,14 @@ describe("TransactionsController", () => {
           provide: DelegationService,
           useValue: { readableAccountIds: jest.fn().mockResolvedValue([]) },
         },
+        {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("../delegation/cross-owner-access.service")
+            .CrossOwnerAccessService,
+          useValue: {
+            readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
+          },
+        },
       ],
     }).compile();
 
