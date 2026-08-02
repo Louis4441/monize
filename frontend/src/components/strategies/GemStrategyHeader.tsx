@@ -12,7 +12,10 @@ import { useDateFormat } from "@/hooks/useDateFormat";
 import { GemCadence, GemStrategyRef } from "@/types/gem-strategy";
 import { isKnown } from "@/lib/gem-strategy-view";
 import { useGemLabels } from "./useGemLabels";
-import { GemScenarioSwitcher } from "./GemScenarioSwitcher";
+import {
+  GemScenarioSwitcher,
+  type GemScenarioOutcome,
+} from "./GemScenarioSwitcher";
 
 interface GemStrategyHeaderProps {
   /**
@@ -23,9 +26,12 @@ interface GemStrategyHeaderProps {
   strategyName: string;
   scenarios: readonly GemStrategyRef[];
   onSelectScenario: (id: string) => void;
-  /** Resolves true on success, so the switcher's dialogs survive a failure. */
-  onCreateScenario: (name: string) => Promise<boolean>;
-  onDeleteScenario: (id: string) => Promise<boolean>;
+  /**
+   * Whether each happened, failed, or is waiting on the user: the switcher's
+   * dialogs survive a failure and step aside for a deferral.
+   */
+  onCreateScenario: (name: string) => Promise<GemScenarioOutcome>;
+  onDeleteScenario: (id: string) => Promise<GemScenarioOutcome>;
   scenarioBusy: boolean;
   cadence: GemCadence;
   nextEvaluationOn: string | null;

@@ -34,12 +34,24 @@ const LIVE_FX_FETCH_CONCURRENCY = 6;
  * holiday gaps, or a failed FX fetch) at the rate that actually prevailed on
  * that bar's own date rather than a single near-current rate.
  */
+/** Why a replayed lot's cost basis cannot be trusted against the live holding. */
+export type ReplayedBasisGap = "quantity_only_action";
+
 /** A position rebuilt from its transactions: what is held, and what it cost. */
 export interface ReplayedLot {
   /** Units the transaction history accounts for. */
   quantity: number;
-  /** Their cost in the holding account's currency, commissions included. */
+  /**
+   * Their cost in the holding account's currency, commissions included.
+   *
+   * Only meaningful when `basisKnown`; otherwise it is the cost of the part of
+   * the position the history does price, which is a different position.
+   */
   costBasis: number;
+  /** False when the replay met a row that moved units without a cost. */
+  basisKnown: boolean;
+  /** Which gap made it unknown, for a caller that reports the reason. */
+  basisGap: ReplayedBasisGap | null;
 }
 
 export type DailyRateIndex = Map<string, Array<{ date: string; rate: number }>>;
@@ -579,16 +591,30 @@ export class PortfolioCalculationService {
    * proportionally using the running average (cost / quantity) so that
    * subsequent gains are calculated against the remaining shares.
    *
-   * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) do not change cost basis;
-   * SPLIT scales the tracked quantity so the per-share average adjusts.
+   * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) move units and carry no
+   * price, so they leave the running cost alone and mark the lot's basis
+   * **unknown** (`basisKnown: false`). They are not a zero-cost sleeve: the
+   * application itself keeps two different answers for what those units cost.
+   * `HoldingsService.adjustQuantity` leaves `average_cost` per share untouched,
+   * so the stored basis grows with an `ADD_SHARES` and shrinks with a
+   * `REMOVE_SHARES`; `computeHoldingsMap`, the full rebuild, holds `totalCost`
+   * fixed instead, so the same history gives a different stored basis depending
+   * on whether a rebuild has run since. Neither is derivable here, and a
+   * position whose cost has two answers has none.
+   *
+   * SPLIT is not in that class: it scales quantity and preserves total cost,
+   * which is what both live paths do, so the per-share average adjusts and the
+   * basis stays known.
    *
    * Returns the **quantity as well as the money**, because the two only mean
    * anything together. A basis replayed from an incomplete history is a real
    * number for a smaller position than the one being valued: 50 of 100 shares
    * imported gives a basis for 50, and pairing it with today's 100-share market
    * value reports a gain that is mostly the missing half. A caller pairing this
-   * with a current holding must compare the quantities and treat a mismatch as
-   * unknown.
+   * with a current holding must compare the quantities **per (account,
+   * security)** and treat a mismatch as unknown. Comparing sums instead lets a
+   * surplus of 30 units in one account cancel a shortfall of 30 in another and
+   * report both bases as reconciled.
    *
    * @returns Map keyed by `${accountId}:${securityId}` -> the replayed lot in
    *          the holding account's currency.
@@ -613,7 +639,10 @@ export class PortfolioCalculationService {
       }),
     );
 
-    const state = new Map<string, { quantity: number; costBasis: number }>();
+    const state = new Map<
+      string,
+      { quantity: number; costBasis: number; basisGap: ReplayedBasisGap | null }
+    >();
 
     for (const tx of transactions) {
       if (!tx.securityId) continue;
@@ -621,7 +650,7 @@ export class PortfolioCalculationService {
       const key = `${tx.accountId}:${tx.securityId}`;
       let entry = state.get(key);
       if (!entry) {
-        entry = { quantity: 0, costBasis: 0 };
+        entry = { quantity: 0, costBasis: 0, basisGap: null };
         state.set(key, entry);
       }
 
@@ -656,9 +685,11 @@ export class PortfolioCalculationService {
         }
         case InvestmentAction.ADD_SHARES:
           entry.quantity += quantity;
+          if (quantity !== 0) entry.basisGap = "quantity_only_action";
           break;
         case InvestmentAction.REMOVE_SHARES:
           entry.quantity -= quantity;
+          if (quantity !== 0) entry.basisGap = "quantity_only_action";
           break;
         case InvestmentAction.SPLIT: {
           const splitRatio = quantity || 1;
@@ -671,10 +702,14 @@ export class PortfolioCalculationService {
       }
 
       // Snap near-zero quantities to exactly zero so precision drift doesn't
-      // leave a stale residual cost basis on fully-closed positions.
+      // leave a stale residual cost basis on fully-closed positions. A position
+      // that closed also clears the gap: whatever the history could not price
+      // has been disposed of, and units bought after this point are priced by
+      // the rows that buy them.
       if (Math.abs(entry.quantity) < 0.0001) {
         entry.quantity = 0;
         entry.costBasis = 0;
+        entry.basisGap = null;
       }
     }
 
@@ -682,6 +717,8 @@ export class PortfolioCalculationService {
       result.set(key, {
         quantity: entry.quantity,
         costBasis: roundMoney(entry.costBasis),
+        basisKnown: entry.basisGap === null,
+        basisGap: entry.basisGap,
       });
     }
 
@@ -695,6 +732,14 @@ export class PortfolioCalculationService {
    * and only need the money. A caller that intends to pair this basis with a
    * *current* holding quantity should use the lots above and check the two
    * agree -- see the note there.
+   *
+   * This projection **drops `basisKnown`**, so every entry it returns looks
+   * equally trustworthy. Its one caller, the holdings valuation below, already
+   * treats a replayed basis as a best effort and falls back to converting the
+   * stored `average_cost` when the history is absent; changing that is a wider
+   * question than the lot flag, and the flag is deliberately not smuggled in
+   * here as a missing map entry. A new caller that reports a gain or a tax
+   * must take the lots and read the flag.
    */
   async calculateCostBasesInAccountCurrency(
     userId: string,

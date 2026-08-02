@@ -192,6 +192,57 @@ describe("GemSettingsForm", () => {
     });
   });
 
+  /**
+   * Invariant: a failed prerequisite is shown as a failure, not as a form
+   * with nothing to choose from.
+   * Canonical adversarial input: a rejected lookup where the success shape is
+   * a list.
+   * Minimal mutation: drop the `lookupError` branch and let the memos read
+   * `data?.accounts ?? []`.
+   * Test that fails under it: this one -- Save is on screen and live.
+   */
+  it("reports a failed lookup rather than an empty form", async () => {
+    mockGetAccounts.mockRejectedValue(new Error("offline"));
+    await renderForm();
+    await act(async () => {});
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Your accounts and instruments could not be loaded, so the settings cannot be edited safely.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    // No pick-lists offering nothing, and nothing to save over the stored
+    // configuration with.
+    expect(
+      screen.queryByLabelText("Strategy accounts"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Save/ })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
+  });
+
+  it("retries the lookup and renders the form once it succeeds", async () => {
+    mockGetSecurities.mockRejectedValueOnce(new Error("offline"));
+    await renderForm();
+    await act(async () => {});
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Try again" }),
+      ).toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Strategy accounts")).toBeInTheDocument(),
+    );
+  });
+
   it("prefills the stored configuration", async () => {
     await renderForm();
 

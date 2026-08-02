@@ -202,11 +202,11 @@ export function GemStrategyReport() {
         toast.success(
           t("gem.scenarios.created", { name: report.strategy.name }),
         );
-        return true;
+        return "done" as const;
       } catch (err) {
         logger.error("Failed to create a GEM scenario:", err);
         toast.error(t("gem.scenarios.createError"));
-        return false;
+        return "failed" as const;
       } finally {
         setIsSaving(false);
       }
@@ -221,11 +221,11 @@ export function GemStrategyReport() {
         adoptScenario(await gemStrategyApi.deleteStrategy(id, range));
         setTab("overview");
         toast.success(t("gem.scenarios.deleted"));
-        return true;
+        return "done" as const;
       } catch (err) {
         logger.error("Failed to delete a GEM scenario:", err);
         toast.error(t("gem.scenarios.deleteError"));
-        return false;
+        return "failed" as const;
       } finally {
         setIsSaving(false);
       }
@@ -255,6 +255,18 @@ export function GemStrategyReport() {
     (() => void) | null
   >(null);
   const submitSettings = useRef<(() => void) | null>(null);
+  /**
+   * The navigation "Save" is saving *for*.
+   *
+   * The dialog offers three answers and one of them is "save and carry on".
+   * Dropping the navigation at submit time turned it into "save and stay",
+   * so the tab or scenario the user had already asked for never arrived and
+   * they had to ask again. It is held until the save resolves rather than run
+   * beside it: a server that refuses the configuration leaves the edits on
+   * screen, and navigating away from them would discard exactly what the
+   * dialog was protecting.
+   */
+  const navigateAfterSave = useRef<(() => void) | null>(null);
 
   const guarded = useCallback(
     (action: () => void) => () => {
@@ -281,6 +293,9 @@ export function GemStrategyReport() {
         ? `${range}|${data?.strategy.id ?? ""}`
         : null;
       savingForStrategy.current = saving ? (data?.strategy.id ?? null) : null;
+      // A save that ends without `onSaved` was refused. The navigation it was
+      // carrying is not owed to a later, unrelated save.
+      if (!saving) navigateAfterSave.current = null;
       setIsSaving(saving);
     },
     [range, data?.strategy.id],
@@ -302,9 +317,19 @@ export function GemStrategyReport() {
         savingForStrategy.current &&
         report.strategy.id !== savingForStrategy.current
       ) {
+        // The response is not of what was saved, so neither is the navigation
+        // that was waiting on it. Dropping it is the same call as dropping the
+        // report: an action aimed at a scenario nobody is looking at.
+        navigateAfterSave.current = null;
         return;
       }
       adopt(report, savingForKey.current ?? requestKey);
+      // The edits are on the server, so the dialog's question is answered and
+      // whatever the user was on their way to can happen.
+      const onward = navigateAfterSave.current;
+      navigateAfterSave.current = null;
+      setSettingsDirty(false);
+      onward?.();
     },
     [adopt, requestKey],
   );
@@ -359,15 +384,26 @@ export function GemStrategyReport() {
         strategyName={strategy.name}
         scenarios={data.strategies}
         onSelectScenario={(id: string) => guarded(() => setStrategyId(id))()}
-        onCreateScenario={handleCreateScenario}
+        // Creating switches to the new scenario's settings, which unmounts a
+        // dirty form exactly as switching or deleting does. It is guarded for
+        // the same reason, and the thunk carries the typed name so the
+        // scenario is still created once the user has answered.
+        onCreateScenario={async (name: string) => {
+          if (settingsDirty) {
+            guarded(() => void handleCreateScenario(name))();
+            return "deferred";
+          }
+          return handleCreateScenario(name);
+        }}
         onDeleteScenario={async (id: string) => {
           // Deleting is the one guarded action that answers the child: the
-          // confirmation stays open until it knows. Holding the edits means
-          // the delete has not happened, so it reports failure and the
-          // unsaved-changes dialog is what the user deals with next.
+          // confirmation stays open until it knows. Holding the edits behind
+          // the unsaved-changes dialog is not a failure and must not read as
+          // one -- a confirmation left open across the deferred delete comes
+          // back pointed at whichever scenario replaced this one.
           if (settingsDirty) {
             guarded(() => void handleDeleteScenario(id))();
-            return false;
+            return "deferred";
           }
           return handleDeleteScenario(id);
         }}
@@ -536,16 +572,21 @@ export function GemStrategyReport() {
       <UnsavedChangesDialog
         isOpen={pendingNavigation !== null}
         onSave={() => {
+          navigateAfterSave.current = pendingNavigation;
           setPendingNavigation(null);
           submitSettings.current?.();
         }}
         onDiscard={() => {
           const action = pendingNavigation;
+          navigateAfterSave.current = null;
           setSettingsDirty(false);
           setPendingNavigation(null);
           action?.();
         }}
-        onCancel={() => setPendingNavigation(null)}
+        onCancel={() => {
+          navigateAfterSave.current = null;
+          setPendingNavigation(null);
+        }}
       />
     </main>
   );

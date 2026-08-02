@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, act, fireEvent } from "@/test/render";
 import { GemScenarioSwitcher } from "./GemScenarioSwitcher";
@@ -9,23 +10,35 @@ const twoScenarios = [
 
 const renderSwitcher = (overrides: Record<string, unknown> = {}) => {
   const onSelect = vi.fn();
-  // True on success, as the parent now reports: `undefined` described a
-  // contract it no longer has, and every dialog below would stay open on it.
-  const onCreate = vi.fn().mockResolvedValue(true);
-  const onDelete = vi.fn().mockResolvedValue(true);
-  render(
-    <GemScenarioSwitcher
-      currentId="strategy-1"
-      currentName="GEM 12m"
-      scenarios={twoScenarios}
-      onSelect={onSelect}
-      onCreate={onCreate}
-      onDelete={onDelete}
-      {...overrides}
-    />,
-  );
-  return { onSelect, onCreate, onDelete };
+  // Three outcomes, not a boolean, and only "failed" keeps a dialog open:
+  // `undefined` described a contract these no longer have, and a boolean could
+  // not tell a refusal from a deferral.
+  const onCreate = vi.fn().mockResolvedValue("done");
+  const onDelete = vi.fn().mockResolvedValue("done");
+  const props = {
+    currentId: "strategy-1",
+    currentName: "GEM 12m",
+    scenarios: twoScenarios,
+    onSelect,
+    onCreate,
+    onDelete,
+    ...overrides,
+  };
+  const asProps = (extra: Record<string, unknown>) =>
+    ({ ...props, ...extra }) as unknown as ComponentProps<
+      typeof GemScenarioSwitcher
+    >;
+  const view = render(<GemScenarioSwitcher {...asProps({})} />);
+  const rerenderWith = (next: Record<string, unknown>) =>
+    view.rerender(<GemScenarioSwitcher {...asProps(next)} />);
+  return { onSelect, onCreate, onDelete, rerenderWith };
 };
+
+/** The confirm button inside the dialog, which shares the trigger's label. */
+const confirmDelete = () =>
+  screen
+    .getAllByRole("button", { name: "Delete scenario" })
+    .at(-1) as HTMLElement;
 
 describe("GemScenarioSwitcher", () => {
   it("offers the other scenarios and reports the pick", async () => {
@@ -81,7 +94,7 @@ describe("GemScenarioSwitcher", () => {
    * way -- discarding the name the user had just typed.
    */
   it("keeps the create dialog and the typed name when the server refuses", async () => {
-    const onCreate = vi.fn().mockResolvedValue(false);
+    const onCreate = vi.fn().mockResolvedValue("failed");
     renderSwitcher({ onCreate });
 
     await act(async () => {
@@ -100,6 +113,28 @@ describe("GemScenarioSwitcher", () => {
     const field = screen.getByLabelText("Scenario name") as HTMLInputElement;
     expect(field).toBeInTheDocument();
     expect(field.value).toBe("IKZE quarterly");
+  });
+
+  it("closes the create dialog when the parent defers the create", async () => {
+    // Deferred is not refused: the scenario will be created once the unsaved
+    // edits are dealt with, and leaving the dialog up invites a second one.
+    const onCreate = vi.fn().mockResolvedValue("deferred");
+    renderSwitcher({ onCreate });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New scenario" }));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Scenario name"), {
+        target: { value: "IKZE quarterly" },
+      });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    });
+
+    expect(onCreate).toHaveBeenCalledWith("IKZE quarterly");
+    expect(screen.queryByLabelText("Scenario name")).not.toBeInTheDocument();
   });
 
   it("warns that deleting takes the evaluation history with it", async () => {
@@ -125,23 +160,77 @@ describe("GemScenarioSwitcher", () => {
   });
 
   it("keeps the delete confirmation open when the server refuses", async () => {
-    const onDelete = vi.fn().mockResolvedValue(false);
+    const onDelete = vi.fn().mockResolvedValue("failed");
     renderSwitcher({ onDelete });
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Delete scenario" }));
     });
     await act(async () => {
-      fireEvent.click(
-        screen
-          .getAllByRole("button", { name: "Delete scenario" })
-          .at(-1) as HTMLElement,
-      );
+      fireEvent.click(confirmDelete());
     });
 
     expect(onDelete).toHaveBeenCalledWith("strategy-1");
     // Still on screen, with its context, so retry is one click.
     expect(screen.getByText(/whole evaluation history/)).toBeInTheDocument();
+  });
+
+  /**
+   * Invariant: a confirmation deletes the scenario it was opened for, or
+   * nothing.
+   * Canonical adversarial input: a mutation response landing after the
+   * selection changed -- here the selection changes because of the mutation.
+   * Minimal mutation: keep the confirmation open on a deferred delete, and
+   * read `currentId` at confirm time.
+   * Test that fails under it: both of the two below.
+   */
+  it("closes the confirmation when the delete is deferred, not refused", async () => {
+    // The parent holds the delete behind its unsaved-changes prompt. That is
+    // not the server saying no, and leaving the confirmation up is how it
+    // ends up aimed at the next scenario.
+    const onDelete = vi.fn().mockResolvedValue("deferred");
+    renderSwitcher({ onDelete });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete scenario" }));
+    });
+    await act(async () => {
+      fireEvent.click(confirmDelete());
+    });
+
+    expect(onDelete).toHaveBeenCalledWith("strategy-1");
+    expect(
+      screen.queryByText(/whole evaluation history/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("never retargets an open confirmation at the scenario that replaced its subject", async () => {
+    const onDelete = vi.fn().mockResolvedValue("failed");
+    const { rerenderWith } = renderSwitcher({ onDelete });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete scenario" }));
+    });
+    expect(screen.getByText(/GEM 12m/)).toBeInTheDocument();
+
+    // The subject is gone and GEM 6m is now current. Whatever the dialog was
+    // asking about, it was not this.
+    await act(async () => {
+      rerenderWith({
+        currentId: "strategy-2",
+        currentName: "GEM 6m",
+        scenarios: [twoScenarios[1], { id: "strategy-3", name: "GEM 3m" }],
+      });
+    });
+
+    expect(
+      screen.queryByText(/whole evaluation history/),
+    ).not.toBeInTheDocument();
+    // And no confirm survives to be clicked a second time.
+    expect(
+      screen.getAllByRole("button", { name: "Delete scenario" }),
+    ).toHaveLength(1);
+    expect(onDelete).not.toHaveBeenCalled();
   });
 
   it("never offers to delete the last scenario", () => {

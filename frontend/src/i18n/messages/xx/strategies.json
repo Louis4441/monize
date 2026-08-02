@@ -337,6 +337,7 @@
       "save": "[XX-Save configuration-XX]",
       "saved": "[XX-Strategy configuration saved.-XX]",
       "saveError": "[XX-Could not save the strategy configuration.-XX]",
+      "lookupsError": "[XX-Your accounts and instruments could not be loaded, so the settings cannot be edited safely.-XX]",
       "addInstrument": "[XX-Add-XX]",
       "addInstrumentFor": "[XX-Add an instrument for {role}-XX]",
       "addInstrumentPrefilled": "[XX-Filled in from the suggested listing. Change the exchange and currency to the ones your broker actually trades.-XX]",

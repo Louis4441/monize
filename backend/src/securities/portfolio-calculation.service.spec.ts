@@ -1368,6 +1368,8 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
     expect(replayed.get("acct-1:sec-a")).toEqual({
       quantity: 100,
       costBasis: 1020,
+      basisKnown: true,
+      basisGap: null,
     });
   });
 
@@ -1405,5 +1407,128 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
     // The caller pairs this with a current holding, and 50 replayed against
     // 100 held is a basis for a different position.
     expect(replayed.get("acct-1:sec-a")?.quantity).toBe(50);
+  });
+
+  /**
+   * Invariant: a row that moves units without a price leaves the basis
+   * unknown, because the application keeps two answers for what they cost.
+   * Canonical adversarial input: a quantity that reconciles over a cost that
+   * does not.
+   * Minimal mutation: stop setting `basisGap` in the ADD_SHARES /
+   * REMOVE_SHARES branches.
+   * Test that fails under it: each of the first two below.
+   */
+  describe("quantity-only rows", () => {
+    const buy = (quantity: number, price: number) =>
+      ({
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        quantity,
+        price,
+        commission: 0,
+        exchangeRate: 1,
+      }) as InvestmentTransaction;
+
+    const move = (action: InvestmentAction, quantity: number) =>
+      ({
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action,
+        quantity,
+        price: 0,
+        commission: 0,
+        exchangeRate: 1,
+      }) as InvestmentTransaction;
+
+    it("marks the basis unknown after an ADD_SHARES", async () => {
+      const replayed = await lots([
+        buy(50, 10),
+        move(InvestmentAction.ADD_SHARES, 50),
+      ]);
+
+      // The units reconcile against a 100-share holding and the 500 prices
+      // half of them. `adjustQuantity` would have stored a basis of 1,000 for
+      // the same history, and a full rebuild 500.
+      expect(replayed.get("acct-1:sec-a")).toEqual({
+        quantity: 100,
+        costBasis: 500,
+        basisKnown: false,
+        basisGap: "quantity_only_action",
+      });
+    });
+
+    it("marks the basis unknown after a REMOVE_SHARES", async () => {
+      const replayed = await lots([
+        buy(100, 10),
+        move(InvestmentAction.REMOVE_SHARES, 50),
+      ]);
+
+      // The other direction: the whole 1,000 left standing against the 50
+      // shares that remain.
+      expect(replayed.get("acct-1:sec-a")).toEqual({
+        quantity: 50,
+        costBasis: 1000,
+        basisKnown: false,
+        basisGap: "quantity_only_action",
+      });
+    });
+
+    it("keeps the basis known across a split, which prices what it moves", async () => {
+      const replayed = await lots([
+        buy(100, 10),
+        move(InvestmentAction.SPLIT, 2),
+      ]);
+
+      // A split scales the units and preserves the total cost -- what both
+      // live paths do -- so the per-share average halves and nothing is
+      // unaccounted for.
+      expect(replayed.get("acct-1:sec-a")).toEqual({
+        quantity: 200,
+        costBasis: 1000,
+        basisKnown: true,
+        basisGap: null,
+      });
+    });
+
+    it("clears the gap once the position closes and is bought again", async () => {
+      const replayed = await lots([
+        buy(50, 10),
+        move(InvestmentAction.ADD_SHARES, 50),
+        {
+          accountId: "acct-1",
+          securityId: "sec-a",
+          action: InvestmentAction.SELL,
+          quantity: 100,
+          price: 12,
+          commission: 0,
+          exchangeRate: 1,
+        } as InvestmentTransaction,
+        buy(10, 20),
+      ]);
+
+      // Whatever the history could not price has been disposed of; the 10
+      // shares held now were bought by a row that says what they cost.
+      expect(replayed.get("acct-1:sec-a")).toEqual({
+        quantity: 10,
+        costBasis: 200,
+        basisKnown: true,
+        basisGap: null,
+      });
+    });
+
+    it("ignores a zero-quantity adjustment, which moves nothing", async () => {
+      const replayed = await lots([
+        buy(100, 10),
+        move(InvestmentAction.ADD_SHARES, 0),
+      ]);
+
+      expect(replayed.get("acct-1:sec-a")).toEqual({
+        quantity: 100,
+        costBasis: 1000,
+        basisKnown: true,
+        basisGap: null,
+      });
+    });
   });
 });

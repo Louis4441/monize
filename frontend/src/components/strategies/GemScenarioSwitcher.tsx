@@ -13,6 +13,23 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import type { GemStrategyRef } from "@/types/gem-strategy";
 
+/**
+ * What became of a confirmed create or delete.
+ *
+ * Three answers, because a boolean folded two of them together: "did not
+ * happen" covered both the server refusing and the parent holding the action
+ * behind an unsaved-changes prompt, and the dialog stayed open for both. Left
+ * open through the second, the delete confirmation re-reads the current
+ * scenario -- so once the deferred delete removed the one it was opened for,
+ * the same dialog was pointed at whichever scenario took its place, and
+ * confirming again deleted that.
+ *
+ * Only `"failed"` keeps a dialog on screen. `"deferred"` means the user has
+ * said what they want and the unsaved-changes prompt is what they deal with
+ * next; the action runs, or does not, without this dialog in the way.
+ */
+export type GemScenarioOutcome = "done" | "failed" | "deferred";
+
 interface GemScenarioSwitcherProps {
   /**
    * The scenario on screen; it is not offered as a destination. Null before
@@ -24,14 +41,14 @@ interface GemScenarioSwitcherProps {
   scenarios: readonly GemStrategyRef[];
   onSelect: (id: string) => void;
   /**
-   * Resolves true when the scenario was created. The parent catches its own
+   * Creates the scenario and says what happened. The parent catches its own
    * errors, so a plain `Promise<void>` looked identical whether the server
    * accepted the name or rejected it -- and the dialog closed on both, taking
-   * the typed name with it.
+   * the typed name with it. See `GemScenarioOutcome`.
    */
-  onCreate: (name: string) => Promise<boolean>;
-  /** Resolves true when the scenario was deleted; see `onCreate`. */
-  onDelete: (id: string) => Promise<boolean>;
+  onCreate: (name: string) => Promise<GemScenarioOutcome>;
+  /** Deletes the scenario and says what happened; same three answers. */
+  onDelete: (id: string) => Promise<GemScenarioOutcome>;
   /** True while a scenario call is in flight, to stop a double submit. */
   busy?: boolean;
 }
@@ -61,7 +78,28 @@ export function GemScenarioSwitcher({
   const t = useTranslations("strategies");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /**
+   * The scenario the open confirmation is about, captured when it opened.
+   *
+   * A boolean made the dialog read `currentId` at confirm time, which is a
+   * different scenario the moment the selection moves under it. Holding the
+   * id and the name together is the same rule the report follows for its
+   * asynchronous data: what an action is aimed at travels with the action.
+   */
+  const [confirmingDelete, setConfirmingDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  /**
+   * And it is only shown while that scenario is still the current one. A
+   * confirmation whose subject has been replaced is not a confirmation of
+   * anything the user asked about.
+   */
+  const pendingDelete =
+    confirmingDelete !== null && confirmingDelete.id === currentId
+      ? confirmingDelete
+      : null;
 
   const items = useMemo<EntitySwitcherItem[]>(
     () =>
@@ -76,7 +114,7 @@ export function GemScenarioSwitcher({
     // Only clear and close on success: a failed create leaves the name in the
     // field and the dialog open, so retrying is one click rather than typing
     // it again.
-    if (!(await onCreate(newName.trim()))) return;
+    if ((await onCreate(newName.trim())) === "failed") return;
     setNewName("");
     setCreating(false);
   };
@@ -109,7 +147,9 @@ export function GemScenarioSwitcher({
         {currentId !== null && scenarios.length > 1 && (
           <button
             type="button"
-            onClick={() => setConfirmingDelete(true)}
+            onClick={() =>
+              setConfirmingDelete({ id: currentId, name: currentName })
+            }
             disabled={busy}
             title={t("gem.scenarios.delete")}
             aria-label={t("gem.scenarios.delete")}
@@ -155,17 +195,22 @@ export function GemScenarioSwitcher({
       </Modal>
 
       <ConfirmDialog
-        isOpen={confirmingDelete}
-        onCancel={() => setConfirmingDelete(false)}
+        isOpen={pendingDelete !== null}
+        onCancel={() => setConfirmingDelete(null)}
         onConfirm={async () => {
+          if (pendingDelete === null) return;
           // Same rule as the create dialog: a rejected delete keeps the
-          // confirmation on screen with its context intact.
-          if (currentId && !(await onDelete(currentId))) return;
-          setConfirmingDelete(false);
+          // confirmation on screen with its context intact. A deferred one
+          // does not -- the user has confirmed, and what happens next is the
+          // unsaved-changes dialog, not this.
+          if ((await onDelete(pendingDelete.id)) === "failed") return;
+          setConfirmingDelete(null);
         }}
         pushHistory
         title={t("gem.scenarios.deleteTitle")}
-        message={t("gem.scenarios.deleteMessage", { name: currentName })}
+        message={t("gem.scenarios.deleteMessage", {
+          name: pendingDelete?.name ?? currentName,
+        })}
         confirmLabel={t("gem.scenarios.delete")}
         variant="danger"
       />

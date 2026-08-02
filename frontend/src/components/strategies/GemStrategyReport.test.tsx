@@ -594,6 +594,169 @@ describe("GemStrategyReport", () => {
       ).not.toBeInTheDocument();
     });
 
+    /**
+     * The dialog's own Save, which shares its label with the form's. The
+     * dialog is rendered last, so it is the later of the two.
+     */
+    const dialogSave = () =>
+      screen.getAllByRole("button", { name: /^Save/ }).at(-1) as HTMLElement;
+
+    /**
+     * Invariant: "Save" answers the dialog and then does the thing the user
+     * asked for.
+     * Canonical adversarial input: stale response + dirty form.
+     * Minimal mutation: drop the navigation instead of holding it in
+     * `navigateAfterSave`.
+     * Test that fails under it: the first of the two below -- the page stays
+     * on Settings.
+     */
+    it("carries out the navigation once the edits are saved", async () => {
+      mockUpdateConfig.mockResolvedValue(gemReport());
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+
+      await act(async () => {
+        fireEvent.click(dialogSave());
+      });
+      await act(async () => {});
+
+      // The dialog offers three answers and this was "save and carry on".
+      // Saving and staying put is not one of them: the user still has to ask
+      // for the tab a second time.
+      expect(
+        screen.queryByRole("heading", { name: "Unsaved Changes" }),
+      ).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByLabelText("Evaluation frequency"),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it("stays on the form when the save it was waiting for is refused", async () => {
+      mockUpdateConfig.mockRejectedValue(new Error("nope"));
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+      await act(async () => {
+        fireEvent.click(dialogSave());
+      });
+      await act(async () => {});
+
+      // Navigating on a refused save would discard exactly the edits the
+      // dialog exists to protect.
+      const field = screen.getByLabelText(
+        "Evaluation frequency",
+      ) as HTMLSelectElement;
+      expect(field).toBeInTheDocument();
+      expect(field.value).toBe("QUARTERLY");
+    });
+
+    it("asks before creating a scenario would discard unsaved settings", async () => {
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "New scenario" }));
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Scenario name"), {
+          target: { value: "IKZE quarterly" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
+      });
+
+      // Creating switches to the new scenario's settings, which unmounts this
+      // form -- the same loss as a tab change, and it was not guarded.
+      expect(
+        screen.getByRole("heading", { name: "Unsaved Changes" }),
+      ).toBeInTheDocument();
+      expect(mockCreateStrategy).not.toHaveBeenCalled();
+    });
+
+    it("creates the scenario with the name it was given once the edits are discarded", async () => {
+      mockCreateStrategy.mockResolvedValue(gemReport());
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "New scenario" }));
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Scenario name"), {
+          target: { value: "IKZE quarterly" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Discard/i }));
+      });
+      await act(async () => {});
+
+      // The typed name travels with the held action; asking again for it
+      // would be the deferral losing the user's input.
+      expect(mockCreateStrategy).toHaveBeenCalledWith(
+        "IKZE quarterly",
+        expect.anything(),
+      );
+    });
+
     it("lets a clean form change tab without asking", async () => {
       await renderReport();
       await act(async () => {

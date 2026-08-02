@@ -3,6 +3,10 @@ import { GemStrategy } from "./entities/gem-strategy.entity";
 import { GemPositionService } from "./gem-position.service";
 import { GemAssetRef } from "./gem-report.types";
 import {
+  ReplayedBasisGap,
+  ReplayedLot,
+} from "../securities/portfolio-calculation.service";
+import {
   createScopedDbMocks,
   ManagerMock,
 } from "../test-helpers/scoped-db-testing";
@@ -12,6 +16,48 @@ jest.mock("../common/db/scoped-db", () =>
 );
 
 const userId = "user-1";
+
+/**
+ * One replayed lot, in the shape `PortfolioCalculationService` returns.
+ *
+ * Typed rather than written inline so `tsc` rejects a lot the real replay
+ * could not produce: the known-ness flag arrived after a plain
+ * `{ quantity, costBasis }` fixture let a position the history cannot price
+ * report a gain and a tax on it.
+ */
+const lot = (
+  quantity: number,
+  costBasis: number,
+  basisGap: ReplayedBasisGap | null = null,
+): ReplayedLot => ({
+  quantity,
+  costBasis,
+  basisKnown: basisGap === null,
+  basisGap,
+});
+
+/**
+ * The three per-security aggregates the holdings query emits, derived from the
+ * per-account quantities a fixture declares.
+ *
+ * They come out of one `GROUP BY` over the same rows, so a fixture cannot set
+ * them independently -- and the ones that tried claimed a total no set of
+ * accounts adds up to, which is exactly the state the per-account
+ * reconciliation exists to catch.
+ */
+const asHoldingsRow = (row: Record<string, unknown>) => {
+  const perAccount = (row.account_quantities ?? {}) as Record<string, string>;
+  return {
+    ...row,
+    account_ids: Object.keys(perAccount),
+    quantity: String(
+      Object.values(perAccount).reduce(
+        (sum, quantity) => sum + Number(quantity),
+        0,
+      ),
+    ),
+  };
+};
 
 const strategy = (overrides: Partial<GemStrategy> = {}): GemStrategy =>
   ({
@@ -105,10 +151,9 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "51",
         cost_basis: "18281.46",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "51" },
       },
     ];
     cashRows = [];
@@ -118,7 +163,9 @@ describe("GemPositionService", () => {
       { id: "acct-2", currency_code: "USD" },
     ];
     manager.query.mockImplementation((sql: string) => {
-      if (sql.includes("FROM holdings")) return Promise.resolve(holdingRows);
+      if (sql.includes("FROM holdings")) {
+        return Promise.resolve(holdingRows.map(asHoldingsRow));
+      }
       if (sql.includes("current_balance")) return Promise.resolve(cashRows);
       if (sql.includes("a.currency_code")) {
         return Promise.resolve(accountCurrencyRows);
@@ -137,9 +184,7 @@ describe("GemPositionService", () => {
     portfolioCalculation = {
       calculateCostBasisLotsInAccountCurrency: jest
         .fn()
-        .mockResolvedValue(
-          new Map([["acct-1:sec-spy", { quantity: 51, costBasis: 18281.46 }]]),
-        ),
+        .mockResolvedValue(new Map([["acct-1:sec-spy", lot(51, 18281.46)]])),
     };
     service = new GemPositionService(
       mocks.dataSource as never,
@@ -197,19 +242,17 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "10",
         cost_basis: "3000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "10" },
       },
       {
         security_id: "sec-wtai",
         symbol: "WTAI",
         name: "AI ETF",
-        quantity: "100",
         cost_basis: "5000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "100" },
       },
     ];
     priceService.latestPrices.mockResolvedValue(
@@ -245,19 +288,17 @@ describe("GemPositionService", () => {
         security_id: "sec-emim",
         symbol: "EMIM",
         name: "EM IMI ETF",
-        quantity: "200",
         cost_basis: "6000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "200" },
       },
       {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "5",
         cost_basis: "1500",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "5" },
       },
     ];
     priceService.latestPrices.mockResolvedValue(
@@ -286,10 +327,9 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "51",
         cost_basis: null,
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "51" },
       },
     ];
 
@@ -308,10 +348,9 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "10",
         cost_basis: "1000",
         currency_code: "EUR",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "10" },
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 200]]));
@@ -320,7 +359,7 @@ describe("GemPositionService", () => {
     // when it happened -- not the holdings table's EUR average re-converted at
     // today's rate.
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", { quantity: 10, costBasis: 1100 }]]),
+      new Map([["acct-1:sec-spy", lot(10, 1100)]]),
     );
 
     const result = await build();
@@ -344,16 +383,15 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "10",
         cost_basis: "1000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "10" },
       },
     ];
     accountCurrencyRows = [{ id: "acct-1", currency_code: "PLN" }];
     // 10 units bought at 100 USD when USD/PLN was 3.00: 3,000 PLN.
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", { quantity: 10, costBasis: 3000 }]]),
+      new Map([["acct-1:sec-spy", lot(10, 3000)]]),
     );
     // Unchanged at 100 USD, but USD/PLN is now 4.00: 4,000 PLN.
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
@@ -382,16 +420,15 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "100",
         cost_basis: "1000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "100" },
       },
     ];
     // Only half the position was ever imported as trades: a real basis, for a
     // smaller holding than the one being valued.
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", { quantity: 50, costBasis: 500 }]]),
+      new Map([["acct-1:sec-spy", lot(50, 500)]]),
     );
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
 
@@ -411,14 +448,13 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "100",
         cost_basis: "1000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "100" },
       },
     ];
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", { quantity: 100, costBasis: 1000 }]]),
+      new Map([["acct-1:sec-spy", lot(100, 1000)]]),
     );
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
 
@@ -428,23 +464,116 @@ describe("GemPositionService", () => {
     expect(result.action?.estimatedTax).toBeCloseTo(95, 2);
   });
 
+  /**
+   * Invariant: units the history moved without pricing leave the basis
+   * unknown, whichever direction they moved in.
+   * Canonical adversarial input: aggregation where one component is unknown,
+   * paired with a quantity that reconciles anyway.
+   * Minimal mutation: drop the `!lot.basisKnown` test in `historicalCostBasis`.
+   * Test that fails under it: each case below.
+   */
+  describe("a history that moves units without pricing them", () => {
+    const heldWorth = (quantity: string, storedBasis: string) => {
+      holdingRows = [
+        {
+          security_id: "sec-spy",
+          symbol: "SPY",
+          name: "S&P 500 ETF",
+          cost_basis: storedBasis,
+          currency_code: "USD",
+          account_quantities: { "acct-1": quantity },
+        },
+      ];
+      priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
+    };
+
+    it("refuses a basis behind an ADD_SHARES", async () => {
+      // Bought 50 at 10, then 50 more arrived with no price on them. The units
+      // reconcile -- 100 replayed against 100 held -- and the 500 the history
+      // does price is the cost of half the position.
+      heldWorth("100", "1000");
+      portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+        new Map([["acct-1:sec-spy", lot(100, 500, "quantity_only_action")]]),
+      );
+
+      const result = await build();
+
+      // 1,500 against 500 would report 1,000 of gain and 190 of tax, when the
+      // stored average cost says the gain is 500 and the tax 95. Two answers,
+      // so neither is the answer.
+      expect(result.action?.realizedGainLoss).toBeNull();
+      expect(result.action?.estimatedTax).toBeNull();
+      expect(result.position?.totalMarketValue).toBe(1500);
+    });
+
+    it("refuses a basis behind a REMOVE_SHARES", async () => {
+      // Bought 100 at 10, removed 50 with no price. The replay still carries
+      // the whole 1,000 against the 50 that are left.
+      heldWorth("50", "500");
+      portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+        new Map([["acct-1:sec-spy", lot(50, 1000, "quantity_only_action")]]),
+      );
+
+      const result = await build();
+
+      // 750 against 1,000 turns a real gain of 250 into a loss of 250, and a
+      // tax of 47.50 into nothing owed.
+      expect(result.action?.realizedGainLoss).toBeNull();
+      expect(result.action?.estimatedTax).toBeNull();
+    });
+  });
+
+  /**
+   * Invariant: every account's own units are accounted for, not just the sum.
+   * Canonical adversarial input: two accounts, same security, mixed positive
+   * and negative differences.
+   * Minimal mutation: compare the summed replayed quantity to the summed held
+   * quantity, as this did before.
+   * Test that fails under it: this one.
+   */
+  it("refuses when two accounts' errors cancel in the total", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        cost_basis: "1000",
+        currency_code: "USD",
+        account_quantities: { "acct-1": "70", "acct-2": "30" },
+      },
+    ];
+    // 100 replayed against 100 held, and not one account of the two agrees:
+    // 30 units too many here, 30 too few there.
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([
+        ["acct-1:sec-spy", lot(40, 400)],
+        ["acct-2:sec-spy", lot(60, 600)],
+      ]),
+    );
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
+
+    const result = await build();
+
+    expect(result.action?.realizedGainLoss).toBeNull();
+    expect(result.action?.estimatedTax).toBeNull();
+  });
+
   it("refuses when one account of several does not reconcile", async () => {
     holdingRows = [
       {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "100",
         cost_basis: "1000",
         currency_code: "USD",
-        account_ids: ["acct-1", "acct-2"],
+        account_quantities: { "acct-1": "60", "acct-2": "40" },
       },
     ];
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
       new Map([
-        ["acct-1:sec-spy", { quantity: 60, costBasis: 600 }],
+        ["acct-1:sec-spy", lot(60, 600)],
         // 30 of the 40 held here were never imported.
-        ["acct-2:sec-spy", { quantity: 10, costBasis: 100 }],
+        ["acct-2:sec-spy", lot(10, 100)],
       ]),
     );
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
@@ -461,7 +590,7 @@ describe("GemPositionService", () => {
     // this whole change exists to avoid.
     accountCurrencyRows = [{ id: "acct-1", currency_code: "EUR" }];
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", { quantity: 51, costBasis: 15000 }]]),
+      new Map([["acct-1:sec-spy", lot(51, 15000)]]),
     );
 
     const result = await build();
@@ -478,10 +607,9 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "10",
         cost_basis: null,
         currency_code: "EUR",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "10" },
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
@@ -506,10 +634,9 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "10",
         cost_basis: "800",
         currency_code: "EUR",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "10" },
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
@@ -601,10 +728,9 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "25",
         cost_basis: "9000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "25" },
       },
     ];
     // The query resolves the linked cash row to the brokerage account, so both
@@ -632,10 +758,9 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "25",
         cost_basis: "9000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "25" },
       },
     ];
     cashRows = [
@@ -660,11 +785,10 @@ describe("GemPositionService", () => {
         security_id: "sec-spy",
         symbol: "SPY",
         name: "S&P 500 ETF",
-        quantity: "20",
         cost_basis: "6000",
         currency_code: "USD",
         // The same fund in both of the strategy's accounts: two sells.
-        account_ids: ["acct-1", "acct-2"],
+        account_quantities: { "acct-1": "12", "acct-2": "8" },
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
@@ -701,10 +825,9 @@ describe("GemPositionService", () => {
         security_id: "sec-emim",
         symbol: "EMIM",
         name: "EM IMI ETF",
-        quantity: "700",
         cost_basis: "21000",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "700" },
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-emim", 35]]));
@@ -723,10 +846,9 @@ describe("GemPositionService", () => {
           security_id: "sec-emim",
           symbol: "EMIM",
           name: "EM IMI ETF",
-          quantity: "200",
           cost_basis: "4000",
           currency_code: "USD",
-          account_ids: ["acct-1"],
+          account_quantities: { "acct-1": "200" },
         },
       ];
       cashRows = [
@@ -816,10 +938,9 @@ describe("GemPositionService", () => {
           security_id: "sec-spy",
           symbol: "SPY",
           name: "S&P 500 ETF",
-          quantity: "10",
           cost_basis: "3000",
           currency_code: "USD",
-          account_ids: ["acct-1"],
+          account_quantities: { "acct-1": "10" },
         },
       ];
       cashRows = [
@@ -831,7 +952,7 @@ describe("GemPositionService", () => {
       ];
       priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
       portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-        new Map([["acct-1:sec-spy", { quantity: 10, costBasis: 3000 }]]),
+        new Map([["acct-1:sec-spy", lot(10, 3000)]]),
       );
 
       const result = await build();
@@ -882,10 +1003,9 @@ describe("GemPositionService", () => {
         security_id: "sec-unrelated",
         symbol: "FZD2050",
         name: "A fund the strategy does not use",
-        quantity: "5",
         cost_basis: "100",
         currency_code: "USD",
-        account_ids: ["acct-1"],
+        account_quantities: { "acct-1": "5" },
       },
     ];
     const result = await build();

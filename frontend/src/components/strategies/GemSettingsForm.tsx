@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { FormActions } from "@/components/ui/FormActions";
 import { Skeleton } from "@/components/ui/LoadingSkeleton";
+import { ReportError } from "@/components/reports/ReportError";
 import { SecurityForm } from "@/components/securities/SecurityForm";
 import { PlusIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { useReportData } from "@/hooks/useReportData";
@@ -145,13 +146,20 @@ export function GemSettingsForm({
   const [createdSecurities, setCreatedSecurities] = useState<Security[]>([]);
 
   // Investment accounts and securities are the two pick-lists the form needs.
-  const { data, isLoading } = useReportData(async () => {
+  const {
+    data: lookups,
+    isLoading,
+    error: lookupError,
+    reload: reloadLookups,
+  } = useReportData(async () => {
     const [accounts, securities] = await Promise.all([
       accountsApi.getAll(),
       investmentsApi.getSecurities(),
     ]);
     return { accounts, securities };
   }, []);
+
+  const data = lookups;
 
   const assetBySecurity = useMemo(
     () => new Map(assets.map((asset) => [asset.role, asset.securityId ?? ""])),
@@ -413,6 +421,24 @@ export function GemSettingsForm({
         <Skeleton className="h-72 w-full" />
         <Skeleton className="h-72 w-full" />
       </div>
+    );
+  }
+
+  /**
+   * A failed lookup is not an empty pick-list.
+   *
+   * Rendering the form over `[]` offers no accounts and no instruments and
+   * leaves Save live above them, so a request that never arrived reads as a
+   * user with nothing to choose -- and one click writes an empty selection
+   * over a configured strategy. Loaded-and-empty, loading, failed,
+   * stale-previous and current are five states, and this is the failed one.
+   */
+  if (lookupError || !lookups) {
+    return (
+      <ReportError
+        message={t("gem.settingsForm.lookupsError")}
+        onRetry={reloadLookups}
+      />
     );
   }
 

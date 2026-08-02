@@ -63,6 +63,14 @@ interface AggregatedHolding {
   quantity: number;
   /** Accounts this position is held in -- one sell order each. */
   accountIds: string[];
+  /**
+   * Units held in each of those accounts.
+   *
+   * Kept beside the sum because the sum cannot be reconciled against a replay:
+   * 30 units too many in one account and 30 too few in another add up to a
+   * total that agrees with the history while neither account does.
+   */
+  quantityByAccount: Map<string, number>;
   /** quantity * average cost, in the security's own currency; null when unknown. */
   costBasis: number | null;
   /** Currency the security is priced and costed in. */
@@ -143,6 +151,7 @@ export class GemPositionService {
       name: string | null;
       quantity: string;
       account_ids: string[];
+      account_quantities: Record<string, string>;
       cost_basis: string | null;
       currency_code: string;
       country_weightings: GemWeighting[] | null;
@@ -158,6 +167,14 @@ export class GemPositionService {
                 -- account, not one per instrument: the same fund held in two
                 -- brokerage accounts is two sells.
                 array_agg(DISTINCT h.account_id) AS account_ids,
+                -- And how much of it each one holds. The sum above cannot be
+                -- reconciled against the replayed history: a surplus in one
+                -- account cancels a shortfall in another and both bases pass.
+                -- holdings is UNIQUE(account_id, security_id), so one entry per
+                -- account; as text because a numeric in jsonb comes back as a
+                -- JavaScript double.
+                jsonb_object_agg(h.account_id::text, h.quantity::text)
+                  AS account_quantities,
                 -- A holding with no average cost makes the whole cost basis
                 -- unknown rather than understated. SUM() skips NULL rows, so
                 -- the CASE turns "one account is uncosted" into an unknown
@@ -188,6 +205,11 @@ export class GemPositionService {
       name: row.name,
       quantity: Number(row.quantity),
       accountIds: row.account_ids ?? [],
+      quantityByAccount: new Map(
+        Object.entries(row.account_quantities ?? {}).map(
+          ([accountId, quantity]) => [accountId, Number(quantity)] as const,
+        ),
+      ),
       costBasis: row.cost_basis === null ? null : Number(row.cost_basis),
       currencyCode: row.currency_code,
       composition: toComposition(row),
@@ -359,7 +381,7 @@ export class GemPositionService {
    * A holding's cost basis in the report currency, or null when it cannot be
    * established from what the transactions recorded.
    *
-   * Three ways it stays unknown, and each is a real state rather than a
+   * Five ways it stays unknown, and each is a real state rather than a
    * shortcut:
    *
    * - a lot with no average cost at all, which the holdings query already
@@ -377,17 +399,27 @@ export class GemPositionService {
    *   smaller basis, it is a basis for a different position. Reported as a
    *   gain it is mostly the cost of the shares nobody recorded: 100 shares
    *   worth 1,500 against a replayed 500 for half of them shows 1,000 of gain
-   *   and 190 of tax where the truth is 500 and 95.
+   *   and 190 of tax where the truth is 500 and 95;
+   * - a replay the lot itself reports as unpriced (`basisKnown: false`),
+   *   which is what an `ADD_SHARES` or `REMOVE_SHARES` in the history leaves
+   *   behind.
    *
-   * The quantity check proves the history accounts for the *units*, not that
-   * it accounts for what they cost. `ADD_SHARES` and `SPLIT` move quantity
-   * without money, so a holding of 100 built from a purchase of 50 and an
-   * `ADD_SHARES` of 50 reconciles and reports a basis covering the purchased
-   * half. That is deliberate rather than overlooked: quantity-only actions
-   * carry no cost anywhere in this application, so a zero-cost sleeve is the
-   * app-wide meaning of those rows, and having the GEM report alone treat them
-   * as unknown would make it disagree with every other cost figure the user
-   * sees. If that meaning ever changes, this is a site that changes with it.
+   * The units and the money are two separate questions, and this asks both.
+   * The quantity check proves the history accounts for the units; it says
+   * nothing about what they cost, because a quantity-only row reconciles
+   * perfectly and prices nothing. Buy 50 at 10, then `ADD_SHARES` 50, and the
+   * holding is 100 units against a replayed cost of 500 -- pass that as the
+   * basis and the report claims 500 of gain and 95 of tax that nobody made.
+   * `REMOVE_SHARES` runs the same error the other way: buy 100 at 10, remove
+   * 50, and the replayed 1,000 against a stored 500 turns a real gain into a
+   * loss. `ReplayedLot.basisKnown` is where that is decided; the comment on
+   * `calculateCostBasisLotsInAccountCurrency` explains why the application
+   * cannot answer it.
+   *
+   * The comparison is **per account**, not on the sum. Summed first, a holding
+   * 30 units above its history in one account and 30 below in another
+   * reconciles exactly, and both wrong bases are reported as the position's
+   * cost.
    */
   private historicalCostBasis(params: {
     holding: AggregatedHolding;
@@ -399,19 +431,17 @@ export class GemPositionService {
       params;
     if (holding.costBasis === null) return null;
     let total = 0;
-    let replayedQuantity = 0;
     for (const accountId of holding.accountIds) {
       if (currencyByAccount.get(accountId) !== currencyCode) return null;
       const lot = accountCostBases.get(`${accountId}:${holding.securityId}`);
-      if (lot === undefined) return null;
+      if (lot === undefined || !lot.basisKnown) return null;
+      const held = holding.quantityByAccount.get(accountId);
+      if (held === undefined) return null;
+      // The tolerance is the dust threshold the position arithmetic already
+      // uses, so a fractional residue from a split does not invalidate an
+      // otherwise complete history.
+      if (Math.abs(lot.quantity - held) > QUANTITY_TOLERANCE) return null;
       total += lot.costBasis;
-      replayedQuantity += lot.quantity;
-    }
-    // The replay has to account for the units actually held. The tolerance is
-    // the dust threshold the position arithmetic already uses, so a fractional
-    // residue from a split does not invalidate an otherwise complete history.
-    if (Math.abs(replayedQuantity - holding.quantity) > QUANTITY_TOLERANCE) {
-      return null;
     }
     return total > 0 ? roundMoney(total) : null;
   }
