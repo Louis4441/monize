@@ -163,6 +163,7 @@
       "currentPortfolio": "目前投資組合 — 模擬",
       "currentPortfolioNote": "此模擬把今天的標的比例放在所選區間的起點。它不還原歷史交易、現金流、現金或匯率變動。",
       "currentPortfolioLateStart": "模擬開始得較晚，因為目前持有的標的中至少有一檔從所選區間開始就沒有資料。",
+      "currentPortfolioEarlyEnd": "模擬到 {date} 為止，因為 {symbols} 在該日期之後沒有價格 — 重新整理其價格歷史即可繪製其餘部分。",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "策略帳戶沒有持倉，因此沒有可模擬的投資組合。",
         "UNKNOWN_CURRENT_VALUE": "其中一檔持倉沒有目前市值，因此今天的比例未知，不顯示模擬。",

@@ -275,6 +275,8 @@ export class GemPerformanceService {
       totalReturnPercent: null,
       completeRange: false,
       startsOn: null,
+      endsOn: null,
+      stoppedBy: [],
       includedHoldings: [],
       unavailableReason,
     });
@@ -363,6 +365,29 @@ export class GemPerformanceService {
     const drawable = points.filter((point) => point.returnPercent !== null);
     if (drawable.length < 2) return empty("MISSING_PRICE_HISTORY");
 
+    /**
+     * Where the line stops, and which instrument stopped it.
+     *
+     * A point needs *every* leg priced -- a portfolio simulated from the legs
+     * that happen to have data is a different portfolio -- so the line ends
+     * with the first holding whose feed does. Ending is fine; ending without
+     * saying why is not, and "why" here is a specific instrument the user can
+     * go and fix, not a property of the chart.
+     */
+    const lastDrawn = drawable[drawable.length - 1].date;
+    const brokeAt = points.find(
+      (point) => point.date > lastDrawn && point.date >= startsOn,
+    );
+    const stoppedBy = brokeAt
+      ? bases
+          .filter(
+            (leg) =>
+              this.carriedClose(leg.prices, brokeAt.date, sampling) === null,
+          )
+          .map((leg) => leg.symbol)
+          .filter((symbol): symbol is string => !!symbol)
+      : [];
+
     // The return over the window, which means the value at the *end* of it.
     //
     // Taking the last point that happened to be priceable answered a different
@@ -386,6 +411,11 @@ export class GemPerformanceService {
           (point) => point.date < startsOn || point.returnPercent !== null,
         ),
       startsOn,
+      // Only when it really is early: the last plotted date is where a
+      // complete line is expected to finish, and saying "ends on" there would
+      // be a caveat about nothing.
+      endsOn: lastDrawn < lastPlotted ? lastDrawn : null,
+      stoppedBy,
       includedHoldings: bases.map((leg) => ({
         securityId: leg.securityId,
         symbol: leg.symbol,

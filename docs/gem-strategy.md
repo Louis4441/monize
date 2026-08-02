@@ -293,6 +293,14 @@ over the held instruments, but only when the simulation actually came back
 that it fetched something. The provider cooldown and the coverage check inside
 `ensureHistory` keep that from becoming a fetch per read.
 
+**A line that ends early says where and why.** A point needs *every* holding
+priced -- a portfolio simulated from the legs that happen to have data is a
+different portfolio -- so the line ends with the first feed that does.
+`endsOn` and `stoppedBy` carry that out: the last date drawn, and the
+instruments whose prices ran out there, named under the chart because the
+instrument is the thing the user can act on. The window return is `null` rather
+than the figure from the day the feed stopped wearing today's date.
+
 `scripts/gem-price-coverage.sql` answers the same question against a live
 database: how many price rows each held instrument has in the window, how stale
 the newest is, and whether they came from a provider or from transactions.

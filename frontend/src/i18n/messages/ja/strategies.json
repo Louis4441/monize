@@ -163,6 +163,7 @@
       "currentPortfolio": "現在のポートフォリオ — シミュレーション",
       "currentPortfolioNote": "このシミュレーションは、現在の銘柄比率を選択期間の開始時点に当てはめたものです。過去の取引、入出金、現金、為替変動は再現していません。",
       "currentPortfolioLateStart": "現在保有する銘柄の少なくとも一つに選択期間の開始時点からのデータがないため、シミュレーションは途中から始まります。",
+      "currentPortfolioEarlyEnd": "{symbols} にその日以降の価格がないため、シミュレーションは {date} で終了します。残りを描画するには価格履歴を更新してください。",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "戦略の口座に銘柄がないため、シミュレーションするポートフォリオがありません。",
         "UNKNOWN_CURRENT_VALUE": "保有銘柄の一つに現在の評価額がないため、今日の比率が不明でシミュレーションは表示しません。",

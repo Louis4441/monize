@@ -163,6 +163,7 @@
       "currentPortfolio": "Portefeuille van vandaag — simulatie",
       "currentPortfolioNote": "De simulatie zet de huidige verhoudingen van de instrumenten aan het begin van de gekozen periode. Ze geeft geen historische transacties, geldstromen, contanten of valutabewegingen weer.",
       "currentPortfolioLateStart": "De simulatie begint later omdat minstens één van de nu aangehouden instrumenten geen gegevens heeft vanaf het begin van de gekozen periode.",
+      "currentPortfolioEarlyEnd": "De simulatie stopt op {date}, omdat {symbols} daarna geen koersen heeft — ververs de koershistorie om de rest te tekenen.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "De strategierekeningen houden geen instrumenten aan, dus er is geen portefeuille om te simuleren.",
         "UNKNOWN_CURRENT_VALUE": "Eén van de aangehouden instrumenten heeft geen actuele waarde, dus de verhoudingen van vandaag zijn onbekend en de simulatie wordt niet getoond.",

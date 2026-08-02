@@ -163,6 +163,7 @@
       "currentPortfolio": "Portofolio hari ini — simulasi",
       "currentPortfolioNote": "Simulasi menerapkan proporsi instrumen hari ini pada awal periode yang dipilih. Simulasi tidak mereproduksi transaksi historis, arus kas, kas, maupun pergerakan nilai tukar.",
       "currentPortfolioLateStart": "Simulasi dimulai lebih lambat karena setidaknya satu instrumen yang dimiliki sekarang tidak punya data sejak awal periode yang dipilih.",
+      "currentPortfolioEarlyEnd": "Simulasi berhenti pada {date} karena {symbols} tidak memiliki harga setelah tanggal itu — segarkan riwayat harganya untuk menggambar sisanya.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "Rekening strategi tidak memegang instrumen apa pun, jadi tidak ada portofolio untuk disimulasikan.",
         "UNKNOWN_CURRENT_VALUE": "Salah satu instrumen tidak punya nilai saat ini, jadi proporsi hari ini tidak diketahui dan simulasi tidak ditampilkan.",

@@ -163,6 +163,7 @@
       "currentPortfolio": "Heutiges Portfolio — Simulation",
       "currentPortfolioNote": "Die Simulation setzt die heutigen Anteile der Instrumente an den Anfang des gewählten Zeitraums. Sie bildet weder historische Transaktionen noch Zahlungsströme, Barmittel oder Wechselkursbewegungen ab.",
       "currentPortfolioLateStart": "Die Simulation beginnt später, weil mindestens eines der heute gehaltenen Instrumente ab Beginn des gewählten Zeitraums keine Daten hat.",
+      "currentPortfolioEarlyEnd": "Die Simulation endet am {date}, weil {symbols} danach keine Kurse hat — aktualisieren Sie die Kurshistorie, um den Rest zu zeichnen.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "Die Strategiekonten halten keine Instrumente, also gibt es kein Portfolio zu simulieren.",
         "UNKNOWN_CURRENT_VALUE": "Eines der gehaltenen Instrumente hat keinen aktuellen Wert, also sind die heutigen Anteile unbekannt und die Simulation wird nicht gezeigt.",

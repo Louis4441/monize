@@ -163,6 +163,7 @@
       "currentPortfolio": "Dzisiejszy portfel — symulacja",
       "currentPortfolioNote": "Symulacja przyjmuje dzisiejsze proporcje instrumentów na początku wybranego okresu. Nie odtwarza historycznych transakcji, przepływów pieniężnych, gotówki ani zmian kursów walut.",
       "currentPortfolioLateStart": "Symulacja zaczyna się później, ponieważ co najmniej jeden z obecnych instrumentów nie ma danych od początku wybranego okresu.",
+      "currentPortfolioEarlyEnd": "Symulacja kończy się {date}, ponieważ {symbols} nie ma cen po tej dacie — odśwież jego historię notowań, aby dorysować resztę.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "Na kontach strategii nie ma żadnych instrumentów, więc nie ma portfela do zasymulowania.",
         "UNKNOWN_CURRENT_VALUE": "Jeden z posiadanych instrumentów nie ma bieżącej wyceny, więc dzisiejsze proporcje są nieznane i symulacja nie jest pokazywana.",

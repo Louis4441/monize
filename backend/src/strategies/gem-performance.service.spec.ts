@@ -540,6 +540,72 @@ describe("GemPerformanceService", () => {
       expect(simulation?.totalReturnPercent).toBeNull();
     });
 
+    it("names the instrument whose prices ran out, and where the line stops", async () => {
+      /**
+       * Invariant: a line that ends early says where and because of what.
+       * Canonical adversarial input: two holdings, one of whose feeds stops
+       * mid-window -- a point needs every leg, so the whole line ends there.
+       * Minimal mutation: return `endsOn: null, stoppedBy: []` unconditionally.
+       * Test that fails under it: this one -- the chart stops mid-air and the
+       * user has nothing to act on.
+       */
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2025-02-14", close: 110 },
+              { date: "2025-08-14", close: 120 },
+            ],
+          ],
+          [
+            "sec-live",
+            [
+              { date: "2024-08-14", close: 10 },
+              { date: "2025-02-14", close: 11 },
+              { date: "2025-08-14", close: 12 },
+            ],
+          ],
+          // Refreshed until February and never again.
+          [
+            "sec-lapsed",
+            [
+              { date: "2024-08-14", close: 20 },
+              { date: "2025-02-14", close: 21 },
+            ],
+          ],
+        ]),
+      );
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-live",
+              symbol: "LIVE",
+              marketValue: 5000,
+              isCash: false,
+            },
+            {
+              securityId: "sec-lapsed",
+              symbol: "LAPSED",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBeNull();
+      expect(simulation?.endsOn).toBe("2025-02-14");
+      // Named, not counted: the user has to know which one to go and refresh.
+      expect(simulation?.stoppedBy).toEqual(["LAPSED"]);
+      // And the window return is unknown rather than February's figure wearing
+      // today's date.
+      expect(simulation?.totalReturnPercent).toBeNull();
+    });
+
     it("explains a simulation that never gets past its zero opening", async () => {
       /**
        * Invariant: a single priceable point is not a line. Rebasing makes the

@@ -37,6 +37,7 @@ import {
   type GemPerformanceRow,
 } from "@/lib/gem-strategy-view";
 import { GemCard, GemEmptyState, GemSwatch, GemUnknown } from "./GemPrimitives";
+import { useDateFormat } from "@/hooks/useDateFormat";
 import { useGemLabels } from "./useGemLabels";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,7 @@ export function GemPerformanceChart({
   const t = useTranslations("strategies");
   const { roleLabel } = useGemLabels();
   const formatChartDate = useChartDateFormat();
+  const { formatDate } = useDateFormat();
   const { formatSignedPercent } = useNumberFormat();
   const [legendOpen, setLegendOpen] = useState(false);
 
@@ -388,6 +390,19 @@ export function GemPerformanceChart({
               {t("gem.chart.currentPortfolioNote")}
               {!simulated.completeRange &&
                 ` ${t("gem.chart.currentPortfolioLateStart")}`}
+              {/* A line stopping mid-chart is fine; stopping without saying
+                  why is not. The instrument is named because that is the thing
+                  the user can act on -- refresh its prices and the line
+                  reaches the end. */}
+              {simulated.endsOn && simulated.stoppedBy.length > 0 && (
+                <>
+                  {" "}
+                  {t("gem.chart.currentPortfolioEarlyEnd", {
+                    date: formatDate(simulated.endsOn),
+                    symbols: simulated.stoppedBy.join(", "),
+                  })}
+                </>
+              )}
             </p>
           )}
           {unavailableSimulation && (

@@ -163,6 +163,7 @@
       "currentPortfolio": "Danh mục hôm nay — mô phỏng",
       "currentPortfolioNote": "Mô phỏng áp dụng tỷ trọng công cụ hôm nay vào đầu kỳ đã chọn. Nó không tái hiện giao dịch lịch sử, dòng tiền, tiền mặt hay biến động tỷ giá.",
       "currentPortfolioLateStart": "Mô phỏng bắt đầu muộn hơn vì ít nhất một công cụ đang nắm giữ không có dữ liệu từ đầu kỳ đã chọn.",
+      "currentPortfolioEarlyEnd": "Mô phỏng dừng ở {date} vì {symbols} không có giá sau ngày đó — hãy làm mới lịch sử giá để vẽ phần còn lại.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "Các tài khoản chiến lược không nắm giữ công cụ nào, nên không có danh mục để mô phỏng.",
         "UNKNOWN_CURRENT_VALUE": "Một công cụ đang nắm giữ không có giá trị hiện tại, nên tỷ trọng hôm nay là chưa biết và mô phỏng không được hiển thị.",

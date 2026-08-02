@@ -243,6 +243,33 @@ describe("GemPerformanceChart", () => {
     ).toBeInTheDocument();
   });
 
+
+  it("says where the simulated line stops, and which instrument stopped it", () => {
+    // A line ending mid-chart is honest; ending without a reason leaves the
+    // user with a question the page could have answered. The instrument is
+    // named because that is the thing they can act on.
+    const performance = gemPerformance();
+    render(
+      <GemPerformanceChart
+        performance={{
+          ...performance,
+          currentPortfolio: {
+            ...performance.currentPortfolio!,
+            endsOn: "2026-06-25",
+            stoppedBy: ["WTAI"],
+          },
+        }}
+        assets={gemAssets}
+        winnerRole="EM_EQUITY"
+        range="1Y"
+        onRangeChange={() => {}}
+      />,
+    );
+
+    expect(
+      screen.getByText(/WTAI has no prices after that date/),
+    ).toBeInTheDocument();
+  });
   it("says why the simulated line starts late", () => {
     const performance = gemPerformance();
     render(
@@ -254,6 +281,8 @@ describe("GemPerformanceChart", () => {
           currentPortfolio: {
             ...performance.currentPortfolio!,
             completeRange: false,
+            endsOn: null,
+            stoppedBy: [],
             startsOn: "2025-02-01",
           },
         }}
@@ -279,6 +308,8 @@ describe("GemPerformanceChart", () => {
             points: [],
             totalReturnPercent: null,
             completeRange: false,
+            endsOn: null,
+            stoppedBy: [],
             startsOn: null,
             includedHoldings: [],
             unavailableReason: "MISSING_PRICE_HISTORY",

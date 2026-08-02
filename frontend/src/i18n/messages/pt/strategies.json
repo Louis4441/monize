@@ -163,6 +163,7 @@
       "currentPortfolio": "Carteira de hoje — simulação",
       "currentPortfolioNote": "A simulação aplica as proporções atuais dos instrumentos no início do período escolhido. Não reproduz transações históricas, fluxos de caixa, dinheiro em conta nem variações cambiais.",
       "currentPortfolioLateStart": "A simulação começa mais tarde porque pelo menos um dos instrumentos detidos hoje não tem dados desde o início do período escolhido.",
+      "currentPortfolioEarlyEnd": "A simulação termina a {date}, porque {symbols} não tem preços depois dessa data — atualize o histórico de preços para desenhar o resto.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "As contas da estratégia não detêm instrumentos, por isso não há carteira a simular.",
         "UNKNOWN_CURRENT_VALUE": "Um dos instrumentos detidos não tem valor atual, por isso as proporções de hoje são desconhecidas e a simulação não é apresentada.",

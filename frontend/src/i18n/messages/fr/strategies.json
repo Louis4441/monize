@@ -163,6 +163,7 @@
       "currentPortfolio": "Portefeuille d’aujourd’hui — simulation",
       "currentPortfolioNote": "La simulation applique les proportions actuelles des instruments au début de la période choisie. Elle ne reproduit ni les transactions passées, ni les flux de trésorerie, ni les liquidités, ni les variations de change.",
       "currentPortfolioLateStart": "La simulation commence plus tard, car au moins un des instruments détenus aujourd’hui n’a pas de données depuis le début de la période choisie.",
+      "currentPortfolioEarlyEnd": "La simulation s’arrête le {date}, car {symbols} n’a pas de cours après cette date : actualisez son historique pour tracer la suite.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "Les comptes de la stratégie ne détiennent aucun instrument : il n’y a pas de portefeuille à simuler.",
         "UNKNOWN_CURRENT_VALUE": "Un des instruments détenus n’a pas de valeur actuelle : les proportions d’aujourd’hui sont inconnues et la simulation n’est pas affichée.",

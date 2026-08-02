@@ -278,6 +278,17 @@ export interface GemCurrentPortfolioSimulation {
   completeRange: boolean;
   /** First date every included holding could be priced on. */
   startsOn: string | null;
+  /**
+   * Last date the line reaches, when that is earlier than the chart's own last
+   * point; null when it runs to the end. A point needs every holding priced,
+   * so the line ends with the first feed that does.
+   */
+  endsOn: string | null;
+  /**
+   * The instruments whose prices ran out there -- what the user has to refresh
+   * for the line to reach the end. Empty when it does.
+   */
+  stoppedBy: string[];
   includedHoldings: Array<{
     securityId: string;
     symbol: string | null;

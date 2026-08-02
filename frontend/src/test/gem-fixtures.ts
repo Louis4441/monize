@@ -235,6 +235,8 @@ export function gemPerformance(
       ],
       totalReturnPercent: 12.8,
       completeRange: true,
+      endsOn: null,
+      stoppedBy: [],
       startsOn: "2024-08-01",
       includedHoldings: [
         { securityId: "sec-spy", symbol: "SPY", weightPercent: 60 },

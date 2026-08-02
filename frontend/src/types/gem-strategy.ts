@@ -269,6 +269,13 @@ export interface GemCurrentPortfolioSimulation {
   /** False when the line starts later than the window the user asked for. */
   completeRange: boolean;
   startsOn: string | null;
+  /**
+   * Last date the line reaches when that is before the chart's own last point;
+   * null when it runs to the end.
+   */
+  endsOn: string | null;
+  /** The instruments whose prices ran out there. Empty when none did. */
+  stoppedBy: string[];
   includedHoldings: Array<{
     securityId: string;
     symbol: string | null;

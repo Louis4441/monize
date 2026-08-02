@@ -163,6 +163,7 @@
       "currentPortfolio": "当前投资组合 — 模拟",
       "currentPortfolioNote": "该模拟把今天的标的比例放在所选区间的起点。它不还原历史交易、现金流、现金或汇率变动。",
       "currentPortfolioLateStart": "模拟开始得较晚，因为当前持有的标的中至少有一只从所选区间开始就没有数据。",
+      "currentPortfolioEarlyEnd": "模拟到 {date} 为止，因为 {symbols} 在该日期之后没有价格 — 刷新其价格历史即可绘制其余部分。",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "策略账户没有持仓，因此没有可模拟的投资组合。",
         "UNKNOWN_CURRENT_VALUE": "其中一只持仓没有当前市值，因此今天的比例未知，不显示模拟。",

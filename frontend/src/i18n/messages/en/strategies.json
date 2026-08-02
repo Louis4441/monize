@@ -163,6 +163,7 @@
       "currentPortfolio": "Today’s portfolio — simulated",
       "currentPortfolioNote": "The simulation applies today’s instrument proportions at the start of the selected period. It does not reproduce historical transactions, cash flows, cash or currency movements.",
       "currentPortfolioLateStart": "The simulation starts later because at least one of the instruments you hold now has no data from the start of the selected period.",
+      "currentPortfolioEarlyEnd": "The simulation stops on {date}, because {symbols} has no prices after that date — refresh its price history to draw the rest.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "The strategy accounts hold no instruments, so there is no portfolio to simulate.",
         "UNKNOWN_CURRENT_VALUE": "One of the instruments held has no current value, so today’s proportions are unknown and the simulation is not shown.",

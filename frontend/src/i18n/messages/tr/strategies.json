@@ -163,6 +163,7 @@
       "currentPortfolio": "Bugünkü portföy — simülasyon",
       "currentPortfolioNote": "Simülasyon, bugünkü enstrüman oranlarını seçilen dönemin başına uygular. Geçmiş işlemleri, nakit akışlarını, nakdi veya kur hareketlerini yeniden üretmez.",
       "currentPortfolioLateStart": "Simülasyon daha geç başlıyor, çünkü şu anda tuttuğunuz enstrümanlardan en az birinin seçilen dönemin başından itibaren verisi yok.",
+      "currentPortfolioEarlyEnd": "Simülasyon {date} tarihinde bitiyor, çünkü {symbols} için bu tarihten sonra fiyat yok — geri kalanını çizmek için fiyat geçmişini yenileyin.",
       "currentPortfolioUnavailable": {
         "NO_HOLDINGS": "Strateji hesaplarında enstrüman yok, dolayısıyla simüle edilecek bir portföy de yok.",
         "UNKNOWN_CURRENT_VALUE": "Tutulan enstrümanlardan birinin güncel değeri yok, bu yüzden bugünkü oranlar bilinmiyor ve simülasyon gösterilmiyor.",
