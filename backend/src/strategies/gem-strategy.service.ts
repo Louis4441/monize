@@ -581,15 +581,16 @@ export class GemStrategyService {
     // Money is reported in the user's default currency: several accounts can be
     // in the strategy, in different currencies, and the totals have to add up.
     const currencyCode = await this.defaultCurrency(userId);
-    const { position, action, noPosition } = await this.positionService.build({
-      userId,
-      strategy,
-      accounts,
-      assetRefs: refs,
-      targetRole: current?.targetRole ?? null,
-      executed: current?.executed ?? false,
-      currencyCode,
-    });
+    const { position, action, noPosition, tradingAccountCount } =
+      await this.positionService.build({
+        userId,
+        strategy,
+        accounts,
+        assetRefs: refs,
+        targetRole: current?.targetRole ?? null,
+        executed: current?.executed ?? false,
+        currencyCode,
+      });
 
     const performance = await this.performanceService.build({
       range,
@@ -626,7 +627,13 @@ export class GemStrategyService {
       signals,
       safeSecurityId: securityByRole.get("SAFE") ?? null,
       notional: position?.totalMarketValue ?? null,
-      accountCount: accounts.length,
+      // Accounts that can actually place an order, not every account the
+      // scenario names. An empty one trades nothing, and charging it a
+      // commission per leg doubled the modelled cost of a strategy set up
+      // across a funded account and an empty one. Floored at one so a run
+      // with a notional but nothing currently held still models the single
+      // order it would take -- `runBacktest` applies the same floor.
+      accountCount: Math.max(1, tradingAccountCount),
       hasEarlierSignals,
       asOf,
     });

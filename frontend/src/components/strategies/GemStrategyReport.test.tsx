@@ -773,6 +773,72 @@ describe("GemStrategyReport", () => {
       expect(mockCreateStrategy).not.toHaveBeenCalled();
     });
 
+    /**
+     * Invariant: the page stays busy until every mutation in flight has
+     * finished, including one another mutation started.
+     * Canonical adversarial input: two overlapping asynchronous operations
+     * sharing one piece of state (testing contract, concurrency).
+     * Minimal mutation: make the busy state a boolean again -- `setIsSaving`
+     * in place of the begin/end pair.
+     * Test that fails under it: this one. The settings form's `finally` runs
+     * straight after `onSaved` started the create, so the boolean went false
+     * with the create still on the wire and the controls came back live.
+     */
+    it("stays busy until the scenario the save deferred has been created", async () => {
+      const pendingCreate = deferred<unknown>();
+      mockUpdateConfig.mockResolvedValue(gemReport());
+      mockCreateStrategy.mockReturnValue(pendingCreate.promise);
+
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+
+      // Ask to create a scenario, which the dirty form defers behind the
+      // dialog, then answer "Save".
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "New scenario" }));
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Scenario name"), {
+          target: { value: "IKZE quarterly" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
+      });
+      await act(async () => {
+        fireEvent.click(dialogSave());
+      });
+      await act(async () => {});
+
+      // The settings save has resolved and started the create, which has not.
+      expect(mockCreateStrategy).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByRole("button", { name: "New scenario" }),
+      ).toBeDisabled();
+
+      await act(async () => {
+        pendingCreate.settle(gemReport());
+      });
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "New scenario" }),
+        ).not.toBeDisabled(),
+      );
+    });
+
     it("creates the scenario with the name it was given once the edits are discarded", async () => {
       mockCreateStrategy.mockResolvedValue(gemReport());
       await renderReport();

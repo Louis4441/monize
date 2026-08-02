@@ -257,6 +257,66 @@ describe("runBacktest", () => {
    * Minimal mutation: charge `legs` trades instead of `legs * ordersPerLeg`.
    * Test that fails under it: this one -- three accounts read as one.
    */
+  /**
+   * Invariant: the acquisition commission is part of the tax basis, in the
+   * simulation as in the live report.
+   * Canonical adversarial input: money with a fee alongside the principal,
+   * carried across a boundary (testing contract, money precision).
+   * Minimal mutation: move `legEntryEquity = equity` back below the buy
+   * commission. Test that fails under it: this one -- the tax comes out on a
+   * basis of 0.99 rather than 1.
+   */
+  it("counts the buy commission in the basis the next switch is taxed on", () => {
+    const result = runBacktest(
+      input({
+        periods: [
+          {
+            effectiveFrom: "2024-01-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+            previousRole: null,
+          },
+          {
+            effectiveFrom: "2024-07-01",
+            targetRole: "EM_EQUITY",
+            targetSecurityId: "sec-emim",
+            previousRole: "US_EQUITY",
+          },
+        ],
+        seriesBySecurity: new Map([
+          ["sec-spy", series({ "2024-01-01": 100, "2024-07-01": 110 })],
+          ["sec-emim", series({ "2024-07-01": 10, "2025-01-01": 10 })],
+        ]),
+        taxRatePercent: 20,
+        commissionAmount: 100,
+        notional: 10_000,
+        accountCount: 1,
+      }),
+    );
+
+    const fee = 0.01; // 100 against a 10,000 notional
+    // The whole sum committed to the position, fee included -- what the
+    // purchase cost, not what ended up invested. This is the one line the
+    // test exists for.
+    const basis = 1;
+    const grossAtSwitch = (basis - fee) * 1.1;
+    const tax = (grossAtSwitch - basis) * 0.2;
+    const finalEquity = grossAtSwitch - tax - fee - fee;
+    const years = 366 / 365.25;
+
+    expect(result?.cagrPercent).toBeCloseTo(
+      (Math.pow(finalEquity, 1 / years) - 1) * 100,
+      2,
+    );
+
+    // And not this: a basis of 0.99 taxes the fee as though it were profit.
+    const understated = grossAtSwitch - (grossAtSwitch - (basis - fee)) * 0.2;
+    expect(result?.cagrPercent).not.toBeCloseTo(
+      (Math.pow(understated - fee - fee, 1 / years) - 1) * 100,
+      2,
+    );
+  });
+
   it("charges the commission once per account, not once per switch", () => {
     const oneAccount = runBacktest(
       input({ commissionAmount: 100, notional: 10_000, accountCount: 1 }),

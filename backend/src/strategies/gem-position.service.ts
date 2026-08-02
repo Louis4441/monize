@@ -37,6 +37,16 @@ export interface GemPositionResult {
   action: GemActionView | null;
   /** True when the strategy has accounts but none of them holds anything. */
   noPosition: boolean;
+  /**
+   * How many of the strategy's accounts hold a position or cash, and so can
+   * place an order. Zero when the accounts are all empty.
+   *
+   * The backtest sizes its per-leg commission on this rather than on the
+   * number of accounts configured: an account with nothing in it places no
+   * order, and charging one doubled the modelled cost of a strategy set up
+   * across a funded account and an empty one.
+   */
+  tradingAccountCount: number;
 }
 
 /**
@@ -194,9 +204,22 @@ export class GemPositionService {
            JOIN securities s ON s.id = h.security_id
           WHERE h.account_id = ANY($1::uuid[])
             AND s.user_id = $2
+            -- Rows the account no longer holds anything under. A full sale
+            -- leaves the holding behind at quantity zero rather than deleting
+            -- it, and an emptied account then survived into account_ids --
+            -- where a switch counts it as an account to sell out of and buy
+            -- into, at two commissions for a pair of orders nobody places. It
+            -- also demanded a replayed lot for a position that is not there,
+            -- which could take the whole cost basis to unknown.
+            --
+            -- Filtered per row and before the aggregates, so the account drops
+            -- out of array_agg and jsonb_object_agg as well as out of the sum.
+            -- A security emptied everywhere disappears entirely, which is the
+            -- right answer: it is not held.
+            AND ABS(h.quantity) >= $3
           GROUP BY h.security_id, s.symbol, s.name, s.currency_code,
                    s.country_weightings, s.asset_weightings, s.sector_weightings`,
-        [accountIds, userId],
+        [accountIds, userId, QUANTITY_TOLERANCE],
       ),
     );
     return rows.map((row) => ({
@@ -401,8 +424,13 @@ export class GemPositionService {
    *   worth 1,500 against a replayed 500 for half of them shows 1,000 of gain
    *   and 190 of tax where the truth is 500 and 95;
    * - a replay the lot itself reports as unpriced (`basisKnown: false`),
-   *   which is what an `ADD_SHARES` or `REMOVE_SHARES` in the history leaves
-   *   behind.
+   *   which is what an `ADD_SHARES` or `REMOVE_SHARES` leaves behind, and
+   *   equally an acquisition stored with no price at all;
+   * - **a basis denominated in something else.** The replay converts each
+   *   trade into the account that paid for it, which is the funding account
+   *   or the brokerage's linked cash account -- not the brokerage. A PLN
+   *   brokerage funded from a EUR account holds a EUR basis, and setting that
+   *   against a PLN market value reports the exchange rate as profit.
    *
    * The units and the money are two separate questions, and this asks both.
    * The quantity check proves the history accounts for the units; it says
@@ -435,6 +463,14 @@ export class GemPositionService {
       if (currencyByAccount.get(accountId) !== currencyCode) return null;
       const lot = accountCostBases.get(`${accountId}:${holding.securityId}`);
       if (lot === undefined || !lot.basisKnown) return null;
+      // The lot's own currency, not the holding account's. The two differ
+      // whenever the brokerage settles through a linked cash account or the
+      // purchase was funded from elsewhere, because that is the account
+      // `exchangeRate` converted into. Adding a EUR basis to a PLN market
+      // value reported the FX difference as gain and then taxed it. There is
+      // no rate to rescue this with: converting at today's would answer a
+      // question about today, and the acquisition happened at its own.
+      if (lot.currencyCode !== currencyCode) return null;
       const held = holding.quantityByAccount.get(accountId);
       if (held === undefined) return null;
       // The tolerance is the dust threshold the position arithmetic already
@@ -482,7 +518,12 @@ export class GemPositionService {
     const target = targetRole ? (assetRefs.get(targetRole) ?? null) : null;
 
     if (accounts.length === 0) {
-      return { position: null, action: null, noPosition: false };
+      return {
+        position: null,
+        action: null,
+        noPosition: false,
+        tradingAccountCount: 0,
+      };
     }
 
     const securityByRole = new Map<GemAssetRole, string>();
@@ -610,6 +651,31 @@ export class GemPositionService {
       });
     }
 
+    /**
+     * Accounts the strategy can actually place an order in today.
+     *
+     * A configured account holding nothing and carrying no cash trades
+     * nothing: there is no position to sell out of and no money to buy with.
+     * Counting every configured account instead -- which is what the backtest
+     * was handed -- charged a commission per leg for orders nobody places,
+     * doubling the modelled cost of a strategy set up across a funded account
+     * and an empty one.
+     *
+     * Built here rather than at the call site because this is the only place
+     * that has both halves at per-account resolution: the holdings rows are
+     * already filtered for dust, and a cash row exists for every account
+     * whether or not it holds a balance.
+     *
+     * It describes today, and a backtest runs over years in which the
+     * allocation was different. Nothing reconstructs those, so this is an
+     * approximation of the run's trading width and not a claim about what
+     * historically happened.
+     */
+    const fundedAccountIds = new Set<string>([
+      ...aggregated.flatMap((holding) => holding.accountIds),
+      ...cashRows.filter((row) => row.amount !== 0).map((row) => row.accountId),
+    ]);
+
     const math = buildPositionMath(valued, targetRole, {
       securityId: target?.securityId ?? null,
       composition: await this.loadComposition(
@@ -683,6 +749,11 @@ export class GemPositionService {
       executed,
     };
 
-    return { position, action, noPosition: math.holdings.length === 0 };
+    return {
+      position,
+      action,
+      noPosition: math.holdings.length === 0,
+      tradingAccountCount: fundedAccountIds.size,
+    };
   }
 }

@@ -327,16 +327,34 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     // result and costs two legs. The very first buy costs one. Each leg is
     // one order in every account the strategy runs in.
     if (securityId !== previousSecurityId) {
-      const legs = previousSecurityId === null ? 1 : 2;
-      const trades = legs * ordersPerLeg;
-      if (taxRate !== null && previousSecurityId !== null) {
+      const opening = previousSecurityId === null;
+      if (taxRate !== null && !opening) {
+        // On the gross value of the leg being closed. The live report taxes
+        // `marketValue - costBasis` and does not net the disposal commission
+        // off the proceeds, so neither does this: the two estimates have to
+        // answer the same question or the backtest is not a projection of the
+        // page it sits on.
         const gain = equity - legEntryEquity;
         if (gain > 0) equity -= gain * taxRate;
       }
-      if (commissionFraction !== null) {
-        equity -= commissionFraction * trades;
+      // Selling costs one order per account; opening the first position sells
+      // nothing.
+      if (commissionFraction !== null && !opening) {
+        equity -= commissionFraction * ordersPerLeg;
       }
+      // The new leg's basis is the whole sum committed to it -- including the
+      // commission about to be paid to acquire it, exactly as
+      // `calculateCostBasisLotsInAccountCurrency` does for a real purchase.
+      //
+      // Set after the buy commission, this was the amount *invested* rather
+      // than the amount spent, so the fee dropped out of the basis and turned
+      // into taxable gain at the next switch. On 10,000 with a 100 fee that is
+      // a basis of 9,900, a gain overstated by 100, and 20 of tax at 20% that
+      // nobody owes -- compounding at every switch and with every account.
       legEntryEquity = equity;
+      if (commissionFraction !== null) {
+        equity -= commissionFraction * ordersPerLeg;
+      }
       previousSecurityId = securityId;
     }
 

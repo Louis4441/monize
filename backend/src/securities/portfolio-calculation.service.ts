@@ -35,20 +35,42 @@ const LIVE_FX_FETCH_CONCURRENCY = 6;
  * that bar's own date rather than a single near-current rate.
  */
 /** Why a replayed lot's cost basis cannot be trusted against the live holding. */
-export type ReplayedBasisGap = "quantity_only_action";
+export type ReplayedBasisGap =
+  | "quantity_only_action"
+  | "unpriced_acquisition"
+  | "mixed_basis_currency";
 
 /** A position rebuilt from its transactions: what is held, and what it cost. */
 export interface ReplayedLot {
   /** Units the transaction history accounts for. */
   quantity: number;
   /**
-   * Their cost in the holding account's currency, commissions included.
+   * Their cost, commissions included, in `currencyCode`.
    *
    * Only meaningful when `basisKnown`; otherwise it is the cost of the part of
    * the position the history does price, which is a different position.
    */
   costBasis: number;
-  /** False when the replay met a row that moved units without a cost. */
+  /**
+   * The currency `costBasis` is actually denominated in, or null when the
+   * replay could not settle on one.
+   *
+   * **Not** the holding account's currency, which is what this used to be
+   * assumed to be. `InvestmentTransaction.exchangeRate` converts the trade out
+   * of the security's currency and into the *cash or funding* account's -- the
+   * account the money came from -- and that is a different account, with its
+   * own currency, whenever a brokerage settles through a linked cash account
+   * or a purchase is funded from elsewhere. A PLN brokerage funded in EUR
+   * produced a basis in EUR and a caller comparing it against a PLN market
+   * value read the FX difference as gain, then taxed it.
+   *
+   * A caller that reports a gain or a tax must check this against the currency
+   * it is reporting in, and treat a mismatch as unknown rather than converting
+   * at today's rate: the acquisition happened at the historical rate, and
+   * today's would answer a different question.
+   */
+  currencyCode: string | null;
+  /** False when the replay met a row it could not price, or could not denominate. */
   basisKnown: boolean;
   /** Which gap made it unknown, for a caller that reports the reason. */
   basisGap: ReplayedBasisGap | null;
@@ -584,8 +606,14 @@ export class PortfolioCalculationService {
    * each transaction's stored exchange rate.
    *
    * For BUY-like actions (BUY/REINVEST/TRANSFER_IN), cost basis increases by
-   * `quantity * price * exchangeRate` — the amount actually spent in the cash
-   * account's currency at that point in time.
+   * `(quantity * price + commission) * exchangeRate` — the amount actually
+   * spent in the settlement account's currency at that point in time,
+   * including what the acquisition itself cost.
+   *
+   * That currency is reported on the lot rather than assumed, and is **not**
+   * the holding account's: `exchangeRate` targets the funding or linked cash
+   * account. An acquisition with no price, or a lot whose acquisitions settled
+   * in more than one currency, has no basis this can state and says so.
    *
    * For SELL-like actions (SELL/TRANSFER_OUT), cost basis is reduced
    * proportionally using the running average (cost / quantity) so that
@@ -616,8 +644,8 @@ export class PortfolioCalculationService {
    * surplus of 30 units in one account cancel a shortfall of 30 in another and
    * report both bases as reconciled.
    *
-   * @returns Map keyed by `${accountId}:${securityId}` -> the replayed lot in
-   *          the holding account's currency.
+   * @returns Map keyed by `${accountId}:${securityId}` -> the replayed lot,
+   *          each carrying the currency its basis is denominated in.
    */
   async calculateCostBasisLotsInAccountCurrency(
     userId: string,
@@ -639,9 +667,28 @@ export class PortfolioCalculationService {
       }),
     );
 
+    // No history, no lots, and so nothing to denominate. Returning before the
+    // account read keeps the common empty case at one query.
+    if (transactions.length === 0) return result;
+
+    // Where each transaction's converted amount actually landed. Resolved for
+    // the whole batch up front rather than per row: the funding accounts are
+    // an arbitrary set and looking each one up inside the loop would be a
+    // query per transaction.
+    const basisCurrencyByAccount = await this.settlementCurrencies(
+      userId,
+      holdingsAccountIds,
+      transactions,
+    );
+
     const state = new Map<
       string,
-      { quantity: number; costBasis: number; basisGap: ReplayedBasisGap | null }
+      {
+        quantity: number;
+        costBasis: number;
+        currencyCode: string | null;
+        basisGap: ReplayedBasisGap | null;
+      }
     >();
 
     for (const tx of transactions) {
@@ -650,7 +697,12 @@ export class PortfolioCalculationService {
       const key = `${tx.accountId}:${tx.securityId}`;
       let entry = state.get(key);
       if (!entry) {
-        entry = { quantity: 0, costBasis: 0, basisGap: null };
+        entry = {
+          quantity: 0,
+          costBasis: 0,
+          currencyCode: null,
+          basisGap: null,
+        };
         state.set(key, entry);
       }
 
@@ -660,7 +712,6 @@ export class PortfolioCalculationService {
         case InvestmentAction.BUY:
         case InvestmentAction.REINVEST:
         case InvestmentAction.TRANSFER_IN: {
-          const price = Number(tx.price) || 0;
           const exchangeRate = Number(tx.exchangeRate) || 1;
           // What the acquisition cost, which includes what it cost to
           // acquire. Leaving the commission out understates the basis and so
@@ -669,6 +720,41 @@ export class PortfolioCalculationService {
           // phantom tax at 19%. The commission is recorded in the same
           // currency as the trade, so it is converted with it.
           const commission = Number(tx.commission) || 0;
+
+          // `price` is nullable, and an acquisition without one has no cost
+          // this replay can work out. `Number(null) || 0` folded that into a
+          // free purchase: the units joined the position, nothing joined the
+          // basis, and the quantity reconciliation downstream then *passed*
+          // because the units did add up. An incomplete import came out as a
+          // confident gain and a confident tax bill. A row genuinely worth
+          // zero is a different thing and still says so -- an explicit 0.
+          const hasPrice =
+            tx.price !== null && Number.isFinite(Number(tx.price));
+          if (!hasPrice && (quantity !== 0 || commission !== 0)) {
+            entry.quantity += quantity;
+            entry.basisGap ??= "unpriced_acquisition";
+            break;
+          }
+
+          // The currency the converted amount is in, which is the settlement
+          // account's and not this holding account's. Acquisitions settled in
+          // two different currencies cannot be added together at all, and
+          // there is no rate to reconcile them with that would not be
+          // answering today's question about a historical cost.
+          const settledIn = basisCurrencyByAccount.get(
+            tx.fundingAccountId ?? tx.accountId,
+          );
+          if (settledIn === undefined) {
+            entry.quantity += quantity;
+            entry.basisGap ??= "mixed_basis_currency";
+            break;
+          }
+          if (entry.currencyCode === null) entry.currencyCode = settledIn;
+          else if (entry.currencyCode !== settledIn) {
+            entry.basisGap ??= "mixed_basis_currency";
+          }
+
+          const price = Number(tx.price) || 0;
           entry.costBasis += (quantity * price + commission) * exchangeRate;
           entry.quantity += quantity;
           break;
@@ -710,6 +796,11 @@ export class PortfolioCalculationService {
         entry.quantity = 0;
         entry.costBasis = 0;
         entry.basisGap = null;
+        // The currency goes with the basis it described. A position rebought
+        // after closing may well settle somewhere else, and holding the old
+        // currency would call that a mixture when it is simply the next
+        // position.
+        entry.currencyCode = null;
       }
     }
 
@@ -717,12 +808,78 @@ export class PortfolioCalculationService {
       result.set(key, {
         quantity: entry.quantity,
         costBasis: roundMoney(entry.costBasis),
+        currencyCode: entry.currencyCode,
         basisKnown: entry.basisGap === null,
         basisGap: entry.basisGap,
       });
     }
 
     return result;
+  }
+
+  /**
+   * Currency each account settles a trade in, for every account the replay can
+   * be pointed at.
+   *
+   * A brokerage does not hold the cash: `InvestmentTransactionsService` posts
+   * the converted amount to the funding account when the row names one, and
+   * otherwise to the brokerage's linked cash account -- so the currency the
+   * stored `exchangeRate` produced belongs to that account, not to the
+   * brokerage. This mirrors that resolution rather than re-deriving it, and
+   * the two must be changed together.
+   *
+   * A brokerage with no linked cash account settles in its own currency, which
+   * is the single-account case and by far the common one.
+   */
+  private async settlementCurrencies(
+    userId: string,
+    holdingsAccountIds: string[],
+    transactions: InvestmentTransaction[],
+  ): Promise<Map<string, string>> {
+    const wanted = new Set<string>(holdingsAccountIds);
+    for (const tx of transactions) {
+      if (tx.fundingAccountId) wanted.add(tx.fundingAccountId);
+    }
+
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { userId, id: In([...wanted]) },
+        select: {
+          id: true,
+          currencyCode: true,
+          accountSubType: true,
+          linkedAccountId: true,
+        },
+      }),
+    );
+    const byId = new Map(accounts.map((account) => [account.id, account]));
+
+    // A linked cash account is not necessarily one of the above -- it is not a
+    // holdings account and need never have funded a row explicitly.
+    const linkedIds = accounts
+      .map((account) => account.linkedAccountId)
+      .filter((id): id is string => Boolean(id) && !byId.has(id as string));
+    if (linkedIds.length > 0) {
+      const linked = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Account).find({
+          where: { userId, id: In(linkedIds) },
+          select: { id: true, currencyCode: true },
+        }),
+      );
+      for (const account of linked) byId.set(account.id, account);
+    }
+
+    const settlement = new Map<string, string>();
+    for (const account of byId.values()) {
+      const linked =
+        account.accountSubType === AccountSubType.INVESTMENT_BROKERAGE &&
+        account.linkedAccountId
+          ? byId.get(account.linkedAccountId)
+          : undefined;
+      const currency = (linked ?? account).currencyCode;
+      if (currency) settlement.set(account.id, currency);
+    }
+    return settlement;
   }
 
   /**

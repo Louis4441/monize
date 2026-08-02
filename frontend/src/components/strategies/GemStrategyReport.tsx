@@ -66,7 +66,28 @@ export function GemStrategyReport() {
   const router = useRouter();
   const [range, setRange] = useState<GemRange>(GEM_DEFAULT_RANGE);
   const [tab, setTab] = useState<GemTab>("overview");
-  const [isSaving, setIsSaving] = useState(false);
+  /**
+   * How many mutations are in flight, rather than whether one is.
+   *
+   * These nest. "Save and carry on" runs the deferred scenario create or
+   * delete from inside the settings save's own `onSaved`, so the create sets
+   * the flag and the settings form's `finally` -- which runs immediately
+   * afterwards -- cleared it again while the create was still waiting on the
+   * server. The page went live over a mutation nobody had finished: a second
+   * create could be started, or a late response adopted under a newer
+   * selection. A boolean cannot express two owners, and whichever finishes
+   * first speaks for both.
+   */
+  const [pendingMutations, setPendingMutations] = useState(0);
+  const isSaving = pendingMutations > 0;
+  const beginMutation = useCallback(
+    () => setPendingMutations((count) => count + 1),
+    [],
+  );
+  const endMutation = useCallback(
+    () => setPendingMutations((count) => Math.max(0, count - 1)),
+    [],
+  );
   // The scenario on screen. Undefined means "whichever the server picks", which
   // is the user's first -- and the only one until they create a second.
   const [strategyId, setStrategyId] = useState<string | undefined>(undefined);
@@ -155,7 +176,7 @@ export function GemStrategyReport() {
     // screen may belong to the scenario the user has just left.
     if (!signalId || isStaleSelection) return;
     const producedFor = requestKey;
-    setIsSaving(true);
+    beginMutation();
     try {
       adopt(
         await gemStrategyApi.markExecuted(signalId, range, strategyId),
@@ -166,11 +187,13 @@ export function GemStrategyReport() {
       logger.error("Failed to mark the GEM operation as executed:", err);
       toast.error(t("gem.action.markExecutedError"));
     } finally {
-      setIsSaving(false);
+      endMutation();
     }
   }, [
     adopt,
+    beginMutation,
     data?.signal?.id,
+    endMutation,
     isStaleSelection,
     range,
     requestKey,
@@ -194,7 +217,7 @@ export function GemStrategyReport() {
    */
   const handleCreateScenario = useCallback(
     async (name: string) => {
-      setIsSaving(true);
+      beginMutation();
       try {
         const report = await gemStrategyApi.createStrategy(name, range);
         adoptScenario(report);
@@ -208,15 +231,15 @@ export function GemStrategyReport() {
         toast.error(t("gem.scenarios.createError"));
         return "failed" as const;
       } finally {
-        setIsSaving(false);
+        endMutation();
       }
     },
-    [adoptScenario, range, t],
+    [adoptScenario, beginMutation, endMutation, range, t],
   );
 
   const handleDeleteScenario = useCallback(
     async (id: string) => {
-      setIsSaving(true);
+      beginMutation();
       try {
         adoptScenario(await gemStrategyApi.deleteStrategy(id, range));
         setTab("overview");
@@ -227,10 +250,10 @@ export function GemStrategyReport() {
         toast.error(t("gem.scenarios.deleteError"));
         return "failed" as const;
       } finally {
-        setIsSaving(false);
+        endMutation();
       }
     },
-    [adoptScenario, range, t],
+    [adoptScenario, beginMutation, endMutation, range, t],
   );
 
   /**
@@ -305,9 +328,10 @@ export function GemStrategyReport() {
       // A save that ends without `onSaved` was refused. The navigation it was
       // carrying is not owed to a later, unrelated save.
       if (!saving) navigateAfterSave.current = null;
-      setIsSaving(saving);
+      if (saving) beginMutation();
+      else endMutation();
     },
-    [dataKey, data?.strategy.id],
+    [beginMutation, dataKey, data?.strategy.id, endMutation],
   );
 
   /**

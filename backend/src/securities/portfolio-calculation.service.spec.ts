@@ -4,7 +4,7 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
-import { Account } from "../accounts/entities/account.entity";
+import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { HoldingWithMarketValue } from "./portfolio.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
@@ -1337,9 +1337,45 @@ describe("PortfolioCalculationService.buildAllocation", () => {
 describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", () => {
   const userId = "user-1";
 
-  const lots = async (transactions: Array<Partial<InvestmentTransaction>>) => {
+  /**
+   * The accounts a replay resolves settlement currencies against.
+   *
+   * `acct-1` is a plain USD holding account with no linked cash account, so
+   * the fixtures below exercise the same-currency case and their basis comes
+   * back in USD. A test about currency declares its own accounts.
+   */
+  const usdAccounts = [
+    {
+      id: "acct-1",
+      currencyCode: "USD",
+      accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+      linkedAccountId: null,
+    },
+  ];
+
+  const lots = async (
+    transactions: Array<Partial<InvestmentTransaction>>,
+    accounts: Array<Record<string, unknown>> = usdAccounts,
+  ) => {
     const txRepo = { find: jest.fn().mockResolvedValue(transactions) };
-    const service = buildService([[InvestmentTransaction, txRepo]], {});
+    // Two reads: the accounts asked for, then any linked cash account those
+    // named. The second is answered from the same fixture list.
+    const accountRepo = {
+      find: jest.fn(({ where }: { where: { id: { _value: string[] } } }) =>
+        Promise.resolve(
+          accounts.filter((account) =>
+            where.id._value.includes(account.id as string),
+          ),
+        ),
+      ),
+    };
+    const service = buildService(
+      [
+        [InvestmentTransaction, txRepo],
+        [Account, accountRepo],
+      ],
+      {},
+    );
     return service.calculateCostBasisLotsInAccountCurrency(userId, ["acct-1"]);
   };
 
@@ -1368,6 +1404,7 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
     expect(replayed.get("acct-1:sec-a")).toEqual({
       quantity: 100,
       costBasis: 1020,
+      currencyCode: "USD",
       basisKnown: true,
       basisGap: null,
     });
@@ -1453,6 +1490,7 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
       expect(replayed.get("acct-1:sec-a")).toEqual({
         quantity: 100,
         costBasis: 500,
+        currencyCode: "USD",
         basisKnown: false,
         basisGap: "quantity_only_action",
       });
@@ -1469,6 +1507,7 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
       expect(replayed.get("acct-1:sec-a")).toEqual({
         quantity: 50,
         costBasis: 1000,
+        currencyCode: "USD",
         basisKnown: false,
         basisGap: "quantity_only_action",
       });
@@ -1486,6 +1525,7 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
       expect(replayed.get("acct-1:sec-a")).toEqual({
         quantity: 200,
         costBasis: 1000,
+        currencyCode: "USD",
         basisKnown: true,
         basisGap: null,
       });
@@ -1512,6 +1552,7 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
       expect(replayed.get("acct-1:sec-a")).toEqual({
         quantity: 10,
         costBasis: 200,
+        currencyCode: "USD",
         basisKnown: true,
         basisGap: null,
       });
@@ -1526,8 +1567,167 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
       expect(replayed.get("acct-1:sec-a")).toEqual({
         quantity: 100,
         costBasis: 1000,
+        currencyCode: "USD",
         basisKnown: true,
         basisGap: null,
+      });
+    });
+  });
+
+  /**
+   * Invariant: every component of a cost basis is known before the total is.
+   * Canonical adversarial input: a nullable money column left null (testing
+   * contract, money precision / missing data).
+   * Minimal mutation: restore `const price = Number(tx.price) || 0` at the top
+   * of the acquisition branch.
+   * Test that fails under it: each of the two below -- the basis comes back
+   * known, having counted the units and none of their cost.
+   */
+  describe("acquisitions with no price", () => {
+    const buy = (quantity: number, price: number | null) =>
+      ({
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        quantity,
+        price,
+        commission: 0,
+        exchangeRate: 1,
+      }) as InvestmentTransaction;
+
+    it("marks the basis unknown for a wholly unpriced holding", async () => {
+      const replayed = await lots([buy(100, null)]);
+
+      expect(replayed.get("acct-1:sec-a")).toEqual({
+        quantity: 100,
+        costBasis: 0,
+        currencyCode: null,
+        basisKnown: false,
+        basisGap: "unpriced_acquisition",
+      });
+    });
+
+    it("marks the basis unknown when only some of the history is priced", async () => {
+      const replayed = await lots([buy(50, 10), buy(50, null)]);
+
+      // The dangerous shape: 100 units against 100 units, so the quantity
+      // reconciliation passes and only the flag stands between an incomplete
+      // import and a confident 1,000 of gain on a 1,500 market value.
+      expect(replayed.get("acct-1:sec-a")).toEqual({
+        quantity: 100,
+        costBasis: 500,
+        currencyCode: "USD",
+        basisKnown: false,
+        basisGap: "unpriced_acquisition",
+      });
+    });
+
+    it("treats an explicit zero price as the price it is", async () => {
+      // Free shares are a known cost, not a missing one. Folding the two
+      // together is what the fix must not do in the other direction.
+      const replayed = await lots([buy(100, 0)]);
+
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        quantity: 100,
+        costBasis: 0,
+        basisKnown: true,
+      });
+    });
+  });
+
+  /**
+   * Invariant: a monetary amount keeps the currency it was calculated into.
+   * Canonical adversarial input: three currencies in one trade (testing
+   * contract, currency conversion).
+   * Minimal mutation: hardcode the lot's `currencyCode` to the holding
+   * account's currency. Test that fails under it: the linked-cash and
+   * funding-account cases below.
+   */
+  describe("the currency a basis is denominated in", () => {
+    const brokerage = (linkedAccountId: string | null, currency: string) => ({
+      id: "acct-1",
+      currencyCode: currency,
+      accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+      linkedAccountId,
+    });
+
+    const buy = (overrides: Partial<InvestmentTransaction> = {}) =>
+      ({
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        quantity: 10,
+        price: 100,
+        commission: 0,
+        exchangeRate: 0.9,
+        ...overrides,
+      }) as InvestmentTransaction;
+
+    it("reports the linked cash account's currency, not the brokerage's", async () => {
+      // `exchangeRate` converted the trade into the account that paid for it.
+      // A PLN brokerage settling through a EUR cash account holds a basis in
+      // EUR; calling it PLN and setting it beside a PLN market value reports
+      // the exchange rate as profit and taxes it.
+      const replayed = await lots(
+        [buy()],
+        [
+          brokerage("cash-eur", "PLN"),
+          { id: "cash-eur", currencyCode: "EUR", linkedAccountId: null },
+        ],
+      );
+
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        costBasis: 900,
+        currencyCode: "EUR",
+        basisKnown: true,
+      });
+    });
+
+    it("reports the funding account's currency when the row names one", async () => {
+      const replayed = await lots(
+        [buy({ fundingAccountId: "fund-eur" })],
+        [
+          brokerage(null, "PLN"),
+          { id: "fund-eur", currencyCode: "EUR", linkedAccountId: null },
+        ],
+      );
+
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        currencyCode: "EUR",
+        basisKnown: true,
+      });
+    });
+
+    it("refuses a basis whose acquisitions settled in two currencies", async () => {
+      // There is no rate that reconciles these. Converting at today's would
+      // answer a question about today; each leg was paid at its own.
+      const replayed = await lots(
+        [buy(), buy({ fundingAccountId: "fund-pln", exchangeRate: 4 })],
+        [
+          brokerage("cash-eur", "PLN"),
+          { id: "cash-eur", currencyCode: "EUR", linkedAccountId: null },
+          { id: "fund-pln", currencyCode: "PLN", linkedAccountId: null },
+        ],
+      );
+
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        basisKnown: false,
+        basisGap: "mixed_basis_currency",
+      });
+    });
+
+    it("reports the brokerage's own currency when it settles itself", async () => {
+      // The ordinary single-account case, and the one that must not regress:
+      // no linked cash account, no funding account, so the money stayed put.
+      const replayed = await lots(
+        [buy({ exchangeRate: 1 })],
+        [brokerage(null, "CAD")],
+      );
+
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        costBasis: 1000,
+        currencyCode: "CAD",
+        basisKnown: true,
       });
     });
   });

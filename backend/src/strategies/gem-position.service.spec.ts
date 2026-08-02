@@ -29,9 +29,15 @@ const lot = (
   quantity: number,
   costBasis: number,
   basisGap: ReplayedBasisGap | null = null,
+  // The report's own currency, so a fixture that says nothing about currency
+  // exercises the ordinary same-currency case. A lot in something else is a
+  // lot the report must not add to a market value, and a test for that says
+  // so explicitly.
+  currencyCode: string | null = "USD",
 ): ReplayedLot => ({
   quantity,
   costBasis,
+  currencyCode,
   basisKnown: basisGap === null,
   basisGap,
 });
@@ -233,7 +239,59 @@ describe("GemPositionService", () => {
     expect(sql).toContain("s.user_id = $2");
     expect(params[1]).toBe("user-1");
     // Every holding counts, not just the strategy's own instruments.
-    expect(params).toHaveLength(2);
+    //
+    // The third parameter is the dust threshold: a row left at quantity zero
+    // by a full sale is not a holding, and counting its account meant a switch
+    // was estimated to sell out of and buy into an account that holds nothing.
+    expect(sql).toContain("ABS(h.quantity) >= $3");
+    expect(params[2]).toBe(0.0001);
+    expect(params).toHaveLength(3);
+  });
+
+  /**
+   * Invariant: only accounts that can place an order are counted as trading.
+   * Canonical adversarial input: a collection holding an element that looks
+   * present and is not (testing contract, collections).
+   * Minimal mutation: pass `accounts.length` as `tradingAccountCount`.
+   * Test that fails under it: this one.
+   */
+  it("counts only the accounts holding something as trading accounts", async () => {
+    // `acct-2` is configured but holds nothing and carries no cash. It places
+    // no order, so charging the backtest a commission for it doubles the
+    // modelled cost of every leg.
+    const result = await build();
+
+    expect(result.tradingAccountCount).toBe(1);
+  });
+
+  it("counts an account holding only cash as a trading account", async () => {
+    // Cash is not a position, but it is what a purchase is made with, so the
+    // account does place an order.
+    cashRows = [
+      {
+        owner_account_id: "acct-2",
+        current_balance: "5000",
+        currency_code: "USD",
+      },
+    ];
+
+    const result = await build();
+
+    expect(result.tradingAccountCount).toBe(2);
+  });
+
+  it("does not count an account whose cash balance is zero", async () => {
+    cashRows = [
+      {
+        owner_account_id: "acct-2",
+        current_balance: "0",
+        currency_code: "USD",
+      },
+    ];
+
+    const result = await build();
+
+    expect(result.tradingAccountCount).toBe(1);
   });
 
   it("counts an instrument the strategy never assigned", async () => {
@@ -389,9 +447,11 @@ describe("GemPositionService", () => {
       },
     ];
     accountCurrencyRows = [{ id: "acct-1", currency_code: "PLN" }];
-    // 10 units bought at 100 USD when USD/PLN was 3.00: 3,000 PLN.
+    // 10 units bought at 100 USD when USD/PLN was 3.00: 3,000 PLN. The lot
+    // says PLN because that is where the money came from -- the report reads
+    // that field rather than assuming the holding account's currency.
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", lot(10, 3000)]]),
+      new Map([["acct-1:sec-spy", lot(10, 3000, null, "PLN")]]),
     );
     // Unchanged at 100 USD, but USD/PLN is now 4.00: 4,000 PLN.
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
@@ -440,6 +500,45 @@ describe("GemPositionService", () => {
     expect(result.action?.realizedGainLoss).toBeNull();
     expect(result.action?.estimatedTax).toBeNull();
     expect(result.position?.totalMarketValue).toBe(1500);
+  });
+
+  /**
+   * Invariant: a monetary amount keeps the currency it was calculated into.
+   * Canonical adversarial input: currency conversion where the two sides
+   * disagree (testing contract, currency conversion).
+   * Minimal mutation: drop the `lot.currencyCode !== currencyCode` guard in
+   * `historicalCostBasis`. Test that fails under it: this one -- a gain of
+   * 3,500 and a tax of 665 appear where the truth is unknown.
+   */
+  it("refuses a basis denominated in something other than the report", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        cost_basis: "1000",
+        currency_code: "USD",
+        account_quantities: { "acct-1": "10" },
+      },
+    ];
+    accountCurrencyRows = [{ id: "acct-1", currency_code: "PLN" }];
+    // A PLN brokerage funded from a EUR account: the replay converted USD into
+    // EUR, because that is the account that paid. 10 x 100 x 0.90.
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([["acct-1:sec-spy", lot(10, 900, null, "EUR")]]),
+    );
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 110]]));
+    exchangeRates.getLatestRate.mockResolvedValue(4);
+
+    const result = await build({ currencyCode: "PLN" });
+
+    // The market value is 4,400 PLN and is known. Reading the EUR 900 as PLN
+    // showed 3,500 of gain and 665 of tax, nearly all of it the exchange rate.
+    // The honest historical cost is 4,000 PLN, which nothing here can derive:
+    // today's rate answers today's question, not the purchase's.
+    expect(result.position?.totalMarketValue).toBeCloseTo(4400, 2);
+    expect(result.action?.realizedGainLoss).toBeNull();
+    expect(result.action?.estimatedTax).toBeNull();
   });
 
   it("accepts a replay that reproduces the position exactly", async () => {
@@ -802,7 +901,12 @@ describe("GemPositionService", () => {
 
   it("returns nothing when the strategy has no accounts", async () => {
     const result = await build({ accounts: [] });
-    expect(result).toEqual({ position: null, action: null, noPosition: false });
+    expect(result).toEqual({
+      position: null,
+      action: null,
+      noPosition: false,
+      tradingAccountCount: 0,
+    });
     expect(manager.query).not.toHaveBeenCalled();
   });
 

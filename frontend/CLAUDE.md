@@ -245,6 +245,18 @@ belonging to a selection nobody was on, with no refetch behind it. A key
 comparison that silently drops the common case looks exactly like one that
 works.
 
+### A busy flag shared by nesting operations is a counter, not a boolean
+
+One mutation can start another -- "save and carry on" runs the deferred
+scenario create from inside the settings save's own `onSaved`. With a single
+boolean the inner operation sets it, the outer one's `finally` runs
+immediately afterwards and clears it, and the page goes live over a request
+still on the wire: a second create can be started, and a late response can be
+adopted under a newer selection. Whichever finishes first speaks for both.
+
+Count the operations in flight and derive the flag (`pending > 0`). Every
+begin needs exactly one end, on both the success and the failure path.
+
 ### Nothing interactive goes inside a `<button>` or an `<a>`
 
 The parser closes the outer element at the inner tag, so the click target ends

@@ -128,6 +128,22 @@ grew a column selects more than one row now; a query still written against the
 old key returns whichever the database offers first. Grep for reads of a
 unique key in the migration that widens it.
 
+## A money value carries the currency it was calculated into
+
+Not the currency of the account it is filed under. `InvestmentTransaction.exchangeRate`
+converts a trade out of the security's currency and into the *settlement*
+account's -- the funding account when the row names one, otherwise the
+brokerage's linked cash account -- so a replayed cost basis is denominated
+there, and a PLN brokerage funded from EUR holds a EUR basis. A consumer that
+assumed the holding account's currency set that against a PLN market value and
+reported the exchange rate as profit, then taxed it.
+
+So the amount and its currency travel together (`ReplayedLot.currencyCode`),
+and a consumer compares that field against what it is reporting in. A mismatch
+is **unknown**, not a conversion: today's rate answers today's question, and
+the acquisition happened at its own. Two acquisitions that settled in
+different currencies cannot be summed at all.
+
 ## A fallback answers only the question it was asked
 
 A lookup that fails is a fact about *that* lookup. A stale scenario id that no
