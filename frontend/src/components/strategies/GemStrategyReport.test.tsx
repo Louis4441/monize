@@ -311,4 +311,103 @@ describe("GemStrategyReport", () => {
       screen.getByText(/No instrument is assigned to:/),
     ).toBeInTheDocument();
   });
+
+  /**
+   * The report on screen and the scenario selected can drift apart, because
+   * the loader keeps the previous report visible while the next one arrives.
+   * That is the right thing to look at and the wrong thing to act on: between
+   * picking scenario B and B's report landing, the page still shows A -- A's
+   * signal id on the button, A's settings in the form. Every one of these
+   * proved reproducible against the unkeyed state.
+   */
+  describe("a selection the rendered report does not describe", () => {
+    /** A promise the test resolves when it chooses. */
+    const deferred = <T,>() => {
+      let settle: (value: T) => void = () => {};
+      const promise = new Promise<T>((resolve) => {
+        settle = resolve;
+      });
+      return { promise, settle };
+    };
+
+    const switchRange = async (label: string) => {
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: label }));
+      });
+    };
+
+    it("will not mark a signal while the newly selected range is still loading", async () => {
+      await renderReport();
+      const pending = deferred<unknown>();
+      mockGetReport.mockReturnValue(pending.promise);
+
+      await switchRange("3M");
+
+      // A is still on screen, B is in flight: the action is not available.
+      const button = screen.getAllByRole("button", {
+        name: /Mark as executed/,
+      })[0];
+      await act(async () => {
+        fireEvent.click(button);
+      });
+      expect(mockMarkExecuted).not.toHaveBeenCalled();
+
+      await act(async () => {
+        pending.settle(gemReport());
+      });
+      // ...and it comes back once the two agree again.
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("button", { name: /Mark as executed/ })[0],
+        ).not.toBeDisabled(),
+      );
+    });
+
+    it("discards a mutation response produced for a range the user has left", async () => {
+      await renderReport();
+
+      // A slow mark-executed for 1Y, then the user moves to 3M mid-flight.
+      const slowMutation = deferred<unknown>();
+      mockMarkExecuted.mockReturnValue(slowMutation.promise);
+      const button = screen.getAllByRole("button", {
+        name: /Mark as executed/,
+      })[0];
+      await act(async () => {
+        fireEvent.click(button);
+      });
+      expect(mockMarkExecuted).toHaveBeenCalledTimes(1);
+
+      const threeMonth = gemReport();
+      threeMonth.performance = { ...threeMonth.performance!, range: "3M" };
+      mockGetReport.mockResolvedValue(threeMonth);
+      await switchRange("3M");
+
+      // The 1Y response now lands. It describes a range nobody is looking at.
+      const oneYear = gemReport();
+      oneYear.performance = { ...oneYear.performance!, range: "1Y" };
+      await act(async () => {
+        slowMutation.settle(oneYear);
+      });
+
+      expect(screen.getByRole("button", { name: "3M" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    it("does not leave a failed load looking like the new selection", async () => {
+      await renderReport();
+      mockGetReport.mockRejectedValue(new Error("boom"));
+
+      await switchRange("3M");
+
+      // The old report must not stay on screen as though it were the new
+      // range's; the shared error presentation takes over instead.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: /Mark as executed/ }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+  });
 });

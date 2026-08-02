@@ -91,6 +91,15 @@ interface GemSettingsFormProps {
   range: GemRange;
   /** Receives the refreshed report the save returns. */
   onSaved: (report: GemStrategyReport) => void;
+  /**
+   * Told when a save starts and when it ends.
+   *
+   * The parent owns the scenario and range controls, and a save is scoped to
+   * the pair that was selected when it began. Without this the form's save was
+   * invisible from up there, so a response for scenario A could land after the
+   * user had moved to B and be adopted as B's report.
+   */
+  onSavingChange?: (saving: boolean) => void;
 }
 
 /**
@@ -103,6 +112,7 @@ export function GemSettingsForm({
   assets,
   range,
   onSaved,
+  onSavingChange,
 }: GemSettingsFormProps) {
   const t = useTranslations("strategies");
   const { roleLabel, roleDescription } = useGemLabels();
@@ -336,6 +346,7 @@ export function GemSettingsForm({
 
   const onSubmit = async (values: ConfigFormValues) => {
     setIsSaving(true);
+    onSavingChange?.(true);
     try {
       const report = await gemStrategyApi.updateConfig(
         {
@@ -366,6 +377,7 @@ export function GemSettingsForm({
       toast.error(getErrorMessage(error, t("gem.settingsForm.saveError")));
     } finally {
       setIsSaving(false);
+      onSavingChange?.(false);
     }
   };
 

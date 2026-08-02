@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
@@ -70,8 +70,17 @@ export function GemStrategyReport() {
   // is the user's first -- and the only one until they create a second.
   const [strategyId, setStrategyId] = useState<string | undefined>(undefined);
 
+  /**
+   * What the report on screen is a report *of*: the scenario and the chart
+   * range together. Everything the page can act on is scoped to this pair, so
+   * it is the identity a response has to match before it may be adopted or
+   * acted upon.
+   */
+  const requestKey = `${range}|${strategyId ?? ""}`;
+
   const {
     data,
+    dataKey,
     isLoading,
     error,
     reload,
@@ -79,13 +88,33 @@ export function GemStrategyReport() {
   } = useReportData<GemStrategyReportData>(
     () => gemStrategyApi.getReport(range, strategyId),
     [range, strategyId],
+    { requestKey },
   );
 
   /**
-   * Every mutation here answers with the refreshed report, so the response is
-   * adopted rather than triggering a second read of the same thing.
+   * True while what is rendered does not describe the current selection.
+   *
+   * The hook keeps the previous report visible during a load, which is the
+   * right thing to look at and the wrong thing to act on: between selecting
+   * scenario B and its report arriving, the page still shows A -- A's signal
+   * id on the button, A's settings in the form. Every mutation is disabled
+   * until the two agree again, so an action can only ever be aimed at the
+   * report the user is actually reading.
    */
-  const adopt = setReport;
+  const isStaleSelection = isLoading || dataKey !== requestKey;
+
+  /**
+   * Every mutation here answers with the refreshed report, so the response is
+   * adopted rather than triggering a second read of the same thing -- but only
+   * when the selection it was produced for is still the one on screen. A
+   * settings save for scenario A that lands after the user moved to B would
+   * otherwise retire B's fetch and put A back under B's selection.
+   */
+  const adopt = useCallback(
+    (report: GemStrategyReportData, producedFor: string = requestKey) =>
+      setReport(report, producedFor),
+    [setReport, requestKey],
+  );
 
   /**
    * A mutation that changed *which* scenario is on screen -- creating one,
@@ -95,8 +124,11 @@ export function GemStrategyReport() {
    */
   const adoptScenario = useCallback(
     (report: GemStrategyReportData) => {
-      setReport(report);
+      // Deliberately unkeyed: this response *is* the new selection, so there
+      // is no earlier key for it to match. The id is set from it, which moves
+      // the key to the scenario the server decided on.
       setStrategyId(report.strategy.id ?? undefined);
+      setReport(report);
     },
     [setReport],
   );
@@ -114,10 +146,16 @@ export function GemStrategyReport() {
 
   const handleMarkExecuted = useCallback(async () => {
     const signalId = data?.signal?.id;
-    if (!signalId) return;
+    // Never act on a report that is not the current selection's: the id on
+    // screen may belong to the scenario the user has just left.
+    if (!signalId || isStaleSelection) return;
+    const producedFor = requestKey;
     setIsSaving(true);
     try {
-      adopt(await gemStrategyApi.markExecuted(signalId, range, strategyId));
+      adopt(
+        await gemStrategyApi.markExecuted(signalId, range, strategyId),
+        producedFor,
+      );
       toast.success(t("gem.action.markExecutedSuccess"));
     } catch (err) {
       logger.error("Failed to mark the GEM operation as executed:", err);
@@ -125,7 +163,15 @@ export function GemStrategyReport() {
     } finally {
       setIsSaving(false);
     }
-  }, [adopt, data?.signal?.id, range, strategyId, t]);
+  }, [
+    adopt,
+    data?.signal?.id,
+    isStaleSelection,
+    range,
+    requestKey,
+    strategyId,
+    t,
+  ]);
 
   const handleAddTransactions = useCallback(() => {
     router.push("/investments");
@@ -183,14 +229,44 @@ export function GemStrategyReport() {
   );
 
   /**
-   * The save returns the strategy re-evaluated with its new configuration, so
-   * the page takes it as-is. The scenario id is deliberately left alone: the
-   * save never moves the user to a different one, and the first save creates
-   * the only scenario there is, which is what an unset id already resolves to.
+   * The selection a settings save was started under.
+   *
+   * A save is a slow round trip and the user can change scenario or range
+   * while it runs. Recording the key when the form begins lets the response be
+   * matched against it: for the selection it belongs to it is adopted, and for
+   * any other it is dropped and the newer fetch stands.
    */
-  const handleConfigSaved = adopt;
+  const savingForKey = useRef<string | null>(null);
+  const handleSettingsSaving = useCallback(
+    (saving: boolean) => {
+      savingForKey.current = saving ? requestKey : null;
+      setIsSaving(saving);
+    },
+    [requestKey],
+  );
 
-  if (error && !data) {
+  /**
+   * The save returns the strategy re-evaluated with its new configuration, so
+   * the page takes it as-is -- provided the user is still looking at what was
+   * saved. The scenario id is deliberately left alone: the save never moves the
+   * user to a different one, and the first save creates the only scenario there
+   * is, which is what an unset id already resolves to.
+   */
+  const handleConfigSaved = useCallback(
+    (report: GemStrategyReportData) =>
+      adopt(report, savingForKey.current ?? requestKey),
+    [adopt, requestKey],
+  );
+
+  // A failed load of a *new* selection cannot fall back to the old report.
+  //
+  // Keeping the previous one visible is right while the next is on its way and
+  // wrong once it has failed: the page would then present scenario A, with A's
+  // signal and A's numbers, as though it were the B the user asked for -- and
+  // the actions on it would be aimed at A. `dataKey` is what tells the two
+  // situations apart, because the hook stamps a failure with the key it was
+  // loading rather than leaving the previous one in place.
+  if (error && (!data || dataKey !== requestKey)) {
     return (
       <div className="px-4 pt-6 pb-8 sm:px-6 lg:px-12">
         <ReportError message={t("gem.error.loadFailed")} onRetry={reload} />
@@ -234,7 +310,7 @@ export function GemStrategyReport() {
         onSelectScenario={setStrategyId}
         onCreateScenario={handleCreateScenario}
         onDeleteScenario={handleDeleteScenario}
-        scenarioBusy={isSaving}
+        scenarioBusy={isSaving || isStaleSelection}
         cadence={strategy.cadence}
         nextEvaluationOn={strategy.nextEvaluationOn}
         daysUntilNextEvaluation={strategy.daysUntilNextEvaluation}
@@ -294,7 +370,7 @@ export function GemStrategyReport() {
                 noAccount={codes.has("NO_ACCOUNT")}
                 onMarkExecuted={handleMarkExecuted}
                 onAddTransactions={handleAddTransactions}
-                isSaving={isSaving}
+                isSaving={isSaving || isStaleSelection}
               />
               <GemAllocationCard
                 signal={signal}
@@ -345,7 +421,7 @@ export function GemStrategyReport() {
             noAccount={codes.has("NO_ACCOUNT")}
             onMarkExecuted={handleMarkExecuted}
             onAddTransactions={handleAddTransactions}
-            isSaving={isSaving}
+            isSaving={isSaving || isStaleSelection}
           />
         </div>
       )}
@@ -367,6 +443,7 @@ export function GemStrategyReport() {
             assets={assets}
             range={range}
             onSaved={handleConfigSaved}
+            onSavingChange={handleSettingsSaving}
           />
         </div>
       )}
