@@ -103,6 +103,7 @@ export function GemStrategyReport() {
   const {
     data,
     dataKey,
+    askedKey,
     isLoading,
     error,
     reload,
@@ -142,7 +143,16 @@ export function GemStrategyReport() {
   if (
     data?.strategy.id &&
     data.strategy.id !== strategyId &&
-    dataKey === `${range}|${data.strategy.id}`
+    dataKey === `${range}|${data.strategy.id}` &&
+    // Only reconcile with an answer to the question currently being asked.
+    //
+    // Without this the branch could not tell a fallback from a selection the
+    // user had just made: picking scenario B leaves B selected with A's report
+    // still on screen, which reads exactly like "the server gave me A", so the
+    // selection was set straight back to A -- during the same render, before
+    // the effect that would have fetched B ever ran. The caret opened, the
+    // scenario was picked, and nothing happened, every time.
+    askedKey === requestKey
   ) {
     setStrategyId(data.strategy.id);
   }

@@ -10,7 +10,7 @@ import {
   GEM_SUGGESTION_REGIONS,
   GemSuggestedSecurity,
   GemSuggestionRegion,
-  listingKey,
+  symbolKey,
 } from "@/lib/gem-suggested-securities";
 
 interface GemInstrumentSelectProps {
@@ -22,6 +22,17 @@ interface GemInstrumentSelectProps {
   value: string;
   /** Instruments the portfolio already holds and can be pointed at. */
   securities: Security[];
+  /**
+   * Every instrument the user holds, keyed by `symbolKey` -- deactivated ones
+   * included, which is why it is not derived from `securities`.
+   *
+   * A suggestion is "already owned" when this map has its symbol, because that
+   * is exactly when the server would refuse to create it. A deactivated
+   * instrument is absent from the pick-list and still owns its symbol, so
+   * matching against what is merely selectable would offer a create that
+   * cannot succeed.
+   */
+  ownedBySymbol: ReadonlyMap<string, Security>;
   /** Suggested instruments for this role, one per region. */
   suggestions: readonly GemSuggestedSecurity[];
   onChange: (securityId: string) => void;
@@ -51,6 +62,7 @@ export function GemInstrumentSelect({
   label,
   value,
   securities,
+  ownedBySymbol,
   suggestions,
   onChange,
   onPickSuggestion,
@@ -103,12 +115,11 @@ export function GemInstrumentSelect({
    */
   const offered = suggestions.map((suggestion) => ({
     suggestion,
-    // Listing identity, not ticker: the same symbol on another exchange or in
-    // another trading currency is a different instrument, and reusing it would
-    // quietly defeat the region the user picked.
-    owned: securities.find(
-      (security) => listingKey(security) === listingKey(suggestion),
-    ),
+    // Symbol identity, because that is the identity the server enforces: one
+    // security per symbol per user. Requiring the exchange and currency to
+    // agree as well made an instrument the user demonstrably owns look absent,
+    // and the create it then offered was refused every time. See `symbolKey`.
+    owned: ownedBySymbol.get(symbolKey(suggestion)),
   }));
 
   return (

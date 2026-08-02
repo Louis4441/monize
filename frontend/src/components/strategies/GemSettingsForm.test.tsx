@@ -308,18 +308,28 @@ describe("GemSettingsForm", () => {
   });
 
   /**
-   * The suggestions distinguish regional listings on purpose. Matching on the
-   * ticker alone reused whichever same-symbol security the portfolio happened
-   * to hold -- silently assigning a listing in another currency and undoing
-   * the region the user had just picked.
+   * Invariant: a suggestion whose symbol the user already holds is offered as
+   * that instrument, never as something to create.
+   *
+   * The picker used to require the exchange and the currency to agree too, on
+   * the reasoning that CSPX on LSE is not CSPX on SIX. True of the world,
+   * false of this application: `SecuritiesService.create` allows one security
+   * per symbol per user, so the second listing cannot exist. The stricter
+   * match therefore offered a create for an instrument that is already there,
+   * and the server refused it every time -- "Security with symbol EXUS
+   * already exists" on a portfolio holding EXUS.
+   *
+   * Minimal mutation: match on symbol + exchange + currency again.
+   * Test that fails under it: this one -- the entry offers a create.
    */
-  it("does not treat the same ticker on another exchange as owned", async () => {
+  it("treats a held instrument as owned whatever exchange it was entered on", async () => {
     mockGetSecurities.mockResolvedValue([
       {
         id: "sec-emim-six",
         symbol: "EMIM",
         name: "iShares MSCI EM IMI ETF",
-        // The suggested EMIM is LSE/USD; this is a different listing.
+        // Recorded on another exchange, in another currency -- and still the
+        // only EMIM this portfolio can hold.
         exchange: "SIX",
         currencyCode: "CHF",
         isActive: true,
@@ -331,13 +341,42 @@ describe("GemSettingsForm", () => {
       fireEvent.click(roleTrigger("Emerging markets"));
     });
 
-    // Offered for creation, not reused: the owned marker belongs to the exact
-    // listing only.
     expect(
-      screen.queryByRole("option", {
+      screen.getByRole("option", {
         name: /EMIM.*already in your instruments/,
       }),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
+  });
+
+  it("assigns a held instrument the pick-list hides because it is deactivated", async () => {
+    // Reached only through its suggestion: deactivated, so it is not in "Your
+    // instruments". Assigning it has to make it visible, or the field reads
+    // "No instrument" over a real assignment.
+    mockGetSecurities.mockResolvedValue([
+      {
+        id: "sec-emim-old",
+        symbol: "EMIM",
+        name: "iShares MSCI EM IMI ETF",
+        exchange: "LSE",
+        currencyCode: "USD",
+        isActive: false,
+      },
+    ]);
+    await renderForm({
+      assets: gemAssets.map((asset) =>
+        asset.role === "EM_EQUITY"
+          ? { ...asset, securityId: null, symbol: null }
+          : asset,
+      ),
+    });
+
+    await pickInstrument(
+      "Emerging markets",
+      "EMIMiShares MSCI EM IMI ETF · already in your instruments",
+    );
+
+    expect(roleTrigger("Emerging markets")).toHaveTextContent("EMIM");
+    expect(mockCreateSecurity).not.toHaveBeenCalled();
   });
 
   it("saves the assignments and hands the refreshed report back", async () => {
@@ -719,6 +758,59 @@ describe("GemSettingsForm", () => {
         mockCreateSecurity.mock.calls.map(([data]) => data.symbol),
       ).toEqual(["VEU", "EEM", "AGG", "BIL"]);
       expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
+    });
+
+    it("reuses a held instrument whose exchange differs from the suggestion", async () => {
+      /**
+       * Invariant: the picker's "you already have this" is the server's own
+       * uniqueness rule -- one security per symbol per user.
+       * Canonical adversarial input: the same ticker recorded with another
+       * exchange, or with none, which is how an instrument entered by hand or
+       * through an import usually looks.
+       * Minimal mutation: key `ownedBySymbol` on symbol + exchange + currency
+       * again.
+       * Test that fails under it: this one -- EXUS is sent to `createSecurity`
+       * and the server answers "Security with symbol EXUS already exists".
+       */
+      mockGetSecurities.mockResolvedValue([
+        {
+          id: "sec-exus",
+          symbol: "EXUS",
+          name: "Xtrackers MSCI World ex USA UCITS ETF",
+          // Held on another exchange, priced in another currency: still the
+          // only EXUS this user can have.
+          exchange: "GPW",
+          currencyCode: "PLN",
+          isActive: true,
+        },
+      ]);
+      await renderForm(unconfigured());
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Listings to add"), {
+          target: { value: "EUROPE" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: /Add the 5 missing/ }),
+        );
+      });
+
+      expect(
+        mockCreateSecurity.mock.calls.map(([data]) => data.symbol),
+      ).toEqual(["CSPX", "EMIM", "AGGG", "IB01"]);
+      expect(roleTrigger("Developed markets ex-US")).toHaveTextContent("EXUS");
+    });
+
+    it("asks for the deactivated instruments too", async () => {
+      // The pick-list hides them, but they hold their symbols against the
+      // server's uniqueness check, so the question "do I already have this"
+      // cannot be answered from the active ones alone.
+      mockGetSecurities.mockResolvedValue([]);
+      await renderForm(unconfigured());
+
+      expect(mockGetSecurities).toHaveBeenCalledWith(true);
     });
 
     it("keeps an assigned instrument selectable after it is deactivated", async () => {

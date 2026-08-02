@@ -56,6 +56,19 @@ interface UseReportDataResult<T> {
    * data on screen describes a different request and must not be acted on.
    */
   dataKey: string | null;
+  /**
+   * The `requestKey` the current `data` was **asked** for, which is not always
+   * the one it turned out to belong to.
+   *
+   * `dataKey` says what the payload is; this says what question produced it.
+   * They differ exactly when the server answered something else -- the GEM
+   * report falling back to another scenario. A caller that reconciles its
+   * selection with the response needs both, because "the answer to my current
+   * question is about something else" (reconcile) and "I have just changed the
+   * question and nothing has come back yet" (wait) are otherwise the same
+   * state, and treating the second as the first undoes the change.
+   */
+  askedKey: string | null;
 }
 
 export interface UseReportDataOptions<T = unknown> {
@@ -106,6 +119,8 @@ export function useReportData<T>(
 ): UseReportDataResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [dataKey, setDataKey] = useState<string | null>(null);
+  // The key the held data's request was started for. See `askedKey`.
+  const [askedKey, setAskedKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -153,6 +168,7 @@ export function useReportData<T>(
         const settledFor = interpretResult?.(result) ?? startedFor ?? null;
         setData(result);
         setDataKey(settledFor);
+        setAskedKey(startedFor ?? null);
         // The caller is about to move its selection onto this key, which
         // changes `deps`. Without this the effect would fetch again for the
         // report already on screen -- and a failure of that superfluous read
@@ -192,6 +208,7 @@ export function useReportData<T>(
     runIdRef.current += 1;
     setData(value);
     setDataKey(requestKeyRef.current ?? null);
+    setAskedKey(requestKeyRef.current ?? null);
     setError(null);
     setIsLoading(false);
   }, []);
@@ -219,6 +236,9 @@ export function useReportData<T>(
     adoptedKeyRef.current = key === requestKeyRef.current ? null : key;
     setData(value);
     setDataKey(key);
+    // The response declares what it is a report of, and the caller is moving
+    // its selection there: asked and answered are the same key by construction.
+    setAskedKey(key);
     setError(null);
     setIsLoading(false);
   }, []);
@@ -244,5 +264,6 @@ export function useReportData<T>(
     reload: run,
     setData: replace,
     adoptAs,
+    askedKey,
   };
 }

@@ -36,7 +36,7 @@ import {
   GemSuggestedSecurity,
   GemSuggestionRegion,
   suggestionsForRole,
-  listingKey,
+  symbolKey,
 } from "@/lib/gem-suggested-securities";
 import { CreateSecurityData, Security } from "@/types/investment";
 import {
@@ -168,7 +168,11 @@ export function GemSettingsForm({
   } = useReportData(async () => {
     const [accounts, securities] = await Promise.all([
       accountsApi.getAll(),
-      investmentsApi.getSecurities(),
+      // Deactivated instruments included. They are not offered in the
+      // pick-list, but they still hold their symbol against the server's
+      // uniqueness check, so leaving them out made "you already have this"
+      // answer no for an instrument that cannot be created again.
+      investmentsApi.getSecurities(true),
     ]);
     return { accounts, securities };
   }, []);
@@ -279,6 +283,42 @@ export function GemSettingsForm({
   }, [data?.securities, createdSecurities, pickableInactiveIds]);
 
   /**
+   * Every instrument the user holds, by symbol -- deactivated ones included.
+   *
+   * This is the "do I already have it" question, and it is answered with the
+   * server's own rule: one security per symbol per user. Anything narrower
+   * offers the user a create the server will refuse (see `symbolKey`).
+   */
+  const ownedBySymbol = useMemo(() => {
+    const bySymbol = new Map<string, Security>();
+    for (const security of [
+      ...(data?.securities ?? []),
+      ...createdSecurities,
+    ]) {
+      bySymbol.set(symbolKey(security), security);
+    }
+    return bySymbol;
+  }, [data?.securities, createdSecurities]);
+
+  /**
+   * Assign an instrument to a role, making it selectable first when it is one
+   * the pick-list does not offer -- a deactivated instrument reached through
+   * its suggestion. Without that the role is set to an id the trigger cannot
+   * resolve, and the field reads "No instrument" over a real assignment.
+   */
+  const assignToRole = (role: GemAssetRole, securityId: string) => {
+    const chosen = securityId
+      ? (data?.securities ?? []).find(
+          (security) => security.id === securityId,
+        )
+      : undefined;
+    if (chosen && !pickableSecurities.some((s) => s.id === chosen.id)) {
+      flushSync(() => setCreatedSecurities((previous) => [...previous, chosen]));
+    }
+    setValue(role, securityId, { shouldDirty: true });
+  };
+
+  /**
    * Currencies the assigned instruments are priced in. More than one means the
    * strategy converts on every switch, which the roles card warns about: the
    * conversion is a real cost the momentum figures do not carry.
@@ -331,12 +371,7 @@ export function GemSettingsForm({
    * the picks and submits the form.
    */
   const handleFillMissingRoles = async () => {
-    const owned = new Map(
-      [...(data?.securities ?? []), ...createdSecurities].map((security) => [
-        listingKey(security),
-        security,
-      ]),
-    );
+    const owned = ownedBySymbol;
     const missing = missingRoles;
     if (missing.length === 0) return;
 
@@ -348,10 +383,12 @@ export function GemSettingsForm({
     const pickable: Security[] = [];
     try {
       for (const { role, region: _region, ...values } of missing) {
-        // Only an exact listing counts as already owned. A same-ticker
-        // security on another exchange stays a separate instrument, and the
-        // suggested one is still created.
-        const existing = owned.get(listingKey(values));
+        // Owned means the symbol is taken, which is the only sense in which
+        // Monize can hold the same instrument twice -- it cannot. Reusing it
+        // is not an approximation of creating it; creating it is impossible,
+        // and asking anyway is what made this button fail with "Security with
+        // symbol EXUS already exists" on a portfolio that had EXUS.
+        const existing = owned.get(symbolKey(values));
         const security =
           existing ?? (await investmentsApi.createSecurity(values));
         if (!existing || security.isActive === false) pickable.push(security);
@@ -662,9 +699,10 @@ export function GemSettingsForm({
                         label={roleLabel(role)}
                         value={String(assignedRoles.get(role) ?? "")}
                         securities={pickableSecurities}
+                        ownedBySymbol={ownedBySymbol}
                         suggestions={suggestionsForRole(role)}
                         onChange={(securityId) =>
-                          setValue(role, securityId, { shouldDirty: true })
+                          assignToRole(role, securityId)
                         }
                         onPickSuggestion={(suggestion) =>
                           setCreatingFor({ role, suggestion })

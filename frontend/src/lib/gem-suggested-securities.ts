@@ -154,28 +154,29 @@ export function suggestedSecurityFor(
 }
 
 /**
- * Normalized identity of a *listing*, not of a ticker.
+ * Normalized identity of an instrument, as *this application* defines it: the
+ * symbol, per user.
  *
- * The suggestions distinguish regional listings on purpose -- CSPX on LSE in
- * USD is not CSPX on SIX in CHF, and a user who picked the European set means
- * the European ones. Matching on `symbol` alone reused whichever same-ticker
- * security the portfolio happened to hold, silently assigning a listing in
- * another currency and undoing the region the user had just chosen.
+ * That is not a modelling opinion, it is the rule the server enforces.
+ * `SecuritiesService.create` refuses a second security with a symbol the user
+ * already holds, so a portfolio cannot contain CSPX on LSE and CSPX on SIX at
+ * the same time -- there is one CSPX or none.
  *
- * A missing exchange or currency normalizes to empty rather than matching
- * anything: an instrument nobody has told us where it trades is not evidence
- * that it trades where the suggestion says.
+ * Keying on `symbol|exchange|currency` was therefore a stricter identity than
+ * the data model can hold, and the picker paid for the difference: an owned
+ * EXUS entered with no exchange, or with the user's own, did not match the
+ * suggestion, so the suggestion offered to *create* it and the server answered
+ * "Security with symbol EXUS already exists". The one-click fill hit the same
+ * wall and stopped at the first role. A UI notion of "you already have this"
+ * that is narrower than the server's uniqueness rule can only produce actions
+ * the server is guaranteed to refuse.
+ *
+ * The region a suggestion belongs to still decides what gets *created* when
+ * nothing with that symbol exists, and the exchange and currency are still
+ * confirmed in the create form. They just do not decide whether it exists.
  */
-export function listingKey(listing: {
+export function symbolKey(listing: {
   symbol: string | null | undefined;
-  exchange?: string | null;
-  currencyCode?: string | null;
 }): string {
-  const part = (value: string | null | undefined): string =>
-    (value ?? "").trim().toUpperCase();
-  return [
-    part(listing.symbol),
-    part(listing.exchange),
-    part(listing.currencyCode),
-  ].join("|");
+  return (listing.symbol ?? "").trim().toUpperCase();
 }

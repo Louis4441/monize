@@ -411,6 +411,31 @@ describe("GemStrategyReport", () => {
       );
     });
 
+    it("switches to the scenario picked from the switcher", async () => {
+      const withBoth = (id: string) => {
+        const report = gemReport();
+        report.strategy = { ...report.strategy, id, name: id };
+        report.strategies = [
+          { id: "strategy-1", name: "Aggressive" },
+          { id: "strategy-2", name: "Conservative" },
+        ];
+        return report;
+      };
+      mockGetReport.mockResolvedValue(withBoth("strategy-1"));
+      await renderReport();
+
+      mockGetReport.mockResolvedValue(withBoth("strategy-2"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Switch scenario" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("menuitem", { name: "Conservative" }));
+      });
+      await act(async () => {});
+
+      expect(mockGetReport).toHaveBeenLastCalledWith("1Y", "strategy-2");
+    });
+
     it("will not mark a signal while the newly selected range is still loading", async () => {
       await renderReport();
       const pending = deferred<unknown>();
