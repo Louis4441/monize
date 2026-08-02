@@ -368,6 +368,47 @@ describe("GemPositionService", () => {
     expect(result.action?.transferValue).toBeNull();
   });
 
+  /**
+   * Deleting the "- Cash" half of a brokerage pair clears the survivor's
+   * `linked_account_id`, and from then on the brokerage account carries its own
+   * balance -- `findCashAccount` already treats it that way. The cash query
+   * matched neither of its two branches in that state, so an account half in
+   * cash reported 100% in the target with nothing to do: the precise failure
+   * counting cash as a position was added to prevent.
+   */
+  it("finds the cash of a brokerage account with no linked cash half", async () => {
+    await build();
+
+    const cashSql = manager.query.mock.calls
+      .map(([sql]: [string]) => sql)
+      .find((sql: string) => sql.includes("current_balance"));
+    expect(cashSql).toContain("a.account_sub_type IS NULL");
+    expect(cashSql).toContain("a.account_sub_type = 'INVESTMENT_BROKERAGE'");
+    expect(cashSql).toContain("a.linked_account_id IS NULL");
+  });
+
+  it("counts one sell order per account a position is held in", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        quantity: "20",
+        cost_basis: "6000",
+        currency_code: "USD",
+        // The same fund in both of the strategy's accounts: two sells.
+        account_ids: ["acct-1", "acct-2"],
+      },
+    ];
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
+
+    const result = await build();
+
+    // Two sells plus a purchase in each account: four orders at 29.90.
+    expect(result.action?.estimatedTradeCount).toBe(4);
+    expect(result.action?.estimatedCommission).toBeCloseTo(119.6, 2);
+  });
+
   it("returns nothing when the strategy has no accounts", async () => {
     const result = await build({ accounts: [] });
     expect(result).toEqual({ position: null, action: null, noPosition: false });

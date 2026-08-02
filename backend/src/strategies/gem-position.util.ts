@@ -40,6 +40,13 @@ export interface GemHolding {
   symbol: string | null;
   name: string | null;
   quantity: number;
+  /**
+   * Accounts this position sits in. A switch places one order per account, so
+   * the same fund held in two of them is two sells, not one.
+   *
+   * Empty for cash, which is spent rather than sold.
+   */
+  accountIds: string[];
   /** Market value in the report currency, or null when the security has no price. */
   marketValue: number | null;
   /** Cost basis in the report currency, or null when it is unknown. */
@@ -103,11 +110,26 @@ export interface GemPositionMath {
   /** Holdings that fell back to a ticker comparison for want of a breakdown. */
   instrumentMatchedCount: number;
   /**
-   * Trades the sell side of a switch takes -- `sold.length`. Cash is off-target
-   * and funds the purchase, but it is not sold, so it costs no commission and
-   * adds no trade.
+   * Orders the sell side of a switch takes.
+   *
+   * One per **(account, security)** pair, not one per instrument. The holdings
+   * are summed across the strategy's accounts so the comparison sees one
+   * portfolio, and counting the summed rows counted a two-account strategy
+   * holding two funds as two sells when it is four -- halving the estimate in
+   * the field the user reads to decide whether the switch is worth making.
+   *
+   * Cash is off-target and funds the purchase, but it is not sold, so it costs
+   * no commission and adds no order.
    */
   sellCount: number;
+  /**
+   * Orders the buy side takes: one per account that will hold the target.
+   *
+   * Every account with something in it is buying, whether that something is a
+   * fund being sold or cash being spent. A single `+1` asserted the whole
+   * strategy trades in one account.
+   */
+  buyCount: number;
   /**
    * Market value of everything in the accounts, or null when any position
    * could not be valued -- a partial sum is not the total, and it is read as
@@ -370,6 +392,16 @@ export function buildPositionMath(
     ? valued.filter((holding) => !holding.isTargetInstrument)
     : [];
   const sold = offTarget.filter((holding) => !holding.isCash);
+  const sellCount = sold.reduce(
+    (orders, holding) => orders + Math.max(1, holding.accountIds.length),
+    0,
+  );
+  // Where the target ends up: every account holding anything, because each of
+  // them places its own purchase. At least one, since a switch always buys.
+  const buyCount = Math.max(
+    1,
+    new Set(valued.flatMap((holding) => holding.accountIds)).size,
+  );
 
   /**
    * With no target there is nothing to be compliant with. Otherwise: anything
@@ -434,7 +466,8 @@ export function buildPositionMath(
       (holding) => holding.matchedByInstrument,
     ).length,
     sold,
-    sellCount: sold.length,
+    sellCount,
+    buyCount,
     totalMarketValue,
     exactTargetPercent,
     marketExposurePercent,
@@ -459,19 +492,26 @@ export function estimateTax(
 }
 
 /**
- * Commission the switch costs: the configured per-trade amount times the number
- * of trades it takes. Selling out of three instruments and buying one is four
- * trades, not one, so charging a single commission understated a switch out of
- * a spread-out portfolio by exactly the amount that makes switching expensive.
+ * Commission the switch costs: the configured per-order amount times the
+ * number of orders it takes. Selling out of three instruments and buying one is
+ * four orders, not one, so charging a single commission understated a switch
+ * out of a spread-out portfolio by exactly the amount that makes switching
+ * expensive.
  *
- * A switch that sells nothing is the first purchase: one trade. Without a
- * configured commission the estimate stays unknown rather than becoming zero.
+ * Orders, not instruments. A strategy run in two brokerage accounts, each
+ * holding the same two funds, places four sells and two buys -- six orders, not
+ * the three a per-instrument count gave. Both sides are counted where they
+ * happen, in `buildPositionMath`.
+ *
+ * A switch that sells nothing is still a purchase. Without a configured
+ * commission the estimate stays unknown rather than becoming zero.
  */
 export function estimateCommission(
   commissionAmount: number | null,
   sellCount: number,
+  buyCount: number,
 ): number | null {
   if (commissionAmount === null) return null;
-  const trades = Math.max(0, sellCount) + 1;
-  return roundMoney(commissionAmount * trades);
+  const orders = Math.max(0, sellCount) + Math.max(1, buyCount);
+  return roundMoney(commissionAmount * orders);
 }

@@ -16,6 +16,9 @@ const holding = (
   symbol: overrides.role ?? "OTHER",
   name: null,
   quantity: 10,
+  // One account unless a test says otherwise: the order count is per
+  // (account, security), so a fixture with no accounts would understate it.
+  accountIds: ["acct-1"],
   marketValue: 1000,
   costBasis: 800,
   ...overrides,
@@ -651,19 +654,93 @@ describe("gem-position.util", () => {
     });
   });
 
+  describe("order counts across several accounts", () => {
+    /**
+     * A strategy may be run in several brokerage accounts, and the holdings
+     * are summed across them so the comparison sees one portfolio. The order
+     * count is the one place that summing must be undone: two accounts each
+     * holding the same two funds is four sell orders and two buys, not the
+     * three a per-instrument count gave -- and the estimate that halves is the
+     * one the user reads to decide whether the switch is worth making.
+     */
+    it("counts one sell per account a position is held in", () => {
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "US_EQUITY",
+            accountIds: ["acct-1", "acct-2"],
+            marketValue: 8000,
+          }),
+          holding({
+            role: null,
+            securityId: "sec-wtai",
+            symbol: "WTAI",
+            accountIds: ["acct-1", "acct-2"],
+            marketValue: 2000,
+          }),
+        ],
+        "EM_EQUITY",
+        { securityId: "sec-emim", composition: EMPTY_COMPOSITION },
+      );
+
+      expect(math.sold).toHaveLength(2);
+      expect(math.sellCount).toBe(4);
+      // Both accounts place their own purchase of the target.
+      expect(math.buyCount).toBe(2);
+      expect(estimateCommission(10, math.sellCount, math.buyCount)).toBe(60);
+    });
+
+    it("counts the account holding only cash as a buyer", () => {
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "EM_EQUITY",
+            accountIds: ["acct-1"],
+            marketValue: 5000,
+          }),
+          holding({
+            role: null,
+            securityId: null,
+            symbol: null,
+            isCash: true,
+            accountIds: ["acct-2"],
+            quantity: 5000,
+            marketValue: 5000,
+            costBasis: 5000,
+          }),
+        ],
+        "EM_EQUITY",
+        { securityId: "sec-EM_EQUITY", composition: EMPTY_COMPOSITION },
+      );
+
+      // Nothing is sold -- the securities are already the target -- but the
+      // cash in the second account still has to be put to work there.
+      expect(math.sellCount).toBe(0);
+      expect(math.buyCount).toBe(2);
+    });
+  });
+
   describe("estimateCommission", () => {
-    it("charges one commission per trade the switch takes", () => {
-      // Three holdings to sell out of plus the target to buy: four trades.
-      expect(estimateCommission(29.9, 3)).toBeCloseTo(119.6, 4);
-      expect(estimateCommission(29.9, 1)).toBeCloseTo(59.8, 4);
+    it("charges one commission per order the switch takes", () => {
+      // Three sells plus one buy: four orders.
+      expect(estimateCommission(29.9, 3, 1)).toBeCloseTo(119.6, 4);
+      expect(estimateCommission(29.9, 1, 1)).toBeCloseTo(59.8, 4);
+    });
+
+    it("charges every account's purchase, not one for the strategy", () => {
+      // Two brokerage accounts each holding the same two funds: four sells
+      // and two buys. A per-instrument count called this three.
+      expect(estimateCommission(29.9, 4, 2)).toBeCloseTo(179.4, 4);
     });
 
     it("charges one commission for a first purchase", () => {
-      expect(estimateCommission(29.9, 0)).toBeCloseTo(29.9, 4);
+      expect(estimateCommission(29.9, 0, 1)).toBeCloseTo(29.9, 4);
+      // A buy always happens, even if the caller forgot to count one.
+      expect(estimateCommission(29.9, 0, 0)).toBeCloseTo(29.9, 4);
     });
 
     it("is unknown without a configured commission", () => {
-      expect(estimateCommission(null, 3)).toBeNull();
+      expect(estimateCommission(null, 3, 1)).toBeNull();
     });
 
     it("is described as per trade everywhere the field is named", () => {

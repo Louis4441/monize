@@ -50,6 +50,8 @@ interface AggregatedHolding {
   symbol: string | null;
   name: string | null;
   quantity: number;
+  /** Accounts this position is held in -- one sell order each. */
+  accountIds: string[];
   /** quantity * average cost, in the security's own currency; null when unknown. */
   costBasis: number | null;
   /** Currency the security is priced and costed in. */
@@ -110,6 +112,7 @@ export class GemPositionService {
       symbol: string | null;
       name: string | null;
       quantity: string;
+      account_ids: string[];
       cost_basis: string | null;
       currency_code: string;
       country_weightings: GemWeighting[] | null;
@@ -121,6 +124,10 @@ export class GemPositionService {
                 s.symbol,
                 s.name,
                 SUM(h.quantity) AS quantity,
+                -- Which accounts hold it. A switch places one order per
+                -- account, not one per instrument: the same fund held in two
+                -- brokerage accounts is two sells.
+                array_agg(DISTINCT h.account_id) AS account_ids,
                 -- A holding with no average cost makes the whole cost basis
                 -- unknown rather than understated. SUM() skips NULL rows, so
                 -- the CASE turns "one account is uncosted" into an unknown
@@ -150,6 +157,7 @@ export class GemPositionService {
       symbol: row.symbol,
       name: row.name,
       quantity: Number(row.quantity),
+      accountIds: row.account_ids ?? [],
       costBasis: row.cost_basis === null ? null : Number(row.cost_basis),
       currencyCode: row.currency_code,
       composition: toComposition(row),
@@ -179,18 +187,34 @@ export class GemPositionService {
   private async loadCash(
     userId: string,
     accountIds: string[],
-  ): Promise<Array<{ amount: number; currencyCode: string }>> {
+  ): Promise<
+    Array<{ accountId: string; amount: number; currencyCode: string }>
+  > {
     if (accountIds.length === 0) return [];
-    const rows: Array<{ current_balance: string; currency_code: string }> =
-      await withScopedDb(this.dataSource, (manager) =>
-        manager.query(
-          `SELECT a.current_balance, a.currency_code
+    const rows: Array<{
+      id: string;
+      current_balance: string;
+      currency_code: string;
+    }> = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `SELECT a.id, a.current_balance, a.currency_code
              FROM accounts a
             WHERE a.user_id = $2
               AND a.current_balance > 0
               AND a.account_type = 'INVESTMENT'
               AND (
-                    (a.id = ANY($1::uuid[]) AND a.account_sub_type IS NULL)
+                    -- A selected account that holds its own cash: either a
+                    -- standalone investment account (no sub-type), or a
+                    -- brokerage account with no linked cash half. The second
+                    -- is reachable -- deleting the "- Cash" account of a pair
+                    -- clears the survivor's link -- and findCashAccount
+                    -- already treats it this way, so the balance really is the
+                    -- cash ledger. Missing it made an account half in cash
+                    -- read as 100% compliant with nothing to do.
+                    (a.id = ANY($1::uuid[])
+                     AND (a.account_sub_type IS NULL
+                          OR (a.account_sub_type = 'INVESTMENT_BROKERAGE'
+                              AND a.linked_account_id IS NULL)))
                  OR (a.account_sub_type = 'INVESTMENT_CASH'
                      AND (a.linked_account_id = ANY($1::uuid[])
                           OR a.id IN (SELECT b.linked_account_id
@@ -198,10 +222,11 @@ export class GemPositionService {
                                        WHERE b.id = ANY($1::uuid[])
                                          AND b.linked_account_id IS NOT NULL)))
               )`,
-          [accountIds, userId],
-        ),
-      );
+        [accountIds, userId],
+      ),
+    );
     return rows.map((row) => ({
+      accountId: row.id,
       amount: Number(row.current_balance),
       currencyCode: row.currency_code,
     }));
@@ -370,6 +395,7 @@ export class GemPositionService {
         symbol: holding.symbol,
         name: holding.name,
         quantity: holding.quantity,
+        accountIds: holding.accountIds,
         marketValue,
         costBasis,
         composition: holding.composition,
@@ -383,6 +409,7 @@ export class GemPositionService {
       userId,
       accounts.map((account) => account.id),
     );
+    const cashAccountIds = [...new Set(cashRows.map((row) => row.accountId))];
     const cashAmounts = await Promise.all(
       // A zero balance is zero in every currency, so it needs no rate.
       cashRows
@@ -414,6 +441,10 @@ export class GemPositionService {
         // units here; `buildPositionMath` keeps an unvalued cash row anyway,
         // because dropping it would hide the very balance it cannot value.
         quantity: cashValue ?? 0,
+        // Cash is spent, not sold, so it places no sell order of its own. The
+        // accounts it sits in still buy, and they are counted from the
+        // securities plus this list.
+        accountIds: cashAccountIds,
         marketValue: cashValue,
         // Cash is worth what it is worth: selling it realizes nothing. Unknown
         // value means unknown basis -- the two are the same number.
@@ -484,8 +515,9 @@ export class GemPositionService {
       estimatedCommission: estimateCommission(
         strategy.commissionAmount,
         math.sellCount,
+        math.buyCount,
       ),
-      estimatedTradeCount: math.sellCount + 1,
+      estimatedTradeCount: math.sellCount + math.buyCount,
       partialMatchCount: math.sold.filter(
         (holding) => (holding.overlap ?? 0) > 0,
       ).length,
