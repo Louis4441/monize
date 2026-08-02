@@ -28,6 +28,18 @@ export interface TransferResult {
 }
 
 /**
+ * Who is performing a transfer operation. `effectiveUserId` is the ledger the
+ * request runs against (the owner's id while a delegate is acting);
+ * `realUserId` is the authenticated human, whose delegations decide
+ * cross-owner access. Non-HTTP callers (scheduled posting, AI prep) omit it
+ * and both ids default to `userId` -- identical to pre-cross-owner behavior.
+ */
+export interface TransferActor {
+  effectiveUserId: string;
+  realUserId: string;
+}
+
+/**
  * Resolved, sanitized preview of a transfer the assistant proposes to create.
  * Carries the resulting state of both legs (resolved account ids/names, derived
  * currencies, and the computed destination amount) so the signed descriptor can
@@ -125,6 +137,7 @@ export class TransactionTransferService {
     userId: string,
     createTransferDto: CreateTransferDto,
     findOne: (userId: string, id: string) => Promise<Transaction>,
+    _actor?: TransferActor,
   ): Promise<TransferResult> {
     const {
       fromAccountId,
@@ -273,6 +286,7 @@ export class TransactionTransferService {
     userId: string,
     transactionId: string,
     findOne: (userId: string, id: string) => Promise<Transaction>,
+    _actor?: TransferActor,
   ): Promise<Transaction | null> {
     const transaction = await findOne(userId, transactionId);
 
@@ -558,6 +572,7 @@ export class TransactionTransferService {
     userId: string,
     transactionId: string,
     findOne: (userId: string, id: string) => Promise<Transaction>,
+    _actor?: TransferActor,
   ): Promise<void> {
     const transaction = await findOne(userId, transactionId);
 
@@ -724,6 +739,7 @@ export class TransactionTransferService {
     transactionId: string,
     updateDto: Partial<UpdateTransferDto>,
     findOne: (userId: string, id: string) => Promise<Transaction>,
+    _actor?: TransferActor,
   ): Promise<TransferResult> {
     const transaction = await findOne(userId, transactionId);
 

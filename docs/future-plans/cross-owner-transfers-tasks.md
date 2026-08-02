@@ -28,7 +28,7 @@ Every task is safe to merge and deploy in any order that respects the dependency
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
 | A1 | `CrossOwnerAccessService`: `accountAccessFor`, `readableAccountIdSetFor`, `isAccountOwnedBy` | -- | inert | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
-| A2 | Guard relaxation (transfer/scheduled decorator blocks only) + actor plumbing through transfer endpoints | A1 | neutral | [ ] |
+| A2 | Guard relaxation (transfer/scheduled decorator blocks only) + actor plumbing through transfer endpoints | A1 | neutral | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | T1 | `createTransfer` cross-owner: per-leg `user_id`, per-owner balances/net-worth/action-history, reference-data gating | A1, A2 | inert | [ ] |
 | T2 | `updateTransfer` / `removeTransfer` / `getLinkedTransaction` cross-owner: `loadLegById`, sync-policy matrix, frozen-link lock, own-leg delete | T1 | inert | [ ] |
 | T3 | Wrappers + bulk + AI prep: tag-sync gating, `syncTransferTags` filter, AI/MCP cross-owner edit block | T2 | neutral | [ ] |

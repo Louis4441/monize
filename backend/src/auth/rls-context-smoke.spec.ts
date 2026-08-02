@@ -109,6 +109,7 @@ describe("R7 modules RLS context smoke (real withScopedDb)", () => {
         }),
       } as never,
       delegationService as never,
+      { isAccountOwnedBy: jest.fn().mockResolvedValue(false) } as never,
     );
 
     const context = {

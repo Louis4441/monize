@@ -25,6 +25,7 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { TransactionSplitService } from "./transaction-split.service";
 import {
   TransactionTransferService,
+  TransferActor,
   TransferResult,
 } from "./transaction-transfer.service";
 import { TransactionReconciliationService } from "./transaction-reconciliation.service";
@@ -2478,11 +2479,13 @@ export class TransactionsService {
   async createTransfer(
     userId: string,
     createTransferDto: CreateTransferDto,
+    actor?: TransferActor,
   ): Promise<TransferResult> {
     const result = await this.transferService.createTransfer(
       userId,
       createTransferDto,
       this.findOne.bind(this),
+      actor,
     );
 
     if (createTransferDto.tagIds && createTransferDto.tagIds.length > 0) {
@@ -2509,19 +2512,26 @@ export class TransactionsService {
   async getLinkedTransaction(
     userId: string,
     transactionId: string,
+    actor?: TransferActor,
   ): Promise<Transaction | null> {
     return this.transferService.getLinkedTransaction(
       userId,
       transactionId,
       this.findOne.bind(this),
+      actor,
     );
   }
 
-  async removeTransfer(userId: string, transactionId: string): Promise<void> {
+  async removeTransfer(
+    userId: string,
+    transactionId: string,
+    actor?: TransferActor,
+  ): Promise<void> {
     return this.transferService.removeTransfer(
       userId,
       transactionId,
       this.findOne.bind(this),
+      actor,
     );
   }
 
@@ -2571,12 +2581,14 @@ export class TransactionsService {
     userId: string,
     transactionId: string,
     updateDto: Partial<UpdateTransferDto>,
+    actor?: TransferActor,
   ): Promise<TransferResult> {
     const result = await this.transferService.updateTransfer(
       userId,
       transactionId,
       updateDto,
       this.findOne.bind(this),
+      actor,
     );
 
     if (updateDto.tagIds !== undefined) {
