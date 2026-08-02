@@ -290,7 +290,7 @@ export class TransactionTransferService {
       toTransaction: await findOne(toOwnerId, savedToId),
     };
 
-    this.recordCreateTransferHistory({
+    await this.recordCreateTransferHistory({
       effectiveUserId: userId,
       realUserId,
       savedFromId,
@@ -312,7 +312,7 @@ export class TransactionTransferService {
    * other party's account name from history. The actor's own entry may name
    * both accounts, since the actor could read both at that moment.
    */
-  private recordCreateTransferHistory(args: {
+  private async recordCreateTransferHistory(args: {
     effectiveUserId: string;
     realUserId: string;
     savedFromId: string;
@@ -321,7 +321,7 @@ export class TransactionTransferService {
     toAccount: Account;
     amount: number;
     currencyCode: string;
-  }): void {
+  }): Promise<void> {
     const {
       effectiveUserId,
       realUserId,
@@ -344,7 +344,8 @@ export class TransactionTransferService {
       fromAccount.userId === effectiveUserId &&
       toAccount.userId === effectiveUserId
     ) {
-      this.actionHistoryService.record(effectiveUserId, {
+      // Same-owner: fire-and-forget, exactly today's behavior.
+      void this.actionHistoryService.record(effectiveUserId, {
         entityType: "transfer",
         entityId: savedFromId,
         action: "create",
@@ -381,11 +382,11 @@ export class TransactionTransferService {
           },
         });
       if (ownerId === effectiveUserId) {
-        record();
+        await record();
       } else {
         // The counterpart owner's history row carries THEIR user_id; writing
         // it from this request's identity needs the audited bypass under RLS.
-        void withSystemContext(record);
+        await withSystemContext(record);
       }
     }
   }
