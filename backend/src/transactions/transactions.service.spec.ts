@@ -5778,6 +5778,7 @@ describe("TransactionsService", () => {
       };
 
       transactionsRepository.findOne.mockResolvedValueOnce(fromTx); // findOne for the transaction
+      transactionsRepository.findOne.mockResolvedValueOnce(toTx); // cross-owner routing probe (same-owner: hit)
       mockQueryRunner.manager.findOne.mockResolvedValueOnce(toTx); // queryRunner finds linked transaction
 
       // Not a parent split child

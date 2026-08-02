@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   Inject,
+  NotFoundException,
   forwardRef,
   Logger,
 } from "@nestjs/common";
@@ -393,8 +394,9 @@ export class TransactionTransferService {
     userId: string,
     transactionId: string,
     findOne: (userId: string, id: string) => Promise<Transaction>,
-    _actor?: TransferActor,
+    actor?: TransferActor,
   ): Promise<Transaction | null> {
+    const realUserId = actor?.realUserId ?? userId;
     const transaction = await findOne(userId, transactionId);
 
     if (!transaction.isTransfer || !transaction.linkedTransactionId) {
@@ -404,10 +406,69 @@ export class TransactionTransferService {
     try {
       return await findOne(userId, transaction.linkedTransactionId);
     } catch (err) {
-      this.logger.warn(
-        `Failed to load linked transaction ${transaction.linkedTransactionId}: ${err instanceof Error ? err.message : err}`,
+      if (!(err instanceof NotFoundException)) {
+        this.logger.warn(
+          `Failed to load linked transaction ${transaction.linkedTransactionId}: ${err instanceof Error ? err.message : err}`,
+        );
+        return null;
+      }
+      // Cross-owner counterpart: return it when the real user can read its
+      // account; anything unreadable stays null (never confirm existence).
+      const counterpart = await this.loadLegById(
+        transaction.linkedTransactionId,
       );
-      return null;
+      if (!counterpart) return null;
+      try {
+        await this.crossOwnerAccess.accountAccessFor(
+          realUserId,
+          counterpart.accountId,
+          "read",
+        );
+        return counterpart;
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Load a transfer leg by id with NO user filter. Used only after the
+   * owner-scoped findOne misses (a cross-owner counterpart); the caller then
+   * decides access via accountAccessFor before anything derived from the row
+   * reaches a response. Authorization-decision read under the audited bypass.
+   */
+  private loadLegById(id: string): Promise<Transaction | null> {
+    return withSystemContext(() =>
+      withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Transaction).findOne({
+          where: { id },
+          relations: ["account"],
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Route a transfer mutation whose counterpart the effective user cannot see:
+   * connected (real user holds `op` on the counterpart account) -> full
+   * cross-leg behavior; readable but not granted `op` -> 403; unreadable ->
+   * frozen (null), where only presentational own-leg edits are allowed.
+   */
+  private async resolveCounterpartAccess(
+    realUserId: string,
+    counterpart: Transaction,
+    op: "edit" | "delete",
+  ): Promise<"connected" | "frozen"> {
+    try {
+      await this.crossOwnerAccess.accountAccessFor(
+        realUserId,
+        counterpart.accountId,
+        op,
+      );
+      return "connected";
+    } catch (err) {
+      if (err instanceof NotFoundException) return "frozen";
+      throw err; // ForbiddenException: readable but the op is not granted
     }
   }
 
@@ -679,8 +740,9 @@ export class TransactionTransferService {
     userId: string,
     transactionId: string,
     findOne: (userId: string, id: string) => Promise<Transaction>,
-    _actor?: TransferActor,
+    actor?: TransferActor,
   ): Promise<void> {
+    const realUserId = actor?.realUserId ?? userId;
     const transaction = await findOne(userId, transactionId);
 
     if (!transaction.isTransfer) {
@@ -694,6 +756,21 @@ export class TransactionTransferService {
         where: { linkedTransactionId: transactionId },
       }),
     );
+
+    // Cross-owner pair: the owner-scoped read of the linked leg misses. Route
+    // to connected (delete both) / frozen (own leg only) / 403 before any
+    // deletion; the same-owner path below is untouched.
+    if (!parentSplit && transaction.linkedTransactionId) {
+      let scopedLinked: Transaction | null = null;
+      try {
+        scopedLinked = await findOne(userId, transaction.linkedTransactionId);
+      } catch (err) {
+        if (!(err instanceof NotFoundException)) throw err;
+      }
+      if (!scopedLinked) {
+        return this.removeCrossOwnerTransfer(realUserId, transaction);
+      }
+    }
 
     const affectedAccountIds = new Set<string>();
 
@@ -757,6 +834,54 @@ export class TransactionTransferService {
     for (const accId of affectedAccountIds) {
       this.triggerNetWorthRecalc(accId, userId);
     }
+  }
+
+  /**
+   * Delete a transfer whose counterpart belongs to another owner. Connected
+   * (delete grant on the counterpart account): both legs and both balances,
+   * atomically, under the audited system context. Frozen (no read on the
+   * counterpart): the own leg only -- the FK's ON DELETE SET NULL detaches the
+   * counterpart, which survives as a one-sided transfer and correctly does not
+   * reconnect on reshare. Readable but no delete grant: 403 from
+   * resolveCounterpartAccess.
+   */
+  private async removeCrossOwnerTransfer(
+    realUserId: string,
+    ownLeg: Transaction,
+  ): Promise<void> {
+    const counterpart = ownLeg.linkedTransactionId
+      ? await this.loadLegById(ownLeg.linkedTransactionId)
+      : null;
+    const access = counterpart
+      ? await this.resolveCounterpartAccess(realUserId, counterpart, "delete")
+      : "frozen";
+
+    const removeLeg = async (m: EntityManager, leg: Transaction) => {
+      const isFuture = isTransactionInFuture(leg.transactionDate);
+      if (!isFuture) {
+        await this.accountsService.updateBalance(
+          leg.accountId,
+          -Number(leg.amount),
+        );
+      }
+      await m.remove(leg);
+      if (isFuture) {
+        await this.accountsService.recalculateCurrentBalance(leg.accountId);
+      }
+    };
+
+    if (access === "connected" && counterpart) {
+      await withSystemContext(() =>
+        withScopedDb(this.dataSource, async (m) => {
+          await removeLeg(m, counterpart);
+          await removeLeg(m, ownLeg);
+        }),
+      );
+      this.triggerNetWorthRecalc(counterpart.accountId, counterpart.userId);
+    } else {
+      await withScopedDb(this.dataSource, (m) => removeLeg(m, ownLeg));
+    }
+    this.triggerNetWorthRecalc(ownLeg.accountId, ownLeg.userId);
   }
 
   private async removeTransferFromSplitInTransaction(
@@ -846,8 +971,9 @@ export class TransactionTransferService {
     transactionId: string,
     updateDto: Partial<UpdateTransferDto>,
     findOne: (userId: string, id: string) => Promise<Transaction>,
-    _actor?: TransferActor,
+    actor?: TransferActor,
   ): Promise<TransferResult> {
+    const realUserId = actor?.realUserId ?? userId;
     const transaction = await findOne(userId, transactionId);
 
     if (!transaction.isTransfer || !transaction.linkedTransactionId) {
@@ -876,10 +1002,23 @@ export class TransactionTransferService {
       );
     }
 
-    const linkedTransaction = await findOne(
-      userId,
-      transaction.linkedTransactionId,
-    );
+    let linkedTransaction: Transaction;
+    try {
+      linkedTransaction = await findOne(
+        userId,
+        transaction.linkedTransactionId,
+      );
+    } catch (err) {
+      if (!(err instanceof NotFoundException)) throw err;
+      // Cross-owner pair: the counterpart is not the effective user's row.
+      return this.updateCrossOwnerTransfer(
+        userId,
+        realUserId,
+        transaction,
+        updateDto,
+        findOne,
+      );
+    }
 
     const isFromTransaction = Number(transaction.amount) < 0;
     const fromTransaction = isFromTransaction ? transaction : linkedTransaction;
@@ -1036,6 +1175,270 @@ export class TransactionTransferService {
     return {
       fromTransaction: await findOne(userId, fromTransaction.id),
       toTransaction: await findOne(userId, toTransaction.id),
+    };
+  }
+
+  /**
+   * Update a transfer whose counterpart belongs to another owner. Routes to
+   * the connected flow (real user holds the edit grant on the counterpart
+   * account), the frozen own-leg flow (counterpart unreadable after unshare),
+   * or 403 (readable but edit not granted).
+   */
+  private async updateCrossOwnerTransfer(
+    effectiveUserId: string,
+    realUserId: string,
+    ownLeg: Transaction,
+    updateDto: Partial<UpdateTransferDto>,
+    findOne: (userId: string, id: string) => Promise<Transaction>,
+  ): Promise<TransferResult> {
+    const counterpart = await this.loadLegById(ownLeg.linkedTransactionId!);
+    if (!counterpart) {
+      // The pointer FK is ON DELETE SET NULL, so a live id with no row should
+      // not happen; fail like the not-a-transfer guard rather than guessing.
+      throw new BadRequestException(
+        tr("errors.transactions.notATransfer", "Transaction is not a transfer"),
+      );
+    }
+
+    const access = await this.resolveCounterpartAccess(
+      realUserId,
+      counterpart,
+      "edit",
+    );
+    if (access === "frozen") {
+      return this.updateFrozenTransferLeg(
+        effectiveUserId,
+        ownLeg,
+        counterpart,
+        updateDto,
+        findOne,
+      );
+    }
+    return this.updateConnectedCrossOwnerTransfer(
+      effectiveUserId,
+      ownLeg,
+      counterpart,
+      updateDto,
+      findOne,
+    );
+  }
+
+  /**
+   * Frozen link (real user lost READ on the counterpart account): only
+   * presentational own-leg fields may change -- description, reference,
+   * status, category, payee -- with no mirroring onto the counterpart.
+   * Amount, date, exchange-rate and account changes are rejected: unmirrored
+   * they would silently break the two-ledger agreement that makes the pair a
+   * transfer. Modeled on the split-transfer-leg lock.
+   */
+  private async updateFrozenTransferLeg(
+    effectiveUserId: string,
+    ownLeg: Transaction,
+    counterpart: Transaction,
+    updateDto: Partial<UpdateTransferDto>,
+    findOne: (userId: string, id: string) => Promise<Transaction>,
+  ): Promise<TransferResult> {
+    const isFromLeg = Number(ownLeg.amount) < 0;
+    const fromLeg = isFromLeg ? ownLeg : counterpart;
+    const toLeg = isFromLeg ? counterpart : ownLeg;
+
+    // The form resends current values on every edit; only a genuine change is
+    // structural.
+    const structuralChange =
+      (updateDto.amount !== undefined &&
+        roundMoney(updateDto.amount) !== Math.abs(Number(fromLeg.amount))) ||
+      (updateDto.toAmount !== undefined &&
+        roundMoney(updateDto.toAmount) !== roundMoney(Number(toLeg.amount))) ||
+      (updateDto.exchangeRate !== undefined &&
+        Number(updateDto.exchangeRate) !== Number(toLeg.exchangeRate)) ||
+      (!!updateDto.transactionDate &&
+        updateDto.transactionDate !== ownLeg.transactionDate) ||
+      (!!updateDto.fromAccountId &&
+        updateDto.fromAccountId !== fromLeg.accountId) ||
+      (!!updateDto.toAccountId && updateDto.toAccountId !== toLeg.accountId);
+    if (structuralChange) {
+      throw new BadRequestException(
+        tr(
+          "errors.transactions.crossOwnerTransferLocked",
+          "The other side of this transfer is in an account you no longer have access to. You can edit this transaction's own details, but its amount, date, and accounts are locked.",
+        ),
+      );
+    }
+
+    await this.assertCategoryOwned(effectiveUserId, updateDto.categoryId);
+
+    const legData: Partial<Transaction> = {};
+    if (updateDto.description !== undefined)
+      legData.description = updateDto.description ?? null;
+    if (updateDto.referenceNumber !== undefined)
+      legData.referenceNumber = updateDto.referenceNumber ?? null;
+    if (updateDto.status !== undefined) legData.status = updateDto.status;
+    if (updateDto.categoryId !== undefined)
+      legData.categoryId = updateDto.categoryId || null;
+    if (updateDto.payeeId !== undefined)
+      legData.payeeId = updateDto.payeeId || null;
+    if (updateDto.payeeName !== undefined)
+      legData.payeeName = updateDto.payeeName || null;
+
+    if (Object.keys(legData).length > 0) {
+      await withScopedDb(this.dataSource, (m) =>
+        m.update(Transaction, ownLeg.id, legData),
+      );
+    }
+
+    // Return the edited leg in both slots (the split-leg pattern) so wrapper
+    // tag-sync touches only this leg and nothing is mirrored.
+    const refreshed = await findOne(effectiveUserId, ownLeg.id);
+    return { fromTransaction: refreshed, toTransaction: refreshed };
+  }
+
+  /**
+   * Connected cross-owner edit: structural fields (date, amounts, exchange
+   * rate, description, reference, custom payee label) mirror across both legs
+   * exactly like a same-owner transfer; per-user reference data (category,
+   * payee link) and per-ledger status stay on effective-user legs only.
+   * Account moves are rejected in v1 -- moving a leg between owners changes
+   * user_id semantics. The atomic block runs under the audited system context
+   * (foreign-leg writes are owner-only under RLS); authorization was fully
+   * decided before entry.
+   */
+  private async updateConnectedCrossOwnerTransfer(
+    effectiveUserId: string,
+    ownLeg: Transaction,
+    counterpart: Transaction,
+    updateDto: Partial<UpdateTransferDto>,
+    findOne: (userId: string, id: string) => Promise<Transaction>,
+  ): Promise<TransferResult> {
+    const isFromTransaction = Number(ownLeg.amount) < 0;
+    const fromTransaction = isFromTransaction ? ownLeg : counterpart;
+    const toTransaction = isFromTransaction ? counterpart : ownLeg;
+
+    const movesFrom =
+      !!updateDto.fromAccountId &&
+      updateDto.fromAccountId !== fromTransaction.accountId;
+    const movesTo =
+      !!updateDto.toAccountId &&
+      updateDto.toAccountId !== toTransaction.accountId;
+    if (movesFrom || movesTo) {
+      throw new BadRequestException(
+        tr(
+          "errors.transactions.crossOwnerAccountMoveLocked",
+          "This transfer involves another user's account, so it cannot be moved to different accounts.",
+        ),
+      );
+    }
+
+    await this.assertCategoryOwned(effectiveUserId, updateDto.categoryId);
+
+    const oldFromAmount = Math.abs(Number(fromTransaction.amount));
+    const oldToAmount = Number(toTransaction.amount);
+    const newAmount = updateDto.amount ?? oldFromAmount;
+    const newExchangeRate =
+      updateDto.exchangeRate ?? toTransaction.exchangeRate;
+    const newToAmount =
+      updateDto.toAmount !== undefined
+        ? roundMoney(updateDto.toAmount)
+        : roundMoney(newAmount * newExchangeRate);
+    const amountsChanged =
+      updateDto.amount !== undefined ||
+      updateDto.exchangeRate !== undefined ||
+      updateDto.toAmount !== undefined;
+
+    const oldDate = fromTransaction.transactionDate;
+    const newDate = updateDto.transactionDate ?? oldDate;
+    const dateChanged = oldDate !== newDate;
+    const anyFuture =
+      isTransactionInFuture(oldDate) || isTransactionInFuture(newDate);
+
+    const fromUpdateData = this.buildFromUpdateData(
+      updateDto,
+      newAmount,
+      fromTransaction.accountId,
+      toTransaction.accountId,
+      toTransaction.account?.name ?? "",
+      fromTransaction.payeeId,
+      fromTransaction.payeeName,
+      toTransaction.account,
+    );
+    const toUpdateData = this.buildToUpdateData(
+      updateDto,
+      newToAmount,
+      newExchangeRate,
+      fromTransaction.accountId,
+      toTransaction.accountId,
+      fromTransaction.account?.name ?? "",
+      toTransaction.payeeId,
+      toTransaction.payeeName,
+      fromTransaction.account,
+    );
+
+    // Per-user reference data and per-ledger reconciliation state never cross
+    // an ownership boundary.
+    for (const [leg, data] of [
+      [fromTransaction, fromUpdateData],
+      [toTransaction, toUpdateData],
+    ] as const) {
+      if (leg.userId !== effectiveUserId) {
+        delete data.categoryId;
+        delete data.payeeId;
+        delete data.status;
+      }
+    }
+
+    await withSystemContext(() =>
+      withScopedDb(this.dataSource, async (m) => {
+        if ((amountsChanged || dateChanged) && !anyFuture) {
+          await this.accountsService.updateBalance(
+            fromTransaction.accountId,
+            oldFromAmount,
+          );
+          await this.accountsService.updateBalance(
+            toTransaction.accountId,
+            -oldToAmount,
+          );
+        }
+
+        if (Object.keys(fromUpdateData).length > 0) {
+          await m.update(Transaction, fromTransaction.id, fromUpdateData);
+        }
+        if (Object.keys(toUpdateData).length > 0) {
+          await m.update(Transaction, toTransaction.id, toUpdateData);
+        }
+
+        if (amountsChanged || dateChanged) {
+          if (anyFuture) {
+            for (const accId of new Set([
+              fromTransaction.accountId,
+              toTransaction.accountId,
+            ])) {
+              await this.accountsService.recalculateCurrentBalance(accId);
+            }
+          } else {
+            await this.accountsService.updateBalance(
+              fromTransaction.accountId,
+              -newAmount,
+            );
+            await this.accountsService.updateBalance(
+              toTransaction.accountId,
+              newToAmount,
+            );
+          }
+        }
+      }),
+    );
+
+    this.triggerNetWorthRecalc(
+      fromTransaction.accountId,
+      fromTransaction.userId,
+    );
+    this.triggerNetWorthRecalc(toTransaction.accountId, toTransaction.userId);
+
+    return {
+      fromTransaction: await findOne(
+        fromTransaction.userId,
+        fromTransaction.id,
+      ),
+      toTransaction: await findOne(toTransaction.userId, toTransaction.id),
     };
   }
 
