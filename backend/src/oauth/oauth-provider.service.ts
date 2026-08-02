@@ -178,9 +178,18 @@ export class OAuthProviderService implements OnModuleInit {
         url: (_ctx, interaction) =>
           `${publicUrl}/api/v1/oauth-consent/${interaction.uid}`,
       },
+      // Every artifact this provider can issue needs an explicit TTL. Leaving
+      // one out does not just inherit a default silently — node-oidc-provider
+      // calls its built-in TTL function and prints a raw
+      // "oidc-provider NOTICE: default ttl.<Model> function called ..." line
+      // straight to console.info, bypassing the Nest Logger and its formatting.
+      // The remaining defaults (ClientCredentials, DeviceCode,
+      // BackchannelAuthenticationRequest) belong to grants/features this
+      // provider does not enable, so they are never reached.
       ttl: {
         AccessToken: 60 * 60, // 1 hour
         AuthorizationCode: 60, // 60 seconds
+        IdToken: 60 * 60, // 1 hour (matches AccessToken; consumed at issue)
         RefreshToken: 60 * 60 * 24 * 14, // 14 days
         Grant: 60 * 60 * 24 * 14,
         Interaction: 60 * 10, // 10 minutes

@@ -62,8 +62,8 @@ See `frontend/src/i18n/messages/README.md` and `backend/src/i18n/README.md` for 
 - Parameterized queries only — never interpolate user input into SQL.
 - Controllers use `@UseGuards(AuthGuard('jwt'))`; service methods derive `userId` from the JWT, never from request params/body.
 - DTOs use `whitelist: true` + `forbidNonWhitelisted: true` with appropriate validation decorators.
-- Any operation touching multiple tables or doing read-modify-write must use a `QueryRunner` transaction (see `CLAUDE.md`).
-- Money values are `decimal(20,4)`; use integer-cents arithmetic to avoid floating-point drift.
+- All database access goes through `withScopedDb` (`backend/src/common/db/scoped-db.ts`) -- the single RLS-compliant door to the database. Any operation touching multiple tables or doing read-modify-write runs inside one `withScopedDb` transaction. Never inject a repository with `@InjectRepository`, call `createQueryRunner()`, or use a bare `dataSource.query(...)` -- ESLint rejects all three (see `CLAUDE.md`).
+- Money values are `decimal(20,4)`; use integer-cents arithmetic to avoid floating-point drift. Financial calculations follow `docs/financial-calculation-contract.md` and `docs/time-series-contract.md` -- in particular, a `total`/`gain`/`tax` field may only carry a value when every component is known; a sum over the non-null subset is a subtotal, not a total.
 
 See [`SECURITY.md`](SECURITY.md) for how to report vulnerabilities.
 

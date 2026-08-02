@@ -84,7 +84,7 @@ Every branch added by this plan is entered only when the two accounts (or two le
 
 ### Phase 1 -- Access foundation (delegation module)
 
-New **`backend/src/delegation/cross-owner-access.service.ts`** (`delegation.service.ts` is at the line-count cap; the new service uses `withScopedDb`, with cross-tenant owner lookups -- reading another owner's `accounts` row to learn its owner -- wrapped in `withSystemContext` from `backend/src/common/db/with-context.ts`, documented as authorization-decision reads):
+New **`backend/src/delegation/cross-owner-access.service.ts`** (`delegation.service.ts` is at the line-count cap; the new service uses `withScopedDb`, with cross-tenant owner lookups -- reading another owner's `accounts` row to learn its owner -- wrapped in `withSystemContext` from `backend/src/common/db/with-context.ts`, documented as authorization-decision reads; importing `with-context` requires adding the file to `WITH_CONTEXT_ALLOWLIST` in `backend/eslint.config.mjs` in the same PR, per RLS lint ban L1):
 
 - `accountAccessFor(realUserId, accountId, op)` -> `{ account, ownerUserId, via: 'own' | 'delegation' }`; throws NotFound (no read / nonexistent) or Forbidden (read but not op).
 - `readableAccountIdSetFor(realUserId)` -> own account ids + `can_read`-granted ids across **all** active delegations. One definition serves masking in both contexts (acting-as-A, B still legitimately sees B's own counterpart).
@@ -120,9 +120,9 @@ Extract the mask logic from `delegate-transfer-mask.interceptor.ts` into a share
 - **`GET /accounts/transfer-candidates`** (`@AllowDelegate`, on `AccountsController`): own context -> accounts shared **to** the real user (active delegations, `can_read`) as `{ id, name, currencyCode, accountType, accountSubType, isClosed, ownerLabel, canCreate, canEdit, canDelete }`; acting context -> the real user's **own** accounts (flags all true). This is the first time per-account write-grant info reaches the frontend -- deliberately scoped to this endpoint, not a fix of the wider read-only-delegate-sees-write-affordances gap.
 - Frontend: API + types in `frontend/src/lib/accounts.ts`; `TransactionForm.tsx` fetches the candidates alongside `accountsApi.getAll(true)`; `TransferTransactionFields.tsx` appends to both Selects a disabled `__separator__` row (existing pattern in `buildAccountDropdownOptions`, `frontend/src/lib/account-utils.ts`) + a disabled group label ("Shared with you" / "Your accounts") + candidates filtered by `canCreate` (create) / `canEdit` (edit), labeled `name (CUR) -- ownerLabel`. When the counterpart resolves to the existing `hiddenAccountOption`, disable From/To/Amount/Date so the frozen lock is visible before the backend rejects. All strings via `useTranslations`, English catalogs only during development, then `npm run i18n:pseudo`.
 
-### Phase 5 -- Migration (RLS prep only)
+### Phase 5 -- Migration (delegate-read policy arm on `transactions`)
 
-No table/column changes. The RLS policies shipped by the RLS plan are not ENABLEd yet, but at enforce time the delegate's eager `linkedTransaction` join on a connected transfer would silently return null -- so ship the policy arm now (next free migration number; `120_securities_websites.sql` was the max when this was written -- **verify with `ls database/migrations` and renumber**):
+No table/column changes. RLS is fully implemented: every policy ships enabled (`123_rls_enable.sql` on migrated databases, the dynamic enable loop at the bottom of `schema.sql` on fresh installs), and `transactions` currently carries the uniform owner-only policy from the direct-ownership `DO` loop. Under `RLS_MODE=enforce` that policy makes the delegate's eager `linkedTransaction` join on a connected transfer silently return null, and every counterpart read this plan adds would see zero rows -- so the delegate-read arm below is a hard dependency of Phases 2-3, not optional prep (next free migration number; `123_rls_enable.sql` was the max when this was written -- **verify with `ls database/migrations` and renumber**, keeping the numeric prefix unique):
 
 - Move `transactions` out of the direct-ownership policy loop in `database/schema.sql` into a dedicated policy:
 
@@ -141,7 +141,10 @@ CREATE POLICY transactions_isolation ON transactions
 
   **WITH CHECK stays owner-only**: cross-owner *writes* (inserting the foreign leg, updating the foreign balance) run under the narrow `withSystemContext` after in-code authorization -- safer than write-widening policies on `accounts` / `transactions`.
 - `CREATE INDEX IF NOT EXISTS idx_adg_account ON account_delegate_grants(account_id);` (only `delegation_id` is indexed today; the policy arm and the access service probe by account).
-- Idempotent per the CI gates; mirror into `database/schema.sql` in the same PR; verify with `npm run migration:lint` and `scripts/verify-schema.sh`.
+- **No `ENABLE ROW LEVEL SECURITY` statement**: `transactions` is already enabled everywhere (see above), so this migration replaces the policy only. The post-`123` "ship your own ENABLE" rule in `database/CLAUDE.md` is about newly created tables and does not apply here.
+- **Deploy impact**: behavior-neutral at `RLS_MODE=off`/`shadow` (the app connects as the table owner, so policies are not consulted); on an enforcing deployment the read arm is live on deploy. That is read-only widening gated on an active `can_read` grant -- exactly the access the delegation feature already grants at the app layer -- and it also fixes the pre-existing enforce-mode gap where an acting delegate's `linkedTransaction` join returned null.
+- **Update `backend/test/integration/rls-enforcement.integration.spec.ts` in the same PR**: its per-table sweep asserts exact per-user visibility and its delegation-semantics block asserts the delegate's own session sees none of the owner's data -- both must learn the new arm (positive case: an active `can_read` grant exposes the granted account's transactions to the delegate's own session; negative case: an absent or revoked grant hides them). The integration harness itself needs no registration: T1's content-based selector picks up any migration referencing the policy helper functions.
+- Idempotent per the CI gates; mirror into `database/schema.sql` in the same PR (moving `transactions` out of the direct-ownership `DO` loop there); verify with `npm run migration:lint` and `scripts/verify-schema.sh`.
 
 ### Phase 6 -- Tests & i18n
 
@@ -165,7 +168,7 @@ See the companion task list ([`cross-owner-transfers-tasks.md`](./cross-owner-tr
 
 ## Verification (end-to-end)
 
-1. `cd backend && npm run lint && TZ=UTC npm run test:unit` (the RLS ratchet runs in lint; the new service must not add `@InjectRepository` / `createQueryRunner`).
+1. `cd backend && npm run lint && TZ=UTC npm run test:unit` (lint bans `@InjectRepository` / `createQueryRunner` outright and restricts `common/db/with-context` imports to `WITH_CONTEXT_ALLOWLIST` -- the new service uses `withScopedDb` and its allowlist entry lands in the same PR).
 2. `npm run migration:lint` + `scripts/verify-schema.sh`.
 3. `TZ=UTC npm run test:e2e` (backend integration suite).
 4. Frontend: `npm run test` (Vitest incl. the ui-conventions guard), `npm run i18n:check`.
