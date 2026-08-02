@@ -36,7 +36,7 @@ Every task is safe to merge and deploy in any order that respects the dependency
 | M2 | CSV export masking + AI/MCP read masking | M1 | neutral | [ ] |
 | F1 | `GET /accounts/transfer-candidates` endpoint | A1 | inert | [ ] |
 | F2 | Frontend: transfer form candidate groups, grant-filtered options, frozen-lock UI | F1, T1, T2 | inert | [ ] |
-| D1 | Migration: delegate-read policy arm on `transactions` + `idx_adg_account` index | -- | inert* | [ ] |
+| D1 | Migration: delegate-read policy arm on `transactions` + `idx_adg_account` index | -- | inert* | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | Q1 | Integration suite: `cross-owner-transfers.integration.spec.ts` (incl. stateless reshare-reconnect proof) | T1-T3, M1-M2 | none | [ ] |
 | Q2 | Playwright e2e journey in `delegation.spec.ts` (share -> transfer -> unshare -> mask -> reshare -> reconnect) | F2, Q1 | none | [ ] |
 | Q3 | Full-locale i18n pass (acceptance, final commit) | all above | none | [ ] |
