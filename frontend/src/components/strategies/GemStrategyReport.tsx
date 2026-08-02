@@ -237,12 +237,21 @@ export function GemStrategyReport() {
    * any other it is dropped and the newer fetch stands.
    */
   const savingForKey = useRef<string | null>(null);
+  const savingForStrategy = useRef<string | null>(null);
   const handleSettingsSaving = useCallback(
     (saving: boolean) => {
-      savingForKey.current = saving ? requestKey : null;
+      // Taken from the report the form is *rendering*, not from whatever is
+      // selected when the save lands. The two are the same now that a stale
+      // form is unmounted, and reading the rendered one keeps it true even if
+      // that ever changes: an origin derived from the current selection would
+      // stamp scenario A's save with scenario B's key.
+      savingForKey.current = saving
+        ? `${range}|${data?.strategy.id ?? ""}`
+        : null;
+      savingForStrategy.current = saving ? (data?.strategy.id ?? null) : null;
       setIsSaving(saving);
     },
-    [requestKey],
+    [range, data?.strategy.id],
   );
 
   /**
@@ -253,8 +262,18 @@ export function GemStrategyReport() {
    * is, which is what an unset id already resolves to.
    */
   const handleConfigSaved = useCallback(
-    (report: GemStrategyReportData) =>
-      adopt(report, savingForKey.current ?? requestKey),
+    (report: GemStrategyReportData) => {
+      // The response has to be of the scenario that was saved. `updateConfig`
+      // answers with the strategy it wrote, so a mismatch means the two have
+      // drifted and neither is safe to show.
+      if (
+        savingForStrategy.current &&
+        report.strategy.id !== savingForStrategy.current
+      ) {
+        return;
+      }
+      adopt(report, savingForKey.current ?? requestKey);
+    },
     [adopt, requestKey],
   );
 
@@ -434,17 +453,30 @@ export function GemStrategyReport() {
 
       {tab === "settings" && (
         <div {...panelProps("settings")}>
-          {/* Keyed on the scenario: react-hook-form reads its defaults once,
-              at mount, so switching scenarios with the tab open would otherwise
-              leave the previous scenario's values under the new one's name. */}
-          <GemSettingsForm
-            key={strategy.id ?? "unsaved"}
-            strategy={strategy}
-            assets={assets}
-            range={range}
-            onSaved={handleConfigSaved}
-            onSavingChange={handleSettingsSaving}
-          />
+          {isStaleSelection ? (
+            /* The whole form goes, not just its submit button. Disabling the
+               action cards was not enough here: the form kept rendering the
+               scenario the user had just left, with its instrument pickers,
+               its one-click fill and its save all live, so a submit sent the
+               old scenario's id and the response could then be adopted under
+               the new selection. There is no version of this form that is
+               safe to interact with while it describes something other than
+               what is selected. */
+            <Skeleton className="h-96 w-full" />
+          ) : (
+            /* Keyed on the scenario: react-hook-form reads its defaults once,
+               at mount, so switching scenarios with the tab open would
+               otherwise leave the previous scenario's values under the new
+               one's name. */
+            <GemSettingsForm
+              key={strategy.id ?? "unsaved"}
+              strategy={strategy}
+              assets={assets}
+              range={range}
+              onSaved={handleConfigSaved}
+              onSavingChange={handleSettingsSaving}
+            />
+          )}
         </div>
       )}
 

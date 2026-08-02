@@ -409,5 +409,37 @@ describe("GemStrategyReport", () => {
         ).not.toBeInTheDocument(),
       );
     });
+
+    it("takes the settings form away while a newer report is loading", async () => {
+      await renderReport();
+
+      // Start a load, then open the settings tab while it is still in flight.
+      const pending = deferred<unknown>();
+      mockGetReport.mockReturnValue(pending.promise);
+      await switchRange("3M");
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+
+      // Nothing to interact with while what is rendered is not what is
+      // selected. Leaving the form mounted kept the previous scenario's
+      // pickers, its one-click fill and its save all live, so a submit sent
+      // the id of the scenario the user had just left.
+      expect(
+        screen.queryByLabelText("Evaluation frequency"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /^Save$/ }),
+      ).not.toBeInTheDocument();
+
+      await act(async () => {
+        pending.settle(gemReport());
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+    });
   });
 });
