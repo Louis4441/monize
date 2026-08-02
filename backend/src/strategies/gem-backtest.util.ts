@@ -1,6 +1,13 @@
 import { roundToDecimals } from "../common/round.util";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
-import { PricePoint, closeAt, daysBetween } from "./gem-momentum.util";
+import {
+  BOUNDARY_LAG_DAYS,
+  PricePoint,
+  closeAt,
+  daysBetween,
+  pointAsOf,
+  spanCloses,
+} from "./gem-momentum.util";
 
 /**
  * Replays the strategy's own stored evaluations against real prices.
@@ -131,19 +138,50 @@ const DAYS_PER_YEAR = 365.25;
 const MIN_PERIODS = 1;
 
 /**
- * Growth of one security between two dates, or null when either boundary has no
- * close close enough in time to stand for it.
+ * Growth of one security between two dates, or null when the span cannot be
+ * priced -- including the case where one close would have to answer for both
+ * ends, which `spanCloses` refuses.
+ *
+ * An `UNELAPSED` span is null here too, but the caller distinguishes it: a
+ * period that has produced no new close yet has not happened, and dropping it
+ * is right where treating it as a gap would discard the whole history before
+ * it.
  */
 function growth(
   series: PricePoint[] | undefined,
   from: string,
   to: string,
 ): number | null {
-  if (!series?.length) return null;
-  const entry = closeAt(series, from);
-  const exit = closeAt(series, to);
-  if (entry === null || exit === null || entry <= 0) return null;
-  return exit / entry;
+  const span = spanCloses(series, from, to);
+  return span.state === "PRICED" ? span.latest / span.base : null;
+}
+
+/**
+ * Whether the closes inside a period are dense enough to draw a path through.
+ *
+ * The drawdown walks the observations between the two boundaries and reports
+ * the worst point it sees. That is only the worst point the *run* went through
+ * if the observations are actually consecutive: with a month-long hole in the
+ * middle, the walk steps straight over whatever happened inside it and reports
+ * a calm 0% for a period that fell by half. Two boundary closes satisfying
+ * `closeAt` say nothing about the interior.
+ *
+ * The same fortnight the boundaries are held to: a gap wider than that between
+ * consecutive closes is a stretch of the path nobody observed.
+ */
+function pathObserved(series: PricePoint[], from: string, to: string): boolean {
+  const inside = series.filter(
+    (point) => point.date >= from && point.date <= to,
+  );
+  const entry = pointAsOf(series, from);
+  if (!entry) return false;
+  // Walk entry -> every interior close -> the far boundary, and fail on the
+  // first stride longer than the window.
+  const marks = [entry.date, ...inside.map((point) => point.date), to];
+  return marks.every(
+    (date, index) =>
+      index === 0 || daysBetween(marks[index - 1], date) <= BOUNDARY_LAG_DAYS,
+  );
 }
 
 /**
@@ -186,30 +224,36 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
 
   if (periods.length < MIN_PERIODS) return null;
 
-  const bounds = periods.map((period, index) => ({
-    ...period,
-    endsOn: periods[index + 1]?.effectiveFrom ?? asOf,
-    growth: null as number | null,
-  }));
-  for (const period of bounds) {
-    period.growth = growth(
+  const bounds = periods.map((period, index) => {
+    const endsOn = periods[index + 1]?.effectiveFrom ?? asOf;
+    const span = spanCloses(
       period.targetSecurityId
         ? seriesBySecurity.get(period.targetSecurityId)
         : undefined,
       period.effectiveFrom,
-      period.endsOn,
+      endsOn,
     );
-  }
+    return {
+      ...period,
+      endsOn,
+      growth: span.state === "PRICED" ? span.latest / span.base : null,
+      unelapsed: span.state === "UNELAPSED",
+    };
+  });
 
-  // A period that has not started yet is not a period.
+  // A period that has not happened yet is not a period.
   //
-  // On the first day of a new one, `effectiveFrom` and `endsOn` are both
-  // today: growth is exactly 1, which loses the hit-rate comparison against a
-  // safe asset that also did nothing, so the ratio dropped the morning a
-  // period opened and climbed back over the month. Nothing about the strategy
-  // changed; there was simply no elapsed time to judge.
+  // Two ways to not have happened. Its dates can be the same -- on the first
+  // day of a new one, `effectiveFrom` and `endsOn` are both today: growth is
+  // exactly 1, which loses the hit-rate comparison against a safe asset that
+  // also did nothing, so the ratio dropped the morning a period opened and
+  // climbed back over the month. Or it can have dates but no second close yet,
+  // which is the same situation a few days later and reads identically in the
+  // arithmetic. Neither is a gap in the history: dropping them keeps the run
+  // that precedes them, where calling them unpriced would throw all of it away
+  // every time a period turned over.
   const elapsed = bounds.filter(
-    (period) => period.endsOn > period.effectiveFrom,
+    (period) => period.endsOn > period.effectiveFrom && !period.unelapsed,
   );
   if (elapsed.length === 0) return null;
 
@@ -256,6 +300,7 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   let previousSecurityId: string | null = null;
   let beatSafe = 0;
   let comparedToSafe = 0;
+  let drawdownObserved = true;
 
   for (const period of run) {
     const securityId = period.targetSecurityId as string;
@@ -278,6 +323,12 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     }
 
     const entryPrice = closeAt(series, period.effectiveFrom) as number;
+    // The path is only worth walking where it was observed. One period with a
+    // hole in it makes the whole run's drawdown unknown, because the deepest
+    // point of the run may be inside that hole.
+    if (!pathObserved(series, period.effectiveFrom, period.endsOn)) {
+      drawdownObserved = false;
+    }
     // Walk the daily closes inside the period so the drawdown reflects what
     // the run actually went through, not only its period-end marks.
     for (const point of series) {
@@ -320,7 +371,11 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     from,
     to,
     cagrPercent,
-    maxDrawdownPercent: roundToDecimals(maxDrawdown * 100, 2),
+    // Unknown, not zero, when any period's interior went unobserved: the
+    // deepest point of an unwatched stretch is exactly what a drawdown is for.
+    maxDrawdownPercent: drawdownObserved
+      ? roundToDecimals(maxDrawdown * 100, 2)
+      : null,
     // Every simulated period has to be comparable, or the ratio has a
     // denominator the reader cannot see and would take to be the whole run.
     hitRatePercent:

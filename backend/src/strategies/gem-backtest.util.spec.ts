@@ -7,6 +7,38 @@ const series = (closes: Record<string, number>): PricePoint[] =>
     .map(([date, close]) => ({ date, close }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
+/**
+ * A series observed every seven days between waypoints, linearly interpolated.
+ *
+ * The backtest reads `"day"` sampling -- real input is a daily close with at
+ * most a long weekend between observations -- and the drawdown now refuses to
+ * describe a path it did not see. A fixture of three points a quarter apart is
+ * not a sparser version of that input, it is a different one, and a test built
+ * on it proves nothing about the code that runs on daily prices.
+ */
+const walk = (waypoints: Record<string, number>): PricePoint[] => {
+  const marks = Object.entries(waypoints).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  const points: PricePoint[] = [];
+  const day = 86_400_000;
+  for (let leg = 0; leg < marks.length - 1; leg += 1) {
+    const [fromDate, fromClose] = marks[leg];
+    const [toDate, toClose] = marks[leg + 1];
+    const start = Date.parse(`${fromDate}T00:00:00Z`);
+    const span = Date.parse(`${toDate}T00:00:00Z`) - start;
+    for (let at = 0; at < span; at += 7 * day) {
+      points.push({
+        date: new Date(start + at).toISOString().slice(0, 10),
+        close: fromClose + ((toClose - fromClose) * at) / span,
+      });
+    }
+  }
+  const [lastDate, lastClose] = marks[marks.length - 1];
+  points.push({ date: lastDate, close: lastClose });
+  return points;
+};
+
 const input = (
   overrides: Partial<GemBacktestInput> = {},
 ): GemBacktestInput => ({
@@ -60,7 +92,7 @@ describe("runBacktest", () => {
         seriesBySecurity: new Map([
           [
             "sec-spy",
-            series({
+            walk({
               "2024-01-01": 100,
               "2024-04-01": 50,
               "2024-07-01": 100,
@@ -73,6 +105,76 @@ describe("runBacktest", () => {
 
     expect(result?.maxDrawdownPercent).toBeCloseTo(-50, 1);
     expect(result?.cagrPercent).toBeCloseTo(0, 6);
+  });
+
+  /**
+   * The adversarial case for the drawdown (time-series contract rule 4): the
+   * two boundaries are priced and near enough to stand for their dates, so the
+   * return is honest -- but nobody observed the middle, and that is exactly
+   * where a drawdown lives.
+   */
+  it("refuses a drawdown over a period whose interior was never observed", () => {
+    const result = runBacktest(
+      input({
+        periods: [
+          {
+            effectiveFrom: "2024-01-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+            previousRole: null,
+          },
+        ],
+        // A 33-day hole with no observation inside the period at all. The
+        // instrument may have halved and recovered inside it; nothing here
+        // says otherwise.
+        seriesBySecurity: new Map([
+          ["sec-spy", series({ "2023-12-29": 100, "2024-02-01": 100 })],
+        ]),
+        asOf: "2024-02-01",
+      }),
+    );
+
+    expect(result?.maxDrawdownPercent).toBeNull();
+    // The period return itself is still knowable: both boundaries are priced.
+    expect(result?.cagrPercent).toBeCloseTo(0, 6);
+  });
+
+  /**
+   * The adversarial case for the boundary rule: a period younger than
+   * `BOUNDARY_LAG_DAYS` resolves both of its ends to the same close, which used
+   * to come back as a hard 0% and count itself as a fully covered period.
+   */
+  it("drops a period too young to have produced a second close", () => {
+    const result = runBacktest(
+      input({
+        periods: [
+          {
+            effectiveFrom: "2024-01-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+            previousRole: null,
+          },
+          {
+            effectiveFrom: "2024-07-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+            previousRole: "US_EQUITY",
+          },
+        ],
+        seriesBySecurity: new Map([
+          ["sec-spy", walk({ "2024-01-01": 100, "2024-07-01": 110 })],
+        ]),
+        // Three days into the second period, whose newest close is 2024-07-01.
+        asOf: "2024-07-04",
+      }),
+    );
+
+    // The young period is not a gap: the first period survives it, and the run
+    // ends where the prices do rather than being thrown away entirely.
+    expect(result).toMatchObject({ from: "2024-01-01", to: "2024-07-01" });
+    // 100 % coverage over one elapsed period -- the young one is not counted
+    // in the denominator either, because it has not happened.
+    expect(result?.coveragePercent).toBe(100);
   });
 
   it("charges tax on the gain realized when the instrument changes", () => {

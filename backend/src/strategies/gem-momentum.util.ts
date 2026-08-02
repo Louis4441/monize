@@ -203,9 +203,56 @@ export function closeAt(prices: PricePoint[], date: string): number | null {
 }
 
 /**
+ * How a span between two boundary dates could be priced.
+ *
+ * Three outcomes, not two. "No new close yet" is not the same as "the prices
+ * are missing": a period still in its opening days has not produced a second
+ * observation, and calling that a gap would throw away the history behind it,
+ * while calling it a flat 0% would invent a return. Only a span longer than
+ * `BOUNDARY_LAG_DAYS` can reach `UNPRICED` by this route, because a shorter one
+ * fails the freshness test at its far end first.
+ */
+export type SpanCloses =
+  | { state: "PRICED"; base: number; latest: number }
+  | { state: "UNELAPSED" }
+  | { state: "UNPRICED" };
+
+/**
+ * The two closes that price a span, each within `BOUNDARY_LAG_DAYS` of the
+ * boundary it stands for, and struck on **different days**.
+ *
+ * The same-observation rule is the point. `closeAt` bounds each end
+ * independently, so a period shorter than the lag window resolves both of its
+ * ends to one close and the arithmetic returns exactly 1.0 -- a hard 0% return
+ * that is indistinguishable from a market that went nowhere, and that counts
+ * itself as a fully covered period. `pointAsOf` documents the trap; this is
+ * where it is closed.
+ */
+export function spanCloses(
+  prices: PricePoint[] | undefined,
+  from: string,
+  to: string,
+): SpanCloses {
+  if (!prices?.length) return { state: "UNPRICED" };
+  const entry = pointAsOf(prices, from);
+  const exit = pointAsOf(prices, to);
+  if (!entry || !exit) return { state: "UNPRICED" };
+  if (daysBetween(entry.date, from) > BOUNDARY_LAG_DAYS) {
+    return { state: "UNPRICED" };
+  }
+  if (daysBetween(exit.date, to) > BOUNDARY_LAG_DAYS) {
+    return { state: "UNPRICED" };
+  }
+  if (entry.date === exit.date) return { state: "UNELAPSED" };
+  if (!(entry.close > 0)) return { state: "UNPRICED" };
+  return { state: "PRICED", base: entry.close, latest: exit.close };
+}
+
+/**
  * Trailing total return between two dates, in percent. Null when either
- * boundary has no close near enough in time to stand for it, or the base is not
- * positive (a zero base would produce Infinity).
+ * boundary has no close near enough in time to stand for it, when one close
+ * would have to answer for both, or when the base is not positive (a zero base
+ * would produce Infinity).
  *
  * The freshness rule is the same one the backtest applies, and for a stronger
  * reason: this figure is what picks the instrument the report tells the user to
@@ -217,10 +264,9 @@ export function trailingReturnPercent(
   from: string,
   to: string,
 ): number | null {
-  const base = closeAt(prices, from);
-  const latest = closeAt(prices, to);
-  if (base === null || latest === null || base <= 0) return null;
-  return roundToDecimals((latest / base - 1) * 100, GEM_PP_DECIMALS);
+  const span = spanCloses(prices, from, to);
+  if (span.state !== "PRICED") return null;
+  return roundToDecimals((span.latest / span.base - 1) * 100, GEM_PP_DECIMALS);
 }
 
 /**
