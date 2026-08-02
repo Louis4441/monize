@@ -251,6 +251,7 @@ describe("GemPerformanceChart", () => {
     const performance = gemPerformance();
     render(
       <GemPerformanceChart
+        {...baseProps}
         performance={{
           ...performance,
           currentPortfolio: {
@@ -259,9 +260,6 @@ describe("GemPerformanceChart", () => {
             stoppedBy: ["WTAI"],
           },
         }}
-        assets={gemAssets}
-        winnerRole="EM_EQUITY"
-        range="1Y"
         onRangeChange={() => {}}
       />,
     );
