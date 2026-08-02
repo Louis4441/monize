@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { CrossOwnerAccessService } from "./cross-owner-access.service";
 import { Account } from "../accounts/entities/account.entity";
+import { User } from "../users/entities/user.entity";
 import { AccountDelegate } from "./entities/account-delegate.entity";
 import { AccountDelegateGrant } from "./entities/account-delegate-grant.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
@@ -37,14 +38,18 @@ describe("CrossOwnerAccessService", () => {
     } as AccountDelegateGrant;
   }
 
+  let usersRepo: Record<string, jest.Mock>;
+
   beforeEach(() => {
     accountsRepo = { findOne: jest.fn(), find: jest.fn(), exists: jest.fn() };
     delegatesRepo = { findOne: jest.fn(), find: jest.fn() };
     grantsRepo = { findOne: jest.fn(), find: jest.fn() };
+    usersRepo = { findOne: jest.fn() };
     const scoped = createScopedDbMocks([
       [Account, accountsRepo as never],
       [AccountDelegate, delegatesRepo as never],
       [AccountDelegateGrant, grantsRepo as never],
+      [User, usersRepo as never],
     ]);
     service = new CrossOwnerAccessService(scoped.dataSource as never);
   });
@@ -208,6 +213,96 @@ describe("CrossOwnerAccessService", () => {
 
       expect(set).toEqual(new Set(["own-1"]));
       expect(grantsRepo.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("transferCandidatesFor", () => {
+    const sharedAccount = {
+      id: "acc-shared",
+      name: "Owner Chequing",
+      currencyCode: "CAD",
+      accountType: "CHEQUING",
+      accountSubType: null,
+      isClosed: false,
+      userId: OWNER,
+      currentBalance: 999.99,
+    };
+
+    it("own context: returns granted accounts with per-op flags and owner label, nothing more", async () => {
+      delegatesRepo.find.mockResolvedValue([
+        {
+          id: DELEGATION_ID,
+          ownerUserId: OWNER,
+          owner: { firstName: "Alice", lastName: "Owner", email: "a@x.com" },
+        },
+      ]);
+      grantsRepo.find.mockResolvedValue([
+        grant({ canCreate: true, canEdit: true, canDelete: false }),
+      ]);
+      accountsRepo.find.mockResolvedValue([
+        { ...sharedAccount, id: ACCOUNT_ID },
+      ]);
+
+      const candidates = await service.transferCandidatesFor(
+        REAL_USER,
+        REAL_USER,
+      );
+
+      expect(candidates).toEqual([
+        {
+          id: ACCOUNT_ID,
+          name: "Owner Chequing",
+          currencyCode: "CAD",
+          accountType: "CHEQUING",
+          accountSubType: null,
+          isClosed: false,
+          ownerLabel: "Alice Owner",
+          canCreate: true,
+          canEdit: true,
+          canDelete: false,
+        },
+      ]);
+      // No balance or institution data leaves the endpoint.
+      expect(Object.keys(candidates[0])).not.toContain("currentBalance");
+    });
+
+    it("own context: empty when the user is a delegate of nobody", async () => {
+      delegatesRepo.find.mockResolvedValue([]);
+      await expect(
+        service.transferCandidatesFor(REAL_USER, REAL_USER),
+      ).resolves.toEqual([]);
+      expect(grantsRepo.find).not.toHaveBeenCalled();
+    });
+
+    it("acting context: returns the real user's own accounts with every flag true", async () => {
+      accountsRepo.find.mockResolvedValue([
+        {
+          ...sharedAccount,
+          id: "acc-own",
+          name: "My Savings",
+          userId: REAL_USER,
+        },
+      ]);
+      usersRepo.findOne.mockResolvedValue({
+        id: REAL_USER,
+        firstName: "Bob",
+        lastName: null,
+        email: "b@x.com",
+      });
+
+      const candidates = await service.transferCandidatesFor(REAL_USER, OWNER);
+
+      expect(candidates).toEqual([
+        expect.objectContaining({
+          id: "acc-own",
+          name: "My Savings",
+          ownerLabel: "Bob",
+          canCreate: true,
+          canEdit: true,
+          canDelete: true,
+        }),
+      ]);
+      expect(delegatesRepo.find).not.toHaveBeenCalled();
     });
   });
 

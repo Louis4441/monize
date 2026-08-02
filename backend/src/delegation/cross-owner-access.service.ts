@@ -8,6 +8,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
 import { tr } from "../i18n/translate";
 import { Account } from "../accounts/entities/account.entity";
+import { User } from "../users/entities/user.entity";
 import { AccountDelegate } from "./entities/account-delegate.entity";
 import { AccountDelegateGrant } from "./entities/account-delegate-grant.entity";
 import { DelegateOperation } from "./decorators/delegate-access.decorator";
@@ -17,6 +18,25 @@ export interface AccountAccess {
   account: Account;
   ownerUserId: string;
   via: "own" | "delegation";
+}
+
+/**
+ * An account the real user may name as the "other side" of a transfer beyond
+ * the effective user's own list. Deliberately carries NO balance or
+ * institution data -- only what the transfer form needs to render and gate
+ * the option.
+ */
+export interface TransferCandidate {
+  id: string;
+  name: string;
+  currencyCode: string;
+  accountType: string;
+  accountSubType: string | null;
+  isClosed: boolean;
+  ownerLabel: string;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 /**
@@ -123,6 +143,119 @@ export class CrossOwnerAccessService {
       ...ownIds.map((a) => a.id),
       ...grantedIds.map((g) => g.accountId),
     ]);
+  }
+
+  /**
+   * The accounts the real user can add to a transfer beyond the effective
+   * user's own list (Phase 4). Own context: accounts shared TO the real user
+   * through active delegations with a READ grant, with the per-op write
+   * flags. Acting context (effective != real): the real user's OWN accounts,
+   * every flag true.
+   */
+  async transferCandidatesFor(
+    realUserId: string,
+    effectiveUserId: string,
+  ): Promise<TransferCandidate[]> {
+    if (realUserId !== effectiveUserId) {
+      // Acting as an owner: offer the delegate's own accounts.
+      // Authorization-decision read -- the acting identity cannot see the
+      // real user's rows; only the fields below leave this method.
+      const [accounts, self] = await withSystemContext(() =>
+        withScopedDb(this.dataSource, async (manager) => {
+          return Promise.all([
+            manager.getRepository(Account).find({
+              where: { userId: realUserId },
+              order: { name: "ASC" },
+            }),
+            manager.getRepository(User).findOne({ where: { id: realUserId } }),
+          ]);
+        }),
+      );
+      const ownerLabel = self ? this.userLabel(self) : realUserId;
+      return accounts.map((account) =>
+        this.toCandidate(account, ownerLabel, {
+          canCreate: true,
+          canEdit: true,
+          canDelete: true,
+        }),
+      );
+    }
+
+    // Own context: accounts shared to the real user.
+    const delegations = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AccountDelegate).find({
+        where: { delegateUserId: realUserId, status: "active" },
+        relations: ["owner"],
+      }),
+    );
+    if (delegations.length === 0) return [];
+
+    const grants = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AccountDelegateGrant).find({
+        where: {
+          delegationId: In(delegations.map((d) => d.id)),
+          canRead: true,
+        },
+      }),
+    );
+    if (grants.length === 0) return [];
+
+    // Authorization-decision read: the granted rows belong to the owners;
+    // the READ grants above are what authorize returning these fields.
+    const accounts = await withSystemContext(() =>
+      withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(Account).find({
+          where: { id: In(grants.map((g) => g.accountId)) },
+          order: { name: "ASC" },
+        }),
+      ),
+    );
+
+    const labelByDelegation = new Map(
+      delegations.map((d) => [
+        d.id,
+        d.owner ? this.userLabel(d.owner) : d.ownerUserId,
+      ]),
+    );
+    const grantByAccount = new Map(grants.map((g) => [g.accountId, g]));
+
+    return accounts.flatMap((account) => {
+      const grant = grantByAccount.get(account.id);
+      if (!grant) return [];
+      return [
+        this.toCandidate(
+          account,
+          labelByDelegation.get(grant.delegationId) ?? account.userId,
+          {
+            canCreate: grant.canCreate,
+            canEdit: grant.canEdit,
+            canDelete: grant.canDelete,
+          },
+        ),
+      ];
+    });
+  }
+
+  private toCandidate(
+    account: Account,
+    ownerLabel: string,
+    flags: { canCreate: boolean; canEdit: boolean; canDelete: boolean },
+  ): TransferCandidate {
+    return {
+      id: account.id,
+      name: account.name,
+      currencyCode: account.currencyCode,
+      accountType: account.accountType,
+      accountSubType: account.accountSubType ?? null,
+      isClosed: account.isClosed,
+      ownerLabel,
+      ...flags,
+    };
+  }
+
+  private userLabel(user: User): string {
+    const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+    return name || user.email || user.id;
   }
 
   /** Whether `accountId` exists and is owned by `userId`. */
