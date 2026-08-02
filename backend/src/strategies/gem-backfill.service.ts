@@ -6,7 +6,15 @@ import { Security } from "../securities/entities/security.entity";
 import { SecurityPriceService } from "../securities/security-price.service";
 import { GemPriceService } from "./gem-price.service";
 import { GemCadence } from "./entities/gem-strategy.entity";
-import { cadenceMonths } from "./gem-momentum.util";
+import {
+  BOUNDARY_LAG_DAYS,
+  PricePoint,
+  addMonthsUtc,
+  cadenceMonths,
+  closeAt,
+  parseYmd,
+  recentPeriods,
+} from "./gem-momentum.util";
 import { GEM_HISTORY_PERIODS } from "./gem-signal.service";
 
 /**
@@ -40,6 +48,54 @@ function monthsAgo(months: number): string {
   const today = new Date(`${todayYMD()}T00:00:00Z`);
   today.setUTCMonth(today.getUTCMonth() - months);
   return today.toISOString().slice(0, 10);
+}
+
+/**
+ * Every date the strategy has to be able to price, oldest first.
+ *
+ * Two per evaluated period -- the momentum window's start and the evaluation
+ * itself -- plus today, because a signal is only current if the newest boundary
+ * can be priced. These are exactly the boundaries `evaluate` reads, so a
+ * security that satisfies all of them can answer the whole report.
+ */
+function requiredBoundaries(
+  asOf: string,
+  lookbackMonths: number,
+  cadence: GemCadence,
+): string[] {
+  const boundaries = new Set<string>([asOf]);
+  for (const period of recentPeriods(asOf, cadence, GEM_HISTORY_PERIODS)) {
+    boundaries.add(period.evaluatedOn);
+    boundaries.add(
+      addMonthsUtc(parseYmd(period.evaluatedOn), -lookbackMonths)
+        .toISOString()
+        .slice(0, 10),
+    );
+  }
+  return [...boundaries].sort();
+}
+
+/**
+ * Whether a series can price every boundary the strategy needs.
+ *
+ * The earliest stored date was the only thing checked before, which answers a
+ * different question: a security with one observation from 2015 and nothing
+ * since reaches back far enough and can price none of the periods the report
+ * actually shows. So did a series with the middle missing, or one whose feed
+ * stopped last spring -- all three skipped the provider while the strategy sat
+ * without a signal, and the save that promised to ensure the history reported
+ * success.
+ *
+ * `closeAt` is the same freshness rule the evaluator applies, so this asks
+ * precisely "would the evaluation find a price here", not an approximation of
+ * it.
+ */
+function coversBoundaries(
+  series: PricePoint[] | undefined,
+  boundaries: string[],
+): boolean {
+  if (!series?.length) return false;
+  return boundaries.every((boundary) => closeAt(series, boundary) !== null);
 }
 
 /**
@@ -80,11 +136,21 @@ export class GemBackfillService {
 
     const months = requiredMonths(lookbackMonths, cadence);
     const needFrom = monthsAgo(months);
-    const earliest = await this.priceService.earliestPriceDates(wanted);
-    const short = wanted.filter((id) => {
-      const from = earliest.get(id);
-      return !from || from > needFrom;
-    });
+    const asOf = todayYMD();
+    const boundaries = requiredBoundaries(asOf, lookbackMonths, cadence);
+    // Load from a fortnight before the oldest boundary: a boundary may be
+    // priced by a close struck up to `BOUNDARY_LAG_DAYS` earlier, and cutting
+    // the window at the boundary itself would hide exactly those.
+    const seriesFrom = new Date(`${needFrom}T00:00:00Z`);
+    seriesFrom.setUTCDate(seriesFrom.getUTCDate() - BOUNDARY_LAG_DAYS);
+    const series = await this.priceService.loadSeries(
+      wanted,
+      seriesFrom.toISOString().slice(0, 10),
+      "day",
+    );
+    const short = wanted.filter(
+      (id) => !coversBoundaries(series.get(id), boundaries),
+    );
     if (short.length === 0) return [];
 
     const securities = await withScopedDb(this.dataSource, (manager) =>
