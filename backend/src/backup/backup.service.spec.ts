@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { gemConfigFingerprint } from "../strategies/gem-signal.service";
 import { DataSource } from "typeorm";
 import {
   UnauthorizedException,
@@ -352,6 +353,34 @@ describe("BackupService", () => {
       "decimal_places",
       "is_active",
       "created_by_user_id",
+      "created_at",
+      "updated_at",
+    ],
+    gem_strategies: [
+      "id",
+      "user_id",
+      "name",
+      "cadence",
+      "lookback_months",
+      "created_at",
+      "updated_at",
+    ],
+    gem_strategy_assets: [
+      "id",
+      "user_id",
+      "strategy_id",
+      "role",
+      "security_id",
+      "created_at",
+      "updated_at",
+    ],
+    gem_strategy_signals: [
+      "id",
+      "user_id",
+      "strategy_id",
+      "evaluated_on",
+      "config_fingerprint",
+      "algorithm_version",
       "created_at",
       "updated_at",
     ],
@@ -1552,6 +1581,99 @@ describe("BackupService", () => {
       // The bigint-shaped string is preserved as-is; only UUID-format ids
       // get remapped.
       expect(row.account_number).toBe("5");
+    });
+
+    /**
+     * Invariant: a restore must not make a user's own GEM history look like it
+     * belongs to a configuration they never had.
+     * Canonical adversarial input: identifiers rewritten underneath derived
+     * data (testing contract, ownership).
+     * Minimal mutation: drop the `rehashGemSignalFingerprints` call.
+     * Test that fails under it: the first below -- the signal keeps a hash of
+     * the pre-restore security ids and the report treats it as stale.
+     */
+    describe("GEM signal fingerprints", () => {
+      const securityId = randomUUID();
+      const strategyId = randomUUID();
+
+      /** The hash the strategy's configuration had before the restore. */
+      const fingerprintFor = (secId: string) =>
+        gemConfigFingerprint(
+          { cadence: "MONTHLY", lookbackMonths: 12 } as never,
+          [{ role: "US_EQUITY", securityId: secId }] as never,
+        );
+
+      const backupWith = (signalFingerprint: string) => ({
+        ...validBackupData,
+        securities: [{ id: securityId, user_id: userId, symbol: "SPY" }],
+        gem_strategies: [
+          {
+            id: strategyId,
+            user_id: userId,
+            name: "GEM",
+            cadence: "MONTHLY",
+            lookback_months: 12,
+          },
+        ],
+        gem_strategy_assets: [
+          {
+            id: randomUUID(),
+            user_id: userId,
+            strategy_id: strategyId,
+            role: "US_EQUITY",
+            security_id: securityId,
+          },
+        ],
+        gem_strategy_signals: [
+          {
+            id: randomUUID(),
+            user_id: userId,
+            strategy_id: strategyId,
+            evaluated_on: "2025-07-31",
+            config_fingerprint: signalFingerprint,
+            algorithm_version: 2,
+          },
+        ],
+      });
+
+      const restoredSignal = async (data: Record<string, unknown>) => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        await service.restoreData(
+          userId,
+          makeInput({ password: "test", data }),
+        );
+        const insert = mockQueryRunner.query.mock.calls.find(
+          (c: unknown[]) =>
+            typeof c[0] === "string" &&
+            c[0].includes('INSERT INTO "gem_strategy_signals"'),
+        );
+        expect(insert).toBeDefined();
+        return insertColumnMap(insert!);
+      };
+
+      it("re-hashes a current signal onto the remapped security ids", async () => {
+        const row = await restoredSignal(
+          backupWith(fingerprintFor(securityId)),
+        );
+
+        // The security got a new UUID, so the hash of the *same* configuration
+        // is a different string -- and it must be that string, or the first
+        // report after the restore recomputes or hides the user's own history.
+        expect(row.config_fingerprint).not.toBe(fingerprintFor(securityId));
+        expect(typeof row.config_fingerprint).toBe("string");
+        expect((row.config_fingerprint as string).length).toBe(64);
+      });
+
+      it("leaves a signal that was already stale alone", async () => {
+        // It answered a different configuration before the backup and still
+        // does. Re-stamping it would promote retired history into the current
+        // run, with its `executed` flags.
+        const stale = "0".repeat(64);
+        const row = await restoredSignal(backupWith(stale));
+
+        expect(row.config_fingerprint).toBe(stale);
+      });
     });
 
     it("should ensure referenced currencies exist before restoring data", async () => {

@@ -618,6 +618,36 @@ export class InvestmentTransactionsService {
     }
   }
 
+  /**
+   * Refuse an acquisition that does not say what it cost.
+   *
+   * One method rather than one check per entry point, because there are three
+   * ways into this table -- `create`, `update` and `createEmbeddedForSplit` --
+   * and a rule enforced by only one of them is not a rule. The first version
+   * of this guard lived in `create` alone: the embedded-split path still wrote
+   * `dto.price ?? 0`, and `update` would happily set an existing purchase's
+   * price to zero, so a "free" acquisition could be created or edited into
+   * existence and its cost, gain and tax were all reported as known.
+   *
+   * Zero is refused along with absent. A zero-cost purchase is not a concept
+   * this application has; shares that arrived without a cost are `ADD_SHARES`,
+   * which records that the cost is unknown rather than nil.
+   */
+  private assertAcquisitionPriced(
+    action: InvestmentAction,
+    price: number | null | undefined,
+  ): void {
+    if (!InvestmentTransactionsService.PRICED_ACQUISITIONS.has(action)) return;
+    if (Number(price) > 0) return;
+    throw new BadRequestException(
+      tr(
+        "errors.securities.acquisitionPriceRequired",
+        `Price per share is required and must be greater than zero for ${action} transactions. Use ADD_SHARES for shares acquired without a known cost.`,
+        { action },
+      ),
+    );
+  }
+
   async create(
     userId: string,
     createDto: CreateInvestmentTransactionDto,
@@ -656,23 +686,7 @@ export class InvestmentTransactionsService {
       );
     }
 
-    // An acquisition that says what it cost, or no acquisition. Rejected here
-    // rather than defaulted, because the default was zero and a zero cost is
-    // an answer -- one that turns the whole position's unrealized gain into
-    // taxable profit. Shares that genuinely arrived without a price are
-    // ADD_SHARES, which records that it does not know.
-    if (
-      InvestmentTransactionsService.PRICED_ACQUISITIONS.has(createDto.action) &&
-      !(Number(createDto.price) > 0)
-    ) {
-      throw new BadRequestException(
-        tr(
-          "errors.securities.acquisitionPriceRequired",
-          `Price per share is required and must be greater than zero for ${createDto.action} transactions. Use ADD_SHARES for shares acquired without a known cost.`,
-          { action: createDto.action },
-        ),
-      );
-    }
+    this.assertAcquisitionPriced(createDto.action, createDto.price);
 
     if (
       createDto.action === InvestmentAction.SPLIT &&
@@ -1924,6 +1938,8 @@ export class InvestmentTransactionsService {
       await this.securitiesService.findOne(userId, dto.securityId);
     }
 
+    this.assertAcquisitionPriced(dto.action, dto.price);
+
     const totalAmount = Math.abs(
       computeInvestmentCashImpact(
         dto.action,
@@ -1952,7 +1968,9 @@ export class InvestmentTransactionsService {
       action: dto.action,
       transactionDate: parentTransactionDate,
       quantity: dto.quantity ?? 0,
-      price: dto.price ?? 0,
+      // Null, not zero -- the same distinction `create` keeps. An action with
+      // no price has an unknown cost, and stored as zero it is a free one.
+      price: dto.price ?? null,
       commission: dto.commission ?? 0,
       totalAmount,
       exchangeRate,
@@ -2954,6 +2972,21 @@ export class InvestmentTransactionsService {
             "Split ratio (quantity) must be greater than zero",
           ),
         );
+      }
+
+      // Checked against the row as it will be, after the assignments above, so
+      // changing either half is covered: setting an existing purchase's price
+      // to zero, and turning an unpriced action into a `BUY` without giving it
+      // one. Without this, `create` could refuse a free acquisition and
+      // `update` would put one back a moment later.
+      //
+      // Only when the edit touches the action or the price. A row that was
+      // already unpriced stays editable in every other respect -- an
+      // unrelated change to its description is not the write that made it
+      // wrong, and refusing it would strand rows that predate this rule with
+      // no way to correct anything at all.
+      if (updateDto.action !== undefined || updateDto.price !== undefined) {
+        this.assertAcquisitionPriced(transaction.action, transaction.price);
       }
 
       // Exchange rate resolution precedence for update():

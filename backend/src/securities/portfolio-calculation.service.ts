@@ -1002,32 +1002,42 @@ export class PortfolioCalculationService {
   }
 
   /**
-   * The same replay, reduced to the cost basis alone.
+   * Replayed bases that a caller may state as a figure in the account's own
+   * currency, keyed the same way as the lots.
    *
-   * Kept for callers that already hold the position's quantity from elsewhere
-   * and only need the money. A caller that intends to pair this basis with a
-   * *current* holding quantity should use the lots above and check the two
-   * agree -- see the note there.
+   * There used to be a projection here that returned `lot.costBasis` and
+   * nothing else. It threw away the two fields that say whether the number
+   * means anything -- `basisKnown` and `currencyCode` -- and its caller then
+   * treated whatever came back as a cost in the *account's* currency. A PLN
+   * brokerage funded from EUR contributed a EUR figure to a PLN total, and a
+   * position the history could not price contributed a confident partial sum.
+   * A number with its qualifications stripped off is not a smaller answer, it
+   * is a different one.
    *
-   * This projection **drops `basisKnown`**, so every entry it returns looks
-   * equally trustworthy. Its one caller, the holdings valuation below, already
-   * treats a replayed basis as a best effort and falls back to converting the
-   * stored `average_cost` when the history is absent; changing that is a wider
-   * question than the lot flag, and the flag is deliberately not smuggled in
-   * here as a missing map entry. A new caller that reports a gain or a tax
-   * must take the lots and read the flag.
+   * So the filtering happens here rather than at the call site: an entry is
+   * present only when the replay knows the basis *and* denominated it in the
+   * currency asked for. Everything else is absent, and a caller that finds
+   * nothing falls back to whatever it does when there is no history at all.
+   * Converting the mismatch instead would need today's rate to answer a
+   * question about a historical purchase.
    */
-  async calculateCostBasesInAccountCurrency(
+  private async knownCostBasesIn(
     userId: string,
     holdingsAccountIds: string[],
+    currencyByAccount: Map<string, string>,
   ): Promise<Map<string, number>> {
     const lots = await this.calculateCostBasisLotsInAccountCurrency(
       userId,
       holdingsAccountIds,
     );
-    return new Map(
-      [...lots].map(([key, lot]) => [key, lot.costBasis] as const),
-    );
+    const usable = new Map<string, number>();
+    for (const [key, lot] of lots) {
+      if (!lot.basisKnown || lot.currencyCode === null) continue;
+      const accountId = key.slice(0, key.indexOf(":"));
+      if (currencyByAccount.get(accountId) !== lot.currencyCode) continue;
+      usable.set(key, lot.costBasis);
+    }
+    return usable;
   }
 
   /**
@@ -1472,10 +1482,19 @@ export class PortfolioCalculationService {
     const securityIds = [...new Set(holdings.map((h) => h.securityId))];
     const priceMap = await getLatestPrices(securityIds);
 
-    // Historical cost basis in each holding's account currency
-    const historicalCostBasis = await this.calculateCostBasesInAccountCurrency(
+    // Historical cost basis, but only where the replay both knows it and
+    // states it in the currency the holding's account keeps its books in.
+    // Anything else falls through to the stored average cost below, the same
+    // way a holding with no transaction history does.
+    const currencyByAccount = new Map(
+      holdings
+        .filter((h) => h.account?.currencyCode)
+        .map((h) => [h.accountId, h.account.currencyCode] as const),
+    );
+    const historicalCostBasis = await this.knownCostBasesIn(
       userId,
       holdingsAccountIds,
+      currencyByAccount,
     );
 
     let totalCostBasis = 0;
@@ -1501,8 +1520,12 @@ export class PortfolioCalculationService {
       const accountCurrency = h.account?.currencyCode ?? holdingCurrency;
 
       // Prefer the historical cost basis derived from transaction exchange
-      // rates; fall back to current-rate conversion when no transaction
-      // history is available (e.g. holdings imported without transactions).
+      // rates; fall back to current-rate conversion when no *usable* one is
+      // available -- no transaction history (e.g. holdings imported without
+      // it), a history the replay could not price, or a basis denominated in
+      // some other account's currency. The stored average cost is the
+      // application's other answer for those, and it is at least an answer
+      // about this holding in this currency.
       const historicalKey = `${h.accountId}:${h.securityId}`;
       let costBasisAccountCurrency = historicalCostBasis.get(historicalKey);
       if (costBasisAccountCurrency === undefined) {

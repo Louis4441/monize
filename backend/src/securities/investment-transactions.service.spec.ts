@@ -1651,6 +1651,57 @@ describe("InvestmentTransactionsService", () => {
       );
     });
 
+    /**
+     * Invariant: an acquisition states what it cost -- on every path that can
+     * write one, not only on `create`.
+     * Canonical adversarial input: a rejected command reintroduced through a
+     * second entry point (testing contract, ownership / money precision).
+     * Minimal mutation: delete the `assertAcquisitionPriced` call in
+     * `update`.
+     * Test that fails under it: the first two below -- a purchase is edited
+     * into a free one and its gain and tax are reported as known.
+     */
+    it("refuses to price an existing BUY at zero", async () => {
+      await expect(
+        service.update(userId, transactionId, { price: 0 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("refuses to turn an unpriced action into a BUY with no price", async () => {
+      const unpriced = {
+        ...mockBuyTransaction,
+        action: InvestmentAction.ADD_SHARES,
+        price: null,
+      };
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(unpriced),
+      );
+
+      await expect(
+        service.update(userId, transactionId, {
+          action: InvestmentAction.BUY,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("still allows an unrelated edit on a row that has no price", async () => {
+      // Rows written before the rule existed must stay correctable. Refusing
+      // every edit would strand them with no way to fix anything at all, and
+      // a change of description is not the write that made one wrong.
+      const unpriced = {
+        ...mockBuyTransaction,
+        action: InvestmentAction.ADD_SHARES,
+        price: null,
+      };
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(unpriced),
+      );
+
+      await expect(
+        service.update(userId, transactionId, { description: "renamed" }),
+      ).resolves.toBeDefined();
+    });
+
     it("updates transaction fields and re-applies effects", async () => {
       // findOne returns existing BUY transaction
       const existingTx = { ...mockBuyTransaction };
@@ -4408,6 +4459,30 @@ describe("InvestmentTransactionsService", () => {
   });
 
   describe("createEmbeddedForSplit", () => {
+    it("refuses an embedded BUY with no price", async () => {
+      accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
+      securitiesService.findOne.mockResolvedValue(mockSecurity);
+
+      // The split path wrote `dto.price ?? 0`, so this was the way around the
+      // guard `create` had: a free purchase inside a split transaction.
+      await expect(
+        service.createEmbeddedForSplit(
+          mockQueryRunner.manager as any,
+          userId,
+          "2026-05-09",
+          "split-1",
+          accountId,
+          cashAccountId,
+          {
+            action: InvestmentAction.BUY,
+            securityId,
+            quantity: 75,
+            commission: 0,
+          } as never,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it("creates an embedded BUY without spawning a linked cash transaction", async () => {
       accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
       securitiesService.findOne.mockResolvedValue(mockSecurity);

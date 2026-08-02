@@ -130,6 +130,17 @@ export function useReportData<T>(
   const run = useCallback(() => {
     const runId = ++runIdRef.current;
     const startedFor = requestKeyRef.current;
+    // Snapshotted with the key, not read back on settle.
+    //
+    // The interpreter closes over the selectors it needs to name a response --
+    // for the GEM report, the chart range -- so reading the *current* one when
+    // an old response lands names that response with the new range's key. The
+    // run counter does not catch it: between the render that changed the range
+    // and the effect that starts its fetch, `runIdRef` still belongs to the
+    // old run, so the stale payload commits and briefly becomes the report for
+    // a range it is not a report of. Both halves of the identity have to be
+    // fixed at the same instant, which is when the request was made.
+    const interpretResult = keyForResultRef.current;
     setIsLoading(true);
     setError(null);
     fetcherRef
@@ -139,8 +150,7 @@ export function useReportData<T>(
         // The response's own identity wins over the one it was asked for: the
         // server may have answered a different question, and the payload is a
         // report of what it says it is.
-        const settledFor =
-          keyForResultRef.current?.(result) ?? startedFor ?? null;
+        const settledFor = interpretResult?.(result) ?? startedFor ?? null;
         setData(result);
         setDataKey(settledFor);
         // The caller is about to move its selection onto this key, which

@@ -1,4 +1,7 @@
-import { PortfolioCalculationService } from "./portfolio-calculation.service";
+import {
+  PortfolioCalculationService,
+  ReplayedLot,
+} from "./portfolio-calculation.service";
 import { Holding } from "./entities/holding.entity";
 import {
   InvestmentTransaction,
@@ -2035,5 +2038,99 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
         basisKnown: true,
       });
     });
+  });
+});
+
+/**
+ * Invariant: a replayed basis is only usable as an account-currency figure
+ * when the replay knows it and denominated it in that currency.
+ * Canonical adversarial input: three currencies and an unpriced row (testing
+ * contract, currency conversion / missing data).
+ * Minimal mutation: return `lot.costBasis` for every lot, as the old
+ * `calculateCostBasesInAccountCurrency` projection did.
+ * Test that fails under it: the first two below -- a EUR figure is summed
+ * into a PLN total, and a position the history cannot price contributes a
+ * confident partial sum.
+ */
+describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
+  const userId = "user-1";
+
+  /** One PLN brokerage holding 10 shares of a USD security at 30 average. */
+  const holdingRow = {
+    id: "h-1",
+    accountId: "acct-1",
+    securityId: "sec-a",
+    quantity: 10,
+    averageCost: 30,
+    security: {
+      id: "sec-a",
+      symbol: "AAA",
+      name: "Alpha",
+      securityType: "STOCK",
+      currencyCode: "PLN",
+    },
+    account: { id: "acct-1", currencyCode: "PLN" },
+  };
+
+  const valuation = async (lot: ReplayedLot) => {
+    const holdingRepo = { find: jest.fn().mockResolvedValue([holdingRow]) };
+    const txRepo = { find: jest.fn().mockResolvedValue([]) };
+    const accountRepo = { find: jest.fn().mockResolvedValue([]) };
+    const service = buildService(
+      [
+        [Holding, holdingRepo],
+        [InvestmentTransaction, txRepo],
+        [Account, accountRepo],
+      ],
+      { getLatestRate: jest.fn().mockResolvedValue(1) },
+    );
+    jest
+      .spyOn(service, "calculateCostBasisLotsInAccountCurrency")
+      .mockResolvedValue(new Map([["acct-1:sec-a", lot]]));
+    return service.calculateHoldingsWithValues(
+      userId,
+      ["acct-1"],
+      "PLN",
+      new Map(),
+      async () => new Map([["sec-a", 50]]),
+    );
+  };
+
+  const lot = (over: Partial<ReplayedLot> = {}): ReplayedLot => ({
+    quantity: 10,
+    costBasis: 900,
+    currencyCode: "PLN",
+    basisKnown: true,
+    basisGap: null,
+    ...over,
+  });
+
+  it("uses a replayed basis that is known and in the account's currency", async () => {
+    const result = await valuation(lot());
+
+    // The replay's 900 PLN, not the stored 10 x 30 = 300.
+    expect(result.holdingsWithValues[0].costBasisAccountCurrency).toBe(900);
+    expect(result.totalCostBasis).toBe(900);
+  });
+
+  it("ignores a basis denominated in another currency", async () => {
+    const result = await valuation(lot({ currencyCode: "EUR" }));
+
+    // 900 EUR is not 900 PLN, and there is no historical rate here to make it
+    // one. Falls back to the stored average cost, which is at least a figure
+    // about this holding in this currency.
+    expect(result.holdingsWithValues[0].costBasisAccountCurrency).toBe(300);
+    expect(result.totalCostBasis).toBe(300);
+  });
+
+  it("ignores a basis the replay could not price", async () => {
+    const result = await valuation(
+      lot({ basisKnown: false, basisGap: "quantity_only_action" }),
+    );
+
+    // The 900 covers only the part of the position the history prices.
+    // Reported as the cost it becomes a confident number for a different
+    // position.
+    expect(result.holdingsWithValues[0].costBasisAccountCurrency).toBe(300);
   });
 });

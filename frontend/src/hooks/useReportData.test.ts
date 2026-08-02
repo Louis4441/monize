@@ -96,4 +96,50 @@ describe('useReportData', () => {
     // Stale resolution must not overwrite the latest data.
     expect(result.current.data).toBe('latest');
   });
+  /**
+   * Invariant: a response is named by the request that produced it, in both
+   * halves of the key.
+   * Canonical adversarial input: a stale response landing after the selection
+   * moved (testing contract, asynchronous).
+   * Minimal mutation: read `keyForResultRef.current` inside `.then` instead of
+   * snapshotting it when the run starts.
+   * Test that fails under it: this one -- the in-flight response is stamped
+   * with the new range's key and becomes that range's report.
+   *
+   * `deps` are deliberately held constant so no second fetch starts. That is
+   * what isolates the defect: the run counter only moves when `run()` is
+   * called, so between a render that changes the interpreter and the effect
+   * that would start a new request, an old response is still allowed to
+   * commit -- and it committed under whatever the interpreter said *then*.
+   */
+  it('names a response with the interpreter in force when it was requested', async () => {
+    const resolvers: Array<(value: string) => void> = [];
+    const fetcher = () =>
+      new Promise<string>((resolve) => {
+        resolvers.push(resolve);
+      });
+
+    // The interpreter closes over the range, exactly as the GEM report's does.
+    // Passed as a prop rather than read from a mutable binding: React gives
+    // each render its own `range`, so the arrow made during the first render
+    // keeps saying 1Y no matter what later renders see. A shared `let` would
+    // make every closure agree and hide the defect entirely.
+    const { result, rerender } = renderHook(
+      ({ range }: { range: string }) =>
+        useReportData(fetcher, ['fixed'], {
+          requestKey: `${range}|s1`,
+          keyForResult: () => `${range}|s1`,
+        }),
+      { initialProps: { range: '1Y' } },
+    );
+
+    rerender({ range: '3M' });
+    act(() => resolvers[0]('report-for-1Y'));
+
+    await waitFor(() => expect(result.current.data).toBe('report-for-1Y'));
+    // The payload is a 1Y report and must say so. Stamped `3M|s1` it becomes
+    // the current selection's report, and every action offered beside it is
+    // aimed at a range it does not describe.
+    expect(result.current.dataKey).toBe('1Y|s1');
+  });
 });

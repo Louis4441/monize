@@ -28,6 +28,9 @@ import {
 import { collectRowIdRemap, deepRemapIds } from "./backup-id-remap.util";
 import { resolveCurrencyMetadata } from "../currencies/currency-metadata";
 import { tr } from "../i18n/translate";
+import { gemConfigFingerprint } from "../strategies/gem-signal.service";
+import { GemStrategy } from "../strategies/entities/gem-strategy.entity";
+import { GemStrategyAsset } from "../strategies/entities/gem-strategy-asset.entity";
 
 export interface RestoreBackupInput {
   compressedData: Buffer;
@@ -607,6 +610,7 @@ export class BackupService {
     // UPDATEs (keyed only by id) would mutate the OTHER user's rows.
     const idRemap = this.buildBackupIdRemap(rawData);
     const data = this.remapBackupIds(rawData, idRemap);
+    this.rehashGemSignalFingerprints(data, idRemap);
 
     this.logger.log(`Starting backup restore for user ${userId}`);
 
@@ -1068,6 +1072,90 @@ export class BackupService {
    * to UUIDs here would (a) corrupt them and (b) clobber unrelated bigint
    * values in other columns that happen to share the same string form.
    */
+  /**
+   * Re-hash each GEM signal's `config_fingerprint` onto the remapped security
+   * ids.
+   *
+   * The fingerprint is a hash of the strategy's cadence, lookback and the
+   * security assigned to every role -- so it contains ids, but as hashed
+   * *material*, not as a value `deepRemapIds` can rewrite. A restore mints new
+   * UUIDs for every security, and the stored hashes went on describing the old
+   * ones. The report reads a mismatch as "the user changed the settings", so
+   * the first read after a restore would recompute the whole history where it
+   * could, and hide the periods it could not -- the user's own past decisions,
+   * and the `executed` flags on them, gone or rewritten by an import that
+   * changed nothing they can see.
+   *
+   * The relation is translated, not overwritten. Only signals whose hash
+   * matches the configuration *as it was* are moved to the configuration *as
+   * it now is*; a signal that was already stale before the backup stays stale,
+   * because it answered a different question then and still does. Blanket
+   * re-stamping would promote retired history into the current run.
+   */
+  private rehashGemSignalFingerprints(
+    data: BackupData,
+    idRemap: Map<string, string>,
+  ): void {
+    const signals = data.gem_strategy_signals;
+    if (!signals?.length) return;
+
+    const toOldId = new Map(
+      [...idRemap].map(([oldId, newId]) => [newId, oldId] as const),
+    );
+    const assetsByStrategy = new Map<string, Record<string, unknown>[]>();
+    for (const asset of data.gem_strategy_assets ?? []) {
+      const key = String(asset.strategy_id ?? "");
+      const group = assetsByStrategy.get(key);
+      if (group) group.push(asset);
+      else assetsByStrategy.set(key, [asset]);
+    }
+
+    /** The backup's snake_case rows in the shape the hash function wants. */
+    const fingerprintOf = (
+      strategy: Record<string, unknown>,
+      assets: Record<string, unknown>[],
+      securityIdOf: (asset: Record<string, unknown>) => string | null,
+    ): string =>
+      gemConfigFingerprint(
+        {
+          cadence: strategy.cadence as GemStrategy["cadence"],
+          lookbackMonths: Number(strategy.lookback_months),
+        },
+        assets.map(
+          (asset) =>
+            ({
+              role: asset.role,
+              securityId: securityIdOf(asset),
+            }) as GemStrategyAsset,
+        ),
+      );
+
+    for (const strategy of data.gem_strategies ?? []) {
+      const strategyId = String(strategy.id ?? "");
+      const assets = assetsByStrategy.get(strategyId) ?? [];
+      const asNow = fingerprintOf(strategy, assets, (asset) =>
+        asset.security_id === null || asset.security_id === undefined
+          ? null
+          : String(asset.security_id),
+      );
+      const asBackedUp = fingerprintOf(strategy, assets, (asset) => {
+        if (asset.security_id === null || asset.security_id === undefined) {
+          return null;
+        }
+        const remapped = String(asset.security_id);
+        return toOldId.get(remapped) ?? remapped;
+      });
+      if (asNow === asBackedUp) continue;
+
+      for (const signal of signals) {
+        if (String(signal.strategy_id ?? "") !== strategyId) continue;
+        if (signal.config_fingerprint === asBackedUp) {
+          signal.config_fingerprint = asNow;
+        }
+      }
+    }
+  }
+
   private buildBackupIdRemap(data: BackupData): Map<string, string> {
     const remap = new Map<string, string>();
     for (const [table, rows] of Object.entries(data)) {
