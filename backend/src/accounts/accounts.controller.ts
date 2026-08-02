@@ -427,6 +427,7 @@ export class AccountsController {
         req.user.id,
         id,
         { expandSplits: shouldExpandSplits, dateFormat: df },
+        req.user.realUserId ?? req.user.id,
       );
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("X-Content-Type-Options", "nosniff");
@@ -444,6 +445,7 @@ export class AccountsController {
         req.user.id,
         id,
         { dateFormat: df },
+        req.user.realUserId ?? req.user.id,
       );
       res.setHeader("Content-Type", "application/x-qif; charset=utf-8");
       res.setHeader("X-Content-Type-Options", "nosniff");

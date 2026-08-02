@@ -165,6 +165,16 @@ describe("AccountExportService", () => {
           provide: AccountsService,
           useValue: mockAccountsService,
         },
+        {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("../delegation/cross-owner-access.service")
+            .CrossOwnerAccessService,
+          useValue: {
+            readableAccountIdSetFor: jest
+              .fn()
+              .mockImplementation(async () => new Set<string>()),
+          },
+        },
       ],
     }).compile();
 
@@ -206,6 +216,66 @@ describe("AccountExportService", () => {
       const lines = csv.split("\n");
 
       expect(lines[1]).toContain("Transfer: Savings");
+    });
+
+    it("masks a cross-owner counterpart the reader cannot read (post-unshare)", async () => {
+      const transfer = {
+        ...buildTransferTransaction(),
+        userId,
+        payeeName: "Transfer to Savings",
+        linkedTransaction: {
+          id: "tx-4",
+          userId: "owner-2",
+          accountId: "account-2",
+          account: { id: "account-2", name: "Savings" },
+        },
+      };
+      const qb = createMockQueryBuilder([transfer]);
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const csv = await service.exportCsv(userId, accountId);
+      const lines = csv.split("\n");
+
+      expect(lines[1]).toContain("Transfer: Hidden account");
+      expect(lines[1]).toContain("Transfer to Hidden account");
+      expect(csv).not.toContain("Savings");
+    });
+
+    it("keeps a readable cross-owner counterpart unmasked (connected pair)", async () => {
+      const crossOwnerAccess = (service as any).crossOwnerAccess;
+      crossOwnerAccess.readableAccountIdSetFor.mockResolvedValue(
+        new Set(["account-2"]),
+      );
+      const transfer = {
+        ...buildTransferTransaction(),
+        userId,
+        payeeName: "Transfer to Savings",
+        linkedTransaction: {
+          id: "tx-4",
+          userId: "owner-2",
+          accountId: "account-2",
+          account: { id: "account-2", name: "Savings" },
+        },
+      };
+      const qb = createMockQueryBuilder([transfer]);
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const csv = await service.exportCsv(userId, accountId);
+      const lines = csv.split("\n");
+
+      expect(lines[1]).toContain("Transfer: Savings");
+      expect(lines[1]).toContain("Transfer to Savings");
+    });
+
+    it("never queries grants for a same-owner export (fast path)", async () => {
+      const crossOwnerAccess = (service as any).crossOwnerAccess;
+      const transactions = [buildTransferTransaction()];
+      const qb = createMockQueryBuilder(transactions);
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.exportCsv(userId, accountId);
+
+      expect(crossOwnerAccess.readableAccountIdSetFor).not.toHaveBeenCalled();
     });
 
     it("handles split transactions with sub-rows", async () => {

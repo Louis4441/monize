@@ -28,6 +28,11 @@ import {
   TransferActor,
   TransferResult,
 } from "./transaction-transfer.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
+import {
+  maskTransactionsAgainst,
+  payloadHasCrossOwnerTransfer,
+} from "../delegation/transfer-mask.util";
 import { TransactionReconciliationService } from "./transaction-reconciliation.service";
 import { TransactionAnalyticsService } from "./transaction-analytics.service";
 import {
@@ -210,6 +215,7 @@ export class TransactionsService {
     private bulkUpdateService: TransactionBulkUpdateService,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
+    private crossOwnerAccess: CrossOwnerAccessService,
   ) {}
 
   /**
@@ -2762,6 +2768,16 @@ export class TransactionsService {
       sortBy,
       sortDirection,
     );
+
+    // AI/MCP responses bypass the HTTP mask interceptor, so cross-owner
+    // counterparts the user cannot read are masked here, before projection
+    // (rewrites the auto payee tail on the visible leg). Pure-payload fast
+    // path first: same-owner result sets never pay the grants query.
+    if (payloadHasCrossOwnerTransfer(result.data)) {
+      const readable =
+        await this.crossOwnerAccess.readableAccountIdSetFor(userId);
+      maskTransactionsAgainst(readable, result.data);
+    }
 
     const transactions = result.data.flatMap((t): LlmTransactionRow[] => {
       const rows: LlmTransactionRow[] =

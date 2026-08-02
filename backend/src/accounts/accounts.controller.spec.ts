@@ -595,6 +595,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: true, dateFormat: undefined },
+        "user-1",
       );
       expect(mockRes.setHeader).toHaveBeenCalledWith(
         "Content-Type",
@@ -628,6 +629,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: false, dateFormat: undefined },
+        "user-1",
       );
     });
 
@@ -650,6 +652,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: false, dateFormat: undefined },
+        "user-1",
       );
     });
 
@@ -672,6 +675,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { dateFormat: undefined },
+        "user-1",
       );
       expect(mockRes.setHeader).toHaveBeenCalledWith(
         "Content-Type",
@@ -701,6 +705,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: true, dateFormat: "DD/MM/YYYY" },
+        "user-1",
       );
     });
 
@@ -723,6 +728,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { dateFormat: "YYYY-MM-DD" },
+        "user-1",
       );
     });
 

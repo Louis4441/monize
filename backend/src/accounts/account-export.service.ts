@@ -4,6 +4,11 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { AccountType } from "./entities/account.entity";
 import { AccountsService } from "./accounts.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
+import {
+  maskTransactionsAgainst,
+  payloadHasCrossOwnerTransfer,
+} from "../delegation/transfer-mask.util";
 import { roundMoney } from "../common/round.util";
 import { withScopedDb } from "../common/db/scoped-db";
 
@@ -46,16 +51,22 @@ export class AccountExportService {
   constructor(
     private dataSource: DataSource,
     private accountsService: AccountsService,
+    private crossOwnerAccess: CrossOwnerAccessService,
   ) {}
 
   async exportCsv(
     userId: string,
     accountId: string,
     options: CsvExportOptions = {},
+    realUserId = userId,
   ): Promise<string> {
     const { expandSplits = true, dateFormat = "YYYY-MM-DD" } = options;
     const account = await this.accountsService.findOne(userId, accountId);
-    const transactions = await this.getExportTransactions(userId, accountId);
+    const transactions = await this.getExportTransactions(
+      userId,
+      accountId,
+      realUserId,
+    );
 
     const rows: string[] = [];
     rows.push(this.csvHeader());
@@ -126,10 +137,15 @@ export class AccountExportService {
     userId: string,
     accountId: string,
     options: QifExportOptions = {},
+    realUserId = userId,
   ): Promise<string> {
     const { dateFormat = "M/D/YYYY" } = options;
     const account = await this.accountsService.findOne(userId, accountId);
-    const transactions = await this.getExportTransactions(userId, accountId);
+    const transactions = await this.getExportTransactions(
+      userId,
+      accountId,
+      realUserId,
+    );
 
     const lines: string[] = [];
     lines.push(`!Type:${this.accountTypeToQif(account.accountType)}`);
@@ -183,6 +199,7 @@ export class AccountExportService {
   private async getExportTransactions(
     userId: string,
     accountId: string,
+    realUserId = userId,
   ): Promise<ExportTransaction[]> {
     const rawTransactions = await withScopedDb(this.dataSource, (m) =>
       m
@@ -202,6 +219,17 @@ export class AccountExportService {
         .addOrderBy("transaction.id", "ASC")
         .getMany(),
     );
+
+    // The linkedTransaction.account join is unfiltered, so after unshare the
+    // export would leak the counterpart's live account name; the response
+    // shape bypasses the HTTP mask interceptor, so the mask is applied here
+    // (rewriting the exported auto payee names too). Pure-payload fast path
+    // first: same-owner exports never pay the grants query.
+    if (payloadHasCrossOwnerTransfer(rawTransactions)) {
+      const readable =
+        await this.crossOwnerAccess.readableAccountIdSetFor(realUserId);
+      maskTransactionsAgainst(readable, rawTransactions);
+    }
 
     const categoryMap = await this.buildCategoryPathMap(userId);
 

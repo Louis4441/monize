@@ -257,6 +257,9 @@ describe("TransactionsService", () => {
                   via: "own",
                 }),
               ),
+            readableAccountIdSetFor: jest
+              .fn()
+              .mockImplementation(async () => new Set<string>()),
           },
         },
         TransactionSplitService,
@@ -6220,6 +6223,68 @@ describe("TransactionsService", () => {
       expect(plain?.categoryName).toBe("Dining");
       expect(plain?.isSplit).toBeUndefined();
       expect(result.total).toBe(2);
+    });
+
+    it("masks a cross-owner counterpart the user cannot read (AI/MCP shared read)", async () => {
+      const crossOwnerAccess = (service as any).crossOwnerAccess;
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-cross",
+            userId: "user-1",
+            transactionDate: "2025-01-15",
+            payeeName: "Transfer to Owner Savings",
+            amount: -100,
+            account: { name: "Checking" },
+            status: "CLEARED",
+            isTransfer: true,
+            linkedTransaction: {
+              userId: "owner-2",
+              accountId: "a2",
+              account: { id: "a2", name: "Owner Savings" },
+            },
+          },
+        ],
+        pagination: { total: 1, hasMore: false },
+      } as any);
+
+      const result = await service.getLlmTransactionRows("user-1", {});
+
+      expect(crossOwnerAccess.readableAccountIdSetFor).toHaveBeenCalledWith(
+        "user-1",
+      );
+      expect(result.transactions[0].payeeName).toBe(
+        "Transfer to Hidden account",
+      );
+    });
+
+    it("never queries grants for same-owner rows (fast path)", async () => {
+      const crossOwnerAccess = (service as any).crossOwnerAccess;
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-own",
+            userId: "user-1",
+            transactionDate: "2025-01-15",
+            payeeName: "Transfer to Savings",
+            amount: -100,
+            account: { name: "Checking" },
+            status: "CLEARED",
+            isTransfer: true,
+            linkedTransaction: {
+              userId: "user-1",
+              accountId: "a2",
+              account: { id: "a2", name: "Savings" },
+            },
+          },
+        ],
+        pagination: { total: 1, hasMore: false },
+      } as any);
+
+      const result = await service.getLlmTransactionRows("user-1", {});
+
+      expect(crossOwnerAccess.readableAccountIdSetFor).not.toHaveBeenCalled();
+      expect(result.transactions[0].payeeName).toBe("Transfer to Savings");
     });
 
     it("applies min/max amount filters to the expanded rows", async () => {
