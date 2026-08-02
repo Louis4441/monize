@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "找不到帳戶",
+    "accountNotInvestment": "GEM 策略只能在投資帳戶中執行。",
     "configurationChanging": "產生報告時策略設定已變更。請重試。",
     "securityNotFound": "找不到證券",
     "signalNotFound": "找不到策略訊號",

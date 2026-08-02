@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "खाता नहीं मिला",
+    "accountNotInvestment": "GEM रणनीति केवल निवेश खातों में चल सकती है।",
     "configurationChanging": "रिपोर्ट बनते समय रणनीति सेटिंग्स बदल गईं। कृपया फिर से प्रयास करें।",
     "securityNotFound": "प्रतिभूति नहीं मिली",
     "signalNotFound": "रणनीति संकेत नहीं मिला",

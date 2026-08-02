@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "Счёт не найден",
+    "accountNotInvestment": "Стратегия GEM может работать только на инвестиционных счетах.",
     "configurationChanging": "Настройки стратегии изменились во время формирования отчёта. Попробуйте ещё раз.",
     "securityNotFound": "Инструмент не найден",
     "signalNotFound": "Сигнал стратегии не найден",

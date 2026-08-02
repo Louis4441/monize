@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "Konto nicht gefunden",
+    "accountNotInvestment": "Eine GEM-Strategie kann nur in Anlagekonten laufen.",
     "configurationChanging": "Die Strategieeinstellungen haben sich geändert, während der Bericht erstellt wurde. Bitte versuchen Sie es erneut.",
     "securityNotFound": "Wertpapier nicht gefunden",
     "signalNotFound": "Strategiesignal nicht gefunden",

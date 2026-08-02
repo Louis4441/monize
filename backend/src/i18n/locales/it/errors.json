@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "Conto non trovato",
+    "accountNotInvestment": "Una strategia GEM può essere eseguita solo su conti di investimento.",
     "configurationChanging": "Le impostazioni della strategia sono cambiate mentre il report veniva creato. Riprova.",
     "securityNotFound": "Titolo non trovato",
     "signalNotFound": "Segnale della strategia non trovato",

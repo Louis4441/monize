@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "[XX-Account not found-XX]",
+    "accountNotInvestment": "[XX-A GEM strategy can only run in investment accounts.-XX]",
     "configurationChanging": "[XX-The strategy settings changed while the report was being built. Please try again.-XX]",
     "securityNotFound": "[XX-Security not found-XX]",
     "signalNotFound": "[XX-Strategy signal not found-XX]",

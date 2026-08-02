@@ -132,7 +132,15 @@ describe("GemStrategyService", () => {
     };
     accountRepo = {
       findOne: jest.fn().mockResolvedValue({ id: "acct-1" }),
-      find: jest.fn().mockResolvedValue([{ id: "acct-1" }]),
+      // A real row carries its type: the eligibility check selects both
+      // columns, so a bare `{ id }` is a shape the query cannot return.
+      find: jest.fn().mockResolvedValue([
+        {
+          id: "acct-1",
+          accountType: "INVESTMENT",
+          accountSubType: "INVESTMENT_BROKERAGE",
+        },
+      ]),
     };
     securityRepo = {
       // Doubles for two reads: the ownership check on save, which only looks at
@@ -812,7 +820,18 @@ describe("GemStrategyService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValue(storedAssets());
       strategyAccountRepo.find.mockResolvedValue([]); // nothing linked yet
-      accountRepo.find.mockResolvedValue([{ id: "acct-1" }, { id: "acct-2" }]);
+      accountRepo.find.mockResolvedValue([
+        {
+          id: "acct-1",
+          accountType: "INVESTMENT",
+          accountSubType: "INVESTMENT_BROKERAGE",
+        },
+        {
+          id: "acct-2",
+          accountType: "INVESTMENT",
+          accountSubType: "INVESTMENT_BROKERAGE",
+        },
+      ]);
 
       await service.updateConfig(userId, {
         accountIds: ["acct-1", "acct-2"],
@@ -886,7 +905,13 @@ describe("GemStrategyService", () => {
       strategyAccountRepo.find.mockResolvedValueOnce([
         { accountId: "acct-1", account: { id: "acct-1", name: "Broker IRA" } },
       ]);
-      accountRepo.find.mockResolvedValue([{ id: "acct-2" }]);
+      accountRepo.find.mockResolvedValue([
+        {
+          id: "acct-2",
+          accountType: "INVESTMENT",
+          accountSubType: "INVESTMENT_BROKERAGE",
+        },
+      ]);
 
       await service.updateConfig(userId, { accountIds: ["acct-2"] });
 
@@ -1052,6 +1077,108 @@ describe("GemStrategyService", () => {
       expect(strategyRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ name: "IKE monthly" }),
       );
+    });
+
+    /**
+     * Invariant: a partial save applies the DTO to the authoritative row, not
+     * to a snapshot read before the lock.
+     * Canonical adversarial input: two concurrent partial writes to different
+     * fields of the same scenario.
+     * Minimal mutation that recreates the defect: drop the re-read after
+     * `lockGemStrategy` in the unnamed branch of `updateConfig`.
+     * Test that fails under that mutation: this one -- the cadence reverts.
+     */
+    /**
+     * Invariant: only an eligible investment account may be assigned.
+     * Canonical adversarial input: a valid, owned identifier of the wrong
+     * entity kind (testing contract, "identifiers and ownership").
+     * Minimal mutation: drop the eligibility filter and keep the ownership
+     * check. Test that fails under it: these two.
+     */
+    it("refuses a chequing account the user happens to own", async () => {
+      // Ownership is not eligibility. The picker never offers this, but the
+      // API takes any id the user owns -- and the report then names the
+      // account while holdings and cash both skip it.
+      accountRepo.find.mockResolvedValue([
+        { id: "acct-chq", accountType: "CHECKING", accountSubType: null },
+      ]);
+
+      await expect(
+        service.updateConfig(userId, { accountIds: ["acct-chq"] }),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(strategyRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("refuses a linked cash sleeve chosen directly", async () => {
+      // Half of an account. Its brokerage side is what a strategy runs in,
+      // and the cash read finds this balance from there anyway.
+      accountRepo.find.mockResolvedValue([
+        {
+          id: "acct-cash",
+          accountType: "INVESTMENT",
+          accountSubType: "INVESTMENT_CASH",
+        },
+      ]);
+
+      await expect(
+        service.updateConfig(userId, { accountIds: ["acct-cash"] }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("accepts brokerage and standalone investment accounts", async () => {
+      accountRepo.find.mockResolvedValue([
+        {
+          id: "acct-1",
+          accountType: "INVESTMENT",
+          accountSubType: "INVESTMENT_BROKERAGE",
+        },
+        { id: "acct-2", accountType: "INVESTMENT", accountSubType: null },
+      ]);
+
+      await expect(
+        service.updateConfig(userId, { accountIds: ["acct-1", "acct-2"] }),
+      ).resolves.toBeDefined();
+    });
+
+    it("re-reads the scenario under the lock before applying a partial save", async () => {
+      // Before the lock: the row as this request first saw it. After the
+      // lock: the row a competing save has since committed a cadence change
+      // to. Applying the DTO to the first silently reverts that change.
+      strategyRepo.findOne
+        .mockResolvedValueOnce(
+          storedStrategy({ cadence: "MONTHLY", taxRatePercent: 19 }),
+        )
+        .mockResolvedValue(
+          storedStrategy({ cadence: "QUARTERLY", taxRatePercent: 19 }),
+        );
+
+      await service.updateConfig(userId, { taxRatePercent: 25 });
+
+      const [saved] = strategyRepo.save.mock.calls[0];
+      expect(saved).toMatchObject({
+        // This request's own change...
+        taxRatePercent: 25,
+        // ...on top of the competitor's, rather than instead of it.
+        cadence: "QUARTERLY",
+      });
+      // The re-read is the second call, and it is scoped to the row found by
+      // the first: an unnamed save must not drift onto another scenario.
+      expect(strategyRepo.findOne.mock.calls[1][0]).toMatchObject({
+        where: { id: "strategy-1", userId },
+      });
+    });
+
+    it("serializes an unnamed save so two of them cannot both create", async () => {
+      // With no scenario yet there is no id to lock on, and two racing saves
+      // each found nothing and each created a default.
+      strategyRepo.findOne.mockResolvedValue(null);
+
+      await service.updateConfig(userId, { taxRatePercent: 25 });
+
+      const locks = manager.query.mock.calls
+        .filter(([sql]: [string]) => sql.includes("pg_advisory_xact_lock"))
+        .map(([, params]: [string, string[]]) => params[0]);
+      expect(locks).toContain(`user:${userId}`);
     });
 
     it("deletes a scenario and falls back to what is left", async () => {

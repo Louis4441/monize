@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -7,7 +8,11 @@ import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
 import { tr } from "../i18n/translate";
-import { Account } from "../accounts/entities/account.entity";
+import {
+  Account,
+  AccountSubType,
+  AccountType,
+} from "../accounts/entities/account.entity";
 import { Security } from "../securities/entities/security.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
@@ -683,15 +688,43 @@ export class GemStrategyService {
       // The id is known only for a named scenario; a save that has to look the
       // strategy up locks below, once it knows which one it is editing.
       if (strategyId) await lockGemStrategy(manager, strategyId);
+      // The unnamed save has no id to lock on yet, and two of them racing on a
+      // user with no scenario each find nothing and each create one -- two
+      // defaults where the model allows the user only to have made one. The
+      // same lock function keyed by the user serializes that, and serializes
+      // the lookup below with any other unnamed save. Nothing else locks on a
+      // user id, so there is no second order in which these can be taken.
+      if (!strategyId) await lockGemStrategy(manager, `user:${userId}`);
       if (dto.accountIds && dto.accountIds.length > 0) {
         const wanted = [...new Set(dto.accountIds)];
         const owned = await manager.getRepository(Account).find({
           where: { id: In(wanted), userId },
-          select: { id: true },
+          select: { id: true, accountType: true, accountSubType: true },
         });
         if (owned.length !== wanted.length) {
           throw new NotFoundException(
             tr("errors.strategies.accountNotFound", "Account not found"),
+          );
+        }
+        // Ownership is not eligibility. The picker offers only brokerage and
+        // standalone investment accounts, but the API takes any id the user
+        // owns, and the rest of the report then quietly disagrees with itself:
+        // holdings finds nothing for a chequing account, the cash read filters
+        // to investment accounts and skips it, and the metadata still names it
+        // as one of the strategy's accounts. A linked cash sleeve is rejected
+        // for the opposite reason -- it is half of an account, and its
+        // brokerage side is the thing a strategy runs in.
+        const ineligible = owned.filter(
+          (account) =>
+            account.accountType !== AccountType.INVESTMENT ||
+            account.accountSubType === AccountSubType.INVESTMENT_CASH,
+        );
+        if (ineligible.length > 0) {
+          throw new BadRequestException(
+            tr(
+              "errors.strategies.accountNotInvestment",
+              "A GEM strategy can only run in investment accounts.",
+            ),
           );
         }
       }
@@ -714,14 +747,23 @@ export class GemStrategyService {
       const strategyRepo = manager.getRepository(GemStrategy);
       // Naming a scenario edits that one; omitting the id edits the first,
       // which is the only one for a user who never created a second.
-      const existing = await strategyRepo.findOne({
+      let existing = await strategyRepo.findOne({
         where: strategyId ? { id: strategyId, userId } : { userId },
         order: { createdAt: "ASC" },
       });
-      // The unnamed case: now that the row is known, take the lock and re-read
-      // under it, so a concurrent materializer is either finished or waiting.
+      // The unnamed case: the read above happened *before* any lock, so the
+      // entity it produced is a snapshot, and the partial DTO is about to be
+      // applied on top of it. Two concurrent saves -- one setting the cadence,
+      // one the tax rate -- both loaded the same snapshot, and the second to
+      // reach the lock wrote its own field plus the first one's stale values,
+      // silently undoing that change. The comment here promised a re-read and
+      // did not perform one; taking the lock and reading again under it is
+      // what makes the write a read-modify-write of the authoritative row.
       if (!strategyId && existing) {
         await lockGemStrategy(manager, existing.id);
+        existing = await strategyRepo.findOne({
+          where: { id: existing.id, userId },
+        });
       }
       if (strategyId && !existing) {
         throw new NotFoundException(

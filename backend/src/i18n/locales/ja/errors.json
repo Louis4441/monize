@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "口座が見つかりません",
+    "accountNotInvestment": "GEM戦略は投資口座でのみ実行できます。",
     "configurationChanging": "レポートの作成中に戦略の設定が変更されました。もう一度お試しください。",
     "securityNotFound": "銘柄が見つかりません",
     "signalNotFound": "戦略シグナルが見つかりません",

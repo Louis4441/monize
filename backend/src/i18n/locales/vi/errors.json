@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "Không tìm thấy tài khoản",
+    "accountNotInvestment": "Chiến lược GEM chỉ có thể chạy trên tài khoản đầu tư.",
     "configurationChanging": "Cài đặt chiến lược đã thay đổi trong khi báo cáo đang được tạo. Vui lòng thử lại.",
     "securityNotFound": "Không tìm thấy chứng khoán",
     "signalNotFound": "Không tìm thấy tín hiệu chiến lược",

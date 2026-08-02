@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "Hesap bulunamadı",
+    "accountNotInvestment": "Bir GEM stratejisi yalnızca yatırım hesaplarında çalışabilir.",
     "configurationChanging": "Rapor oluşturulurken strateji ayarları değişti. Lütfen tekrar deneyin.",
     "securityNotFound": "Menkul kıymet bulunamadı",
     "signalNotFound": "Strateji sinyali bulunamadı",

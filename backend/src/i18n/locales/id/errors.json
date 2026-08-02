@@ -504,6 +504,7 @@
   },
   "strategies": {
     "accountNotFound": "Akun tidak ditemukan",
+    "accountNotInvestment": "Strategi GEM hanya dapat dijalankan di akun investasi.",
     "configurationChanging": "Pengaturan strategi berubah saat laporan sedang dibuat. Silakan coba lagi.",
     "securityNotFound": "Efek tidak ditemukan",
     "signalNotFound": "Sinyal strategi tidak ditemukan",
