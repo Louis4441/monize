@@ -56,16 +56,16 @@ export function gemSignal(overrides: Partial<GemSignal> = {}): GemSignal {
     effectiveFrom: "2025-08-01",
     evaluatedOn: "2025-08-01",
     absolute: {
-      equity: { ...gemAssets[0], momentum12m: 15.42, rank: 2 },
-      benchmark: { ...gemAssets[3], momentum12m: 4.21, rank: null },
+      equity: { ...gemAssets[0], momentumPercent: 15.42, rank: 2 },
+      benchmark: { ...gemAssets[3], momentumPercent: 4.21, rank: null },
       spreadPp: 11.21,
       result: "RISK_ON",
     },
     relative: {
       ranking: [
-        { ...gemAssets[2], momentum12m: 29.87, rank: 1 },
-        { ...gemAssets[0], momentum12m: 15.42, rank: 2 },
-        { ...gemAssets[1], momentum12m: 8.31, rank: 3 },
+        { ...gemAssets[2], momentumPercent: 29.87, rank: 1 },
+        { ...gemAssets[0], momentumPercent: 15.42, rank: 2 },
+        { ...gemAssets[1], momentumPercent: 8.31, rank: 3 },
       ],
       winner: gemAssets[2],
       leadPp: 14.45,

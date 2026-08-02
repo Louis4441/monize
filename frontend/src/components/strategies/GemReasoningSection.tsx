@@ -59,15 +59,15 @@ export function GemReasoningSection({
     });
 
   const absoluteValues = [
-    absolute.equity.momentum12m,
-    absolute.benchmark.momentum12m,
+    absolute.equity.momentumPercent,
+    absolute.benchmark.momentumPercent,
   ];
   /** A momentum figure for prose, or the unknown marker's words. */
   const momentumText = (value: number | null): string =>
     isKnown(value) ? formatSignedPercent(value) : t("gem.common.unknown");
   const winnerMomentum =
     relative.ranking.find((asset) => asset.role === relative.winner?.role)
-      ?.momentum12m ?? null;
+      ?.momentumPercent ?? null;
 
   /** One momentum row: label, coloured bar and the signed 12-month figure. */
   const momentumRow = (
@@ -101,14 +101,14 @@ export function GemReasoningSection({
       </div>
       <span className="text-sm font-medium tabular-nums">
         <GemSigned
-          value={asset.momentum12m}
+          value={asset.momentumPercent}
           format={(value) => formatSignedPercent(value)}
         />
       </span>
       <div className="col-span-2">
         <GemBar
-          width={momentumBarWidth(asset.momentum12m, values)}
-          negative={isKnown(asset.momentum12m) && asset.momentum12m < 0}
+          width={momentumBarWidth(asset.momentumPercent, values)}
+          negative={isKnown(asset.momentumPercent) && asset.momentumPercent < 0}
         />
       </div>
     </div>
@@ -160,15 +160,15 @@ export function GemReasoningSection({
             {isRiskOn
               ? t("gem.reasoning.step1AnswerRiskOn", {
                   equity: assetLabel(absolute.equity),
-                  equityReturn: momentumText(absolute.equity.momentum12m),
+                  equityReturn: momentumText(absolute.equity.momentumPercent),
                   benchmark: assetLabel(absolute.benchmark),
-                  benchmarkReturn: momentumText(absolute.benchmark.momentum12m),
+                  benchmarkReturn: momentumText(absolute.benchmark.momentumPercent),
                 })
               : t("gem.reasoning.step1AnswerRiskOff", {
                   equity: assetLabel(absolute.equity),
-                  equityReturn: momentumText(absolute.equity.momentum12m),
+                  equityReturn: momentumText(absolute.equity.momentumPercent),
                   benchmark: assetLabel(absolute.benchmark),
-                  benchmarkReturn: momentumText(absolute.benchmark.momentum12m),
+                  benchmarkReturn: momentumText(absolute.benchmark.momentumPercent),
                   safe: assetLabel(signal.target),
                 })}
           </p>
@@ -231,7 +231,7 @@ export function GemReasoningSection({
               {relative.ranking.map((asset, index) =>
                 momentumRow(
                   asset,
-                  relative.ranking.map((item) => item.momentum12m),
+                  relative.ranking.map((item) => item.momentumPercent),
                   asset.rank ?? index + 1,
                 ),
               )}

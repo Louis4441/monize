@@ -8,10 +8,11 @@ describe("GemStrategyHeader", () => {
     strategyName: "GEM Strategy",
     scenarios: [{ id: "strategy-1", name: "GEM Strategy" }],
     onSelectScenario: vi.fn(),
-    onCreateScenario: vi.fn().mockResolvedValue(undefined),
-    onDeleteScenario: vi.fn().mockResolvedValue(undefined),
+    onCreateScenario: vi.fn().mockResolvedValue("done" as const),
+    onDeleteScenario: vi.fn().mockResolvedValue("done" as const),
     scenarioBusy: false,
     cadence: "MONTHLY" as const,
+    lookbackMonths: 12,
     nextEvaluationOn: "2025-08-31",
     daysUntilNextEvaluation: 28,
   };
@@ -38,6 +39,31 @@ describe("GemStrategyHeader", () => {
       screen.getByText("Evaluation frequency: monthly"),
     ).toBeInTheDocument();
     expect(screen.getByText(/in 28 days/)).toBeInTheDocument();
+  });
+
+  /**
+   * Invariant: copy naming the momentum window names the configured one.
+   * Canonical adversarial input: a configuration away from the default.
+   * Minimal mutation: hardcode 12 in the `explainer` catalog string.
+   * Test that fails under it: this one.
+   */
+  it("explains the strategy with the window it is actually run on", () => {
+    render(
+      <GemStrategyHeader
+        {...baseProps}
+        lookbackMonths={6}
+        onEditSettings={vi.fn()}
+      />,
+    );
+
+    // The tooltip's text is on the trigger, so it is readable without hover.
+    const explainer = screen.getByLabelText(/Global Equities Momentum/);
+    expect(explainer).toHaveAccessibleName(
+      expect.stringContaining("6-month return"),
+    );
+    expect(explainer).not.toHaveAccessibleName(
+      expect.stringContaining("12-month return"),
+    );
   });
 
   it("omits the day count when it is unknown", () => {

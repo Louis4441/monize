@@ -202,6 +202,18 @@ export function GemPerformanceChart({
             </span>
           </li>
         ))}
+        {/* The simulation belongs in the key too. It is a line on the same
+            chart, and one drawn in a colour and a dash the legend never
+            explained -- so the only way to learn what it was involved reading
+            the note under the chart, if it was noticed at all. */}
+        {simulated && (
+          <li className="flex items-center gap-1.5">
+            <GemSwatch colour={chartColors.neutral} dashed />
+            <span className="text-gray-600 dark:text-gray-300">
+              {t("gem.chart.currentPortfolio")}
+            </span>
+          </li>
+        )}
       </ul>
 
       {isLoading ? (

@@ -199,8 +199,9 @@ asset, so a holding the strategy never assigned is exactly what makes the
 portfolio non-compliant and exactly what a switch has to sell. A strategy can
 span several brokerage accounts: a security held in more than one is summed into
 a single position, so the comparison sees one portfolio rather than one account
-at a time, and each holding is converted into the user's default currency with
-the latest stored exchange rate.
+at a time, and each holding is converted into the user's default currency at a
+stored rate no older than `BOUNDARY_LAG_DAYS` -- past that the holding's market
+value is unknown, not converted at whatever rate happens to be newest.
 
 Idle cash in those accounts is a position too (`isCash`): the linked
 `INVESTMENT_CASH` balance of each brokerage account, and a standalone investment
@@ -282,6 +283,18 @@ the report saying there was nothing to do about a position it could not see.
 Unknown says so, and holding an instrument other than the target still settles
 that a change is needed: what to do does not depend on being able to value it.
 
+**A cost basis is the position's only if the history reproduces the position,
+per account and per row.** The basis is rebuilt from the transactions at the
+rate each one recorded, commissions included, and the rebuilt units are
+compared against the units actually held **in each account separately** -- a
+surplus in one account cancels a shortfall in another if the totals are
+compared, and both wrong bases then pass. A history containing an `ADD_SHARES`
+or a `REMOVE_SHARES` leaves the basis unknown outright: those rows move units
+and carry no price, and the application itself keeps two answers for what they
+cost (`HoldingsService.adjustQuantity` holds the per-share average fixed, the
+full rebuild holds the total fixed). A `SPLIT` is not in that class -- it
+scales units and preserves total cost, which is what both paths do.
+
 **A missing exchange rate is missing data, not a rate of 1.** A holding priced
 in a currency with no stored rate to the report currency -- in either direction
 -- has an unknown market value and an unknown cost basis, and the totals above
@@ -351,6 +364,12 @@ One evaluation is enough to simulate, because the last period is bounded by
 `asOf` rather than by the next signal: entry price, exit price, the daily path
 between them and the safe asset over the same interval. Only a signal effective
 today, or one whose period cannot be priced, comes back with nothing.
+
+The simulation charges the same per-account count. A switch is
+`accountCount` sells plus `accountCount` buys, and the opening purchase is
+`accountCount` orders -- modelling one synthetic account understated the drag
+by a factor of the account count and compounded that over every period of the
+run.
 
 **Tax and commission are reported separately** (`taxApplied`,
 `commissionApplied`). They fail independently: tax is a percentage and applies

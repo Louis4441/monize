@@ -759,11 +759,17 @@ export class PortfolioCalculationService {
    * gain or loss of each SELL transaction using the average-cost method.
    *
    * For every prior BUY/REINVEST/TRANSFER_IN, the running cost basis for that
-   * (account, security) grows by `quantity * price * exchangeRate` (the same
-   * bookkeeping as `calculateCostBasesInAccountCurrency`). A SELL then draws
-   * down cost basis proportionally at the running average cost per share, and
-   * the realized gain is `proceeds - costBasis` — all in the holding account's
-   * currency.
+   * (account, security) grows by `quantity * price * exchangeRate`. A SELL
+   * then draws down cost basis proportionally at the running average cost per
+   * share, and the realized gain is `proceeds - costBasis` — all in the
+   * holding account's currency.
+   *
+   * This is **not** the same bookkeeping as
+   * `calculateCostBasisLotsInAccountCurrency`, which the comment here used to
+   * claim: that replay adds the acquisition commission to the basis and
+   * reports whether the basis is knowable at all. Reconciling the two is a
+   * change to what every realized-gain figure in the application reports, so
+   * it is its own change and not a footnote to this one.
    *
    * The entire history is replayed regardless of the requested date range so
    * SELLs early in the range still see cost basis built up by prior BUYs; only

@@ -254,10 +254,10 @@ describe("GemStrategyService", () => {
       });
       expect(report.signal?.absolute.equity).toMatchObject({
         symbol: "SPY",
-        momentum12m: 15.42,
+        momentumPercent: 15.42,
         rank: 2,
       });
-      expect(report.signal?.absolute.benchmark.momentum12m).toBe(4.21);
+      expect(report.signal?.absolute.benchmark.momentumPercent).toBe(4.21);
       expect(
         report.signal?.relative.ranking.map((entry) => entry.symbol),
       ).toEqual(["EMIM", "SPY", "EWA"]);
@@ -535,7 +535,7 @@ describe("GemStrategyService", () => {
       expect(report.signal?.absolute.benchmark).toMatchObject({
         role: "RISK_FREE",
         symbol: "BIL",
-        momentum12m: 5.13,
+        momentumPercent: 5.13,
       });
     });
 
@@ -549,7 +549,7 @@ describe("GemStrategyService", () => {
       expect(report.signal?.absolute.benchmark).toMatchObject({
         role: "SAFE",
         symbol: "IEF",
-        momentum12m: 4.21,
+        momentumPercent: 4.21,
       });
     });
 

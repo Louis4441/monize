@@ -72,7 +72,7 @@ export interface GemAssetRef {
 
 export interface GemAssetMomentum extends GemAssetRef {
   /** Trailing 12-month total return, in percent. Null when history is incomplete. */
-  momentum12m: number | null;
+  momentumPercent: number | null;
   /** 1-based rank among the equity assets; null for the safe asset or when unknown. */
   rank: number | null;
 }
@@ -85,7 +85,7 @@ export interface GemAbsoluteStep {
    * strategy assigns one, otherwise the safe asset.
    */
   benchmark: GemAssetMomentum;
-  /** equity.momentum12m - benchmark.momentum12m in percentage points; null when either is unknown. */
+  /** equity.momentumPercent - benchmark.momentumPercent in percentage points; null when either is unknown. */
   spreadPp: number | null;
   result: GemSignalState;
 }

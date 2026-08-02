@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@/test/render";
+import { render, screen, fireEvent, within } from "@/test/render";
 import { GemPerformanceChart } from "./GemPerformanceChart";
 import { gemAssets, gemPerformance } from "@/test/gem-fixtures";
 
@@ -226,9 +226,13 @@ describe("GemPerformanceChart", () => {
     );
 
     // The line is legible as a hypothetical, in the legend and in the note.
+    // In the legend specifically: the note under the chart explains the line,
+    // and the key above it did not list it at all, so the one place a reader
+    // looks to find out what a line is had nothing to say about this one.
+    const legend = document.getElementById("gem-chart-legend") as HTMLElement;
     expect(
-      screen.getAllByText("Today’s composition — simulated").length,
-    ).toBeGreaterThan(0);
+      within(legend).getByText("Today’s composition — simulated"),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/applies today’s instrument proportions at the start/),
     ).toBeInTheDocument();

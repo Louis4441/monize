@@ -56,7 +56,15 @@ export interface GemAssetRef {
 }
 
 export interface GemAssetMomentum extends GemAssetRef {
-  momentum12m: number | null;
+  /**
+   * Total return over the strategy's configured lookback, as a percentage.
+   *
+   * Not named for twelve months: the lookback is configurable, and a field
+   * called `momentum12m` carrying a six-month return is a claim the type makes
+   * and the data does not keep. The window itself travels as
+   * `strategy.lookbackMonths`, which is what the copy interpolates.
+   */
+  momentumPercent: number | null;
   rank: number | null;
 }
 

@@ -257,11 +257,30 @@ export function GemBadge({
 /** Colour swatch tying a row or legend entry to its chart series. */
 export function GemSwatch({
   colour,
+  dashed = false,
   className,
 }: {
   colour: string;
+  /**
+   * Draw the swatch as a dashed rule rather than a dot, for a series the chart
+   * draws dashed. A legend entry that does not look like its line is a second
+   * thing to work out rather than a key to the first.
+   */
+  dashed?: boolean;
   className?: string;
 }) {
+  if (dashed) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(
+          "inline-block w-3.5 shrink-0 border-t-2 border-dashed",
+          className,
+        )}
+        style={{ borderColor: colour }}
+      />
+    );
+  }
   return (
     <span
       aria-hidden="true"

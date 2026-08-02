@@ -87,6 +87,11 @@ export class GemBacktestService {
     safeSecurityId: string | null;
     notional: number | null;
     /**
+     * How many accounts the strategy is run in. A switch costs one order per
+     * account, exactly as the live estimate counts them.
+     */
+    accountCount: number;
+    /**
      * Whether the strategy evaluated anything before the oldest signal here.
      * Answered from the table by the caller, because the signals in hand are
      * bounded to the last `GEM_HISTORY_PERIODS` periods and cannot say.
@@ -94,8 +99,14 @@ export class GemBacktestService {
     hasEarlierSignals: boolean;
     asOf?: string;
   }): Promise<GemBacktestResult | null> {
-    const { strategy, signals, safeSecurityId, notional, hasEarlierSignals } =
-      params;
+    const {
+      strategy,
+      signals,
+      safeSecurityId,
+      notional,
+      accountCount,
+      hasEarlierSignals,
+    } = params;
     const asOf = params.asOf ?? todayYMD();
 
     const evaluated = [...signals]
@@ -159,6 +170,7 @@ export class GemBacktestService {
       taxRatePercent: strategy.taxRatePercent,
       commissionAmount: strategy.commissionAmount,
       notional,
+      accountCount,
       asOf,
     });
   }

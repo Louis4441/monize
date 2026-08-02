@@ -192,7 +192,7 @@ export class GemStrategyService {
   ): GemAssetMomentum {
     return {
       ...(refs.get(role) as GemAssetRef),
-      momentum12m: momentum[role] ?? null,
+      momentumPercent: momentum[role] ?? null,
       rank,
     };
   }
@@ -591,6 +591,7 @@ export class GemStrategyService {
       signals,
       safeSecurityId: securityByRole.get("SAFE") ?? null,
       notional: position?.totalMarketValue ?? null,
+      accountCount: accounts.length,
       hasEarlierSignals,
       asOf,
     });

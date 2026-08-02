@@ -409,6 +409,7 @@ export function GemStrategyReport() {
         }}
         scenarioBusy={isSaving || isStaleSelection}
         cadence={strategy.cadence}
+        lookbackMonths={strategy.lookbackMonths}
         nextEvaluationOn={strategy.nextEvaluationOn}
         daysUntilNextEvaluation={strategy.daysUntilNextEvaluation}
         onEditSettings={guarded(() => setTab("settings"))}

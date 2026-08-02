@@ -66,6 +66,7 @@ const input = (
   taxRatePercent: null,
   commissionAmount: null,
   notional: null,
+  accountCount: 1,
   hasEarlierSignals: false,
   asOf: "2025-01-01",
   ...overrides,
@@ -246,6 +247,35 @@ describe("runBacktest", () => {
     // One trade at 1% of the notional: the run starts from 0.99.
     expect(result?.cagrPercent).toBeCloseTo(19.79, 0);
     expect(result?.commissionApplied).toBe(true);
+  });
+
+  /**
+   * Invariant: a switch costs one order per account, in the simulation as in
+   * the live estimate.
+   * Canonical adversarial input: the same instrument held across several
+   * accounts (testing contract, collections).
+   * Minimal mutation: charge `legs` trades instead of `legs * ordersPerLeg`.
+   * Test that fails under it: this one -- three accounts read as one.
+   */
+  it("charges the commission once per account, not once per switch", () => {
+    const oneAccount = runBacktest(
+      input({ commissionAmount: 100, notional: 10_000, accountCount: 1 }),
+    );
+    const threeAccounts = runBacktest(
+      input({ commissionAmount: 100, notional: 10_000, accountCount: 3 }),
+    );
+
+    // The opening purchase is three orders rather than one: 3% off the
+    // notional instead of 1%, and the gap grows with every later switch.
+    expect(threeAccounts?.cagrPercent).toBeLessThan(
+      oneAccount?.cagrPercent as number,
+    );
+    expect(threeAccounts?.commissionApplied).toBe(true);
+    // 0.97 against 0.99 at the start, compounded over the same return.
+    const ratio =
+      (1 + (threeAccounts?.cagrPercent as number) / 100) /
+      (1 + (oneAccount?.cagrPercent as number) / 100);
+    expect(ratio).toBeCloseTo(0.97 / 0.99, 3);
   });
 
   it("restarts the run after a period it could not price", () => {
@@ -583,6 +613,7 @@ describe("runBacktest", () => {
       input({
         periods,
         seriesBySecurity,
+        accountCount: 1,
         hasEarlierSignals: true,
         taxRatePercent: 20,
         commissionAmount: 100,

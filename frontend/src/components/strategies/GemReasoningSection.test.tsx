@@ -19,7 +19,7 @@ describe("GemReasoningSection", () => {
           ...signal,
           absolute: {
             ...signal.absolute,
-            benchmark: { ...gemAssets[4], momentum12m: 5.13, rank: null },
+            benchmark: { ...gemAssets[4], momentumPercent: 5.13, rank: null },
           },
         }}
         lookbackMonths={12}
@@ -90,7 +90,7 @@ describe("GemReasoningSection", () => {
           target: gemAssets[3],
           absolute: {
             ...signal.absolute,
-            equity: { ...gemAssets[0], momentum12m: -1.28, rank: 3 },
+            equity: { ...gemAssets[0], momentumPercent: -1.28, rank: 3 },
             spreadPp: -5.04,
             result: "RISK_OFF",
           },
@@ -131,7 +131,7 @@ describe("GemReasoningSection", () => {
         signal={gemSignal({
           absolute: {
             ...signal.absolute,
-            equity: { ...gemAssets[0], momentum12m: null, rank: null },
+            equity: { ...gemAssets[0], momentumPercent: null, rank: null },
             spreadPp: null,
           },
         })}

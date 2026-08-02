@@ -108,7 +108,7 @@ describe("GemTransferCard", () => {
 
     expect(screen.getByText("Estimated tax (19%)")).toBeInTheDocument();
     expect(
-      screen.getByText("Cannot be estimated: a cost basis is missing"),
+      screen.getByText("Cannot be estimated: the cost of one of these positions is not known"),
     ).toBeInTheDocument();
   });
 

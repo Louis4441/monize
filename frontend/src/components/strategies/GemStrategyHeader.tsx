@@ -34,6 +34,8 @@ interface GemStrategyHeaderProps {
   onDeleteScenario: (id: string) => Promise<GemScenarioOutcome>;
   scenarioBusy: boolean;
   cadence: GemCadence;
+  /** The strategy's momentum window, which the explainer names. */
+  lookbackMonths: number;
   nextEvaluationOn: string | null;
   daysUntilNextEvaluation: number | null;
   onEditSettings: () => void;
@@ -53,6 +55,7 @@ export function GemStrategyHeader({
   onDeleteScenario,
   scenarioBusy,
   cadence,
+  lookbackMonths,
   nextEvaluationOn,
   daysUntilNextEvaluation,
   onEditSettings,
@@ -86,7 +89,12 @@ export function GemStrategyHeader({
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {strategyName}
             </h1>
-            <InfoTooltip text={t("gem.header.explainer")} usePortal />
+            <InfoTooltip
+              // The window is configurable, so the explainer names the one
+              // this strategy actually runs rather than the canonical twelve.
+              text={t("gem.header.explainer", { months: lookbackMonths })}
+              usePortal
+            />
             <GemScenarioSwitcher
               currentId={strategyId}
               currentName={strategyName}

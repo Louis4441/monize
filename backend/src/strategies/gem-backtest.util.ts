@@ -59,6 +59,17 @@ export interface GemBacktestInput {
    * a drag. Null or zero leaves commission out of the simulation.
    */
   notional: number | null;
+  /**
+   * How many accounts the strategy is run in.
+   *
+   * A switch is one order per account, not one per instrument -- the same rule
+   * the live estimate follows -- so a strategy run in three brokerage accounts
+   * pays three commissions to sell and three to buy. Modelling one synthetic
+   * account understated the drag by a factor of the account count, and the
+   * understatement compounds over every period of the run. Zero or one behaves
+   * exactly as before.
+   */
+  accountCount: number;
   /** Last day of the simulation: the final period runs up to it. */
   asOf: string;
   /**
@@ -218,6 +229,7 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     taxRatePercent,
     commissionAmount,
     notional,
+    accountCount,
     asOf,
     hasEarlierSignals,
   } = input;
@@ -289,6 +301,10 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     !truncated && commissionAmount !== null && notional !== null && notional > 0
       ? commissionAmount / notional
       : null;
+  // One order per account per leg. Below one the simulation still charges the
+  // single trade it always did: a strategy with no accounts has no notional
+  // either, so this only matters for a caller that supplies one anyway.
+  const ordersPerLeg = Math.max(1, Math.trunc(accountCount));
   const taxRate =
     !truncated && taxRatePercent !== null ? taxRatePercent / 100 : null;
 
@@ -308,9 +324,11 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     const periodGrowth = period.growth as number;
 
     // Entering a different instrument: the old one is sold, which realizes a
-    // result and costs two trades. The very first buy costs one.
+    // result and costs two legs. The very first buy costs one. Each leg is
+    // one order in every account the strategy runs in.
     if (securityId !== previousSecurityId) {
-      const trades = previousSecurityId === null ? 1 : 2;
+      const legs = previousSecurityId === null ? 1 : 2;
+      const trades = legs * ordersPerLeg;
       if (taxRate !== null && previousSecurityId !== null) {
         const gain = equity - legEntryEquity;
         if (gain > 0) equity -= gain * taxRate;
