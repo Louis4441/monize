@@ -170,6 +170,10 @@ export function PostTransactionDialog({
   const [foreignAmount, setForeignAmount] = useState<number>(0);
   const [postFxRate, setPostFxRate] = useState<number | null>(null);
   const [postFxRateLoading, setPostFxRateLoading] = useState(false);
+  // True when the last lookup errored rather than returning an answer. Kept
+  // apart from `postFxRate === null` so a throttled or offline request is not
+  // reported to the user as "no exchange rate exists".
+  const [rateLookupFailed, setRateLookupFailed] = useState(false);
   // Set once the user types a converted total of their own, so a later date
   // tweak does not discard the rate that figure implies. Same guard, and the
   // same reason, as `rateOverriddenRef` in TransactionForm.
@@ -196,27 +200,44 @@ export function PostTransactionDialog({
     [postFxFeePercent],
   );
 
-  // Re-fetch the rate whenever the posting date changes, and re-derive the
-  // account-currency amount from it.
+  // Re-fetch the rate whenever the posting date changes, debounced.
+  //
+  // The debounce is not cosmetic. Stepping the date with the arrow keys fires a
+  // change per keypress, and the rate endpoint is throttled per minute -- an
+  // undebounced lookup burned the whole allowance in a few presses and every
+  // later date came back 429, which the UI then reported as "no exchange rate
+  // found" for dates that plainly had one. Same 300ms wait TransactionForm uses,
+  // for the same reason.
   useEffect(() => {
     if (!isOpen || !isForeignPosting || !transactionDate) return;
     if (rateOverriddenRef.current) return;
     let cancelled = false;
     setPostFxRateLoading(true);
-    exchangeRatesApi
-      .getRateForDate(entryCurrency, scheduledTransaction.currencyCode, transactionDate)
-      .then((rate) => {
-        if (cancelled) return;
-        setPostFxRate(rate);
-        setPostFxRateLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setPostFxRate(null);
-        setPostFxRateLoading(false);
-      });
+    const handle = setTimeout(() => {
+      exchangeRatesApi
+        .getRateForDate(entryCurrency, scheduledTransaction.currencyCode, transactionDate)
+        .then((rate) => {
+          if (cancelled) return;
+          setPostFxRate(rate);
+          // The server answered: `null` here really does mean no rate exists
+          // for this pair and date, so the warning is a fact.
+          setRateLookupFailed(false);
+          setPostFxRateLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          // The request itself failed (offline, throttled, timed out). That is
+          // not evidence about the rate, so the preview goes blank rather than
+          // claiming none exists -- and posting still works, because the
+          // backend resolves the rate for the date itself.
+          setPostFxRate(null);
+          setRateLookupFailed(true);
+          setPostFxRateLoading(false);
+        });
+    }, 300);
     return () => {
       cancelled = true;
+      clearTimeout(handle);
     };
   }, [
     isOpen,
@@ -327,6 +348,7 @@ export function PostTransactionDialog({
           : 0,
       );
       setPostFxRate(null);
+      setRateLookupFailed(false);
       rateOverriddenRef.current = false;
       setCategoryId(nextOverride?.categoryId ?? scheduledTransaction.categoryId ?? '');
       setDescription(nextOverride?.description ?? scheduledTransaction.description ?? '');
@@ -521,17 +543,12 @@ export function PostTransactionDialog({
   }, [categories]);
 
   const handlePost = async () => {
-    // Without a rate for the posting date there is nothing to convert the
-    // biller's amount with -- posting would book an arbitrary figure.
-    if (isForeignPosting && postFxRate == null) {
-      toast.error(
-        t('postDialog.toasts.fxRateUnavailable', {
-          from: entryCurrency,
-          to: scheduledTransaction.currencyCode,
-        }),
-      );
-      return;
-    }
+    // A missing preview is not a reason to block: the backend resolves the rate
+    // for the posting date itself (carry-forward over weekends, a fetched
+    // window, then the latest stored rate) and raises a translated error only
+    // if the pair has no rate anywhere. Blocking here on a preview the client
+    // could not fetch -- because the lookup was throttled, say -- refused
+    // postings that would have gone through fine.
     if (isInvestmentKind) {
       if (isInvestmentQuantityPrice || isInvestmentQuantityOnly) {
         if (investmentQuantity === '' || Number(investmentQuantity) <= 0) {
@@ -579,12 +596,18 @@ export function PostTransactionDialog({
           }
         : {
             transactionDate,
-            // For a foreign-currency schedule the biller's amount and the rate
-            // for the posting date are sent instead of an account-currency
-            // total, so the backend -- not this dialog -- decides what is
-            // booked. Sending `amount` would pin it and override the lookup.
+            // For a foreign-currency schedule only the biller's amount is sent,
+            // so the backend -- not this dialog -- decides what is booked;
+            // sending `amount` would pin it and override the lookup. The rate
+            // goes along only when the user set it themselves by typing a
+            // converted total. Otherwise the backend resolves it for the
+            // posting date, which means a preview that was throttled or offline
+            // costs nothing: the posting is still correct.
             ...(isForeignPosting
-              ? { originalAmount: foreignAmount, exchangeRate: postFxRate }
+              ? {
+                  originalAmount: foreignAmount,
+                  ...(rateOverriddenRef.current ? { exchangeRate: postFxRate } : {}),
+                }
               : { amount }),
             categoryId: isSplit ? null : (categoryId || null),
             description: description || null,
@@ -933,7 +956,10 @@ export function PostTransactionDialog({
                       date: transactionDate,
                     })}
                   </span>
-                ) : !postFxRateLoading ? (
+                ) : !postFxRateLoading && !rateLookupFailed ? (
+                  // Only when the server answered "none". A failed request says
+                  // nothing about whether a rate exists, so it shows no preview
+                  // rather than a claim it cannot support.
                   <span className="text-amber-600 dark:text-amber-400">
                     {t('postDialog.fx.noRateWarning', {
                       from: entryCurrency,

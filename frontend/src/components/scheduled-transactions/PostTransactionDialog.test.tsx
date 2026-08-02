@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@/test/render';
 import { PostTransactionDialog } from './PostTransactionDialog';
 import toast from 'react-hot-toast';
@@ -1784,7 +1784,7 @@ describe('PostTransactionDialog - foreign currency', () => {
     });
   });
 
-  it('posts the foreign amount and rate rather than an account-currency total', async () => {
+  it('posts the foreign amount and lets the backend resolve the rate', async () => {
     await renderDialog();
     await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
 
@@ -1796,16 +1796,16 @@ describe('PostTransactionDialog - foreign currency', () => {
     await waitFor(() => {
       expect(mockPostApi).toHaveBeenCalledWith(
         's-fx',
-        expect.objectContaining({
-          originalAmount: -40,
-          exchangeRate: 1.4,
-        }),
+        expect.objectContaining({ originalAmount: -40 }),
       );
     });
+    // Neither an account-currency total nor a rate: the fetched rate drove the
+    // preview only, and the backend resolves the real one for the posting date.
     expect(mockPostApi.mock.calls[0][1].amount).toBeUndefined();
+    expect(mockPostApi.mock.calls[0][1].exchangeRate).toBeUndefined();
   });
 
-  it('refuses to post when no rate is available for the date', async () => {
+  it('still posts when no preview rate came back, deferring to the backend', async () => {
     mockGetRateForDate.mockResolvedValue(null);
     await renderDialog();
     await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
@@ -1815,8 +1815,15 @@ describe('PostTransactionDialog - foreign currency', () => {
       fireEvent.click(buttons[buttons.length - 1]);
     });
 
-    expect(mockPostApi).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalled();
+    // The backend has fallbacks the preview call does not expose, and raises a
+    // translated error only when the pair has no rate anywhere. Blocking here
+    // refused postings that would have succeeded.
+    await waitFor(() =>
+      expect(mockPostApi).toHaveBeenCalledWith(
+        's-fx',
+        expect.objectContaining({ originalAmount: -40 }),
+      ),
+    );
   });
 
   it('leaves an ordinary schedule on the account-currency amount', async () => {
@@ -1890,9 +1897,10 @@ describe('PostTransactionDialog - editing the converted total', () => {
   it('shows both the foreign amount and the account-currency total', async () => {
     await renderDialog();
     expect(screen.getByLabelText('Amount in USD')).toBeInTheDocument();
-    const total = screen.getByLabelText('Total in CAD') as HTMLInputElement;
-    // -40 * 1.4
-    expect(total.value).toContain('56');
+    // The lookup is debounced, so the total fills in once it resolves.
+    await waitFor(() =>
+      expect((screen.getByLabelText('Total in CAD') as HTMLInputElement).value).toContain('56'),
+    );
   });
 
   it('re-derives the total when the foreign amount changes', async () => {
@@ -1996,5 +2004,120 @@ describe('PostTransactionDialog - copy button sits flush with the Amount field',
     expect(copy.className).toContain('mt-6');
     expect(copy.className).not.toContain('py-2.5');
     expect(copy.parentElement?.className).toContain('items-stretch');
+  });
+});
+
+// ============================================================
+// Stepping the date must not burn the rate endpoint's throttle allowance,
+// and a failed lookup must not be reported as "no rate exists".
+// ============================================================
+describe('PostTransactionDialog - rate lookup while stepping the date', () => {
+  const foreignSchedule = {
+    id: 's-fx3',
+    name: 'Netflix',
+    amount: -54.61,
+    currencyCode: 'CAD',
+    originalAmount: -40,
+    originalCurrencyCode: 'USD',
+    exchangeRate: 1.365234,
+    accountId: 'a1',
+    categoryId: 'c1',
+    description: '',
+    nextDueDate: '2026-03-10T00:00:00Z',
+    isTransfer: false,
+    isSplit: false,
+    account: { name: 'Checking' },
+  } as any;
+
+  const props = {
+    isOpen: true,
+    scheduledTransaction: foreignSchedule,
+    categories: [{ id: 'c1', name: 'Entertainment', parentId: null }] as any[],
+    accounts: [{ id: 'a1', name: 'Checking', currentBalance: 5000, fxFeePercent: null }] as any[],
+    scheduledTransactions: [] as any[],
+    futureTransactions: [] as any[],
+    onClose: vi.fn(),
+    onPosted: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockGetRateForDate.mockResolvedValue(1.4);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('issues one lookup for a run of arrow-key date changes, not one per press', async () => {
+    await act(async () => {
+      render(<PostTransactionDialog {...props} />);
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    mockGetRateForDate.mockClear();
+
+    // Walk the date back a week, a keypress at a time.
+    const dateInput = screen.getByLabelText('Transaction Date');
+    for (let day = 9; day >= 3; day--) {
+      await act(async () => {
+        fireEvent.change(dateInput, {
+          target: { value: `2026-03-${String(day).padStart(2, '0')}` },
+        });
+        await vi.advanceTimersByTimeAsync(50);
+      });
+    }
+    // Nothing has fired yet -- the debounce is still swallowing the run.
+    expect(mockGetRateForDate).not.toHaveBeenCalled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+
+    // One request, for the date the user actually landed on. Seven would have
+    // eaten most of the endpoint's per-minute allowance.
+    expect(mockGetRateForDate).toHaveBeenCalledTimes(1);
+    expect(mockGetRateForDate).toHaveBeenCalledWith('USD', 'CAD', '2026-03-03');
+  });
+
+  it('does not claim "no exchange rate found" when the lookup itself failed', async () => {
+    mockGetRateForDate.mockRejectedValue(new Error('Request failed with status code 429'));
+    await act(async () => {
+      render(<PostTransactionDialog {...props} />);
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    await act(async () => {});
+
+    // A throttled request is not evidence about the rate.
+    expect(screen.queryByText(/No exchange rate found/)).not.toBeInTheDocument();
+  });
+
+  it('still says so when the server answers that no rate exists', async () => {
+    mockGetRateForDate.mockResolvedValue(null);
+    await act(async () => {
+      render(<PostTransactionDialog {...props} />);
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+
+    expect(screen.getByText(/No exchange rate found/)).toBeInTheDocument();
+  });
+
+  it('posts without a rate when the preview could not be fetched, letting the backend resolve it', async () => {
+    mockGetRateForDate.mockRejectedValue(new Error('Request failed with status code 429'));
+    await act(async () => {
+      render(<PostTransactionDialog {...props} />);
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    await act(async () => {});
+
+    await act(async () => {
+      const buttons = screen.getAllByText('Post Transaction');
+      fireEvent.click(buttons[buttons.length - 1]);
+    });
+
+    await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
+    const payload = mockPostApi.mock.calls[0][1];
+    expect(payload.originalAmount).toBe(-40);
+    // No rate and no pinned amount: the backend resolves for the posting date.
+    expect(payload.exchangeRate).toBeUndefined();
+    expect(payload.amount).toBeUndefined();
   });
 });

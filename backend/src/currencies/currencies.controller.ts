@@ -146,7 +146,14 @@ export class CurrenciesController {
 
   @Get("exchange-rates/rate")
   @AllowDelegate()
-  @Throttle({ default: { ttl: 60000, limit: 10 } }) // L2: 10 requests per minute
+  // L2: 60 lookups per minute, matching securities/lookup. Ten was set when the
+  // only caller was the transaction form's debounced single lookup; the post
+  // dialog's date field is stepped with the arrow keys, and a user walking back
+  // through a fortnight legitimately asks for a dozen dates. At ten the rest
+  // came back 429 and the UI reported "no exchange rate found" for dates that
+  // had one. The work behind a request is a single indexed read except on a
+  // miss, and the route is authenticated, so the looser bound is still bounded.
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
   @ApiOperation({
     summary: "Get the exchange rate for a specific currency pair and date",
     description:
