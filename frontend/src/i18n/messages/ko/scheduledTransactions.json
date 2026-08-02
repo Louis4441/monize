@@ -61,7 +61,8 @@
       "postFailed": "거래 게시에 실패했습니다",
       "skipFailed": "발생 건너뛰기에 실패했습니다",
       "deleteFailed": "삭제에 실패했습니다"
-    }
+    },
+    "foreignAmountTitle": "수취인이 청구하는 금액(수취인 통화 기준)"
   },
   "filters": {
     "label": "필터",
@@ -111,13 +112,21 @@
       "priceRequired": "가격은 0보다 커야 합니다",
       "totalAmountRequired": "총 금액이 필요합니다",
       "splitsMinimum": "분할 거래에는 최소 2개의 분할이 필요합니다",
-      "splitsTotal": "분할 금액의 합계가 거래 금액과 같아야 합니다"
+      "splitsTotal": "분할 금액의 합계가 거래 금액과 같아야 합니다",
+      "fxRateUnavailable": "이 날짜에는 {from}에서 {to}로의 환율을 사용할 수 없습니다."
     },
     "latestPlaceholder": "최신: {price}",
     "descriptionPlaceholder": "설명...",
     "amountLabel": "금액",
     "selectCategoryPlaceholder": "카테고리 선택...",
-    "referencePlaceholder": "수표 번호, 확인 번호..."
+    "referencePlaceholder": "수표 번호, 확인 번호...",
+    "fx": {
+      "amountInCurrency": "{currency} 기준 금액",
+      "rateCaption": "{date}의 환율 1 {from} = {rate} {to}로 {total}로 게시됩니다.",
+      "noRateWarning": "{date}에 {from}에서 {to}로의 환율을 찾을 수 없습니다. 다른 날짜를 선택하거나 환율을 새로 고치세요.",
+      "feeCaption": "{percent}% 해외 거래 수수료({fee})가 포함됩니다.",
+      "totalInCurrency": "{currency} 기준 총액"
+    }
   },
   "occurrencePicker": {
     "title": "발생 날짜 선택",
@@ -253,7 +262,14 @@
       "securityRequired": "이 투자 작업에는 유가증권이 필요합니다",
       "quantityRequired": "수량은 0보다 커야 합니다",
       "priceRequired": "가격은 0보다 커야 합니다",
-      "totalAmountRequired": "이 작업에는 총 금액이 필요합니다"
+      "totalAmountRequired": "이 작업에는 총 금액이 필요합니다",
+      "fxRateRequired": "저장하기 전에 선택한 통화로 금액을 입력하세요. 아직 사용할 수 있는 환율이 없습니다."
+    },
+    "fx": {
+      "amountInCurrency": "{currency} 기준 금액",
+      "estimateCaption": "약 {total}(1 {from} = {rate} {to}).",
+      "noRateWarning": "{from}에서 {to}로의 환율을 찾을 수 없습니다. 다른 통화를 선택하거나 금액을 {to}로 입력하세요.",
+      "feeCaption": "{percent}% 해외 거래 수수료({fee})가 포함됩니다."
     }
   },
   "postTransaction": {

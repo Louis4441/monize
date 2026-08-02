@@ -9,6 +9,7 @@ import { InvestmentTransactionsService } from "../securities/investment-transact
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 /**
@@ -42,6 +43,11 @@ describe("scheduled-transactions module RLS context smoke (real withScopedDb)", 
       createTransfer: jest.fn(),
     };
 
+    const exchangeRateService = {
+      getLatestRate: jest.fn().mockResolvedValue(null),
+      getRateForDate: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScheduledTransactionsService,
@@ -58,6 +64,7 @@ describe("scheduled-transactions module RLS context smoke (real withScopedDb)", 
           },
         },
         { provide: ActionHistoryService, useValue: { record: jest.fn() } },
+        { provide: ExchangeRateService, useValue: exchangeRateService },
       ],
     }).compile();
 
@@ -66,6 +73,7 @@ describe("scheduled-transactions module RLS context smoke (real withScopedDb)", 
       manager,
       dataSource,
       transactionsService,
+      exchangeRateService,
     };
   };
 
@@ -142,6 +150,48 @@ describe("scheduled-transactions module RLS context smoke (real withScopedDb)", 
       ScheduledTransaction,
       SCHEDULED_ID,
       expect.objectContaining({ nextDueDate: expect.any(String) }),
+    );
+  });
+
+  it("refreshForeignCurrencyEstimates sweeps under system context and writes under the owner's", async () => {
+    const foreignRow = {
+      id: SCHEDULED_ID,
+      userId: OWNER_ID,
+      name: "Netflix",
+      amount: -54.61,
+      currencyCode: "CAD",
+      originalAmount: -40,
+      originalCurrencyCode: "USD",
+      exchangeRate: 1.365234,
+      account: { fxFeePercent: null },
+    };
+    const scheduledRepo = {
+      find: jest.fn().mockResolvedValue([foreignRow]),
+      findOne: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const overridesRepo = {
+      createQueryBuilder: jest.fn().mockImplementation(overrideQueryBuilder),
+    };
+
+    const { service, manager, exchangeRateService } = await buildModule(
+      scheduledRepo,
+      overridesRepo,
+    );
+    exchangeRateService.getLatestRate.mockResolvedValue(1.4);
+
+    const errorSpy = jest
+      .spyOn(service["logger"], "error")
+      .mockImplementation(() => undefined);
+
+    await service.refreshForeignCurrencyEstimates();
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(scheduledRepo.find).toHaveBeenCalled();
+    expect(manager.update).toHaveBeenCalledWith(
+      ScheduledTransaction,
+      SCHEDULED_ID,
+      { amount: -56, exchangeRate: 1.4 },
     );
   });
 

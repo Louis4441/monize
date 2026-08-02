@@ -97,6 +97,17 @@ export function roundToCents(value: number): number {
 }
 
 /**
+ * Decimal places an exchange rate is *displayed* at.
+ *
+ * Rates are stored at ten (`NUMERIC(20,10)`), and every conversion multiplies
+ * at that full precision. Six is what a bank statement quotes -- showing four
+ * made a USD/CAD rate look rounder than the figure the conversion actually
+ * used, and a four-figure amount reconciled a few cents off the statement.
+ * Use this wherever a rate is rendered; never round the rate itself to it.
+ */
+export const FX_RATE_DISPLAY_DECIMALS = 6;
+
+/**
  * Sum money values without IEEE 754 accumulation drift by accumulating in
  * integer ten-thousandths (matching the backend `roundMoney` / decimal(20,4)
  * precision) and dividing back once at the end. Mirrors the backend `sumMoney`

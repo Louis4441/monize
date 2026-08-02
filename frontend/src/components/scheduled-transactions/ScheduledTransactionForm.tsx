@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, MutableRefObject } from 'react';
+import { useState, useEffect, useMemo, useRef, MutableRefObject } from 'react';
 import { useForm, Controller, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,7 +17,9 @@ import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { TagForm } from '@/components/tags/TagForm';
 import { SplitEditor, SplitRow, createEmptySplits, toSplitRows, toCreateSplitData } from '@/components/transactions/SplitEditor';
+import { CurrencyPickerButton } from '@/components/transactions/CurrencyPickerButton';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
+import { exchangeRatesApi } from '@/lib/exchange-rates';
 import { investmentsApi } from '@/lib/investments';
 import { getLocalDateString } from '@/lib/utils';
 import { payeesApi } from '@/lib/payees';
@@ -32,7 +34,7 @@ import { Category } from '@/types/category';
 import { Account } from '@/types/account';
 import { Tag } from '@/types/tag';
 import { buildCategoryTree } from '@/lib/categoryUtils';
-import { roundToCents, getCurrencySymbol } from '@/lib/format';
+import { roundToCents, getCurrencySymbol, FX_RATE_DISPLAY_DECIMALS } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { getErrorMessage } from '@/lib/errors';
 import { useTranslations } from 'next-intl';
@@ -121,7 +123,7 @@ export function ScheduledTransactionForm({
   submitRef,
 }: ScheduledTransactionFormProps) {
   const t = useTranslations('scheduledTransactions');
-  const { defaultCurrency } = useNumberFormat();
+  const { defaultCurrency, formatCurrency, formatNumber } = useNumberFormat();
   const [isLoading, setIsLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -287,6 +289,143 @@ export function ScheduledTransactionForm({
   }, [watchedAccountId, accounts, setValue]);
 
   const currencySymbol = getCurrencySymbol(watchedCurrencyCode || defaultCurrency);
+
+  // ── Foreign-currency entry ────────────────────────────────────────────────
+  //
+  // Mirrors TransactionForm: `entryCurrency` is the currency the amount is
+  // typed in ('' means the account currency), `foreignAmount` is that typed
+  // amount, and `fxRate` is account-currency units per 1 unit of it. What
+  // differs is which rate: a schedule is future-dated, so there is no rate for
+  // its due date. The latest available rate converts the estimate stored in
+  // `amount` (the figure the bills list and forecast chart read, refreshed
+  // nightly by the backend), and the rate for the posting date is looked up
+  // again when an occurrence actually posts.
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.id === watchedAccountId),
+    [accounts, watchedAccountId],
+  );
+  const accountCurrency =
+    selectedAccount?.currencyCode || watchedCurrencyCode || defaultCurrency;
+
+  const [entryCurrency, setEntryCurrency] = useState<string>(
+    scheduledTransaction?.originalCurrencyCode || '',
+  );
+  const [foreignAmount, setForeignAmount] = useState<number | undefined>(
+    scheduledTransaction?.originalAmount != null
+      ? Number(scheduledTransaction.originalAmount)
+      : undefined,
+  );
+  const [fxRate, setFxRate] = useState<number | null>(
+    scheduledTransaction?.originalCurrencyCode
+      ? Number(scheduledTransaction.exchangeRate)
+      : null,
+  );
+  const [fxRateLoading, setFxRateLoading] = useState(false);
+  // Guards the rate-fetch effect from clobbering a rate the user typed in.
+  const rateOverriddenRef = useRef(false);
+
+  // Only a plain scheduled transaction can be entered in another currency: a
+  // transfer already has cross-currency handling per leg, an investment carries
+  // its own rate, and split amounts are stored in the account currency and
+  // could not be re-derived when the rate moves. The backend rejects the
+  // combination too.
+  const isForeign =
+    mode === 'transaction' &&
+    !!entryCurrency &&
+    entryCurrency.toUpperCase() !== accountCurrency.toUpperCase();
+
+  const fxFeePercent = selectedAccount?.fxFeePercent ?? undefined;
+  const convertedBase =
+    isForeign && foreignAmount !== undefined && fxRate != null
+      ? roundToCents(foreignAmount * fxRate)
+      : undefined;
+  const fxFeeApplies =
+    isForeign && convertedBase !== undefined && !!fxFeePercent && fxFeePercent > 0;
+  const fxFeeAmount = fxFeeApplies
+    ? -roundToCents((Math.abs(convertedBase as number) * (fxFeePercent as number)) / 100)
+    : 0;
+  const fxTotal =
+    convertedBase !== undefined ? roundToCents(convertedBase + fxFeeAmount) : undefined;
+
+  // Derive the account-currency `amount` from the foreign amount and rate,
+  // folding in the account's foreign-transaction fee. Matches `recomputeFx` in
+  // TransactionForm and `applyFxConversion` on the backend.
+  const recomputeFx = (fAmount: number | undefined, rate: number | null) => {
+    if (fAmount === undefined || rate == null) return;
+    const base = roundToCents(fAmount * rate);
+    const fee =
+      fxFeePercent && fxFeePercent > 0
+        ? -roundToCents((Math.abs(base) * fxFeePercent) / 100)
+        : 0;
+    setValue('amount', roundToCents(base + fee), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  const handleForeignAmountChange = (value: number | undefined) => {
+    const rounded = value === undefined ? undefined : roundToCents(value);
+    setForeignAmount(rounded);
+    recomputeFx(rounded, fxRate);
+  };
+
+  // '' (or the account currency) resets to an ordinary account-currency
+  // schedule, clearing the foreign fields.
+  const handleEntryCurrencyChange = (code: string) => {
+    rateOverriddenRef.current = false;
+    if (!code || code.toUpperCase() === accountCurrency.toUpperCase()) {
+      setEntryCurrency('');
+      setForeignAmount(undefined);
+      setFxRate(null);
+      return;
+    }
+    setEntryCurrency(code);
+    // Seed the foreign amount from whatever is in the amount field so the
+    // conversion has something to show before the user types.
+    if (foreignAmount === undefined && watchedAmount) {
+      setForeignAmount(watchedAmount);
+    }
+  };
+
+  // Re-sign the foreign amount when the category changes, so an expense
+  // category flips it negative exactly as the account-currency path does.
+  const resignForeignAmount = (isIncome: boolean) => {
+    if (foreignAmount === undefined || foreignAmount === 0) return;
+    const signed = isIncome ? Math.abs(foreignAmount) : -Math.abs(foreignAmount);
+    if (signed !== foreignAmount) {
+      setForeignAmount(signed);
+      recomputeFx(signed, fxRate);
+    }
+  };
+
+  // Fetch the latest available rate for (entryCurrency -> account currency).
+  // `getRateForDate` with today's date carries the most recent stored rate
+  // forward over weekends and holidays, which is the right answer for a
+  // future-dated schedule -- there is no rate for its due date yet.
+  useEffect(() => {
+    if (!isForeign || rateOverriddenRef.current) return;
+    let cancelled = false;
+    setFxRateLoading(true);
+    exchangeRatesApi
+      .getRateForDate(entryCurrency, accountCurrency, getLocalDateString())
+      .then((rate) => {
+        if (cancelled) return;
+        setFxRate(rate);
+        setFxRateLoading(false);
+        recomputeFx(foreignAmount, rate);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFxRate(null);
+        setFxRateLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // foreignAmount/recomputeFx are read fresh inside the callback; amount edits
+    // recompute synchronously via handleForeignAmountChange.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isForeign, entryCurrency, accountCurrency]);
 
   // Memoize category options
   const categoryOptions = useMemo(() => buildCategoryTree(categories).map(({ category }) => {
@@ -600,9 +739,13 @@ export function ScheduledTransactionForm({
           setSelectedCategoryId(payee.defaultCategoryId);
           setValue('categoryId', payee.defaultCategoryId, { shouldDirty: true });
 
-          // Adjust amount sign based on default category type
+          // Adjust amount sign based on default category type. While entering a
+          // foreign currency the typed amount is the foreign one -- re-sign that
+          // and let the conversion re-derive the account-currency amount.
           const category = categories.find((c) => c.id === payee.defaultCategoryId);
-          if (category && watchedAmount !== undefined && watchedAmount !== 0) {
+          if (category && isForeign) {
+            resignForeignAmount(category.isIncome);
+          } else if (category && watchedAmount !== undefined && watchedAmount !== 0) {
             const absAmount = Math.abs(watchedAmount);
             const newAmount = category.isIncome ? absAmount : -absAmount;
             if (newAmount !== watchedAmount) {
@@ -643,7 +786,11 @@ export function ScheduledTransactionForm({
       // where the amount is always a positive magnitude (negated on submit) and
       // the category is just a label that does not drive income/expense sign.
       const category = categories.find((c) => c.id === categoryId);
-      if (mode !== 'transfer' && category && watchedAmount !== undefined && watchedAmount !== 0) {
+      if (mode !== 'transfer' && category && isForeign) {
+        // The typed amount is the foreign one; re-sign it and let the
+        // conversion re-derive the account-currency amount.
+        resignForeignAmount(category.isIncome);
+      } else if (mode !== 'transfer' && category && watchedAmount !== undefined && watchedAmount !== 0) {
         const absAmount = Math.abs(watchedAmount);
         const newAmount = category.isIncome ? absAmount : -absAmount;
         if (newAmount !== watchedAmount) {
@@ -691,6 +838,13 @@ export function ScheduledTransactionForm({
   };
 
   const onSubmit = async (data: ScheduledTransactionFormData) => {
+    // A foreign entry without a rate would save whatever happens to be in the
+    // account-currency amount field -- refuse rather than guess.
+    if (isForeign && (fxRate == null || foreignAmount === undefined)) {
+      toast.error(t('form.toasts.fxRateRequired'));
+      return;
+    }
+
     // Validate transfer destination
     if (mode === 'transfer') {
       if (!transferToAccountId) {
@@ -831,6 +985,18 @@ export function ScheduledTransactionForm({
           // send an explicit empty array so the backend clears the splits and
           // sets isSplit=false. `undefined` would leave the splits untouched.
           splits: scheduledTransaction?.isSplit ? [] : undefined,
+          // Foreign-currency entry: send the trio, or explicit nulls when the
+          // schedule used to carry one and the user switched back to the
+          // account currency (undefined would leave the old values in place).
+          ...(isForeign && foreignAmount !== undefined && fxRate != null
+            ? {
+                originalAmount: foreignAmount,
+                originalCurrencyCode: entryCurrency,
+                exchangeRate: fxRate,
+              }
+            : scheduledTransaction?.originalCurrencyCode
+              ? { originalAmount: null, originalCurrencyCode: null, exchangeRate: 1 }
+              : {}),
         };
       }
 
@@ -855,6 +1021,39 @@ export function ScheduledTransactionForm({
     value,
     label: t(`frequency.${value}`),
   }));
+
+  // Conversion caption under the Amount field while entering another currency.
+  // It says what the account will be charged today and at what rate, and is
+  // explicit that this is an estimate: the schedule is future-dated, so the
+  // figure tracks the market daily and the rate on the posting date is what
+  // ends up on the transaction.
+  const renderFxCaption = () => (
+    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      {fxRate != null && fxTotal !== undefined ? (
+        <span>
+          {t('form.fx.estimateCaption', {
+            total: formatCurrency(fxTotal, accountCurrency),
+            from: entryCurrency,
+            rate: formatNumber(fxRate, FX_RATE_DISPLAY_DECIMALS),
+            to: accountCurrency,
+          })}
+        </span>
+      ) : !fxRateLoading ? (
+        <span className="text-amber-600 dark:text-amber-400">
+          {t('form.fx.noRateWarning', { from: entryCurrency, to: accountCurrency })}
+        </span>
+      ) : null}
+      {fxFeeApplies && (
+        <span>
+          {' '}
+          {t('form.fx.feeCaption', {
+            percent: formatNumber(fxFeePercent as number, 2),
+            fee: formatCurrency(Math.abs(fxFeeAmount), accountCurrency),
+          })}
+        </span>
+      )}
+    </p>
+  );
 
   // Shared End Condition section
   const renderEndCondition = (_idSuffix: string) => {
@@ -1107,14 +1306,38 @@ export function ScheduledTransactionForm({
 
           {/* Row 4: Amount, Reference Number */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <CurrencyInput
-              label={t('form.amountLabel')}
-              prefix={currencySymbol}
-              value={watchedAmount}
-              onChange={(value) => setValue('amount', value ?? 0, { shouldValidate: true })}
-              allowSignToggle
-              error={errors.amount?.message}
-            />
+            <div>
+              {/* items-stretch + min-w-0, the same row NormalTransactionFields
+                  and SplitTransactionFields use, so the picker button is the
+                  height of the Amount input beside it. */}
+              <div className="flex items-stretch space-x-2">
+                <CurrencyPickerButton
+                  value={entryCurrency}
+                  accountCurrencyCode={accountCurrency}
+                  onChange={handleEntryCurrencyChange}
+                  disabled={isLoading}
+                />
+                <div className="flex-1 min-w-0">
+                  <CurrencyInput
+                    label={
+                      isForeign
+                        ? t('form.fx.amountInCurrency', { currency: entryCurrency })
+                        : t('form.amountLabel')
+                    }
+                    prefix={getCurrencySymbol(isForeign ? entryCurrency : accountCurrency)}
+                    value={isForeign ? foreignAmount : watchedAmount}
+                    onChange={
+                      isForeign
+                        ? handleForeignAmountChange
+                        : (value) => setValue('amount', value ?? 0, { shouldValidate: true })
+                    }
+                    allowSignToggle
+                    error={errors.amount?.message}
+                  />
+                </div>
+              </div>
+              {isForeign && renderFxCaption()}
+            </div>
             <Input
               label={t('form.referenceNumberLabel')}
               type="text"

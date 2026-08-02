@@ -206,7 +206,9 @@ describe('CurrencyList', () => {
     const currencies = [makeCurrency()];
 
     render(<CurrencyList currencies={currencies} {...defaultProps} getRate={rateGetter} />);
-    expect(screen.getByText('0.7321')).toBeInTheDocument();
+    // Six decimals -- see FX_RATE_DISPLAY_DECIMALS; four made the rate look
+    // rounder than the one the conversion actually used.
+    expect(screen.getByText('0.732100')).toBeInTheDocument();
   });
 
   it('displays usage information when currency is in use', () => {

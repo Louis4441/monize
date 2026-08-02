@@ -11,7 +11,11 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 vi.mock('@/hooks/useNumberFormat', () => ({
-  useNumberFormat: () => ({ defaultCurrency: 'CAD' }),
+  useNumberFormat: () => ({
+    defaultCurrency: 'CAD',
+    formatCurrency: (v: number, code: string) => `${code} ${v.toFixed(2)}`,
+    formatNumber: (v: number, decimals = 2) => v.toFixed(decimals),
+  }),
 }));
 
 vi.mock('@hookform/resolvers/zod', () => ({
@@ -22,6 +26,7 @@ vi.mock('@hookform/resolvers/zod', () => ({
 }));
 
 vi.mock('@/lib/format', () => ({
+  FX_RATE_DISPLAY_DECIMALS: 6,
   getCurrencySymbol: () => '$',
   getDecimalPlacesForCurrency: () => 2,
   roundToCents: (v: number) => Math.round(v * 100) / 100,
@@ -31,6 +36,31 @@ vi.mock('@/lib/format', () => ({
   filterCalculatorInput: (v: string) => v,
   hasCalculatorOperators: () => false,
   evaluateExpression: (v: string) => parseFloat(v) || 0,
+}));
+
+const mockGetRateForDate = vi.fn().mockResolvedValue(null);
+
+vi.mock('@/lib/exchange-rates', () => ({
+  exchangeRatesApi: {
+    getRateForDate: (...args: any[]) => mockGetRateForDate(...args),
+    getCurrencies: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+// The picker itself is covered by CurrencyPickerButton.test.tsx; here it stands
+// in as a plain control so the form's conversion behaviour is what is under test.
+vi.mock('@/components/transactions/CurrencyPickerButton', () => ({
+  CurrencyPickerButton: ({ value, accountCurrencyCode, onChange }: any) => (
+    <div data-testid="currency-picker">
+      <span data-testid="currency-picker-value">{value || accountCurrencyCode}</span>
+      <button type="button" data-testid="pick-usd" onClick={() => onChange('USD')}>
+        USD
+      </button>
+      <button type="button" data-testid="pick-account" onClick={() => onChange('')}>
+        Use account currency
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/lib/errors', () => ({
@@ -2702,5 +2732,160 @@ describe('ScheduledTransactionForm - extra coverage', () => {
     await waitFor(() =>
       expect(Number(amount.value.replace(/,/g, ''))).toBeLessThan(0),
     );
+  });
+});
+
+// ============================================================
+// Foreign-currency entry (matches TransactionForm's picker)
+// ============================================================
+describe('ScheduledTransactionForm - foreign currency', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAccountsGetAll.mockResolvedValue(mockAccounts);
+    mockCategoriesGetAll.mockResolvedValue(mockCategories);
+    mockPayeesGetAll.mockResolvedValue(mockPayees);
+    mockGetSecurities.mockResolvedValue([]);
+    mockGetRateForDate.mockResolvedValue(1.365234);
+  });
+
+  const setUpForeign = async () => {
+    const result = render(<ScheduledTransactionForm />);
+    await waitFor(() => expect(mockAccountsGetAll).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Netflix' } });
+    fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'acc-1' } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('pick-usd'));
+    });
+    return result;
+  };
+
+  it('offers the currency picker on the transaction tab', async () => {
+    render(<ScheduledTransactionForm />);
+    await waitFor(() => expect(mockAccountsGetAll).toHaveBeenCalled());
+    expect(screen.getByTestId('currency-picker')).toBeInTheDocument();
+    expect(screen.getByTestId('currency-picker-value')).toHaveTextContent('CAD');
+  });
+
+  it('relabels the amount field and fetches the latest rate when a currency is picked', async () => {
+    await setUpForeign();
+
+    await waitFor(() => {
+      expect(mockGetRateForDate).toHaveBeenCalledWith('USD', 'CAD', expect.any(String));
+    });
+    expect(screen.getByLabelText('Amount in USD')).toBeInTheDocument();
+  });
+
+  it('sends the foreign amount, currency and rate on save', async () => {
+    const { container } = await setUpForeign();
+    await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+    const amountInput = screen.getByLabelText('Amount in USD');
+    await act(async () => {
+      fireEvent.change(amountInput, { target: { value: '-40' } });
+      fireEvent.blur(amountInput);
+    });
+
+    await act(async () => {
+      fireEvent.click(container.querySelector('button[type="submit"]')!);
+    });
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          originalAmount: -40,
+          originalCurrencyCode: 'USD',
+          exchangeRate: 1.365234,
+          // -40 * 1.365234, rounded to cents
+          amount: -54.61,
+        }),
+      );
+    });
+  });
+
+  it('refuses to save when no rate is available for the chosen currency', async () => {
+    mockGetRateForDate.mockResolvedValue(null);
+    const { container } = await setUpForeign();
+    await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(container.querySelector('button[type="submit"]')!);
+    });
+
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('clears the foreign fields when the account currency is picked again', async () => {
+    const { container } = await setUpForeign();
+    await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('pick-account'));
+    });
+    expect(screen.getByLabelText('Amount')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(container.querySelector('button[type="submit"]')!);
+    });
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    const payload = mockCreate.mock.calls[0][0];
+    expect(payload.originalCurrencyCode).toBeUndefined();
+  });
+
+  it('seeds the picker and rate from an existing foreign-currency schedule', async () => {
+    const existing: any = {
+      id: 'st-fx',
+      userId: 'u1',
+      accountId: 'acc-1',
+      account: null,
+      name: 'Netflix',
+      payeeId: null,
+      payee: null,
+      payeeName: null,
+      categoryId: null,
+      category: null,
+      amount: -54.61,
+      currencyCode: 'CAD',
+      originalAmount: -40,
+      originalCurrencyCode: 'USD',
+      exchangeRate: 1.365234,
+      description: null,
+      frequency: 'MONTHLY',
+      nextDueDate: '2026-03-01',
+      startDate: '2026-02-01',
+      endDate: null,
+      occurrencesRemaining: null,
+      totalOccurrences: null,
+      isActive: true,
+      autoPost: false,
+      reminderDaysBefore: 3,
+      lastPostedDate: null,
+      isSplit: false,
+      isTransfer: false,
+      transferAccountId: null,
+      transferAccount: null,
+      isInvestment: false,
+      investmentAction: null,
+      investmentSecurityId: null,
+      investmentSecurity: null,
+      investmentFundingAccountId: null,
+      investmentFundingAccount: null,
+      investmentQuantity: null,
+      investmentPrice: null,
+      investmentCommission: null,
+      investmentTotalAmount: null,
+      investmentExchangeRate: null,
+      tagIds: [],
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    render(<ScheduledTransactionForm scheduledTransaction={existing} />);
+    await waitFor(() => expect(mockAccountsGetAll).toHaveBeenCalled());
+
+    expect(screen.getByTestId('currency-picker-value')).toHaveTextContent('USD');
+    expect(screen.getByLabelText('Amount in USD')).toBeInTheDocument();
+    expect((screen.getByLabelText('Amount in USD') as HTMLInputElement).value).toContain('40');
   });
 });

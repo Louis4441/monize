@@ -345,7 +345,9 @@
     "splitOverrideRequiresAmount": "L'importo è obbligatorio quando si crea una sostituzione suddivisa",
     "overrideNotFound": "Sostituzione con ID {{ overrideId }} non trovata",
     "updateSplitOverrideRequiresAmount": "L'importo è obbligatorio per la sostituzione suddivisa",
-    "dateMustBeYMD": "la data deve essere nel formato YYYY-MM-DD"
+    "dateMustBeYMD": "la data deve essere nel formato YYYY-MM-DD",
+    "fxPlainOnly": "Una valuta diversa può essere usata solo su una transazione pianificata semplice, non su una suddivisione, un trasferimento o un investimento",
+    "fxRateUnavailable": "Non è disponibile alcun tasso di cambio da {{ from }} a {{ to }} il {{ date }}. Inserisci l'importo in {{ to }} per registrarla."
   },
   "securities": {
     "exchangeRateUnavailable": "Impossibile determinare un tasso di cambio per {{ from }} -> {{ to }} alla data della transazione. Fornisci un exchangeRate esplicito affinché la registrazione sul conto di liquidità sia corretta.",

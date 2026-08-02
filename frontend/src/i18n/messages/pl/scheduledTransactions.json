@@ -61,7 +61,8 @@
       "postFailed": "Nie udało się zaksięgować transakcji",
       "skipFailed": "Nie udało się pominąć wystąpienia",
       "deleteFailed": "Nie udało się usunąć"
-    }
+    },
+    "foreignAmountTitle": "Kwota, którą nalicza odbiorca, w jego własnej walucie"
   },
   "filters": {
     "label": "Filtry",
@@ -111,13 +112,21 @@
       "priceRequired": "Cena musi być większa od zera",
       "totalAmountRequired": "Kwota łączna jest wymagana",
       "splitsMinimum": "Transakcje podzielone wymagają co najmniej 2 podziałów",
-      "splitsTotal": "Suma podziałów musi być równa kwocie transakcji"
+      "splitsTotal": "Suma podziałów musi być równa kwocie transakcji",
+      "fxRateUnavailable": "Dla tej daty nie ma dostępnego kursu wymiany z {from} na {to}."
     },
     "latestPlaceholder": "Ostatnia: {price}",
     "descriptionPlaceholder": "Opis...",
     "amountLabel": "Kwota",
     "selectCategoryPlaceholder": "Wybierz kategorię...",
-    "referencePlaceholder": "Nr czeku, nr potwierdzenia..."
+    "referencePlaceholder": "Nr czeku, nr potwierdzenia...",
+    "fx": {
+      "amountInCurrency": "Kwota w {currency}",
+      "rateCaption": "Zostanie zaksięgowane jako {total} po kursie 1 {from} = {rate} {to} z dnia {date}.",
+      "noRateWarning": "Nie znaleziono kursu wymiany z {from} na {to} w dniu {date}. Wybierz inną datę lub odśwież kursy.",
+      "feeCaption": "Zawiera opłatę za transakcję zagraniczną {percent}% ({fee}).",
+      "totalInCurrency": "Razem w {currency}"
+    }
   },
   "occurrencePicker": {
     "title": "Wybierz datę wystąpienia",
@@ -253,7 +262,14 @@
       "securityRequired": "Ta akcja inwestycyjna wymaga papieru wartościowego",
       "quantityRequired": "Ilość musi być większa od zera",
       "priceRequired": "Cena musi być większa od zera",
-      "totalAmountRequired": "Kwota łączna jest wymagana dla tej akcji"
+      "totalAmountRequired": "Kwota łączna jest wymagana dla tej akcji",
+      "fxRateRequired": "Przed zapisaniem wprowadź kwotę w wybranej walucie. Kurs wymiany nie jest jeszcze dostępny."
+    },
+    "fx": {
+      "amountInCurrency": "Kwota w {currency}",
+      "estimateCaption": "Około {total} przy 1 {from} = {rate} {to}.",
+      "noRateWarning": "Nie znaleziono kursu wymiany z {from} na {to}. Wybierz inną walutę lub wprowadź kwotę w {to}.",
+      "feeCaption": "Zawiera opłatę za transakcję zagraniczną {percent}% ({fee})."
     }
   },
   "postTransaction": {

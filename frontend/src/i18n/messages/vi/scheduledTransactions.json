@@ -61,7 +61,8 @@
       "postFailed": "Không thể đăng giao tác",
       "skipFailed": "Không thể bỏ qua lần xuất hiện",
       "deleteFailed": "Không thể xóa"
-    }
+    },
+    "foreignAmountTitle": "Số tiền người nhận tính phí, bằng đơn vị tiền tệ của họ"
   },
   "filters": {
     "label": "Bộ lọc",
@@ -111,13 +112,21 @@
       "priceRequired": "Giá phải lớn hơn không",
       "totalAmountRequired": "Cần có tổng số tiền",
       "splitsMinimum": "Giao tác chia cần ít nhất 2 phần",
-      "splitsTotal": "Tổng số tiền các phần phải bằng số tiền giao tác"
+      "splitsTotal": "Tổng số tiền các phần phải bằng số tiền giao tác",
+      "fxRateUnavailable": "Không có tỷ giá từ {from} sang {to} vào ngày này."
     },
     "latestPlaceholder": "Mới nhất: {price}",
     "descriptionPlaceholder": "Mô tả...",
     "amountLabel": "Số tiền",
     "selectCategoryPlaceholder": "Chọn danh mục...",
-    "referencePlaceholder": "Số séc, số xác nhận..."
+    "referencePlaceholder": "Số séc, số xác nhận...",
+    "fx": {
+      "amountInCurrency": "Số tiền bằng {currency}",
+      "rateCaption": "Sẽ được đăng là {total} theo tỷ giá 1 {from} = {rate} {to} ngày {date}.",
+      "noRateWarning": "Không tìm thấy tỷ giá từ {from} sang {to} vào {date}. Hãy chọn ngày khác, hoặc làm mới tỷ giá.",
+      "feeCaption": "Bao gồm phí giao dịch nước ngoài {percent}% ({fee}).",
+      "totalInCurrency": "Tổng bằng {currency}"
+    }
   },
   "occurrencePicker": {
     "title": "Chọn ngày xuất hiện",
@@ -253,7 +262,14 @@
       "securityRequired": "Hành động đầu tư này cần giấy chứng khoán",
       "quantityRequired": "Số lượng phải lớn hơn không",
       "priceRequired": "Giá phải lớn hơn không",
-      "totalAmountRequired": "Tổng số tiền là bắt buộc cho hành động này"
+      "totalAmountRequired": "Tổng số tiền là bắt buộc cho hành động này",
+      "fxRateRequired": "Hãy nhập số tiền bằng đơn vị tiền tệ đã chọn trước khi lưu. Hiện chưa có tỷ giá."
+    },
+    "fx": {
+      "amountInCurrency": "Số tiền bằng {currency}",
+      "estimateCaption": "Khoảng {total} theo tỷ giá 1 {from} = {rate} {to}.",
+      "noRateWarning": "Không tìm thấy tỷ giá từ {from} sang {to}. Hãy chọn đơn vị tiền tệ khác, hoặc nhập số tiền bằng {to}.",
+      "feeCaption": "Bao gồm phí giao dịch nước ngoài {percent}% ({fee})."
     }
   },
   "postTransaction": {

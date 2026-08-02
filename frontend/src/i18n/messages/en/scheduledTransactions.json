@@ -61,7 +61,8 @@
       "postFailed": "Failed to post transaction",
       "skipFailed": "Failed to skip occurrence",
       "deleteFailed": "Failed to delete"
-    }
+    },
+    "foreignAmountTitle": "The amount the biller charges, in its own currency"
   },
   "filters": {
     "label": "Filters",
@@ -111,13 +112,21 @@
       "priceRequired": "Price must be greater than zero",
       "totalAmountRequired": "Total amount is required",
       "splitsMinimum": "Split transactions require at least 2 splits",
-      "splitsTotal": "Split amounts must equal the transaction amount"
+      "splitsTotal": "Split amounts must equal the transaction amount",
+      "fxRateUnavailable": "No exchange rate is available for {from} to {to} on this date."
     },
     "latestPlaceholder": "Latest: {price}",
     "descriptionPlaceholder": "Description...",
     "amountLabel": "Amount",
     "selectCategoryPlaceholder": "Select category...",
-    "referencePlaceholder": "Cheque #, confirmation #..."
+    "referencePlaceholder": "Cheque #, confirmation #...",
+    "fx": {
+      "amountInCurrency": "Amount in {currency}",
+      "rateCaption": "Posts as {total} at 1 {from} = {rate} {to} on {date}.",
+      "noRateWarning": "No exchange rate found for {from} to {to} on {date}. Pick another date, or refresh rates.",
+      "feeCaption": "Includes a {percent}% foreign transaction fee ({fee}).",
+      "totalInCurrency": "Total in {currency}"
+    }
   },
   "occurrencePicker": {
     "title": "Select Occurrence Date",
@@ -253,7 +262,14 @@
       "securityRequired": "This investment action requires a security",
       "quantityRequired": "Quantity must be greater than zero",
       "priceRequired": "Price must be greater than zero",
-      "totalAmountRequired": "Total amount is required for this action"
+      "totalAmountRequired": "Total amount is required for this action",
+      "fxRateRequired": "Enter an amount in the chosen currency before saving. No exchange rate is available yet."
+    },
+    "fx": {
+      "amountInCurrency": "Amount in {currency}",
+      "estimateCaption": "About {total} at 1 {from} = {rate} {to}.",
+      "noRateWarning": "No exchange rate found for {from} to {to}. Pick another currency, or enter the amount in {to}.",
+      "feeCaption": "Includes a {percent}% foreign transaction fee ({fee})."
     }
   },
   "postTransaction": {

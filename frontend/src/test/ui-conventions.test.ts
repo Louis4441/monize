@@ -191,3 +191,52 @@ describe('chart colours come from the theme tokens', () => {
     expect(hits).toHaveLength(2);
   });
 });
+
+describe('a control sitting beside an input is the height of that input', () => {
+  /**
+   * `CurrencyPickerButton` is the square button left of an Amount field. It has
+   * no vertical padding and no height of its own, so its height comes entirely
+   * from the flex row. That made it a two-part rule that was easy to half-apply:
+   * the button needs `self-stretch`, and the row it sits in needs
+   * `items-stretch` with a `min-w-0` sibling. Getting either wrong renders a
+   * squat button beside a full-height input, which is what a human had to point
+   * out on the Bills & Deposits form.
+   *
+   * Both halves are checked: `self-stretch` on the button makes it correct
+   * whatever the wrapper does, and the row check keeps the two existing call
+   * sites (and any new one) on the same layout.
+   */
+  const BUTTON = '/src/components/transactions/CurrencyPickerButton.tsx';
+
+  it('gives CurrencyPickerButton self-stretch, so any wrapper renders it full height', () => {
+    const source = sources[BUTTON];
+    expect(source, `${BUTTON} not found -- update BUTTON in this test`).toBeTruthy();
+    // Guard against the class being dropped in a future restyle: align-self
+    // beats the parent's align-items, so this is what makes the button
+    // independent of how it is laid out.
+    expect(source).toMatch(/className="[^"]*\bself-stretch\b/);
+  });
+
+  it('renders the picker only inside an items-stretch row', () => {
+    const ROW = /<div className="flex items-stretch space-x-2">/;
+    // Building the picker and handing it down as `currencyPickerSlot={...}` is
+    // not laying it out -- TransactionForm does exactly that, and the row lives
+    // in NormalTransactionFields / SplitTransactionFields, which receive it. So
+    // a file that passes the slot on is a producer, and the check applies to
+    // whoever actually renders it beside an input.
+    const HANDS_OFF = /currencyPickerSlot=\{/;
+    const offenders = productionSources()
+      .filter(([path]) => path !== BUTTON)
+      .filter(
+        ([, content]) =>
+          /<CurrencyPickerButton\b/.test(content) || /\{currencyPickerSlot\}/.test(content),
+      )
+      .filter(([, content]) => !HANDS_OFF.test(content))
+      .filter(([, content]) => !ROW.test(content))
+      .map(([path]) => path);
+
+    // `items-start` (or the default `stretch` being overridden) leaves the
+    // button at its content height. Use the same row the other call sites do.
+    expect(offenders).toEqual([]);
+  });
+});

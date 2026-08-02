@@ -351,10 +351,11 @@ describe('CurrencyExposureReport', () => {
     expect(arg.title).toBe('Currency Exposure');
     expect(arg.filename).toBe('currency-exposure');
     // USD and CAD holdings both present; USD uses the mocked 1.365 rate, CAD is
-    // the home currency so it renders the fixed '1.0000' rate string.
+    // the home currency so it renders the fixed unity rate string, at the
+    // six decimals every rate is displayed with.
     const rateColumn = arg.tableData.rows.map((r: string[]) => r[2]);
-    expect(rateColumn).toContain('1.0000');
-    expect(rateColumn).toContain('1.3650');
+    expect(rateColumn).toContain('1.000000');
+    expect(rateColumn).toContain('1.365000');
     expect(arg.chartLegend.length).toBeGreaterThan(0);
   });
 

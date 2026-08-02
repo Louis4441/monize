@@ -61,7 +61,8 @@
       "postFailed": "Falha ao lançar transação",
       "skipFailed": "Falha ao ignorar ocorrência",
       "deleteFailed": "Falha ao excluir"
-    }
+    },
+    "foreignAmountTitle": "O valor cobrado pelo beneficiário, na moeda dele"
   },
   "filters": {
     "label": "Filtros",
@@ -111,13 +112,21 @@
       "priceRequired": "O preço deve ser superior a zero",
       "totalAmountRequired": "O valor total é obrigatório",
       "splitsMinimum": "As transações divididas requerem pelo menos 2 parcelas",
-      "splitsTotal": "Os valores das parcelas devem ser iguais ao valor da transação"
+      "splitsTotal": "Os valores das parcelas devem ser iguais ao valor da transação",
+      "fxRateUnavailable": "Não há uma taxa de câmbio disponível de {from} para {to} nesta data."
     },
     "latestPlaceholder": "Último: {price}",
     "descriptionPlaceholder": "Descrição...",
     "amountLabel": "Valor",
     "selectCategoryPlaceholder": "Selecionar categoria...",
-    "referencePlaceholder": "Cheque nº, confirmação nº..."
+    "referencePlaceholder": "Cheque nº, confirmação nº...",
+    "fx": {
+      "amountInCurrency": "Valor em {currency}",
+      "rateCaption": "Será lançado como {total} à taxa 1 {from} = {rate} {to} de {date}.",
+      "noRateWarning": "Nenhuma taxa de câmbio encontrada de {from} para {to} em {date}. Escolha outra data ou atualize as taxas.",
+      "feeCaption": "Inclui uma taxa de transação no exterior de {percent}% ({fee}).",
+      "totalInCurrency": "Total em {currency}"
+    }
   },
   "occurrencePicker": {
     "title": "Selecionar Data de Ocorrência",
@@ -253,7 +262,14 @@
       "securityRequired": "Esta ação de investimento requer um título",
       "quantityRequired": "A quantidade deve ser superior a zero",
       "priceRequired": "O preço deve ser superior a zero",
-      "totalAmountRequired": "O valor total é obrigatório para esta ação"
+      "totalAmountRequired": "O valor total é obrigatório para esta ação",
+      "fxRateRequired": "Insira um valor na moeda escolhida antes de salvar. Ainda não há uma taxa de câmbio disponível."
+    },
+    "fx": {
+      "amountInCurrency": "Valor em {currency}",
+      "estimateCaption": "Cerca de {total} a 1 {from} = {rate} {to}.",
+      "noRateWarning": "Nenhuma taxa de câmbio encontrada de {from} para {to}. Escolha outra moeda ou insira o valor em {to}.",
+      "feeCaption": "Inclui uma taxa de transação no exterior de {percent}% ({fee})."
     }
   },
   "postTransaction": {

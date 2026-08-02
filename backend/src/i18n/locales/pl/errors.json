@@ -345,7 +345,9 @@
     "splitOverrideRequiresAmount": "Kwota jest wymagana przy tworzeniu nadpisania podziału",
     "overrideNotFound": "Nie znaleziono nadpisania o ID {{ overrideId }}",
     "updateSplitOverrideRequiresAmount": "Kwota jest wymagana dla nadpisania podziału",
-    "dateMustBeYMD": "date musi być w formacie YYYY-MM-DD"
+    "dateMustBeYMD": "date musi być w formacie YYYY-MM-DD",
+    "fxPlainOnly": "Innej waluty można użyć tylko w zwykłej zaplanowanej transakcji, a nie w podziale, przelewie ani inwestycji",
+    "fxRateUnavailable": "Dla {{ date }} nie ma dostępnego kursu wymiany z {{ from }} na {{ to }}. Wprowadź kwotę w {{ to }}, aby ją zaksięgować."
   },
   "securities": {
     "exchangeRateUnavailable": "Nie można ustalić kursu wymiany dla {{ from }} -> {{ to }} na dzień transakcji. Podaj jawny exchangeRate, aby księgowanie na koncie gotówkowym było poprawne.",

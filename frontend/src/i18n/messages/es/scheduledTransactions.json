@@ -61,7 +61,8 @@
       "postFailed": "Error al registrar la transacción",
       "skipFailed": "Error al omitir la ocurrencia",
       "deleteFailed": "Error al eliminar"
-    }
+    },
+    "foreignAmountTitle": "El importe que cobra el beneficiario, en su propia moneda"
   },
   "filters": {
     "label": "Filtros",
@@ -111,13 +112,21 @@
       "priceRequired": "El precio debe ser mayor que cero",
       "totalAmountRequired": "El monto total es obligatorio",
       "splitsMinimum": "Los desgloses de transacción requieren al menos 2 partes",
-      "splitsTotal": "Los montos de las partes deben ser iguales a la cantidad de la transacción"
+      "splitsTotal": "Los montos de las partes deben ser iguales a la cantidad de la transacción",
+      "fxRateUnavailable": "No hay un tipo de cambio disponible de {from} a {to} en esta fecha."
     },
     "latestPlaceholder": "Último: {price}",
     "descriptionPlaceholder": "Descripción...",
     "amountLabel": "Monto",
     "selectCategoryPlaceholder": "Seleccionar categoría...",
-    "referencePlaceholder": "Nro. de cheque, nro. de confirmación..."
+    "referencePlaceholder": "Nro. de cheque, nro. de confirmación...",
+    "fx": {
+      "amountInCurrency": "Monto en {currency}",
+      "rateCaption": "Se registrará como {total} al tipo 1 {from} = {rate} {to} del {date}.",
+      "noRateWarning": "No se encontró un tipo de cambio de {from} a {to} el {date}. Elige otra fecha o actualiza los tipos.",
+      "feeCaption": "Incluye una comisión por transacción en el extranjero del {percent}% ({fee}).",
+      "totalInCurrency": "Total en {currency}"
+    }
   },
   "occurrencePicker": {
     "title": "Seleccionar fecha de ocurrencia",
@@ -253,7 +262,14 @@
       "securityRequired": "Esta acción de inversión requiere un valor",
       "quantityRequired": "La cantidad debe ser mayor que cero",
       "priceRequired": "El precio debe ser mayor que cero",
-      "totalAmountRequired": "El monto total es obligatorio para esta acción"
+      "totalAmountRequired": "El monto total es obligatorio para esta acción",
+      "fxRateRequired": "Introduce un importe en la moneda elegida antes de guardar. Todavía no hay un tipo de cambio disponible."
+    },
+    "fx": {
+      "amountInCurrency": "Monto en {currency}",
+      "estimateCaption": "Unos {total} a 1 {from} = {rate} {to}.",
+      "noRateWarning": "No se encontró un tipo de cambio de {from} a {to}. Elige otra moneda o introduce el importe en {to}.",
+      "feeCaption": "Incluye una comisión por transacción en el extranjero del {percent}% ({fee})."
     }
   },
   "postTransaction": {

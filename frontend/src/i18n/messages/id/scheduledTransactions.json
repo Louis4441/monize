@@ -61,7 +61,8 @@
       "postFailed": "Gagal memposting transaksi",
       "skipFailed": "Gagal melewati kemunculan",
       "deleteFailed": "Gagal menghapus"
-    }
+    },
+    "foreignAmountTitle": "Jumlah yang ditagih penerima, dalam mata uangnya sendiri"
   },
   "filters": {
     "label": "Filter",
@@ -111,13 +112,21 @@
       "priceRequired": "Harga harus lebih dari nol",
       "totalAmountRequired": "Total jumlah wajib diisi",
       "splitsMinimum": "Transaksi terbagi memerlukan setidaknya 2 pembagian",
-      "splitsTotal": "Jumlah pembagian harus sama dengan jumlah transaksi"
+      "splitsTotal": "Jumlah pembagian harus sama dengan jumlah transaksi",
+      "fxRateUnavailable": "Tidak ada nilai tukar yang tersedia untuk {from} ke {to} pada tanggal ini."
     },
     "latestPlaceholder": "Terbaru: {price}",
     "descriptionPlaceholder": "Deskripsi...",
     "amountLabel": "Jumlah",
     "selectCategoryPlaceholder": "Pilih kategori...",
-    "referencePlaceholder": "No. cek, no. konfirmasi..."
+    "referencePlaceholder": "No. cek, no. konfirmasi...",
+    "fx": {
+      "amountInCurrency": "Jumlah dalam {currency}",
+      "rateCaption": "Akan diposting sebesar {total} pada kurs 1 {from} = {rate} {to} tanggal {date}.",
+      "noRateWarning": "Tidak ada nilai tukar untuk {from} ke {to} pada {date}. Pilih tanggal lain, atau segarkan kurs.",
+      "feeCaption": "Termasuk biaya transaksi luar negeri {percent}% ({fee}).",
+      "totalInCurrency": "Total dalam {currency}"
+    }
   },
   "occurrencePicker": {
     "title": "Pilih Tanggal Kemunculan",
@@ -253,7 +262,14 @@
       "securityRequired": "Tindakan investasi ini memerlukan sekuritas",
       "quantityRequired": "Kuantitas harus lebih dari nol",
       "priceRequired": "Harga harus lebih dari nol",
-      "totalAmountRequired": "Total jumlah wajib diisi untuk tindakan ini"
+      "totalAmountRequired": "Total jumlah wajib diisi untuk tindakan ini",
+      "fxRateRequired": "Masukkan jumlah dalam mata uang yang dipilih sebelum menyimpan. Belum ada nilai tukar yang tersedia."
+    },
+    "fx": {
+      "amountInCurrency": "Jumlah dalam {currency}",
+      "estimateCaption": "Sekitar {total} pada 1 {from} = {rate} {to}.",
+      "noRateWarning": "Tidak ada nilai tukar untuk {from} ke {to}. Pilih mata uang lain, atau masukkan jumlah dalam {to}.",
+      "feeCaption": "Termasuk biaya transaksi luar negeri {percent}% ({fee})."
     }
   },
   "postTransaction": {

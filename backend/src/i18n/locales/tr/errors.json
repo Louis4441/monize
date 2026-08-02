@@ -345,7 +345,9 @@
     "splitOverrideRequiresAmount": "Bölünmüş geçersiz kılma oluştururken tutar gereklidir",
     "overrideNotFound": "{{ overrideId }} kimliğine sahip geçersiz kılma bulunamadı",
     "updateSplitOverrideRequiresAmount": "Bölünmüş geçersiz kılma için tutar gereklidir",
-    "dateMustBeYMD": "tarih YYYY-AA-GG biçiminde olmalıdır"
+    "dateMustBeYMD": "tarih YYYY-AA-GG biçiminde olmalıdır",
+    "fxPlainOnly": "Farklı bir para birimi yalnızca sade bir zamanlanmış işlemde kullanılabilir; bölünmüş işlem, transfer veya yatırımda kullanılamaz",
+    "fxRateUnavailable": "{{ date }} tarihinde {{ from }} biriminden {{ to }} birimine döviz kuru yok. Kaydetmek için tutarı {{ to }} cinsinden girin."
   },
   "securities": {
     "exchangeRateUnavailable": "İşlem tarihinde {{ from }} -> {{ to }} için bir döviz kuru belirlenemedi. Nakit hesabına kaydın doğru olması için açık bir exchangeRate girin.",

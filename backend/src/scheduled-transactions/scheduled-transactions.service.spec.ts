@@ -13,6 +13,7 @@ import { InvestmentTransactionsService } from "../securities/investment-transact
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { getRequestContext } from "../common/request-context";
 import {
   createScopedDbMocks,
@@ -38,6 +39,7 @@ describe("ScheduledTransactionsService", () => {
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: DataSourceMock;
   let mockActionHistoryService: Record<string, jest.Mock>;
+  let mockExchangeRateService: Record<string, jest.Mock>;
 
   const userId = "11111111-1111-1111-1111-111111111111";
   const stId = "st-1";
@@ -163,6 +165,11 @@ describe("ScheduledTransactionsService", () => {
       record: jest.fn().mockResolvedValue(null),
     };
 
+    mockExchangeRateService = {
+      getLatestRate: jest.fn().mockResolvedValue(null),
+      getRateForDate: jest.fn().mockResolvedValue(null),
+    };
+
     const tenantMocks = createScopedDbMocks([
       [ScheduledTransaction, scheduledRepo],
       [ScheduledTransactionSplit, splitsRepo],
@@ -214,6 +221,10 @@ describe("ScheduledTransactionsService", () => {
         {
           provide: ActionHistoryService,
           useValue: mockActionHistoryService,
+        },
+        {
+          provide: ExchangeRateService,
+          useValue: mockExchangeRateService,
         },
       ],
     }).compile();
@@ -2201,6 +2212,277 @@ describe("ScheduledTransactionsService", () => {
   });
 
   // ==================== Override CRUD ====================
+  describe("foreign-currency schedules", () => {
+    const baseDto = {
+      accountId: "acc-1",
+      name: "Netflix",
+      amount: -54.61,
+      currencyCode: "CAD",
+      frequency: "MONTHLY" as any,
+      nextDueDate: "2025-02-15",
+    };
+
+    beforeEach(() => {
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        currencyCode: "CAD",
+        fxFeePercent: null,
+      });
+    });
+
+    const stubNoOverride = () => {
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+    };
+
+    it("stores the foreign trio on create", async () => {
+      const saved = makeScheduled();
+      scheduledRepo.save.mockResolvedValue(saved);
+      stubFindOne(saved);
+
+      await service.create(userId, {
+        ...baseDto,
+        originalAmount: -40,
+        originalCurrencyCode: "usd",
+        exchangeRate: 1.365234,
+      });
+
+      const createArg = scheduledRepo.create.mock.calls[0][0];
+      expect(createArg.originalAmount).toBe(-40);
+      expect(createArg.originalCurrencyCode).toBe("USD");
+      expect(createArg.exchangeRate).toBe(1.365234);
+    });
+
+    it("strips the trio when the entry currency is the account currency", async () => {
+      const saved = makeScheduled();
+      scheduledRepo.save.mockResolvedValue(saved);
+      stubFindOne(saved);
+
+      await service.create(userId, {
+        ...baseDto,
+        originalAmount: -54.61,
+        originalCurrencyCode: "CAD",
+        exchangeRate: 1,
+      });
+
+      const createArg = scheduledRepo.create.mock.calls[0][0];
+      expect(createArg.originalCurrencyCode).toBeNull();
+      expect(createArg.originalAmount).toBeNull();
+      expect(createArg.exchangeRate).toBe(1);
+    });
+
+    it.each([
+      ["a transfer", { isTransfer: true, transferAccountId: "acc-2" }],
+      [
+        "a split",
+        {
+          splits: [
+            { categoryId: "cat-a", amount: -30 },
+            { categoryId: "cat-b", amount: -24.61 },
+          ],
+        },
+      ],
+    ])("rejects a foreign entry on %s", async (_label, extra) => {
+      await expect(
+        service.create(userId, {
+          ...baseDto,
+          ...(extra as any),
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.365234,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("clears the trio when an existing foreign schedule becomes a transfer", async () => {
+      stubFindOne(
+        makeScheduled({
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.365234,
+          currencyCode: "CAD",
+        }),
+      );
+
+      await service.update(userId, stId, {
+        isTransfer: true,
+        transferAccountId: "acc-2",
+      });
+
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        ScheduledTransaction,
+        stId,
+        expect.objectContaining({
+          originalAmount: null,
+          originalCurrencyCode: null,
+          exchangeRate: 1,
+        }),
+      );
+    });
+
+    it("converts at the rate for the posting date, not the stored estimate", async () => {
+      stubFindOne(
+        makeScheduled({
+          amount: -54.61,
+          currencyCode: "CAD",
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.365234,
+          account: {
+            id: "acc-1",
+            currencyCode: "CAD",
+            fxFeePercent: null,
+          } as any,
+        }),
+      );
+      stubNoOverride();
+      mockExchangeRateService.getRateForDate.mockResolvedValue(1.4);
+
+      await service.post(userId, stId, { transactionDate: "2025-03-01" });
+
+      expect(mockExchangeRateService.getRateForDate).toHaveBeenCalledWith(
+        "USD",
+        "CAD",
+        "2025-03-01",
+      );
+      expect(transactionsService.create).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({
+          amount: -56,
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.4,
+        }),
+      );
+    });
+
+    it("folds the account's foreign transaction fee into the posted amount", async () => {
+      stubFindOne(
+        makeScheduled({
+          currencyCode: "CAD",
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.4,
+          account: {
+            id: "acc-1",
+            currencyCode: "CAD",
+            fxFeePercent: 2.5,
+          } as any,
+        }),
+      );
+      stubNoOverride();
+      mockExchangeRateService.getRateForDate.mockResolvedValue(1.4);
+
+      await service.post(userId, stId, { transactionDate: "2025-03-01" });
+
+      // base -56, fee -1.40, total -57.40
+      expect(transactionsService.create).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ amount: -57.4 }),
+      );
+    });
+
+    it("refuses to post when no rate can be resolved for the date", async () => {
+      stubFindOne(
+        makeScheduled({
+          currencyCode: "CAD",
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.4,
+          account: {
+            id: "acc-1",
+            currencyCode: "CAD",
+            fxFeePercent: null,
+          } as any,
+        }),
+      );
+      stubNoOverride();
+      mockExchangeRateService.getRateForDate.mockResolvedValue(null);
+
+      await expect(
+        service.post(userId, stId, { transactionDate: "2025-03-01" }),
+      ).rejects.toThrow(BadRequestException);
+      expect(transactionsService.create).not.toHaveBeenCalled();
+    });
+
+    it("honours an occurrence override as an account-currency total", async () => {
+      stubFindOne(
+        makeScheduled({
+          currencyCode: "CAD",
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.4,
+          account: {
+            id: "acc-1",
+            currencyCode: "CAD",
+            fxFeePercent: null,
+          } as any,
+        }),
+      );
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue({
+        id: "ovr-1",
+        originalDate: "2025-02-15",
+        overrideDate: "2025-02-15",
+        amount: -60,
+      });
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await service.post(userId, stId);
+
+      // The pinned total is booked as-is, and the rate is derived so the row
+      // still round-trips: -60 / -40 = 1.5.
+      expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
+      expect(transactionsService.create).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({
+          amount: -60,
+          originalAmount: -40,
+          exchangeRate: 1.5,
+        }),
+      );
+    });
+
+    it("refreshes stored estimates from the latest rate", async () => {
+      scheduledRepo.find.mockResolvedValue([
+        {
+          id: stId,
+          userId,
+          name: "Netflix",
+          amount: -54.61,
+          currencyCode: "CAD",
+          originalAmount: -40,
+          originalCurrencyCode: "USD",
+          exchangeRate: 1.365234,
+          account: { fxFeePercent: null },
+        },
+      ]);
+      mockExchangeRateService.getLatestRate.mockResolvedValue(1.4);
+
+      await service.refreshForeignCurrencyEstimates();
+
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        ScheduledTransaction,
+        stId,
+        { amount: -56, exchangeRate: 1.4 },
+      );
+    });
+
+    it("leaves an ordinary schedule alone on the refresh sweep", async () => {
+      scheduledRepo.find.mockResolvedValue([
+        { id: stId, userId, amount: -1200, currencyCode: "USD" },
+      ]);
+
+      await service.refreshForeignCurrencyEstimates();
+
+      expect(mockExchangeRateService.getLatestRate).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+    });
+  });
   describe("createOverride", () => {
     it("should create an override", async () => {
       stubFindOne(makeScheduled());

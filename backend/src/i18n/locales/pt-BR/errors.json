@@ -345,7 +345,9 @@
     "splitOverrideRequiresAmount": "O valor é obrigatório ao criar uma substituição de divisão",
     "overrideNotFound": "Substituição com ID {{ overrideId }} não encontrada",
     "updateSplitOverrideRequiresAmount": "O valor é obrigatório para substituição de divisão",
-    "dateMustBeYMD": "date deve estar no formato YYYY-MM-DD"
+    "dateMustBeYMD": "date deve estar no formato YYYY-MM-DD",
+    "fxPlainOnly": "Só é possível usar outra moeda em uma transação agendada simples, não em uma divisão, transferência ou investimento",
+    "fxRateUnavailable": "Não há uma taxa de câmbio disponível de {{ from }} para {{ to }} em {{ date }}. Insira o valor em {{ to }} para lançá-la."
   },
   "securities": {
     "exchangeRateUnavailable": "Não foi possível determinar uma taxa de câmbio para {{ from }} -> {{ to }} na data da transação. Informe um exchangeRate explícito para que o lançamento na conta de caixa fique correto.",

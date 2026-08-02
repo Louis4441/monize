@@ -1308,7 +1308,8 @@ export class BackupService {
                               OR t.original_currency_code = c.code)
           AND NOT EXISTS (SELECT 1 FROM securities s WHERE s.currency_code = c.code)
           AND NOT EXISTS (SELECT 1 FROM scheduled_transactions st
-                           WHERE st.currency_code = c.code)
+                           WHERE st.currency_code = c.code
+                              OR st.original_currency_code = c.code)
           AND NOT EXISTS (SELECT 1 FROM budgets b WHERE b.currency_code = c.code)
           AND NOT EXISTS (SELECT 1 FROM user_preferences up
                            WHERE up.default_currency = c.code)`,

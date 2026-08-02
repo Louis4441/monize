@@ -345,7 +345,9 @@
     "splitOverrideRequiresAmount": "Jumlah diperlukan saat membuat penggantian terbagi",
     "overrideNotFound": "Penggantian dengan ID {{ overrideId }} tidak ditemukan",
     "updateSplitOverrideRequiresAmount": "Jumlah diperlukan untuk penggantian terbagi",
-    "dateMustBeYMD": "tanggal harus dalam format YYYY-MM-DD"
+    "dateMustBeYMD": "tanggal harus dalam format YYYY-MM-DD",
+    "fxPlainOnly": "Mata uang lain hanya dapat dipakai pada transaksi terjadwal biasa, bukan pada transaksi terbagi, transfer, atau investasi",
+    "fxRateUnavailable": "Tidak ada nilai tukar yang tersedia untuk {{ from }} ke {{ to }} pada {{ date }}. Masukkan jumlah dalam {{ to }} untuk mempostingnya."
   },
   "securities": {
     "exchangeRateUnavailable": "Tidak dapat menentukan nilai tukar untuk {{ from }} -> {{ to }} pada tanggal transaksi. Berikan exchangeRate eksplisit agar pencatatan ke akun kas benar.",

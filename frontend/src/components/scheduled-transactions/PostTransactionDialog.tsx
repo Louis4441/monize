@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline';
@@ -21,7 +21,14 @@ import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { investmentsApi } from '@/lib/investments';
 import { getLocalDateString } from '@/lib/utils';
 import { buildCategoryTree } from '@/lib/categoryUtils';
-import { roundToCents, getCurrencySymbol, formatAmount } from '@/lib/format';
+import {
+  roundToCents,
+  roundToDecimals,
+  getCurrencySymbol,
+  formatAmount,
+  FX_RATE_DISPLAY_DECIMALS,
+} from '@/lib/format';
+import { exchangeRatesApi } from '@/lib/exchange-rates';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -150,6 +157,127 @@ export function PostTransactionDialog({
     ? accounts.find(a => a.id === scheduledTransaction.transferAccountId) ?? scheduledTransaction.transferAccount
     : null;
 
+  // ── Foreign-currency posting ──────────────────────────────────────────────
+  //
+  // A foreign-currency schedule fixes the amount the biller charges, not what
+  // the account is debited. The rate is therefore looked up for the date being
+  // posted -- not the estimate the bills list shows -- so moving the date here
+  // re-converts, and a back-dated posting uses that day's rate.
+  const isForeignPosting =
+    !isInvestmentKind &&
+    !!scheduledTransaction.originalCurrencyCode &&
+    scheduledTransaction.originalAmount != null;
+  const entryCurrency = scheduledTransaction.originalCurrencyCode ?? '';
+  const [foreignAmount, setForeignAmount] = useState<number>(0);
+  const [postFxRate, setPostFxRate] = useState<number | null>(null);
+  const [postFxRateLoading, setPostFxRateLoading] = useState(false);
+  // True when the last lookup errored rather than returning an answer. Kept
+  // apart from `postFxRate === null` so a throttled or offline request is not
+  // reported to the user as "no exchange rate exists".
+  const [rateLookupFailed, setRateLookupFailed] = useState(false);
+  // Set once the user types a converted total of their own, so a later date
+  // tweak does not discard the rate that figure implies. Same guard, and the
+  // same reason, as `rateOverriddenRef` in TransactionForm.
+  const rateOverriddenRef = useRef(false);
+
+  const postingAccount = useMemo(
+    () => accounts.find((a) => a.id === scheduledTransaction.accountId) ?? null,
+    [accounts, scheduledTransaction.accountId],
+  );
+  const postFxFeePercent = postingAccount?.fxFeePercent ?? undefined;
+
+  // Convert at the posting-date rate, folding in the account's foreign
+  // transaction fee. Mirrors `applyFxConversion` on the backend, which is what
+  // actually books the row.
+  const convertForeign = useCallback(
+    (foreign: number, rate: number) => {
+      const base = roundToCents(foreign * rate);
+      const fee =
+        postFxFeePercent && postFxFeePercent > 0
+          ? -roundToCents((Math.abs(base) * postFxFeePercent) / 100)
+          : 0;
+      return { base, fee, total: roundToCents(base + fee) };
+    },
+    [postFxFeePercent],
+  );
+
+  // Re-fetch the rate whenever the posting date changes, debounced.
+  //
+  // The debounce is not cosmetic. Stepping the date with the arrow keys fires a
+  // change per keypress, and the rate endpoint is throttled per minute -- an
+  // undebounced lookup burned the whole allowance in a few presses and every
+  // later date came back 429, which the UI then reported as "no exchange rate
+  // found" for dates that plainly had one. Same 300ms wait TransactionForm uses,
+  // for the same reason.
+  useEffect(() => {
+    if (!isOpen || !isForeignPosting || !transactionDate) return;
+    if (rateOverriddenRef.current) return;
+    let cancelled = false;
+    setPostFxRateLoading(true);
+    const handle = setTimeout(() => {
+      exchangeRatesApi
+        .getRateForDate(entryCurrency, scheduledTransaction.currencyCode, transactionDate)
+        .then((rate) => {
+          if (cancelled) return;
+          setPostFxRate(rate);
+          // The server answered: `null` here really does mean no rate exists
+          // for this pair and date, so the warning is a fact.
+          setRateLookupFailed(false);
+          setPostFxRateLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          // The request itself failed (offline, throttled, timed out). That is
+          // not evidence about the rate, so the preview goes blank rather than
+          // claiming none exists -- and posting still works, because the
+          // backend resolves the rate for the date itself.
+          setPostFxRate(null);
+          setRateLookupFailed(true);
+          setPostFxRateLoading(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [
+    isOpen,
+    isForeignPosting,
+    entryCurrency,
+    scheduledTransaction.currencyCode,
+    transactionDate,
+  ]);
+
+  // Keep the account-currency amount (what the balance preview and the split
+  // editor work in) in step with the foreign amount and the fetched rate.
+  useEffect(() => {
+    if (!isForeignPosting || postFxRate == null) return;
+    setAmount(convertForeign(foreignAmount, postFxRate).total);
+  }, [isForeignPosting, foreignAmount, postFxRate, convertForeign]);
+
+  const foreignConversion =
+    isForeignPosting && postFxRate != null
+      ? convertForeign(foreignAmount, postFxRate)
+      : null;
+
+  // User typed the account-currency total directly: back the fee out to the
+  // pre-fee base, derive the rate (10 dp) so it round-trips, and mark the rate
+  // overridden. Mirrors `handleConvertedTotalOverride` in TransactionForm --
+  // the posted row still satisfies originalAmount x exchangeRate ~ base, so the
+  // backend re-deriving the fee lands on the same total the user typed.
+  const handleConvertedTotalChange = (total: number | undefined) => {
+    if (total === undefined || !foreignAmount) return;
+    let base = total;
+    if (postFxFeePercent && postFxFeePercent > 0) {
+      // total = base - |base| * p; solve for base by its (matching) sign.
+      const p = postFxFeePercent / 100;
+      base = roundToCents(total >= 0 ? total / (1 - p) : total / (1 + p));
+    }
+    rateOverriddenRef.current = true;
+    setPostFxRate(roundToDecimals(base / foreignAmount, 10));
+    setAmount(roundToCents(total));
+  };
+
   // The cash impact that will actually post -- reflects per-occurrence edits
   // the user makes here, not just the base scheduled transaction's amount.
   // For investments we re-derive from the current quantity / price / total so
@@ -211,6 +339,18 @@ export function PostTransactionDialog({
         nextOverride?.amount ?? scheduledTransaction.amount
       );
       setAmount(amt);
+      // Foreign-currency schedule: the field the user edits is the biller's
+      // amount in its own currency. An occurrence override deliberately stays
+      // an account-currency figure (see resolveFxForPosting on the backend), so
+      // it does not seed this.
+      setForeignAmount(
+        scheduledTransaction.originalAmount != null
+          ? roundToCents(Number(scheduledTransaction.originalAmount))
+          : 0,
+      );
+      setPostFxRate(null);
+      setRateLookupFailed(false);
+      rateOverriddenRef.current = false;
       setCategoryId(nextOverride?.categoryId ?? scheduledTransaction.categoryId ?? '');
       setDescription(nextOverride?.description ?? scheduledTransaction.description ?? '');
       setIsSplit(nextOverride?.isSplit ?? scheduledTransaction.isSplit);
@@ -404,6 +544,12 @@ export function PostTransactionDialog({
   }, [categories]);
 
   const handlePost = async () => {
+    // A missing preview is not a reason to block: the backend resolves the rate
+    // for the posting date itself (carry-forward over weekends, a fetched
+    // window, then the latest stored rate) and raises a translated error only
+    // if the pair has no rate anywhere. Blocking here on a preview the client
+    // could not fetch -- because the lookup was throttled, say -- refused
+    // postings that would have gone through fine.
     if (isInvestmentKind) {
       if (isInvestmentQuantityPrice || isInvestmentQuantityOnly) {
         if (investmentQuantity === '' || Number(investmentQuantity) <= 0) {
@@ -451,7 +597,19 @@ export function PostTransactionDialog({
           }
         : {
             transactionDate,
-            amount,
+            // For a foreign-currency schedule only the biller's amount is sent,
+            // so the backend -- not this dialog -- decides what is booked;
+            // sending `amount` would pin it and override the lookup. The rate
+            // goes along only when the user set it themselves by typing a
+            // converted total. Otherwise the backend resolves it for the
+            // posting date, which means a preview that was throttled or offline
+            // costs nothing: the posting is still correct.
+            ...(isForeignPosting
+              ? {
+                  originalAmount: foreignAmount,
+                  ...(rateOverriddenRef.current ? { exchangeRate: postFxRate } : {}),
+                }
+              : { amount }),
             categoryId: isSplit ? null : (categoryId || null),
             description: description || null,
             referenceNumber: referenceNumber || undefined,
@@ -478,7 +636,11 @@ export function PostTransactionDialog({
   // pastes cleanly into other fields, e.g. when reconciling against a statement.
   const handleCopyAmount = async () => {
     try {
-      await navigator.clipboard.writeText(formatAmount(Math.abs(amount)));
+      // The button is attached to the Amount field, so it copies whatever that
+      // field is showing: the biller's own-currency figure while posting a
+      // foreign-currency schedule, the account-currency amount otherwise.
+      const copied = isForeignPosting ? foreignAmount : amount;
+      await navigator.clipboard.writeText(formatAmount(Math.abs(copied)));
       setAmountCopied(true);
       toast.success(t('postDialog.toasts.amountCopied'));
       window.setTimeout(() => setAmountCopied(false), 2000);
@@ -712,31 +874,111 @@ export function PostTransactionDialog({
           </>
         )}
 
-        {/* Amount — non-investment only */}
+        {/* Amount — non-investment only.
+
+            While posting a foreign-currency schedule this is the same pair of
+            fields the transaction form uses: the biller's amount on the left,
+            the account-currency total on the right, either one editable. Typing
+            in the right-hand field derives the rate rather than just overwriting
+            a number, so the posted row still reconciles.
+
+            The copy button sits in an items-stretch row with the Amount input
+            and takes its height from it (mt-6 clears the input's label); the
+            conversion caption is a sibling *below* that row, so it does not
+            stretch the button past the field it belongs to. */}
         {!isInvestmentKind && (
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <CurrencyInput
-              label={t('postDialog.amountLabel')}
-              prefix={getCurrencySymbol(scheduledTransaction.currencyCode)}
-              value={amount}
-              onChange={(value) => setAmount(value ?? 0)}
-              allowSignToggle
-            />
-          </div>
-          <button
-            type="button"
-            onClick={handleCopyAmount}
-            title={t('postDialog.copyAmount')}
-            aria-label={t('postDialog.copyAmount')}
-            className="shrink-0 flex items-center justify-center px-3 py-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-          >
-            {amountCopied ? (
-              <CheckIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-            ) : (
-              <ClipboardDocumentIcon className="w-5 h-5" />
+        <div>
+          <div className={isForeignPosting ? 'grid grid-cols-1 md:grid-cols-2 gap-4 items-start' : ''}>
+            <div className="flex items-stretch gap-2">
+              <div className="flex-1 min-w-0">
+                <CurrencyInput
+                  label={
+                    isForeignPosting
+                      ? t('postDialog.fx.amountInCurrency', { currency: entryCurrency })
+                      : t('postDialog.amountLabel')
+                  }
+                  prefix={getCurrencySymbol(
+                    isForeignPosting ? entryCurrency : scheduledTransaction.currencyCode,
+                  )}
+                  value={isForeignPosting ? foreignAmount : amount}
+                  onChange={(value) =>
+                    isForeignPosting
+                      ? setForeignAmount(roundToCents(value ?? 0))
+                      : setAmount(value ?? 0)
+                  }
+                  allowSignToggle
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyAmount}
+                title={t('postDialog.copyAmount')}
+                aria-label={t('postDialog.copyAmount')}
+                className="shrink-0 self-stretch mt-6 flex items-center justify-center px-3 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                {amountCopied ? (
+                  <CheckIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                ) : (
+                  <ClipboardDocumentIcon className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+            {isForeignPosting && (
+              <CurrencyInput
+                label={t('postDialog.fx.totalInCurrency', {
+                  currency: scheduledTransaction.currencyCode,
+                })}
+                prefix={getCurrencySymbol(scheduledTransaction.currencyCode)}
+                value={foreignConversion ? foreignConversion.total : undefined}
+                onChange={handleConvertedTotalChange}
+                allowSignToggle
+              />
             )}
-          </button>
+          </div>
+            {isForeignPosting && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {foreignConversion ? (
+                  <span>
+                    {t('postDialog.fx.rateCaption', {
+                      total: formatCurrency(
+                        foreignConversion.total,
+                        scheduledTransaction.currencyCode,
+                      ),
+                      from: entryCurrency,
+                      rate: formatNumber(
+                        postFxRate as number,
+                        FX_RATE_DISPLAY_DECIMALS,
+                      ),
+                      to: scheduledTransaction.currencyCode,
+                      date: transactionDate,
+                    })}
+                  </span>
+                ) : !postFxRateLoading && !rateLookupFailed ? (
+                  // Only when the server answered "none". A failed request says
+                  // nothing about whether a rate exists, so it shows no preview
+                  // rather than a claim it cannot support.
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {t('postDialog.fx.noRateWarning', {
+                      from: entryCurrency,
+                      to: scheduledTransaction.currencyCode,
+                      date: transactionDate,
+                    })}
+                  </span>
+                ) : null}
+                {foreignConversion && foreignConversion.fee !== 0 && (
+                  <span>
+                    {' '}
+                    {t('postDialog.fx.feeCaption', {
+                      percent: formatNumber(postFxFeePercent as number, 2),
+                      fee: formatCurrency(
+                        Math.abs(foreignConversion.fee),
+                        scheduledTransaction.currencyCode,
+                      ),
+                    })}
+                  </span>
+                )}
+              </p>
+            )}
         </div>
         )}
 

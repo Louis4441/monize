@@ -397,7 +397,11 @@ export class CurrenciesService implements OnApplicationBootstrap {
         UNION ALL SELECT 1 FROM securities WHERE currency_code = $1 AND user_id = $2
         UNION ALL SELECT 1 FROM transactions t
           JOIN accounts a ON a.id = t.account_id
-          WHERE t.currency_code = $1 AND a.user_id = $2
+          WHERE (t.currency_code = $1 OR t.original_currency_code = $1)
+            AND a.user_id = $2
+        UNION ALL SELECT 1 FROM scheduled_transactions st
+          WHERE (st.currency_code = $1 OR st.original_currency_code = $1)
+            AND st.user_id = $2
         UNION ALL SELECT 1 FROM user_preferences WHERE default_currency = $1 AND user_id = $2
       ) AS "inUse"`,
         [code.toUpperCase(), userId],
@@ -539,7 +543,10 @@ export class CurrenciesService implements OnApplicationBootstrap {
         `SELECT EXISTS (
         SELECT 1 FROM accounts WHERE currency_code = $1
         UNION ALL SELECT 1 FROM securities WHERE currency_code = $1
-        UNION ALL SELECT 1 FROM transactions WHERE currency_code = $1
+        UNION ALL SELECT 1 FROM transactions
+          WHERE currency_code = $1 OR original_currency_code = $1
+        UNION ALL SELECT 1 FROM scheduled_transactions
+          WHERE currency_code = $1 OR original_currency_code = $1
         UNION ALL SELECT 1 FROM user_preferences WHERE default_currency = $1
       ) AS "inUse"`,
         [code.toUpperCase()],

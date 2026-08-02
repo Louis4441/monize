@@ -16,7 +16,12 @@ import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { useDisableTransactionSplit } from '@/store/tourStore';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
-import { getCurrencySymbol, roundToCents, roundToDecimals } from '@/lib/format';
+import {
+  FX_RATE_DISPLAY_DECIMALS,
+  getCurrencySymbol,
+  roundToCents,
+  roundToDecimals,
+} from '@/lib/format';
 import {
   getRememberedTransactionCurrency,
   rememberTransactionCurrency,
@@ -252,6 +257,10 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
   // does not clobber the bank's stored rate.
   const rateOverriddenRef = useRef<boolean>(!!initSource?.originalCurrencyCode);
   const [fxRateLoading, setFxRateLoading] = useState(false);
+  // True when the last lookup errored rather than returning an answer. Kept
+  // apart from `fxRate === null` so a throttled or offline request is not
+  // reported to the user as "no exchange rate exists".
+  const [fxRateLookupFailed, setFxRateLookupFailed] = useState(false);
 
   // Note: CurrencyInput components manage their own display state internally
 
@@ -796,6 +805,7 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
   // ordinary account-currency transaction, clearing the FX fields.
   const handleEntryCurrencyChange = (code: string) => {
     rateOverriddenRef.current = false;
+    setFxRateLookupFailed(false);
     if (!code || code.toUpperCase() === accountCurrency.toUpperCase()) {
       setEntryCurrency('');
       setForeignAmount(undefined);
@@ -824,12 +834,20 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         .then((rate) => {
           if (cancelled) return;
           setFxRate(rate);
+          // The server answered: a null here really does mean no rate exists
+          // for this pair and date, so the warning below is a fact.
+          setFxRateLookupFailed(false);
           setFxRateLoading(false);
           recomputeFx(foreignAmount, rate);
         })
         .catch(() => {
           if (cancelled) return;
+          // The request itself failed (offline, throttled, timed out). That is
+          // not evidence about the rate, so the panel goes blank rather than
+          // claiming none exists -- the user can still type the converted
+          // total, which derives a rate.
           setFxRate(null);
+          setFxRateLookupFailed(true);
           setFxRateLoading(false);
         });
     }, 300);
@@ -1218,12 +1236,15 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         <span>
           {t('form.fx.rateCaption', {
             from: entryCurrency,
-            rate: formatNumber(fxRate, 4),
+            rate: formatNumber(fxRate, FX_RATE_DISPLAY_DECIMALS),
             to: accountCurrency,
             date: watchedDate ? formatDate(watchedDate) : watchedDate,
           })}
         </span>
-      ) : !fxRateLoading ? (
+      ) : !fxRateLoading && !fxRateLookupFailed ? (
+        // Only when the server answered "none". A failed request says nothing
+        // about whether a rate exists, so it shows no caption rather than a
+        // claim it cannot support.
         <span className="text-amber-600 dark:text-amber-400">
           {t('form.fx.noRateWarning', {
             from: entryCurrency,

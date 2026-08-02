@@ -8,6 +8,7 @@ import { exchangeRatesApi } from '@/lib/exchange-rates';
 import toast from 'react-hot-toast';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
+import { FX_RATE_DISPLAY_DECIMALS } from '@/lib/format';
 
 import { DensityLevel, nextDensity } from '@/hooks/useTableDensity';
 import { SortIcon } from '@/components/ui/SortIcon';
@@ -190,8 +191,8 @@ const CurrencyRow = memo(function CurrencyRow({
         {isDefault ? (
           <span className="text-gray-400 dark:text-gray-500">-</span>
         ) : exchangeRate ? (
-          <span title={`1 ${currency.code} = ${exchangeRate.toFixed(4)} ${defaultCurrency}`}>
-            {exchangeRate.toFixed(4)}
+          <span title={`1 ${currency.code} = ${exchangeRate.toFixed(FX_RATE_DISPLAY_DECIMALS)} ${defaultCurrency}`}>
+            {exchangeRate.toFixed(FX_RATE_DISPLAY_DECIMALS)}
           </span>
         ) : (
           <span className="text-gray-400 dark:text-gray-500">N/A</span>

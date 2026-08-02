@@ -18,7 +18,7 @@ import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { roundMoney } from "../common/round.util";
+import { roundFxRate } from "../common/fx-entry.util";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 
@@ -216,8 +216,11 @@ export class ExchangeRateService implements OnModuleInit {
     return withScopedDb(this.dataSource, async (manager) => {
       const result = await this.saveOneDirection(manager, from, to, rate, date);
 
-      // Also save the inverse rate so both directions stay current
-      const inverseRate = roundMoney(1 / rate);
+      // Also save the inverse rate so both directions stay current. Rounded at
+      // the rate column's own precision, not money precision: 1/1.3652 rounded
+      // to 4dp is 0.7325, which converts USD->CAD back to 1.3661 -- an error a
+      // bank statement quoting six decimals would show up immediately.
+      const inverseRate = roundFxRate(1 / rate);
       await this.saveOneDirection(manager, to, from, inverseRate, date);
 
       return result;
@@ -254,6 +257,67 @@ export class ExchangeRateService implements OnModuleInit {
       source: "yahoo_finance",
     });
     return repo.save(newRate);
+  }
+
+  /**
+   * Bulk-upsert a daily rate series for a pair, in both directions.
+   *
+   * A provider call returns a whole daily series for the period asked for, and
+   * costs the same whether that is one day or a hundred. Persisting only the
+   * day that was wanted threw the rest away and sent the next lookup for a
+   * neighbouring date straight back out to the provider -- which is how a user
+   * stepping a date field backwards ran into rate limits. Storing the series
+   * makes one call cover the whole window.
+   *
+   * Both directions are written for the reason `saveRate` gives: a pair
+   * persisted one way only leaves the reverse lookup falling through to a live
+   * fetch forever.
+   */
+  private async persistRateSeries(
+    from: string,
+    to: string,
+    series: Array<{ date: Date; rate: number }>,
+  ): Promise<number> {
+    // One row per day, last value wins, ignoring anything unusable.
+    const byDay = new Map<string, { date: Date; rate: number }>();
+    for (const point of series) {
+      if (!isFinite(point.rate) || point.rate <= 0) continue;
+      byDay.set(point.date.toISOString().slice(0, 10), point);
+    }
+    const points = Array.from(byDay.values());
+    if (points.length === 0) return 0;
+
+    const rows: Array<[string, string, Date, number]> = [];
+    for (const point of points) {
+      rows.push([from, to, point.date, point.rate]);
+      rows.push([to, from, point.date, roundFxRate(1 / point.rate)]);
+    }
+
+    const batchSize = 500;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const values = batch
+        .map((_, idx) => {
+          const offset = idx * 4;
+          return `($${offset + 1}, $${offset + 2}, $${offset + 3}::DATE, $${offset + 4}, 'yahoo_finance')`;
+        })
+        .join(", ");
+      const params: any[] = [];
+      for (const [f, t, date, rate] of batch) params.push(f, t, date, rate);
+
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO exchange_rates (from_currency, to_currency, rate_date, rate, source)
+           VALUES ${values}
+           ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE SET
+             rate = EXCLUDED.rate,
+             source = EXCLUDED.source`,
+          params,
+        ),
+      );
+    }
+
+    return points.length;
   }
 
   /**
@@ -529,33 +593,11 @@ export class ExchangeRateService implements OnModuleInit {
       }
 
       try {
-        // Bulk upsert using raw SQL for performance
-        const batchSize = 500;
-        for (let i = 0; i < filtered.length; i += batchSize) {
-          const batch = filtered.slice(i, i + batchSize);
-          const values = batch
-            .map((_, idx) => {
-              const offset = idx * 4;
-              return `($${offset + 1}, $${offset + 2}, $${offset + 3}::DATE, $${offset + 4}, 'yahoo_finance')`;
-            })
-            .join(", ");
-
-          const batchParams: any[] = [];
-          for (const r of batch) {
-            batchParams.push(from, to, r.date, r.rate);
-          }
-
-          await withScopedDb(this.dataSource, (manager) =>
-            manager.query(
-              `INSERT INTO exchange_rates (from_currency, to_currency, rate_date, rate, source)
-             VALUES ${values}
-             ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE SET
-               rate = EXCLUDED.rate,
-               source = EXCLUDED.source`,
-              batchParams,
-            ),
-          );
-        }
+        // Same bulk upsert the single-date lookup uses, which also writes the
+        // inverse pair -- this loop used to store one direction only, so a
+        // CAD->USD lookup went out to the provider even though the USD->CAD
+        // history had just been backfilled.
+        await this.persistRateSeries(from, to, filtered);
 
         this.logger.log(
           `Backfilled ${filtered.length} rates for ${from}/${to} (from ${cutoffDate.toISOString().substring(0, 10)})`,
@@ -635,12 +677,22 @@ export class ExchangeRateService implements OnModuleInit {
    * rate that applied on the transaction's date -- essential for back-dated
    * transactions, where the latest snapshot can be far from the historical
    * rate. Precedence:
-   *   1. The stored rate on the closest date on or before the target
-   *      (carry-forward, matching how a missing weekend/holiday is handled).
+   *   0. A date in the future has no rate and never will until it arrives, so
+   *      the target is clamped to today and the answer is today's rate. Without
+   *      the clamp a future date fell through to a Yahoo window that contains
+   *      nothing, and the lookup returned null for a scheduled transaction
+   *      posted ahead of time.
+   *   1. The stored rate on the closest date on or before the target. This is
+   *      what makes a weekend or a holiday resolve: Saturday and Sunday carry
+   *      Friday's rate forward, which is the closest day that has one.
    *   2. A short historical daily window fetched from Yahoo around the target
    *      date; the value on the closest day on or before the target is used and
    *      persisted for reuse. The window (not the full "max" history) keeps the
-   *      request small and fast.
+   *      request small and fast. When the target predates every point in the
+   *      window, the nearest point in either direction wins.
+   *   3. The latest stored rate of any date, as a last resort, so a pair that
+   *      has a rate today still resolves for a date the provider has no data
+   *      for at all.
    * Returns null when no rate can be determined (so the caller can reject or
    * flag the operation rather than silently assuming 1.0).
    */
@@ -651,13 +703,19 @@ export class ExchangeRateService implements OnModuleInit {
   ): Promise<number | null> {
     if (from === to) return 1;
 
-    const target =
+    const requested =
       typeof date === "string"
         ? date.slice(0, 10)
         : date.toISOString().slice(0, 10);
+
+    // 0. Clamp a future date to today: today's rate is the best available
+    //    estimate, and it is the same figure the bills list is showing.
+    const todayYMD = new Date().toISOString().slice(0, 10);
+    const target = requested > todayYMD ? todayYMD : requested;
     const targetDate = new Date(`${target}T00:00:00.000Z`);
 
-    // 1. Closest stored rate on or before the target date.
+    // 1. Closest stored rate on or before the target date (carry-forward over
+    //    weekends and holidays).
     const stored = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(ExchangeRate).findOne({
         where: {
@@ -670,14 +728,18 @@ export class ExchangeRateService implements OnModuleInit {
     );
     if (stored) return Number(stored.rate);
 
-    // 2. Fetch a short Yahoo window around the target (not the full "max"
-    //    history) and use the rate on the closest day on or before the target.
-    //    The lower bound reaches back two weeks so weekends/holidays before the
-    //    target still resolve; the upper bound adds two days to cover the target
-    //    itself (and minor timezone slack). Persist just the chosen point (and
-    //    its inverse, via saveRate) so a repeat lookup hits the database.
-    const windowStart = new Date(targetDate.getTime() - 14 * 86_400_000);
-    const windowEnd = new Date(targetDate.getTime() + 2 * 86_400_000);
+    // 2. Fetch a Yahoo window around the target (not the full "max" history)
+    //    and use the rate on the closest day on or before the target.
+    //
+    //    The window is wide because it costs nothing to be: one call returns
+    //    the whole daily series for the period, and every bar in it is
+    //    persisted below. Six weeks back and one forward means a user stepping
+    //    a date field through a month of history pays for a single fetch, and
+    //    the reverse pair is filled in at the same time. It was two weeks back
+    //    and one point kept, so neighbouring dates each went back out to the
+    //    provider and ran into its rate limits.
+    const windowStart = new Date(targetDate.getTime() - 45 * 86_400_000);
+    const windowEnd = new Date(targetDate.getTime() + 7 * 86_400_000);
     const series = await this.fetchYahooHistoricalRatesWindow(
       from,
       to,
@@ -690,15 +752,29 @@ export class ExchangeRateService implements OnModuleInit {
         (a, b) => a.date.getTime() - b.date.getTime(),
       );
       const onOrBefore = sorted.filter((p) => p.date.getTime() <= targetTime);
-      // Fall back to the earliest available point when the target predates the
-      // series -- a best-effort rate is still far better than a silent 1.0.
+      // Prefer the closest day on or before the target -- a Saturday takes
+      // Friday's rate. When the target predates every point in the window, take
+      // the nearest point in either direction instead: a best-effort rate from
+      // the closest day the market traded beats a silent 1.0.
       const chosen =
-        onOrBefore.length > 0 ? onOrBefore[onOrBefore.length - 1] : sorted[0];
+        onOrBefore.length > 0
+          ? onOrBefore[onOrBefore.length - 1]
+          : sorted.reduce((best, point) =>
+              Math.abs(point.date.getTime() - targetTime) <
+              Math.abs(best.date.getTime() - targetTime)
+                ? point
+                : best,
+            );
       try {
-        await this.saveRate(from, to, chosen.rate, chosen.date);
+        // The whole window, not just the day that was asked for: the next
+        // lookup for any date in it is then a database read.
+        const stored = await this.persistRateSeries(from, to, series);
+        this.logger.log(
+          `Stored ${stored} daily ${from}/${to} rates around ${target} from one lookup`,
+        );
       } catch (error) {
         this.logger.warn(
-          `Could not persist historical rate ${from}->${to} for ${target}: ${
+          `Could not persist historical rates ${from}->${to} around ${target}: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
@@ -706,7 +782,10 @@ export class ExchangeRateService implements OnModuleInit {
       return chosen.rate;
     }
 
-    return null;
+    // 3. Nothing for this date anywhere. A pair that has any stored rate at all
+    //    still resolves -- better a known rate from another day than refusing
+    //    the posting outright.
+    return this.getLatestRate(from, to);
   }
 
   /**

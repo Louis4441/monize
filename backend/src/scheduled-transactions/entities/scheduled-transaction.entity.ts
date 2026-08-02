@@ -87,6 +87,48 @@ export class ScheduledTransaction {
   @Column({ type: "varchar", name: "currency_code", length: 3 })
   currencyCode: string;
 
+  // Foreign-currency entry, mirroring the same trio on Transaction. NULL for an
+  // ordinary schedule (amount/currencyCode are the account currency). When set,
+  // originalAmount is the fixed amount the biller charges in
+  // originalCurrencyCode, exchangeRate is account-currency units per 1 unit of
+  // it, and `amount` is the converted estimate -- refreshed daily from the
+  // latest stored rate, and re-derived for the posting date when posted.
+  @Column({
+    type: "decimal",
+    precision: 20,
+    scale: 4,
+    name: "original_amount",
+    nullable: true,
+    transformer: {
+      to: (value: number | null): number | null => value,
+      from: (value: string | null): number | null =>
+        value === null ? null : Number(value),
+    },
+  })
+  originalAmount: number | null;
+
+  @Column({
+    type: "varchar",
+    name: "original_currency_code",
+    length: 3,
+    nullable: true,
+  })
+  originalCurrencyCode: string | null;
+
+  @Column({
+    type: "decimal",
+    precision: 20,
+    scale: 10,
+    name: "exchange_rate",
+    default: 1,
+    transformer: {
+      to: (value: number | null): number | null => value,
+      from: (value: string | null): number =>
+        value === null ? 1 : Number(value),
+    },
+  })
+  exchangeRate: number;
+
   @Column({ type: "text", nullable: true })
   description: string | null;
 
