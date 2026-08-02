@@ -735,7 +735,7 @@ describe("gem-position.util", () => {
       expect(estimateCommission(10, math.sellCount, math.buyCount)).toBe(60);
     });
 
-    it("counts the account holding only cash as a buyer", () => {
+    it("buys only where there is something to put into the target", () => {
       const math = buildPositionMath(
         [
           holding({
@@ -758,10 +758,73 @@ describe("gem-position.util", () => {
         { securityId: "sec-EM_EQUITY", composition: EMPTY_COMPOSITION },
       );
 
-      // Nothing is sold -- the securities are already the target -- but the
-      // cash in the second account still has to be put to work there.
+      // Nothing is sold -- the securities are already the target -- and the
+      // account wholly in it places no order either. Only the cash in the
+      // second account has to be put to work.
       expect(math.sellCount).toBe(0);
-      expect(math.buyCount).toBe(2);
+      expect(math.buyCount).toBe(1);
+    });
+
+    it("leaves an already-compliant account out of the buy side", () => {
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "EM_EQUITY",
+            accountIds: ["acct-a"],
+            marketValue: 5000,
+          }),
+          holding({
+            role: null,
+            securityId: "sec-iusq",
+            symbol: "IUSQ",
+            accountIds: ["acct-b"],
+            marketValue: 5000,
+          }),
+        ],
+        "EM_EQUITY",
+        { securityId: "sec-EM_EQUITY", composition: EMPTY_COMPOSITION },
+      );
+
+      // Account A holds the target and does nothing. Account B sells IUSQ and
+      // buys the target: two orders in total, not three.
+      expect(math.sellCount).toBe(1);
+      expect(math.buyCount).toBe(1);
+      expect(estimateCommission(29.9, math.sellCount, math.buyCount)).toBe(
+        59.8,
+      );
+    });
+
+    it("places no order at all for a portfolio already in the target", () => {
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "EM_EQUITY",
+            accountIds: ["acct-1"],
+            marketValue: 5000,
+          }),
+        ],
+        "EM_EQUITY",
+        { securityId: "sec-EM_EQUITY", composition: EMPTY_COMPOSITION },
+      );
+
+      expect(math.changeRequired).toBe(false);
+      expect(math.sellCount).toBe(0);
+      expect(math.buyCount).toBe(0);
+      // Zero orders is a real answer: charging one commission billed the user
+      // for a switch nobody is being asked to make.
+      expect(estimateCommission(29.9, math.sellCount, math.buyCount)).toBe(0);
+    });
+
+    it("counts the opening purchase when the accounts are empty", () => {
+      const math = buildPositionMath([], "EM_EQUITY", {
+        securityId: "sec-emim",
+        composition: EMPTY_COMPOSITION,
+      });
+
+      // Nothing is held anywhere, so which account buys is unknown -- but the
+      // purchase is still one order.
+      expect(math.sellCount).toBe(0);
+      expect(math.buyCount).toBe(1);
     });
   });
 
@@ -780,8 +843,13 @@ describe("gem-position.util", () => {
 
     it("charges one commission for a first purchase", () => {
       expect(estimateCommission(29.9, 0, 1)).toBeCloseTo(29.9, 4);
-      // A buy always happens, even if the caller forgot to count one.
-      expect(estimateCommission(29.9, 0, 0)).toBeCloseTo(29.9, 4);
+    });
+
+    it("charges nothing when there are no orders to place", () => {
+      // A compliant portfolio places none, and zero is the honest estimate.
+      // The old floor of one purchase billed it for a switch that is not
+      // being asked for.
+      expect(estimateCommission(29.9, 0, 0)).toBe(0);
     });
 
     it("is unknown without a configured commission", () => {

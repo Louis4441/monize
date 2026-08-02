@@ -123,11 +123,15 @@ export interface GemPositionMath {
    */
   sellCount: number;
   /**
-   * Orders the buy side takes: one per account that will hold the target.
+   * Orders the buy side takes: one per account that has something to put into
+   * the target.
    *
-   * Every account with something in it is buying, whether that something is a
-   * fund being sold or cash being spent. A single `+1` asserted the whole
-   * strategy trades in one account.
+   * An account already wholly in the target buys nothing -- there is no order
+   * to place and no commission to pay -- so the count comes from `offTarget`,
+   * which is exactly "holdings that free money", cash included. Counting every
+   * account with anything in it charged a purchase to accounts with nothing to
+   * do. Zero when the portfolio already complies; one, for the opening
+   * purchase, when the accounts are empty and the account cannot be named.
    */
   buyCount: number;
   /**
@@ -414,12 +418,25 @@ export function buildPositionMath(
     (orders, holding) => orders + Math.max(1, holding.accountIds.length),
     0,
   );
-  // Where the target ends up: every account holding anything, because each of
-  // them places its own purchase. At least one, since a switch always buys.
-  const buyCount = Math.max(
-    1,
-    new Set(valued.flatMap((holding) => holding.accountIds)).size,
+  /**
+   * Where the target has to be bought: the accounts holding something that is
+   * not it. Selling a fund frees money in the account it was held in, and cash
+   * is spent where it sits, so both sides of that come from `offTarget`.
+   *
+   * An account already wholly in the target is deliberately absent: it places
+   * no order. The one case with no such account and still a purchase to make
+   * is empty accounts -- nothing is held anywhere, so which account buys is
+   * unknown, and the opening purchase counts as the single order it is.
+   */
+  const buyAccountIds = new Set(
+    offTarget.flatMap((holding) => holding.accountIds),
   );
+  const buyCount =
+    buyAccountIds.size > 0
+      ? buyAccountIds.size
+      : targetRole && valued.length === 0
+        ? 1
+        : 0;
 
   /**
    * With no target there is nothing to be compliant with. Otherwise: anything
@@ -524,8 +541,11 @@ export function estimateTax(
  * the three a per-instrument count gave. Both sides are counted where they
  * happen, in `buildPositionMath`.
  *
- * A switch that sells nothing is still a purchase. Without a configured
- * commission the estimate stays unknown rather than becoming zero.
+ * A portfolio that already complies places no orders and costs nothing, so
+ * zero orders is a real answer here and not a floor to be raised: forcing a
+ * purchase charged a commission for a switch nobody is being asked to make.
+ * Without a configured commission the estimate stays unknown rather than
+ * becoming zero.
  */
 export function estimateCommission(
   commissionAmount: number | null,
@@ -533,6 +553,6 @@ export function estimateCommission(
   buyCount: number,
 ): number | null {
   if (commissionAmount === null) return null;
-  const orders = Math.max(0, sellCount) + Math.max(1, buyCount);
+  const orders = Math.max(0, sellCount) + Math.max(0, buyCount);
   return roundMoney(commissionAmount * orders);
 }

@@ -192,12 +192,28 @@ export class GemPositionService {
   > {
     if (accountIds.length === 0) return [];
     const rows: Array<{
-      id: string;
+      owner_account_id: string;
       current_balance: string;
       currency_code: string;
     }> = await withScopedDb(this.dataSource, (manager) =>
       manager.query(
-        `SELECT a.id, a.current_balance, a.currency_code
+        `SELECT
+                -- The account the purchase is *placed on*, which is not always
+                -- the row the balance sits on. A linked INVESTMENT_CASH account
+                -- is a ledger, not somewhere you buy an ETF: reporting its own
+                -- id counted an ordinary brokerage pair as two accounts and so
+                -- charged two purchase commissions for one order.
+                COALESCE(
+                  CASE WHEN a.id = ANY($1::uuid[]) THEN a.id END,
+                  CASE WHEN a.linked_account_id = ANY($1::uuid[])
+                       THEN a.linked_account_id END,
+                  (SELECT b.id
+                     FROM accounts b
+                    WHERE b.linked_account_id = a.id
+                      AND b.id = ANY($1::uuid[])
+                    LIMIT 1)
+                ) AS owner_account_id,
+                a.current_balance, a.currency_code
              FROM accounts a
             WHERE a.user_id = $2
               AND a.current_balance > 0
@@ -226,7 +242,7 @@ export class GemPositionService {
       ),
     );
     return rows.map((row) => ({
-      accountId: row.id,
+      accountId: row.owner_account_id,
       amount: Number(row.current_balance),
       currencyCode: row.currency_code,
     }));

@@ -103,6 +103,7 @@ describe("GemPositionService", () => {
         quantity: "51",
         cost_basis: "18281.46",
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
     ];
     cashRows = [];
@@ -176,6 +177,7 @@ describe("GemPositionService", () => {
         quantity: "10",
         cost_basis: "3000",
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
       {
         security_id: "sec-wtai",
@@ -184,6 +186,7 @@ describe("GemPositionService", () => {
         quantity: "100",
         cost_basis: "5000",
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
     ];
     priceService.latestPrices.mockResolvedValue(
@@ -222,6 +225,7 @@ describe("GemPositionService", () => {
         quantity: "200",
         cost_basis: "6000",
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
       {
         security_id: "sec-spy",
@@ -230,6 +234,7 @@ describe("GemPositionService", () => {
         quantity: "5",
         cost_basis: "1500",
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
     ];
     priceService.latestPrices.mockResolvedValue(
@@ -261,6 +266,7 @@ describe("GemPositionService", () => {
         quantity: "51",
         cost_basis: null,
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
     ];
 
@@ -282,6 +288,7 @@ describe("GemPositionService", () => {
         quantity: "10",
         cost_basis: "1000",
         currency_code: "EUR",
+        account_ids: ["acct-1"],
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 200]]));
@@ -306,6 +313,7 @@ describe("GemPositionService", () => {
         quantity: "10",
         cost_basis: null,
         currency_code: "EUR",
+        account_ids: ["acct-1"],
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
@@ -333,6 +341,7 @@ describe("GemPositionService", () => {
         quantity: "10",
         cost_basis: "800",
         currency_code: "EUR",
+        account_ids: ["acct-1"],
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
@@ -357,7 +366,13 @@ describe("GemPositionService", () => {
   });
 
   it("reports an unconvertible cash balance as unvalued, never at parity", async () => {
-    cashRows = [{ current_balance: "5000", currency_code: "PLN" }];
+    cashRows = [
+      {
+        owner_account_id: "acct-1",
+        current_balance: "5000",
+        currency_code: "PLN",
+      },
+    ];
     exchangeRates.getLatestRate.mockResolvedValue(null);
 
     const result = await build();
@@ -388,6 +403,87 @@ describe("GemPositionService", () => {
     expect(cashSql).toContain("a.account_sub_type IS NULL");
     expect(cashSql).toContain("a.account_sub_type = 'INVESTMENT_BROKERAGE'");
     expect(cashSql).toContain("a.linked_account_id IS NULL");
+  });
+
+  /**
+   * A linked INVESTMENT_CASH account is a ledger, not somewhere an ETF is
+   * bought. Reporting its own id counted an ordinary brokerage pair -- one
+   * account, as the user sees it -- as two buyers, and charged two purchase
+   * commissions for the single order they will actually place.
+   */
+  it("attributes a linked cash balance to the brokerage account that trades", async () => {
+    await build();
+
+    const cashSql = manager.query.mock.calls
+      .map(([sql]: [string]) => sql)
+      .find((sql: string) => sql.includes("current_balance")) as string;
+
+    // The selected account keeps its own id...
+    expect(cashSql).toContain("CASE WHEN a.id = ANY($1::uuid[]) THEN a.id END");
+    // ...a cash account pointing at a selected brokerage resolves to it...
+    expect(cashSql).toContain("THEN a.linked_account_id END");
+    // ...and so does one the selected brokerage points at.
+    expect(cashSql).toContain("WHERE b.linked_account_id = a.id");
+    expect(cashSql).toContain("AS owner_account_id");
+  });
+
+  it("charges one purchase for a brokerage account and its cash half", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        quantity: "25",
+        cost_basis: "9000",
+        currency_code: "USD",
+        account_ids: ["acct-1"],
+      },
+    ];
+    // The query resolves the linked cash row to the brokerage account, so both
+    // rows name the same trading account.
+    cashRows = [
+      {
+        owner_account_id: "acct-1",
+        current_balance: "1000",
+        currency_code: "USD",
+      },
+    ];
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
+
+    const result = await build();
+
+    // One sell of SPY and one purchase of the target, both on acct-1. The
+    // cash is spent, not sold, so it adds no order of its own.
+    expect(result.action?.estimatedTradeCount).toBe(2);
+    expect(result.action?.estimatedCommission).toBeCloseTo(59.8, 2);
+  });
+
+  it("charges a purchase in each of two independent brokerage accounts", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        quantity: "25",
+        cost_basis: "9000",
+        currency_code: "USD",
+        account_ids: ["acct-1"],
+      },
+    ];
+    cashRows = [
+      {
+        owner_account_id: "acct-2",
+        current_balance: "5000",
+        currency_code: "USD",
+      },
+    ];
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
+
+    const result = await build();
+
+    // One sell on acct-1, then a purchase on each account: three orders.
+    expect(result.action?.estimatedTradeCount).toBe(3);
+    expect(result.action?.estimatedCommission).toBeCloseTo(89.7, 2);
   });
 
   it("counts one sell order per account a position is held in", async () => {
@@ -440,6 +536,7 @@ describe("GemPositionService", () => {
         quantity: "700",
         cost_basis: "21000",
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-emim", 35]]));
@@ -461,9 +558,16 @@ describe("GemPositionService", () => {
           quantity: "200",
           cost_basis: "4000",
           currency_code: "USD",
+          account_ids: ["acct-1"],
         },
       ];
-      cashRows = [{ current_balance: "5000", currency_code: "USD" }];
+      cashRows = [
+        {
+          owner_account_id: "acct-1",
+          current_balance: "5000",
+          currency_code: "USD",
+        },
+      ];
       priceService.latestPrices.mockResolvedValue(new Map([["sec-emim", 25]]));
     };
 
@@ -522,7 +626,13 @@ describe("GemPositionService", () => {
       // Cash" is an instruction nobody can carry out. The switch here is a
       // pure purchase: there is nothing to sell.
       holdingRows = [];
-      cashRows = [{ current_balance: "5000", currency_code: "USD" }];
+      cashRows = [
+        {
+          owner_account_id: "acct-1",
+          current_balance: "5000",
+          currency_code: "USD",
+        },
+      ];
 
       const result = await build();
 
@@ -541,9 +651,16 @@ describe("GemPositionService", () => {
           quantity: "10",
           cost_basis: "3000",
           currency_code: "USD",
+          account_ids: ["acct-1"],
         },
       ];
-      cashRows = [{ current_balance: "9000", currency_code: "USD" }];
+      cashRows = [
+        {
+          owner_account_id: "acct-1",
+          current_balance: "9000",
+          currency_code: "USD",
+        },
+      ];
       priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
 
       const result = await build();
@@ -597,6 +714,7 @@ describe("GemPositionService", () => {
         quantity: "5",
         cost_basis: "100",
         currency_code: "USD",
+        account_ids: ["acct-1"],
       },
     ];
     const result = await build();
