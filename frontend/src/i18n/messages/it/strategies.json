@@ -247,6 +247,7 @@
       "executedNotApplicable": "Nulla da fare",
       "noChange": "Nessuna modifica",
       "changeTo": "diventa",
+      "instrumentUnavailable": "Strumento non più disponibile",
       "toggleDetails": "Mostra il dettaglio della valutazione",
       "showAll": "Vedi lo storico completo ({count})",
       "emptyTitle": "Nessuna valutazione",

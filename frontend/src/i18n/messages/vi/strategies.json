@@ -247,6 +247,7 @@
       "executedNotApplicable": "Không cần làm gì",
       "noChange": "Không thay đổi",
       "changeTo": "chuyển thành",
+      "instrumentUnavailable": "Công cụ không còn khả dụng",
       "toggleDetails": "Hiện chi tiết đánh giá",
       "showAll": "Xem toàn bộ lịch sử ({count})",
       "emptyTitle": "Chưa có lần đánh giá nào",

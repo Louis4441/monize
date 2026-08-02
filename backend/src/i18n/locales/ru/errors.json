@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Счёт не найден",
+    "configurationChanging": "Настройки стратегии изменились во время формирования отчёта. Попробуйте ещё раз.",
     "securityNotFound": "Инструмент не найден",
     "signalNotFound": "Сигнал стратегии не найден",
+    "signalStrategyMismatch": "Этот сигнал относится к другой стратегии.",
     "strategyNotFound": "Стратегия не найдена"
   }
 }

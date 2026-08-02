@@ -247,6 +247,7 @@
       "executedNotApplicable": "无需操作",
       "noChange": "无变动",
       "changeTo": "变为",
+      "instrumentUnavailable": "该标的已不可用",
       "toggleDetails": "显示评估明细",
       "showAll": "查看完整历史（{count}）",
       "emptyTitle": "尚无评估",

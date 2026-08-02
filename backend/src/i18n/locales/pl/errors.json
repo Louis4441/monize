@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Nie znaleziono konta",
+    "configurationChanging": "Ustawienia strategii zmieniły się w trakcie tworzenia raportu. Spróbuj ponownie.",
     "securityNotFound": "Nie znaleziono papieru wartościowego",
     "signalNotFound": "Nie znaleziono sygnału strategii",
+    "signalStrategyMismatch": "Ten sygnał należy do innej strategii.",
     "strategyNotFound": "Nie znaleziono strategii"
   }
 }

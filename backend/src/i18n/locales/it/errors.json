@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Conto non trovato",
+    "configurationChanging": "Le impostazioni della strategia sono cambiate mentre il report veniva creato. Riprova.",
     "securityNotFound": "Titolo non trovato",
     "signalNotFound": "Segnale della strategia non trovato",
+    "signalStrategyMismatch": "Quel segnale appartiene a un'altra strategia.",
     "strategyNotFound": "Strategia non trovata"
   }
 }

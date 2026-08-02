@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Akun tidak ditemukan",
+    "configurationChanging": "Pengaturan strategi berubah saat laporan sedang dibuat. Silakan coba lagi.",
     "securityNotFound": "Efek tidak ditemukan",
     "signalNotFound": "Sinyal strategi tidak ditemukan",
+    "signalStrategyMismatch": "Sinyal itu milik strategi lain.",
     "strategyNotFound": "Strategi tidak ditemukan"
   }
 }

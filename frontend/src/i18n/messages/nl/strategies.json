@@ -247,6 +247,7 @@
       "executedNotApplicable": "Niets te doen",
       "noChange": "Geen wijziging",
       "changeTo": "wordt",
+      "instrumentUnavailable": "Instrument niet meer beschikbaar",
       "toggleDetails": "Evaluatiedetails tonen",
       "showAll": "Volledige historie bekijken ({count})",
       "emptyTitle": "Nog geen evaluaties",

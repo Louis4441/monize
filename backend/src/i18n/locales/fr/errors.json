@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Compte introuvable",
+    "configurationChanging": "Les paramètres de la stratégie ont changé pendant la création du rapport. Veuillez réessayer.",
     "securityNotFound": "Titre introuvable",
     "signalNotFound": "Signal de stratégie introuvable",
+    "signalStrategyMismatch": "Ce signal appartient à une autre stratégie.",
     "strategyNotFound": "Stratégie introuvable"
   }
 }

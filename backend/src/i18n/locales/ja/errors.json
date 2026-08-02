@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "口座が見つかりません",
+    "configurationChanging": "レポートの作成中に戦略の設定が変更されました。もう一度お試しください。",
     "securityNotFound": "銘柄が見つかりません",
     "signalNotFound": "戦略シグナルが見つかりません",
+    "signalStrategyMismatch": "そのシグナルは別の戦略のものです。",
     "strategyNotFound": "戦略が見つかりません"
   }
 }

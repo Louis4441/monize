@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Рахунок не знайдено",
+    "configurationChanging": "Налаштування стратегії змінилися під час створення звіту. Спробуйте ще раз.",
     "securityNotFound": "Інструмент не знайдено",
     "signalNotFound": "Сигнал стратегії не знайдено",
+    "signalStrategyMismatch": "Цей сигнал належить до іншої стратегії.",
     "strategyNotFound": "Стратегію не знайдено"
   }
 }

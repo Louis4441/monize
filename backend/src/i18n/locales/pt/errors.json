@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Conta não encontrada",
+    "configurationChanging": "As definições da estratégia mudaram enquanto o relatório estava a ser criado. Tente novamente.",
     "securityNotFound": "Título não encontrado",
     "signalNotFound": "Sinal da estratégia não encontrado",
+    "signalStrategyMismatch": "Esse sinal pertence a outra estratégia.",
     "strategyNotFound": "Estratégia não encontrada"
   }
 }

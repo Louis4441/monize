@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Konto nicht gefunden",
+    "configurationChanging": "Die Strategieeinstellungen haben sich geändert, während der Bericht erstellt wurde. Bitte versuchen Sie es erneut.",
     "securityNotFound": "Wertpapier nicht gefunden",
     "signalNotFound": "Strategiesignal nicht gefunden",
+    "signalStrategyMismatch": "Dieses Signal gehört zu einer anderen Strategie.",
     "strategyNotFound": "Strategie nicht gefunden"
   }
 }

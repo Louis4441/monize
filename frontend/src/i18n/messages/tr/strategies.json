@@ -247,6 +247,7 @@
       "executedNotApplicable": "Yapılacak bir şey yok",
       "noChange": "Değişiklik yok",
       "changeTo": "şuna değişiyor",
+      "instrumentUnavailable": "Enstrüman artık mevcut değil",
       "toggleDetails": "Değerlendirme ayrıntısını göster",
       "showAll": "Tüm geçmişi gör ({count})",
       "emptyTitle": "Henüz değerlendirme yok",

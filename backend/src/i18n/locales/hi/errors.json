@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "खाता नहीं मिला",
+    "configurationChanging": "रिपोर्ट बनते समय रणनीति सेटिंग्स बदल गईं। कृपया फिर से प्रयास करें।",
     "securityNotFound": "प्रतिभूति नहीं मिली",
     "signalNotFound": "रणनीति संकेत नहीं मिला",
+    "signalStrategyMismatch": "वह सिग्नल किसी दूसरी रणनीति का है।",
     "strategyNotFound": "रणनीति नहीं मिली"
   }
 }

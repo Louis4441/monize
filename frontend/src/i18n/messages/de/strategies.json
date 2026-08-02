@@ -247,6 +247,7 @@
       "executedNotApplicable": "Nichts zu tun",
       "noChange": "Keine Änderung",
       "changeTo": "wechselt zu",
+      "instrumentUnavailable": "Instrument nicht mehr verfügbar",
       "toggleDetails": "Auswertungsdetails anzeigen",
       "showAll": "Vollständigen Verlauf ansehen ({count})",
       "emptyTitle": "Noch keine Auswertungen",

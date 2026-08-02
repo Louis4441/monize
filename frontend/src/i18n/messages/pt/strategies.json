@@ -247,6 +247,7 @@
       "executedNotApplicable": "Nada a fazer",
       "noChange": "Sem alteração",
       "changeTo": "muda para",
+      "instrumentUnavailable": "Instrumento já não disponível",
       "toggleDetails": "Mostrar o detalhe da avaliação",
       "showAll": "Ver o histórico completo ({count})",
       "emptyTitle": "Ainda sem avaliações",

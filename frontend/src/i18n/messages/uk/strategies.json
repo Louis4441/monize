@@ -247,6 +247,7 @@
       "executedNotApplicable": "Нічого не потрібно",
       "noChange": "Без змін",
       "changeTo": "змінюється на",
+      "instrumentUnavailable": "Інструмент більше недоступний",
       "toggleDetails": "Показати деталі оцінювання",
       "showAll": "Дивитися всю історію ({count})",
       "emptyTitle": "Оцінювань ще немає",

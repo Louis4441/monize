@@ -247,6 +247,7 @@
       "executedNotApplicable": "Tidak ada yang perlu dilakukan",
       "noChange": "Tidak berubah",
       "changeTo": "berubah menjadi",
+      "instrumentUnavailable": "Instrumen tidak lagi tersedia",
       "toggleDetails": "Tampilkan detail evaluasi",
       "showAll": "Lihat riwayat lengkap ({count})",
       "emptyTitle": "Belum ada evaluasi",

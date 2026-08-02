@@ -247,6 +247,7 @@
       "executedNotApplicable": "Ничего не требуется",
       "noChange": "Без изменений",
       "changeTo": "меняется на",
+      "instrumentUnavailable": "Инструмент больше недоступен",
       "toggleDetails": "Показать детали оценки",
       "showAll": "Смотреть всю историю ({count})",
       "emptyTitle": "Оценок пока нет",

@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "找不到帳戶",
+    "configurationChanging": "產生報告時策略設定已變更。請重試。",
     "securityNotFound": "找不到證券",
     "signalNotFound": "找不到策略訊號",
+    "signalStrategyMismatch": "該訊號屬於另一個策略。",
     "strategyNotFound": "找不到策略"
   }
 }

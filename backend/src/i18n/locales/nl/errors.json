@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Rekening niet gevonden",
+    "configurationChanging": "De strategie-instellingen zijn gewijzigd terwijl het rapport werd opgebouwd. Probeer het opnieuw.",
     "securityNotFound": "Effect niet gevonden",
     "signalNotFound": "Strategiesignaal niet gevonden",
+    "signalStrategyMismatch": "Dat signaal hoort bij een andere strategie.",
     "strategyNotFound": "Strategie niet gevonden"
   }
 }

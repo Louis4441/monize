@@ -247,6 +247,7 @@
       "executedNotApplicable": "कुछ करने की आवश्यकता नहीं",
       "noChange": "कोई परिवर्तन नहीं",
       "changeTo": "में बदलता है",
+      "instrumentUnavailable": "उपकरण अब उपलब्ध नहीं है",
       "toggleDetails": "मूल्यांकन का विवरण दिखाएँ",
       "showAll": "पूरा इतिहास देखें ({count})",
       "emptyTitle": "अभी कोई मूल्यांकन नहीं",

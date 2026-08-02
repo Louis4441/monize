@@ -247,6 +247,7 @@
       "executedNotApplicable": "対応不要",
       "noChange": "変更なし",
       "changeTo": "から変更",
+      "instrumentUnavailable": "この銘柄は現在利用できません",
       "toggleDetails": "評価の詳細を表示",
       "showAll": "全履歴を見る（{count}）",
       "emptyTitle": "評価はまだありません",

@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "Hesap bulunamadı",
+    "configurationChanging": "Rapor oluşturulurken strateji ayarları değişti. Lütfen tekrar deneyin.",
     "securityNotFound": "Menkul kıymet bulunamadı",
     "signalNotFound": "Strateji sinyali bulunamadı",
+    "signalStrategyMismatch": "Bu sinyal başka bir stratejiye ait.",
     "strategyNotFound": "Strateji bulunamadı"
   }
 }
