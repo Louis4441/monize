@@ -111,8 +111,41 @@ export function GemStrategyReport() {
   } = useReportData<GemStrategyReportData>(
     () => gemStrategyApi.getReport(range, strategyId),
     [range, strategyId],
-    { requestKey },
+    {
+      requestKey,
+      // The report is a report of whichever scenario came back, which is not
+      // always the one asked for: a scenario deleted in another tab makes the
+      // server fall back to the user's default rather than answer with an
+      // unconfigured page. Keyed by the request, the page then held A's report
+      // under B's selection and every action it offered was aimed at the pair
+      // -- `markExecuted` sent A's signal id with `strategyId=B`, which the
+      // server refuses, and nothing on screen could get back to a good state.
+      keyForResult: (report) =>
+        report.strategy.id ? `${range}|${report.strategy.id}` : null,
+    },
   );
+
+  /**
+   * Move the selection onto the scenario the report actually describes.
+   *
+   * During render rather than in an effect, per the project's
+   * `react-hooks/set-state-in-effect` rule: this is state derived from what
+   * has just been loaded, and React re-renders before committing, so the pair
+   * is never painted disagreeing. Idempotent -- once the two agree the branch
+   * stops firing -- and it cannot fight a load in flight, because `dataKey` is
+   * only stamped when one commits.
+   *
+   * It also settles the ordinary first load, where the selection starts unset
+   * and the server picks. Leaving it unset there was what let the page build
+   * mutation keys out of two different namespaces.
+   */
+  if (
+    data?.strategy.id &&
+    data.strategy.id !== strategyId &&
+    dataKey === `${range}|${data.strategy.id}`
+  ) {
+    setStrategyId(data.strategy.id);
+  }
 
   /**
    * True while what is rendered does not describe the current selection.
@@ -290,6 +323,23 @@ export function GemStrategyReport() {
    * dialog was protecting.
    */
   const navigateAfterSave = useRef<(() => void) | null>(null);
+
+  /**
+   * The dialog's "Save" was answered by a form that refused to submit.
+   *
+   * Nothing went to the server, so nothing is coming back to run the action
+   * the dialog staged -- and leaving it armed is not merely useless, it is
+   * dangerous: `pendingNavigation` can be a scenario *deletion*, and it would
+   * have fired on whatever the user's next successful save happened to be,
+   * long after they had stopped asking for it.
+   *
+   * The edits and their validation errors stay exactly where they are. Only
+   * the staged action is dropped, because the user has to answer the dialog
+   * again once the form is valid.
+   */
+  const handleInvalidSettingsSubmit = useCallback(() => {
+    navigateAfterSave.current = null;
+  }, []);
 
   const guarded = useCallback(
     (action: () => void) => () => {
@@ -592,6 +642,7 @@ export function GemStrategyReport() {
               onDirtyChange={setSettingsDirty}
               submitRef={submitSettings}
               onSavingChange={handleSettingsSaving}
+              onInvalidSubmit={handleInvalidSettingsSubmit}
             />
           )}
         </div>

@@ -17,6 +17,7 @@ import { ScheduledTransactionLoanService } from "@/scheduled-transactions/schedu
 import type { TypeOrmModuleOptions } from "@nestjs/typeorm";
 import * as bcrypt from "bcryptjs";
 import { applyRlsPolicies } from "./rls-setup";
+import { settlePendingPriceWrites } from "@/securities/security-price.service";
 
 /**
  * Shared PostgreSQL connection options for integration suites. Specs that need
@@ -149,6 +150,18 @@ export async function cleanTables(
   dataSource: DataSource,
   tableNames: string[],
 ): Promise<void> {
+  // Creating a security or an investment transaction starts a price fetch that
+  // nobody awaits, and the write it eventually makes has outlived the request
+  // that caused it. Truncating `securities ... CASCADE` underneath one takes
+  // the same locks in the opposite order -- a deadlock reported against
+  // whichever spec happened to be running -- and when the truncate wins
+  // instead, the insert fails as an orphan foreign key. Both look like a bug
+  // in the test rather than in its housekeeping.
+  //
+  // So the tables are only emptied once the database is quiet. This waits on
+  // work that has started, not on a duration, so it costs nothing when there
+  // is none.
+  await settlePendingPriceWrites();
   const tables = tableNames.join(", ");
   await dataSource.query(`TRUNCATE ${tables} CASCADE`);
 }

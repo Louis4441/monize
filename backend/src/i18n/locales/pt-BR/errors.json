@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "A conta deve ser do tipo INVESTMENT",
     "securityIdRequired": "O ID do título é obrigatório para transações de {{ action }}",
     "splitRatioRequired": "O índice de desdobramento (quantidade) deve ser maior que zero",
+    "acquisitionPriceRequired": "É necessário um preço por cota maior que zero para transações {{ action }}. Use ADD_SHARES para cotas adquiridas sem um custo conhecido.",
     "cannotHoldSecurities": "{{ label }} não pode deter títulos",
     "sourceDestMustDiffer": "As contas de origem e destino devem ser diferentes",
     "bothAccountsMustBeInvestment": "Ambas as contas devem ser do tipo INVESTMENT",

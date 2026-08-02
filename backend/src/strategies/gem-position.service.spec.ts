@@ -541,6 +541,35 @@ describe("GemPositionService", () => {
     expect(result.action?.estimatedTax).toBeNull();
   });
 
+  it("taxes the gain over a basis carried through a transfer", async () => {
+    // The reviewed numerical case, at the end of the chain that produces it:
+    // 10 shares bought for USD 100 when USD/PLN was 3.00 (PLN 3,000), moved
+    // to another account, now worth USD 110 at 4.00.
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        cost_basis: "1000",
+        currency_code: "USD",
+        account_quantities: { "acct-1": "10" },
+      },
+    ];
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([["acct-1:sec-spy", lot(10, 3000, null, "PLN")]]),
+    );
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 110]]));
+    exchangeRates.getLatestRate.mockResolvedValue(4);
+
+    const result = await build({ currencyCode: "PLN" });
+
+    expect(result.position?.totalMarketValue).toBeCloseTo(4400, 2);
+    expect(result.action?.realizedGainLoss).toBeCloseTo(1400, 2);
+    // 19% of 1,400. Rebuilding the basis from the transfer's own row gave
+    // PLN 1,000, a gain of 3,400 and a tax of 646.
+    expect(result.action?.estimatedTax).toBeCloseTo(266, 2);
+  });
+
   it("accepts a replay that reproduces the position exactly", async () => {
     holdingRows = [
       {
@@ -682,22 +711,32 @@ describe("GemPositionService", () => {
     expect(result.action?.realizedGainLoss).toBeNull();
   });
 
-  it("will not guess a cost basis held in another currency than the report", async () => {
-    // The per-transaction rate translated each purchase into the *account's*
-    // currency. Converting that multi-year aggregate into the report currency
-    // would need a rate that does not exist, and today's is the wrong answer
-    // this whole change exists to avoid.
-    accountCurrencyRows = [{ id: "acct-1", currency_code: "EUR" }];
+  /**
+   * Invariant: the lot's own currency decides whether its basis is usable.
+   * Canonical adversarial input: three currencies in one position (testing
+   * contract, currency conversion).
+   * Minimal mutation: restore the
+   * `currencyByAccount.get(accountId) !== currencyCode` guard.
+   * Test that fails under it: this one -- a known basis reported as unknown.
+   */
+  it("accepts a lot in the report currency held in an account denominated in another", async () => {
+    // The brokerage keeps its books in USD; the purchases were funded from a
+    // PLN account, so `exchangeRate` produced PLN and the replay says PLN.
+    // The report is in PLN too, which makes this basis directly usable -- the
+    // holding account's currency is a fact about the account, not about what
+    // the shares cost.
+    accountCurrencyRows = [{ id: "acct-1", currency_code: "USD" }];
     portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", lot(51, 15000)]]),
+      new Map([["acct-1:sec-spy", lot(51, 15000, null, "PLN")]]),
     );
+    exchangeRates.getLatestRate.mockResolvedValue(4);
 
-    const result = await build();
+    const result = await build({ currencyCode: "PLN" });
 
-    expect(result.action?.realizedGainLoss).toBeNull();
-    expect(result.action?.estimatedTax).toBeNull();
-    // The market value is still knowable: it is a price today, not a history.
-    expect(result.position?.totalMarketValue).toBeCloseTo(23076.225, 3);
+    // 51 x 452.475 USD at 4.00 = 92,304.90 PLN against a 15,000 PLN basis.
+    expect(result.position?.totalMarketValue).toBeCloseTo(92304.9, 2);
+    expect(result.action?.realizedGainLoss).toBeCloseTo(77304.9, 2);
+    expect(result.action?.estimatedTax).toBeCloseTo(14687.93, 1);
   });
 
   it("falls back to the inverse rate", async () => {

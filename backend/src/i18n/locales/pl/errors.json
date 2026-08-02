@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Konto musi być typu INVESTMENT",
     "securityIdRequired": "Identyfikator papieru wartościowego jest wymagany dla transakcji {{ action }}",
     "splitRatioRequired": "Współczynnik splitu (ilość) musi być większy od zera",
+    "acquisitionPriceRequired": "Transakcje {{ action }} wymagają ceny za jednostkę większej od zera. W przypadku udziałów nabytych bez znanego kosztu użyj ADD_SHARES.",
     "cannotHoldSecurities": "{{ label }} nie może przechowywać papierów wartościowych",
     "sourceDestMustDiffer": "Konto źródłowe i docelowe muszą być różne",
     "bothAccountsMustBeInvestment": "Oba konta muszą być typu INVESTMENT",

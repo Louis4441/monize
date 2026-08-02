@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Tài khoản phải là loại ĐẦU TƯ",
     "securityIdRequired": "ID chứng khoán là bắt buộc cho giao tác {{ action }}",
     "splitRatioRequired": "Tỷ lệ chia (số lượng) phải lớn hơn không",
+    "acquisitionPriceRequired": "Giao dịch {{ action }} yêu cầu giá mỗi cổ phiếu lớn hơn 0. Hãy dùng ADD_SHARES cho cổ phiếu có được mà không biết giá vốn.",
     "cannotHoldSecurities": "{{ label }} không thể nắm giữ chứng khoán",
     "sourceDestMustDiffer": "Tài khoản nguồn và đích phải khác nhau",
     "bothAccountsMustBeInvestment": "Cả hai tài khoản phải là loại ĐẦU TƯ",

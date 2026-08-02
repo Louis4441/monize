@@ -126,24 +126,6 @@ export class GemPositionService {
     private portfolioCalculation: PortfolioCalculationService,
   ) {}
 
-  /** Currency each strategy account keeps its books in. */
-  private async accountCurrencies(
-    userId: string,
-    accountIds: string[],
-  ): Promise<Map<string, string>> {
-    if (accountIds.length === 0) return new Map();
-    const rows: Array<{ id: string; currency_code: string }> =
-      await withScopedDb(this.dataSource, (manager) =>
-        manager.query(
-          `SELECT a.id, a.currency_code
-             FROM accounts a
-            WHERE a.id = ANY($1::uuid[]) AND a.user_id = $2`,
-          [accountIds, userId],
-        ),
-      );
-    return new Map(rows.map((row) => [row.id, row.currency_code]));
-  }
-
   /**
    * Everything held in the strategy's accounts, summed per security across
    * them. Not filtered to the strategy's own instruments: GEM wants the whole
@@ -452,24 +434,27 @@ export class GemPositionService {
   private historicalCostBasis(params: {
     holding: AggregatedHolding;
     accountCostBases: Map<string, ReplayedLot>;
-    currencyByAccount: Map<string, string>;
     currencyCode: string;
   }): number | null {
-    const { holding, accountCostBases, currencyByAccount, currencyCode } =
-      params;
+    const { holding, accountCostBases, currencyCode } = params;
     if (holding.costBasis === null) return null;
     let total = 0;
     for (const accountId of holding.accountIds) {
-      if (currencyByAccount.get(accountId) !== currencyCode) return null;
       const lot = accountCostBases.get(`${accountId}:${holding.securityId}`);
       if (lot === undefined || !lot.basisKnown) return null;
-      // The lot's own currency, not the holding account's. The two differ
-      // whenever the brokerage settles through a linked cash account or the
-      // purchase was funded from elsewhere, because that is the account
-      // `exchangeRate` converted into. Adding a EUR basis to a PLN market
-      // value reported the FX difference as gain and then taxed it. There is
-      // no rate to rescue this with: converting at today's would answer a
-      // question about today, and the acquisition happened at its own.
+      // The lot's own currency, and only the lot's.
+      //
+      // The holding *account's* currency used to be checked here as well, and
+      // it is not evidence about the basis: `exchangeRate` converts a trade
+      // into whichever account paid for it, so a USD brokerage funded from a
+      // PLN account holds a PLN basis that this rejected out of hand -- a
+      // known cost reported as unknowable, and the gain and tax with it. Once
+      // the lot states its own currency the account's is simply a different
+      // fact about a different thing.
+      //
+      // A mismatch here is still unknown rather than converted: today's rate
+      // would answer a question about today, and the acquisition happened at
+      // its own.
       if (lot.currencyCode !== currencyCode) return null;
       const held = holding.quantityByAccount.get(accountId);
       if (held === undefined) return null;
@@ -562,11 +547,6 @@ export class GemPositionService {
         userId,
         accounts.map((account) => account.id),
       );
-    const currencyByAccount = await this.accountCurrencies(
-      userId,
-      accounts.map((account) => account.id),
-    );
-
     const rateCache = new Map<string, number | null>();
     const valued: GemHolding[] = [];
     for (const holding of aggregated) {
@@ -584,7 +564,6 @@ export class GemPositionService {
       const costBasis = this.historicalCostBasis({
         holding,
         accountCostBases,
-        currencyByAccount,
         currencyCode,
       });
       valued.push({

@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Akun harus bertipe INVESTMENT",
     "securityIdRequired": "ID sekuritas diperlukan untuk transaksi {{ action }}",
     "splitRatioRequired": "Rasio pemecahan (kuantitas) harus lebih dari nol",
+    "acquisitionPriceRequired": "Harga per lembar wajib diisi dan harus lebih besar dari nol untuk transaksi {{ action }}. Gunakan ADD_SHARES untuk saham yang diperoleh tanpa biaya yang diketahui.",
     "cannotHoldSecurities": "{{ label }} tidak dapat menyimpan sekuritas",
     "sourceDestMustDiffer": "Akun sumber dan tujuan harus berbeda",
     "bothAccountsMustBeInvestment": "Kedua akun harus bertipe INVESTMENT",

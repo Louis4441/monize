@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "口座は INVESTMENT タイプでなければなりません",
     "securityIdRequired": "{{ action }} 取引には有価証券IDが必要です",
     "splitRatioRequired": "株式分割比率（数量）はゼロより大きくなければなりません",
+    "acquisitionPriceRequired": "{{ action }} 取引には 0 より大きい 1 株あたりの価格が必要です。取得原価が不明な株式には ADD_SHARES を使用してください。",
     "cannotHoldSecurities": "{{ label }} は有価証券を保有できません",
     "sourceDestMustDiffer": "ソース口座と振替先口座は異なる必要があります",
     "bothAccountsMustBeInvestment": "両方の口座は INVESTMENT タイプでなければなりません",

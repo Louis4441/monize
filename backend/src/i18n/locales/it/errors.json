@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Il conto deve essere di tipo INVESTMENT",
     "securityIdRequired": "L'ID titolo è obbligatorio per le transazioni {{ action }}",
     "splitRatioRequired": "Il rapporto di suddivisione (quantità) deve essere maggiore di zero",
+    "acquisitionPriceRequired": "Per le transazioni {{ action }} è richiesto un prezzo per quota maggiore di zero. Usa ADD_SHARES per le quote acquisite senza un costo noto.",
     "cannotHoldSecurities": "{{ label }} non può detenere titoli",
     "sourceDestMustDiffer": "I conti di origine e destinazione devono essere diversi",
     "bothAccountsMustBeInvestment": "Entrambi i conti devono essere di tipo INVESTMENT",

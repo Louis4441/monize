@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "科目類型必須為 INVESTMENT",
     "securityIdRequired": "{{ action }} 交易需要證券 ID",
     "splitRatioRequired": "分割比例（數量）必須大於零",
+    "acquisitionPriceRequired": "{{ action }} 交易需要填寫每股價格，且必須大於零。對於成本未知的股份，請使用 ADD_SHARES。",
     "cannotHoldSecurities": "{{ label }} 無法持有證券",
     "sourceDestMustDiffer": "來源和目的科目必須不同",
     "bothAccountsMustBeInvestment": "兩個科目的類型都必須為 INVESTMENT",

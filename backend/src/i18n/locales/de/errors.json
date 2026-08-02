@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Konto muss vom Typ INVESTMENT sein",
     "securityIdRequired": "Wertpapier-ID ist für {{ action }}-Buchungen erforderlich",
     "splitRatioRequired": "Teilungsverhältnis (Menge) muss größer als null sein",
+    "acquisitionPriceRequired": "Für {{ action }}-Transaktionen ist ein Preis pro Anteil erforderlich, der größer als null sein muss. Verwenden Sie ADD_SHARES für Anteile, deren Kosten nicht bekannt sind.",
     "cannotHoldSecurities": "{{ label }} kann keine Wertpapiere halten",
     "sourceDestMustDiffer": "Quell- und Zielkonto müssen verschieden sein",
     "bothAccountsMustBeInvestment": "Beide Konten müssen vom Typ INVESTMENT sein",

@@ -115,6 +115,7 @@ describe("GemStrategyReport", () => {
 
   it("requests the 1Y range first and refetches when the range changes", async () => {
     await renderReport();
+    // The first read leaves the scenario to the server.
     expect(mockGetReport).toHaveBeenCalledWith("1Y", undefined);
 
     await act(async () => {
@@ -122,7 +123,11 @@ describe("GemStrategyReport", () => {
         screen.getByRole("button", { name: "MAX", pressed: false }),
       );
     });
-    expect(mockGetReport).toHaveBeenLastCalledWith("MAX", undefined);
+    // ...and every read after it names the scenario that came back. An unset
+    // selection means "whichever the server picks", and asking that a second
+    // time is a different question: if the report on screen has since been
+    // deleted, the range change would silently move the user to another one.
+    expect(mockGetReport).toHaveBeenLastCalledWith("MAX", "strategy-1");
     expect(screen.getByRole("button", { name: "MAX" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -156,7 +161,13 @@ describe("GemStrategyReport", () => {
       fireEvent.click(screen.getByRole("button", { name: /Mark as executed/ }));
     });
 
-    expect(mockMarkExecuted).toHaveBeenCalledWith("signal-1", "1Y", undefined);
+    // The scenario is named, not left to the server to pick again: the id and
+    // the signal have to describe the same report.
+    expect(mockMarkExecuted).toHaveBeenCalledWith(
+      "signal-1",
+      "1Y",
+      "strategy-1",
+    );
     expect(mockToastSuccess).toHaveBeenCalledWith(
       "Operation marked as executed.",
     );
@@ -341,6 +352,64 @@ describe("GemStrategyReport", () => {
         fireEvent.click(screen.getByRole("button", { name: label }));
       });
     };
+
+    /**
+     * Invariant: the page's selection is whatever the report it is showing
+     * actually describes.
+     * Canonical adversarial input: the server answering a different question
+     * from the one asked (testing contract, asynchronous / ownership).
+     * Minimal mutation: drop `keyForResult` from the `useReportData` options,
+     * so the fallback report is stamped with the key it was requested under.
+     * Test that fails under it: this one -- the mutation goes out naming the
+     * scenario that no longer exists.
+     */
+    it("moves the selection onto the scenario the server fell back to", async () => {
+      // Two scenarios, B selected.
+      const withBoth = (id: string) => {
+        const report = gemReport();
+        report.strategy = { ...report.strategy, id, name: id };
+        report.strategies = [
+          { id: "strategy-1", name: "strategy-1" },
+          { id: "strategy-2", name: "strategy-2" },
+        ];
+        return report;
+      };
+      mockGetReport.mockResolvedValue(withBoth("strategy-2"));
+      await renderReport();
+      // The first read settles the selection on what came back, so the page is
+      // now explicitly on B rather than on "whichever the server picks".
+      expect(mockGetReport).toHaveBeenCalledWith("1Y", undefined);
+
+      // B is deleted elsewhere, so the next read asks for B and gets A.
+      const loadsBefore = mockGetReport.mock.calls.length;
+      mockGetReport.mockResolvedValue(withBoth("strategy-1"));
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "3M", pressed: false }),
+        );
+      });
+      await act(async () => {});
+
+      // The range change asked for the scenario that is gone...
+      expect(mockGetReport).toHaveBeenCalledWith("3M", "strategy-2");
+      // ...and the fallback it got is on screen, with the selection moved onto
+      // it: one read for the range change, and no second one chasing B.
+      expect(mockGetReport.mock.calls.length).toBe(loadsBefore + 1);
+
+      // And the action it offers names A, not the B that was asked for. Sent
+      // as A's signal under B's id the server refuses the pair outright.
+      mockMarkExecuted.mockResolvedValue(withBoth("strategy-1"));
+      await act(async () => {
+        fireEvent.click(
+          screen.getAllByRole("button", { name: /Mark as executed/ })[0],
+        );
+      });
+      expect(mockMarkExecuted).toHaveBeenCalledWith(
+        "signal-1",
+        "3M",
+        "strategy-1",
+      );
+    });
 
     it("will not mark a signal while the newly selected range is still loading", async () => {
       await renderReport();
@@ -837,6 +906,140 @@ describe("GemStrategyReport", () => {
           screen.getByRole("button", { name: "New scenario" }),
         ).not.toBeDisabled(),
       );
+    });
+
+    /**
+     * Invariant: an action staged behind the unsaved-changes dialog only ever
+     * runs for the save it was staged for.
+     * Canonical adversarial input: a rejected command followed by a valid one
+     * (testing contract, concurrency / ownership).
+     * Minimal mutation: go back to `handleSubmit(onSubmit)` with no invalid
+     * branch, so the form refuses silently and nothing disarms.
+     * Test that fails under it: this one -- the scenario is deleted by a save
+     * the user made minutes later for an unrelated reason.
+     */
+    it("drops a deferred delete when the form refuses to submit", async () => {
+      // The delete control only appears with a second scenario to fall back
+      // to, so the fixture has to carry one.
+      const twoScenarios = gemReport();
+      twoScenarios.strategies = [
+        { id: "strategy-1", name: "GEM" },
+        { id: "strategy-2", name: "IKZE" },
+      ];
+      mockGetReport.mockResolvedValue(twoScenarios);
+      mockUpdateConfig.mockResolvedValue(twoScenarios);
+      mockDeleteStrategy.mockResolvedValue(twoScenarios);
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+
+      // Dirty the form and then make it invalid: the momentum window is
+      // required and bounded, so an empty one cannot be saved.
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Momentum window (months)"), {
+          target: { value: "" },
+        });
+      });
+
+      // Ask to delete the scenario; the dirty form defers it behind the
+      // dialog, and the user answers "Save".
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "Delete scenario" }),
+        );
+      });
+      await act(async () => {
+        const confirm = screen
+          .getAllByRole("button", { name: /^Delete/ })
+          .at(-1) as HTMLElement;
+        fireEvent.click(confirm);
+      });
+      await act(async () => {
+        fireEvent.click(dialogSave());
+      });
+      await act(async () => {});
+
+      // The save never reached the server, so nothing was deleted...
+      expect(mockUpdateConfig).not.toHaveBeenCalled();
+      expect(mockDeleteStrategy).not.toHaveBeenCalled();
+      // ...and the edits are still on screen to be corrected.
+      expect(screen.getByLabelText("Evaluation frequency")).toBeInTheDocument();
+
+      // Correct the field and save for real. The delete must not ride along.
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Momentum window (months)"), {
+          target: { value: "6" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+      });
+      await act(async () => {});
+
+      expect(mockUpdateConfig).toHaveBeenCalledTimes(1);
+      expect(mockDeleteStrategy).not.toHaveBeenCalled();
+    });
+
+    it("drops a deferred tab change when the form refuses to submit", async () => {
+      // The same rule for the harmless half: a navigation the user was never
+      // told happened is still a navigation they did not ask for now.
+      mockUpdateConfig.mockResolvedValue(gemReport());
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Momentum window (months)"), {
+          target: { value: "" },
+        });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+      await act(async () => {
+        fireEvent.click(dialogSave());
+      });
+      await act(async () => {});
+
+      // Still on Settings, with the errors visible.
+      expect(screen.getByLabelText("Evaluation frequency")).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Momentum window (months)"), {
+          target: { value: "6" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+      });
+      await act(async () => {});
+
+      // The save succeeded and the page stayed put: the tab change belonged to
+      // a dialog the user answered a while ago and never got to complete.
+      expect(mockUpdateConfig).toHaveBeenCalledTimes(1);
+      expect(screen.getByLabelText("Evaluation frequency")).toBeInTheDocument();
     });
 
     it("creates the scenario with the name it was given once the edits are discarded", async () => {

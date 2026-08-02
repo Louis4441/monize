@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Рахунок має бути типу INVESTMENT",
     "securityIdRequired": "Ідентифікатор цінного паперу обов'язковий для операцій {{ action }}",
     "splitRatioRequired": "Коефіцієнт дроблення (кількість) має бути більше нуля",
+    "acquisitionPriceRequired": "Для операцій {{ action }} потрібна ціна за одиницю, більша за нуль. Для паперів, придбаних без відомої вартості, використовуйте ADD_SHARES.",
     "cannotHoldSecurities": "{{ label }} не може утримувати цінні папери",
     "sourceDestMustDiffer": "Рахунки-джерело та призначення мають бути різними",
     "bothAccountsMustBeInvestment": "Обидва рахунки мають бути типу INVESTMENT",

@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Счёт должен быть типа INVESTMENT",
     "securityIdRequired": "ID ценной бумаги обязателен для проводок {{ action }}",
     "splitRatioRequired": "Коэффициент дробления (количество) должен быть больше нуля",
+    "acquisitionPriceRequired": "Для операций {{ action }} требуется цена за единицу больше нуля. Для бумаг, приобретённых без известной стоимости, используйте ADD_SHARES.",
     "cannotHoldSecurities": "{{ label }} не может хранить ценные бумаги",
     "sourceDestMustDiffer": "Исходный и целевой счета должны быть разными",
     "bothAccountsMustBeInvestment": "Оба счёта должны быть типа INVESTMENT",

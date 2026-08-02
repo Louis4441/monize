@@ -295,6 +295,30 @@ cost (`HoldingsService.adjustQuantity` holds the per-share average fixed, the
 full rebuild holds the total fixed). A `SPLIT` is not in that class -- it
 scales units and preserves total cost, which is what both paths do.
 
+**An acquisition with no price is unknown, not free.** `price` is nullable, and
+the API refuses a `BUY` or `REINVEST` without a positive one -- shares that
+genuinely arrived without a cost are `ADD_SHARES`, which records that it does
+not know. A row stored at zero could not be told from a real free purchase, and
+the units still reconciled, so an incomplete import came out as a confident gain
+and a confident tax bill.
+
+**A basis is denominated where the money came from.** `exchangeRate` converts
+the trade into the account that paid for it -- the funding account, or the
+brokerage's linked cash account -- so a PLN brokerage funded from EUR carries a
+EUR basis. The lot states its own currency and the report compares that against
+the currency it is reporting in; the holding account's currency is a fact about
+the account, not about what the shares cost. A mismatch is unknown rather than
+converted, because today's rate answers a question about today.
+
+**A transfer moves cost with the shares.** `TRANSFER_OUT` releases basis at the
+running average and the paired `TRANSFER_IN` takes exactly that, in the source's
+currency, with its share of the acquisition commission already inside. A partial
+transfer splits the basis in the same proportion as the units, and the total
+across the pair is unchanged: a transfer creates no gain, no tax and no new
+acquisition. Where the source cannot price what it gave up -- or is not among
+the accounts being read -- the destination's basis is unknown, never rebuilt
+from the transfer row's own carried price and rate of 1.
+
 **A missing exchange rate is missing data, not a rate of 1.** A holding priced
 in a currency with no stored rate to the report currency -- in either direction
 -- has an unknown market value and an unknown cost basis, and the totals above

@@ -1356,6 +1356,7 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
   const lots = async (
     transactions: Array<Partial<InvestmentTransaction>>,
     accounts: Array<Record<string, unknown>> = usdAccounts,
+    requested: string[] = ["acct-1"],
   ) => {
     const txRepo = { find: jest.fn().mockResolvedValue(transactions) };
     // Two reads: the accounts asked for, then any linked cash account those
@@ -1376,7 +1377,7 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
       ],
       {},
     );
-    return service.calculateCostBasisLotsInAccountCurrency(userId, ["acct-1"]);
+    return service.calculateCostBasisLotsInAccountCurrency(userId, requested);
   };
 
   /**
@@ -1727,6 +1728,310 @@ describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", 
       expect(replayed.get("acct-1:sec-a")).toMatchObject({
         costBasis: 1000,
         currencyCode: "CAD",
+        basisKnown: true,
+      });
+    });
+  });
+  /**
+   * Invariant: a transfer moves shares and the cost they already carry. It is
+   * not a sale and not a new acquisition, so it creates no gain, no tax and no
+   * basis of its own.
+   * Canonical adversarial input: money crossing an account boundary between
+   * currencies (testing contract, currency conversion / ownership).
+   * Minimal mutation: treat TRANSFER_IN as an acquisition again -- basis
+   * `quantity * price * exchangeRate` off its own row.
+   * Test that fails under it: the first of these, which is the reviewed
+   * numerical case.
+   */
+  describe("cost carried across a transfer", () => {
+    /**
+     * A PLN-settling source and a PLN-settling destination, so the carried
+     * amount needs no conversion and the arithmetic below is about the basis
+     * rather than about a rate.
+     */
+    const plnPair = [
+      {
+        id: "acct-1",
+        currencyCode: "PLN",
+        accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+        linkedAccountId: null,
+      },
+      {
+        id: "acct-2",
+        currencyCode: "PLN",
+        accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+        linkedAccountId: null,
+      },
+    ];
+
+    const at = (day: number) => new Date(Date.UTC(2024, 0, day));
+
+    /** USD 100 a share bought when USD/PLN was 3.00: PLN 3,000 for ten. */
+    const sourceBuy = (overrides: Partial<InvestmentTransaction> = {}) =>
+      ({
+        id: "buy-1",
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-01",
+        createdAt: at(1),
+        quantity: 10,
+        price: 100,
+        commission: 0,
+        exchangeRate: 3,
+        ...overrides,
+      }) as InvestmentTransaction;
+
+    /**
+     * The two legs `transferSecurity` writes: same date, same `created_at`
+     * (one transaction, one statement timestamp), paired by
+     * `linkedTransactionId`, priced at the carried average with a rate of 1.
+     * Those last two are exactly what must *not* be used to rebuild the basis.
+     */
+    const legs = (quantity: number) =>
+      [
+        {
+          id: "out-1",
+          linkedTransactionId: "in-1",
+          accountId: "acct-1",
+          securityId: "sec-a",
+          action: InvestmentAction.TRANSFER_OUT,
+          transactionDate: "2024-02-01",
+          createdAt: at(2),
+          quantity,
+          price: 100,
+          commission: 0,
+          exchangeRate: 1,
+        },
+        {
+          id: "in-1",
+          linkedTransactionId: "out-1",
+          accountId: "acct-2",
+          securityId: "sec-a",
+          action: InvestmentAction.TRANSFER_IN,
+          transactionDate: "2024-02-01",
+          createdAt: at(2),
+          quantity,
+          price: 100,
+          commission: 0,
+          exchangeRate: 1,
+        },
+      ] as InvestmentTransaction[];
+
+    it("hands the destination the whole basis the source gave up", async () => {
+      const replayed = await lots([sourceBuy(), ...legs(10)], plnPair, [
+        "acct-1",
+        "acct-2",
+      ]);
+
+      // PLN 3,000, not the PLN 1,000 that `10 x 100 x 1` off the IN leg gives.
+      // Against a market value of PLN 4,400 that is 1,400 of gain and 266 of
+      // tax at 19%, where the wrong basis showed 3,400 and 646.
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        quantity: 10,
+        costBasis: 3000,
+        currencyCode: "PLN",
+        basisKnown: true,
+      });
+      // And the source kept nothing: it holds no shares and no cost.
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        quantity: 0,
+        costBasis: 0,
+      });
+    });
+
+    it("splits the basis in proportion on a partial transfer", async () => {
+      const replayed = await lots([sourceBuy(), ...legs(4)], plnPair, [
+        "acct-1",
+        "acct-2",
+      ]);
+
+      // Four of ten shares carry four tenths of the cost; six tenths stay.
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        quantity: 4,
+        costBasis: 1200,
+        currencyCode: "PLN",
+        basisKnown: true,
+      });
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        quantity: 6,
+        costBasis: 1800,
+        basisKnown: true,
+      });
+    });
+
+    it("carries the blended cost of several lots", async () => {
+      const replayed = await lots(
+        [
+          sourceBuy(),
+          sourceBuy({
+            id: "buy-2",
+            transactionDate: "2024-01-15",
+            createdAt: at(15),
+            quantity: 10,
+            price: 200,
+            exchangeRate: 3,
+          }),
+          ...legs(10),
+        ],
+        plnPair,
+        ["acct-1", "acct-2"],
+      );
+
+      // 3,000 + 6,000 over 20 shares is 450 a share; ten of them move.
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        quantity: 10,
+        costBasis: 4500,
+        basisKnown: true,
+      });
+      expect(replayed.get("acct-1:sec-a")).toMatchObject({
+        quantity: 10,
+        costBasis: 4500,
+      });
+    });
+
+    it("carries the acquisition commission inside the cost it moves", async () => {
+      const replayed = await lots(
+        [sourceBuy({ commission: 50 }), ...legs(5)],
+        plnPair,
+        ["acct-1", "acct-2"],
+      );
+
+      // (10 x 100 + 50) x 3 = 3,150 for ten shares. Half of them move with
+      // half the commission already inside the average.
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        quantity: 5,
+        costBasis: 1575,
+        basisKnown: true,
+      });
+    });
+
+    it("keeps an unknown source basis unknown at the destination", async () => {
+      const replayed = await lots(
+        [
+          sourceBuy(),
+          {
+            id: "add-1",
+            accountId: "acct-1",
+            securityId: "sec-a",
+            action: InvestmentAction.ADD_SHARES,
+            transactionDate: "2024-01-20",
+            createdAt: at(20),
+            quantity: 5,
+            price: null,
+            commission: 0,
+            exchangeRate: 1,
+          } as InvestmentTransaction,
+          ...legs(15),
+        ],
+        plnPair,
+        ["acct-1", "acct-2"],
+      );
+
+      // The source could not price its own position, so neither can whatever
+      // it hands on. Laundering it through a transfer must not make it known.
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        quantity: 15,
+        basisKnown: false,
+        basisGap: "transferred_basis_unknown",
+      });
+    });
+
+    it("refuses a basis whose source leg is outside the replay", async () => {
+      // The shares came from an account the caller did not ask about, so
+      // nothing here knows what they cost -- and the IN leg's own price is a
+      // carried average at a rate of 1, which is not an answer.
+      const replayed = await lots([legs(10)[1]], plnPair, ["acct-2"]);
+
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        quantity: 10,
+        basisKnown: false,
+        basisGap: "transferred_basis_unknown",
+      });
+    });
+
+    it("refuses to carry a basis into a differently settling account", async () => {
+      // The source's cost is in PLN and the destination settles in EUR. There
+      // is no rate for a multi-year aggregate, and today's would answer a
+      // different question, so the destination's basis is unknown rather than
+      // converted.
+      const mixed = [
+        plnPair[0],
+        {
+          id: "acct-2",
+          currencyCode: "EUR",
+          accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+          linkedAccountId: null,
+        },
+      ];
+      const replayed = await lots(
+        [
+          sourceBuy(),
+          {
+            id: "buy-eur",
+            accountId: "acct-2",
+            securityId: "sec-a",
+            action: InvestmentAction.BUY,
+            transactionDate: "2024-01-05",
+            createdAt: at(5),
+            quantity: 1,
+            price: 100,
+            commission: 0,
+            exchangeRate: 1,
+          } as InvestmentTransaction,
+          ...legs(10),
+        ],
+        mixed,
+        ["acct-1", "acct-2"],
+      );
+
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        basisKnown: false,
+        basisGap: "mixed_basis_currency",
+      });
+    });
+
+    it("does not let a transfer invent a basis the source never had", async () => {
+      // No history behind the shares being moved: the OUT leg draws nothing
+      // down, so the destination inherits nothing knowable rather than a cost
+      // of zero.
+      const replayed = await lots(legs(10), plnPair, ["acct-1", "acct-2"]);
+
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        basisKnown: false,
+        basisGap: "transferred_basis_unknown",
+      });
+    });
+
+    it("conserves the total basis across the pair", async () => {
+      // The whole point, stated as one sum: a transfer neither creates nor
+      // destroys cost. Anything else is a gain or a loss the user never made.
+      const replayed = await lots([sourceBuy(), ...legs(4)], plnPair, [
+        "acct-1",
+        "acct-2",
+      ]);
+
+      const source = replayed.get("acct-1:sec-a");
+      const destination = replayed.get("acct-2:sec-a");
+      expect(
+        (source?.costBasis ?? 0) + (destination?.costBasis ?? 0),
+      ).toBeCloseTo(3000, 4);
+      expect((source?.quantity ?? 0) + (destination?.quantity ?? 0)).toBe(10);
+    });
+
+    it("puts the OUT leg first even when the IN leg is read first", async () => {
+      // Both rows are written in one transaction, so `created_at` is identical
+      // and the SQL order between them is whatever the plan produces. Fed in
+      // the wrong order the replay must still see the source give the shares
+      // up before the destination receives them.
+      const [out, incoming] = legs(10);
+      const replayed = await lots([sourceBuy(), incoming, out], plnPair, [
+        "acct-1",
+        "acct-2",
+      ]);
+
+      expect(replayed.get("acct-2:sec-a")).toMatchObject({
+        costBasis: 3000,
         basisKnown: true,
       });
     });

@@ -38,7 +38,8 @@ const LIVE_FX_FETCH_CONCURRENCY = 6;
 export type ReplayedBasisGap =
   | "quantity_only_action"
   | "unpriced_acquisition"
-  | "mixed_basis_currency";
+  | "mixed_basis_currency"
+  | "transferred_basis_unknown";
 
 /** A position rebuilt from its transactions: what is held, and what it cost. */
 export interface ReplayedLot {
@@ -601,23 +602,45 @@ export class PortfolioCalculationService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Compute historical cost basis in each holding's account currency by
-   * walking the investment transaction history chronologically and applying
-   * each transaction's stored exchange rate.
+   * Historical cost basis per (account, security), rebuilt by walking the
+   * transaction history chronologically. Average cost, not FIFO: the whole
+   * application values a position at its blended average, and a second model
+   * here would disagree with everything it is displayed beside.
    *
-   * For BUY-like actions (BUY/REINVEST/TRANSFER_IN), cost basis increases by
-   * `(quantity * price + commission) * exchangeRate` — the amount actually
-   * spent in the settlement account's currency at that point in time,
-   * including what the acquisition itself cost.
+   * **Acquisition (BUY, REINVEST).** The basis grows by
+   * `(quantity × price + acquisition commission) × exchange rate`. The
+   * commission is inside it because it is part of what the shares cost, and
+   * inside the conversion because it was charged in the currency of the trade.
    *
-   * That currency is reported on the lot rather than assumed, and is **not**
-   * the holding account's: `exchangeRate` targets the funding or linked cash
-   * account. An acquisition with no price, or a lot whose acquisitions settled
-   * in more than one currency, has no basis this can state and says so.
+   * **Denomination.** `exchangeRate` converts out of the security's currency
+   * and into the *settlement* account's -- the funding account when the row
+   * names one, otherwise the brokerage's linked cash account, otherwise the
+   * brokerage itself. That is the currency the lot reports, and it is **not**
+   * necessarily the holding account's. A consumer compares `currencyCode`
+   * against the currency it is reporting in; a mismatch is unknown, never a
+   * conversion, because today's rate cannot answer a question about a
+   * historical purchase.
    *
-   * For SELL-like actions (SELL/TRANSFER_OUT), cost basis is reduced
-   * proportionally using the running average (cost / quantity) so that
-   * subsequent gains are calculated against the remaining shares.
+   * **Partial disposal (SELL, TRANSFER_OUT).** Basis is drawn down at the
+   * running average, so selling a third of a position releases a third of its
+   * cost and the remainder keeps the same per-share average.
+   *
+   * **Transfer (TRANSFER_OUT/TRANSFER_IN pair).** Not a disposal and not an
+   * acquisition: the destination takes exactly the basis the source released,
+   * in the source's currency, together with the share of the acquisition
+   * commission already blended into it. A partial transfer therefore splits
+   * the basis in the same proportion as the units, and the total across the
+   * pair is conserved. The legs are matched on `linkedTransactionId`, which
+   * `transferSecurity` writes on both.
+   *
+   * **Unknown propagates.** The basis is reported unknown -- with a
+   * `basisGap` naming which of these it was -- when the history contains an
+   * acquisition with no price (`unpriced_acquisition`), a quantity-only row
+   * that moved units without a cost (`quantity_only_action`), acquisitions
+   * that settled in two different currencies (`mixed_basis_currency`), or a
+   * transfer whose source leg is unpriced or outside the accounts being
+   * replayed (`transferred_basis_unknown`). Unknown never degrades to zero,
+   * and it survives being carried through a transfer.
    *
    * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) move units and carry no
    * price, so they leave the running cost alone and mark the lot's basis
@@ -681,6 +704,39 @@ export class PortfolioCalculationService {
       transactions,
     );
 
+    // Both legs of a transfer are written in one transaction, so `created_at`
+    // -- a statement timestamp -- is identical on the pair and the SQL order
+    // between them is whatever the plan happens to produce. The OUT leg has to
+    // be seen first, because it is what tells the IN leg what the shares cost.
+    // Only the two legs are reordered: the comparator returns 0 for everything
+    // else at the same instant, and `sort` is stable, so nothing else moves.
+    const legRank = (action: InvestmentAction): number =>
+      action === InvestmentAction.TRANSFER_OUT
+        ? -1
+        : action === InvestmentAction.TRANSFER_IN
+          ? 1
+          : 0;
+    const ordered = [...transactions].sort((a, b) => {
+      if (a.transactionDate !== b.transactionDate) {
+        return a.transactionDate < b.transactionDate ? -1 : 1;
+      }
+      const created = Number(a.createdAt) - Number(b.createdAt);
+      if (created !== 0) return created;
+      return legRank(a.action) - legRank(b.action);
+    });
+
+    /**
+     * What each `TRANSFER_OUT` released, for its paired `TRANSFER_IN` to take.
+     *
+     * Keyed by the OUT leg's id, which the IN leg names in
+     * `linkedTransactionId` -- durable pairing the schema already carries, set
+     * by `transferSecurity` on both rows.
+     */
+    const carriedByTransferOut = new Map<
+      string,
+      { amount: number; currencyCode: string | null; known: boolean }
+    >();
+
     const state = new Map<
       string,
       {
@@ -691,7 +747,7 @@ export class PortfolioCalculationService {
       }
     >();
 
-    for (const tx of transactions) {
+    for (const tx of ordered) {
       if (!tx.securityId) continue;
 
       const key = `${tx.accountId}:${tx.securityId}`;
@@ -709,9 +765,46 @@ export class PortfolioCalculationService {
       const quantity = Number(tx.quantity) || 0;
 
       switch (tx.action) {
-        case InvestmentAction.BUY:
-        case InvestmentAction.REINVEST:
+        // A transfer is neither a sale nor a purchase: the same shares change
+        // custody and keep whatever they cost. Treated as an acquisition
+        // priced at the carried average with `exchangeRate` 1 -- which is what
+        // `transferSecurity` writes on the row -- the replay rebuilt the basis
+        // out of a per-share figure in the *security's* currency and then
+        // labelled it with the destination's. Ten shares bought for PLN 3,000
+        // (USD 100 each at 3.00) arrived in a PLN account as a basis of 1,000,
+        // turning PLN 1,400 of real gain into 3,400 and PLN 266 of tax into
+        // 646, with the quantity reconciling perfectly throughout.
+        //
+        // So the destination takes the basis the source gave up, which the
+        // `TRANSFER_OUT` leg has already worked out at the running average --
+        // proportional for a partial transfer, and carrying the share of the
+        // acquisition commission that is in that average.
         case InvestmentAction.TRANSFER_IN: {
+          const carried = tx.linkedTransactionId
+            ? carriedByTransferOut.get(tx.linkedTransactionId)
+            : undefined;
+          entry.quantity += quantity;
+          if (carried === undefined || !carried.known) {
+            // The paired leg is out of this replay's scope -- a transfer in
+            // from an account the caller did not ask about -- or the source
+            // could not price the shares either. Either way this position's
+            // cost is not known here, and the destination's own row cannot
+            // supply it: its price is a carried average, not a market price,
+            // and its rate is 1 regardless of what the money actually did.
+            entry.basisGap ??= "transferred_basis_unknown";
+            break;
+          }
+          if (entry.currencyCode === null) {
+            entry.currencyCode = carried.currencyCode;
+          } else if (entry.currencyCode !== carried.currencyCode) {
+            entry.basisGap ??= "mixed_basis_currency";
+            break;
+          }
+          entry.costBasis += carried.amount;
+          break;
+        }
+        case InvestmentAction.BUY:
+        case InvestmentAction.REINVEST: {
           const exchangeRate = Number(tx.exchangeRate) || 1;
           // What the acquisition cost, which includes what it cost to
           // acquire. Leaving the commission out understates the basis and so
@@ -761,11 +854,37 @@ export class PortfolioCalculationService {
         }
         case InvestmentAction.SELL:
         case InvestmentAction.TRANSFER_OUT: {
+          let released = 0;
+          let releasedAll = false;
           if (entry.quantity > 0) {
             const avgCostPerShare = entry.costBasis / entry.quantity;
             const sellQty = Math.min(quantity, entry.quantity);
-            entry.costBasis -= sellQty * avgCostPerShare;
+            released = sellQty * avgCostPerShare;
+            releasedAll = sellQty >= quantity;
+            entry.costBasis -= released;
             entry.quantity -= sellQty;
+          }
+          if (tx.action === InvestmentAction.TRANSFER_OUT) {
+            // What the destination inherits. Recorded even when it is not
+            // knowable, so the paired leg can tell "the source gave up an
+            // unpriced position" from "the source is not in this replay at
+            // all" -- both unknown, but only the first is a fact this replay
+            // established.
+            //
+            // `releasedAll` guards the case where the source's history does
+            // not cover the units being moved: drawing down what there is and
+            // calling the remainder free would hand the destination a basis
+            // for a smaller position than it received, which is the same
+            // partial-history error the quantity reconciliation exists to
+            // catch, laundered through a transfer.
+            carriedByTransferOut.set(tx.id, {
+              amount: released,
+              currencyCode: entry.currencyCode,
+              known:
+                entry.basisGap === null &&
+                entry.currencyCode !== null &&
+                releasedAll,
+            });
           }
           break;
         }

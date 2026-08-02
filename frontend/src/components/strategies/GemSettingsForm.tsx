@@ -115,6 +115,19 @@ interface GemSettingsFormProps {
    * user had moved to B and be adopted as B's report.
    */
   onSavingChange?: (saving: boolean) => void;
+  /**
+   * Told when a submit was rejected by client-side validation, so it never
+   * reached the server.
+   *
+   * The parent's unsaved-changes dialog answers "Save" by arming the action
+   * the user was interrupted mid-way through -- a tab change, a scenario
+   * switch, a *deletion* -- and running this form's submitter. A submit that
+   * fails validation never calls `onSubmit`, so nothing cleared that armed
+   * action: it sat there and fired against whatever the next successful save
+   * happened to be, which for a delete means removing a scenario the user had
+   * stopped asking to remove.
+   */
+  onInvalidSubmit?: () => void;
 }
 
 /**
@@ -130,6 +143,7 @@ export function GemSettingsForm({
   onDirtyChange,
   submitRef,
   onSavingChange,
+  onInvalidSubmit,
 }: GemSettingsFormProps) {
   const t = useTranslations("strategies");
   const { roleLabel, roleDescription } = useGemLabels();
@@ -442,13 +456,25 @@ export function GemSettingsForm({
     );
   }
 
+  /**
+   * The submit the dialog's "Save" runs, and the branch it takes when the
+   * form refuses.
+   *
+   * `handleSubmit(onSubmit)` with no second argument silently does nothing on
+   * an invalid form -- correct for a form, wrong for a caller that has staged
+   * an action behind the save and is waiting to be told which way it went.
+   * The errors stay on screen either way; what changes is that the parent now
+   * hears about it and can disarm.
+   */
+  const submitOrReport = handleSubmit(onSubmit, () => onInvalidSubmit?.());
+
   // Handed to the parent so the unsaved-changes dialog's "save" runs this
   // form, rather than the parent reaching into react-hook-form itself.
-  if (submitRef) submitRef.current = handleSubmit(onSubmit);
+  if (submitRef) submitRef.current = submitOrReport;
 
   return (
     <>
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form onSubmit={submitOrReport} noValidate>
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <GemCard title={t("gem.settings.generalTitle")}>
             <div className="space-y-3">

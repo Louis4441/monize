@@ -58,7 +58,7 @@ interface UseReportDataResult<T> {
   dataKey: string | null;
 }
 
-export interface UseReportDataOptions {
+export interface UseReportDataOptions<T = unknown> {
   /**
    * Identity of the request the fetcher answers -- everything that selects
    * *what* is being loaded, not merely when. Supplying it makes the returned
@@ -66,6 +66,26 @@ export interface UseReportDataOptions {
    * to a selection the user has already left.
    */
   requestKey?: string;
+  /**
+   * The key a *response* belongs to, read off the response itself.
+   *
+   * A server may answer a different question from the one it was asked. Ask
+   * for a scenario that has since been deleted and the GEM report falls back
+   * to the user's default one -- deliberately, because an empty page is a
+   * worse answer. But the payload is then a report of A while the request that
+   * produced it named B, and stamping it with the key it was *started* for
+   * says the opposite: the page believes it is showing B, offers B's actions,
+   * and sends A's signal id under B's `strategyId` when one is used. The
+   * server rejects that pair, and the screen has no way back.
+   *
+   * Supplying this makes the response's own identity the authority. The key it
+   * returns is also remembered as adopted, so the caller moving its selection
+   * to match does not trigger a fetch for something already in hand.
+   *
+   * Return `null` to keep the started key -- the right answer when the
+   * response carries nothing that identifies it.
+   */
+  keyForResult?: (value: T) => string | null;
 }
 
 /**
@@ -82,7 +102,7 @@ export interface UseReportDataOptions {
 export function useReportData<T>(
   fetcher: () => Promise<T>,
   deps: DependencyList,
-  options: UseReportDataOptions = {},
+  options: UseReportDataOptions<T> = {},
 ): UseReportDataResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [dataKey, setDataKey] = useState<string | null>(null);
@@ -100,6 +120,11 @@ export function useReportData<T>(
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
 
+  // Same reasoning as the fetcher: read through a ref so redefining it inline
+  // does not become a fetch trigger.
+  const keyForResultRef = useRef(options.keyForResult);
+  keyForResultRef.current = options.keyForResult;
+
   const runIdRef = useRef(0);
 
   const run = useCallback(() => {
@@ -111,8 +136,21 @@ export function useReportData<T>(
       .current()
       .then((result) => {
         if (runId !== runIdRef.current) return;
+        // The response's own identity wins over the one it was asked for: the
+        // server may have answered a different question, and the payload is a
+        // report of what it says it is.
+        const settledFor =
+          keyForResultRef.current?.(result) ?? startedFor ?? null;
         setData(result);
-        setDataKey(startedFor ?? null);
+        setDataKey(settledFor);
+        // The caller is about to move its selection onto this key, which
+        // changes `deps`. Without this the effect would fetch again for the
+        // report already on screen -- and a failure of that superfluous read
+        // would replace a good result with an error.
+        adoptedKeyRef.current =
+          settledFor !== null && settledFor !== requestKeyRef.current
+            ? settledFor
+            : null;
         setError(null);
       })
       .catch((err: unknown) => {

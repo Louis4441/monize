@@ -3327,17 +3327,71 @@ describe("InvestmentTransactionsService", () => {
       );
     });
 
-    it("handles missing quantity and price for BUY (defaults to 0)", async () => {
+    /**
+     * Invariant: an omitted acquisition price is a missing fact, never a
+     * zero-cost purchase.
+     * Canonical adversarial input: a nullable money column left out of the
+     * request (testing contract, money precision / missing data).
+     * Minimal mutation: restore `price: createDto.price ?? 0` and drop the
+     * guard above it.
+     * Test that fails under it: this one -- the row is written at zero.
+     */
+    it("refuses a BUY with no price rather than recording a free purchase", async () => {
+      await expect(
+        service.create(userId, {
+          accountId,
+          securityId,
+          action: InvestmentAction.BUY,
+          transactionDate: "2025-01-15",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(investmentTransactionsRepository.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses a BUY priced at zero, which ADD_SHARES exists to record", async () => {
+      await expect(
+        service.create(userId, {
+          accountId,
+          securityId,
+          action: InvestmentAction.BUY,
+          transactionDate: "2025-01-15",
+          quantity: 10,
+          price: 0,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("stores no price at all for shares added without one", async () => {
+      // ADD_SHARES is the action for units whose cost is not known. It must
+      // persist that as null: written as 0 it is indistinguishable from a
+      // free acquisition, and the replay can no longer refuse to price it.
+      await service.create(userId, {
+        accountId,
+        securityId,
+        action: InvestmentAction.ADD_SHARES,
+        transactionDate: "2025-01-15",
+        quantity: 10,
+      });
+
+      expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ price: null, totalAmount: 0 }),
+      );
+    });
+
+    it("stores the price a valid BUY was given", async () => {
       await service.create(userId, {
         accountId,
         securityId,
         action: InvestmentAction.BUY,
         transactionDate: "2025-01-15",
+        quantity: 10,
+        price: 25,
+        commission: 5,
       });
 
-      // (0 * 0) + 0 = 0
       expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ totalAmount: 0 }),
+        expect.objectContaining({ price: 25, totalAmount: 255 }),
       );
     });
   });

@@ -362,6 +362,7 @@
     "securityIdRequired": "[XX-Security ID is required for {{ action }} transactions-XX]",
     "exchangeRateUnavailable": "[XX-Could not determine an exchange rate for {{ from }} -> {{ to }} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.-XX]",
     "splitRatioRequired": "[XX-Split ratio (quantity) must be greater than zero-XX]",
+    "acquisitionPriceRequired": "[XX-Price per share is required and must be greater than zero for {{ action }} transactions. Use ADD_SHARES for shares acquired without a known cost.-XX]",
     "ambiguousSecurity": "[XX-\"{{ query }}\" matches multiple securities: {{ list }}. Use the exact ticker symbol.-XX]",
     "allocationExceedsTotal": "[XX-Allocation percentages add up to more than 100%.-XX]",
     "assetOptionNameRequired": "[XX-An asset class name is required.-XX]",
