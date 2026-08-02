@@ -340,7 +340,10 @@ describe("GemPositionService", () => {
 
     const result = await build();
 
-    expect(result.position?.current?.marketValue).toBeNull();
+    // Nothing in the accounts can be valued, so there is no "largest
+    // position" to name either.
+    expect(result.position?.current).toBeNull();
+    expect(result.position?.holdings[0].marketValue).toBeNull();
     expect(result.position?.totalMarketValue).toBeNull();
     // Nothing is in the target, so the share held in it is 0% of a denominator
     // that is itself unknown -- unknown, not "0% of 1,000".
@@ -421,7 +424,11 @@ describe("GemPositionService", () => {
     expect(result.noPosition).toBe(true);
     expect(result.position?.current).toBeNull();
     expect(result.action?.required).toBe(true);
-    expect(result.action?.transferValue).toBeNull();
+    // Empty accounts move nothing, realize nothing and owe nothing. All three
+    // are known; `null` said they could not be worked out.
+    expect(result.action?.transferValue).toBe(0);
+    expect(result.action?.realizedGainLoss).toBe(0);
+    expect(result.action?.estimatedTax).toBe(0);
   });
 
   it("needs no operation once the accounts hold the target", async () => {
@@ -595,9 +602,11 @@ describe("GemPositionService", () => {
     const result = await build();
     // There is a position -- just none of it where the strategy wants it.
     expect(result.noPosition).toBe(false);
-    expect(result.position?.current?.symbol).toBe("FZD2050");
-    // Nothing here can be priced, so the share is unknown rather than zero --
-    // but holding something other than the target still calls for a switch.
+    expect(result.position?.holdings[0].symbol).toBe("FZD2050");
+    // Nothing here can be priced, so neither the share nor the largest
+    // position can be stated -- but holding something other than the target
+    // still calls for a switch.
+    expect(result.position?.current).toBeNull();
     expect(result.position?.exactTargetPercent).toBeNull();
     expect(result.action?.required).toBe(true);
   });

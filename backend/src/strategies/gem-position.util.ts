@@ -302,12 +302,30 @@ export function buildPositionMath(
   // unknown. Summing the priced part and labelling it the whole understates
   // the portfolio -- and it is what the backtest sizes its commission drag
   // against, so the error does not stay in one number.
+  //
+  // Empty accounts are the one case where the total is a known zero: holding
+  // nothing is not the same as not knowing what is held, and the contract's
+  // truth table is explicit that `0` and `null` must never stand in for each
+  // other. It reached the transfer card as "Amount to move: Unknown" for a
+  // portfolio that had been sold down to nothing, where the answer is nothing.
   const totalMarketValue =
-    unpricedCount === 0 && knownValues.length > 0
-      ? sumMoney(knownValues)
-      : null;
+    valued.length === 0
+      ? 0
+      : unpricedCount === 0
+        ? sumMoney(knownValues)
+        : null;
 
-  const current = valued[0] ?? null;
+  /**
+   * The largest holding, or null when that cannot be decided.
+   *
+   * The sort ranks an unpriced holding as zero, which is a convenience for
+   * ordering and a claim when the top of that list is printed as "largest
+   * position". A portfolio of VOO at 10,000 and 3,000 units of a fund with no
+   * price row admitted it could not be valued on one line and stated the
+   * largest position confidently on the next.
+   */
+  const current =
+    valued.length === 0 || unpricedCount > 0 ? null : (valued[0] ?? null);
 
   /**
    * The denominator both percentages are measured against: the securities.
@@ -423,13 +441,12 @@ export function buildPositionMath(
   // moves -- it is a smaller one, printed in the place the user reads to decide
   // how much cash the switch frees. One unpriced holding makes the figure
   // unknown, and the report says so rather than understating it.
+  // Nothing off target is nothing to move: a known zero, not an unknown.
   const transferValue = offTarget.some(
     (holding) => holding.marketValue === null,
   )
     ? null
-    : offTarget.length > 0
-      ? sumMoney(offTarget.map((holding) => holding.marketValue as number))
-      : null;
+    : sumMoney(offTarget.map((holding) => holding.marketValue as number));
 
   // Selling the position whole realizes the whole result on it -- pro-rating
   // this by the overlap understated the tax on exactly the switches where the
@@ -441,18 +458,22 @@ export function buildPositionMath(
   // the tax with it. A single sold position without a cost basis makes the
   // whole estimate unknown; a partial gain is not the gain that will be taxed.
   const realizedGainLoss =
-    sold.length > 0 &&
-    sold.every(
-      (holding) => holding.marketValue !== null && holding.costBasis !== null,
-    )
-      ? sumMoney(
-          sold.map(
+    sold.length === 0
+      ? // Nothing is sold, so nothing is realized -- whether the purchase is
+        // funded by cash, or there is nothing to do at all. Both are zero, and
+        // returning null for the second told a user with empty accounts that
+        // the tax on a switch moving nothing could not be worked out.
+        0
+      : sold.every(
             (holding) =>
-              (holding.marketValue as number) - (holding.costBasis as number),
-          ),
-        )
-      : sold.length === 0 && offTarget.length > 0
-        ? 0 // Nothing is sold -- a cash-funded purchase realizes nothing.
+              holding.marketValue !== null && holding.costBasis !== null,
+          )
+        ? sumMoney(
+            sold.map(
+              (holding) =>
+                (holding.marketValue as number) - (holding.costBasis as number),
+            ),
+          )
         : null;
 
   return {

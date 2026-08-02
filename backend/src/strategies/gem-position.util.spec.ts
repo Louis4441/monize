@@ -65,7 +65,9 @@ describe("gem-position.util", () => {
       // Both rows are the target instrument, in two accounts.
       expect(math.exactTargetPercent).toBe(100);
       expect(math.changeRequired).toBe(false);
-      expect(math.transferValue).toBeNull();
+      // Nothing off target is nothing to move: a known zero. `null` here read
+      // as "the amount could not be worked out" on a portfolio that is done.
+      expect(math.transferValue).toBe(0);
     });
 
     it("counts a holding outside the strategy against compliance", () => {
@@ -128,7 +130,9 @@ describe("gem-position.util", () => {
       );
 
       expect(math.holdings).toHaveLength(0);
-      expect(math.totalMarketValue).toBeNull();
+      // Dust is deliberately treated as no position at all, so the total of
+      // what is held is zero rather than unknown.
+      expect(math.totalMarketValue).toBe(0);
       // An empty set of accounts still needs the target bought.
       expect(math.changeRequired).toBe(true);
       expect(math.exactTargetPercent).toBeNull();
@@ -165,7 +169,7 @@ describe("gem-position.util", () => {
       expect(math.exactTargetPercent).toBeNull();
       expect(math.changeRequired).toBe(false);
       expect(math.offTarget).toEqual([]);
-      expect(math.transferValue).toBeNull();
+      expect(math.transferValue).toBe(0);
     });
   });
 
@@ -601,7 +605,7 @@ describe("gem-position.util", () => {
       expect(math.exactTargetPercent).toBe(100);
       expect(math.changeRequired).toBe(false);
       expect(math.sold).toEqual([]);
-      expect(math.transferValue).toBeNull();
+      expect(math.transferValue).toBe(0);
     });
 
     it("keeps the exposure estimate out of every operational decision", () => {
@@ -651,6 +655,47 @@ describe("gem-position.util", () => {
     it("is unknown without a gain figure or a rate", () => {
       expect(estimateTax(null, 19)).toBeNull();
       expect(estimateTax(1000, null)).toBeNull();
+    });
+  });
+
+  /**
+   * Financial contract rule 2: `0` and `null` must never stand in for each
+   * other. "Nothing to do" is knowledge, and the transfer card printed it as
+   * "Amount to move: Unknown / Realized: -" with the tax row gone entirely --
+   * for a user who had just sold everything, where the honest answer is move
+   * nothing, realize nothing, owe nothing.
+   */
+  describe("empty accounts", () => {
+    const empty = () =>
+      buildPositionMath([], "EM_EQUITY", {
+        securityId: "sec-emim",
+        composition: EMPTY_COMPOSITION,
+      });
+
+    it("knows it holds nothing rather than not knowing", () => {
+      const math = empty();
+
+      expect(math.totalMarketValue).toBe(0);
+      expect(math.transferValue).toBe(0);
+      expect(math.realizedGainLoss).toBe(0);
+      expect(estimateTax(math.realizedGainLoss, 19)).toBe(0);
+      // There is still something to do: the target has to be bought.
+      expect(math.changeRequired).toBe(true);
+      // ...and nothing to call the largest position.
+      expect(math.current).toBeNull();
+    });
+
+    it("keeps an unpriced portfolio unknown, which is a different thing", () => {
+      const math = buildPositionMath(
+        [holding({ role: "US_EQUITY", marketValue: null, costBasis: null })],
+        "EM_EQUITY",
+        { securityId: "sec-emim", composition: EMPTY_COMPOSITION },
+      );
+
+      expect(math.totalMarketValue).toBeNull();
+      expect(math.transferValue).toBeNull();
+      expect(math.realizedGainLoss).toBeNull();
+      expect(math.current).toBeNull();
     });
   });
 
