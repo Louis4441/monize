@@ -491,7 +491,7 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
       expect(rows[0].n).toBe(0);
     });
 
-    describe("delegate READ arm on transactions (migration 124)", () => {
+    describe("delegate READ arm on transactions (migration 125)", () => {
       let grantedTxId: string;
       let ungrantedTxId: string;
 

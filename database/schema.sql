@@ -1645,7 +1645,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- transactions -- direct ownership plus a delegate READ arm (migration 124).
+-- transactions -- direct ownership plus a delegate READ arm (migration 125).
 --
 -- Rows in an account covered by an active can_read grant are visible to the
 -- delegate's own session (app.real_user_id), which is what lets a cross-owner

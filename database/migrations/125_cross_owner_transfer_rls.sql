@@ -1,4 +1,4 @@
--- 124: Cross-owner transfers -- delegate-read policy arm on transactions.
+-- 125: Cross-owner transfers -- delegate-read policy arm on transactions.
 --
 -- Replaces the uniform direct-ownership policy on transactions with a
 -- dedicated one whose USING adds a read arm for delegates: rows in an account
