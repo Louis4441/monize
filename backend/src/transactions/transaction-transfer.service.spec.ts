@@ -9,7 +9,9 @@ import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
 import { isTransactionInFuture } from "../common/date-utils";
+import { withSystemContext } from "../common/db/with-context";
 import {
   createScopedDbMocks,
   DataSourceMock,
@@ -18,6 +20,17 @@ import {
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
+
+// Passthrough spy: cross-owner writes must enter the audited system context;
+// same-owner writes must not.
+jest.mock("../common/db/with-context", () => {
+  const actual = jest.requireActual("../common/db/with-context");
+  return { ...actual, withSystemContext: jest.fn(actual.withSystemContext) };
+});
+
+const mockedWithSystemContext = withSystemContext as jest.MockedFunction<
+  typeof withSystemContext
+>;
 
 jest.mock("../common/date-utils", () => ({
   isTransactionInFuture: jest.fn().mockReturnValue(false),
@@ -40,17 +53,21 @@ describe("TransactionTransferService", () => {
   let mockDataSource: DataSourceMock;
 
   const mockFindOne = jest.fn();
+  let crossOwnerAccess: Record<string, jest.Mock>;
+  let actionHistoryService: Record<string, jest.Mock>;
 
   const mockFromAccount = {
     id: "from-account",
     name: "Checking",
     currencyCode: "USD",
+    userId: "user-1",
   };
 
   const mockToAccount = {
     id: "to-account",
     name: "Savings",
     currencyCode: "USD",
+    userId: "user-1",
   };
 
   const baseTransferDto = {
@@ -126,6 +143,34 @@ describe("TransactionTransferService", () => {
       triggerDebouncedRecalc: jest.fn(),
     };
 
+    // Default: both accounts owned by user-1, mirroring the old owner-scoped
+    // findOne. Cross-owner tests override per account id.
+    crossOwnerAccess = {
+      accountAccessFor: jest
+        .fn()
+        .mockImplementation(async (realUserId: string, accountId: string) => {
+          const account =
+            accountId === "from-account"
+              ? mockFromAccount
+              : accountId === "to-account"
+                ? mockToAccount
+                : {
+                    id: accountId,
+                    name: "Unknown",
+                    currencyCode: "USD",
+                    userId: "user-1",
+                  };
+          return {
+            account,
+            ownerUserId: account.userId,
+            via: account.userId === realUserId ? "own" : "delegation",
+          };
+        }),
+    };
+
+    actionHistoryService = { record: jest.fn().mockResolvedValue(null) };
+
+    mockedWithSystemContext.mockClear();
     mockFindOne.mockReset();
 
     const tenantMocks = createScopedDbMocks([
@@ -169,10 +214,8 @@ describe("TransactionTransferService", () => {
         { provide: PayeesService, useValue: payeesService },
         { provide: NetWorthService, useValue: netWorthService },
         { provide: DataSource, useValue: mockDataSource },
-        {
-          provide: ActionHistoryService,
-          useValue: { record: jest.fn().mockResolvedValue(null) },
-        },
+        { provide: ActionHistoryService, useValue: actionHistoryService },
+        { provide: CrossOwnerAccessService, useValue: crossOwnerAccess },
       ],
     }).compile();
 
@@ -233,6 +276,164 @@ describe("TransactionTransferService", () => {
 
       expect(result.fromTransaction.id).toBe("from-tx-id");
       expect(result.toTransaction.id).toBe("to-tx-id");
+    });
+
+    it("writes both legs with the effective user's id and no system context on the same-owner path", async () => {
+      mockFindOne
+        .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+        .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+
+      await service.createTransfer("user-1", baseTransferDto, mockFindOne, {
+        effectiveUserId: "user-1",
+        realUserId: "user-1",
+      });
+
+      const [fromCreate, toCreate] = transactionsRepository.create.mock.calls;
+      expect(fromCreate[0].userId).toBe("user-1");
+      expect(toCreate[0].userId).toBe("user-1");
+      expect(mockedWithSystemContext).not.toHaveBeenCalled();
+      // Exactly today's single history record, under the effective user.
+      expect(actionHistoryService.record).toHaveBeenCalledTimes(1);
+      expect(actionHistoryService.record).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({
+          descriptionKey: "createdTransfer",
+          descriptionParams: {
+            amount: expect.any(String),
+            from: "Checking",
+            to: "Savings",
+          },
+        }),
+      );
+      // Result legs loaded through the same owner-scoped findOne as before.
+      expect(mockFindOne).toHaveBeenNthCalledWith(1, "user-1", "from-tx-id");
+      expect(mockFindOne).toHaveBeenNthCalledWith(2, "user-1", "to-tx-id");
+    });
+
+    describe("cross-owner", () => {
+      const foreignToAccount = {
+        id: "to-account",
+        name: "Owner Savings",
+        currencyCode: "USD",
+        userId: "owner-2",
+      };
+
+      beforeEach(() => {
+        crossOwnerAccess.accountAccessFor.mockImplementation(
+          async (realUserId: string, accountId: string) => {
+            const account =
+              accountId === "from-account" ? mockFromAccount : foreignToAccount;
+            return {
+              account,
+              ownerUserId: account.userId,
+              via: account.userId === realUserId ? "own" : "delegation",
+            };
+          },
+        );
+        transactionsRepository.save
+          .mockReset()
+          .mockResolvedValueOnce({ id: "from-tx-id" })
+          .mockResolvedValueOnce({ id: "to-tx-id" });
+        mockFindOne
+          .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+          .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+      });
+
+      const crossDto = {
+        ...baseTransferDto,
+        categoryId: "cat-1",
+        payeeId: "payee-1",
+      };
+      const actor = { effectiveUserId: "user-1", realUserId: "user-1" };
+
+      it("writes each leg with its account owner's user id inside a system-context transaction", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        const [fromCreate, toCreate] = transactionsRepository.create.mock.calls;
+        expect(fromCreate[0].userId).toBe("user-1");
+        expect(toCreate[0].userId).toBe("owner-2");
+        expect(mockedWithSystemContext).toHaveBeenCalled();
+
+        // Balances still update both accounts.
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "from-account",
+          -500,
+        );
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "to-account",
+          500,
+        );
+      });
+
+      it("authorizes both accounts for the REAL user with the create op", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, {
+          effectiveUserId: "user-1",
+          realUserId: "real-9",
+        });
+        expect(crossOwnerAccess.accountAccessFor).toHaveBeenCalledWith(
+          "real-9",
+          "from-account",
+          "create",
+        );
+        expect(crossOwnerAccess.accountAccessFor).toHaveBeenCalledWith(
+          "real-9",
+          "to-account",
+          "create",
+        );
+      });
+
+      it("applies category and payee to effective-user legs only", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        const [fromCreate, toCreate] = transactionsRepository.create.mock.calls;
+        expect(fromCreate[0].categoryId).toBe("cat-1");
+        expect(fromCreate[0].payeeId).toBe("payee-1");
+        expect(toCreate[0].categoryId).toBeNull();
+        expect(toCreate[0].payeeId).toBeNull();
+      });
+
+      it("loads each result leg as its owner and recalcs net worth per owner", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        expect(mockFindOne).toHaveBeenNthCalledWith(1, "user-1", "from-tx-id");
+        expect(mockFindOne).toHaveBeenNthCalledWith(2, "owner-2", "to-tx-id");
+        expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
+          "from-account",
+          "user-1",
+        );
+        expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
+          "to-account",
+          "owner-2",
+        );
+      });
+
+      it("records history per owner, masking the foreign account name in the counterpart's entry", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        expect(actionHistoryService.record).toHaveBeenCalledTimes(2);
+        // Actor's own entry names both accounts.
+        expect(actionHistoryService.record).toHaveBeenCalledWith(
+          "user-1",
+          expect.objectContaining({
+            entityId: "from-tx-id",
+            descriptionParams: expect.objectContaining({
+              from: "Checking",
+              to: "Owner Savings",
+            }),
+          }),
+        );
+        // Counterpart owner's entry masks the actor's account name.
+        expect(actionHistoryService.record).toHaveBeenCalledWith(
+          "owner-2",
+          expect.objectContaining({
+            entityId: "to-tx-id",
+            descriptionParams: expect.objectContaining({
+              from: "Shared account",
+              to: "Owner Savings",
+            }),
+          }),
+        );
+      });
     });
 
     it("throws when source and destination accounts are the same", async () => {

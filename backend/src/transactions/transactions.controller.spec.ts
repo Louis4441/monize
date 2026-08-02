@@ -863,10 +863,14 @@ describe("TransactionsController", () => {
       const result = await controller.removeTransfer(mockReq, "tx-1");
 
       expect(result).toBeUndefined();
-      expect(mockService.removeTransfer).toHaveBeenCalledWith("user-1", "tx-1", {
-        effectiveUserId: "user-1",
-        realUserId: "user-1",
-      });
+      expect(mockService.removeTransfer).toHaveBeenCalledWith(
+        "user-1",
+        "tx-1",
+        {
+          effectiveUserId: "user-1",
+          realUserId: "user-1",
+        },
+      );
     });
   });
 

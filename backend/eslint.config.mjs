@@ -52,6 +52,7 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/securities/holdings.service.ts",
   "src/securities/securities.controller.ts",
   "src/securities/security-price.service.ts",
+  "src/transactions/transaction-transfer.service.ts",
 ];
 
 /**

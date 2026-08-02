@@ -238,6 +238,27 @@ describe("TransactionsService", () => {
             reverseAndRemoveEmbedded: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          // Same-owner default: every account resolves as owned by the caller,
+          // mirroring the pre-cross-owner owner-scoped findOne.
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("../delegation/cross-owner-access.service")
+            .CrossOwnerAccessService,
+          useValue: {
+            accountAccessFor: jest
+              .fn()
+              .mockImplementation(
+                async (realUserId: string, accountId: string) => ({
+                  account: {
+                    userId: realUserId,
+                    ...(await accountsService.findOne(realUserId, accountId)),
+                  },
+                  ownerUserId: realUserId,
+                  via: "own",
+                }),
+              ),
+          },
+        },
         TransactionSplitService,
         TransactionTransferService,
         TransactionReconciliationService,

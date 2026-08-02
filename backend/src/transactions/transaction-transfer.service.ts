@@ -12,15 +12,18 @@ import { Category } from "../categories/entities/category.entity";
 import { CreateTransferDto } from "./dto/create-transfer.dto";
 import { UpdateTransferDto } from "./dto/update-transfer.dto";
 import { AccountsService } from "../accounts/accounts.service";
+import { Account } from "../accounts/entities/account.entity";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { isTransactionInFuture } from "../common/date-utils";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
 import { formatCurrency } from "../common/format-currency.util";
 import { roundMoney } from "../common/round.util";
 import { stripHtml } from "../common/sanitization.util";
 import { tr } from "../i18n/translate";
 import { withScopedDb } from "../common/db/scoped-db";
+import { withSystemContext } from "../common/db/with-context";
 
 export interface TransferResult {
   fromTransaction: Transaction;
@@ -105,6 +108,7 @@ export class TransactionTransferService {
     private netWorthService: NetWorthService,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
+    private crossOwnerAccess: CrossOwnerAccessService,
   ) {}
 
   private triggerNetWorthRecalc(accountId: string, userId: string): void {
@@ -137,8 +141,9 @@ export class TransactionTransferService {
     userId: string,
     createTransferDto: CreateTransferDto,
     findOne: (userId: string, id: string) => Promise<Transaction>,
-    _actor?: TransferActor,
+    actor?: TransferActor,
   ): Promise<TransferResult> {
+    const realUserId = actor?.realUserId ?? userId;
     const {
       fromAccountId,
       toAccountId,
@@ -176,11 +181,27 @@ export class TransactionTransferService {
 
     await this.assertCategoryOwned(userId, categoryId);
 
-    const fromAccount = await this.accountsService.findOne(
-      userId,
-      fromAccountId,
+    // The authoritative per-leg authorization: the REAL user must own each
+    // account or hold an active delegation with the create grant on it. For a
+    // normal user this reduces to today's ownership check (foreign -> 404).
+    const { account: fromAccount } =
+      await this.crossOwnerAccess.accountAccessFor(
+        realUserId,
+        fromAccountId,
+        "create",
+      );
+    const { account: toAccount } = await this.crossOwnerAccess.accountAccessFor(
+      realUserId,
+      toAccountId,
+      "create",
     );
-    const toAccount = await this.accountsService.findOne(userId, toAccountId);
+    const fromOwnerId = fromAccount.userId;
+    const toOwnerId = toAccount.userId;
+    // A leg not owned by the effective user makes this a cross-owner write:
+    // per-leg user_id, gated reference data, and a system-context transaction
+    // (the transactions WITH CHECK stays owner-only under RLS). Authorization
+    // is fully decided above, before the bypass window opens.
+    const hasForeignLeg = fromOwnerId !== userId || toOwnerId !== userId;
 
     const toAmount =
       explicitToAmount !== undefined
@@ -192,94 +213,180 @@ export class TransactionTransferService {
     const toPayeeName = customPayeeName || `Transfer from ${fromAccount.name}`;
 
     // Both legs, their linkage, and the balance updates commit atomically.
-    const { savedFromId, savedToId } = await withScopedDb(
-      this.dataSource,
-      async (m) => {
-        const fromTransaction = m.create(Transaction, {
-          userId,
-          accountId: fromAccountId,
-          transactionDate: transactionDate as any,
-          amount: -amount,
-          currencyCode: fromCurrencyCode,
-          exchangeRate: 1,
-          description: description || null,
-          referenceNumber,
-          status,
-          isTransfer: true,
-          payeeId: payeeId || null,
-          payeeName: fromPayeeName,
-          categoryId: categoryId || null,
-        });
+    // Each leg is owned by ITS account's owner; per-user reference data
+    // (category, payee link) is only written onto effective-user legs.
+    const writeLegsAtomically = async (m: EntityManager) => {
+      const fromTransaction = m.create(Transaction, {
+        userId: fromOwnerId,
+        accountId: fromAccountId,
+        transactionDate: transactionDate as any,
+        amount: -amount,
+        currencyCode: fromCurrencyCode,
+        exchangeRate: 1,
+        description: description || null,
+        referenceNumber,
+        status,
+        isTransfer: true,
+        payeeId: fromOwnerId === userId ? payeeId || null : null,
+        payeeName: fromPayeeName,
+        categoryId: fromOwnerId === userId ? categoryId || null : null,
+      });
 
-        const toTransaction = m.create(Transaction, {
-          userId,
-          accountId: toAccountId,
-          transactionDate: transactionDate as any,
-          amount: toAmount,
-          currencyCode: destinationCurrency,
-          exchangeRate: exchangeRate,
-          description: description || null,
-          referenceNumber,
-          status,
-          isTransfer: true,
-          payeeId: payeeId || null,
-          payeeName: toPayeeName,
-          categoryId: categoryId || null,
-        });
+      const toTransaction = m.create(Transaction, {
+        userId: toOwnerId,
+        accountId: toAccountId,
+        transactionDate: transactionDate as any,
+        amount: toAmount,
+        currencyCode: destinationCurrency,
+        exchangeRate: exchangeRate,
+        description: description || null,
+        referenceNumber,
+        status,
+        isTransfer: true,
+        payeeId: toOwnerId === userId ? payeeId || null : null,
+        payeeName: toPayeeName,
+        categoryId: toOwnerId === userId ? categoryId || null : null,
+      });
 
-        const savedFromTransaction = await m.save(fromTransaction);
-        const savedToTransaction = await m.save(toTransaction);
+      const savedFromTransaction = await m.save(fromTransaction);
+      const savedToTransaction = await m.save(toTransaction);
 
-        const fromId = savedFromTransaction.id;
-        const toId = savedToTransaction.id;
+      const fromId = savedFromTransaction.id;
+      const toId = savedToTransaction.id;
 
-        await m.update(Transaction, fromId, {
-          linkedTransactionId: toId,
-        });
-        await m.update(Transaction, toId, {
-          linkedTransactionId: fromId,
-        });
+      await m.update(Transaction, fromId, {
+        linkedTransactionId: toId,
+      });
+      await m.update(Transaction, toId, {
+        linkedTransactionId: fromId,
+      });
 
-        if (isTransactionInFuture(transactionDate)) {
-          await this.accountsService.recalculateCurrentBalance(fromAccountId);
-          await this.accountsService.recalculateCurrentBalance(toAccountId);
-        } else {
-          await this.accountsService.updateBalance(fromAccountId, -amount);
-          await this.accountsService.updateBalance(toAccountId, toAmount);
-        }
+      if (isTransactionInFuture(transactionDate)) {
+        await this.accountsService.recalculateCurrentBalance(fromAccountId);
+        await this.accountsService.recalculateCurrentBalance(toAccountId);
+      } else {
+        await this.accountsService.updateBalance(fromAccountId, -amount);
+        await this.accountsService.updateBalance(toAccountId, toAmount);
+      }
 
-        return { savedFromId: fromId, savedToId: toId };
-      },
-    );
-
-    this.triggerNetWorthRecalc(fromAccountId, userId);
-    this.triggerNetWorthRecalc(toAccountId, userId);
-
-    const result = {
-      fromTransaction: await findOne(userId, savedFromId),
-      toTransaction: await findOne(userId, savedToId),
+      return { savedFromId: fromId, savedToId: toId };
     };
 
-    this.actionHistoryService.record(userId, {
-      entityType: "transfer",
-      entityId: savedFromId,
-      action: "create",
-      afterData: {
-        fromTransactionId: savedFromId,
-        toTransactionId: savedToId,
-        fromAccountId,
-        toAccountId,
-      },
-      description: `Created transfer ${formatCurrency(amount, fromCurrencyCode)} from ${fromAccount.name} to ${toAccount.name}`,
-      descriptionKey: "createdTransfer",
-      descriptionParams: {
-        amount: formatCurrency(amount, fromCurrencyCode),
-        from: fromAccount.name,
-        to: toAccount.name,
-      },
+    const { savedFromId, savedToId } = hasForeignLeg
+      ? // Cross-owner: the foreign leg insert and foreign balance update fail
+        // the owner-only policies, so the (already fully authorized) atomic
+        // block runs under the audited system bypass. No-op at RLS_MODE=off.
+        await withSystemContext(() =>
+          withScopedDb(this.dataSource, writeLegsAtomically),
+        )
+      : await withScopedDb(this.dataSource, writeLegsAtomically);
+
+    this.triggerNetWorthRecalc(fromAccountId, fromOwnerId);
+    this.triggerNetWorthRecalc(toAccountId, toOwnerId);
+
+    const result = {
+      fromTransaction: await findOne(fromOwnerId, savedFromId),
+      toTransaction: await findOne(toOwnerId, savedToId),
+    };
+
+    this.recordCreateTransferHistory({
+      effectiveUserId: userId,
+      realUserId,
+      savedFromId,
+      savedToId,
+      fromAccount,
+      toAccount,
+      amount,
+      currencyCode: fromCurrencyCode,
     });
 
     return result;
+  }
+
+  /**
+   * Action history for a created transfer. Same-owner (both legs the effective
+   * user's) keeps producing exactly today's single record. Cross-owner writes
+   * one record per leg owner; an account name foreign to that owner is
+   * replaced with the "Shared account" label -- an owner must not learn the
+   * other party's account name from history. The actor's own entry may name
+   * both accounts, since the actor could read both at that moment.
+   */
+  private recordCreateTransferHistory(args: {
+    effectiveUserId: string;
+    realUserId: string;
+    savedFromId: string;
+    savedToId: string;
+    fromAccount: Account;
+    toAccount: Account;
+    amount: number;
+    currencyCode: string;
+  }): void {
+    const {
+      effectiveUserId,
+      realUserId,
+      savedFromId,
+      savedToId,
+      fromAccount,
+      toAccount,
+      amount,
+      currencyCode,
+    } = args;
+    const formattedAmount = formatCurrency(amount, currencyCode);
+    const afterData = {
+      fromTransactionId: savedFromId,
+      toTransactionId: savedToId,
+      fromAccountId: fromAccount.id,
+      toAccountId: toAccount.id,
+    };
+
+    if (
+      fromAccount.userId === effectiveUserId &&
+      toAccount.userId === effectiveUserId
+    ) {
+      this.actionHistoryService.record(effectiveUserId, {
+        entityType: "transfer",
+        entityId: savedFromId,
+        action: "create",
+        afterData,
+        description: `Created transfer ${formattedAmount} from ${fromAccount.name} to ${toAccount.name}`,
+        descriptionKey: "createdTransfer",
+        descriptionParams: {
+          amount: formattedAmount,
+          from: fromAccount.name,
+          to: toAccount.name,
+        },
+      });
+      return;
+    }
+
+    const sharedLabel = tr("common.sharedAccountLabel", "Shared account");
+    for (const ownerId of new Set([fromAccount.userId, toAccount.userId])) {
+      const nameFor = (account: Account) =>
+        ownerId === realUserId || account.userId === ownerId
+          ? account.name
+          : sharedLabel;
+      const record = () =>
+        this.actionHistoryService.record(ownerId, {
+          entityType: "transfer",
+          entityId: ownerId === fromAccount.userId ? savedFromId : savedToId,
+          action: "create",
+          afterData,
+          description: `Created transfer ${formattedAmount} from ${nameFor(fromAccount)} to ${nameFor(toAccount)}`,
+          descriptionKey: "createdTransfer",
+          descriptionParams: {
+            amount: formattedAmount,
+            from: nameFor(fromAccount),
+            to: nameFor(toAccount),
+          },
+        });
+      if (ownerId === effectiveUserId) {
+        record();
+      } else {
+        // The counterpart owner's history row carries THEIR user_id; writing
+        // it from this request's identity needs the audited bypass under RLS.
+        void withSystemContext(record);
+      }
+    }
   }
 
   async getLinkedTransaction(
