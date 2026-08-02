@@ -297,9 +297,7 @@ describe("Cross-owner transfers (integration)", () => {
           actorB(),
         ),
       );
-      expect((await loadTx(fromTransaction.id))!.description).toBe(
-        "mine only",
-      );
+      expect((await loadTx(fromTransaction.id))!.description).toBe("mine only");
       expect((await loadTx(toTransaction.id))!.description).toBeNull();
     });
 

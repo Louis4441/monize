@@ -383,6 +383,12 @@
       "transaction": "Transacción"
     },
     "transferAmountNote": "La cantidad debe ser positiva para transferencias",
+    "transferCandidates": {
+      "sharedWithYou": "Compartidas contigo",
+      "yourAccounts": "Tus cuentas",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "El otro lado de esta transferencia está en una cuenta que ya no se comparte contigo. Su importe, fecha y cuentas están bloqueados, pero aún puedes editar los detalles de esta transacción.",
     "amountReceivedNote": "Cantidad recibida después de la conversión de moneda",
     "splitTransaction": "Desglosar transacción",
     "splitDisabledDuringTour": "No disponible durante el recorrido guiado",

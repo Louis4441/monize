@@ -1,5 +1,6 @@
 {
   "ok": "OK",
+  "sharedAccountLabel": "Gedeelde rekening",
   "accountSuffix": {
     "cash": "Contant",
     "brokerage": "Effecten"

@@ -383,6 +383,12 @@
       "transaction": "Transakcja"
     },
     "transferAmountNote": "Kwota przelewu musi być dodatnia",
+    "transferCandidates": {
+      "sharedWithYou": "Udostępnione Tobie",
+      "yourAccounts": "Twoje konta",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "Druga strona tego przelewu znajduje się na koncie, które nie jest już Tobie udostępniane. Kwota, data i konta są zablokowane, ale nadal możesz edytować szczegóły tej transakcji.",
     "amountReceivedNote": "Kwota otrzymana po przeliczeniu waluty",
     "splitTransaction": "Podziel transakcję",
     "splitDisabledDuringTour": "Niedostępne podczas przewodnika",

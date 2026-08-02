@@ -39,7 +39,7 @@ Every task is safe to merge and deploy in any order that respects the dependency
 | D1 | Migration: delegate-read policy arm on `transactions` + `idx_adg_account` index | -- | inert* | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | Q1 | Integration suite: `cross-owner-transfers.integration.spec.ts` (incl. stateless reshare-reconnect proof) | T1-T3, M1-M2 | none | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 | Q2 | Playwright e2e journey in `delegation.spec.ts` (share -> transfer -> unshare -> mask -> reshare -> reconnect) | F2, Q1 | none | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
-| Q3 | Full-locale i18n pass (acceptance, final commit) | all above | none | [ ] |
+| Q3 | Full-locale i18n pass (acceptance, final commit) | all above | none | [x] (branch `claude/cross-owner-transfers-5ig0bn`) |
 
 *D1 is inert at `RLS_MODE=off`/`shadow` (the app connects as the table owner, so policies are not consulted); on an enforcing deployment its read arm is live on deploy -- read-only widening gated on an active `can_read` grant, matching the delegated access the app layer already grants. See the D1 task details.
 

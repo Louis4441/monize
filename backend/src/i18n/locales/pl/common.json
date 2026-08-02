@@ -1,5 +1,6 @@
 {
   "ok": "OK",
+  "sharedAccountLabel": "Konto udostępnione",
   "accountSuffix": {
     "cash": "Gotówka",
     "brokerage": "Maklerskie"

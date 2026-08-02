@@ -383,6 +383,12 @@
       "transaction": "取引"
     },
     "transferAmountNote": "振替の金額はプラスである必要があります",
+    "transferCandidates": {
+      "sharedWithYou": "共有された口座",
+      "yourAccounts": "自分の口座",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "この振替の相手側は、共有が解除された口座にあります。金額、日付、口座はロックされていますが、この取引自体の詳細は引き続き編集できます。",
     "amountReceivedNote": "通貨変換後の受取金額",
     "splitTransaction": "取引を分割",
     "splitDisabledDuringTour": "ガイド付きツアー中は利用できません",

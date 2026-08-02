@@ -1,5 +1,6 @@
 {
   "ok": "확인",
+  "sharedAccountLabel": "공유 계좌",
   "accountSuffix": {
     "cash": "현금",
     "brokerage": "증권"
