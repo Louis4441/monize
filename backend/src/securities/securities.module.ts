@@ -67,10 +67,6 @@ import { DelegationModule } from "../delegation/delegation.module";
     InvestmentTransactionsService,
     PortfolioCalculationService,
     PortfolioService,
-    // The GEM report needs cost bases translated at each transaction's own
-    // historical rate; converting a historical aggregate at today's rate is a
-    // different (and wrong) number.
-    PortfolioCalculationService,
     SecurityDetailService,
     SecurityDocumentsService,
     SecurityNewsService,
@@ -91,6 +87,10 @@ import { DelegationModule } from "../delegation/delegation.module";
     QuoteProviderRegistry,
     HoldingsService,
     InvestmentTransactionsService,
+    // The GEM report needs cost bases translated at each transaction's own
+    // historical rate; converting a historical aggregate at today's rate is a
+    // different (and wrong) number.
+    PortfolioCalculationService,
     PortfolioService,
     SecurityDetailService,
     SecurityDocumentsService,

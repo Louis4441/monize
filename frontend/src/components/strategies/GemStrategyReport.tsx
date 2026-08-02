@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { useReportData } from "@/hooks/useReportData";
 import { ReportError } from "@/components/reports/ReportError";
+import { UnsavedChangesDialog } from "@/components/ui/UnsavedChangesDialog";
 import { Skeleton } from "@/components/ui/LoadingSkeleton";
 import { createLogger } from "@/lib/logger";
 import { gemStrategyApi } from "@/lib/gem-strategy";
@@ -240,6 +241,33 @@ export function GemStrategyReport() {
    * matched against it: for the selection it belongs to it is adopted, and for
    * any other it is dropped and the newer fetch stands.
    */
+  /**
+   * Unsaved settings edits, and the navigation waiting on them.
+   *
+   * Every control that changes tab, scenario or deletes the scenario unmounts
+   * the settings form, and remounting it under a new key does not bring the
+   * edits back. The form reports its dirty state up; those controls run
+   * through `guarded`, which holds the action until the user has said what to
+   * do with the edits.
+   */
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<
+    (() => void) | null
+  >(null);
+  const submitSettings = useRef<(() => void) | null>(null);
+
+  const guarded = useCallback(
+    (action: () => void) => () => {
+      if (!settingsDirty) {
+        action();
+        return;
+      }
+      // Stored as a thunk, so the state setter does not call it.
+      setPendingNavigation(() => action);
+    },
+    [settingsDirty],
+  );
+
   const savingForKey = useRef<string | null>(null);
   const savingForStrategy = useRef<string | null>(null);
   const handleSettingsSaving = useCallback(
@@ -330,17 +358,30 @@ export function GemStrategyReport() {
         strategyId={strategy.id}
         strategyName={strategy.name}
         scenarios={data.strategies}
-        onSelectScenario={setStrategyId}
+        onSelectScenario={(id: string) => guarded(() => setStrategyId(id))()}
         onCreateScenario={handleCreateScenario}
-        onDeleteScenario={handleDeleteScenario}
+        onDeleteScenario={async (id: string) => {
+          // Deleting is the one guarded action that answers the child: the
+          // confirmation stays open until it knows. Holding the edits means
+          // the delete has not happened, so it reports failure and the
+          // unsaved-changes dialog is what the user deals with next.
+          if (settingsDirty) {
+            guarded(() => void handleDeleteScenario(id))();
+            return false;
+          }
+          return handleDeleteScenario(id);
+        }}
         scenarioBusy={isSaving || isStaleSelection}
         cadence={strategy.cadence}
         nextEvaluationOn={strategy.nextEvaluationOn}
         daysUntilNextEvaluation={strategy.daysUntilNextEvaluation}
-        onEditSettings={() => setTab("settings")}
+        onEditSettings={guarded(() => setTab("settings"))}
       />
 
-      <GemStrategyTabs active={tab} onChange={setTab} />
+      <GemStrategyTabs
+        active={tab}
+        onChange={(next: GemTab) => guarded(() => setTab(next))()}
+      />
 
       <GemWarningsBanner
         warnings={data.warnings}
@@ -411,7 +452,7 @@ export function GemStrategyReport() {
           <GemSignalHistoryTable
             history={history}
             limit={OVERVIEW_HISTORY_ROWS}
-            onShowAll={() => setTab("signals")}
+            onShowAll={guarded(() => setTab("signals"))}
             symbolByRole={symbolByRole}
             lookbackMonths={strategy.lookbackMonths}
           />
@@ -478,6 +519,8 @@ export function GemStrategyReport() {
               assets={assets}
               range={range}
               onSaved={handleConfigSaved}
+              onDirtyChange={setSettingsDirty}
+              submitRef={submitSettings}
               onSavingChange={handleSettingsSaving}
             />
           )}
@@ -485,6 +528,25 @@ export function GemStrategyReport() {
       )}
 
       <GemStrategyFooter strategy={strategy} />
+
+      {/* The repository's own dialog rather than a second bespoke flow.
+          "Save" submits the form and stays put: navigating on the strength of
+          a submit that has not resolved would discard the edits anyway if the
+          server refused them. */}
+      <UnsavedChangesDialog
+        isOpen={pendingNavigation !== null}
+        onSave={() => {
+          setPendingNavigation(null);
+          submitSettings.current?.();
+        }}
+        onDiscard={() => {
+          const action = pendingNavigation;
+          setSettingsDirty(false);
+          setPendingNavigation(null);
+          action?.();
+        }}
+        onCancel={() => setPendingNavigation(null)}
+      />
     </main>
   );
 }

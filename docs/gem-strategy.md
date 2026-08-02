@@ -49,7 +49,7 @@ be decided on.
 
 | Table | Holds |
 |-------|-------|
-| `gem_strategies` | One configuration row per user: cadence, lookback, tax rate, commission, rules-source link |
+| `gem_strategies` | One row per saved scenario, many per user: cadence, lookback, tax rate, commission, rules-source link. The report's switcher moves between them, and each carries its own signals |
 | `gem_strategy_accounts` | The brokerage accounts the strategy is run in (many per strategy); their holdings are summed |
 | `gem_strategy_assets` | The security filling each role (`security_id` nullable = unmapped) |
 | `gem_strategy_signals` | One row per evaluated period: state, target, momentum snapshot, spread, lead, previous role, execution flag |
@@ -143,9 +143,14 @@ a calendar this strategy is not on today, and switching the cadence back brings
 them and their `executed` flags with it.
 
 History renders the instrument each decision **actually named**, resolved from
-the signal's own `target_security_id`; the role's current instrument is only the
-fallback for a security since deleted. Resolving through the live mapping meant
-replacing an ETF rewrote the past.
+the signal's own `target_security_id`. When that security has since been
+deleted the row keeps its role and reports the instrument as no longer
+available; the role's *current* assignment is never substituted, because dating
+today's fund to a decision taken before it is a historical falsehood with
+nothing on the page marking it as a guess. A switch's `from` takes its role and
+its instrument from the same place or from neither, since this row's
+`previousRole` and the predecessor row's target can disagree after a period is
+materialized out of order.
 
 Periods whose momentum window opens before the price history does are bounded
 out with one cheap aggregate rather than re-read on every load; nothing is
@@ -202,9 +207,10 @@ Idle cash in those accounts is a position too (`isCash`): the linked
 account's own balance. GEM wants the whole strategy portfolio in one instrument,
 so cash beside the target is exactly as off-target as the wrong fund -- an
 account holding 5,000 of the target and 5,000 in cash is half invested, not
-compliant. It is spent rather than sold, so it costs no commission, adds no
-trade to `estimatedTradeCount` and realizes nothing. A negative balance is a
-margin debt, not an asset the switch can move, and is ignored.
+compliant. It is spent rather than sold, so it places no *sell* order and
+realizes nothing -- but the account it sits in still buys, so it does add a
+purchase to `estimatedTradeCount`. A negative balance is a margin debt, not an
+asset the switch can move, and is ignored.
 
 - `holdings` is every position in the accounts, largest first, each tagged with
   the role it fills (`role: null` for one that fills none);
@@ -246,12 +252,19 @@ pro-rated sale never reaches the 100% allocation the signal asks for.
 position, and the transfer card explains it rather than leaving a compliance
 figure and a full-value transfer looking contradictory.
 
-**`commissionAmount` is per trade, not per switch.** A switch sells every
-off-target holding and buys one instrument, so it costs `sellCount + 1` trades
-and the estimate multiplies the configured amount by that count; the transfer
-card names the count beside the figure. Selling out of three funds and buying
-one is four commissions, and charging a single one understated exactly the
-switches that cost the most.
+**`commissionAmount` is per order, and orders are counted per account.** A
+sell is placed once per **(account, security)** pair, and a purchase once per
+account that has something to put into the target -- a fund being sold, or cash
+being spent. An account already wholly in the target places nothing, and a
+portfolio that already complies places nothing at all, so zero orders and a
+zero commission are real answers rather than a floor.
+
+Two brokerage accounts each holding the same two funds is four sells and two
+buys. Counting the summed holdings instead called that three orders and charged
+for three, halving the figure the user reads to decide whether the switch is
+worth making. A linked `INVESTMENT_CASH` sleeve is not a second account here:
+its balance is attributed to the brokerage account that actually trades, or the
+pair would be charged two purchases for one order.
 
 **One unpriced holding makes the money figures unknown, not approximate.** That
 covers the compliance share, `totalMarketValue` and `transferValue` alike: a sum
@@ -283,10 +296,25 @@ numbers.
 
 Prices come from `security_prices` (whatever provider filled them). Every
 *historical* series -- momentum, the performance chart, the backtest -- reads
-`COALESCE(adjusted_close, close_price)`, because all three measure a return over
-time: on raw closes a 4-for-1 split reads as a 75% crash and flips the absolute
-test, and distributions vanish from the return of whichever leg pays the most.
-Valuing today's holdings is the other question and keeps the raw close.
+adjusted closes, because all three measure a return over time: on raw closes a
+4-for-1 split reads as a 75% crash and flips the absolute test, and
+distributions vanish from the return of whichever leg pays the most.
+
+The basis is chosen **per security over the window being read**, never per row.
+`adjusted_close` is nullable and only the provider backfill writes it, so a
+per-row `COALESCE(adjusted_close, close_price)` spliced raw rows -- a
+transaction-derived price, an import, a seed -- into an adjusted history for
+any instrument the user had ever traded, which around a split is a
+several-hundred-percent return and a drawdown that never happened. Adjusted
+rows only where any exist, raw throughout where none do, never both.
+
+Valuing today's holdings is the other question and keeps the raw close, bounded
+to `BOUNDARY_LAG_DAYS`: a security whose newest quote is older than that is
+absent from the valuation rather than priced at it. The exchange rate used to
+convert it is held to the same window, and the **cost** basis is not converted
+at today's rate at all -- it is rebuilt from the transactions at the rate each
+one recorded, and left unknown where the account's currency is not the
+report's.
 
 Staleness is judged **per role**: `pricesAsOf` is the oldest required
 instrument's last close, not the newest, and the `STALE_PRICES` warning names

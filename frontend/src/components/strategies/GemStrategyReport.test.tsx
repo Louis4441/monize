@@ -458,6 +458,123 @@ describe("GemStrategyReport", () => {
       expect(mockGetReport.mock.calls.length).toBe(loadsBefore);
     });
 
+    /**
+     * Invariant: changing the request key while a keyed form is dirty asks
+     * first.
+     * Canonical adversarial input: stale response + dirty form (testing
+     * contract, combinations).
+     * Minimal mutation: call `setTab` / `setStrategyId` directly instead of
+     * through `guarded`. Test that fails under it: the first of these.
+     */
+    it("asks before a tab change discards unsaved settings", async () => {
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+
+      // Dirty the form.
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+
+      // The navigation is held, not performed.
+      expect(
+        screen.getByRole("heading", { name: "Unsaved Changes" }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Evaluation frequency")).toBeInTheDocument();
+    });
+
+    it("keeps the form and the edit when the user cancels", async () => {
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+      });
+
+      const field = screen.getByLabelText(
+        "Evaluation frequency",
+      ) as HTMLSelectElement;
+      expect(field).toBeInTheDocument();
+      expect(field.value).toBe("QUARTERLY");
+    });
+
+    it("performs the navigation once the edits are discarded", async () => {
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Discard/i }));
+      });
+
+      expect(
+        screen.queryByLabelText("Evaluation frequency"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("lets a clean form change tab without asking", async () => {
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+
+      expect(
+        screen.queryByRole("heading", { name: "Unsaved Changes" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Evaluation frequency"),
+      ).not.toBeInTheDocument();
+    });
+
     it("takes the settings form away while a newer report is loading", async () => {
       await renderReport();
 

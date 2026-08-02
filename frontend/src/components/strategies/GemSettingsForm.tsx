@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MutableRefObject } from "react";
+import { useFormDirtyNotify } from "@/hooks/useFormDirtyNotify";
 import { flushSync } from "react-dom";
 import { useTranslations } from "next-intl";
 import { useForm, Resolver } from "react-hook-form";
@@ -92,6 +93,19 @@ interface GemSettingsFormProps {
   /** Receives the refreshed report the save returns. */
   onSaved: (report: GemStrategyReport) => void;
   /**
+   * Told when the form gains or loses unsaved edits.
+   *
+   * The parent owns the tab, scenario and delete controls, and each of those
+   * unmounts this form. Without the signal there is nothing for them to ask
+   * about, and the edits go silently.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
+  /**
+   * Filled with a submitter so the unsaved-changes dialog's "save" can run
+   * this form without the parent reaching into react-hook-form.
+   */
+  submitRef?: MutableRefObject<(() => void) | null>;
+  /**
    * Told when a save starts and when it ends.
    *
    * The parent owns the scenario and range controls, and a save is scoped to
@@ -112,6 +126,8 @@ export function GemSettingsForm({
   assets,
   range,
   onSaved,
+  onDirtyChange,
+  submitRef,
   onSavingChange,
 }: GemSettingsFormProps) {
   const t = useTranslations("strategies");
@@ -147,7 +163,7 @@ export function GemSettingsForm({
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ConfigFormValues>({
     // The coercing schema's input and output types differ; the project's
     // convention is to type the resolver by the form's value shape.
@@ -344,6 +360,9 @@ export function GemSettingsForm({
     }
   };
 
+  // Reported up so the parent can guard the controls that unmount this form.
+  useFormDirtyNotify(isDirty, onDirtyChange);
+
   const onSubmit = async (values: ConfigFormValues) => {
     setIsSaving(true);
     onSavingChange?.(true);
@@ -389,6 +408,10 @@ export function GemSettingsForm({
       </div>
     );
   }
+
+  // Handed to the parent so the unsaved-changes dialog's "save" runs this
+  // form, rather than the parent reaching into react-hook-form itself.
+  if (submitRef) submitRef.current = handleSubmit(onSubmit);
 
   return (
     <>
