@@ -160,11 +160,11 @@
       "noDataDescription": "沒有任何策略資產在此區間有價格。匯入或更新價格後即可查看比較。",
       "footnote": "每檔標的以其自身上市貨幣計的總報酬——與判定訊號所用的基準相同。標的之間的匯率變動未計入。",
       "incompleteHistory": "部分資產未涵蓋整個區間。",
-      "currentPortfolio": "目前組合 — 模擬",
+      "currentPortfolio": "目前投資組合 — 模擬",
       "currentPortfolioNote": "此模擬把今天的標的比例放在所選區間的起點。它不還原歷史交易、現金流、現金或匯率變動。",
       "currentPortfolioLateStart": "模擬開始得較晚，因為目前持有的標的中至少有一檔從所選區間開始就沒有資料。",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "策略帳戶沒有持倉，因此沒有可模擬的組合。",
+        "NO_HOLDINGS": "策略帳戶沒有持倉，因此沒有可模擬的投資組合。",
         "UNKNOWN_CURRENT_VALUE": "其中一檔持倉沒有目前市值，因此今天的比例未知，不顯示模擬。",
         "MISSING_PRICE_HISTORY": "其中一檔持倉沒有可用的價格歷史，因此不顯示模擬：僅用其餘標的畫出的曲線是另一個組合。"
       }

@@ -347,17 +347,21 @@ export class GemPerformanceService {
       };
     });
 
-    // A simulation with no drawable point is not a simulation.
+    // A simulation that cannot get past its own opening is not a simulation.
     //
-    // Every leg can be based and still produce nothing: a feed that stops
-    // before the window opens fails the freshness rule at every plotted date,
-    // and `carriedClose` then returns null right across the range. The result
-    // passed every check above, so it came back with `unavailableReason: null`
-    // -- which put "Today's composition" in the legend, drew no line, and
-    // offered no explanation. An absence has to say why it is absent.
-    if (points.every((point) => point.returnPercent === null)) {
-      return empty("MISSING_PRICE_HISTORY");
-    }
+    // Every leg can be based and still produce nothing after that. A feed that
+    // stops before the window opens fails the freshness rule at every plotted
+    // date, and `carriedClose` then returns null right across the range; a feed
+    // that reaches only the opening leaves exactly one point, and that point is
+    // 0% by construction -- the rebase, not a result. Both passed every check
+    // above and came back with `unavailableReason: null`, which put "Today's
+    // portfolio" in the legend over a line that was either absent or a single
+    // dot on the zero axis, reading as "your portfolio returned nothing".
+    //
+    // Two priceable points is the least that can describe a change, so below
+    // that the answer is the absence and its reason.
+    const drawable = points.filter((point) => point.returnPercent !== null);
+    if (drawable.length < 2) return empty("MISSING_PRICE_HISTORY");
 
     // The return over the window, which means the value at the *end* of it.
     //

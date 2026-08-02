@@ -160,11 +160,11 @@
       "noDataDescription": "Tidak ada aset strategi yang punya harga untuk periode ini. Impor atau segarkan harga untuk melihat perbandingannya.",
       "footnote": "Imbal hasil total tiap instrumen dalam mata uang pencatatannya sendiri — dasar yang sama dengan yang dipakai untuk memutuskan sinyal. Pergerakan kurs di antaranya tidak termasuk.",
       "incompleteHistory": "Beberapa aset tidak mencakup seluruh periode.",
-      "currentPortfolio": "Komposisi hari ini — simulasi",
+      "currentPortfolio": "Portofolio hari ini — simulasi",
       "currentPortfolioNote": "Simulasi menerapkan proporsi instrumen hari ini pada awal periode yang dipilih. Simulasi tidak mereproduksi transaksi historis, arus kas, kas, maupun pergerakan nilai tukar.",
       "currentPortfolioLateStart": "Simulasi dimulai lebih lambat karena setidaknya satu instrumen yang dimiliki sekarang tidak punya data sejak awal periode yang dipilih.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "Rekening strategi tidak memegang instrumen apa pun, jadi tidak ada komposisi untuk disimulasikan.",
+        "NO_HOLDINGS": "Rekening strategi tidak memegang instrumen apa pun, jadi tidak ada portofolio untuk disimulasikan.",
         "UNKNOWN_CURRENT_VALUE": "Salah satu instrumen tidak punya nilai saat ini, jadi proporsi hari ini tidak diketahui dan simulasi tidak ditampilkan.",
         "MISSING_PRICE_HISTORY": "Salah satu instrumen tidak punya riwayat harga yang bisa dipakai, jadi simulasi tidak ditampilkan: garis dari sisanya adalah portofolio yang berbeda."
       }

@@ -540,6 +540,49 @@ describe("GemPerformanceService", () => {
       expect(simulation?.totalReturnPercent).toBeNull();
     });
 
+    it("explains a simulation that never gets past its zero opening", async () => {
+      /**
+       * Invariant: a single priceable point is not a line. Rebasing makes the
+       * opening 0% whatever the instrument did, so a lone point on the zero
+       * axis reads as "your portfolio returned nothing" -- a claim, from one
+       * quote.
+       * Canonical adversarial input: a feed that reaches the window's opening
+       * and stops.
+       * Minimal mutation: require only one drawable point instead of two.
+       * Test that fails under it: this one.
+       */
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2025-02-14", close: 110 },
+              { date: "2025-08-14", close: 120 },
+            ],
+          ],
+          // Priced on the window's first plotted date and never again.
+          ["sec-quiet", [{ date: "2024-08-14", close: 10 }]],
+        ]),
+      );
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-quiet",
+              symbol: "QUIET",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBe("MISSING_PRICE_HISTORY");
+      expect(simulation?.points).toEqual([]);
+    });
+
     it("says there is nothing to simulate for empty accounts", async () => {
       twoHoldings();
       const simulation = (await build({ holdings: [] }))?.currentPortfolio;

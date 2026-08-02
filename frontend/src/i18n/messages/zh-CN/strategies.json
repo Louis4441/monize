@@ -160,11 +160,11 @@
       "noDataDescription": "没有任何策略资产在此区间有价格。导入或刷新价格后即可查看比较。",
       "footnote": "每只标的以其自身上市货币计的总回报——与判定信号所用的基准相同。标的之间的汇率变动未计入。",
       "incompleteHistory": "部分资产未覆盖整个区间。",
-      "currentPortfolio": "当前组合 — 模拟",
+      "currentPortfolio": "当前投资组合 — 模拟",
       "currentPortfolioNote": "该模拟把今天的标的比例放在所选区间的起点。它不还原历史交易、现金流、现金或汇率变动。",
       "currentPortfolioLateStart": "模拟开始得较晚，因为当前持有的标的中至少有一只从所选区间开始就没有数据。",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "策略账户没有持仓，因此没有可模拟的组合。",
+        "NO_HOLDINGS": "策略账户没有持仓，因此没有可模拟的投资组合。",
         "UNKNOWN_CURRENT_VALUE": "其中一只持仓没有当前市值，因此今天的比例未知，不显示模拟。",
         "MISSING_PRICE_HISTORY": "其中一只持仓没有可用的价格历史，因此不显示模拟：仅用其余标的画出的曲线是另一个组合。"
       }

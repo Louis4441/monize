@@ -160,11 +160,11 @@
       "noDataDescription": "Żadne z aktywów strategii nie ma cen w tym okresie. Zaimportuj lub odśwież ceny, aby zobaczyć porównanie.",
       "footnote": "Całkowita stopa zwrotu każdego instrumentu w jego własnej walucie notowania — na tej samej podstawie wyznaczany jest sygnał. Ruch kursu między nimi nie jest uwzględniony.",
       "incompleteHistory": "Niektóre aktywa nie pokrywają całego okresu.",
-      "currentPortfolio": "Dzisiejszy skład — symulacja",
+      "currentPortfolio": "Dzisiejszy portfel — symulacja",
       "currentPortfolioNote": "Symulacja przyjmuje dzisiejsze proporcje instrumentów na początku wybranego okresu. Nie odtwarza historycznych transakcji, przepływów pieniężnych, gotówki ani zmian kursów walut.",
       "currentPortfolioLateStart": "Symulacja zaczyna się później, ponieważ co najmniej jeden z obecnych instrumentów nie ma danych od początku wybranego okresu.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "Na kontach strategii nie ma żadnych instrumentów, więc nie ma składu do zasymulowania.",
+        "NO_HOLDINGS": "Na kontach strategii nie ma żadnych instrumentów, więc nie ma portfela do zasymulowania.",
         "UNKNOWN_CURRENT_VALUE": "Jeden z posiadanych instrumentów nie ma bieżącej wyceny, więc dzisiejsze proporcje są nieznane i symulacja nie jest pokazywana.",
         "MISSING_PRICE_HISTORY": "Jeden z posiadanych instrumentów nie ma użytecznej historii cen, więc symulacja nie jest pokazywana: linia z pozostałych byłaby innym portfelem."
       }

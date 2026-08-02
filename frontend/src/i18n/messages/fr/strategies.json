@@ -160,11 +160,11 @@
       "noDataDescription": "Aucun actif de la stratégie n'a de cours sur cette période. Importez ou actualisez les cours pour voir la comparaison.",
       "footnote": "Rendement total de chaque instrument dans sa propre devise de cotation — la base même sur laquelle le signal est décidé. Un mouvement de change entre elles n'est pas inclus.",
       "incompleteHistory": "Certains actifs ne couvrent pas toute la période.",
-      "currentPortfolio": "Composition d’aujourd’hui — simulation",
+      "currentPortfolio": "Portefeuille d’aujourd’hui — simulation",
       "currentPortfolioNote": "La simulation applique les proportions actuelles des instruments au début de la période choisie. Elle ne reproduit ni les transactions passées, ni les flux de trésorerie, ni les liquidités, ni les variations de change.",
       "currentPortfolioLateStart": "La simulation commence plus tard, car au moins un des instruments détenus aujourd’hui n’a pas de données depuis le début de la période choisie.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "Les comptes de la stratégie ne détiennent aucun instrument : il n’y a pas de composition à simuler.",
+        "NO_HOLDINGS": "Les comptes de la stratégie ne détiennent aucun instrument : il n’y a pas de portefeuille à simuler.",
         "UNKNOWN_CURRENT_VALUE": "Un des instruments détenus n’a pas de valeur actuelle : les proportions d’aujourd’hui sont inconnues et la simulation n’est pas affichée.",
         "MISSING_PRICE_HISTORY": "Un des instruments détenus n’a pas d’historique de cours exploitable : la simulation n’est pas affichée, car une courbe tracée sans lui serait un autre portefeuille."
       }

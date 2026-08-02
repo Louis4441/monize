@@ -216,7 +216,7 @@ describe("GemPerformanceChart", () => {
     expect(labelSets[0].querySelector("text")).toHaveTextContent("+29.87%");
   });
 
-  it("draws today's composition as a simulation, and says what it is not", () => {
+  it("draws today's portfolio as a simulation, and says what it is not", () => {
     render(
       <GemPerformanceChart
         {...baseProps}
@@ -231,7 +231,7 @@ describe("GemPerformanceChart", () => {
     // looks to find out what a line is had nothing to say about this one.
     const legend = document.getElementById("gem-chart-legend") as HTMLElement;
     expect(
-      within(legend).getByText("Today’s composition — simulated"),
+      within(legend).getByText("Today’s portfolio — simulated"),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/applies today’s instrument proportions at the start/),
@@ -293,7 +293,7 @@ describe("GemPerformanceChart", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("Today’s composition — simulated"),
+      screen.queryByText("Today’s portfolio — simulated"),
     ).not.toBeInTheDocument();
   });
 });

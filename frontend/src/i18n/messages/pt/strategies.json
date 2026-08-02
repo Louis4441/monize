@@ -160,11 +160,11 @@
       "noDataDescription": "Nenhum dos ativos da estratégia tem preços para este período. Importe ou atualize preços para ver a comparação.",
       "footnote": "Retorno total de cada instrumento na sua própria moeda de cotação — a mesma base em que o sinal é decidido. Um movimento cambial entre elas não está incluído.",
       "incompleteHistory": "Alguns ativos não cobrem todo o período.",
-      "currentPortfolio": "Composição de hoje — simulação",
+      "currentPortfolio": "Carteira de hoje — simulação",
       "currentPortfolioNote": "A simulação aplica as proporções atuais dos instrumentos no início do período escolhido. Não reproduz transações históricas, fluxos de caixa, dinheiro em conta nem variações cambiais.",
       "currentPortfolioLateStart": "A simulação começa mais tarde porque pelo menos um dos instrumentos detidos hoje não tem dados desde o início do período escolhido.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "As contas da estratégia não detêm instrumentos, por isso não há composição a simular.",
+        "NO_HOLDINGS": "As contas da estratégia não detêm instrumentos, por isso não há carteira a simular.",
         "UNKNOWN_CURRENT_VALUE": "Um dos instrumentos detidos não tem valor atual, por isso as proporções de hoje são desconhecidas e a simulação não é apresentada.",
         "MISSING_PRICE_HISTORY": "Um dos instrumentos detidos não tem histórico de preços utilizável, por isso a simulação não é apresentada: uma linha com os restantes seria outra carteira."
       }

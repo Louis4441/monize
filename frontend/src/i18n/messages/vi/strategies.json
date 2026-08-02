@@ -160,11 +160,11 @@
       "noDataDescription": "Không tài sản nào của chiến lược có giá trong khoảng này. Hãy nhập hoặc làm mới giá để xem so sánh.",
       "footnote": "Tổng lợi nhuận của từng công cụ theo đúng loại tiền niêm yết của nó — cùng cơ sở dùng để quyết định tín hiệu. Biến động tỷ giá giữa chúng không được tính.",
       "incompleteHistory": "Một số tài sản không phủ hết khoảng thời gian.",
-      "currentPortfolio": "Cơ cấu hôm nay — mô phỏng",
+      "currentPortfolio": "Danh mục hôm nay — mô phỏng",
       "currentPortfolioNote": "Mô phỏng áp dụng tỷ trọng công cụ hôm nay vào đầu kỳ đã chọn. Nó không tái hiện giao dịch lịch sử, dòng tiền, tiền mặt hay biến động tỷ giá.",
       "currentPortfolioLateStart": "Mô phỏng bắt đầu muộn hơn vì ít nhất một công cụ đang nắm giữ không có dữ liệu từ đầu kỳ đã chọn.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "Các tài khoản chiến lược không nắm giữ công cụ nào, nên không có cơ cấu để mô phỏng.",
+        "NO_HOLDINGS": "Các tài khoản chiến lược không nắm giữ công cụ nào, nên không có danh mục để mô phỏng.",
         "UNKNOWN_CURRENT_VALUE": "Một công cụ đang nắm giữ không có giá trị hiện tại, nên tỷ trọng hôm nay là chưa biết và mô phỏng không được hiển thị.",
         "MISSING_PRICE_HISTORY": "Một công cụ đang nắm giữ không có lịch sử giá dùng được, nên mô phỏng không được hiển thị: đường vẽ từ phần còn lại sẽ là một danh mục khác."
       }

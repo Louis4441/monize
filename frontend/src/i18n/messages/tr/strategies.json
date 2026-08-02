@@ -160,11 +160,11 @@
       "noDataDescription": "Strateji varlıklarının hiçbirinin bu dönem için fiyatı yok. Karşılaştırmayı görmek için fiyatları içe aktarın veya yenileyin.",
       "footnote": "Her enstrümanın kendi kotasyon para birimindeki toplam getirisi — sinyalin karara bağlandığı ölçütün aynısı. Aralarındaki kur hareketi dahil değildir.",
       "incompleteHistory": "Bazı varlıklar tüm dönemi kapsamıyor.",
-      "currentPortfolio": "Bugünkü bileşim — simülasyon",
+      "currentPortfolio": "Bugünkü portföy — simülasyon",
       "currentPortfolioNote": "Simülasyon, bugünkü enstrüman oranlarını seçilen dönemin başına uygular. Geçmiş işlemleri, nakit akışlarını, nakdi veya kur hareketlerini yeniden üretmez.",
       "currentPortfolioLateStart": "Simülasyon daha geç başlıyor, çünkü şu anda tuttuğunuz enstrümanlardan en az birinin seçilen dönemin başından itibaren verisi yok.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "Strateji hesaplarında enstrüman yok, dolayısıyla simüle edilecek bir bileşim de yok.",
+        "NO_HOLDINGS": "Strateji hesaplarında enstrüman yok, dolayısıyla simüle edilecek bir portföy de yok.",
         "UNKNOWN_CURRENT_VALUE": "Tutulan enstrümanlardan birinin güncel değeri yok, bu yüzden bugünkü oranlar bilinmiyor ve simülasyon gösterilmiyor.",
         "MISSING_PRICE_HISTORY": "Tutulan enstrümanlardan birinin kullanılabilir fiyat geçmişi yok, bu yüzden simülasyon gösterilmiyor: kalanlardan çizilen bir çizgi başka bir portföy olurdu."
       }

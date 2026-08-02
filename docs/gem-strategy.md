@@ -254,6 +254,40 @@ pro-rated sale never reaches the 100% allocation the signal asks for.
 position, and the transfer card explains it rather than leaving a compliance
 figure and a full-value transfer looking contradictory.
 
+### "Today's portfolio", the dashed line on the asset chart
+
+`GemPerformanceService.simulateCurrentComposition` replays what the strategy
+accounts hold **now** across the selected window, so the instruments the user
+actually owns can be read against the strategy's own five:
+
+    w_i                = holding_i market value / total market value, struck once at t0
+    securityIndex_i(t) = P_i(t) / P_i(t0)
+    portfolioIndex(t)  = sum(w_i * securityIndex_i(t))
+    returnPercent(t)   = (portfolioIndex(t) - 1) * 100
+
+`t0` is the first date every held instrument can be priced on, never earlier
+than the chart's own first point. Nothing rebalances afterwards: it is
+buy-and-hold from `t0`, which is what makes it comparable with the
+single-instrument lines beside it. Prices are the same adjusted closes those
+lines use, each in its own listing currency. It is explicitly **not** a
+performance record: no historical transactions, no cash flows, no cash, no FX.
+
+It declines to answer rather than draw something misleading, and says which:
+nothing held (`NO_HOLDINGS`), a holding with no current value so the weights
+are unknown (`UNKNOWN_CURRENT_VALUE`), or no usable price history
+(`MISSING_PRICE_HISTORY`). That last one also covers the two cases that used to
+slip through as an *available* simulation with nothing in it: every point
+unpriceable -- a feed that stops before the window opens is stale at every
+plotted date -- and only the opening point priceable, which is 0% by
+construction and reads as "your portfolio returned nothing" when it is really
+one quote and no second one. **Fewer than two drawable points is an absence,
+not a flat line.**
+
+The practical cause of that state is a held instrument whose prices Monize does
+not have or has not refreshed. The strategy's own assets are kept current
+because the signal depends on them; a fund the user merely holds is not, so it
+is the one that empties the simulation.
+
 ### Exposure is a floor, not a measurement -- and a floor is shown
 
 **Product decision. Do not revert it in code review; a change here needs the

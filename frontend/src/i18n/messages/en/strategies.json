@@ -160,11 +160,11 @@
       "noDataDescription": "None of the strategy assets has prices for this window. Import or refresh prices to see the comparison.",
       "footnote": "Total return of each instrument in its own listing currency — the same basis the signal is decided on. A currency move between them is not included.",
       "incompleteHistory": "Some assets do not cover the whole window.",
-      "currentPortfolio": "Today’s composition — simulated",
+      "currentPortfolio": "Today’s portfolio — simulated",
       "currentPortfolioNote": "The simulation applies today’s instrument proportions at the start of the selected period. It does not reproduce historical transactions, cash flows, cash or currency movements.",
       "currentPortfolioLateStart": "The simulation starts later because at least one of the instruments you hold now has no data from the start of the selected period.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "The strategy accounts hold no instruments, so there is no composition to simulate.",
+        "NO_HOLDINGS": "The strategy accounts hold no instruments, so there is no portfolio to simulate.",
         "UNKNOWN_CURRENT_VALUE": "One of the instruments held has no current value, so today’s proportions are unknown and the simulation is not shown.",
         "MISSING_PRICE_HISTORY": "One of the instruments held has no usable price history, so the simulation is not shown: a line drawn from the rest would be a different portfolio."
       }

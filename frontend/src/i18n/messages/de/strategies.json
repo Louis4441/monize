@@ -160,11 +160,11 @@
       "noDataDescription": "Keines der Strategie-Anlagegüter hat Kurse für diesen Zeitraum. Importieren oder aktualisieren Sie Kurse, um den Vergleich zu sehen.",
       "footnote": "Gesamtrendite jedes Instruments in seiner eigenen Notierungswährung — dieselbe Grundlage, auf der das Signal entschieden wird. Eine Währungsbewegung zwischen ihnen ist nicht enthalten.",
       "incompleteHistory": "Einige Anlagegüter decken nicht den gesamten Zeitraum ab.",
-      "currentPortfolio": "Heutige Zusammensetzung — Simulation",
+      "currentPortfolio": "Heutiges Portfolio — Simulation",
       "currentPortfolioNote": "Die Simulation setzt die heutigen Anteile der Instrumente an den Anfang des gewählten Zeitraums. Sie bildet weder historische Transaktionen noch Zahlungsströme, Barmittel oder Wechselkursbewegungen ab.",
       "currentPortfolioLateStart": "Die Simulation beginnt später, weil mindestens eines der heute gehaltenen Instrumente ab Beginn des gewählten Zeitraums keine Daten hat.",
       "currentPortfolioUnavailable": {
-        "NO_HOLDINGS": "Die Strategiekonten halten keine Instrumente, also gibt es keine Zusammensetzung zu simulieren.",
+        "NO_HOLDINGS": "Die Strategiekonten halten keine Instrumente, also gibt es kein Portfolio zu simulieren.",
         "UNKNOWN_CURRENT_VALUE": "Eines der gehaltenen Instrumente hat keinen aktuellen Wert, also sind die heutigen Anteile unbekannt und die Simulation wird nicht gezeigt.",
         "MISSING_PRICE_HISTORY": "Eines der gehaltenen Instrumente hat keine brauchbare Kurshistorie, also wird die Simulation nicht gezeigt: eine Linie aus dem Rest wäre ein anderes Portfolio."
       }
