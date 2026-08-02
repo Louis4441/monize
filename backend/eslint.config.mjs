@@ -36,6 +36,7 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/database/demo-reset.service.ts",
   "src/database/demo-seed.service.ts",
   "src/database/seed.service.ts",
+  "src/delegation/cross-owner-access.service.ts",
   "src/delegation/guards/account-delegate.guard.ts",
   "src/emergency-access/emergency-access-claim.controller.ts",
   "src/emergency-access/emergency-access-monitor.service.ts",
