@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Счёт должен быть типа INVESTMENT",
     "securityIdRequired": "ID ценной бумаги обязателен для проводок {{ action }}",
     "splitRatioRequired": "Коэффициент дробления (количество) должен быть больше нуля",
+    "acquisitionPriceRequired": "Для операций {{ action }} требуется цена за единицу больше нуля. Для бумаг, приобретённых без известной стоимости, используйте ADD_SHARES.",
     "cannotHoldSecurities": "{{ label }} не может хранить ценные бумаги",
     "sourceDestMustDiffer": "Исходный и целевой счета должны быть разными",
     "bothAccountsMustBeInvestment": "Оба счёта должны быть типа INVESTMENT",
@@ -501,5 +502,14 @@
     "fileTooLarge": "Файл превышает максимальный размер {{ max }} байт",
     "unsupportedType": "Неподдерживаемый тип файла. Разрешённые типы: {{ types }}",
     "tooMany": "У этой проводки уже максимальное число вложений — {{ max }}"
+  },
+  "strategies": {
+    "accountNotFound": "Счёт не найден",
+    "accountNotInvestment": "Стратегия GEM может работать только на инвестиционных счетах.",
+    "configurationChanging": "Настройки стратегии изменились во время формирования отчёта. Попробуйте ещё раз.",
+    "securityNotFound": "Инструмент не найден",
+    "signalNotFound": "Сигнал стратегии не найден",
+    "signalStrategyMismatch": "Этот сигнал относится к другой стратегии.",
+    "strategyNotFound": "Стратегия не найдена"
   }
 }

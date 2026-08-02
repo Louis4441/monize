@@ -1068,11 +1068,56 @@ export class YahooFinanceService implements QuoteProvider {
     }
   }
 
+  /**
+   * The fund's asset-class split -- stocks, bonds, cash and the rest -- as
+   * weights 0-1, or null when the provider has nothing.
+   *
+   * Yahoo has always returned these positions in `topHoldings`; until now they
+   * were only read to synthesise a description. They are the one breakdown a
+   * provider can fill that the GEM comparison can use for the defensive roles,
+   * where bonds against equities is the distinction that matters. Country, the
+   * breakdown the equity roles need, is not in this module and stays manual.
+   *
+   * "Other" is deliberately dropped: the convention for these columns is that a
+   * shortfall under 100% is displayed as "Other" rather than stored, so storing
+   * it would double-count at display time.
+   */
+  async fetchEtfAssetPositions(
+    symbol: string,
+    exchange: string | null = null,
+  ): Promise<Array<{ name: string; weight: number }> | null> {
+    return (await this.fetchEtfBreakdowns(symbol, exchange)).assets;
+  }
+
   async fetchEtfSectorWeightings(
     symbol: string,
     exchange: string | null = null,
     _opts?: QuoteProviderOptions,
   ): Promise<EtfSectorWeighting[] | null> {
+    return (await this.fetchEtfBreakdowns(symbol, exchange)).sectors;
+  }
+
+  /**
+   * Both fund breakdowns from one request.
+   *
+   * The sector weightings and the asset-class positions live in the same
+   * `topHoldings` module, so asking for them separately is two identical round
+   * trips per fund -- doubling the calls a refresh makes against a provider
+   * that rate-limits, for data that arrived together the first time. The two
+   * single-breakdown methods stay because `fetchEtfSectorWeightings` is part of
+   * the `QuoteProvider` interface, but both now read one response.
+   *
+   * Either half is null when the request failed, and an empty array when the
+   * request succeeded and the fund simply has no such breakdown -- the
+   * difference decides whether a caller may store the absence.
+   */
+  async fetchEtfBreakdowns(
+    symbol: string,
+    exchange: string | null = null,
+  ): Promise<{
+    sectors: EtfSectorWeighting[] | null;
+    assets: Array<{ name: string; weight: number }> | null;
+  }> {
     const yahooSymbol = this.getYahooSymbol(symbol, exchange);
     try {
       const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol)}?modules=topHoldings`;
@@ -1083,36 +1128,59 @@ export class YahooFinanceService implements QuoteProvider {
         this.logger.warn(
           `Yahoo Finance topHoldings returned ${response?.status ?? "no response"} for ${yahooSymbol}`,
         );
-        return null;
+        return { sectors: null, assets: null };
       }
 
       const data = await response.json();
       const topHoldings = data.quoteSummary?.result?.[0]?.topHoldings;
+      if (!topHoldings) return { sectors: [], assets: [] };
 
-      if (!topHoldings?.sectorWeightings) {
-        return [];
-      }
-
-      const weightings: EtfSectorWeighting[] = [];
-      for (const entry of topHoldings.sectorWeightings) {
-        const key = Object.keys(entry)[0];
-        if (!key) continue;
-        const rawValue = entry[key]?.raw ?? 0;
-        if (rawValue <= 0) continue;
-
-        const displayName =
-          YAHOO_SECTOR_NAMES[key] || key.charAt(0).toUpperCase() + key.slice(1);
-        weightings.push({ sector: displayName, weight: rawValue });
-      }
-
-      return weightings;
+      return {
+        sectors: this.parseSectorWeightings(topHoldings),
+        assets: this.parseAssetPositions(topHoldings),
+      };
     } catch (error) {
       this.logger.error(
-        `Failed to fetch ETF sector weightings for ${yahooSymbol}`,
+        `Failed to fetch ETF breakdowns for ${yahooSymbol}`,
         error instanceof Error ? error.stack : undefined,
       );
-      return null;
+      return { sectors: null, assets: null };
     }
+  }
+
+  private parseSectorWeightings(topHoldings: any): EtfSectorWeighting[] {
+    if (!topHoldings?.sectorWeightings) return [];
+    const weightings: EtfSectorWeighting[] = [];
+    for (const entry of topHoldings.sectorWeightings) {
+      const key = Object.keys(entry)[0];
+      if (!key) continue;
+      const rawValue = entry[key]?.raw ?? 0;
+      if (rawValue <= 0) continue;
+
+      const displayName =
+        YAHOO_SECTOR_NAMES[key] || key.charAt(0).toUpperCase() + key.slice(1);
+      weightings.push({ sector: displayName, weight: rawValue });
+    }
+    return weightings;
+  }
+
+  private parseAssetPositions(
+    topHoldings: any,
+  ): Array<{ name: string; weight: number }> {
+    const positions: Array<{ name: string; key: string }> = [
+      { name: "Stocks", key: "stockPosition" },
+      { name: "Bonds", key: "bondPosition" },
+      { name: "Cash", key: "cashPosition" },
+      { name: "Preferred", key: "preferredPosition" },
+      { name: "Convertible", key: "convertiblePosition" },
+    ];
+
+    return positions
+      .map(({ name, key }) => ({
+        name,
+        weight: Number(topHoldings[key]?.raw),
+      }))
+      .filter((entry) => Number.isFinite(entry.weight) && entry.weight > 0);
   }
 
   /**

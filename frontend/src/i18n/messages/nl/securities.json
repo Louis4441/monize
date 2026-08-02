@@ -120,6 +120,7 @@
     "typeLabel": "Type",
     "exchangeLabel": "Beurs",
     "currencyLabel": "Valuta",
+    "currencyNotConfigured": "{code} — niet in uw valuta's",
     "quoteProviderLabel": "Koersprovider",
     "msnIdLabel": "MSN-instrument-ID (geavanceerd)",
     "lookupProviderAriaLabel": "Provider opzoeken",
@@ -184,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Verdeling naar beleggingscategorie",
-      "help": "Koersaanbieders leveren geen verdeling naar beleggingscategorie voor ETF's en fondsen. Voeg die handmatig toe in percentages -- typ een willekeurige naam, daarna is die ook bij je andere effecten beschikbaar. Alles onder 100% wordt weergegeven als \"Overig\".",
+      "help": "Een koersleverancier kan de aandelen-/obligatie-/kasverdeling van een fonds invullen als u die niet zelf hebt vastgelegd; wat u hier invoert blijft staan en wordt nooit overschreven. Voeg het toe als percentages — typ een willekeurige klassenaam, die daarna bij uw andere effecten wordt aangeboden. Alles onder 100% wordt getoond als \"Overig\".",
       "placeholder": "Selecteer of typ een beleggingscategorie",
       "addRow": "Beleggingscategorie toevoegen",
       "nameAriaLabel": "Beleggingscategorie",

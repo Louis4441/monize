@@ -120,6 +120,7 @@
     "typeLabel": "Typ",
     "exchangeLabel": "Börse",
     "currencyLabel": "Währung",
+    "currencyNotConfigured": "{code} — nicht in Ihren Währungen",
     "quoteProviderLabel": "Kursanbieter",
     "msnIdLabel": "MSN Instrument ID (erweitert)",
     "lookupProviderAriaLabel": "Anbieter suchen",
@@ -184,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Anlageklassen-Aufteilung",
-      "help": "Kursanbieter liefern keine Aufteilung nach Anlageklassen für ETFs und Fonds. Füge sie manuell in Prozent hinzu -- gib einen beliebigen Namen ein, er steht danach auch bei deinen anderen Wertpapieren zur Verfügung. Alles unter 100 % wird als „Sonstige“ angezeigt.",
+      "help": "Ein Kursanbieter kann die Aktien-/Anleihen-/Cash-Aufteilung eines Fonds ergänzen, wenn Sie sie nicht selbst erfasst haben; was Sie hier eintragen, bleibt erhalten und wird nie überschrieben. Tragen Sie sie als Prozentwerte ein — Sie können beliebige Klassennamen verwenden, sie werden danach bei Ihren anderen Wertpapieren angeboten. Alles unter 100 % wird als „Sonstige\" angezeigt.",
       "placeholder": "Anlageklasse auswählen oder eingeben",
       "addRow": "Anlageklasse hinzufügen",
       "nameAriaLabel": "Anlageklasse",

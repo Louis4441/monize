@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Akun harus bertipe INVESTMENT",
     "securityIdRequired": "ID sekuritas diperlukan untuk transaksi {{ action }}",
     "splitRatioRequired": "Rasio pemecahan (kuantitas) harus lebih dari nol",
+    "acquisitionPriceRequired": "Harga per lembar wajib diisi dan harus lebih besar dari nol untuk transaksi {{ action }}. Gunakan ADD_SHARES untuk saham yang diperoleh tanpa biaya yang diketahui.",
     "cannotHoldSecurities": "{{ label }} tidak dapat menyimpan sekuritas",
     "sourceDestMustDiffer": "Akun sumber dan tujuan harus berbeda",
     "bothAccountsMustBeInvestment": "Kedua akun harus bertipe INVESTMENT",
@@ -501,5 +502,14 @@
     "fileTooLarge": "File melebihi ukuran maksimum {{ max }} byte",
     "unsupportedType": "Jenis file tidak didukung. Jenis yang diizinkan: {{ types }}",
     "tooMany": "Transaksi ini sudah memiliki maksimum {{ max }} lampiran"
+  },
+  "strategies": {
+    "accountNotFound": "Akun tidak ditemukan",
+    "accountNotInvestment": "Strategi GEM hanya dapat dijalankan di akun investasi.",
+    "configurationChanging": "Pengaturan strategi berubah saat laporan sedang dibuat. Silakan coba lagi.",
+    "securityNotFound": "Efek tidak ditemukan",
+    "signalNotFound": "Sinyal strategi tidak ditemukan",
+    "signalStrategyMismatch": "Sinyal itu milik strategi lain.",
+    "strategyNotFound": "Strategi tidak ditemukan"
   }
 }

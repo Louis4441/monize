@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Konto muss vom Typ INVESTMENT sein",
     "securityIdRequired": "Wertpapier-ID ist für {{ action }}-Buchungen erforderlich",
     "splitRatioRequired": "Teilungsverhältnis (Menge) muss größer als null sein",
+    "acquisitionPriceRequired": "Für {{ action }}-Transaktionen ist ein Preis pro Anteil erforderlich, der größer als null sein muss. Verwenden Sie ADD_SHARES für Anteile, deren Kosten nicht bekannt sind.",
     "cannotHoldSecurities": "{{ label }} kann keine Wertpapiere halten",
     "sourceDestMustDiffer": "Quell- und Zielkonto müssen verschieden sein",
     "bothAccountsMustBeInvestment": "Beide Konten müssen vom Typ INVESTMENT sein",
@@ -501,5 +502,14 @@
     "fileTooLarge": "Die Datei überschreitet die maximale Größe von {{ max }} Bytes",
     "unsupportedType": "Nicht unterstützter Dateityp. Erlaubte Typen: {{ types }}",
     "tooMany": "Diese Transaktion hat bereits die maximale Anzahl von {{ max }} Anhängen"
+  },
+  "strategies": {
+    "accountNotFound": "Konto nicht gefunden",
+    "accountNotInvestment": "Eine GEM-Strategie kann nur in Anlagekonten laufen.",
+    "configurationChanging": "Die Strategieeinstellungen haben sich geändert, während der Bericht erstellt wurde. Bitte versuchen Sie es erneut.",
+    "securityNotFound": "Wertpapier nicht gefunden",
+    "signalNotFound": "Strategiesignal nicht gefunden",
+    "signalStrategyMismatch": "Dieses Signal gehört zu einer anderen Strategie.",
+    "strategyNotFound": "Strategie nicht gefunden"
   }
 }

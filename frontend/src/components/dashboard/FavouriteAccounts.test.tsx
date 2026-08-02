@@ -293,9 +293,41 @@ describe("FavouriteAccounts", () => {
     ] as any[];
 
     render(<FavouriteAccounts accounts={accounts} isLoading={false} />);
-    const row = screen.getByText("Checking").closest("button")!;
-    expect(row.className).toContain("hover:border-blue-400");
-    expect(row.className).toContain("dark:hover:border-blue-500");
+    // The border and its hover live on the card, which wraps the navigation
+    // button rather than being it -- a credit card's statement-day help
+    // carries its own button, and one cannot be nested in the other.
+    const card = screen.getByText("Checking").closest("button")!.parentElement!;
+    expect(card.className).toContain("hover:border-blue-400");
+    expect(card.className).toContain("dark:hover:border-blue-500");
+  });
+
+  it("keeps the statement-day help out of the navigation button", () => {
+    // A `<button>` inside a `<button>` is closed early by the parser: the card
+    // lost most of its click target, and the server's markup stopped matching
+    // what React built on the client.
+    const accounts = [
+      {
+        id: "acc-cc",
+        name: "Visa",
+        accountType: "CREDIT_CARD",
+        statementDueDay: 15,
+        statementSettlementDay: 3,
+        currentBalance: -250,
+        currencyCode: "CAD",
+        isFavourite: true,
+        favouriteSortOrder: 0,
+        isClosed: false,
+      },
+    ] as any[];
+
+    render(<FavouriteAccounts accounts={accounts} isLoading={false} />);
+
+    const navigation = screen.getByText("Visa").closest("button")!;
+    expect(navigation.querySelector("button")).toBeNull();
+    // The help is still on the card, beside the button rather than within it.
+    const card = navigation.parentElement!;
+    expect(card.textContent).toContain("15th");
+    expect(card.querySelectorAll("button").length).toBeGreaterThan(1);
   });
 
   describe("favourite account ordering", () => {

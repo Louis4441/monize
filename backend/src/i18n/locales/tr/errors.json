@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Hesap YATIRİM türünde olmalıdır",
     "securityIdRequired": "{{ action }} işlemleri için menkul kıymet kimliği gereklidir",
     "splitRatioRequired": "Bölünme oranı (miktar) sıfırdan büyük olmalıdır",
+    "acquisitionPriceRequired": "{{ action }} işlemleri için sıfırdan büyük bir birim fiyat gereklidir. Maliyeti bilinmeyen paylar için ADD_SHARES kullanın.",
     "cannotHoldSecurities": "{{ label }} menkul kıymet tutamaz",
     "sourceDestMustDiffer": "Kaynak ve hedef hesaplar farklı olmalıdır",
     "bothAccountsMustBeInvestment": "Her iki hesap da YATIRİM türünde olmalıdır",
@@ -501,5 +502,14 @@
     "fileTooLarge": "Dosya, {{ max }} baytlık maksimum boyutu aşıyor",
     "unsupportedType": "Desteklenmeyen dosya türü. İzin verilen türler: {{ types }}",
     "tooMany": "Bu işlemde zaten en fazla {{ max }} ek var"
+  },
+  "strategies": {
+    "accountNotFound": "Hesap bulunamadı",
+    "accountNotInvestment": "Bir GEM stratejisi yalnızca yatırım hesaplarında çalışabilir.",
+    "configurationChanging": "Rapor oluşturulurken strateji ayarları değişti. Lütfen tekrar deneyin.",
+    "securityNotFound": "Menkul kıymet bulunamadı",
+    "signalNotFound": "Strateji sinyali bulunamadı",
+    "signalStrategyMismatch": "Bu sinyal başka bir stratejiye ait.",
+    "strategyNotFound": "Strateji bulunamadı"
   }
 }

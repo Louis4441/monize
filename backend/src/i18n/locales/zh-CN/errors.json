@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "账户类型必须为 INVESTMENT",
     "securityIdRequired": "{{ action }} 交易需要证券 ID",
     "splitRatioRequired": "拆股比例（数量）必须大于零",
+    "acquisitionPriceRequired": "{{ action }} 交易需要填写每股价格，且必须大于零。对于成本未知的股份，请使用 ADD_SHARES。",
     "cannotHoldSecurities": "{{ label }} 不能持有证券",
     "sourceDestMustDiffer": "来源账户和目标账户必须不同",
     "bothAccountsMustBeInvestment": "两个账户类型都必须为 INVESTMENT",
@@ -501,5 +502,14 @@
     "fileTooLarge": "文件超过最大大小 {{ max }} 字节",
     "unsupportedType": "不支持的文件类型。允许的类型：{{ types }}",
     "tooMany": "此交易已达到最多 {{ max }} 个附件的上限"
+  },
+  "strategies": {
+    "accountNotFound": "未找到账户",
+    "accountNotInvestment": "GEM 策略只能在投资账户中运行。",
+    "configurationChanging": "生成报告时策略设置发生了更改。请重试。",
+    "securityNotFound": "未找到证券",
+    "signalNotFound": "未找到策略信号",
+    "signalStrategyMismatch": "该信号属于另一个策略。",
+    "strategyNotFound": "未找到策略"
   }
 }

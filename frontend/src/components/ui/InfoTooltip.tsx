@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 
@@ -35,6 +35,14 @@ const VIEWPORT_MARGIN = 8;
  * breakpoint because a hover popover can't be triggered on touch. The text
  * is exposed via aria-label for screen readers; no native title attribute
  * is used so the browser tooltip doesn't duplicate the styled popover.
+ *
+ * The trigger is a `<button>`, not a focusable `<span>`. A span's implicit role
+ * is generic, which screen readers do not announce and whose `aria-label` they
+ * therefore drop -- so a `tabIndex` on one produces a tab stop that says
+ * nothing, repeated wherever this component appears. The button carries the
+ * label, is reachable by keyboard, and shows the same popover on focus.
+ *
+ * Escape dismisses the popover without moving focus, per WCAG 1.4.13.
  */
 export function InfoTooltip({
   text,
@@ -43,10 +51,12 @@ export function InfoTooltip({
   iconClassName = 'h-4 w-4',
   usePortal = false,
 }: InfoTooltipProps) {
-  const iconRef = useRef<HTMLSpanElement>(null);
+  const iconRef = useRef<HTMLButtonElement>(null);
   const [portalPos, setPortalPos] = useState<{ top: number; left: number } | null>(
     null,
   );
+  /** Only used by the CSS-driven variant, whose popover has no state of its own. */
+  const [dismissed, setDismissed] = useState(false);
 
   const showPortal = useCallback(() => {
     const rect = iconRef.current?.getBoundingClientRect();
@@ -62,16 +72,34 @@ export function InfoTooltip({
 
   const hidePortal = useCallback(() => setPortalPos(null), []);
 
+  /** Escape closes the help without taking focus away from the trigger. */
+  const dismissOnEscape = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      hidePortal();
+      setDismissed(true);
+    },
+    [hidePortal],
+  );
+
+  const triggerClasses =
+    'relative hidden md:inline-flex items-center align-middle ml-1 text-gray-400 hover:text-blue-500 focus-visible:text-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded transition-colors cursor-help';
+
   if (usePortal) {
     return (
-      <span
+      <button
+        type="button"
         ref={iconRef}
         aria-label={text}
         onMouseEnter={showPortal}
         onMouseLeave={hidePortal}
-        className="relative hidden md:inline-flex items-center align-middle ml-1 text-gray-400 hover:text-blue-500 transition-colors cursor-help"
+        onFocus={showPortal}
+        onBlur={hidePortal}
+        onKeyDown={dismissOnEscape}
+        className={triggerClasses}
       >
-        <QuestionMarkCircleIcon className={iconClassName} />
+        <QuestionMarkCircleIcon className={iconClassName} aria-hidden="true" />
         {portalPos &&
           createPortal(
             <span
@@ -89,7 +117,7 @@ export function InfoTooltip({
             </span>,
             document.body,
           )}
-      </span>
+      </button>
     );
   }
 
@@ -102,19 +130,28 @@ export function InfoTooltip({
         : placement === 'top'
           ? 'left-1/2 -translate-x-1/2'
           : 'left-0';
+  // The popover is shown by CSS on hover/focus of the group. Escape has to win
+  // over that, and re-arm the next time the pointer or focus arrives.
+  const visibility = dismissed
+    ? 'hidden'
+    : 'hidden md:group-hover/tip:block md:group-focus/tip:block';
   const popoverClasses = `${horizontal} ${vertical}`;
   return (
-    <span
+    <button
+      type="button"
       aria-label={text}
-      className="relative hidden md:inline-flex items-center align-middle ml-1 group/tip text-gray-400 hover:text-blue-500 transition-colors cursor-help"
+      onKeyDown={dismissOnEscape}
+      onMouseEnter={() => setDismissed(false)}
+      onFocus={() => setDismissed(false)}
+      className={`${triggerClasses} group/tip`}
     >
-      <QuestionMarkCircleIcon className={iconClassName} />
+      <QuestionMarkCircleIcon className={iconClassName} aria-hidden="true" />
       <span
         role="tooltip"
-        className={`pointer-events-none hidden md:group-hover/tip:block absolute z-20 w-64 whitespace-normal rounded-md bg-gray-900 dark:bg-gray-700 px-2.5 py-2 text-xs font-normal leading-snug text-white shadow-lg ${popoverClasses}`}
+        className={`pointer-events-none ${visibility} absolute z-20 w-64 whitespace-normal rounded-md bg-gray-900 dark:bg-gray-700 px-2.5 py-2 text-xs font-normal leading-snug text-white shadow-lg ${popoverClasses}`}
       >
         {text}
       </span>
-    </span>
+    </button>
   );
 }

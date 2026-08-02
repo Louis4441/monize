@@ -176,6 +176,45 @@ describe('SecurityForm', () => {
     });
   });
 
+  it('keeps a looked-up currency the user has not configured', async () => {
+    // The provider returns the listing currency, which need not be one of the
+    // user's currencies in Tools. A <select> whose value has no <option>
+    // renders blank, so the code would vanish from the field and be lost on
+    // save; it stays in the list, labelled as not configured.
+    (investmentsApi.lookupSecurityCandidates as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([
+        {
+          symbol: 'CSPX',
+          name: 'iShares Core S&P 500 UCITS ETF',
+          exchange: 'LSE',
+          currencyCode: 'GBP',
+          securityType: 'ETF',
+        },
+      ]);
+
+    render(<SecurityForm onSubmit={onSubmit} onCancel={onCancel} />);
+    await waitFor(() => {
+      expect(exchangeRatesApi.getCurrencies).toHaveBeenCalled();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Symbol'), {
+        target: { value: 'CSPX' },
+      });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Lookup'));
+    });
+
+    await waitFor(() => {
+      const select = screen.getByLabelText('Currency') as HTMLSelectElement;
+      expect(select.value).toBe('GBP');
+    });
+    expect(
+      screen.getByRole('option', { name: 'GBP — not in your currencies' }),
+    ).toBeInTheDocument();
+  });
+
   it('shows Lookup button for new security form', async () => {
     render(<SecurityForm onSubmit={onSubmit} onCancel={onCancel} />);
     await waitFor(() => {

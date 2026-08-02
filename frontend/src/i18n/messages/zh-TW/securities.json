@@ -120,6 +120,7 @@
     "typeLabel": "類型",
     "exchangeLabel": "交易所",
     "currencyLabel": "貨幣",
+    "currencyNotConfigured": "{code} — 不在你的貨幣清單中",
     "quoteProviderLabel": "報價提供者",
     "msnIdLabel": "MSN 金融商品 ID（進階）",
     "lookupProviderAriaLabel": "查找提供者",
@@ -184,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "資產類別配置",
-      "help": "報價提供商不提供 ETF 和基金的資產類別曝險。請以百分比手動新增——可輸入任意名稱，之後在你的其他證券上也能選用。低於 100% 的部分將顯示為「其他」。",
+      "help": "若您未自行填寫，報價提供方可能會補上基金的股票／債券／現金組成；您在此輸入的內容會保留，絕不會被覆寫。請以百分比填寫——可輸入任意類別名稱，之後會在您的其他證券中作為選項出現。不足 100% 的部分顯示為「其他」。",
       "placeholder": "選擇或輸入資產類別",
       "addRow": "新增資產類別",
       "nameAriaLabel": "資產類別",

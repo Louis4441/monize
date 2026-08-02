@@ -191,13 +191,11 @@ export class SectorWeightingService {
           sec.symbol,
           sec.exchange,
         );
-        const weightings =
-          await this.yahooFinanceService.fetchEtfSectorWeightings(yahooSymbol);
-        if (weightings) {
-          sec.sectorWeightings = weightings;
+        // Only a request that reached the provider makes the row fresh.
+        if (await this.fillEtfBreakdowns(sec, yahooSymbol)) {
+          sec.sectorDataUpdatedAt = new Date();
+          toUpdate.push(sec);
         }
-        sec.sectorDataUpdatedAt = new Date();
-        toUpdate.push(sec);
       } else if (sec.sectorDataUpdatedAt && !isFresh && (isStock || isEtf)) {
         // Re-fetch stale data
         const yahooSymbol = this.yahooFinanceService.getYahooSymbol(
@@ -211,14 +209,10 @@ export class SectorWeightingService {
             sec.sector = info.sector;
             sec.industry = info.industry;
           }
-        } else {
-          const weightings =
-            await this.yahooFinanceService.fetchEtfSectorWeightings(
-              yahooSymbol,
-            );
-          if (weightings) {
-            sec.sectorWeightings = weightings;
-          }
+        } else if (!(await this.fillEtfBreakdowns(sec, yahooSymbol))) {
+          // The refresh never happened, so the row is exactly as stale as it
+          // was and stays eligible for the next sweep.
+          continue;
         }
         sec.sectorDataUpdatedAt = new Date();
         toUpdate.push(sec);
@@ -232,6 +226,41 @@ export class SectorWeightingService {
     }
   }
 
+  /**
+   * Fill a fund's sector weightings and asset-class split from the provider.
+   *
+   * Both come out of the same `topHoldings` response, so they are fetched
+   * together -- asking twice was two identical requests per fund.
+   *
+   * The asset-class column is documented as manual and the allocation editor
+   * writes it, so a fetched value must never overwrite a typed one: the
+   * provider's split is a convenience for funds nobody has described, not a
+   * source of truth that outranks the owner. It matters to the GEM report,
+   * whose defensive roles are compared on exactly this breakdown.
+   *
+   * Returns whether the request actually reached the provider, which is what
+   * decides freshness. The two are not the same question: the provider
+   * distinguishes `null` (the request failed) from `[]` (it answered, and the
+   * fund has no breakdown to give), and only the second is knowledge. Stamping
+   * `sectorDataUpdatedAt` on a failure suppressed the retry for a week behind a
+   * row that looked up to date, which is how a transient outage turned into a
+   * fund with no asset-class data and no way back.
+   */
+  private async fillEtfBreakdowns(
+    sec: Security,
+    yahooSymbol: string,
+  ): Promise<boolean> {
+    const { sectors, assets } =
+      await this.yahooFinanceService.fetchEtfBreakdowns(yahooSymbol);
+    if (sectors === null && assets === null) return false;
+    if (sectors) sec.sectorWeightings = sectors;
+    if (!sec.assetWeightings?.length && assets?.length) {
+      sec.assetWeightings = assets;
+    }
+    // One half missing is still an answer: the fund was described, just not in
+    // both dimensions, and re-asking every sweep would not change that.
+    return true;
+  }
   /**
    * Get the latest price per security from security_prices table.
    */

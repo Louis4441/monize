@@ -43,6 +43,7 @@ const NAMESPACES = [
   "scheduledTransactions",
   "securities",
   "securityDetail",
+  "strategies",
   "tags",
   "tours",
   "transactions",

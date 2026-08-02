@@ -1450,6 +1450,121 @@ describe("YahooFinanceService", () => {
     });
   });
 
+  describe("fetchEtfAssetPositions", () => {
+    beforeEach(() => seedCrumb());
+
+    it("returns the fund's asset-class split as weights", async () => {
+      mockFetchResponse({
+        quoteSummary: {
+          result: [
+            {
+              topHoldings: {
+                stockPosition: { raw: 0.006 },
+                bondPosition: { raw: 0.98 },
+                cashPosition: { raw: 0.014 },
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await service.fetchEtfAssetPositions("AGGG", "LSE");
+
+      expect(result).toEqual([
+        { name: "Stocks", weight: 0.006 },
+        { name: "Bonds", weight: 0.98 },
+        { name: "Cash", weight: 0.014 },
+      ]);
+    });
+
+    it("drops the unattributed remainder rather than storing it", async () => {
+      // A shortfall under 100% is shown as "Other" at display time; storing
+      // Yahoo's own otherPosition too would double-count it.
+      mockFetchResponse({
+        quoteSummary: {
+          result: [
+            {
+              topHoldings: {
+                stockPosition: { raw: 0.9 },
+                otherPosition: { raw: 0.1 },
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await service.fetchEtfAssetPositions("VTI");
+
+      expect(result).toEqual([{ name: "Stocks", weight: 0.9 }]);
+    });
+
+    it("skips positions the provider reports as zero or missing", async () => {
+      mockFetchResponse({
+        quoteSummary: {
+          result: [
+            {
+              topHoldings: {
+                stockPosition: { raw: 1 },
+                bondPosition: { raw: 0 },
+                cashPosition: {},
+              },
+            },
+          ],
+        },
+      });
+
+      expect(await service.fetchEtfAssetPositions("VTI")).toEqual([
+        { name: "Stocks", weight: 1 },
+      ]);
+    });
+
+    it("is empty when the provider knows the fund but holds no split", async () => {
+      mockFetchResponse({ quoteSummary: { result: [{}] } });
+      expect(await service.fetchEtfAssetPositions("VTI")).toEqual([]);
+    });
+  });
+
+  describe("fetchEtfBreakdowns", () => {
+    beforeEach(() => seedCrumb());
+
+    it("returns both breakdowns from a single request", async () => {
+      // Sectors and asset positions arrive in the same topHoldings module, so
+      // fetching them separately was two identical round trips per fund.
+      mockFetchResponse({
+        quoteSummary: {
+          result: [
+            {
+              topHoldings: {
+                stockPosition: { raw: 1 },
+                sectorWeightings: [{ technology: { raw: 0.3 } }],
+              },
+            },
+          ],
+        },
+      });
+      const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
+
+      const result = await service.fetchEtfBreakdowns("VTI");
+
+      expect(result).toEqual({
+        sectors: [{ sector: "Technology", weight: 0.3 }],
+        assets: [{ name: "Stocks", weight: 1 }],
+      });
+      expect((global.fetch as jest.Mock).mock.calls.length - callsBefore).toBe(
+        1,
+      );
+    });
+
+    it("reports both halves as unknown when the request fails", async () => {
+      // Null is "we could not ask", which a caller must not store as "none".
+      mockFetchResponse({}, false, 500);
+      expect(await service.fetchEtfBreakdowns("VTI")).toEqual({
+        sectors: null,
+        assets: null,
+      });
+    });
+  });
+
   describe("fetchEtfSectorWeightings", () => {
     beforeEach(() => seedCrumb());
 

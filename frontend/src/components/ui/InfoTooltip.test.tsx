@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@/test/render';
+import { render, screen, fireEvent } from '@/test/render';
 import { InfoTooltip } from './InfoTooltip';
 
 describe('InfoTooltip', () => {
@@ -44,5 +44,59 @@ describe('InfoTooltip', () => {
   it('applies custom icon className', () => {
     const { container } = render(<InfoTooltip text="Tooltip" iconClassName="h-6 w-6" />);
     expect(container.querySelector('.h-6.w-6')).toBeInTheDocument();
+  });
+
+  it('is reachable by keyboard and reveals the popover on focus', () => {
+    render(<InfoTooltip text="Keyboard help" />);
+    const trigger = screen.getByLabelText('Keyboard help');
+    expect(trigger.tagName).toBe('BUTTON');
+    expect(screen.getByRole('tooltip').className).toContain('group-focus/tip:block');
+  });
+
+  it('is a button, not a focusable span', () => {
+    // A span's implicit role is generic: screen readers skip it and drop its
+    // aria-label, so a tabIndex on one is a tab stop that announces nothing.
+    // The trigger is announced as a button, and never submits its form.
+    render(<InfoTooltip text="Named help" />);
+    const trigger = screen.getByRole('button', { name: 'Named help' });
+    expect(trigger).toHaveAttribute('type', 'button');
+    expect(trigger).not.toHaveAttribute('tabindex');
+  });
+
+  it('dismisses the popover on Escape and re-arms on the next focus', () => {
+    render(<InfoTooltip text="Escapable" />);
+    const trigger = screen.getByRole('button', { name: 'Escapable' });
+
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(screen.getByRole('tooltip').className).not.toContain(
+      'group-focus/tip:block',
+    );
+
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip').className).toContain(
+      'group-focus/tip:block',
+    );
+  });
+
+  it('opens and closes the portal popover on focus and blur', () => {
+    render(<InfoTooltip text="Portal help" usePortal />);
+    const trigger = screen.getByRole('button', { name: 'Portal help' });
+
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Portal help');
+
+    fireEvent.blur(trigger);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('dismisses the portal popover on Escape', () => {
+    render(<InfoTooltip text="Portal escape" usePortal />);
+    const trigger = screen.getByRole('button', { name: 'Portal escape' });
+
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });

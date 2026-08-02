@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "खाता INVESTMENT प्रकार का होना चाहिए",
     "securityIdRequired": "{{ action }} लेनदेन के लिए प्रतिभूति ID आवश्यक है",
     "splitRatioRequired": "विभाजन अनुपात (मात्रा) शून्य से अधिक होना चाहिए",
+    "acquisitionPriceRequired": "{{ action }} लेनदेन के लिए प्रति शेयर मूल्य आवश्यक है और यह शून्य से अधिक होना चाहिए। जिन शेयरों की लागत ज्ञात नहीं है, उनके लिए ADD_SHARES का उपयोग करें।",
     "cannotHoldSecurities": "{{ label }} प्रतिभूतियाँ नहीं रख सकता",
     "sourceDestMustDiffer": "स्रोत और गंतव्य खाते अलग होने चाहिए",
     "bothAccountsMustBeInvestment": "दोनों खाते INVESTMENT प्रकार के होने चाहिए",
@@ -501,5 +502,14 @@
     "fileTooLarge": "फ़ाइल {{ max }} बाइट्स की अधिकतम सीमा से अधिक है",
     "unsupportedType": "असमर्थित फ़ाइल प्रकार। अनुमत प्रकार: {{ types }}",
     "tooMany": "इस लेन-देन में पहले से ही अधिकतम {{ max }} अटैचमेंट हैं"
+  },
+  "strategies": {
+    "accountNotFound": "खाता नहीं मिला",
+    "accountNotInvestment": "GEM रणनीति केवल निवेश खातों में चल सकती है।",
+    "configurationChanging": "रिपोर्ट बनते समय रणनीति सेटिंग्स बदल गईं। कृपया फिर से प्रयास करें।",
+    "securityNotFound": "प्रतिभूति नहीं मिली",
+    "signalNotFound": "रणनीति संकेत नहीं मिला",
+    "signalStrategyMismatch": "वह सिग्नल किसी दूसरी रणनीति का है।",
+    "strategyNotFound": "रणनीति नहीं मिली"
   }
 }

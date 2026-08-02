@@ -1,5 +1,8 @@
 import { NotFoundException } from "@nestjs/common";
-import { SecurityPriceService } from "./security-price.service";
+import {
+  SecurityPriceService,
+  settlePendingPriceWrites,
+} from "./security-price.service";
 import { SecurityPrice } from "./entities/security-price.entity";
 import { Security } from "./entities/security.entity";
 import { YahooFinanceService } from "./yahoo-finance.service";
@@ -1342,6 +1345,54 @@ describe("SecurityPriceService", () => {
       await expect(
         service.backfillSecurity(mockSecurity),
       ).resolves.not.toThrow();
+    });
+
+    /**
+     * Invariant: a price write nobody awaited is still visible to something
+     * that needs the database quiet.
+     * Canonical adversarial input: an operation outliving the request that
+     * started it (testing contract, concurrency).
+     * Minimal mutation: drop the `trackPriceWrite` wrapper in
+     * `backfillSecurity`.
+     * Test that fails under it: this one -- `settlePendingPriceWrites`
+     * returns while the write is still in flight, which in an integration
+     * suite is the truncate racing the insert.
+     */
+    it("is visible to settlePendingPriceWrites until it finishes", async () => {
+      const historicalData = makeYahooHistoricalResponse({
+        timestamps: [1748700000, 1748800000],
+        closes: [193.0, 194.0],
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(historicalData),
+        ) as jest.Mock;
+      dataSourceMock.query.mockResolvedValue(undefined);
+
+      // What the waiter has to outlast is the *write*, not the promise that
+      // wraps it. Untracked, the register is empty and
+      // `settlePendingPriceWrites` returns on the next microtask -- before the
+      // fetch has even resolved, let alone the insert -- and that gap is
+      // exactly where a TRUNCATE meets a live INSERT.
+      let writes = 0;
+      dataSourceMock.query.mockImplementation(async () => {
+        writes += 1;
+      });
+
+      // Started and deliberately not awaited, exactly as SecuritiesService
+      // does it.
+      const backfill = service.backfillSecurity(mockSecurity);
+      const writesWhenSettled = settlePendingPriceWrites().then(() => writes);
+
+      expect(await writesWhenSettled).toBeGreaterThan(0);
+
+      await backfill;
+      // The write really did go through this mock, so the assertion above is
+      // about ordering and not about a counter nothing increments.
+      expect(writes).toBeGreaterThan(0);
+      // And the register is empty again, so the next suite's teardown is free.
+      await expect(settlePendingPriceWrites()).resolves.toBeUndefined();
     });
   });
 

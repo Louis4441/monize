@@ -120,6 +120,7 @@
     "typeLabel": "Tür",
     "exchangeLabel": "Borsa",
     "currencyLabel": "Para Birimi",
+    "currencyNotConfigured": "{code} — para birimlerinizde yok",
     "quoteProviderLabel": "Fiyat Teklifi Sağlayıcısı",
     "msnIdLabel": "MSN Araç ID'si (gelişmiş)",
     "lookupProviderAriaLabel": "Sağlayıcıyı ara",
@@ -184,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Varlık Sınıfı Dağılımı",
-      "help": "Fiyat sağlayıcıları ETF ve fonlar için varlık sınıfı dağılımı vermez. Yüzde olarak elle ekleyin -- istediğiniz adı yazın, sonrasında diğer menkul kıymetlerinizde de kullanılabilir. %100'ün altında kalan kısım \"Diğer\" olarak gösterilir.",
+      "help": "Kendiniz tanımlamadıysanız bir fiyat sağlayıcı fonun hisse/tahvil/nakit dağılımını doldurabilir; buraya girdikleriniz korunur ve asla üzerine yazılmaz. Yüzde olarak ekleyin — istediğiniz sınıf adını yazın, sonrasında diğer menkul kıymetlerinizde de önerilir. %100’ün altında kalan her şey \"Diğer\" olarak gösterilir.",
       "placeholder": "Varlık sınıfı seçin veya yazın",
       "addRow": "Varlık sınıfı ekle",
       "nameAriaLabel": "Varlık sınıfı",

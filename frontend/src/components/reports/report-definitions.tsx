@@ -293,6 +293,18 @@ export const builtInReports: Report[] = [
       </svg>
     ),
   },
+  {
+    // Dedicated page at /reports/gem-strategy (not the generic [reportId] renderer).
+    id: 'gem-strategy',
+    category: 'investment',
+    color: 'bg-purple-500',
+    icon: (
+      <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5l5.25-5.25 3.75 3.75 4.5-6 4.5 4.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 20.25h18" />
+      </svg>
+    ),
+  },
   // Behavioral Insights
   {
     id: 'recurring-expenses',

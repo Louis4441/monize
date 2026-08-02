@@ -40,6 +40,52 @@ const TRANSACTION_SOURCES = [
 // not fire hundreds of concurrent Yahoo/MSN requests and trip rate limits.
 const QUOTE_FETCH_CONCURRENCY = 6;
 
+/**
+ * Price writes that were started without anybody waiting for them.
+ *
+ * Creating a security or an investment transaction kicks off a price fetch and
+ * returns straight away -- deliberately, because the user should not wait on
+ * Yahoo to see their own row. The write that lands afterwards is still a write,
+ * and it arrives with no relationship to the request that caused it.
+ *
+ * Harmless in a running server. Not harmless against a database being torn
+ * down: an integration suite that truncates `securities ... CASCADE` while one
+ * of these is inserting into `security_prices` takes both sides of a lock in
+ * the opposite order and deadlocks, or -- when the truncate wins -- the insert
+ * comes back as a foreign key violation against a security that no longer
+ * exists. Neither is a bug in the code under test, and both read as one.
+ *
+ * Module scope rather than instance state on purpose: the thing that needs to
+ * wait is a test helper holding a `DataSource`, not a consumer of this service,
+ * and giving it the whole DI graph to reach one boolean would be the larger
+ * change. Nothing in `src/` waits on this; production keeps exactly the
+ * fire-and-forget behaviour it had.
+ */
+const pendingPriceWrites = new Set<Promise<unknown>>();
+
+/**
+ * Resolves once every background price write started so far has finished, in
+ * either direction. Call this before dropping or truncating price tables.
+ *
+ * Settled, not successful: a failed backfill has also stopped touching the
+ * database, which is the only property a teardown needs.
+ */
+export async function settlePendingPriceWrites(): Promise<void> {
+  // Snapshotted because a settling promise removes itself from the set, and a
+  // backfill may start another write before it finishes.
+  while (pendingPriceWrites.size > 0) {
+    await Promise.allSettled([...pendingPriceWrites]);
+  }
+}
+
+/** Register a background price write so `settlePendingPriceWrites` can see it. */
+function trackPriceWrite<T>(work: Promise<T>): Promise<T> {
+  pendingPriceWrites.add(work);
+  // `finally` keeps the returned promise's own settlement untouched, so a
+  // caller that does await this still sees the original result or rejection.
+  return work.finally(() => pendingPriceWrites.delete(work));
+}
+
 function sourceFor(provider: QuoteProviderName | undefined): string {
   return provider === "msn" ? "msn_finance" : "yahoo_finance";
 }
@@ -1119,7 +1165,10 @@ export class SecurityPriceService {
    * provider override + user default + preferredExchanges.
    */
   async backfillSecurity(security: Security): Promise<void> {
-    await this.backfillSecurityRange(security, "1y");
+    // Registered rather than merely started. `SecuritiesService.create` does
+    // not await this, so without a record of it the write is invisible to
+    // anything that needs the database to be quiet.
+    await trackPriceWrite(this.backfillSecurityRange(security, "1y"));
   }
 
   /**
@@ -1308,6 +1357,15 @@ export class SecurityPriceService {
    * existing source is itself a transaction action.
    */
   async upsertTransactionPrice(
+    securityId: string,
+    transactionDate: string,
+  ): Promise<void> {
+    return trackPriceWrite(
+      this.upsertTransactionPriceInner(securityId, transactionDate),
+    );
+  }
+
+  private async upsertTransactionPriceInner(
     securityId: string,
     transactionDate: string,
   ): Promise<void> {

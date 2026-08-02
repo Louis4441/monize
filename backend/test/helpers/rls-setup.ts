@@ -86,6 +86,12 @@ export function findRlsMigrations(includeEnable = false): string[] {
     const sql = stripSqlComments(
       fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"),
     );
+    // A file that references a helper declares a policy, and that settles it --
+    // the test asked first, because a migration numbered after M3 has to ship
+    // its own ENABLE alongside its policy (database/CLAUDE.md) and would
+    // otherwise be read as an enable migration and dropped from the default
+    // apply, leaving its table unpolicied while the suite went green.
+    if (/app_current_user_id|app_bypass_rls/.test(sql)) return true;
     // The enable migration (M3) references neither helper -- it reads
     // pg_policies -- so it is opted into separately, and applied in its
     // filename position rather than appended. Position is what makes the
@@ -94,7 +100,7 @@ export function findRlsMigrations(includeEnable = false): string[] {
     // an enable leaves that table unenforced, exactly as it would on a deployed
     // database where M3 has already been recorded in schema_migrations.
     if (/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(sql)) return includeEnable;
-    return /app_current_user_id|app_bypass_rls/.test(sql);
+    return false;
   });
 
   if (rlsFiles.length === 0) {
@@ -115,7 +121,7 @@ export function findRlsMigrations(includeEnable = false): string[] {
  * Used as a post-condition -- what was declared has to exist in `pg_policies`
  * once the files have been applied.
  */
-function declaredPolicyTables(rawSql: string): string[] {
+export function declaredPolicyTables(rawSql: string): string[] {
   // Comments stripped for the same reason as in the selector: these files
   // discuss policies in prose, and a sentence naming one would become a
   // post-condition demanding a policy nothing creates.

@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Il conto deve essere di tipo INVESTMENT",
     "securityIdRequired": "L'ID titolo è obbligatorio per le transazioni {{ action }}",
     "splitRatioRequired": "Il rapporto di suddivisione (quantità) deve essere maggiore di zero",
+    "acquisitionPriceRequired": "Per le transazioni {{ action }} è richiesto un prezzo per quota maggiore di zero. Usa ADD_SHARES per le quote acquisite senza un costo noto.",
     "cannotHoldSecurities": "{{ label }} non può detenere titoli",
     "sourceDestMustDiffer": "I conti di origine e destinazione devono essere diversi",
     "bothAccountsMustBeInvestment": "Entrambi i conti devono essere di tipo INVESTMENT",
@@ -501,5 +502,14 @@
     "fileTooLarge": "Il file supera la dimensione massima di {{ max }} byte",
     "unsupportedType": "Tipo di file non supportato. Tipi consentiti: {{ types }}",
     "tooMany": "Questa transazione ha già il numero massimo di {{ max }} allegati"
+  },
+  "strategies": {
+    "accountNotFound": "Conto non trovato",
+    "accountNotInvestment": "Una strategia GEM può essere eseguita solo su conti di investimento.",
+    "configurationChanging": "Le impostazioni della strategia sono cambiate mentre il report veniva creato. Riprova.",
+    "securityNotFound": "Titolo non trovato",
+    "signalNotFound": "Segnale della strategia non trovato",
+    "signalStrategyMismatch": "Quel segnale appartiene a un'altra strategia.",
+    "strategyNotFound": "Strategia non trovata"
   }
 }

@@ -362,6 +362,7 @@
     "securityIdRequired": "[XX-Security ID is required for {{ action }} transactions-XX]",
     "exchangeRateUnavailable": "[XX-Could not determine an exchange rate for {{ from }} -> {{ to }} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.-XX]",
     "splitRatioRequired": "[XX-Split ratio (quantity) must be greater than zero-XX]",
+    "acquisitionPriceRequired": "[XX-Price per share is required and must be greater than zero for {{ action }} transactions. Use ADD_SHARES for shares acquired without a known cost.-XX]",
     "ambiguousSecurity": "[XX-\"{{ query }}\" matches multiple securities: {{ list }}. Use the exact ticker symbol.-XX]",
     "allocationExceedsTotal": "[XX-Allocation percentages add up to more than 100%.-XX]",
     "assetOptionNameRequired": "[XX-An asset class name is required.-XX]",
@@ -501,5 +502,14 @@
     "recalculateMortgageOnly": "[XX-Payment recalculation is only available for mortgage accounts-XX]",
     "insufficientData": "[XX-Not enough payments with interest details to detect rate changes-XX]",
     "frequencyMismatch": "[XX-Payment dates do not match the account's payment frequency; inferred rates may be less accurate-XX]"
+  },
+  "strategies": {
+    "accountNotFound": "[XX-Account not found-XX]",
+    "accountNotInvestment": "[XX-A GEM strategy can only run in investment accounts.-XX]",
+    "configurationChanging": "[XX-The strategy settings changed while the report was being built. Please try again.-XX]",
+    "securityNotFound": "[XX-Security not found-XX]",
+    "signalNotFound": "[XX-Strategy signal not found-XX]",
+    "signalStrategyMismatch": "[XX-That signal belongs to a different strategy.-XX]",
+    "strategyNotFound": "[XX-Strategy not found-XX]"
   }
 }

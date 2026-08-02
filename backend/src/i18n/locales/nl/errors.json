@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Rekening moet van het type INVESTMENT zijn",
     "securityIdRequired": "Waardepapier-ID is vereist voor {{ action }}-transacties",
     "splitRatioRequired": "Splitsingsverhouding (hoeveelheid) moet groter zijn dan nul",
+    "acquisitionPriceRequired": "Voor {{ action }}-transacties is een prijs per aandeel groter dan nul vereist. Gebruik ADD_SHARES voor aandelen die zonder bekende kostprijs zijn verworven.",
     "cannotHoldSecurities": "{{ label }} kan geen waardepapieren aanhouden",
     "sourceDestMustDiffer": "Bron- en doelrekeningen moeten verschillend zijn",
     "bothAccountsMustBeInvestment": "Beide rekeningen moeten van het type INVESTMENT zijn",
@@ -501,5 +502,14 @@
     "fileTooLarge": "Bestand overschrijdt de maximale grootte van {{ max }} bytes",
     "unsupportedType": "Niet-ondersteund bestandstype. Toegestane types: {{ types }}",
     "tooMany": "Deze transactie heeft al het maximum van {{ max }} bijlagen"
+  },
+  "strategies": {
+    "accountNotFound": "Rekening niet gevonden",
+    "accountNotInvestment": "Een GEM-strategie kan alleen op beleggingsrekeningen draaien.",
+    "configurationChanging": "De strategie-instellingen zijn gewijzigd terwijl het rapport werd opgebouwd. Probeer het opnieuw.",
+    "securityNotFound": "Effect niet gevonden",
+    "signalNotFound": "Strategiesignaal niet gevonden",
+    "signalStrategyMismatch": "Dat signaal hoort bij een andere strategie.",
+    "strategyNotFound": "Strategie niet gevonden"
   }
 }

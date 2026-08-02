@@ -85,6 +85,14 @@ const lookupProviderOptions = [
 
 interface SecurityFormProps {
   security?: Security;
+  /**
+   * Starting values for a *new* security, so a caller that already knows which
+   * fund is wanted can open the form filled in. Ignored in edit mode, where
+   * `security` supplies the values. Every prefilled field stays editable: a
+   * suggested listing names one exchange and currency, and the investor's
+   * broker may trade a different one.
+   */
+  defaults?: Partial<CreateSecurityData>;
   onSubmit: (data: CreateSecurityData) => Promise<void>;
   onCancel: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -102,7 +110,7 @@ const securityTypeOptions = [
   { value: 'OTHER', labelKey: 'form.types.other' },
 ];
 
-export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, submitRef }: SecurityFormProps) {
+export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyChange, submitRef }: SecurityFormProps) {
   const t = useTranslations('securities');
   const { defaultCurrency } = useNumberFormat();
   const rawPreferredExchanges = usePreferencesStore((s) => s.preferences?.preferredExchanges);
@@ -200,17 +208,6 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       .catch(() => setMsnReady(null));
   }, []);
 
-  const currencyOptions = useMemo(() => {
-    const sorted = [...currencies].sort((a, b) => {
-      if (a.code === defaultCurrency) return -1;
-      if (b.code === defaultCurrency) return 1;
-      return a.code.localeCompare(b.code);
-    });
-    return sorted.map((c) => ({
-      value: c.code,
-      label: `${c.code} - ${c.name} (${c.symbol})`,
-    }));
-  }, [currencies, defaultCurrency]);
 
   const {
     register,
@@ -223,11 +220,11 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
   } = useForm<SecurityFormData>({
     resolver: zodResolver(buildSecuritySchema(t)),
     defaultValues: {
-      symbol: security?.symbol || '',
-      name: security?.name || '',
-      securityType: security?.securityType || '',
-      exchange: security?.exchange || '',
-      currencyCode: security?.currencyCode || defaultCurrency,
+      symbol: security?.symbol || defaults?.symbol || '',
+      name: security?.name || defaults?.name || '',
+      securityType: security?.securityType || defaults?.securityType || '',
+      exchange: security?.exchange || defaults?.exchange || '',
+      currencyCode: security?.currencyCode || defaults?.currencyCode || defaultCurrency,
       description: security?.description || '',
       website: security?.website || '',
       irWebsite: security?.irWebsite || '',
@@ -236,6 +233,40 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       isFavourite: security?.isFavourite || false,
     },
   });
+
+  const selectedCurrency = watch('currencyCode');
+
+  /**
+   * The user's currencies, plus whatever the form currently holds.
+   *
+   * A lookup fills the currency from the provider, and that currency need not
+   * be one the user has configured in Tools. A `<select>` whose value has no
+   * matching `<option>` renders blank, so the code the provider returned would
+   * silently disappear from the field -- and be lost on save. Keeping it in the
+   * list preserves it and says where it came from, the same way a deactivated
+   * security stays selectable while it is still assigned.
+   */
+  const currencyOptions = useMemo(() => {
+    const sorted = [...currencies].sort((a, b) => {
+      if (a.code === defaultCurrency) return -1;
+      if (b.code === defaultCurrency) return 1;
+      return a.code.localeCompare(b.code);
+    });
+    const options = sorted.map((c) => ({
+      value: c.code,
+      label: `${c.code} - ${c.name} (${c.symbol})`,
+    }));
+    if (
+      selectedCurrency &&
+      !currencies.some((c) => c.code === selectedCurrency)
+    ) {
+      options.push({
+        value: selectedCurrency,
+        label: t('form.currencyNotConfigured', { code: selectedCurrency }),
+      });
+    }
+    return options;
+  }, [currencies, defaultCurrency, selectedCurrency, t]);
 
   const isFavourite = watch('isFavourite') ?? false;
   const toggleFavourite = () =>
@@ -552,7 +583,7 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
         <Select
           label={t('form.currencyLabel')}
           options={currencyOptions}
-          value={watch('currencyCode') || ''}
+          value={selectedCurrency || ''}
           onChange={(e) =>
             setValue('currencyCode', e.target.value, { shouldDirty: true })
           }

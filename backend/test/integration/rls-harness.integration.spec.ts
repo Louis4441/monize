@@ -5,9 +5,17 @@ import * as path from "path";
 import { INTEGRATION_TYPEORM_OPTIONS } from "../helpers/integration-setup";
 import {
   applyRlsPolicies,
+  declaredPolicyTables,
   findRlsMigrations,
   TEST_APP_ROLE,
 } from "../helpers/rls-setup";
+
+/**
+ * The enable migration, by filename. Migrations are applied in filename order,
+ * so a file sorting after this one runs on a database where M3 has already
+ * been recorded and must therefore enable RLS for the tables it policies.
+ */
+const M3_MIGRATION = "123_rls_enable.sql";
 
 /**
  * Acceptance coverage for RLS task T1 -- the integration harness applies the
@@ -118,16 +126,35 @@ describe("RLS integration harness (T1)", () => {
       ).toEqual(["import_jobs", "import_staged_files", "security_documents"]);
     });
 
-    it("leaves row-level security disabled -- policies ship inert until M3", async () => {
-      // Applying policies must not change what the other 15 suites observe.
-      // The enable is flip B and belongs to a spec that opts into it.
-      const [row] = await dataSource.query(
-        `SELECT count(*)::int AS enabled
+    it("enables row-level security only where a post-M3 migration must", async () => {
+      // For every table that existed when M3 was written the policies ship
+      // inert: applying them must not change what the other suites observe,
+      // and the enable is flip B, which a spec opts into.
+      //
+      // A migration numbered *after* M3 is the exception its own convention
+      // requires. M3 derives its targets from pg_policies at the moment it
+      // runs and is already recorded in schema_migrations on a deployed
+      // database, so a later policy that did not enable its own table would
+      // leave that table the single unprotected one under enforcement
+      // (database/CLAUDE.md). Deriving the expectation from disk keeps both
+      // halves guarded: a pre-M3 file that starts enabling fails here, and so
+      // does a post-M3 policy that forgets to.
+      const expected = [
+        ...new Set(
+          findRlsMigrations()
+            .filter((f) => path.basename(f) > M3_MIGRATION)
+            .flatMap((f) => declaredPolicyTables(fs.readFileSync(f, "utf8"))),
+        ),
+      ].sort();
+
+      const rows = await dataSource.query(
+        `SELECT c.relname
            FROM pg_class c
            JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE n.nspname = 'public' AND c.relrowsecurity`,
+          WHERE n.nspname = 'public' AND c.relrowsecurity
+          ORDER BY c.relname`,
       );
-      expect(row.enabled).toBe(0);
+      expect(rows.map((r: { relname: string }) => r.relname)).toEqual(expected);
     });
 
     it("is idempotent -- re-applying leaves one policy per table", async () => {

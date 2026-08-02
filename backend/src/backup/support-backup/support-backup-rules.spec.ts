@@ -32,6 +32,19 @@ describe("support backup rules registry", () => {
     }
   });
 
+  it("keeps the structural columns a restored GEM signal is read by", () => {
+    // RULES is an allowlist, so an unclassified column is dropped -- and for
+    // these two that is not a safe default but a change of meaning. A signal
+    // restored without `algorithm_version` takes the column default of 1, the
+    // reader files it as an older version's record, and it vanishes from the
+    // current history and the backtest. Without `config_fingerprint` every
+    // restored row looks stale and is recomputed on the first read.
+    expect(RULES.gem_strategy_signals.algorithm_version).toEqual({ t: "keep" });
+    expect(RULES.gem_strategy_signals.config_fingerprint).toEqual({
+      t: "keep",
+    });
+  });
+
   it("always-excluded tables have no rules (they are never emitted)", () => {
     for (const table of ALWAYS_EXCLUDED_TABLES) {
       expect(RULES[table]).toBeUndefined();

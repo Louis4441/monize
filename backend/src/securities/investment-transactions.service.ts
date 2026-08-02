@@ -315,6 +315,26 @@ export class InvestmentTransactionsService {
     private currenciesService: CurrenciesService,
   ) {}
 
+  /**
+   * Actions whose cost basis *is* the price they carry.
+   *
+   * For these an omitted price is not a free purchase, it is a missing fact,
+   * and the two must not be stored as the same thing. `price` is nullable
+   * precisely so the replay can tell them apart -- but `create` collapsed the
+   * distinction on the way in (`createDto.price ?? 0`), so by the time the
+   * replay looked there was nothing left to distinguish: the units joined the
+   * position, no cost joined the basis, the quantity reconciliation passed
+   * because the units did add up, and an incomplete import came out as a
+   * confident gain and a confident tax bill.
+   *
+   * `ADD_SHARES` is the action for units arriving without a cost, and it says
+   * so: the replay marks the basis unknown rather than guessing. `TRANSFER_IN`
+   * carries its basis from the paired `TRANSFER_OUT`, not from a price of its
+   * own. Neither belongs here.
+   */
+  private static readonly PRICED_ACQUISITIONS: ReadonlySet<InvestmentAction> =
+    new Set([InvestmentAction.BUY, InvestmentAction.REINVEST]);
+
   private static readonly PRICE_ACTIONS: ReadonlySet<InvestmentAction> =
     new Set([
       InvestmentAction.BUY,
@@ -598,6 +618,36 @@ export class InvestmentTransactionsService {
     }
   }
 
+  /**
+   * Refuse an acquisition that does not say what it cost.
+   *
+   * One method rather than one check per entry point, because there are three
+   * ways into this table -- `create`, `update` and `createEmbeddedForSplit` --
+   * and a rule enforced by only one of them is not a rule. The first version
+   * of this guard lived in `create` alone: the embedded-split path still wrote
+   * `dto.price ?? 0`, and `update` would happily set an existing purchase's
+   * price to zero, so a "free" acquisition could be created or edited into
+   * existence and its cost, gain and tax were all reported as known.
+   *
+   * Zero is refused along with absent. A zero-cost purchase is not a concept
+   * this application has; shares that arrived without a cost are `ADD_SHARES`,
+   * which records that the cost is unknown rather than nil.
+   */
+  private assertAcquisitionPriced(
+    action: InvestmentAction,
+    price: number | null | undefined,
+  ): void {
+    if (!InvestmentTransactionsService.PRICED_ACQUISITIONS.has(action)) return;
+    if (Number(price) > 0) return;
+    throw new BadRequestException(
+      tr(
+        "errors.securities.acquisitionPriceRequired",
+        `Price per share is required and must be greater than zero for ${action} transactions. Use ADD_SHARES for shares acquired without a known cost.`,
+        { action },
+      ),
+    );
+  }
+
   async create(
     userId: string,
     createDto: CreateInvestmentTransactionDto,
@@ -635,6 +685,8 @@ export class InvestmentTransactionsService {
         ),
       );
     }
+
+    this.assertAcquisitionPriced(createDto.action, createDto.price);
 
     if (
       createDto.action === InvestmentAction.SPLIT &&
@@ -674,7 +726,10 @@ export class InvestmentTransactionsService {
         action: createDto.action,
         transactionDate: createDto.transactionDate,
         quantity: createDto.quantity ?? 0,
-        price: createDto.price ?? 0,
+        // Null, not zero. The column is nullable so "no price was given" and
+        // "it cost nothing" stay two different rows; `?? 0` made every
+        // unpriced action indistinguishable from a free one downstream.
+        price: createDto.price ?? null,
         commission: createDto.commission || 0,
         totalAmount,
         exchangeRate,
@@ -1883,6 +1938,8 @@ export class InvestmentTransactionsService {
       await this.securitiesService.findOne(userId, dto.securityId);
     }
 
+    this.assertAcquisitionPriced(dto.action, dto.price);
+
     const totalAmount = Math.abs(
       computeInvestmentCashImpact(
         dto.action,
@@ -1911,7 +1968,9 @@ export class InvestmentTransactionsService {
       action: dto.action,
       transactionDate: parentTransactionDate,
       quantity: dto.quantity ?? 0,
-      price: dto.price ?? 0,
+      // Null, not zero -- the same distinction `create` keeps. An action with
+      // no price has an unknown cost, and stored as zero it is a free one.
+      price: dto.price ?? null,
       commission: dto.commission ?? 0,
       totalAmount,
       exchangeRate,
@@ -2913,6 +2972,21 @@ export class InvestmentTransactionsService {
             "Split ratio (quantity) must be greater than zero",
           ),
         );
+      }
+
+      // Checked against the row as it will be, after the assignments above, so
+      // changing either half is covered: setting an existing purchase's price
+      // to zero, and turning an unpriced action into a `BUY` without giving it
+      // one. Without this, `create` could refuse a free acquisition and
+      // `update` would put one back a moment later.
+      //
+      // Only when the edit touches the action or the price. A row that was
+      // already unpriced stays editable in every other respect -- an
+      // unrelated change to its description is not the write that made it
+      // wrong, and refusing it would strand rows that predate this rule with
+      // no way to correct anything at all.
+      if (updateDto.action !== undefined || updateDto.price !== undefined) {
+        this.assertAcquisitionPriced(transaction.action, transaction.price);
       }
 
       // Exchange rate resolution precedence for update():

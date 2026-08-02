@@ -99,8 +99,10 @@ describe('PortfolioSummaryCard', () => {
 
   it('renders info tooltip icons for all metrics', () => {
     const { container } = render(<PortfolioSummaryCard summary={makeSummary()} isLoading={false} />);
-    // Each InfoTooltip renders its question-mark icon inside a span.cursor-help.
-    const tooltipIcons = container.querySelectorAll('span.cursor-help svg');
+    // Each InfoTooltip renders its question-mark icon inside its trigger, which
+    // is a button: a focusable span has the generic role, so screen readers
+    // dropped its aria-label and announced a nameless tab stop.
+    const tooltipIcons = container.querySelectorAll('button.cursor-help svg');
     // Holdings Value, Cash Balance, Total Gain, Net Invested, Cost Basis, Gain/Loss, Simple Return, TWR, CAGR
     expect(tooltipIcons.length).toBe(9);
   });

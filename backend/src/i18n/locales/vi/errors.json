@@ -354,6 +354,7 @@
     "accountMustBeInvestment": "Tài khoản phải là loại ĐẦU TƯ",
     "securityIdRequired": "ID chứng khoán là bắt buộc cho giao tác {{ action }}",
     "splitRatioRequired": "Tỷ lệ chia (số lượng) phải lớn hơn không",
+    "acquisitionPriceRequired": "Giao dịch {{ action }} yêu cầu giá mỗi cổ phiếu lớn hơn 0. Hãy dùng ADD_SHARES cho cổ phiếu có được mà không biết giá vốn.",
     "cannotHoldSecurities": "{{ label }} không thể nắm giữ chứng khoán",
     "sourceDestMustDiffer": "Tài khoản nguồn và đích phải khác nhau",
     "bothAccountsMustBeInvestment": "Cả hai tài khoản phải là loại ĐẦU TƯ",
@@ -501,5 +502,14 @@
     "fileTooLarge": "Tệp vượt quá kích thước tối đa {{ max }} byte",
     "unsupportedType": "Loại tệp không được hỗ trợ. Các loại được phép: {{ types }}",
     "tooMany": "Giao tác này đã có tối đa {{ max }} tệp đính kèm"
+  },
+  "strategies": {
+    "accountNotFound": "Không tìm thấy tài khoản",
+    "accountNotInvestment": "Chiến lược GEM chỉ có thể chạy trên tài khoản đầu tư.",
+    "configurationChanging": "Cài đặt chiến lược đã thay đổi trong khi báo cáo đang được tạo. Vui lòng thử lại.",
+    "securityNotFound": "Không tìm thấy chứng khoán",
+    "signalNotFound": "Không tìm thấy tín hiệu chiến lược",
+    "signalStrategyMismatch": "Tín hiệu đó thuộc về một chiến lược khác.",
+    "strategyNotFound": "Không tìm thấy chiến lược"
   }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 
 /**
  * Guard tests for the UI conventions in `frontend/CLAUDE.md`.
@@ -16,10 +16,10 @@ import { describe, it, expect } from 'vitest';
  * Modelled on `src/lib/tours/anchors.uniqueness.test.ts`, which scans the tree the
  * same way for detached tour anchors.
  */
-const sources = import.meta.glob('/src/**/*.{ts,tsx}', {
-  query: '?raw',
+const sources = import.meta.glob("/src/**/*.{ts,tsx}", {
+  query: "?raw",
   eager: true,
-  import: 'default',
+  import: "default",
 }) as Record<string, string>;
 
 /** Source files only: tests legitimately contain the markup they assert on. */
@@ -29,9 +29,9 @@ function productionSources(): [string, string][] {
   );
 }
 
-describe('date entry goes through DateInput', () => {
+describe("date entry goes through DateInput", () => {
   /** The one file allowed to hold a raw date input -- it *is* the wrapper. */
-  const WRAPPER = '/src/components/ui/DateInput.tsx';
+  const WRAPPER = "/src/components/ui/DateInput.tsx";
   const RAW_DATE_INPUT = /type=["']date["']/;
 
   it('has no raw <input type="date"> outside the shared component', () => {
@@ -46,7 +46,7 @@ describe('date entry goes through DateInput', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('still finds the wrapper, so the rule cannot pass by accident', () => {
+  it("still finds the wrapper, so the rule cannot pass by accident", () => {
     // Were DateInput renamed, or were it to stop using a native date input, the
     // check above would trivially pass over an empty set. This fails first and
     // says what to update.
@@ -111,7 +111,7 @@ describe('numeric entry goes through NumericInput or CurrencyInput', () => {
   });
 });
 
-describe('a scrollbar you need is not hidden', () => {
+describe("a scrollbar you need is not hidden", () => {
   /**
    * `scrollbar-hide` is for a horizontal strip of chips, where the content being
    * cut off is itself the signal that there is more. On a vertical list it hides
@@ -124,13 +124,13 @@ describe('a scrollbar you need is not hidden', () => {
    */
   const CLASS_ATTR = /class(?:Name)?=(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})/g;
 
-  it('never puts scrollbar-hide on a vertically scrolling element', () => {
+  it("never puts scrollbar-hide on a vertically scrolling element", () => {
     const offenders: string[] = [];
     for (const [path, content] of productionSources()) {
       for (const match of content.matchAll(CLASS_ATTR)) {
-        const classes = match[1] ?? match[2] ?? match[3] ?? '';
+        const classes = match[1] ?? match[2] ?? match[3] ?? "";
         if (
-          classes.includes('scrollbar-hide') &&
+          classes.includes("scrollbar-hide") &&
           /\boverflow-y-(auto|scroll)\b/.test(classes)
         ) {
           offenders.push(`${path}: ${classes.trim()}`);
@@ -141,7 +141,7 @@ describe('a scrollbar you need is not hidden', () => {
   });
 });
 
-describe('chart colours come from the theme tokens', () => {
+describe("chart colours come from the theme tokens", () => {
   /**
    * `src/lib/chart-colors.ts` exposes `var(--chart-*)` strings so a chart
    * follows the active colour theme and light/dark mode with no JS. A literal
@@ -158,7 +158,8 @@ describe('chart colours come from the theme tokens', () => {
    * like `fill={up ? '#16a34a' : '#dc2626'}` is caught too, not just the
    * literal-valued form.
    */
-  const COLOUR_PROP = /\b(fill|stroke|stopColor)\s*[=:]\s*(\{[^{}]*\}|"[^"]*"|'[^']*')/g;
+  const COLOUR_PROP =
+    /\b(fill|stroke|stopColor)\s*[=:]\s*(\{[^{}]*\}|"[^"]*"|'[^']*')/g;
   const HEX = /#[0-9a-fA-F]{3,8}\b/;
 
   /**
@@ -167,9 +168,9 @@ describe('chart colours come from the theme tokens', () => {
    * would make them the card colour and so invisible on the bubble in dark
    * mode. The only exemption; anything new needs its own reason here.
    */
-  const ON_FILL_WHITE = '/src/components/investments/portfolio-chart-utils.tsx';
+  const ON_FILL_WHITE = "/src/components/investments/portfolio-chart-utils.tsx";
 
-  it('never hardcodes a hex colour on a chart fill or stroke', () => {
+  it("never hardcodes a hex colour on a chart fill or stroke", () => {
     const offenders: string[] = [];
     for (const [path, content] of productionSources()) {
       if (!/from ['"]recharts['"]/.test(content)) continue;
@@ -183,11 +184,13 @@ describe('chart colours come from the theme tokens', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('still matches the colour props it is meant to police', () => {
+  it("still matches the colour props it is meant to police", () => {
     // Were the regex to stop matching -- a Recharts rename, a bad edit -- the
     // check above would pass over an empty set. This fails first and says so.
     const sample = `fill="#22c55e" stroke={up ? '#16a34a' : '#dc2626'}`;
-    const hits = [...sample.matchAll(COLOUR_PROP)].filter((m) => HEX.test(m[2]));
+    const hits = [...sample.matchAll(COLOUR_PROP)].filter((m) =>
+      HEX.test(m[2]),
+    );
     expect(hits).toHaveLength(2);
   });
 });
@@ -238,5 +241,133 @@ describe('a control sitting beside an input is the height of that input', () => 
     // `items-start` (or the default `stretch` being overridden) leaves the
     // button at its content height. Use the same row the other call sites do.
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('the GEM report links through its shared wrappers', () => {
+  /**
+   * Every account and instrument the report names is a way into that account
+   * or instrument, and they all have to look the same doing it. A hand-rolled
+   * `<Link>` in one card gets its own colour and its own hover, which is how
+   * the report ended up with permanently blue anchors in one tab and plain
+   * text everywhere else. `GemSecurityLink` / `GemAccountLink` in
+   * `GemPrimitives.tsx` are the only place that markup lives.
+   */
+  const WRAPPERS = "/src/components/strategies/GemPrimitives.tsx";
+
+  it("has no ad-hoc security or account link in a strategy component", () => {
+    const offenders = productionSources()
+      .filter(
+        ([path]) =>
+          path.startsWith("/src/components/strategies/") && path !== WRAPPERS,
+      )
+      .filter(([, source]) => /href={`\/(securities|accounts)\//.test(source))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("nothing interactive is nested inside a button", () => {
+  /**
+   * `<button>`'s content model forbids interactive descendants, and the
+   * failure is not cosmetic: the parser closes the outer button at the inner
+   * tag, so the click target is truncated to whatever preceded it and the
+   * server's markup no longer matches what React builds on the client.
+   *
+   * This landed the moment `InfoTooltip`'s trigger changed from a `<span>` to
+   * a `<button>` -- correct in isolation, and it broke the one card that had
+   * put a tooltip inside a clickable card. That is the shape of mistake a
+   * scan catches and a component test cannot: neither file is wrong on its
+   * own, only the pair is, and the pair is discovered by grepping.
+   *
+   * Fix it at the call site by making the two siblings, not by demoting the
+   * inner control to a non-focusable element -- a tab stop that announces
+   * nothing is how `InfoTooltip` got here in the first place.
+   */
+  const INTERACTIVE = /<(button|a|select|textarea|input|InfoTooltip)[\s/>]/g;
+
+  /**
+   * Blank out comment bodies, keeping the file's length and line breaks so
+   * reported line numbers still point at the source. Prose in this repo
+   * discusses `<button>` constantly, and a scan that reads its own
+   * explanation as a violation is worse than no scan.
+   */
+  function withoutComments(source: string): string {
+    return source
+      .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, " "))
+      .replace(
+        /(^|[^:])\/\/[^\n]*/g,
+        (match, before: string) =>
+          before + " ".repeat(match.length - before.length),
+      );
+  }
+
+  /** [start, end) of every non-self-closing `<button>` element's children. */
+  function buttonBodies(source: string): Array<[number, number]> {
+    const bodies: Array<[number, number]> = [];
+    const opens = /<button(?=[\s/>])/g;
+    let open: RegExpExecArray | null;
+    while ((open = opens.exec(source))) {
+      const tagEnd = source.indexOf(">", open.index);
+      if (tagEnd === -1) continue;
+      // `<button ... />` has no children to search.
+      if (source[tagEnd - 1] === "/") continue;
+      let depth = 1;
+      let cursor = tagEnd + 1;
+      while (depth > 0) {
+        const close = source.indexOf("</button>", cursor);
+        if (close === -1) break;
+        const nested = source.slice(cursor).search(/<button(?=[\s/>])/);
+        const nestedAt = nested === -1 ? Infinity : cursor + nested;
+        if (nestedAt < close) {
+          const nestedEnd = source.indexOf(">", nestedAt);
+          if (source[nestedEnd - 1] !== "/") depth += 1;
+          cursor = nestedEnd + 1;
+          continue;
+        }
+        depth -= 1;
+        cursor = close + "</button>".length;
+        if (depth === 0) bodies.push([tagEnd + 1, close]);
+      }
+    }
+    return bodies;
+  }
+
+  it("puts no control, link or tooltip inside a <button>", () => {
+    const offenders: string[] = [];
+    for (const [path, raw] of productionSources()) {
+      if (!path.endsWith(".tsx")) continue;
+      const source = withoutComments(raw);
+      for (const [start, end] of buttonBodies(source)) {
+        const body = source.slice(start, end);
+        INTERACTIVE.lastIndex = 0;
+        let hit: RegExpExecArray | null;
+        while ((hit = INTERACTIVE.exec(body))) {
+          const line = source.slice(0, start + hit.index).split("\n").length;
+          offenders.push(`${path}:${line} nests <${hit[1]}> in a <button>`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("still recognises a nested control, so the rule cannot pass by accident", () => {
+    // The scanner skips self-closing buttons and blanks out comments, and
+    // both of those could silently grow into "skips everything". This is the
+    // markup the guard exists for.
+    const sample = `
+      {/* a <button> inside a comment is not a violation */}
+      <button type="button" />
+      <button onClick={go}>
+        <span>Account</span>
+        <InfoTooltip text={help} />
+      </button>
+    `;
+    const bodies = buttonBodies(withoutComments(sample));
+    expect(bodies).toHaveLength(1);
+    const body = sample.slice(bodies[0][0], bodies[0][1]);
+    expect(/<InfoTooltip[\s/>]/.test(body)).toBe(true);
   });
 });

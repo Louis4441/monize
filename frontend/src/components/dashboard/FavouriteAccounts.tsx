@@ -172,16 +172,30 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
                 </button>
               </div>
             )}
+            {/* The card is a bordered wrapper; the navigation button sits
+                inside it rather than being it. The statement-day help below
+                carries its own `<button>` trigger, and a button inside a
+                button is not a nesting the HTML parser allows -- it closes the
+                outer one at the inner tag, which cost the card most of its
+                click target and made the server and client markup disagree on
+                hydration. Making the two buttons siblings is what removes the
+                conflict, and it leaves the help trigger a real button, so it
+                stays announced and keyboard-reachable. */}
+            <div
+              className={`flex-1 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors ${
+                reordering
+                  ? ''
+                  : 'hover:border-blue-400 hover:bg-gray-50 dark:hover:border-blue-500 dark:hover:bg-gray-700/50'
+              }`}
+            >
             <button
               onClick={() => !reordering && router.push(
                 account.accountSubType === 'INVESTMENT_BROKERAGE'
                   ? `/investments?accountId=${account.id}`
                   : `/transactions?accountId=${account.id}`
               )}
-              className={`flex-1 flex items-center justify-between p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors text-left ${
-                reordering
-                  ? 'cursor-default'
-                  : 'hover:border-blue-400 hover:bg-gray-50 dark:hover:border-blue-500 dark:hover:bg-gray-700/50'
+              className={`w-full flex items-center justify-between p-2 sm:p-3 text-left ${
+                reordering ? 'cursor-default' : ''
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -199,23 +213,6 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
                   {account.institution && (
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       {account.institution}
-                    </div>
-                  )}
-                  {account.accountType === 'CREDIT_CARD' &&
-                    (account.statementDueDay || account.statementSettlementDay) && (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {account.statementDueDay && (
-                        <span className="flex items-center">
-                          {t('favouriteAccounts.due', { ordinal: getOrdinal(account.statementDueDay) })}
-                          <InfoTooltip text={t('favouriteAccounts.dueTooltip')} />
-                        </span>
-                      )}
-                      {account.statementSettlementDay && (
-                        <span className="flex items-center">
-                          {t('favouriteAccounts.settlement', { ordinal: getOrdinal(account.statementSettlementDay) })}
-                          <InfoTooltip text={t('favouriteAccounts.settlementTooltip')} />
-                        </span>
-                      )}
                     </div>
                   )}
                 </div>
@@ -245,6 +242,27 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
                 );
               })()}
             </button>
+            {/* Below the navigation button, not within it, so the help
+                triggers are its siblings. Indented to the account name's
+                column so the line still reads as part of the card. */}
+            {account.accountType === 'CREDIT_CARD' &&
+              (account.statementDueDay || account.statementSettlementDay) && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 text-xs text-gray-500 dark:text-gray-400 -mt-1 ml-8 px-2 pb-2 sm:px-3 sm:pb-3">
+                {account.statementDueDay && (
+                  <span className="flex items-center">
+                    {t('favouriteAccounts.due', { ordinal: getOrdinal(account.statementDueDay) })}
+                    <InfoTooltip text={t('favouriteAccounts.dueTooltip')} />
+                  </span>
+                )}
+                {account.statementSettlementDay && (
+                  <span className="flex items-center">
+                    {t('favouriteAccounts.settlement', { ordinal: getOrdinal(account.statementSettlementDay) })}
+                    <InfoTooltip text={t('favouriteAccounts.settlementTooltip')} />
+                  </span>
+                )}
+              </div>
+            )}
+            </div>
           </div>
         ))}
       </div>

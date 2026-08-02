@@ -1486,6 +1486,92 @@ CREATE INDEX idx_loan_rate_changes_user ON loan_rate_changes(user_id);
 CREATE INDEX idx_loan_rate_changes_account_date
     ON loan_rate_changes(account_id, effective_date);
 
+CREATE TABLE gem_strategies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL DEFAULT 'GEM', -- scenario name; several per user
+    cadence VARCHAR(20) NOT NULL DEFAULT 'MONTHLY', -- 'MONTHLY' | 'QUARTERLY'
+    lookback_months INTEGER NOT NULL DEFAULT 12, -- momentum window
+    tax_rate_percent NUMERIC(9,4), -- applied to an estimated realized gain
+    commission_amount NUMERIC(20,4), -- per-switch broker commission estimate
+    rules_source_url VARCHAR(500),
+    rules_source_label VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_gem_strategies_user ON gem_strategies(user_id);
+
+CREATE TRIGGER update_gem_strategies_updated_at
+  BEFORE UPDATE ON gem_strategies
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- The brokerage accounts a strategy is run in. The signal is the same for all
+-- of them; the report sums the strategy's securities across the set.
+CREATE TABLE gem_strategy_accounts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    strategy_id UUID NOT NULL REFERENCES gem_strategies(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX idx_gem_strategy_accounts_pair ON gem_strategy_accounts(strategy_id, account_id);
+CREATE INDEX idx_gem_strategy_accounts_user ON gem_strategy_accounts(user_id);
+
+CREATE TABLE gem_strategy_assets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    strategy_id UUID NOT NULL REFERENCES gem_strategies(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL, -- 'US_EQUITY' | 'EX_US_EQUITY' | 'EM_EQUITY' | 'SAFE' | 'RISK_FREE'
+    security_id UUID REFERENCES securities(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX idx_gem_strategy_assets_role ON gem_strategy_assets(strategy_id, role);
+CREATE INDEX idx_gem_strategy_assets_user ON gem_strategy_assets(user_id);
+
+CREATE TRIGGER update_gem_strategy_assets_updated_at
+  BEFORE UPDATE ON gem_strategy_assets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE gem_strategy_signals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    strategy_id UUID NOT NULL REFERENCES gem_strategies(id) ON DELETE CASCADE,
+    evaluated_on DATE NOT NULL, -- price date the decision was taken on
+    effective_from DATE NOT NULL, -- first day the allocation applies
+    state VARCHAR(10) NOT NULL, -- 'RISK_ON' | 'RISK_OFF'
+    target_role VARCHAR(20),
+    target_security_id UUID REFERENCES securities(id) ON DELETE SET NULL,
+    target_weight_percent NUMERIC(9,4) NOT NULL DEFAULT 100,
+    momentum JSONB NOT NULL DEFAULT '{}'::jsonb, -- percent per role at evaluation time
+    benchmark_role VARCHAR(20), -- role the absolute test measured against; NULL reads as 'SAFE'
+    spread_pp NUMERIC(12,4), -- US equity momentum minus benchmark momentum
+    lead_pp NUMERIC(12,4), -- winner minus runner-up, RISK_ON only
+    previous_role VARCHAR(20), -- role held before this evaluation
+    -- Hash of the signal-driving configuration (cadence, lookback, role->security)
+    -- this row was calculated under. A period whose fingerprint no longer matches
+    -- the strategy is recomputed instead of being served as the current signal.
+    config_fingerprint VARCHAR(64),
+    -- Version of the evaluation code behind this row. A settings change is
+    -- recomputed in place; an algorithm change is not, because the row records
+    -- what was actually decided and executed. Older versions are legacy
+    -- periods: left untouched, and left out of the current history.
+    algorithm_version SMALLINT NOT NULL DEFAULT 1,
+    executed BOOLEAN NOT NULL DEFAULT FALSE,
+    executed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- One row per period *per evaluation version*: an older version's row is an
+-- immutable record of what was decided and executed, and must not stop the
+-- current version from answering the same period.
+CREATE UNIQUE INDEX idx_gem_strategy_signals_period ON gem_strategy_signals(strategy_id, evaluated_on, algorithm_version);
+CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
+
+
 
 -- ===========================================================================
 -- Row-Level Security policies
@@ -1522,6 +1608,10 @@ DECLARE
         'budgets',
         'categories',
         'custom_reports',
+        'gem_strategies',
+        'gem_strategy_accounts',
+        'gem_strategy_assets',
+        'gem_strategy_signals',
         'import_column_mappings',
         'import_jobs',
         'import_staged_files',
@@ -1972,10 +2062,11 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 53 policies -- 26 direct + 4 real-user-keyed (112),
+-- Expected: 57 policies -- 26 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
 --           2 direct for the .mny import's staging + job tables (117),
---           1 direct for security_documents (118).
+--           1 direct for security_documents (118),
+--           4 direct for the GEM strategy tables (124, 125).
 
 -- ---------------------------------------------------------------------------
 -- Enable row-level security (migration 123).

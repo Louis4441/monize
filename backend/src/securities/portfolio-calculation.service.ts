@@ -34,6 +34,49 @@ const LIVE_FX_FETCH_CONCURRENCY = 6;
  * holiday gaps, or a failed FX fetch) at the rate that actually prevailed on
  * that bar's own date rather than a single near-current rate.
  */
+/** Why a replayed lot's cost basis cannot be trusted against the live holding. */
+export type ReplayedBasisGap =
+  | "quantity_only_action"
+  | "unpriced_acquisition"
+  | "mixed_basis_currency"
+  | "transferred_basis_unknown";
+
+/** A position rebuilt from its transactions: what is held, and what it cost. */
+export interface ReplayedLot {
+  /** Units the transaction history accounts for. */
+  quantity: number;
+  /**
+   * Their cost, commissions included, in `currencyCode`.
+   *
+   * Only meaningful when `basisKnown`; otherwise it is the cost of the part of
+   * the position the history does price, which is a different position.
+   */
+  costBasis: number;
+  /**
+   * The currency `costBasis` is actually denominated in, or null when the
+   * replay could not settle on one.
+   *
+   * **Not** the holding account's currency, which is what this used to be
+   * assumed to be. `InvestmentTransaction.exchangeRate` converts the trade out
+   * of the security's currency and into the *cash or funding* account's -- the
+   * account the money came from -- and that is a different account, with its
+   * own currency, whenever a brokerage settles through a linked cash account
+   * or a purchase is funded from elsewhere. A PLN brokerage funded in EUR
+   * produced a basis in EUR and a caller comparing it against a PLN market
+   * value read the FX difference as gain, then taxed it.
+   *
+   * A caller that reports a gain or a tax must check this against the currency
+   * it is reporting in, and treat a mismatch as unknown rather than converting
+   * at today's rate: the acquisition happened at the historical rate, and
+   * today's would answer a different question.
+   */
+  currencyCode: string | null;
+  /** False when the replay met a row it could not price, or could not denominate. */
+  basisKnown: boolean;
+  /** Which gap made it unknown, for a caller that reports the reason. */
+  basisGap: ReplayedBasisGap | null;
+}
+
 export type DailyRateIndex = Map<string, Array<{ date: string; rate: number }>>;
 
 /**
@@ -559,29 +602,79 @@ export class PortfolioCalculationService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Compute historical cost basis in each holding's account currency by
-   * walking the investment transaction history chronologically and applying
-   * each transaction's stored exchange rate.
+   * Historical cost basis per (account, security), rebuilt by walking the
+   * transaction history chronologically. Average cost, not FIFO: the whole
+   * application values a position at its blended average, and a second model
+   * here would disagree with everything it is displayed beside.
    *
-   * For BUY-like actions (BUY/REINVEST/TRANSFER_IN), cost basis increases by
-   * `quantity * price * exchangeRate` — the amount actually spent in the cash
-   * account's currency at that point in time.
+   * **Acquisition (BUY, REINVEST).** The basis grows by
+   * `(quantity × price + acquisition commission) × exchange rate`. The
+   * commission is inside it because it is part of what the shares cost, and
+   * inside the conversion because it was charged in the currency of the trade.
    *
-   * For SELL-like actions (SELL/TRANSFER_OUT), cost basis is reduced
-   * proportionally using the running average (cost / quantity) so that
-   * subsequent gains are calculated against the remaining shares.
+   * **Denomination.** `exchangeRate` converts out of the security's currency
+   * and into the *settlement* account's -- the funding account when the row
+   * names one, otherwise the brokerage's linked cash account, otherwise the
+   * brokerage itself. That is the currency the lot reports, and it is **not**
+   * necessarily the holding account's. A consumer compares `currencyCode`
+   * against the currency it is reporting in; a mismatch is unknown, never a
+   * conversion, because today's rate cannot answer a question about a
+   * historical purchase.
    *
-   * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) do not change cost basis;
-   * SPLIT scales the tracked quantity so the per-share average adjusts.
+   * **Partial disposal (SELL, TRANSFER_OUT).** Basis is drawn down at the
+   * running average, so selling a third of a position releases a third of its
+   * cost and the remainder keeps the same per-share average.
    *
-   * @returns Map keyed by `${accountId}:${securityId}` -> cost basis in the
-   *          holding account's currency.
+   * **Transfer (TRANSFER_OUT/TRANSFER_IN pair).** Not a disposal and not an
+   * acquisition: the destination takes exactly the basis the source released,
+   * in the source's currency, together with the share of the acquisition
+   * commission already blended into it. A partial transfer therefore splits
+   * the basis in the same proportion as the units, and the total across the
+   * pair is conserved. The legs are matched on `linkedTransactionId`, which
+   * `transferSecurity` writes on both.
+   *
+   * **Unknown propagates.** The basis is reported unknown -- with a
+   * `basisGap` naming which of these it was -- when the history contains an
+   * acquisition with no price (`unpriced_acquisition`), a quantity-only row
+   * that moved units without a cost (`quantity_only_action`), acquisitions
+   * that settled in two different currencies (`mixed_basis_currency`), or a
+   * transfer whose source leg is unpriced or outside the accounts being
+   * replayed (`transferred_basis_unknown`). Unknown never degrades to zero,
+   * and it survives being carried through a transfer.
+   *
+   * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) move units and carry no
+   * price, so they leave the running cost alone and mark the lot's basis
+   * **unknown** (`basisKnown: false`). They are not a zero-cost sleeve: the
+   * application itself keeps two different answers for what those units cost.
+   * `HoldingsService.adjustQuantity` leaves `average_cost` per share untouched,
+   * so the stored basis grows with an `ADD_SHARES` and shrinks with a
+   * `REMOVE_SHARES`; `computeHoldingsMap`, the full rebuild, holds `totalCost`
+   * fixed instead, so the same history gives a different stored basis depending
+   * on whether a rebuild has run since. Neither is derivable here, and a
+   * position whose cost has two answers has none.
+   *
+   * SPLIT is not in that class: it scales quantity and preserves total cost,
+   * which is what both live paths do, so the per-share average adjusts and the
+   * basis stays known.
+   *
+   * Returns the **quantity as well as the money**, because the two only mean
+   * anything together. A basis replayed from an incomplete history is a real
+   * number for a smaller position than the one being valued: 50 of 100 shares
+   * imported gives a basis for 50, and pairing it with today's 100-share market
+   * value reports a gain that is mostly the missing half. A caller pairing this
+   * with a current holding must compare the quantities **per (account,
+   * security)** and treat a mismatch as unknown. Comparing sums instead lets a
+   * surplus of 30 units in one account cancel a shortfall of 30 in another and
+   * report both bases as reconciled.
+   *
+   * @returns Map keyed by `${accountId}:${securityId}` -> the replayed lot,
+   *          each carrying the currency its basis is denominated in.
    */
-  async calculateCostBasesInAccountCurrency(
+  async calculateCostBasisLotsInAccountCurrency(
     userId: string,
     holdingsAccountIds: string[],
-  ): Promise<Map<string, number>> {
-    const result = new Map<string, number>();
+  ): Promise<Map<string, ReplayedLot>> {
+    const result = new Map<string, ReplayedLot>();
     if (holdingsAccountIds.length === 0) return result;
 
     const today = formatDateYMDLocal(new Date());
@@ -597,45 +690,211 @@ export class PortfolioCalculationService {
       }),
     );
 
-    const state = new Map<string, { quantity: number; costBasis: number }>();
+    // No history, no lots, and so nothing to denominate. Returning before the
+    // account read keeps the common empty case at one query.
+    if (transactions.length === 0) return result;
 
-    for (const tx of transactions) {
+    // Where each transaction's converted amount actually landed. Resolved for
+    // the whole batch up front rather than per row: the funding accounts are
+    // an arbitrary set and looking each one up inside the loop would be a
+    // query per transaction.
+    const basisCurrencyByAccount = await this.settlementCurrencies(
+      userId,
+      holdingsAccountIds,
+      transactions,
+    );
+
+    // Both legs of a transfer are written in one transaction, so `created_at`
+    // -- a statement timestamp -- is identical on the pair and the SQL order
+    // between them is whatever the plan happens to produce. The OUT leg has to
+    // be seen first, because it is what tells the IN leg what the shares cost.
+    // Only the two legs are reordered: the comparator returns 0 for everything
+    // else at the same instant, and `sort` is stable, so nothing else moves.
+    const legRank = (action: InvestmentAction): number =>
+      action === InvestmentAction.TRANSFER_OUT
+        ? -1
+        : action === InvestmentAction.TRANSFER_IN
+          ? 1
+          : 0;
+    const ordered = [...transactions].sort((a, b) => {
+      if (a.transactionDate !== b.transactionDate) {
+        return a.transactionDate < b.transactionDate ? -1 : 1;
+      }
+      const created = Number(a.createdAt) - Number(b.createdAt);
+      if (created !== 0) return created;
+      return legRank(a.action) - legRank(b.action);
+    });
+
+    /**
+     * What each `TRANSFER_OUT` released, for its paired `TRANSFER_IN` to take.
+     *
+     * Keyed by the OUT leg's id, which the IN leg names in
+     * `linkedTransactionId` -- durable pairing the schema already carries, set
+     * by `transferSecurity` on both rows.
+     */
+    const carriedByTransferOut = new Map<
+      string,
+      { amount: number; currencyCode: string | null; known: boolean }
+    >();
+
+    const state = new Map<
+      string,
+      {
+        quantity: number;
+        costBasis: number;
+        currencyCode: string | null;
+        basisGap: ReplayedBasisGap | null;
+      }
+    >();
+
+    for (const tx of ordered) {
       if (!tx.securityId) continue;
 
       const key = `${tx.accountId}:${tx.securityId}`;
       let entry = state.get(key);
       if (!entry) {
-        entry = { quantity: 0, costBasis: 0 };
+        entry = {
+          quantity: 0,
+          costBasis: 0,
+          currencyCode: null,
+          basisGap: null,
+        };
         state.set(key, entry);
       }
 
       const quantity = Number(tx.quantity) || 0;
 
       switch (tx.action) {
-        case InvestmentAction.BUY:
-        case InvestmentAction.REINVEST:
+        // A transfer is neither a sale nor a purchase: the same shares change
+        // custody and keep whatever they cost. Treated as an acquisition
+        // priced at the carried average with `exchangeRate` 1 -- which is what
+        // `transferSecurity` writes on the row -- the replay rebuilt the basis
+        // out of a per-share figure in the *security's* currency and then
+        // labelled it with the destination's. Ten shares bought for PLN 3,000
+        // (USD 100 each at 3.00) arrived in a PLN account as a basis of 1,000,
+        // turning PLN 1,400 of real gain into 3,400 and PLN 266 of tax into
+        // 646, with the quantity reconciling perfectly throughout.
+        //
+        // So the destination takes the basis the source gave up, which the
+        // `TRANSFER_OUT` leg has already worked out at the running average --
+        // proportional for a partial transfer, and carrying the share of the
+        // acquisition commission that is in that average.
         case InvestmentAction.TRANSFER_IN: {
-          const price = Number(tx.price) || 0;
+          const carried = tx.linkedTransactionId
+            ? carriedByTransferOut.get(tx.linkedTransactionId)
+            : undefined;
+          entry.quantity += quantity;
+          if (carried === undefined || !carried.known) {
+            // The paired leg is out of this replay's scope -- a transfer in
+            // from an account the caller did not ask about -- or the source
+            // could not price the shares either. Either way this position's
+            // cost is not known here, and the destination's own row cannot
+            // supply it: its price is a carried average, not a market price,
+            // and its rate is 1 regardless of what the money actually did.
+            entry.basisGap ??= "transferred_basis_unknown";
+            break;
+          }
+          if (entry.currencyCode === null) {
+            entry.currencyCode = carried.currencyCode;
+          } else if (entry.currencyCode !== carried.currencyCode) {
+            entry.basisGap ??= "mixed_basis_currency";
+            break;
+          }
+          entry.costBasis += carried.amount;
+          break;
+        }
+        case InvestmentAction.BUY:
+        case InvestmentAction.REINVEST: {
           const exchangeRate = Number(tx.exchangeRate) || 1;
-          entry.costBasis += quantity * price * exchangeRate;
+          // What the acquisition cost, which includes what it cost to
+          // acquire. Leaving the commission out understates the basis and so
+          // overstates every gain and every tax computed from it -- 20 of
+          // commission on a 1,000 purchase is 20 of phantom gain and 3.80 of
+          // phantom tax at 19%. The commission is recorded in the same
+          // currency as the trade, so it is converted with it.
+          const commission = Number(tx.commission) || 0;
+
+          // `price` is nullable, and an acquisition without one has no cost
+          // this replay can work out. `Number(null) || 0` folded that into a
+          // free purchase: the units joined the position, nothing joined the
+          // basis, and the quantity reconciliation downstream then *passed*
+          // because the units did add up. An incomplete import came out as a
+          // confident gain and a confident tax bill. A row genuinely worth
+          // zero is a different thing and still says so -- an explicit 0.
+          const hasPrice =
+            tx.price !== null && Number.isFinite(Number(tx.price));
+          if (!hasPrice && (quantity !== 0 || commission !== 0)) {
+            entry.quantity += quantity;
+            entry.basisGap ??= "unpriced_acquisition";
+            break;
+          }
+
+          // The currency the converted amount is in, which is the settlement
+          // account's and not this holding account's. Acquisitions settled in
+          // two different currencies cannot be added together at all, and
+          // there is no rate to reconcile them with that would not be
+          // answering today's question about a historical cost.
+          const settledIn = basisCurrencyByAccount.get(
+            tx.fundingAccountId ?? tx.accountId,
+          );
+          if (settledIn === undefined) {
+            entry.quantity += quantity;
+            entry.basisGap ??= "mixed_basis_currency";
+            break;
+          }
+          if (entry.currencyCode === null) entry.currencyCode = settledIn;
+          else if (entry.currencyCode !== settledIn) {
+            entry.basisGap ??= "mixed_basis_currency";
+          }
+
+          const price = Number(tx.price) || 0;
+          entry.costBasis += (quantity * price + commission) * exchangeRate;
           entry.quantity += quantity;
           break;
         }
         case InvestmentAction.SELL:
         case InvestmentAction.TRANSFER_OUT: {
+          let released = 0;
+          let releasedAll = false;
           if (entry.quantity > 0) {
             const avgCostPerShare = entry.costBasis / entry.quantity;
             const sellQty = Math.min(quantity, entry.quantity);
-            entry.costBasis -= sellQty * avgCostPerShare;
+            released = sellQty * avgCostPerShare;
+            releasedAll = sellQty >= quantity;
+            entry.costBasis -= released;
             entry.quantity -= sellQty;
+          }
+          if (tx.action === InvestmentAction.TRANSFER_OUT) {
+            // What the destination inherits. Recorded even when it is not
+            // knowable, so the paired leg can tell "the source gave up an
+            // unpriced position" from "the source is not in this replay at
+            // all" -- both unknown, but only the first is a fact this replay
+            // established.
+            //
+            // `releasedAll` guards the case where the source's history does
+            // not cover the units being moved: drawing down what there is and
+            // calling the remainder free would hand the destination a basis
+            // for a smaller position than it received, which is the same
+            // partial-history error the quantity reconciliation exists to
+            // catch, laundered through a transfer.
+            carriedByTransferOut.set(tx.id, {
+              amount: released,
+              currencyCode: entry.currencyCode,
+              known:
+                entry.basisGap === null &&
+                entry.currencyCode !== null &&
+                releasedAll,
+            });
           }
           break;
         }
         case InvestmentAction.ADD_SHARES:
           entry.quantity += quantity;
+          if (quantity !== 0) entry.basisGap = "quantity_only_action";
           break;
         case InvestmentAction.REMOVE_SHARES:
           entry.quantity -= quantity;
+          if (quantity !== 0) entry.basisGap = "quantity_only_action";
           break;
         case InvestmentAction.SPLIT: {
           const splitRatio = quantity || 1;
@@ -648,18 +907,137 @@ export class PortfolioCalculationService {
       }
 
       // Snap near-zero quantities to exactly zero so precision drift doesn't
-      // leave a stale residual cost basis on fully-closed positions.
+      // leave a stale residual cost basis on fully-closed positions. A position
+      // that closed also clears the gap: whatever the history could not price
+      // has been disposed of, and units bought after this point are priced by
+      // the rows that buy them.
       if (Math.abs(entry.quantity) < 0.0001) {
         entry.quantity = 0;
         entry.costBasis = 0;
+        entry.basisGap = null;
+        // The currency goes with the basis it described. A position rebought
+        // after closing may well settle somewhere else, and holding the old
+        // currency would call that a mixture when it is simply the next
+        // position.
+        entry.currencyCode = null;
       }
     }
 
     for (const [key, entry] of state) {
-      result.set(key, roundMoney(entry.costBasis));
+      result.set(key, {
+        quantity: entry.quantity,
+        costBasis: roundMoney(entry.costBasis),
+        currencyCode: entry.currencyCode,
+        basisKnown: entry.basisGap === null,
+        basisGap: entry.basisGap,
+      });
     }
 
     return result;
+  }
+
+  /**
+   * Currency each account settles a trade in, for every account the replay can
+   * be pointed at.
+   *
+   * A brokerage does not hold the cash: `InvestmentTransactionsService` posts
+   * the converted amount to the funding account when the row names one, and
+   * otherwise to the brokerage's linked cash account -- so the currency the
+   * stored `exchangeRate` produced belongs to that account, not to the
+   * brokerage. This mirrors that resolution rather than re-deriving it, and
+   * the two must be changed together.
+   *
+   * A brokerage with no linked cash account settles in its own currency, which
+   * is the single-account case and by far the common one.
+   */
+  private async settlementCurrencies(
+    userId: string,
+    holdingsAccountIds: string[],
+    transactions: InvestmentTransaction[],
+  ): Promise<Map<string, string>> {
+    const wanted = new Set<string>(holdingsAccountIds);
+    for (const tx of transactions) {
+      if (tx.fundingAccountId) wanted.add(tx.fundingAccountId);
+    }
+
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { userId, id: In([...wanted]) },
+        select: {
+          id: true,
+          currencyCode: true,
+          accountSubType: true,
+          linkedAccountId: true,
+        },
+      }),
+    );
+    const byId = new Map(accounts.map((account) => [account.id, account]));
+
+    // A linked cash account is not necessarily one of the above -- it is not a
+    // holdings account and need never have funded a row explicitly.
+    const linkedIds = accounts
+      .map((account) => account.linkedAccountId)
+      .filter((id): id is string => Boolean(id) && !byId.has(id as string));
+    if (linkedIds.length > 0) {
+      const linked = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Account).find({
+          where: { userId, id: In(linkedIds) },
+          select: { id: true, currencyCode: true },
+        }),
+      );
+      for (const account of linked) byId.set(account.id, account);
+    }
+
+    const settlement = new Map<string, string>();
+    for (const account of byId.values()) {
+      const linked =
+        account.accountSubType === AccountSubType.INVESTMENT_BROKERAGE &&
+        account.linkedAccountId
+          ? byId.get(account.linkedAccountId)
+          : undefined;
+      const currency = (linked ?? account).currencyCode;
+      if (currency) settlement.set(account.id, currency);
+    }
+    return settlement;
+  }
+
+  /**
+   * Replayed bases that a caller may state as a figure in the account's own
+   * currency, keyed the same way as the lots.
+   *
+   * There used to be a projection here that returned `lot.costBasis` and
+   * nothing else. It threw away the two fields that say whether the number
+   * means anything -- `basisKnown` and `currencyCode` -- and its caller then
+   * treated whatever came back as a cost in the *account's* currency. A PLN
+   * brokerage funded from EUR contributed a EUR figure to a PLN total, and a
+   * position the history could not price contributed a confident partial sum.
+   * A number with its qualifications stripped off is not a smaller answer, it
+   * is a different one.
+   *
+   * So the filtering happens here rather than at the call site: an entry is
+   * present only when the replay knows the basis *and* denominated it in the
+   * currency asked for. Everything else is absent, and a caller that finds
+   * nothing falls back to whatever it does when there is no history at all.
+   * Converting the mismatch instead would need today's rate to answer a
+   * question about a historical purchase.
+   */
+  private async knownCostBasesIn(
+    userId: string,
+    holdingsAccountIds: string[],
+    currencyByAccount: Map<string, string>,
+  ): Promise<Map<string, number>> {
+    const lots = await this.calculateCostBasisLotsInAccountCurrency(
+      userId,
+      holdingsAccountIds,
+    );
+    const usable = new Map<string, number>();
+    for (const [key, lot] of lots) {
+      if (!lot.basisKnown || lot.currencyCode === null) continue;
+      const accountId = key.slice(0, key.indexOf(":"));
+      if (currencyByAccount.get(accountId) !== lot.currencyCode) continue;
+      usable.set(key, lot.costBasis);
+    }
+    return usable;
   }
 
   /**
@@ -667,11 +1045,17 @@ export class PortfolioCalculationService {
    * gain or loss of each SELL transaction using the average-cost method.
    *
    * For every prior BUY/REINVEST/TRANSFER_IN, the running cost basis for that
-   * (account, security) grows by `quantity * price * exchangeRate` (the same
-   * bookkeeping as `calculateCostBasesInAccountCurrency`). A SELL then draws
-   * down cost basis proportionally at the running average cost per share, and
-   * the realized gain is `proceeds - costBasis` — all in the holding account's
-   * currency.
+   * (account, security) grows by `quantity * price * exchangeRate`. A SELL
+   * then draws down cost basis proportionally at the running average cost per
+   * share, and the realized gain is `proceeds - costBasis` — all in the
+   * holding account's currency.
+   *
+   * This is **not** the same bookkeeping as
+   * `calculateCostBasisLotsInAccountCurrency`, which the comment here used to
+   * claim: that replay adds the acquisition commission to the basis and
+   * reports whether the basis is knowable at all. Reconciling the two is a
+   * change to what every realized-gain figure in the application reports, so
+   * it is its own change and not a footnote to this one.
    *
    * The entire history is replayed regardless of the requested date range so
    * SELLs early in the range still see cost basis built up by prior BUYs; only
@@ -1098,10 +1482,19 @@ export class PortfolioCalculationService {
     const securityIds = [...new Set(holdings.map((h) => h.securityId))];
     const priceMap = await getLatestPrices(securityIds);
 
-    // Historical cost basis in each holding's account currency
-    const historicalCostBasis = await this.calculateCostBasesInAccountCurrency(
+    // Historical cost basis, but only where the replay both knows it and
+    // states it in the currency the holding's account keeps its books in.
+    // Anything else falls through to the stored average cost below, the same
+    // way a holding with no transaction history does.
+    const currencyByAccount = new Map(
+      holdings
+        .filter((h) => h.account?.currencyCode)
+        .map((h) => [h.accountId, h.account.currencyCode] as const),
+    );
+    const historicalCostBasis = await this.knownCostBasesIn(
       userId,
       holdingsAccountIds,
+      currencyByAccount,
     );
 
     let totalCostBasis = 0;
@@ -1127,8 +1520,12 @@ export class PortfolioCalculationService {
       const accountCurrency = h.account?.currencyCode ?? holdingCurrency;
 
       // Prefer the historical cost basis derived from transaction exchange
-      // rates; fall back to current-rate conversion when no transaction
-      // history is available (e.g. holdings imported without transactions).
+      // rates; fall back to current-rate conversion when no *usable* one is
+      // available -- no transaction history (e.g. holdings imported without
+      // it), a history the replay could not price, or a basis denominated in
+      // some other account's currency. The stored average cost is the
+      // application's other answer for those, and it is at least an answer
+      // about this holding in this currency.
       const historicalKey = `${h.accountId}:${h.securityId}`;
       let costBasisAccountCurrency = historicalCostBasis.get(historicalKey);
       if (costBasisAccountCurrency === undefined) {
