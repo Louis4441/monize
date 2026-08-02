@@ -70,7 +70,7 @@ describe("GemPositionService", () => {
   let priceService: { latestPrices: jest.Mock };
   let exchangeRates: { getLatestRate: jest.Mock };
   let portfolioCalculation: {
-    calculateCostBasesInAccountCurrency: jest.Mock;
+    calculateCostBasisLotsInAccountCurrency: jest.Mock;
   };
 
   const build = (overrides: Record<string, unknown> = {}) =>
@@ -135,9 +135,11 @@ describe("GemPositionService", () => {
     // historical rate. The default matches the base holding fixture so the
     // existing gain and tax expectations still describe a real acquisition.
     portfolioCalculation = {
-      calculateCostBasesInAccountCurrency: jest
+      calculateCostBasisLotsInAccountCurrency: jest
         .fn()
-        .mockResolvedValue(new Map([["acct-1:sec-spy", 18281.46]])),
+        .mockResolvedValue(
+          new Map([["acct-1:sec-spy", { quantity: 51, costBasis: 18281.46 }]]),
+        ),
     };
     service = new GemPositionService(
       mocks.dataSource as never,
@@ -317,8 +319,8 @@ describe("GemPositionService", () => {
     // What the purchase actually cost in the account's currency, translated
     // when it happened -- not the holdings table's EUR average re-converted at
     // today's rate.
-    portfolioCalculation.calculateCostBasesInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", 1100]]),
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([["acct-1:sec-spy", { quantity: 10, costBasis: 1100 }]]),
     );
 
     const result = await build();
@@ -350,8 +352,8 @@ describe("GemPositionService", () => {
     ];
     accountCurrencyRows = [{ id: "acct-1", currency_code: "PLN" }];
     // 10 units bought at 100 USD when USD/PLN was 3.00: 3,000 PLN.
-    portfolioCalculation.calculateCostBasesInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", 3000]]),
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([["acct-1:sec-spy", { quantity: 10, costBasis: 3000 }]]),
     );
     // Unchanged at 100 USD, but USD/PLN is now 4.00: 4,000 PLN.
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
@@ -366,14 +368,100 @@ describe("GemPositionService", () => {
     expect(result.action?.estimatedTax).toBeCloseTo(190, 2);
   });
 
+  /**
+   * Invariant: a cost basis is only the position's if the replay reproduces
+   * the position.
+   * Canonical adversarial input: aggregation where one component is unknown --
+   * here the trades behind half the shares.
+   * Minimal mutation: drop the quantity comparison in `historicalCostBasis`.
+   * Test that fails under it: this one.
+   */
+  it("refuses a basis whose transactions do not account for the position", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        quantity: "100",
+        cost_basis: "1000",
+        currency_code: "USD",
+        account_ids: ["acct-1"],
+      },
+    ];
+    // Only half the position was ever imported as trades: a real basis, for a
+    // smaller holding than the one being valued.
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([["acct-1:sec-spy", { quantity: 50, costBasis: 500 }]]),
+    );
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
+
+    const result = await build();
+
+    // 1,500 against a 500 basis would show 1,000 of gain and 190 of tax; the
+    // truth is unknown, and half of that "gain" is the cost of the shares
+    // nobody recorded.
+    expect(result.action?.realizedGainLoss).toBeNull();
+    expect(result.action?.estimatedTax).toBeNull();
+    expect(result.position?.totalMarketValue).toBe(1500);
+  });
+
+  it("accepts a replay that reproduces the position exactly", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        quantity: "100",
+        cost_basis: "1000",
+        currency_code: "USD",
+        account_ids: ["acct-1"],
+      },
+    ];
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([["acct-1:sec-spy", { quantity: 100, costBasis: 1000 }]]),
+    );
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
+
+    const result = await build();
+
+    expect(result.action?.realizedGainLoss).toBe(500);
+    expect(result.action?.estimatedTax).toBeCloseTo(95, 2);
+  });
+
+  it("refuses when one account of several does not reconcile", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        quantity: "100",
+        cost_basis: "1000",
+        currency_code: "USD",
+        account_ids: ["acct-1", "acct-2"],
+      },
+    ];
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([
+        ["acct-1:sec-spy", { quantity: 60, costBasis: 600 }],
+        // 30 of the 40 held here were never imported.
+        ["acct-2:sec-spy", { quantity: 10, costBasis: 100 }],
+      ]),
+    );
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 15]]));
+
+    const result = await build();
+
+    expect(result.action?.realizedGainLoss).toBeNull();
+  });
+
   it("will not guess a cost basis held in another currency than the report", async () => {
     // The per-transaction rate translated each purchase into the *account's*
     // currency. Converting that multi-year aggregate into the report currency
     // would need a rate that does not exist, and today's is the wrong answer
     // this whole change exists to avoid.
     accountCurrencyRows = [{ id: "acct-1", currency_code: "EUR" }];
-    portfolioCalculation.calculateCostBasesInAccountCurrency.mockResolvedValue(
-      new Map([["acct-1:sec-spy", 15000]]),
+    portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+      new Map([["acct-1:sec-spy", { quantity: 51, costBasis: 15000 }]]),
     );
 
     const result = await build();
@@ -742,8 +830,8 @@ describe("GemPositionService", () => {
         },
       ];
       priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
-      portfolioCalculation.calculateCostBasesInAccountCurrency.mockResolvedValue(
-        new Map([["acct-1:sec-spy", 3000]]),
+      portfolioCalculation.calculateCostBasisLotsInAccountCurrency.mockResolvedValue(
+        new Map([["acct-1:sec-spy", { quantity: 10, costBasis: 3000 }]]),
       );
 
       const result = await build();

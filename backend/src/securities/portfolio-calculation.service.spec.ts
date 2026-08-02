@@ -1333,3 +1333,77 @@ describe("PortfolioCalculationService.buildAllocation", () => {
     );
   });
 });
+
+describe("PortfolioCalculationService.calculateCostBasisLotsInAccountCurrency", () => {
+  const userId = "user-1";
+
+  const lots = async (transactions: Array<Partial<InvestmentTransaction>>) => {
+    const txRepo = { find: jest.fn().mockResolvedValue(transactions) };
+    const service = buildService([[InvestmentTransaction, txRepo]], {});
+    return service.calculateCostBasisLotsInAccountCurrency(userId, ["acct-1"]);
+  };
+
+  /**
+   * Invariant: cost basis is what the acquisition cost, commission included.
+   * Canonical adversarial input: money with a fee alongside the principal.
+   * Minimal mutation: drop the commission term from the BUY branch.
+   * Test that fails under it: this one -- the basis comes back 1,000.
+   */
+  it("includes the acquisition commission in the basis", async () => {
+    const replayed = await lots([
+      {
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        quantity: 100,
+        price: 10,
+        commission: 20,
+        exchangeRate: 1,
+      } as InvestmentTransaction,
+    ]);
+
+    // 100 x 10 plus the 20 it cost to place the trade. Leaving the commission
+    // out reports 200 of gain on a 1,200 sale where the truth is 180, and
+    // 38.00 of tax at 19% where the truth is 34.20.
+    expect(replayed.get("acct-1:sec-a")).toEqual({
+      quantity: 100,
+      costBasis: 1020,
+    });
+  });
+
+  it("converts the commission at the trade's own rate", async () => {
+    const replayed = await lots([
+      {
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        quantity: 10,
+        price: 100,
+        commission: 5,
+        exchangeRate: 4,
+      } as InvestmentTransaction,
+    ]);
+
+    // (10 x 100 + 5) x 4. The commission is recorded in the trade's currency,
+    // so it moves with the trade rather than being added afterwards.
+    expect(replayed.get("acct-1:sec-a")?.costBasis).toBe(4020);
+  });
+
+  it("reports the quantity the history accounts for", async () => {
+    const replayed = await lots([
+      {
+        accountId: "acct-1",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        quantity: 50,
+        price: 10,
+        commission: 0,
+        exchangeRate: 1,
+      } as InvestmentTransaction,
+    ]);
+
+    // The caller pairs this with a current holding, and 50 replayed against
+    // 100 held is a basis for a different position.
+    expect(replayed.get("acct-1:sec-a")?.quantity).toBe(50);
+  });
+});

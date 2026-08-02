@@ -34,6 +34,14 @@ const LIVE_FX_FETCH_CONCURRENCY = 6;
  * holiday gaps, or a failed FX fetch) at the rate that actually prevailed on
  * that bar's own date rather than a single near-current rate.
  */
+/** A position rebuilt from its transactions: what is held, and what it cost. */
+export interface ReplayedLot {
+  /** Units the transaction history accounts for. */
+  quantity: number;
+  /** Their cost in the holding account's currency, commissions included. */
+  costBasis: number;
+}
+
 export type DailyRateIndex = Map<string, Array<{ date: string; rate: number }>>;
 
 /**
@@ -574,14 +582,22 @@ export class PortfolioCalculationService {
    * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) do not change cost basis;
    * SPLIT scales the tracked quantity so the per-share average adjusts.
    *
-   * @returns Map keyed by `${accountId}:${securityId}` -> cost basis in the
-   *          holding account's currency.
+   * Returns the **quantity as well as the money**, because the two only mean
+   * anything together. A basis replayed from an incomplete history is a real
+   * number for a smaller position than the one being valued: 50 of 100 shares
+   * imported gives a basis for 50, and pairing it with today's 100-share market
+   * value reports a gain that is mostly the missing half. A caller pairing this
+   * with a current holding must compare the quantities and treat a mismatch as
+   * unknown.
+   *
+   * @returns Map keyed by `${accountId}:${securityId}` -> the replayed lot in
+   *          the holding account's currency.
    */
-  async calculateCostBasesInAccountCurrency(
+  async calculateCostBasisLotsInAccountCurrency(
     userId: string,
     holdingsAccountIds: string[],
-  ): Promise<Map<string, number>> {
-    const result = new Map<string, number>();
+  ): Promise<Map<string, ReplayedLot>> {
+    const result = new Map<string, ReplayedLot>();
     if (holdingsAccountIds.length === 0) return result;
 
     const today = formatDateYMDLocal(new Date());
@@ -617,7 +633,14 @@ export class PortfolioCalculationService {
         case InvestmentAction.TRANSFER_IN: {
           const price = Number(tx.price) || 0;
           const exchangeRate = Number(tx.exchangeRate) || 1;
-          entry.costBasis += quantity * price * exchangeRate;
+          // What the acquisition cost, which includes what it cost to
+          // acquire. Leaving the commission out understates the basis and so
+          // overstates every gain and every tax computed from it -- 20 of
+          // commission on a 1,000 purchase is 20 of phantom gain and 3.80 of
+          // phantom tax at 19%. The commission is recorded in the same
+          // currency as the trade, so it is converted with it.
+          const commission = Number(tx.commission) || 0;
+          entry.costBasis += (quantity * price + commission) * exchangeRate;
           entry.quantity += quantity;
           break;
         }
@@ -656,10 +679,34 @@ export class PortfolioCalculationService {
     }
 
     for (const [key, entry] of state) {
-      result.set(key, roundMoney(entry.costBasis));
+      result.set(key, {
+        quantity: entry.quantity,
+        costBasis: roundMoney(entry.costBasis),
+      });
     }
 
     return result;
+  }
+
+  /**
+   * The same replay, reduced to the cost basis alone.
+   *
+   * Kept for callers that already hold the position's quantity from elsewhere
+   * and only need the money. A caller that intends to pair this basis with a
+   * *current* holding quantity should use the lots above and check the two
+   * agree -- see the note there.
+   */
+  async calculateCostBasesInAccountCurrency(
+    userId: string,
+    holdingsAccountIds: string[],
+  ): Promise<Map<string, number>> {
+    const lots = await this.calculateCostBasisLotsInAccountCurrency(
+      userId,
+      holdingsAccountIds,
+    );
+    return new Map(
+      [...lots].map(([key, lot]) => [key, lot.costBasis] as const),
+    );
   }
 
   /**

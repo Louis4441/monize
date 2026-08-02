@@ -5,7 +5,10 @@ import { roundMoney, sumMoney } from "../common/round.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
-import { PortfolioCalculationService } from "../securities/portfolio-calculation.service";
+import {
+  PortfolioCalculationService,
+  ReplayedLot,
+} from "../securities/portfolio-calculation.service";
 import { GemPriceService } from "./gem-price.service";
 import { BOUNDARY_LAG_DAYS } from "./gem-momentum.util";
 import {
@@ -44,6 +47,13 @@ export interface GemPositionResult {
  * rate is no more knowable than one built from a stale price.
  */
 const RATE_MAX_AGE_DAYS = BOUNDARY_LAG_DAYS;
+
+/**
+ * How far a replayed quantity may sit from the held one and still be the same
+ * position. Matches the dust threshold the position arithmetic uses, so a
+ * fractional residue left by a split is not read as a missing trade.
+ */
+const QUANTITY_TOLERANCE = 0.0001;
 
 /** One security's holdings summed over the strategy's accounts. */
 interface AggregatedHolding {
@@ -360,11 +370,18 @@ export class GemPositionService {
    *   pick a rate for an aggregate spanning years -- there is no such rate,
    *   and today's is the wrong answer this method exists to avoid;
    * - a derived basis of zero, which for a position that is held means the
-   *   transactions do not describe how it was acquired, not that it was free.
+   *   transactions do not describe how it was acquired, not that it was free;
+   * - **a replay that does not reproduce the position being valued.** An
+   *   imported portfolio often carries the holding without every trade behind
+   *   it, and a basis for 50 shares beside a market value for 100 is not a
+   *   smaller basis, it is a basis for a different position. Reported as a
+   *   gain it is mostly the cost of the shares nobody recorded: 100 shares
+   *   worth 1,500 against a replayed 500 for half of them shows 1,000 of gain
+   *   and 190 of tax where the truth is 500 and 95.
    */
   private historicalCostBasis(params: {
     holding: AggregatedHolding;
-    accountCostBases: Map<string, number>;
+    accountCostBases: Map<string, ReplayedLot>;
     currencyByAccount: Map<string, string>;
     currencyCode: string;
   }): number | null {
@@ -372,11 +389,19 @@ export class GemPositionService {
       params;
     if (holding.costBasis === null) return null;
     let total = 0;
+    let replayedQuantity = 0;
     for (const accountId of holding.accountIds) {
       if (currencyByAccount.get(accountId) !== currencyCode) return null;
-      const basis = accountCostBases.get(`${accountId}:${holding.securityId}`);
-      if (basis === undefined) return null;
-      total += basis;
+      const lot = accountCostBases.get(`${accountId}:${holding.securityId}`);
+      if (lot === undefined) return null;
+      total += lot.costBasis;
+      replayedQuantity += lot.quantity;
+    }
+    // The replay has to account for the units actually held. The tolerance is
+    // the dust threshold the position arithmetic already uses, so a fractional
+    // residue from a split does not invalidate an otherwise complete history.
+    if (Math.abs(replayedQuantity - holding.quantity) > QUANTITY_TOLERANCE) {
+      return null;
     }
     return total > 0 ? roundMoney(total) : null;
   }
@@ -452,7 +477,7 @@ export class GemPositionService {
      * transactions.
      */
     const accountCostBases =
-      await this.portfolioCalculation.calculateCostBasesInAccountCurrency(
+      await this.portfolioCalculation.calculateCostBasisLotsInAccountCurrency(
         userId,
         accounts.map((account) => account.id),
       );
