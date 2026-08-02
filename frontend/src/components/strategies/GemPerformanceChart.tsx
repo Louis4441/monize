@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   CartesianGrid,
   Line,
@@ -11,15 +11,20 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from 'recharts';
-import { chartColors } from '@/lib/chart-colors';
-import { buildTimeAxisTicks } from '@/lib/chart-time-axis';
-import { useChartDateFormat } from '@/hooks/useChartDateFormat';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { Skeleton } from '@/components/ui/LoadingSkeleton';
-import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
-import { type ChartDatePattern } from '@/lib/utils';
-import { GemAssetRef, GemAssetRole, GemPerformance, GemRange } from '@/types/gem-strategy';
+} from "recharts";
+import { chartColors } from "@/lib/chart-colors";
+import { buildTimeAxisTicks } from "@/lib/chart-time-axis";
+import { useChartDateFormat } from "@/hooks/useChartDateFormat";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { Skeleton } from "@/components/ui/LoadingSkeleton";
+import { ChartTooltipPanel } from "@/components/reports/ChartTooltip";
+import { type ChartDatePattern } from "@/lib/utils";
+import {
+  GemAssetRef,
+  GemAssetRole,
+  GemPerformance,
+  GemRange,
+} from "@/types/gem-strategy";
 import {
   GEM_PORTFOLIO_SERIES,
   GEM_RANGES,
@@ -30,10 +35,10 @@ import {
   rolesWithData,
   performanceDomain,
   type GemPerformanceRow,
-} from '@/lib/gem-strategy-view';
-import { GemCard, GemEmptyState, GemSwatch, GemUnknown } from './GemPrimitives';
-import { useGemLabels } from './useGemLabels';
-import { cn } from '@/lib/utils';
+} from "@/lib/gem-strategy-view";
+import { GemCard, GemEmptyState, GemSwatch, GemUnknown } from "./GemPrimitives";
+import { useGemLabels } from "./useGemLabels";
+import { cn } from "@/lib/utils";
 
 /**
  * The subset of Recharts' label-render props the end-of-line label needs. Typed
@@ -74,7 +79,7 @@ export function GemPerformanceChart({
   onRangeChange,
   isLoading,
 }: GemPerformanceChartProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const { roleLabel } = useGemLabels();
   const formatChartDate = useChartDateFormat();
   const { formatSignedPercent } = useNumberFormat();
@@ -102,8 +107,8 @@ export function GemPerformanceChart({
     if (rows.length === 0) {
       return {
         ticks: [] as number[],
-        domain: ['dataMin', 'dataMax'] as [string, string],
-        tickFormat: 'MMM yyyy' as ChartDatePattern,
+        domain: ["dataMin", "dataMax"] as [string, string],
+        tickFormat: "MMM yyyy" as ChartDatePattern,
       };
     }
     const minTs = rows[0].ts;
@@ -112,7 +117,7 @@ export function GemPerformanceChart({
     return {
       ticks,
       domain: [minTs, maxTs] as [number, number],
-      tickFormat: (stepMonths >= 12 ? 'yyyy' : 'MMM yyyy') as ChartDatePattern,
+      tickFormat: (stepMonths >= 12 ? "yyyy" : "MMM yyyy") as ChartDatePattern,
     };
   }, [rows]);
 
@@ -124,7 +129,7 @@ export function GemPerformanceChart({
   const rangeSwitcher = (
     <div
       role="group"
-      aria-label={t('gem.chart.rangeAriaLabel')}
+      aria-label={t("gem.chart.rangeAriaLabel")}
       className="flex flex-wrap gap-1"
     >
       {GEM_RANGES.map((option) => {
@@ -136,10 +141,10 @@ export function GemPerformanceChart({
             aria-pressed={isActive}
             onClick={() => onRangeChange(option)}
             className={cn(
-              'rounded px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800',
+              "rounded px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800",
               isActive
-                ? 'bg-blue-600 text-white dark:bg-blue-500'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600',
+                ? "bg-blue-600 text-white dark:bg-blue-500"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600",
             )}
           >
             {t(`gem.chart.ranges.${option}` as Parameters<typeof t>[0])}
@@ -151,10 +156,12 @@ export function GemPerformanceChart({
 
   return (
     <GemCard
-      title={t('gem.chart.title', { window: t(`gem.chart.windows.${range}` as Parameters<typeof t>[0]) })}
-      hint={t('gem.chart.hint')}
+      title={t("gem.chart.title", {
+        window: t(`gem.chart.windows.${range}` as Parameters<typeof t>[0]),
+      })}
+      hint={t("gem.chart.hint")}
       headerRight={rangeSwitcher}
-      ariaLabel={t('gem.chart.title', {
+      ariaLabel={t("gem.chart.title", {
         window: t(`gem.chart.windows.${range}` as Parameters<typeof t>[0]),
       })}
     >
@@ -166,14 +173,14 @@ export function GemPerformanceChart({
         aria-controls="gem-chart-legend"
         className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:hidden dark:text-blue-400"
       >
-        {legendOpen ? t('gem.chart.hideLegend') : t('gem.chart.showLegend')}
+        {legendOpen ? t("gem.chart.hideLegend") : t("gem.chart.showLegend")}
       </button>
       <ul
         id="gem-chart-legend"
         className={cn(
-          'mb-2 flex-wrap gap-x-4 gap-y-1 text-xs',
-          legendOpen ? 'flex' : 'hidden',
-          'sm:flex',
+          "mb-2 flex-wrap gap-x-4 gap-y-1 text-xs",
+          legendOpen ? "flex" : "hidden",
+          "sm:flex",
         )}
       >
         {roles.map((role) => (
@@ -181,14 +188,15 @@ export function GemPerformanceChart({
             <GemSwatch colour={GEM_ROLE_COLOURS[role]} />
             <span
               className={cn(
-                'text-gray-600 dark:text-gray-300',
-                role === winnerRole && 'font-semibold text-gray-900 dark:text-gray-100',
+                "text-gray-600 dark:text-gray-300",
+                role === winnerRole &&
+                  "font-semibold text-gray-900 dark:text-gray-100",
               )}
             >
               {seriesLabel(role)}
               {role === winnerRole && (
                 <span className="ml-1 font-medium text-gray-500 dark:text-gray-400">
-                  {t('gem.chart.winnerMarker')}
+                  {t("gem.chart.winnerMarker")}
                 </span>
               )}
             </span>
@@ -200,34 +208,48 @@ export function GemPerformanceChart({
         <Skeleton className="h-64 w-full sm:h-72" />
       ) : roles.length === 0 ? (
         <GemEmptyState
-          title={t('gem.chart.noDataTitle')}
-          description={t('gem.chart.noDataDescription')}
+          title={t("gem.chart.noDataTitle")}
+          description={t("gem.chart.noDataDescription")}
         />
       ) : (
         <>
           <div className="h-64 sm:h-72 xl:h-[19rem]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <LineChart data={rows} margin={{ top: 8, right: 60, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+              <LineChart
+                data={rows}
+                margin={{ top: 8, right: 60, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke={chartColors.grid}
+                />
                 <XAxis
                   dataKey="ts"
                   type="number"
                   scale="time"
                   domain={xAxis.domain}
                   ticks={xAxis.ticks}
-                  tickFormatter={(ts: number) => formatChartDate(new Date(ts), xAxis.tickFormat)}
+                  tickFormatter={(ts: number) =>
+                    formatChartDate(new Date(ts), xAxis.tickFormat)
+                  }
                   tick={{ fontSize: 11 }}
                   stroke={chartColors.axis}
                 />
                 <YAxis
-                  domain={domain ?? ['auto', 'auto']}
-                  tickFormatter={(value: number) => formatSignedPercent(value, 0)}
+                  domain={domain ?? ["auto", "auto"]}
+                  tickFormatter={(value: number) =>
+                    formatSignedPercent(value, 0)
+                  }
                   tick={{ fontSize: 11 }}
                   stroke={chartColors.axis}
                   width={60}
                 />
                 {/* Zero baseline: the break-even line for a cumulative return. */}
-                <ReferenceLine y={0} stroke={chartColors.axis} strokeDasharray="4 4" />
+                <ReferenceLine
+                  y={0}
+                  stroke={chartColors.axis}
+                  strokeDasharray="4 4"
+                />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
@@ -235,12 +257,12 @@ export function GemPerformanceChart({
                     return (
                       <ChartTooltipPanel>
                         <p className="mb-1 font-medium text-gray-900 dark:text-gray-100">
-                          {formatChartDate(new Date(row.ts), 'MMM d, yyyy')}
+                          {formatChartDate(new Date(row.ts), "MMM d, yyyy")}
                         </p>
                         {simulated && (
                           <p className="flex justify-between gap-4 text-sm">
                             <span style={{ color: chartColors.neutral }}>
-                              {t('gem.chart.currentPortfolio')}
+                              {t("gem.chart.currentPortfolio")}
                             </span>
                             <span className="text-gray-700 dark:text-gray-300">
                               {isKnown(row[GEM_PORTFOLIO_SERIES]) ? (
@@ -286,7 +308,13 @@ export function GemPerformanceChart({
                       stroke={colour}
                       strokeWidth={role === winnerRole ? 3 : 1.75}
                       dot={false}
-                      connectNulls
+                      // A gap in the prices stays a gap in the line. Bridging
+                      // it draws a straight segment through months nobody
+                      // observed, indistinguishable from measured data, while
+                      // the tooltip under the cursor calls the value unknown.
+                      // The simulated line below always did this; the asset
+                      // lines were the outlier.
+                      connectNulls={false}
                       isAnimationActive={false}
                       label={(props: GemEndLabelProps) => {
                         const { index } = props;
@@ -324,7 +352,7 @@ export function GemPerformanceChart({
                   <Line
                     type="monotone"
                     dataKey={GEM_PORTFOLIO_SERIES}
-                    name={t('gem.chart.currentPortfolio')}
+                    name={t("gem.chart.currentPortfolio")}
                     stroke={chartColors.neutral}
                     strokeWidth={2}
                     strokeDasharray="5 3"
@@ -337,17 +365,17 @@ export function GemPerformanceChart({
             </ResponsiveContainer>
           </div>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {t('gem.chart.footnote')}
-            {performance?.incomplete && ` ${t('gem.chart.incompleteHistory')}`}
+            {t("gem.chart.footnote")}
+            {performance?.incomplete && ` ${t("gem.chart.incompleteHistory")}`}
           </p>
           {/* What the dashed line is, and everything it is not. Printed rather
               than tucked into a tooltip: a portfolio line beside the asset
               lines reads as "what I actually made" unless it says otherwise. */}
           {simulated && (
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {t('gem.chart.currentPortfolioNote')}
+              {t("gem.chart.currentPortfolioNote")}
               {!simulated.completeRange &&
-                ` ${t('gem.chart.currentPortfolioLateStart')}`}
+                ` ${t("gem.chart.currentPortfolioLateStart")}`}
             </p>
           )}
           {unavailableSimulation && (

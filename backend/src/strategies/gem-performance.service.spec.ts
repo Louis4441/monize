@@ -511,4 +511,75 @@ describe("GemPerformanceService", () => {
       expect([...ids].sort()).toEqual(["sec-emim", "sec-spy"]);
     });
   });
+
+  /**
+   * The adversarial cases for time-series rules 2, 3 and 4 on the chart.
+   *
+   * A feed that stops is not a flat line. Both of these passed before the
+   * carry-forward was bounded: the chart drew EMIM level across eleven months
+   * it had no price for, called it +20% for the year, and reported the whole
+   * window as complete.
+   */
+  describe("a series whose feed stops mid-window", () => {
+    const deadFeed = () =>
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2024-09-30", close: 105 },
+              { date: "2025-08-14", close: 111 },
+            ],
+          ],
+          // Last quoted 2024-09-30: 318 days before the right edge of the
+          // chart, 31 times the daily carry-forward window.
+          [
+            "sec-emim",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2024-09-30", close: 120 },
+            ],
+          ],
+        ]),
+      );
+
+    it("breaks the line instead of holding it level, and reports no total", async () => {
+      deadFeed();
+
+      const performance = await build();
+
+      expect(performance?.totals).toEqual({ US_EQUITY: 11, EM_EQUITY: null });
+      const last = performance?.points[performance.points.length - 1];
+      expect(last?.date).toBe("2025-08-14");
+      expect(last?.values.EM_EQUITY).toBeNull();
+      // The window is not covered, and the caveat is what says so.
+      expect(performance?.incomplete).toBe(true);
+    });
+
+    it("will not report a simulated return for a holding it stopped pricing", async () => {
+      deadFeed();
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-emim",
+              symbol: "EMIM",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      // Not +20%: that is the return to the day the prices stopped, and
+      // printing it as the window's return dates a dead quote to today.
+      expect(simulation?.totalReturnPercent).toBeNull();
+      expect(simulation?.completeRange).toBe(false);
+      expect(
+        simulation?.points[simulation.points.length - 1].returnPercent,
+      ).toBeNull();
+    });
+  });
 });

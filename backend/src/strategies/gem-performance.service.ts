@@ -7,7 +7,8 @@ import {
   PricePoint,
   addMonthsUtc,
   parseYmd,
-  priceAsOf,
+  daysBetween,
+  pointAsOf,
 } from "./gem-momentum.util";
 import {
   GemPriceService,
@@ -45,6 +46,27 @@ const COVERAGE_TOLERANCE_DAYS: Record<"day" | "week" | "month", number> = {
   month: 45,
 };
 
+/**
+ * How stale a close may be and still stand for a plotted date.
+ *
+ * Every line here carries each asset forward from its last known close, which
+ * is deliberate: a market holiday in one country must not punch a hole in the
+ * others' lines. Unbounded, though, the same mechanism draws a delisted fund as
+ * a perfectly flat line across every month since its feed stopped, and reports
+ * the level it stopped at as the window's return. That is a stale quote wearing
+ * today's date -- the thing `BOUNDARY_LAG_DAYS` exists to refuse on the signal
+ * path, and there is no reason the chart should be laxer than the signal.
+ *
+ * One sampling bucket plus a closed market, matching the coverage tolerances
+ * above in size but answering a different question: those ask whether a series
+ * *started* in time, these whether it is still running.
+ */
+const CARRY_FORWARD_DAYS: Record<"day" | "week" | "month", number> = {
+  day: 10,
+  week: 21,
+  month: 45,
+};
+
 /** ISO date `days` after `date`. */
 function addDays(date: string, days: number): string {
   const shifted = new Date(`${date}T00:00:00Z`);
@@ -69,6 +91,23 @@ export class GemPerformanceService {
   }
 
   /**
+   * The close standing for `date` in this series, carried forward from the last
+   * observation but only while that observation is still recent enough to speak
+   * for the date. Null once it is not: an unknown level, not a flat line.
+   */
+  private carriedClose(
+    prices: PricePoint[],
+    date: string,
+    sampling: "day" | "week" | "month",
+  ): number | null {
+    const point = pointAsOf(prices, date);
+    if (!point) return null;
+    return daysBetween(point.date, date) <= CARRY_FORWARD_DAYS[sampling]
+      ? point.close
+      : null;
+  }
+
+  /**
    * Rebase one series to its first observation in the window. Returns null when
    * the series has no usable base (no prices in range, or a non-positive first
    * close), which the caller reports as an asset with no data rather than a flat
@@ -76,12 +115,13 @@ export class GemPerformanceService {
    */
   private rebase(
     prices: PricePoint[],
+    sampling: "day" | "week" | "month",
   ): ((date: string) => number | null) | null {
     if (prices.length === 0) return null;
     const base = prices[0].close;
     if (!(base > 0)) return null;
     return (date: string) => {
-      const close = priceAsOf(prices, date);
+      const close = this.carriedClose(prices, date, sampling);
       if (close === null) return null;
       return roundToDecimals((close / base - 1) * 100, GEM_PP_DECIMALS);
     };
@@ -130,7 +170,7 @@ export class GemPerformanceService {
 
     for (const [role, securityId] of securityByRole) {
       const prices = series.get(securityId) ?? [];
-      const reader = this.rebase(prices);
+      const reader = this.rebase(prices, sampling);
       if (!reader) {
         incomplete = true;
         continue;
@@ -158,10 +198,23 @@ export class GemPerformanceService {
     if (starts.some((date) => date > latestAcceptableStart)) incomplete = true;
 
     const orderedDates = [...dates].sort();
+    const firstObservation = new Map<GemAssetRole, string>();
+    for (const [role, securityId] of securityByRole) {
+      const prices = series.get(securityId);
+      if (prices?.length) firstObservation.set(role, prices[0].date);
+    }
     const points: GemPerformancePoint[] = orderedDates.map((date) => {
       const values: Partial<Record<GemAssetRole, number | null>> = {};
       for (const [role, reader] of readers) {
-        values[role] = reader(date);
+        const value = reader(date);
+        values[role] = value;
+        // A hole after the series has begun is a stretch of the line nobody
+        // observed. Only a late start is excused here -- that is the case the
+        // start-coverage test above already reports, and re-reporting it would
+        // say nothing new.
+        if (value === null && date >= (firstObservation.get(role) as string)) {
+          incomplete = true;
+        }
       }
       return { date, values };
     });
@@ -169,6 +222,9 @@ export class GemPerformanceService {
     const lastDate = orderedDates[orderedDates.length - 1];
     const totals: Partial<Record<GemAssetRole, number | null>> = {};
     for (const [role, reader] of readers) {
+      // The window's return, or nothing. A series whose feed stopped in March
+      // is not up 20% over the year: it is up 20% to March and unknown since,
+      // and the second half of that sentence is the half that matters.
       totals[role] = reader(lastDate);
     }
 
@@ -265,9 +321,13 @@ export class GemPerformanceService {
     // show, and saying so is the difference between an explained absence and a
     // legend entry for a line that is not there.
     if (startsOn > lastPlotted) return empty("MISSING_PRICE_HISTORY");
+    // The opening level, held to the same freshness rule as every later point:
+    // a leg whose feed stopped years before the window opens has no base here,
+    // and rebasing the whole simulation to that dead quote would price every
+    // point after it off a number nobody struck.
     const bases = legs.map((leg) => ({
       ...leg,
-      base: priceAsOf(leg.prices, startsOn) as number,
+      base: this.carriedClose(leg.prices, startsOn, sampling) as number,
     }));
     if (bases.some((leg) => !(leg.base > 0))) {
       return empty("MISSING_PRICE_HISTORY");
@@ -277,7 +337,7 @@ export class GemPerformanceService {
       if (date < startsOn) return { date, returnPercent: null };
       let index = 0;
       for (const leg of bases) {
-        const close = priceAsOf(leg.prices, date);
+        const close = this.carriedClose(leg.prices, date, sampling);
         if (close === null) return { date, returnPercent: null };
         index += leg.weight * (close / leg.base);
       }
@@ -287,18 +347,28 @@ export class GemPerformanceService {
       };
     });
 
-    const priced = points.filter((point) => point.returnPercent !== null);
+    // The return over the window, which means the value at the *end* of it.
+    //
+    // Taking the last point that happened to be priceable answered a different
+    // question and labelled it with this one: a holding whose feed stopped four
+    // months ago reported the return to the day it stopped as the return to
+    // today, with nothing marking the difference.
+    const closing = points[points.length - 1]?.returnPercent ?? null;
     return {
       points,
-      totalReturnPercent: priced[priced.length - 1]?.returnPercent ?? null,
-      // Measured against the chart's own first point, not the requested
-      // window. When the strategy's instruments are what cut the window short,
+      totalReturnPercent: closing,
+      // Complete means covering the chart from end to end. The start is
+      // measured against the chart's own first point, not the requested
+      // window: when the strategy's instruments are what cut the window short,
       // every line starts there and the simulation is as complete as the chart
       // can be -- blaming the user's holdings for it printed "at least one of
       // the instruments you hold now has no data from the start of the period"
       // over a holding priced from the very first day.
       completeRange:
-        startsOn <= addDays(firstPlotted, COVERAGE_TOLERANCE_DAYS[sampling]),
+        startsOn <= addDays(firstPlotted, COVERAGE_TOLERANCE_DAYS[sampling]) &&
+        points.every(
+          (point) => point.date < startsOn || point.returnPercent !== null,
+        ),
       startsOn,
       includedHoldings: bases.map((leg) => ({
         securityId: leg.securityId,
