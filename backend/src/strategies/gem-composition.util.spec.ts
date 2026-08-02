@@ -225,6 +225,71 @@ describe("gem-composition.util", () => {
       expect(match.byInstrument).toBe(false);
     });
 
+    /**
+     * Partial coverage is the storage format, not an edge case: the securities
+     * editor drops the "Other" bucket so its weight falls into the computed
+     * remainder, and the DTO says the slices need not sum to 1. Unaccounted
+     * weight is unknown, and scoring it as known-absent turns a floor into a
+     * figure -- the same false zero this module already refuses when a
+     * breakdown is missing altogether.
+     */
+    it("refuses to measure against a partially described target", () => {
+      const match = matchHolding({
+        isTarget: false,
+        // A China-only fund against a target recorded as 30% China and nothing
+        // else. The old answer was 0.30; the truth is somewhere in 0.30-1.00.
+        holding: composition({ COUNTRY: [{ name: "China", weight: 1 }] }),
+        target: composition({ COUNTRY: [{ name: "China", weight: 0.3 }] }),
+        dimension: "COUNTRY",
+      });
+
+      expect(match.overlap).toBeNull();
+      // What *is* known is still shown: the shared market and its size.
+      expect(match.matched).toEqual([{ name: "China", weight: 0.3 }]);
+      expect(match.byInstrument).toBe(false);
+    });
+
+    it("refuses a confident zero against a partially described target", () => {
+      const match = matchHolding({
+        isTarget: false,
+        holding: composition({ COUNTRY: [{ name: "Brazil", weight: 1 }] }),
+        target: composition({ COUNTRY: [{ name: "China", weight: 0.3 }] }),
+        dimension: "COUNTRY",
+      });
+
+      // "0.00% exposure to the target market" was printed for a target 70% of
+      // which nobody had described.
+      expect(match.overlap).toBeNull();
+      expect(match.matched).toEqual([]);
+    });
+
+    it("refuses to measure a partially described holding", () => {
+      const match = matchHolding({
+        isTarget: false,
+        holding: composition({ COUNTRY: [{ name: "China", weight: 0.2 }] }),
+        target,
+        dimension: "COUNTRY",
+      });
+      expect(match.overlap).toBeNull();
+    });
+
+    it("tolerates rounding in an otherwise complete breakdown", () => {
+      const match = matchHolding({
+        isTarget: false,
+        holding: composition({
+          COUNTRY: [
+            { name: "China", weight: 0.201 },
+            { name: "United States", weight: 0.79 },
+          ],
+        }),
+        target,
+        dimension: "COUNTRY",
+      });
+      // 0.991 is a provider rounding its percentages, not a fund described in
+      // part.
+      expect(match.overlap).toBeCloseTo(0.201, 6);
+    });
+
     it("falls back to the instrument when the holding is undescribed", () => {
       const undescribed = {
         holding: EMPTY_COMPOSITION,

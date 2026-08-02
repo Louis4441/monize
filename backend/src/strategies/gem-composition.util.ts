@@ -246,10 +246,42 @@ export function overlapContributions(
   return contributions.sort((a, b) => b.weight - a.weight);
 }
 
+/**
+ * How much weight a breakdown must account for before an overlap measured over
+ * it means anything.
+ *
+ * Two points of slack for rounding in a provider's percentages. Anything more
+ * missing is not rounding: it is a description of part of the fund.
+ */
+const COMPLETE_WEIGHT_TOLERANCE = 0.02;
+
+/**
+ * Whether a breakdown accounts for essentially all of the fund.
+ *
+ * Partial coverage is the documented storage format, not an edge case: the
+ * securities editor deliberately drops the "Other" bucket so its weight falls
+ * into the computed remainder, and the DTO says the slices need not sum to 1.
+ * Unaccounted weight is therefore *unknown*, and an overlap computed over it
+ * scores it as known-absent.
+ */
+function accountsForWholeFund(
+  weights: GemWeighting[] | null | undefined,
+): boolean {
+  const total = (weights ?? []).reduce(
+    (sum, entry) => sum + (Number(entry?.weight) || 0),
+    0,
+  );
+  return total >= 1 - COMPLETE_WEIGHT_TOLERANCE;
+}
+
 /** One holding's verdict: how much of it counts, and how that was decided. */
 export interface GemHoldingMatch {
-  /** Share of the holding already in the target's markets, 0-1. */
-  overlap: number;
+  /**
+   * Share of the holding already in the target's markets, 0-1, or null when
+   * neither side describes enough of itself for that share to be a
+   * measurement rather than a lower bound.
+   */
+  overlap: number | null;
   /** True when the ticker was compared because no breakdown was available. */
   byInstrument: boolean;
   /**
@@ -290,8 +322,19 @@ export function matchHolding(params: {
     };
   }
   const matched = overlapContributions(holding[dimension], target[dimension]);
+  // A partially described fund on either side makes the overlap a floor, not a
+  // figure. A target recorded only as "China 30%" against a China-only holding
+  // scored 0.30 -- the honest answer is somewhere between 30% and 100% -- and
+  // against a Brazil fund it printed a confident "0.00% exposure to the target
+  // market", which is the same false zero this module already refuses when a
+  // breakdown is missing altogether.
+  const measurable =
+    accountsForWholeFund(holding[dimension]) &&
+    accountsForWholeFund(target[dimension]);
   return {
-    overlap: compositionOverlap(holding[dimension], target[dimension]),
+    overlap: measurable
+      ? compositionOverlap(holding[dimension], target[dimension])
+      : null,
     byInstrument: false,
     matched,
   };
