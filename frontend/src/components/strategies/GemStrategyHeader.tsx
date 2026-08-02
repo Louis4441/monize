@@ -1,15 +1,18 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useTranslations } from 'next-intl';
-import { CalendarDaysIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
-import { Button } from '@/components/ui/Button';
-import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { useDateFormat } from '@/hooks/useDateFormat';
-import { GemCadence, GemStrategyRef } from '@/types/gem-strategy';
-import { isKnown } from '@/lib/gem-strategy-view';
-import { useGemLabels } from './useGemLabels';
-import { GemScenarioSwitcher } from './GemScenarioSwitcher';
+import Link from "next/link";
+import { useTranslations } from "next-intl";
+import {
+  CalendarDaysIcon,
+  PencilSquareIcon,
+} from "@heroicons/react/24/outline";
+import { Button } from "@/components/ui/Button";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { useDateFormat } from "@/hooks/useDateFormat";
+import { GemCadence, GemStrategyRef } from "@/types/gem-strategy";
+import { isKnown } from "@/lib/gem-strategy-view";
+import { useGemLabels } from "./useGemLabels";
+import { GemScenarioSwitcher } from "./GemScenarioSwitcher";
 
 interface GemStrategyHeaderProps {
   /**
@@ -20,8 +23,9 @@ interface GemStrategyHeaderProps {
   strategyName: string;
   scenarios: readonly GemStrategyRef[];
   onSelectScenario: (id: string) => void;
-  onCreateScenario: (name: string) => Promise<void>;
-  onDeleteScenario: (id: string) => Promise<void>;
+  /** Resolves true on success, so the switcher's dialogs survive a failure. */
+  onCreateScenario: (name: string) => Promise<boolean>;
+  onDeleteScenario: (id: string) => Promise<boolean>;
   scenarioBusy: boolean;
   cadence: GemCadence;
   nextEvaluationOn: string | null;
@@ -47,25 +51,25 @@ export function GemStrategyHeader({
   daysUntilNextEvaluation,
   onEditSettings,
 }: GemStrategyHeaderProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const { cadenceLabel } = useGemLabels();
   const { formatDate } = useDateFormat();
 
   return (
     <header className="mb-4">
-      <nav aria-label={t('gem.header.breadcrumbAriaLabel')} className="mb-1">
+      <nav aria-label={t("gem.header.breadcrumbAriaLabel")} className="mb-1">
         <ol className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
           <li>
             <Link
               href="/reports"
               className="rounded hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-blue-400"
             >
-              {t('gem.header.breadcrumbRoot')}
+              {t("gem.header.breadcrumbRoot")}
             </Link>
           </li>
           <li aria-hidden="true">/</li>
           <li className="text-gray-700 dark:text-gray-300" aria-current="page">
-            {t('gem.header.title')}
+            {t("gem.header.title")}
           </li>
         </ol>
       </nav>
@@ -76,7 +80,7 @@ export function GemStrategyHeader({
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {strategyName}
             </h1>
-            <InfoTooltip text={t('gem.header.explainer')} usePortal />
+            <InfoTooltip text={t("gem.header.explainer")} usePortal />
             <GemScenarioSwitcher
               currentId={strategyId}
               currentName={strategyName}
@@ -87,7 +91,9 @@ export function GemStrategyHeader({
               busy={scenarioBusy}
             />
           </div>
-          <p className="text-gray-500 dark:text-gray-400">{t('gem.header.subtitle')}</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            {t("gem.header.subtitle")}
+          </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
@@ -98,24 +104,30 @@ export function GemStrategyHeader({
             />
             <div>
               <p className="text-gray-600 dark:text-gray-300">
-                {t('gem.header.cadence', { cadence: cadenceLabel(cadence) })}
+                {t("gem.header.cadence", { cadence: cadenceLabel(cadence) })}
               </p>
               <p className="text-gray-500 dark:text-gray-400">
                 {nextEvaluationOn
                   ? isKnown(daysUntilNextEvaluation)
-                    ? t('gem.header.nextEvaluationWithDays', {
+                    ? t("gem.header.nextEvaluationWithDays", {
                         date: formatDate(nextEvaluationOn),
                         days: daysUntilNextEvaluation,
                       })
-                    : t('gem.header.nextEvaluation', { date: formatDate(nextEvaluationOn) })
-                  : t('gem.header.nextEvaluationUnknown')}
+                    : t("gem.header.nextEvaluation", {
+                        date: formatDate(nextEvaluationOn),
+                      })
+                  : t("gem.header.nextEvaluationUnknown")}
               </p>
             </div>
           </div>
 
-          <Button variant="outline" onClick={onEditSettings} className="shrink-0">
+          <Button
+            variant="outline"
+            onClick={onEditSettings}
+            className="shrink-0"
+          >
             <PencilSquareIcon className="mr-2 h-4 w-4" aria-hidden="true" />
-            {t('gem.header.editSettings')}
+            {t("gem.header.editSettings")}
           </Button>
         </div>
       </div>

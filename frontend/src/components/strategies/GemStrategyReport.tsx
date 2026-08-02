@@ -1,34 +1,38 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import toast from 'react-hot-toast';
-import { useReportData } from '@/hooks/useReportData';
-import { ReportError } from '@/components/reports/ReportError';
-import { Skeleton } from '@/components/ui/LoadingSkeleton';
-import { createLogger } from '@/lib/logger';
-import { gemStrategyApi } from '@/lib/gem-strategy';
-import { GemAssetRole, GemRange, GemStrategyReport as GemStrategyReportData } from '@/types/gem-strategy';
-import { GEM_DEFAULT_RANGE, warningCodes } from '@/lib/gem-strategy-view';
-import { GemStrategyHeader } from './GemStrategyHeader';
-import { GemStrategyTabs, GemTab } from './GemStrategyTabs';
-import { GemWarningsBanner } from './GemWarningsBanner';
-import { GemSignalCard } from './GemSignalCard';
-import { GemPortfolioCard } from './GemPortfolioCard';
-import { GemTransferCard } from './GemTransferCard';
-import { GemAssetsCard } from './GemAssetsCard';
-import { GemPerformanceChart } from './GemPerformanceChart';
-import { GemNextActionCard } from './GemNextActionCard';
-import { GemAllocationCard } from './GemAllocationCard';
-import { GemReasoningSection } from './GemReasoningSection';
-import { GemSignalHistoryTable } from './GemSignalHistoryTable';
-import { GemPortfolioPanel } from './GemPortfolioPanel';
-import { GemBacktestPanel } from './GemBacktestPanel';
-import { GemSettingsForm } from './GemSettingsForm';
-import { GemStrategyFooter } from './GemStrategyFooter';
+import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import toast from "react-hot-toast";
+import { useReportData } from "@/hooks/useReportData";
+import { ReportError } from "@/components/reports/ReportError";
+import { Skeleton } from "@/components/ui/LoadingSkeleton";
+import { createLogger } from "@/lib/logger";
+import { gemStrategyApi } from "@/lib/gem-strategy";
+import {
+  GemAssetRole,
+  GemRange,
+  GemStrategyReport as GemStrategyReportData,
+} from "@/types/gem-strategy";
+import { GEM_DEFAULT_RANGE, warningCodes } from "@/lib/gem-strategy-view";
+import { GemStrategyHeader } from "./GemStrategyHeader";
+import { GemStrategyTabs, GemTab } from "./GemStrategyTabs";
+import { GemWarningsBanner } from "./GemWarningsBanner";
+import { GemSignalCard } from "./GemSignalCard";
+import { GemPortfolioCard } from "./GemPortfolioCard";
+import { GemTransferCard } from "./GemTransferCard";
+import { GemAssetsCard } from "./GemAssetsCard";
+import { GemPerformanceChart } from "./GemPerformanceChart";
+import { GemNextActionCard } from "./GemNextActionCard";
+import { GemAllocationCard } from "./GemAllocationCard";
+import { GemReasoningSection } from "./GemReasoningSection";
+import { GemSignalHistoryTable } from "./GemSignalHistoryTable";
+import { GemPortfolioPanel } from "./GemPortfolioPanel";
+import { GemBacktestPanel } from "./GemBacktestPanel";
+import { GemSettingsForm } from "./GemSettingsForm";
+import { GemStrategyFooter } from "./GemStrategyFooter";
 
-const logger = createLogger('GemStrategyReport');
+const logger = createLogger("GemStrategyReport");
 
 /** Rows of signal history shown on the overview before "see full history". */
 const OVERVIEW_HISTORY_ROWS = 5;
@@ -57,10 +61,10 @@ function GemReportSkeleton() {
  * with the strategy itself evaluated server-side.
  */
 export function GemStrategyReport() {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const router = useRouter();
   const [range, setRange] = useState<GemRange>(GEM_DEFAULT_RANGE);
-  const [tab, setTab] = useState<GemTab>('overview');
+  const [tab, setTab] = useState<GemTab>("overview");
   const [isSaving, setIsSaving] = useState(false);
   // The scenario on screen. Undefined means "whichever the server picks", which
   // is the user's first -- and the only one until they create a second.
@@ -103,7 +107,8 @@ export function GemStrategyReport() {
     [data?.signal],
   );
   const symbolByRole = useMemo(
-    () => new Map((data?.assets ?? []).map((asset) => [asset.role, asset.symbol])),
+    () =>
+      new Map((data?.assets ?? []).map((asset) => [asset.role, asset.symbol])),
     [data?.assets],
   );
 
@@ -113,30 +118,44 @@ export function GemStrategyReport() {
     setIsSaving(true);
     try {
       adopt(await gemStrategyApi.markExecuted(signalId, range, strategyId));
-      toast.success(t('gem.action.markExecutedSuccess'));
+      toast.success(t("gem.action.markExecutedSuccess"));
     } catch (err) {
-      logger.error('Failed to mark the GEM operation as executed:', err);
-      toast.error(t('gem.action.markExecutedError'));
+      logger.error("Failed to mark the GEM operation as executed:", err);
+      toast.error(t("gem.action.markExecutedError"));
     } finally {
       setIsSaving(false);
     }
   }, [adopt, data?.signal?.id, range, strategyId, t]);
 
   const handleAddTransactions = useCallback(() => {
-    router.push('/investments');
+    router.push("/investments");
   }, [router]);
 
+  /**
+   * Both scenario mutations report success to the switcher rather than
+   * swallowing it.
+   *
+   * The switcher closed its modal after awaiting these, and because the errors
+   * are caught here the child saw a resolved promise either way -- so a
+   * rejected create closed the dialog and threw away the name the user had just
+   * typed. Returning a boolean keeps the failure visible to the one component
+   * that can act on it, without a second toast.
+   */
   const handleCreateScenario = useCallback(
     async (name: string) => {
       setIsSaving(true);
       try {
         const report = await gemStrategyApi.createStrategy(name, range);
         adoptScenario(report);
-        setTab('settings');
-        toast.success(t('gem.scenarios.created', { name: report.strategy.name }));
+        setTab("settings");
+        toast.success(
+          t("gem.scenarios.created", { name: report.strategy.name }),
+        );
+        return true;
       } catch (err) {
-        logger.error('Failed to create a GEM scenario:', err);
-        toast.error(t('gem.scenarios.createError'));
+        logger.error("Failed to create a GEM scenario:", err);
+        toast.error(t("gem.scenarios.createError"));
+        return false;
       } finally {
         setIsSaving(false);
       }
@@ -149,11 +168,13 @@ export function GemStrategyReport() {
       setIsSaving(true);
       try {
         adoptScenario(await gemStrategyApi.deleteStrategy(id, range));
-        setTab('overview');
-        toast.success(t('gem.scenarios.deleted'));
+        setTab("overview");
+        toast.success(t("gem.scenarios.deleted"));
+        return true;
       } catch (err) {
-        logger.error('Failed to delete a GEM scenario:', err);
-        toast.error(t('gem.scenarios.deleteError'));
+        logger.error("Failed to delete a GEM scenario:", err);
+        toast.error(t("gem.scenarios.deleteError"));
+        return false;
       } finally {
         setIsSaving(false);
       }
@@ -172,7 +193,7 @@ export function GemStrategyReport() {
   if (error && !data) {
     return (
       <div className="px-4 pt-6 pb-8 sm:px-6 lg:px-12">
-        <ReportError message={t('gem.error.loadFailed')} onRetry={reload} />
+        <ReportError message={t("gem.error.loadFailed")} onRetry={reload} />
       </div>
     );
   }
@@ -185,13 +206,22 @@ export function GemStrategyReport() {
     );
   }
 
-  const { strategy, assets, signal, position, action, performance, history, backtest } = data;
+  const {
+    strategy,
+    assets,
+    signal,
+    position,
+    action,
+    performance,
+    history,
+    backtest,
+  } = data;
   const signalUnavailable = signal === null;
 
   const panelProps = (panel: GemTab) => ({
-    role: 'tabpanel' as const,
+    role: "tabpanel" as const,
     id: `gem-panel-${panel}`,
-    'aria-labelledby': `gem-tab-${panel}`,
+    "aria-labelledby": `gem-tab-${panel}`,
     tabIndex: -1,
   });
 
@@ -208,7 +238,7 @@ export function GemStrategyReport() {
         cadence={strategy.cadence}
         nextEvaluationOn={strategy.nextEvaluationOn}
         daysUntilNextEvaluation={strategy.daysUntilNextEvaluation}
-        onEditSettings={() => setTab('settings')}
+        onEditSettings={() => setTab("settings")}
       />
 
       <GemStrategyTabs active={tab} onChange={setTab} />
@@ -218,22 +248,25 @@ export function GemStrategyReport() {
         lookbackMonths={strategy.lookbackMonths}
       />
 
-      {tab === 'overview' && (
-        <div {...panelProps('overview')} className="space-y-4">
+      {tab === "overview" && (
+        <div {...panelProps("overview")} className="space-y-4">
           {/* Four summary cards: signal, portfolio fit, money to move, asset roster. */}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <GemSignalCard
               signal={signal}
               nextEvaluationOn={strategy.nextEvaluationOn}
               daysUntilNextEvaluation={strategy.daysUntilNextEvaluation}
-              firstRun={codes.has('FIRST_RUN')}
-              failed={codes.has('CALCULATION_FAILED')}
+              firstRun={codes.has("FIRST_RUN")}
+              failed={codes.has("CALCULATION_FAILED")}
             />
-            <GemPortfolioCard position={position} noAccount={codes.has('NO_ACCOUNT')} />
+            <GemPortfolioCard
+              position={position}
+              noAccount={codes.has("NO_ACCOUNT")}
+            />
             <GemTransferCard
               action={action}
               signalUnavailable={signalUnavailable}
-              noAccount={codes.has('NO_ACCOUNT')}
+              noAccount={codes.has("NO_ACCOUNT")}
             />
             <GemAssetsCard assets={assets} winnerRole={winnerRole} />
           </div>
@@ -258,7 +291,7 @@ export function GemStrategyReport() {
               <GemNextActionCard
                 action={action}
                 signalUnavailable={signalUnavailable}
-                noAccount={codes.has('NO_ACCOUNT')}
+                noAccount={codes.has("NO_ACCOUNT")}
                 onMarkExecuted={handleMarkExecuted}
                 onAddTransactions={handleAddTransactions}
                 isSaving={isSaving}
@@ -271,20 +304,23 @@ export function GemStrategyReport() {
             </div>
           </div>
 
-          <GemReasoningSection signal={signal} lookbackMonths={strategy.lookbackMonths} />
+          <GemReasoningSection
+            signal={signal}
+            lookbackMonths={strategy.lookbackMonths}
+          />
 
           <GemSignalHistoryTable
             history={history}
             limit={OVERVIEW_HISTORY_ROWS}
-            onShowAll={() => setTab('signals')}
+            onShowAll={() => setTab("signals")}
             symbolByRole={symbolByRole}
             lookbackMonths={strategy.lookbackMonths}
           />
         </div>
       )}
 
-      {tab === 'signals' && (
-        <div {...panelProps('signals')}>
+      {tab === "signals" && (
+        <div {...panelProps("signals")}>
           <GemSignalHistoryTable
             history={history}
             symbolByRole={symbolByRole}
@@ -293,17 +329,20 @@ export function GemStrategyReport() {
         </div>
       )}
 
-      {tab === 'portfolio' && (
-        <div {...panelProps('portfolio')} className="grid gap-4 lg:grid-cols-2 lg:items-start">
+      {tab === "portfolio" && (
+        <div
+          {...panelProps("portfolio")}
+          className="grid gap-4 lg:grid-cols-2 lg:items-start"
+        >
           <GemPortfolioPanel
             position={position}
-            noAccount={codes.has('NO_ACCOUNT')}
-            noPosition={codes.has('NO_POSITION')}
+            noAccount={codes.has("NO_ACCOUNT")}
+            noPosition={codes.has("NO_POSITION")}
           />
           <GemNextActionCard
             action={action}
             signalUnavailable={signalUnavailable}
-            noAccount={codes.has('NO_ACCOUNT')}
+            noAccount={codes.has("NO_ACCOUNT")}
             onMarkExecuted={handleMarkExecuted}
             onAddTransactions={handleAddTransactions}
             isSaving={isSaving}
@@ -311,19 +350,19 @@ export function GemStrategyReport() {
         </div>
       )}
 
-      {tab === 'backtest' && (
-        <div {...panelProps('backtest')}>
+      {tab === "backtest" && (
+        <div {...panelProps("backtest")}>
           <GemBacktestPanel backtest={backtest} />
         </div>
       )}
 
-      {tab === 'settings' && (
-        <div {...panelProps('settings')}>
+      {tab === "settings" && (
+        <div {...panelProps("settings")}>
           {/* Keyed on the scenario: react-hook-form reads its defaults once,
               at mount, so switching scenarios with the tab open would otherwise
               leave the previous scenario's values under the new one's name. */}
           <GemSettingsForm
-            key={strategy.id ?? 'unsaved'}
+            key={strategy.id ?? "unsaved"}
             strategy={strategy}
             assets={assets}
             range={range}

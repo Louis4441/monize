@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { GemAction } from '@/types/gem-strategy';
-import { isKnown } from '@/lib/gem-strategy-view';
+import { useTranslations } from "next-intl";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { GemAction } from "@/types/gem-strategy";
+import { isKnown } from "@/lib/gem-strategy-view";
 import {
   GemAccountLinks,
   GemCard,
@@ -11,7 +11,7 @@ import {
   GemSigned,
   GemStatRow,
   GemUnknown,
-} from './GemPrimitives';
+} from "./GemPrimitives";
 
 interface GemTransferCardProps {
   action: GemAction | null;
@@ -31,17 +31,17 @@ export function GemTransferCard({
   signalUnavailable = false,
   noAccount = false,
 }: GemTransferCardProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const { formatCurrency } = useNumberFormat();
 
   if (!action || !action.required) {
     return (
-      <GemCard title={t('gem.transfer.title')} hint={t('gem.transfer.hint')}>
+      <GemCard title={t("gem.transfer.title")} hint={t("gem.transfer.hint")}>
         <GemEmptyState
           title={
             noAccount && !signalUnavailable
-              ? t('gem.portfolio.noAccountTitle')
-              : t('gem.transfer.noneTitle')
+              ? t("gem.portfolio.noAccountTitle")
+              : t("gem.transfer.noneTitle")
           }
           description={
             // Without a signal there is no target to compare the account with,
@@ -50,10 +50,10 @@ export function GemTransferCard({
             // claim about accounts that do not exist. The portfolio card says
             // the same thing on the same row; this card must not contradict it.
             signalUnavailable
-              ? t('gem.transfer.noSignalDescription')
+              ? t("gem.transfer.noSignalDescription")
               : noAccount
-                ? t('gem.portfolio.noAccountDescription')
-                : t('gem.transfer.noneDescription')
+                ? t("gem.portfolio.noAccountDescription")
+                : t("gem.transfer.noneDescription")
           }
         />
       </GemCard>
@@ -63,15 +63,15 @@ export function GemTransferCard({
   const currency = action.currencyCode;
 
   return (
-    <GemCard title={t('gem.transfer.title')} hint={t('gem.transfer.hint')}>
+    <GemCard title={t("gem.transfer.title")} hint={t("gem.transfer.hint")}>
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        {t('gem.transfer.valueLabel')}
+        {t("gem.transfer.valueLabel")}
       </p>
       <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">
         {isKnown(action.transferValue) ? (
           formatCurrency(action.transferValue, currency)
         ) : (
-          <GemUnknown label={t('gem.transfer.valueUnknown')} />
+          <GemUnknown label={t("gem.transfer.valueUnknown")} />
         )}
       </p>
 
@@ -80,7 +80,7 @@ export function GemTransferCard({
           rest of it, so the sale is all or nothing. */}
       {action.partialMatchCount > 0 && (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          {t('gem.transfer.partialMatchNote', {
+          {t("gem.transfer.partialMatchNote", {
             count: action.partialMatchCount,
           })}
         </p>
@@ -88,12 +88,12 @@ export function GemTransferCard({
 
       <dl className="mt-3 space-y-1">
         <GemStatRow
-          label={t('gem.transfer.realized')}
+          label={t("gem.transfer.realized")}
           value={
             <GemSigned
               value={action.realizedGainLoss}
               format={(value) =>
-                `${value >= 0 ? '+' : '-'}${formatCurrency(Math.abs(value), currency)}`
+                `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value), currency)}`
               }
             />
           }
@@ -102,22 +102,22 @@ export function GemTransferCard({
           <GemStatRow
             label={
               isKnown(action.taxRatePercent)
-                ? t('gem.transfer.taxWithRate', { rate: action.taxRatePercent })
-                : t('gem.transfer.tax')
+                ? t("gem.transfer.taxWithRate", { rate: action.taxRatePercent })
+                : t("gem.transfer.tax")
             }
             value={formatCurrency(action.estimatedTax, currency)}
           />
         )}
         {isKnown(action.estimatedCommission) && (
           <GemStatRow
-            label={t('gem.transfer.commissionForTrades', {
+            label={t("gem.transfer.commissionForTrades", {
               trades: action.estimatedTradeCount,
             })}
             value={formatCurrency(action.estimatedCommission, currency)}
           />
         )}
         <GemStatRow
-          label={t('gem.transfer.accounts')}
+          label={t("gem.transfer.accounts")}
           value={
             action.accounts.length > 0 ? (
               <GemAccountLinks accounts={action.accounts} />

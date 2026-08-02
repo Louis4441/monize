@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { GemPosition } from '@/types/gem-strategy';
-import { compliancePercent, isKnown } from '@/lib/gem-strategy-view';
+import { useTranslations } from "next-intl";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { GemPosition } from "@/types/gem-strategy";
+import { compliancePercent, isKnown } from "@/lib/gem-strategy-view";
 import {
   GemBadge,
   GemCard,
@@ -11,8 +11,8 @@ import {
   GemSecurityLink,
   GemStatRow,
   GemUnknown,
-} from './GemPrimitives';
-import { useGemLabels } from './useGemLabels';
+} from "./GemPrimitives";
+import { useGemLabels } from "./useGemLabels";
 
 interface GemPortfolioCardProps {
   position: GemPosition | null;
@@ -25,17 +25,20 @@ interface GemPortfolioCardProps {
  * held instrument against the target one and how much of the strategy account is
  * already positioned per the signal.
  */
-export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps) {
-  const t = useTranslations('strategies');
+export function GemPortfolioCard({
+  position,
+  noAccount,
+}: GemPortfolioCardProps) {
+  const t = useTranslations("strategies");
   const { assetFullLabel } = useGemLabels();
   const { formatPercent, formatCurrency } = useNumberFormat();
 
   if (!position || noAccount) {
     return (
-      <GemCard title={t('gem.portfolio.title')} hint={t('gem.portfolio.hint')}>
+      <GemCard title={t("gem.portfolio.title")} hint={t("gem.portfolio.hint")}>
         <GemEmptyState
-          title={t('gem.portfolio.noAccountTitle')}
-          description={t('gem.portfolio.noAccountDescription')}
+          title={t("gem.portfolio.noAccountTitle")}
+          description={t("gem.portfolio.noAccountDescription")}
         />
       </GemCard>
     );
@@ -46,20 +49,20 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
   const largest = position.current;
 
   return (
-    <GemCard title={t('gem.portfolio.title')} hint={t('gem.portfolio.hint')}>
+    <GemCard title={t("gem.portfolio.title")} hint={t("gem.portfolio.hint")}>
       <dl className="space-y-1">
         {/* What the accounts hold, counted. Naming the largest holding as "the
             current instrument" described a four-fund portfolio as though it
             were in one of them, and the other three appeared only as "+3". */}
         <GemStatRow
-          label={t('gem.portfolio.positions')}
-          value={t('gem.portfolio.positionsValue', {
+          label={t("gem.portfolio.positions")}
+          value={t("gem.portfolio.positionsValue", {
             instruments: securities.length,
             accounts: position.accounts.length,
           })}
         />
         <GemStatRow
-          label={t('gem.portfolio.target')}
+          label={t("gem.portfolio.target")}
           value={
             position.target ? (
               <GemSecurityLink securityId={position.target.securityId}>
@@ -74,17 +77,17 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
             the portfolio's identity. */}
         {largest && (
           <GemStatRow
-            label={t('gem.portfolio.largest')}
+            label={t("gem.portfolio.largest")}
             value={
               <span>
                 <GemSecurityLink securityId={largest.securityId}>
                   {largest.isCash
-                    ? t('gem.portfolioPanel.workingCash')
+                    ? t("gem.portfolioPanel.workingCash")
                     : assetFullLabel(largest)}
                 </GemSecurityLink>
                 {isKnown(largest.marketValue) && (
                   <span className="text-gray-500 dark:text-gray-400">
-                    {t('gem.portfolio.largestValue', {
+                    {t("gem.portfolio.largestValue", {
                       value: formatCurrency(
                         largest.marketValue,
                         position.currencyCode,
@@ -101,7 +104,7 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
       <div className="mt-3">
         <div className="mb-1 flex items-baseline justify-between text-xs">
           <span className="text-gray-500 dark:text-gray-400">
-            {t('gem.portfolio.exactTarget')}
+            {t("gem.portfolio.exactTarget")}
           </span>
           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {percent === null ? <GemUnknown /> : formatPercent(percent, 0)}
@@ -109,10 +112,10 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
         </div>
         <div
           role="progressbar"
-          aria-label={t('gem.portfolio.exactTarget')}
+          aria-label={t("gem.portfolio.exactTarget")}
           aria-valuemin={0}
           aria-valuemax={100}
-          {...(percent === null ? {} : { 'aria-valuenow': percent })}
+          {...(percent === null ? {} : { "aria-valuenow": percent })}
           className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
         >
           {/* One neutral fill: the percentage above and the "change required"
@@ -130,23 +133,23 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
           there" -- which is not true of an instruction to hold one instrument. */}
       <div className="mt-2 flex items-baseline justify-between text-xs">
         <span className="text-gray-500 dark:text-gray-400">
-          {t('gem.portfolio.marketExposure')}
+          {t("gem.portfolio.marketExposure")}
         </span>
         <span className="font-medium text-gray-700 dark:text-gray-200">
           {isKnown(position.marketExposurePercent) ? (
             formatPercent(position.marketExposurePercent, 0)
           ) : (
-            <GemUnknown label={t('gem.portfolio.marketExposureUnknown')} />
+            <GemUnknown label={t("gem.portfolio.marketExposureUnknown")} />
           )}
         </span>
       </div>
 
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="text-gray-500 dark:text-gray-400">
-          {t('gem.portfolio.changeRequired')}
+          {t("gem.portfolio.changeRequired")}
         </span>
-        <GemBadge tone={position.changeRequired ? 'red' : 'green'}>
-          {position.changeRequired ? t('gem.common.yes') : t('gem.common.no')}
+        <GemBadge tone={position.changeRequired ? "red" : "green"}>
+          {position.changeRequired ? t("gem.common.yes") : t("gem.common.no")}
         </GemBadge>
       </div>
     </GemCard>

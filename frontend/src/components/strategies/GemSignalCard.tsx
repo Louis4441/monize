@@ -1,12 +1,20 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
-import { ArrowTrendingUpIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
-import { useDateFormat } from '@/hooks/useDateFormat';
-import { GemSignal } from '@/types/gem-strategy';
-import { isKnown } from '@/lib/gem-strategy-view';
-import { GemBadge, GemCard, GemEmptyState, GemSecurityLink } from './GemPrimitives';
-import { useGemLabels } from './useGemLabels';
+import { useTranslations } from "next-intl";
+import {
+  ArrowTrendingUpIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/outline";
+import { useDateFormat } from "@/hooks/useDateFormat";
+import { GemSignal } from "@/types/gem-strategy";
+import { isKnown } from "@/lib/gem-strategy-view";
+import {
+  GemBadge,
+  GemCard,
+  GemEmptyState,
+  GemSecurityLink,
+} from "./GemPrimitives";
+import { useGemLabels } from "./useGemLabels";
 
 interface GemSignalCardProps {
   signal: GemSignal | null;
@@ -30,44 +38,51 @@ export function GemSignalCard({
   firstRun,
   failed,
 }: GemSignalCardProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const { stateLabel, assetLabel, assetFullLabel } = useGemLabels();
   const { formatDate } = useDateFormat();
 
   if (!signal) {
     return (
-      <GemCard title={t('gem.signal.title')} hint={t('gem.signal.hint')}>
+      <GemCard title={t("gem.signal.title")} hint={t("gem.signal.hint")}>
         <GemEmptyState
-          title={failed ? t('gem.signal.failedTitle') : t('gem.signal.firstRunTitle')}
+          title={
+            failed ? t("gem.signal.failedTitle") : t("gem.signal.firstRunTitle")
+          }
           description={
             failed
-              ? t('gem.signal.failedDescription')
+              ? t("gem.signal.failedDescription")
               : firstRun
-                ? t('gem.signal.firstRunDescription')
-                : t('gem.signal.unavailableDescription')
+                ? t("gem.signal.firstRunDescription")
+                : t("gem.signal.unavailableDescription")
           }
         />
       </GemCard>
     );
   }
 
-  const isRiskOn = signal.state === 'RISK_ON';
+  const isRiskOn = signal.state === "RISK_ON";
   const Icon = isRiskOn ? ArrowTrendingUpIcon : ShieldCheckIcon;
 
   return (
     <GemCard
-      title={t('gem.signal.title')}
-      hint={t('gem.signal.hint')}
+      title={t("gem.signal.title")}
+      hint={t("gem.signal.hint")}
       headerRight={
-        <GemBadge tone={isRiskOn ? 'green' : 'gray'}>{stateLabel(signal.state)}</GemBadge>
+        <GemBadge tone={isRiskOn ? "green" : "gray"}>
+          {stateLabel(signal.state)}
+        </GemBadge>
       }
     >
       {/* The badge above states RISK-ON/RISK-OFF; the allocation itself reads
           as an ordinary heading rather than a coloured one. */}
       <p className="text-lg font-semibold leading-tight text-gray-900 dark:text-gray-100">
-        {t('gem.signal.allocation', {
+        {t("gem.signal.allocation", {
           weight: signal.targetWeightPercent,
-          asset: signal.target?.name ?? signal.target?.symbol ?? t('gem.common.unassigned'),
+          asset:
+            signal.target?.name ??
+            signal.target?.symbol ??
+            t("gem.common.unassigned"),
         })}
       </p>
       <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
@@ -78,22 +93,26 @@ export function GemSignalCard({
 
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         <div>
-          <dt className="text-gray-500 dark:text-gray-400">{t('gem.signal.effectiveFrom')}</dt>
+          <dt className="text-gray-500 dark:text-gray-400">
+            {t("gem.signal.effectiveFrom")}
+          </dt>
           <dd className="font-medium text-gray-900 dark:text-gray-100">
             {formatDate(signal.effectiveFrom)}
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500 dark:text-gray-400">{t('gem.signal.nextEvaluation')}</dt>
+          <dt className="text-gray-500 dark:text-gray-400">
+            {t("gem.signal.nextEvaluation")}
+          </dt>
           <dd className="font-medium text-gray-900 dark:text-gray-100">
             {nextEvaluationOn
               ? isKnown(daysUntilNextEvaluation)
-                ? t('gem.signal.nextEvaluationValue', {
+                ? t("gem.signal.nextEvaluationValue", {
                     date: formatDate(nextEvaluationOn),
                     days: daysUntilNextEvaluation,
                   })
                 : formatDate(nextEvaluationOn)
-              : t('gem.header.nextEvaluationUnknown')}
+              : t("gem.header.nextEvaluationUnknown")}
           </dd>
         </div>
       </dl>
@@ -105,13 +124,13 @@ export function GemSignalCard({
       <p className="mt-3 flex items-start gap-1.5 text-xs text-gray-600 dark:text-gray-300">
         <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         {isRiskOn
-          ? t('gem.signal.summaryRiskOn', {
+          ? t("gem.signal.summaryRiskOn", {
               winner:
                 signal.relative.winner?.symbol ??
                 signal.target?.symbol ??
                 assetLabel(signal.target),
             })
-          : t('gem.signal.summaryRiskOff', {
+          : t("gem.signal.summaryRiskOff", {
               safe: signal.target?.symbol ?? assetLabel(signal.target),
             })}
       </p>

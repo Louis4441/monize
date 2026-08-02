@@ -1,10 +1,16 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
-import { useDateFormat } from '@/hooks/useDateFormat';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { GemBacktestSummary } from '@/types/gem-strategy';
-import { GemCard, GemEmptyState, GemSigned, GemStatRow, GemUnknown } from './GemPrimitives';
+import { useTranslations } from "next-intl";
+import { useDateFormat } from "@/hooks/useDateFormat";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { GemBacktestSummary } from "@/types/gem-strategy";
+import {
+  GemCard,
+  GemEmptyState,
+  GemSigned,
+  GemStatRow,
+  GemUnknown,
+} from "./GemPrimitives";
 
 interface GemBacktestPanelProps {
   backtest: GemBacktestSummary | null;
@@ -17,10 +23,10 @@ interface GemBacktestPanelProps {
  * must not say it was.
  */
 function costsApplied(backtest: GemBacktestSummary) {
-  if (backtest.taxApplied && backtest.commissionApplied) return 'netOfCosts';
-  if (backtest.taxApplied) return 'netOfTaxOnly';
-  if (backtest.commissionApplied) return 'netOfCommissionOnly';
-  return 'grossOfCosts';
+  if (backtest.taxApplied && backtest.commissionApplied) return "netOfCosts";
+  if (backtest.taxApplied) return "netOfTaxOnly";
+  if (backtest.commissionApplied) return "netOfCommissionOnly";
+  return "grossOfCosts";
 }
 
 /**
@@ -29,38 +35,41 @@ function costsApplied(backtest: GemBacktestSummary) {
  * rather than showing zeroed metrics.
  */
 export function GemBacktestPanel({ backtest }: GemBacktestPanelProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const { formatDate } = useDateFormat();
   const { formatSignedPercent, formatPercent } = useNumberFormat();
 
   if (!backtest) {
     return (
-      <GemCard title={t('gem.backtest.title')}>
+      <GemCard title={t("gem.backtest.title")}>
         <GemEmptyState
-          title={t('gem.backtest.emptyTitle')}
-          description={t('gem.backtest.emptyDescription')}
+          title={t("gem.backtest.emptyTitle")}
+          description={t("gem.backtest.emptyDescription")}
         />
       </GemCard>
     );
   }
 
   return (
-    <GemCard title={t('gem.backtest.title')} hint={t('gem.backtest.hint')}>
+    <GemCard title={t("gem.backtest.title")} hint={t("gem.backtest.hint")}>
       <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-        {t('gem.backtest.period', {
+        {t("gem.backtest.period", {
           from: formatDate(backtest.from),
           to: formatDate(backtest.to),
         })}
       </p>
       <dl className="space-y-1">
         <GemStatRow
-          label={t('gem.backtest.cagr')}
+          label={t("gem.backtest.cagr")}
           value={
-            <GemSigned value={backtest.cagrPercent} format={(value) => formatSignedPercent(value)} />
+            <GemSigned
+              value={backtest.cagrPercent}
+              format={(value) => formatSignedPercent(value)}
+            />
           }
         />
         <GemStatRow
-          label={t('gem.backtest.maxDrawdown')}
+          label={t("gem.backtest.maxDrawdown")}
           value={
             <GemSigned
               value={backtest.maxDrawdownPercent}
@@ -69,7 +78,7 @@ export function GemBacktestPanel({ backtest }: GemBacktestPanelProps) {
           }
         />
         <GemStatRow
-          label={t('gem.backtest.hitRate')}
+          label={t("gem.backtest.hitRate")}
           value={
             backtest.hitRatePercent === null ? (
               <GemUnknown />
@@ -94,7 +103,7 @@ export function GemBacktestPanel({ backtest }: GemBacktestPanelProps) {
           sets both. */}
       {backtest.coveragePercent < 100 && (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {t('gem.backtest.partialCoverage', {
+          {t("gem.backtest.partialCoverage", {
             coverage: formatPercent(backtest.coveragePercent, 0),
           })}
         </p>

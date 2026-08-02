@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
+import { useTranslations } from "next-intl";
 import {
   ArrowRightIcon,
   CheckCircleIcon,
   CheckIcon,
   PlusIcon,
-} from '@heroicons/react/24/outline';
-import { Button } from '@/components/ui/Button';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { GemAction } from '@/types/gem-strategy';
-import { isKnown } from '@/lib/gem-strategy-view';
+} from "@heroicons/react/24/outline";
+import { Button } from "@/components/ui/Button";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { GemAction } from "@/types/gem-strategy";
+import { isKnown } from "@/lib/gem-strategy-view";
 import {
   GemAccountLinks,
   GemCard,
@@ -18,8 +18,8 @@ import {
   GemSigned,
   GemStatRow,
   GemUnknown,
-} from './GemPrimitives';
-import { useGemLabels } from './useGemLabels';
+} from "./GemPrimitives";
+import { useGemLabels } from "./useGemLabels";
 
 interface GemNextActionCardProps {
   action: GemAction | null;
@@ -46,15 +46,15 @@ export function GemNextActionCard({
   onAddTransactions,
   isSaving,
 }: GemNextActionCardProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const { assetFullLabel } = useGemLabels();
   const { formatCurrency, formatQuantity } = useNumberFormat();
 
   if (signalUnavailable) {
     return (
-      <GemCard title={t('gem.action.title')} hint={t('gem.action.hint')}>
+      <GemCard title={t("gem.action.title")} hint={t("gem.action.hint")}>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {t('gem.action.signalUnavailable')}
+          {t("gem.action.signalUnavailable")}
         </p>
       </GemCard>
     );
@@ -65,12 +65,12 @@ export function GemNextActionCard({
   // nothing assigned that there was nothing to do.
   if (noAccount) {
     return (
-      <GemCard title={t('gem.action.title')} hint={t('gem.action.hint')}>
+      <GemCard title={t("gem.action.title")} hint={t("gem.action.hint")}>
         <p className="font-medium text-gray-900 dark:text-gray-100">
-          {t('gem.portfolio.noAccountTitle')}
+          {t("gem.portfolio.noAccountTitle")}
         </p>
         <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-          {t('gem.portfolio.noAccountDescription')}
+          {t("gem.portfolio.noAccountDescription")}
         </p>
       </GemCard>
     );
@@ -78,7 +78,7 @@ export function GemNextActionCard({
 
   if (!action || !action.required) {
     return (
-      <GemCard title={t('gem.action.title')} hint={t('gem.action.hint')}>
+      <GemCard title={t("gem.action.title")} hint={t("gem.action.hint")}>
         <div className="flex items-start gap-2">
           <CheckCircleIcon
             className="mt-0.5 h-5 w-5 shrink-0 text-gray-400 dark:text-gray-500"
@@ -86,10 +86,10 @@ export function GemNextActionCard({
           />
           <div>
             <p className="font-medium text-gray-900 dark:text-gray-100">
-              {t('gem.action.compliantTitle')}
+              {t("gem.action.compliantTitle")}
             </p>
             <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-              {t('gem.action.compliantDescription')}
+              {t("gem.action.compliantDescription")}
             </p>
           </div>
         </div>
@@ -101,11 +101,11 @@ export function GemNextActionCard({
 
   return (
     <GemCard
-      title={t('gem.action.title')}
-      hint={t('gem.action.hint')}
+      title={t("gem.action.title")}
+      hint={t("gem.action.hint")}
       headerRight={
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          {t('gem.action.signalChanged')}
+          {t("gem.action.signalChanged")}
         </span>
       }
     >
@@ -116,14 +116,14 @@ export function GemNextActionCard({
               described a four-fund portfolio as though it were in one of them
               -- while the three the user also has to sell went unnamed. */}
           <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {t('gem.action.sellLabel', { count: action.sellPositions.length })}
+            {t("gem.action.sellLabel", { count: action.sellPositions.length })}
           </p>
           {action.sellPositions.length === 0 ? (
             // Spelled out, not dashed: a cash-funded purchase sells nothing,
             // which is a fact about the operation and not a value the server
             // failed to supply.
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t('gem.action.nothingToSell')}
+              {t("gem.action.nothingToSell")}
             </p>
           ) : (
             <ul className="scrollbar-slim max-h-32 space-y-1 overflow-y-auto pr-1">
@@ -141,7 +141,7 @@ export function GemNextActionCard({
                       <GemUnknown />
                     )}
                     {isKnown(position.quantity) &&
-                      ` · ${t('gem.action.units', {
+                      ` · ${t("gem.action.units", {
                         units: formatQuantity(position.quantity),
                       })}`}
                   </p>
@@ -156,11 +156,11 @@ export function GemNextActionCard({
             className="h-4 w-4 text-gray-400 dark:text-gray-500"
             aria-hidden="true"
           />
-          <span className="sr-only">{t('gem.action.arrowAriaLabel')}</span>
+          <span className="sr-only">{t("gem.action.arrowAriaLabel")}</span>
         </span>
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {t('gem.action.buyLabel')}
+            {t("gem.action.buyLabel")}
           </p>
           <p className="text-sm font-medium break-words text-gray-900 dark:text-gray-100">
             {action.to ? (
@@ -172,14 +172,16 @@ export function GemNextActionCard({
             )}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t('gem.action.targetWeight', { weight: action.targetWeightPercent })}
+            {t("gem.action.targetWeight", {
+              weight: action.targetWeightPercent,
+            })}
           </p>
         </div>
       </div>
 
       <dl className="mt-3 space-y-1 border-t border-gray-200 pt-3 dark:border-gray-700">
         <GemStatRow
-          label={t('gem.action.transferValue')}
+          label={t("gem.action.transferValue")}
           value={
             isKnown(action.transferValue) ? (
               formatCurrency(action.transferValue, currency)
@@ -189,12 +191,12 @@ export function GemNextActionCard({
           }
         />
         <GemStatRow
-          label={t('gem.action.realized')}
+          label={t("gem.action.realized")}
           value={
             <GemSigned
               value={action.realizedGainLoss}
               format={(value) =>
-                `${value >= 0 ? '+' : '-'}${formatCurrency(Math.abs(value), currency)}`
+                `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value), currency)}`
               }
             />
           }
@@ -203,22 +205,22 @@ export function GemNextActionCard({
           <GemStatRow
             label={
               isKnown(action.taxRatePercent)
-                ? t('gem.action.taxWithRate', { rate: action.taxRatePercent })
-                : t('gem.action.tax')
+                ? t("gem.action.taxWithRate", { rate: action.taxRatePercent })
+                : t("gem.action.tax")
             }
             value={formatCurrency(action.estimatedTax, currency)}
           />
         )}
         {isKnown(action.estimatedCommission) && (
           <GemStatRow
-            label={t('gem.action.commissionForTrades', {
+            label={t("gem.action.commissionForTrades", {
               trades: action.estimatedTradeCount,
             })}
             value={formatCurrency(action.estimatedCommission, currency)}
           />
         )}
         <GemStatRow
-          label={t('gem.action.accounts')}
+          label={t("gem.action.accounts")}
           value={
             action.accounts.length > 0 ? (
               <GemAccountLinks accounts={action.accounts} />
@@ -238,13 +240,16 @@ export function GemNextActionCard({
       {action.executed ? (
         <>
           <p className="mt-3 flex items-start gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-            <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {t('gem.action.executedButChanged')}
+            <CheckCircleIcon
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-hidden="true"
+            />
+            {t("gem.action.executedButChanged")}
           </p>
           <div className="mt-3">
             <Button variant="outline" onClick={onAddTransactions}>
               <PlusIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-              {t('gem.action.addTransactions')}
+              {t("gem.action.addTransactions")}
             </Button>
           </div>
         </>
@@ -252,11 +257,11 @@ export function GemNextActionCard({
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <Button onClick={onMarkExecuted} isLoading={isSaving}>
             <CheckIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-            {t('gem.action.markExecuted')}
+            {t("gem.action.markExecuted")}
           </Button>
           <Button variant="outline" onClick={onAddTransactions}>
             <PlusIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-            {t('gem.action.addTransactions')}
+            {t("gem.action.addTransactions")}
           </Button>
         </div>
       )}

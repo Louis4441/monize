@@ -1,16 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, fireEvent, waitFor, within } from '@/test/render';
-import { GemSettingsForm } from './GemSettingsForm';
-import { gemAssets, gemReport } from '@/test/gem-fixtures';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, act, fireEvent, waitFor, within } from "@/test/render";
+import { GemSettingsForm } from "./GemSettingsForm";
+import { gemAssets, gemReport } from "@/test/gem-fixtures";
 
 const mockGetAccounts = vi.fn();
-vi.mock('@/lib/accounts', () => ({
+vi.mock("@/lib/accounts", () => ({
   accountsApi: { getAll: (...args: unknown[]) => mockGetAccounts(...args) },
 }));
 
 const mockGetSecurities = vi.fn();
 const mockCreateSecurity = vi.fn();
-vi.mock('@/lib/investments', () => ({
+vi.mock("@/lib/investments", () => ({
   investmentsApi: {
     getSecurities: (...args: unknown[]) => mockGetSecurities(...args),
     createSecurity: (...args: unknown[]) => mockCreateSecurity(...args),
@@ -19,7 +19,7 @@ vi.mock('@/lib/investments', () => ({
 
 // The real security form is exercised by its own tests; here it only needs to
 // hand a payload back so the assignment wiring can be asserted.
-vi.mock('@/components/securities/SecurityForm', () => ({
+vi.mock("@/components/securities/SecurityForm", () => ({
   SecurityForm: ({
     onSubmit,
     onCancel,
@@ -31,9 +31,10 @@ vi.mock('@/components/securities/SecurityForm', () => ({
       <button
         type="button"
         onClick={() =>
-          onSubmit({ symbol: 'CSPX', name: 'iShares Core S&P 500 UCITS ETF' }).catch(
-            () => undefined,
-          )
+          onSubmit({
+            symbol: "CSPX",
+            name: "iShares Core S&P 500 UCITS ETF",
+          }).catch(() => undefined)
         }
       >
         stub-create-security
@@ -46,61 +47,87 @@ vi.mock('@/components/securities/SecurityForm', () => ({
 }));
 
 const mockUpdateConfig = vi.fn();
-vi.mock('@/lib/gem-strategy', () => ({
-  gemStrategyApi: { updateConfig: (...args: unknown[]) => mockUpdateConfig(...args) },
+vi.mock("@/lib/gem-strategy", () => ({
+  gemStrategyApi: {
+    updateConfig: (...args: unknown[]) => mockUpdateConfig(...args),
+  },
 }));
 
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
-vi.mock('react-hot-toast', () => ({
+vi.mock("react-hot-toast", () => ({
   default: {
     success: (message: string) => mockToastSuccess(message),
     error: (message: string) => mockToastError(message),
   },
 }));
 
-vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
+vi.mock("@/lib/logger", () => ({
+  createLogger: () => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 
 const accounts = [
   {
-    id: 'acct-1',
-    name: 'Broker IRA',
-    accountType: 'INVESTMENT',
-    accountSubType: 'INVESTMENT_BROKERAGE',
-    currencyCode: 'USD',
+    id: "acct-1",
+    name: "Broker IRA",
+    accountType: "INVESTMENT",
+    accountSubType: "INVESTMENT_BROKERAGE",
+    currencyCode: "USD",
   },
   {
-    id: 'acct-2',
-    name: 'Broker Taxable',
-    accountType: 'INVESTMENT',
-    accountSubType: 'INVESTMENT_BROKERAGE',
-    currencyCode: 'USD',
+    id: "acct-2",
+    name: "Broker Taxable",
+    accountType: "INVESTMENT",
+    accountSubType: "INVESTMENT_BROKERAGE",
+    currencyCode: "USD",
   },
   {
-    id: 'acct-cash',
-    name: 'Broker IRA Cash',
-    accountType: 'INVESTMENT',
-    accountSubType: 'INVESTMENT_CASH',
-    currencyCode: 'USD',
+    id: "acct-cash",
+    name: "Broker IRA Cash",
+    accountType: "INVESTMENT",
+    accountSubType: "INVESTMENT_CASH",
+    currencyCode: "USD",
   },
   {
-    id: 'acct-chequing',
-    name: 'Chequing',
-    accountType: 'BANKING',
+    id: "acct-chequing",
+    name: "Chequing",
+    accountType: "BANKING",
     accountSubType: null,
-    currencyCode: 'CAD',
+    currencyCode: "CAD",
   },
 ];
 
 const securities = [
-  { id: 'sec-spy', symbol: 'SPY', name: 'SPDR S&P 500 ETF', isActive: true },
-  { id: 'sec-emim', symbol: 'EMIM', name: 'iShares MSCI EM IMI ETF', isActive: true },
-  { id: 'sec-old', symbol: 'OLD', name: 'Delisted ETF', isActive: false },
+  // Exchange and currency are part of the fixtures because they are part of
+  // an instrument's identity: the suggestions name a listing, and a bare
+  // ticker is not one.
+  {
+    id: "sec-spy",
+    symbol: "SPY",
+    name: "SPDR S&P 500 ETF",
+    exchange: "NYSEARCA",
+    currencyCode: "USD",
+    isActive: true,
+  },
+  {
+    id: "sec-emim",
+    symbol: "EMIM",
+    name: "iShares MSCI EM IMI ETF",
+    exchange: "LSE",
+    currencyCode: "USD",
+    isActive: true,
+  },
+  { id: "sec-old", symbol: "OLD", name: "Delisted ETF", isActive: false },
 ];
 
-async function renderForm(props: Partial<Parameters<typeof GemSettingsForm>[0]> = {}) {
+async function renderForm(
+  props: Partial<Parameters<typeof GemSettingsForm>[0]> = {},
+) {
   const onSaved = vi.fn();
   let result: ReturnType<typeof render>;
   await act(async () => {
@@ -117,13 +144,14 @@ async function renderForm(props: Partial<Parameters<typeof GemSettingsForm>[0]> 
   return { ...result!, onSaved };
 }
 
-describe('GemSettingsForm', () => {
+describe("GemSettingsForm", () => {
   /**
    * The role's dropdown trigger. Queried by role rather than by label: the
    * popup listbox is labelled by the same element, as the ARIA combobox
    * pattern prescribes, so the label alone matches two nodes.
    */
-  const roleTrigger = (role: string) => screen.getByRole('button', { name: role });
+  const roleTrigger = (role: string) =>
+    screen.getByRole("button", { name: role });
 
   /** Open a role's instrument dropdown and click one of its entries. */
   const pickInstrument = async (role: string, option: string | RegExp) => {
@@ -131,7 +159,7 @@ describe('GemSettingsForm', () => {
       fireEvent.click(roleTrigger(role));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('option', { name: option }));
+      fireEvent.click(screen.getByRole("option", { name: option }));
     });
   };
 
@@ -142,9 +170,9 @@ describe('GemSettingsForm', () => {
     });
     // Scoped to the dropdown: a native <select> elsewhere on the form also
     // publishes its <option> children under the same role.
-    const labels = within(screen.getByRole('listbox'))
-      .getAllByRole('option')
-      .map((option) => option.textContent?.trim() ?? '');
+    const labels = within(screen.getByRole("listbox"))
+      .getAllByRole("option")
+      .map((option) => option.textContent?.trim() ?? "");
     await act(async () => {
       fireEvent.click(roleTrigger(role));
     });
@@ -157,194 +185,255 @@ describe('GemSettingsForm', () => {
     mockGetSecurities.mockResolvedValue(securities);
     mockUpdateConfig.mockResolvedValue(gemReport());
     mockCreateSecurity.mockResolvedValue({
-      id: 'sec-cspx',
-      symbol: 'CSPX',
-      name: 'iShares Core S&P 500 UCITS ETF',
+      id: "sec-cspx",
+      symbol: "CSPX",
+      name: "iShares Core S&P 500 UCITS ETF",
       isActive: true,
     });
   });
 
-  it('prefills the stored configuration', async () => {
+  it("prefills the stored configuration", async () => {
     await renderForm();
 
-    expect(screen.getByLabelText('Strategy accounts')).toHaveTextContent(
-      'Broker IRA (USD)',
+    expect(screen.getByLabelText("Strategy accounts")).toHaveTextContent(
+      "Broker IRA (USD)",
     );
-    expect(screen.getByLabelText('Evaluation frequency')).toHaveValue('MONTHLY');
+    expect(screen.getByLabelText("Evaluation frequency")).toHaveValue(
+      "MONTHLY",
+    );
     // NumericInput and CurrencyInput are text fields that format on blur, so
     // the values read back as the formatted strings, not as numbers.
-    expect(screen.getByLabelText('Momentum window (months)')).toHaveValue('12');
-    expect(screen.getByLabelText('Tax rate (%)')).toHaveValue('19.00');
-    expect(screen.getByLabelText('Commission per trade')).toHaveValue('29.90');
-    expect(screen.getByLabelText('Text to show for that link')).toHaveValue('example.test/gem');
-    expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
+    expect(screen.getByLabelText("Momentum window (months)")).toHaveValue("12");
+    expect(screen.getByLabelText("Tax rate (%)")).toHaveValue("19.00");
+    expect(screen.getByLabelText("Commission per trade")).toHaveValue("29.90");
+    expect(screen.getByLabelText("Text to show for that link")).toHaveValue(
+      "example.test/gem",
+    );
+    expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
   });
 
-  it('offers only brokerage investment accounts and active securities', async () => {
+  it("offers only brokerage investment accounts and active securities", async () => {
     await renderForm();
 
     // The account picker is a multi-select, so its options live in a dropdown.
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Strategy accounts'));
+      fireEvent.click(screen.getByLabelText("Strategy accounts"));
     });
     expect(
-      screen.getAllByRole('checkbox').map((box) => box.closest('label')?.textContent),
-    ).toEqual(['Broker IRA (USD)', 'Broker Taxable (USD)']);
+      screen
+        .getAllByRole("checkbox")
+        .map((box) => box.closest("label")?.textContent),
+    ).toEqual(["Broker IRA (USD)", "Broker Taxable (USD)"]);
 
     // Suggestions for this role first, one per region, then what is held.
-    expect(await instrumentOptions('Emerging markets')).toEqual([
-      'EEMiShares MSCI Emerging Markets ETF · NYSEARCA',
+    expect(await instrumentOptions("Emerging markets")).toEqual([
+      "EEMiShares MSCI Emerging Markets ETF · NYSEARCA",
       // The recommendation the portfolio already holds is still a
       // recommendation -- picking it assigns the instrument instead of
       // opening the create form, and it says so rather than dropping out of
       // the group and leaving the role's own fund unmarked in the long list
       // of everything owned.
-      'EMIMiShares MSCI EM IMI ETF · already in your instruments',
-      'No instrument',
-      'SPY — SPDR S&P 500 ETF',
-      'EMIM — iShares MSCI EM IMI ETF',
+      "EMIMiShares MSCI EM IMI ETF · already in your instruments",
+      "No instrument",
+      "SPY — SPDR S&P 500 ETF",
+      "EMIM — iShares MSCI EM IMI ETF",
     ]);
   });
 
-  it('assigns an owned instrument straight from the suggestions', async () => {
+  it("assigns an owned instrument straight from the suggestions", async () => {
     await renderForm();
 
-    await pickInstrument('Emerging markets', 'No instrument');
-    expect(roleTrigger('Emerging markets')).toHaveTextContent('No instrument');
+    await pickInstrument("Emerging markets", "No instrument");
+    expect(roleTrigger("Emerging markets")).toHaveTextContent("No instrument");
 
     await pickInstrument(
-      'Emerging markets',
-      'EMIMiShares MSCI EM IMI ETF · already in your instruments',
+      "Emerging markets",
+      "EMIMiShares MSCI EM IMI ETF · already in your instruments",
     );
 
     // Assigned, not sent to the create form: the instrument exists.
-    expect(roleTrigger('Emerging markets')).toHaveTextContent('EMIM');
+    expect(roleTrigger("Emerging markets")).toHaveTextContent("EMIM");
     expect(mockCreateSecurity).not.toHaveBeenCalled();
   });
 
-  it('saves the assignments and hands the refreshed report back', async () => {
+  /**
+   * The suggestions distinguish regional listings on purpose. Matching on the
+   * ticker alone reused whichever same-symbol security the portfolio happened
+   * to hold -- silently assigning a listing in another currency and undoing
+   * the region the user had just picked.
+   */
+  it("does not treat the same ticker on another exchange as owned", async () => {
+    mockGetSecurities.mockResolvedValue([
+      {
+        id: "sec-emim-six",
+        symbol: "EMIM",
+        name: "iShares MSCI EM IMI ETF",
+        // The suggested EMIM is LSE/USD; this is a different listing.
+        exchange: "SIX",
+        currencyCode: "CHF",
+        isActive: true,
+      },
+    ]);
+    await renderForm();
+
+    await act(async () => {
+      fireEvent.click(roleTrigger("Emerging markets"));
+    });
+
+    // Offered for creation, not reused: the owned marker belongs to the exact
+    // listing only.
+    expect(
+      screen.queryByRole("option", {
+        name: /EMIM.*already in your instruments/,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("saves the assignments and hands the refreshed report back", async () => {
     const refreshed = gemReport();
     mockUpdateConfig.mockResolvedValue(refreshed);
     const { onSaved } = await renderForm();
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Evaluation frequency'), {
-        target: { value: 'QUARTERLY' },
+      fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+        target: { value: "QUARTERLY" },
       });
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
 
     expect(mockUpdateConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        accountIds: ['acct-1'],
-        cadence: 'QUARTERLY',
+        accountIds: ["acct-1"],
+        cadence: "QUARTERLY",
         lookbackMonths: 12,
         taxRatePercent: 19,
         commissionAmount: 29.9,
-        rulesSourceLabel: 'example.test/gem',
+        rulesSourceLabel: "example.test/gem",
         assets: [
-          { role: 'US_EQUITY', securityId: 'sec-spy' },
-          { role: 'EX_US_EQUITY', securityId: 'sec-ewa' },
-          { role: 'EM_EQUITY', securityId: 'sec-emim' },
-          { role: 'SAFE', securityId: 'sec-ief' },
-          { role: 'RISK_FREE', securityId: 'sec-bil' },
+          { role: "US_EQUITY", securityId: "sec-spy" },
+          { role: "EX_US_EQUITY", securityId: "sec-ewa" },
+          { role: "EM_EQUITY", securityId: "sec-emim" },
+          { role: "SAFE", securityId: "sec-ief" },
+          { role: "RISK_FREE", securityId: "sec-bil" },
         ],
       }),
-      '1Y',
+      "1Y",
       // The save names the scenario being edited; without it the server would
       // rewrite the user's oldest one instead.
-      'strategy-1',
+      "strategy-1",
     );
-    expect(mockToastSuccess).toHaveBeenCalledWith('Strategy configuration saved.');
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      "Strategy configuration saved.",
+    );
     expect(onSaved).toHaveBeenCalledWith(refreshed);
   });
 
-  it('clears a role, the accounts and a cost assumption', async () => {
+  it("clears a role, the accounts and a cost assumption", async () => {
     await renderForm();
 
-    await pickInstrument('Safe asset', 'No instrument');
+    await pickInstrument("Safe asset", "No instrument");
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Commission per trade'), {
-        target: { value: '' },
+      fireEvent.change(screen.getByLabelText("Commission per trade"), {
+        target: { value: "" },
       });
-      fireEvent.click(screen.getByLabelText('Strategy accounts'));
+      fireEvent.click(screen.getByLabelText("Strategy accounts"));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
 
     const [payload] = mockUpdateConfig.mock.calls[0];
     expect(payload.accountIds).toEqual([]);
     // Cleared, not zeroed -- a blank cost is unknown.
     expect(payload.commissionAmount).toBeNull();
-    expect(payload.assets).toContainEqual({ role: 'SAFE', securityId: null });
+    expect(payload.assets).toContainEqual({ role: "SAFE", securityId: null });
   });
 
-  it('runs the strategy across several accounts at once', async () => {
+  it("runs the strategy across several accounts at once", async () => {
     await renderForm();
 
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Strategy accounts'));
+      fireEvent.click(screen.getByLabelText("Strategy accounts"));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('checkbox', { name: 'Broker Taxable (USD)' }));
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "Broker Taxable (USD)" }),
+      );
     });
     // Both accounts now feed the strategy, so the trigger shows a count.
-    expect(screen.getByLabelText('Strategy accounts')).toHaveTextContent('2 selected');
+    expect(screen.getByLabelText("Strategy accounts")).toHaveTextContent(
+      "2 selected",
+    );
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
 
     const [payload] = mockUpdateConfig.mock.calls[0];
-    expect(payload.accountIds).toEqual(['acct-1', 'acct-2']);
+    expect(payload.accountIds).toEqual(["acct-1", "acct-2"]);
   });
 
-  it('sends the range the page is showing so the refreshed report matches', async () => {
-    await renderForm({ range: 'MAX' });
+  it("sends the range the page is showing so the refreshed report matches", async () => {
+    await renderForm({ range: "MAX" });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
-    expect(mockUpdateConfig).toHaveBeenCalledWith(expect.anything(), 'MAX', 'strategy-1');
+    expect(mockUpdateConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      "MAX",
+      "strategy-1",
+    );
   });
 
-  it('holds the momentum window at its minimum rather than accepting zero', async () => {
+  it("holds the momentum window at its minimum rather than accepting zero", async () => {
     // NumericInput enforces `min` as you type, so the invalid value never
     // reaches the form -- the field settles on 1 instead of erroring.
     await renderForm();
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Momentum window (months)'), {
-        target: { value: '0' },
+      fireEvent.change(screen.getByLabelText("Momentum window (months)"), {
+        target: { value: "0" },
       });
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
 
     expect(mockUpdateConfig).toHaveBeenCalledWith(
       expect.objectContaining({ lookbackMonths: 1 }),
-      '1Y',
-      'strategy-1',
+      "1Y",
+      "strategy-1",
     );
   });
 
-  it('rejects a momentum window longer than the schema allows', async () => {
+  it("rejects a momentum window longer than the schema allows", async () => {
     // The shared input has no maximum, so this one is the schema's to catch.
     await renderForm();
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Momentum window (months)'), {
-        target: { value: '999' },
+      fireEvent.change(screen.getByLabelText("Momentum window (months)"), {
+        target: { value: "999" },
       });
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
 
     expect(mockUpdateConfig).not.toHaveBeenCalled();
@@ -353,40 +442,44 @@ describe('GemSettingsForm', () => {
   it("surfaces the server's reason for a rejected save", async () => {
     // The backend rejects an account or security that is not the caller's.
     mockUpdateConfig.mockRejectedValue({
-      response: { data: { message: 'Security not found' } },
+      response: { data: { message: "Security not found" } },
     });
     const { onSaved } = await renderForm();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
     await act(async () => {});
 
     await waitFor(() =>
-      expect(mockToastError).toHaveBeenCalledWith('Security not found'),
+      expect(mockToastError).toHaveBeenCalledWith("Security not found"),
     );
     expect(onSaved).not.toHaveBeenCalled();
     // The entered values survive so the user can correct and retry.
-    expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
+    expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
   });
 
-  it('falls back to its own message when the failure carries none', async () => {
+  it("falls back to its own message when the failure carries none", async () => {
     mockUpdateConfig.mockRejectedValue({});
     await renderForm();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
     await act(async () => {});
 
     await waitFor(() =>
       expect(mockToastError).toHaveBeenCalledWith(
-        'Could not save the strategy configuration.',
+        "Could not save the strategy configuration.",
       ),
     );
   });
 
-  it('starts from an empty configuration for an unconfigured strategy', async () => {
+  it("starts from an empty configuration for an unconfigured strategy", async () => {
     const report = gemReport({
       strategy: {
         ...gemReport().strategy,
@@ -399,18 +492,24 @@ describe('GemSettingsForm', () => {
     });
     await renderForm({
       strategy: report.strategy,
-      assets: gemAssets.map((asset) => ({ ...asset, securityId: null, symbol: null })),
+      assets: gemAssets.map((asset) => ({
+        ...asset,
+        securityId: null,
+        symbol: null,
+      })),
     });
 
-    expect(screen.getByLabelText('Strategy accounts')).toHaveTextContent(
-      'No account assigned',
+    expect(screen.getByLabelText("Strategy accounts")).toHaveTextContent(
+      "No account assigned",
     );
-    expect(screen.getByLabelText('Tax rate (%)')).toHaveValue('');
-    expect(roleTrigger('S&P 500')).toHaveTextContent('No instrument');
-    expect(screen.getByText(/Assign an ETF or fund to each role/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Tax rate (%)")).toHaveValue("");
+    expect(roleTrigger("S&P 500")).toHaveTextContent("No instrument");
+    expect(
+      screen.getByText(/Assign an ETF or fund to each role/),
+    ).toBeInTheDocument();
   });
 
-  it('sends no scenario id on the very first save', async () => {
+  it("sends no scenario id on the very first save", async () => {
     // Before the first save there is no stored strategy, so its id is null.
     // Sending a stand-in in its place put a non-UUID on the query string,
     // which the endpoint rejects -- every new user's first save failed.
@@ -419,17 +518,19 @@ describe('GemSettingsForm', () => {
     });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save configuration" }),
+      );
     });
 
     expect(mockUpdateConfig).toHaveBeenCalledWith(
       expect.anything(),
-      '1Y',
+      "1Y",
       undefined,
     );
   });
 
-  describe('filling the missing roles', () => {
+  describe("filling the missing roles", () => {
     const unconfigured = () => ({
       strategy: { ...gemReport().strategy, accounts: [] },
       assets: gemAssets.map((asset) => ({
@@ -440,42 +541,46 @@ describe('GemSettingsForm', () => {
     });
 
     beforeEach(() => {
-      mockCreateSecurity.mockImplementation((data: { symbol: string; name: string }) =>
-        Promise.resolve({ id: `sec-new-${data.symbol}`, ...data, isActive: true }),
+      mockCreateSecurity.mockImplementation(
+        (data: { symbol: string; name: string }) =>
+          Promise.resolve({
+            id: `sec-new-${data.symbol}`,
+            ...data,
+            isActive: true,
+          }),
       );
     });
 
-    it('creates and assigns an instrument for every unassigned role', async () => {
+    it("creates and assigns an instrument for every unassigned role", async () => {
       // A portfolio that has never held a GEM instrument: only SPY is on file.
       mockGetSecurities.mockResolvedValue([securities[0]]);
       await renderForm(unconfigured());
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Add the 5 missing/ }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /Add the 5 missing/ }),
+        );
       });
 
       // SPY already exists, so only the other three are created.
-      expect(mockCreateSecurity.mock.calls.map(([data]) => data.symbol)).toEqual([
-        'VEU',
-        'EEM',
-        'AGG',
-        'BIL',
-      ]);
-      expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
-      expect(roleTrigger('Developed markets ex-US')).toHaveTextContent('VEU');
-      expect(roleTrigger('Emerging markets')).toHaveTextContent('EEM');
+      expect(
+        mockCreateSecurity.mock.calls.map(([data]) => data.symbol),
+      ).toEqual(["VEU", "EEM", "AGG", "BIL"]);
+      expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
+      expect(roleTrigger("Developed markets ex-US")).toHaveTextContent("VEU");
+      expect(roleTrigger("Emerging markets")).toHaveTextContent("EEM");
       // The two defensive roles get different funds: the bond fund is what a
       // RISK-OFF period holds, T-bills are only the yardstick.
-      expect(roleTrigger('Safe asset')).toHaveTextContent('AGG');
-      expect(roleTrigger('Risk-free benchmark')).toHaveTextContent('BIL');
+      expect(roleTrigger("Safe asset")).toHaveTextContent("AGG");
+      expect(roleTrigger("Risk-free benchmark")).toHaveTextContent("BIL");
       expect(mockToastSuccess).toHaveBeenCalledWith(
-        '5 instruments added. Save the configuration to load their prices and evaluate the first signal.',
+        "5 instruments added. Save the configuration to load their prices and evaluate the first signal.",
       );
       // Nothing is saved until the user reviews the picks.
       expect(mockUpdateConfig).not.toHaveBeenCalled();
     });
 
-    it('adds the UCITS listings when Europe is chosen', async () => {
+    it("adds the UCITS listings when Europe is chosen", async () => {
       // The same index is a different fund depending on the broker: the US
       // listings the button used to add unconditionally cannot be bought at a
       // European broker at all, which made the one-click path useless to
@@ -484,32 +589,30 @@ describe('GemSettingsForm', () => {
       await renderForm(unconfigured());
 
       await act(async () => {
-        fireEvent.change(screen.getByLabelText('Listings to add'), {
-          target: { value: 'EUROPE' },
+        fireEvent.change(screen.getByLabelText("Listings to add"), {
+          target: { value: "EUROPE" },
         });
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Add the 5 missing/ }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /Add the 5 missing/ }),
+        );
       });
 
-      expect(mockCreateSecurity.mock.calls.map(([data]) => data.symbol)).toEqual([
-        'CSPX',
-        'EXUS',
-        'EMIM',
-        'AGGG',
-        'IB01',
-      ]);
+      expect(
+        mockCreateSecurity.mock.calls.map(([data]) => data.symbol),
+      ).toEqual(["CSPX", "EXUS", "EMIM", "AGGG", "IB01"]);
     });
 
-    it('names the listings it is about to add', async () => {
+    it("names the listings it is about to add", async () => {
       mockGetSecurities.mockResolvedValue([]);
       await renderForm(unconfigured());
 
       expect(screen.getByText(/SPY, VEU, EEM, AGG, BIL/)).toBeInTheDocument();
 
       await act(async () => {
-        fireEvent.change(screen.getByLabelText('Listings to add'), {
-          target: { value: 'EUROPE' },
+        fireEvent.change(screen.getByLabelText("Listings to add"), {
+          target: { value: "EUROPE" },
         });
       });
 
@@ -518,188 +621,249 @@ describe('GemSettingsForm', () => {
       ).toBeInTheDocument();
     });
 
-    it('leaves the roles the user already assigned alone', async () => {
+    it("leaves the roles the user already assigned alone", async () => {
       await renderForm();
 
       // The fixture assigns every role, so there is nothing to offer.
-      expect(screen.queryByRole('button', { name: /missing instrument/ })).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /missing instrument/ }),
+      ).toBeNull();
 
-      await pickInstrument('Safe asset', 'No instrument');
+      await pickInstrument("Safe asset", "No instrument");
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Add the missing instrument/ }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /Add the missing instrument/ }),
+        );
       });
 
-      expect(mockCreateSecurity.mock.calls.map(([data]) => data.symbol)).toEqual(['AGG']);
-      expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
-      expect(roleTrigger('Safe asset')).toHaveTextContent('AGG');
+      expect(
+        mockCreateSecurity.mock.calls.map(([data]) => data.symbol),
+      ).toEqual(["AGG"]);
+      expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
+      expect(roleTrigger("Safe asset")).toHaveTextContent("AGG");
     });
 
-    it('reuses a deactivated instrument instead of dropping the assignment', async () => {
+    it("reuses a deactivated instrument instead of dropping the assignment", async () => {
       // The symbol is taken, so creating it again would be rejected; the
       // deactivated security has to become selectable and actually get picked.
       mockGetSecurities.mockResolvedValue([
-        { id: 'sec-old-spy', symbol: 'SPY', name: 'SPDR S&P 500 ETF', isActive: false },
+        {
+          id: "sec-old-spy",
+          symbol: "SPY",
+          name: "SPDR S&P 500 ETF",
+          exchange: "NYSEARCA",
+          currencyCode: "USD",
+          isActive: false,
+        },
       ]);
       await renderForm(unconfigured());
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Add the 5 missing/ }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /Add the 5 missing/ }),
+        );
       });
 
-      expect(mockCreateSecurity.mock.calls.map(([data]) => data.symbol)).toEqual([
-        'VEU',
-        'EEM',
-        'AGG',
-        'BIL',
-      ]);
-      expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
+      expect(
+        mockCreateSecurity.mock.calls.map(([data]) => data.symbol),
+      ).toEqual(["VEU", "EEM", "AGG", "BIL"]);
+      expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
     });
 
-    it('keeps an assigned instrument selectable after it is deactivated', async () => {
+    it("keeps an assigned instrument selectable after it is deactivated", async () => {
       // Otherwise the select silently falls back to "No instrument" and saving
       // clears a role the user never touched.
       mockGetSecurities.mockResolvedValue([
-        { id: 'sec-spy', symbol: 'SPY', name: 'SPDR S&P 500 ETF', isActive: false },
+        {
+          id: "sec-spy",
+          symbol: "SPY",
+          name: "SPDR S&P 500 ETF",
+          exchange: "NYSEARCA",
+          currencyCode: "USD",
+          isActive: false,
+        },
       ]);
       await renderForm();
 
-      expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
+      expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "Save configuration" }),
+        );
       });
       const [payload] = mockUpdateConfig.mock.calls[0];
-      expect(payload.assets).toContainEqual({ role: 'US_EQUITY', securityId: 'sec-spy' });
+      expect(payload.assets).toContainEqual({
+        role: "US_EQUITY",
+        securityId: "sec-spy",
+      });
     });
 
-    it('reports a failure and keeps what it managed to create', async () => {
+    it("reports a failure and keeps what it managed to create", async () => {
       mockGetSecurities.mockResolvedValue([]);
       // The first instrument is created, the next one is rejected.
       mockCreateSecurity
         .mockResolvedValueOnce({
-          id: 'sec-new-SPY',
-          symbol: 'SPY',
-          name: 'SPDR S&P 500 ETF Trust',
+          id: "sec-new-SPY",
+          symbol: "SPY",
+          name: "SPDR S&P 500 ETF Trust",
           isActive: true,
         })
-        .mockRejectedValue({ response: { data: { message: 'Symbol not recognized' } } });
+        .mockRejectedValue({
+          response: { data: { message: "Symbol not recognized" } },
+        });
       await renderForm(unconfigured());
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Add the 5 missing/ }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /Add the 5 missing/ }),
+        );
       });
       await act(async () => {});
 
       await waitFor(() =>
-        expect(mockToastError).toHaveBeenCalledWith('Symbol not recognized'),
+        expect(mockToastError).toHaveBeenCalledWith("Symbol not recognized"),
       );
       // The created instrument is assigned, so a retry reuses it instead of
       // adding the same symbol twice.
-      expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
-      expect(roleTrigger('Safe asset')).toHaveTextContent('No instrument');
+      expect(roleTrigger("S&P 500")).toHaveTextContent("SPY");
+      expect(roleTrigger("Safe asset")).toHaveTextContent("No instrument");
       expect(
-        screen.getByRole('button', { name: /Add the 4 missing/ }),
+        screen.getByRole("button", { name: /Add the 4 missing/ }),
       ).toBeInTheDocument();
     });
   });
 
-  it('shows a skeleton while the pick-lists load', async () => {
+  it("shows a skeleton while the pick-lists load", async () => {
     let resolve: (value: unknown) => void = () => {};
-    mockGetAccounts.mockReturnValue(new Promise((r) => { resolve = r; }));
+    mockGetAccounts.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
     const { container } = await renderForm();
-    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
+    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
     await act(async () => {
       resolve(accounts);
     });
   });
 
-  describe('adding a missing instrument', () => {
-    it('creates one from the role that has none and assigns it', async () => {
+  describe("adding a missing instrument", () => {
+    it("creates one from the role that has none and assigns it", async () => {
       await renderForm({
-        assets: gemAssets.map((asset) => ({ ...asset, securityId: null, symbol: null })),
+        assets: gemAssets.map((asset) => ({
+          ...asset,
+          securityId: null,
+          symbol: null,
+        })),
       });
 
       await act(async () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Add an instrument for S&P 500' }),
+          screen.getByRole("button", { name: "Add an instrument for S&P 500" }),
         );
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'stub-create-security' }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "stub-create-security" }),
+        );
       });
 
       expect(mockCreateSecurity).toHaveBeenCalledWith({
-        symbol: 'CSPX',
-        name: 'iShares Core S&P 500 UCITS ETF',
+        symbol: "CSPX",
+        name: "iShares Core S&P 500 UCITS ETF",
       });
-      expect(mockToastSuccess).toHaveBeenCalledWith('CSPX created and assigned.');
+      expect(mockToastSuccess).toHaveBeenCalledWith(
+        "CSPX created and assigned.",
+      );
       // Assigned to the role that opened the modal, and offered to the others.
-      expect(roleTrigger('S&P 500')).toHaveTextContent('CSPX');
-      expect(await instrumentOptions('Safe asset')).toContain(
-        'CSPX — iShares Core S&P 500 UCITS ETF',
+      expect(roleTrigger("S&P 500")).toHaveTextContent("CSPX");
+      expect(await instrumentOptions("Safe asset")).toContain(
+        "CSPX — iShares Core S&P 500 UCITS ETF",
       );
     });
 
-    it('saves the newly created instrument with the configuration', async () => {
+    it("saves the newly created instrument with the configuration", async () => {
       await renderForm({
-        assets: gemAssets.map((asset) => ({ ...asset, securityId: null, symbol: null })),
+        assets: gemAssets.map((asset) => ({
+          ...asset,
+          securityId: null,
+          symbol: null,
+        })),
       });
 
       await act(async () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Add an instrument for Safe asset' }),
+          screen.getByRole("button", {
+            name: "Add an instrument for Safe asset",
+          }),
         );
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'stub-create-security' }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "stub-create-security" }),
+        );
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "Save configuration" }),
+        );
       });
 
       const [payload] = mockUpdateConfig.mock.calls[0];
-      expect(payload.assets).toContainEqual({ role: 'SAFE', securityId: 'sec-cspx' });
+      expect(payload.assets).toContainEqual({
+        role: "SAFE",
+        securityId: "sec-cspx",
+      });
     });
 
-    it('leaves the role untouched when the creation fails', async () => {
+    it("leaves the role untouched when the creation fails", async () => {
       mockCreateSecurity.mockRejectedValue({
-        response: { data: { message: 'Symbol already exists' } },
+        response: { data: { message: "Symbol already exists" } },
       });
       await renderForm({
-        assets: gemAssets.map((asset) => ({ ...asset, securityId: null, symbol: null })),
+        assets: gemAssets.map((asset) => ({
+          ...asset,
+          securityId: null,
+          symbol: null,
+        })),
       });
 
       await act(async () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Add an instrument for S&P 500' }),
+          screen.getByRole("button", { name: "Add an instrument for S&P 500" }),
         );
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'stub-create-security' }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "stub-create-security" }),
+        );
       });
       await act(async () => {});
 
       await waitFor(() =>
-        expect(mockToastError).toHaveBeenCalledWith('Symbol already exists'),
+        expect(mockToastError).toHaveBeenCalledWith("Symbol already exists"),
       );
-      expect(roleTrigger('S&P 500')).toHaveTextContent('No instrument');
+      expect(roleTrigger("S&P 500")).toHaveTextContent("No instrument");
     });
 
-    it('closes the modal on cancel without creating anything', async () => {
+    it("closes the modal on cancel without creating anything", async () => {
       await renderForm();
 
       await act(async () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Add an instrument for S&P 500' }),
+          screen.getByRole("button", { name: "Add an instrument for S&P 500" }),
         );
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'stub-cancel-security' }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "stub-cancel-security" }),
+        );
       });
 
       expect(mockCreateSecurity).not.toHaveBeenCalled();
       expect(
-        screen.queryByRole('button', { name: 'stub-create-security' }),
+        screen.queryByRole("button", { name: "stub-create-security" }),
       ).not.toBeInTheDocument();
     });
   });

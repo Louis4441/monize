@@ -1,52 +1,62 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
-import { GEM_TABS, GemStrategyTabs } from './GemStrategyTabs';
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@/test/render";
+import { GEM_TABS, GemStrategyTabs } from "./GemStrategyTabs";
 
-describe('GemStrategyTabs', () => {
-  it('renders every tab with one tab stop on the active one', () => {
+describe("GemStrategyTabs", () => {
+  it("renders every tab with one tab stop on the active one", () => {
     render(<GemStrategyTabs active="overview" onChange={vi.fn()} />);
 
-    expect(screen.getByRole('tablist', { name: 'GEM strategy sections' })).toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(GEM_TABS.length);
-    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('tabindex', '0');
-    expect(screen.getByRole('tab', { name: 'Signals' })).toHaveAttribute('tabindex', '-1');
+    expect(
+      screen.getByRole("tablist", { name: "GEM strategy sections" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(GEM_TABS.length);
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+    expect(screen.getByRole("tab", { name: "Signals" })).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
   });
 
-  it('selects a tab on click', () => {
+  it("selects a tab on click", () => {
     const onChange = vi.fn();
     render(<GemStrategyTabs active="overview" onChange={onChange} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Backtest' }));
-    expect(onChange).toHaveBeenCalledWith('backtest');
+    fireEvent.click(screen.getByRole("tab", { name: "Backtest" }));
+    expect(onChange).toHaveBeenCalledWith("backtest");
   });
 
-  it('moves selection with the arrow keys, wrapping at both ends', () => {
+  it("moves selection with the arrow keys, wrapping at both ends", () => {
     const onChange = vi.fn();
     render(<GemStrategyTabs active="overview" onChange={onChange} />);
-    const overview = screen.getByRole('tab', { name: 'Overview' });
+    const overview = screen.getByRole("tab", { name: "Overview" });
 
-    fireEvent.keyDown(overview, { key: 'ArrowRight' });
-    expect(onChange).toHaveBeenLastCalledWith('signals');
+    fireEvent.keyDown(overview, { key: "ArrowRight" });
+    expect(onChange).toHaveBeenLastCalledWith("signals");
 
-    fireEvent.keyDown(overview, { key: 'ArrowLeft' });
-    expect(onChange).toHaveBeenLastCalledWith('settings');
+    fireEvent.keyDown(overview, { key: "ArrowLeft" });
+    expect(onChange).toHaveBeenLastCalledWith("settings");
   });
 
-  it('jumps to the first and last tab with Home and End', () => {
+  it("jumps to the first and last tab with Home and End", () => {
     const onChange = vi.fn();
     render(<GemStrategyTabs active="portfolio" onChange={onChange} />);
-    const portfolio = screen.getByRole('tab', { name: 'My portfolio' });
+    const portfolio = screen.getByRole("tab", { name: "My portfolio" });
 
-    fireEvent.keyDown(portfolio, { key: 'End' });
-    expect(onChange).toHaveBeenLastCalledWith('settings');
+    fireEvent.keyDown(portfolio, { key: "End" });
+    expect(onChange).toHaveBeenLastCalledWith("settings");
 
-    fireEvent.keyDown(portfolio, { key: 'Home' });
-    expect(onChange).toHaveBeenLastCalledWith('overview');
+    fireEvent.keyDown(portfolio, { key: "Home" });
+    expect(onChange).toHaveBeenLastCalledWith("overview");
   });
 
-  it('ignores unrelated keys', () => {
+  it("ignores unrelated keys", () => {
     const onChange = vi.fn();
     render(<GemStrategyTabs active="overview" onChange={onChange} />);
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Overview' }), { key: 'a' });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Overview" }), {
+      key: "a",
+    });
     expect(onChange).not.toHaveBeenCalled();
   });
 });

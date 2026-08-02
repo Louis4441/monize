@@ -1,14 +1,17 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { EntitySwitcher, type EntitySwitcherItem } from '@/components/ui/EntitySwitcher';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import type { GemStrategyRef } from '@/types/gem-strategy';
+import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
+import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  EntitySwitcher,
+  type EntitySwitcherItem,
+} from "@/components/ui/EntitySwitcher";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import type { GemStrategyRef } from "@/types/gem-strategy";
 
 interface GemScenarioSwitcherProps {
   /**
@@ -20,8 +23,15 @@ interface GemScenarioSwitcherProps {
   currentName: string;
   scenarios: readonly GemStrategyRef[];
   onSelect: (id: string) => void;
-  onCreate: (name: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  /**
+   * Resolves true when the scenario was created. The parent catches its own
+   * errors, so a plain `Promise<void>` looked identical whether the server
+   * accepted the name or rejected it -- and the dialog closed on both, taking
+   * the typed name with it.
+   */
+  onCreate: (name: string) => Promise<boolean>;
+  /** Resolves true when the scenario was deleted; see `onCreate`. */
+  onDelete: (id: string) => Promise<boolean>;
   /** True while a scenario call is in flight, to stop a double submit. */
   busy?: boolean;
 }
@@ -48,19 +58,26 @@ export function GemScenarioSwitcher({
   onDelete,
   busy = false,
 }: GemScenarioSwitcherProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [newName, setNewName] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const items = useMemo<EntitySwitcherItem[]>(
-    () => scenarios.map((scenario) => ({ id: scenario.id, primary: scenario.name })),
+    () =>
+      scenarios.map((scenario) => ({
+        id: scenario.id,
+        primary: scenario.name,
+      })),
     [scenarios],
   );
 
   const submitCreate = async () => {
-    await onCreate(newName.trim());
-    setNewName('');
+    // Only clear and close on success: a failed create leaves the name in the
+    // field and the dialog open, so retrying is one click rather than typing
+    // it again.
+    if (!(await onCreate(newName.trim()))) return;
+    setNewName("");
     setCreating(false);
   };
 
@@ -72,17 +89,17 @@ export function GemScenarioSwitcher({
             currentId={currentId}
             items={items}
             onSelect={onSelect}
-            triggerLabel={t('gem.scenarios.switch')}
-            filterPlaceholder={t('gem.scenarios.filterPlaceholder')}
-            noMatchesLabel={t('gem.scenarios.noMatches')}
+            triggerLabel={t("gem.scenarios.switch")}
+            filterPlaceholder={t("gem.scenarios.filterPlaceholder")}
+            noMatchesLabel={t("gem.scenarios.noMatches")}
           />
         )}
         <button
           type="button"
           onClick={() => setCreating(true)}
           disabled={busy}
-          title={t('gem.scenarios.create')}
-          aria-label={t('gem.scenarios.create')}
+          title={t("gem.scenarios.create")}
+          aria-label={t("gem.scenarios.create")}
           className="rounded p-1 text-gray-400 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 dark:hover:text-blue-400"
         >
           <PlusIcon className="h-4 w-4" aria-hidden="true" />
@@ -94,8 +111,8 @@ export function GemScenarioSwitcher({
             type="button"
             onClick={() => setConfirmingDelete(true)}
             disabled={busy}
-            title={t('gem.scenarios.delete')}
-            aria-label={t('gem.scenarios.delete')}
+            title={t("gem.scenarios.delete")}
+            aria-label={t("gem.scenarios.delete")}
             className="rounded p-1 text-gray-400 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 dark:hover:text-red-400"
           >
             <TrashIcon className="h-4 w-4" aria-hidden="true" />
@@ -111,24 +128,28 @@ export function GemScenarioSwitcher({
         className="p-6"
       >
         <h2 className="mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
-          {t('gem.scenarios.createTitle')}
+          {t("gem.scenarios.createTitle")}
         </h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          {t('gem.scenarios.createHint')}
+          {t("gem.scenarios.createHint")}
         </p>
         <Input
-          label={t('gem.scenarios.nameLabel')}
+          label={t("gem.scenarios.nameLabel")}
           value={newName}
           onChange={(event) => setNewName(event.target.value)}
-          placeholder={t('gem.scenarios.namePlaceholder')}
+          placeholder={t("gem.scenarios.namePlaceholder")}
           maxLength={100}
         />
         <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => setCreating(false)}>
-            {t('gem.scenarios.cancel')}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCreating(false)}
+          >
+            {t("gem.scenarios.cancel")}
           </Button>
           <Button type="button" onClick={submitCreate} disabled={busy}>
-            {t('gem.scenarios.createConfirm')}
+            {t("gem.scenarios.createConfirm")}
           </Button>
         </div>
       </Modal>
@@ -137,13 +158,15 @@ export function GemScenarioSwitcher({
         isOpen={confirmingDelete}
         onCancel={() => setConfirmingDelete(false)}
         onConfirm={async () => {
-          if (currentId) await onDelete(currentId);
+          // Same rule as the create dialog: a rejected delete keeps the
+          // confirmation on screen with its context intact.
+          if (currentId && !(await onDelete(currentId))) return;
           setConfirmingDelete(false);
         }}
         pushHistory
-        title={t('gem.scenarios.deleteTitle')}
-        message={t('gem.scenarios.deleteMessage', { name: currentName })}
-        confirmLabel={t('gem.scenarios.delete')}
+        title={t("gem.scenarios.deleteTitle")}
+        message={t("gem.scenarios.deleteMessage", { name: currentName })}
+        confirmLabel={t("gem.scenarios.delete")}
         variant="danger"
       />
     </>

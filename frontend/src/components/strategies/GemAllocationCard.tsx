@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
-import { CheckIcon } from '@heroicons/react/24/outline';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { GemAssetRole, GemCadence, GemSignal } from '@/types/gem-strategy';
-import { GEM_ROLE_COLOURS } from '@/lib/gem-strategy-view';
-import { GemCard, GemDonut, GemEmptyState } from './GemPrimitives';
-import { useGemLabels } from './useGemLabels';
+import { useTranslations } from "next-intl";
+import { CheckIcon } from "@heroicons/react/24/outline";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { GemAssetRole, GemCadence, GemSignal } from "@/types/gem-strategy";
+import { GEM_ROLE_COLOURS } from "@/lib/gem-strategy-view";
+import { GemCard, GemDonut, GemEmptyState } from "./GemPrimitives";
+import { useGemLabels } from "./useGemLabels";
 
 interface GemAllocationCardProps {
   signal: GemSignal | null;
@@ -19,39 +19,46 @@ interface GemAllocationCardProps {
  * it. Deliberately short: the instrument details, dates and portfolio state are
  * already covered by the summary cards above.
  */
-export function GemAllocationCard({ signal, winnerRole, cadence }: GemAllocationCardProps) {
-  const t = useTranslations('strategies');
+export function GemAllocationCard({
+  signal,
+  winnerRole,
+  cadence,
+}: GemAllocationCardProps) {
+  const t = useTranslations("strategies");
   const { cadenceLabel, assetLabel } = useGemLabels();
   const { formatPercent } = useNumberFormat();
 
   if (!signal) {
     return (
-      <GemCard title={t('gem.allocation.title')} hint={t('gem.allocation.hint')}>
+      <GemCard
+        title={t("gem.allocation.title")}
+        hint={t("gem.allocation.hint")}
+      >
         <GemEmptyState
-          title={t('gem.allocation.noSignalTitle')}
-          description={t('gem.allocation.noSignalDescription')}
+          title={t("gem.allocation.noSignalTitle")}
+          description={t("gem.allocation.noSignalDescription")}
         />
       </GemCard>
     );
   }
 
-  const colour = winnerRole ? GEM_ROLE_COLOURS[winnerRole] : 'var(--chart-1)';
+  const colour = winnerRole ? GEM_ROLE_COLOURS[winnerRole] : "var(--chart-1)";
   const rules = [
-    t('gem.allocation.ruleCadence', { cadence: cadenceLabel(cadence) }),
-    t('gem.allocation.ruleTwoSteps'),
-    t('gem.allocation.ruleSingleAsset'),
+    t("gem.allocation.ruleCadence", { cadence: cadenceLabel(cadence) }),
+    t("gem.allocation.ruleTwoSteps"),
+    t("gem.allocation.ruleSingleAsset"),
   ];
 
   return (
-    <GemCard title={t('gem.allocation.title')} hint={t('gem.allocation.hint')}>
+    <GemCard title={t("gem.allocation.title")} hint={t("gem.allocation.hint")}>
       <div className="flex items-center gap-4">
         <GemDonut
           segments={[
-            { key: 'target', percent: signal.targetWeightPercent, colour },
+            { key: "target", percent: signal.targetWeightPercent, colour },
           ]}
           centreValue={formatPercent(signal.targetWeightPercent, 0)}
           centreLabel={assetLabel(signal.target)}
-          ariaLabel={t('gem.allocation.donutAriaLabel', {
+          ariaLabel={t("gem.allocation.donutAriaLabel", {
             weight: signal.targetWeightPercent,
             asset: assetLabel(signal.target),
           })}

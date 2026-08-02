@@ -1,16 +1,17 @@
-'use client';
+"use client";
 
-import { useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
-import { useClickOutside } from '@/hooks/useClickOutside';
-import { cn } from '@/lib/utils';
-import { Security } from '@/types/investment';
+import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
+import { CheckIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { useClickOutside } from "@/hooks/useClickOutside";
+import { cn } from "@/lib/utils";
+import { Security } from "@/types/investment";
 import {
   GEM_SUGGESTION_REGIONS,
   GemSuggestedSecurity,
   GemSuggestionRegion,
-} from '@/lib/gem-suggested-securities';
+  listingKey,
+} from "@/lib/gem-suggested-securities";
 
 interface GemInstrumentSelectProps {
   /** The role being assigned; only used to build stable element ids. */
@@ -56,7 +57,7 @@ export function GemInstrumentSelect({
   disabled = false,
   error,
 }: GemInstrumentSelectProps) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -102,9 +103,11 @@ export function GemInstrumentSelect({
    */
   const offered = suggestions.map((suggestion) => ({
     suggestion,
+    // Listing identity, not ticker: the same symbol on another exchange or in
+    // another trading currency is a different instrument, and reusing it would
+    // quietly defeat the region the user picked.
     owned: securities.find(
-      (security) =>
-        security.symbol.toUpperCase() === suggestion.symbol.toUpperCase(),
+      (security) => listingKey(security) === listingKey(suggestion),
     ),
   }));
 
@@ -125,30 +128,33 @@ export function GemInstrumentSelect({
         aria-expanded={isOpen}
         aria-labelledby={labelId}
         className={cn(
-          'block w-full rounded-md border px-3 py-2 text-left text-sm shadow-sm',
-          'bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500',
-          'disabled:cursor-not-allowed disabled:opacity-60',
+          "block w-full rounded-md border px-3 py-2 text-left text-sm shadow-sm",
+          "bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100",
+          "focus:outline-none focus:ring-2 focus:ring-blue-500",
+          "disabled:cursor-not-allowed disabled:opacity-60",
           error
-            ? 'border-red-500 dark:border-red-500'
-            : 'border-gray-300 dark:border-gray-600',
+            ? "border-red-500 dark:border-red-500"
+            : "border-gray-300 dark:border-gray-600",
         )}
       >
         <span className="flex items-center justify-between gap-2">
           <span
-            className={cn('truncate', !selected && 'text-gray-400 dark:text-gray-400')}
+            className={cn(
+              "truncate",
+              !selected && "text-gray-400 dark:text-gray-400",
+            )}
           >
             {selected
-              ? t('gem.settingsForm.instrumentOption', {
+              ? t("gem.settingsForm.instrumentOption", {
                   symbol: selected.symbol,
                   name: selected.name,
                 })
-              : t('gem.settingsForm.noInstrument')}
+              : t("gem.settingsForm.noInstrument")}
           </span>
           <svg
             className={cn(
-              'h-5 w-5 shrink-0 text-gray-400 transition-transform',
-              isOpen && 'rotate-180',
+              "h-5 w-5 shrink-0 text-gray-400 transition-transform",
+              isOpen && "rotate-180",
             )}
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -168,15 +174,15 @@ export function GemInstrumentSelect({
           role="listbox"
           aria-labelledby={labelId}
           className={cn(
-            'absolute z-20 mt-1 w-full rounded-md bg-white shadow-lg dark:bg-gray-800 dark:shadow-gray-700/50',
-            'ring-1 ring-black/5 dark:ring-gray-600',
-            'scrollbar-slim max-h-80 overflow-y-auto py-1',
+            "absolute z-20 mt-1 w-full rounded-md bg-white shadow-lg dark:bg-gray-800 dark:shadow-gray-700/50",
+            "ring-1 ring-black/5 dark:ring-gray-600",
+            "scrollbar-slim max-h-80 overflow-y-auto py-1",
           )}
         >
           {offered.length > 0 && (
             <>
               <p className="px-3 pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('gem.settingsForm.suggestedHeading')}
+                {t("gem.settingsForm.suggestedHeading")}
               </p>
               {GEM_SUGGESTION_REGIONS.map((region) => {
                 const inRegion = offered.filter(
@@ -198,18 +204,19 @@ export function GemInstrumentSelect({
                           owned ? choose(owned.id) : pick(suggestion)
                         }
                         className={cn(
-                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                          'hover:bg-gray-100 dark:hover:bg-gray-700',
-                          owned?.id === value && 'bg-gray-50 dark:bg-gray-700/50',
+                          "flex w-full items-center gap-2 px-3 py-2 text-left text-sm",
+                          "hover:bg-gray-100 dark:hover:bg-gray-700",
+                          owned?.id === value &&
+                            "bg-gray-50 dark:bg-gray-700/50",
                         )}
                       >
                         {owned ? (
                           <CheckIcon
                             className={cn(
-                              'h-4 w-4 shrink-0',
+                              "h-4 w-4 shrink-0",
                               owned.id === value
-                                ? 'text-blue-600 dark:text-blue-400'
-                                : 'text-gray-400',
+                                ? "text-blue-600 dark:text-blue-400"
+                                : "text-gray-400",
                             )}
                             aria-hidden="true"
                           />
@@ -225,12 +232,12 @@ export function GemInstrumentSelect({
                           </span>
                           <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
                             {owned
-                              ? t('gem.settingsForm.suggestedOwned', {
+                              ? t("gem.settingsForm.suggestedOwned", {
                                   name: owned.name,
                                 })
-                              : t('gem.settingsForm.suggestedListing', {
+                              : t("gem.settingsForm.suggestedListing", {
                                   name: suggestion.name,
-                                  exchange: suggestion.exchange ?? '',
+                                  exchange: suggestion.exchange ?? "",
                                 })}
                           </span>
                         </span>
@@ -244,21 +251,21 @@ export function GemInstrumentSelect({
           )}
 
           <p className="px-3 pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {t('gem.settingsForm.ownedHeading')}
+            {t("gem.settingsForm.ownedHeading")}
           </p>
           <button
             type="button"
             role="option"
-            aria-selected={value === ''}
-            onClick={() => choose('')}
+            aria-selected={value === ""}
+            onClick={() => choose("")}
             className={cn(
-              'block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700',
-              value === ''
-                ? 'font-medium text-gray-900 dark:text-gray-100'
-                : 'text-gray-600 dark:text-gray-300',
+              "block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700",
+              value === ""
+                ? "font-medium text-gray-900 dark:text-gray-100"
+                : "text-gray-600 dark:text-gray-300",
             )}
           >
-            {t('gem.settingsForm.noInstrument')}
+            {t("gem.settingsForm.noInstrument")}
           </button>
           {securities.map((security) => (
             <button
@@ -268,13 +275,13 @@ export function GemInstrumentSelect({
               aria-selected={security.id === value}
               onClick={() => choose(security.id)}
               className={cn(
-                'block w-full truncate px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700',
+                "block w-full truncate px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700",
                 security.id === value
-                  ? 'font-medium text-gray-900 dark:text-gray-100'
-                  : 'text-gray-600 dark:text-gray-300',
+                  ? "font-medium text-gray-900 dark:text-gray-100"
+                  : "text-gray-600 dark:text-gray-300",
               )}
             >
-              {t('gem.settingsForm.instrumentOption', {
+              {t("gem.settingsForm.instrumentOption", {
                 symbol: security.symbol,
                 name: security.name,
               })}
@@ -283,7 +290,9 @@ export function GemInstrumentSelect({
         </div>
       )}
 
-      {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && (
+        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
     </div>
   );
 }

@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { ReactNode } from 'react';
-import { useTranslations } from 'next-intl';
-import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { chartColors } from '@/lib/chart-colors';
-import { cn } from '@/lib/utils';
-import { isKnown } from '@/lib/gem-strategy-view';
+import Link from "next/link";
+import { ReactNode } from "react";
+import { useTranslations } from "next-intl";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { chartColors } from "@/lib/chart-colors";
+import { cn } from "@/lib/utils";
+import { isKnown } from "@/lib/gem-strategy-view";
 
 /**
  * Small building blocks shared by the GEM report cards. They compose the
@@ -18,8 +18,8 @@ import { isKnown } from '@/lib/gem-strategy-view';
  */
 
 const CARD_BASE =
-  'bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 ' +
-  'border border-gray-200 dark:border-gray-700';
+  "bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 " +
+  "border border-gray-200 dark:border-gray-700";
 
 interface GemCardProps {
   /** Card heading. Rendered as the section label in small caps. */
@@ -47,7 +47,7 @@ export function GemCard({
   return (
     <section
       aria-label={ariaLabel ?? title}
-      className={cn(CARD_BASE, 'flex flex-col', className)}
+      className={cn(CARD_BASE, "flex flex-col", className)}
     >
       {(title || headerRight) && (
         <div className="flex items-start justify-between gap-2 px-4 pt-3 pb-2">
@@ -60,7 +60,7 @@ export function GemCard({
           {headerRight}
         </div>
       )}
-      <div className={cn('px-4 pb-4 flex-1', !title && 'pt-4', bodyClassName)}>
+      <div className={cn("px-4 pb-4 flex-1", !title && "pt-4", bodyClassName)}>
         {children}
       </div>
     </section>
@@ -72,11 +72,11 @@ export function GemCard({
  * could not supply; screen readers get the spelled-out reason.
  */
 export function GemUnknown({ label }: { label?: string }) {
-  const t = useTranslations('strategies');
+  const t = useTranslations("strategies");
   return (
     <span className="text-gray-400 dark:text-gray-500">
       <span aria-hidden="true">&mdash;</span>
-      <span className="sr-only">{label ?? t('gem.common.unknown')}</span>
+      <span className="sr-only">{label ?? t("gem.common.unknown")}</span>
     </span>
   );
 }
@@ -112,10 +112,10 @@ export function GemSigned({
 }) {
   if (!isKnown(value)) return <GemUnknown />;
   const tone = neutral
-    ? 'text-gray-900 dark:text-gray-100'
+    ? "text-gray-900 dark:text-gray-100"
     : value >= 0
-      ? 'text-green-600 dark:text-green-400'
-      : 'text-red-600 dark:text-red-400';
+      ? "text-green-600 dark:text-green-400"
+      : "text-red-600 dark:text-red-400";
   return <span className={cn(tone, className)}>{format(value)}</span>;
 }
 
@@ -129,8 +129,8 @@ export function GemSigned({
  * so a caller never has to branch.
  */
 const GEM_LINK_CLASS =
-  'rounded hover:text-blue-600 focus:outline-none focus-visible:ring-2 ' +
-  'focus-visible:ring-blue-500 dark:hover:text-blue-400';
+  "rounded hover:text-blue-600 focus:outline-none focus-visible:ring-2 " +
+  "focus-visible:ring-blue-500 dark:hover:text-blue-400";
 
 export function GemSecurityLink({
   securityId,
@@ -143,7 +143,10 @@ export function GemSecurityLink({
 }) {
   if (!securityId) return <span className={className}>{children}</span>;
   return (
-    <Link href={`/securities/${securityId}`} className={cn(GEM_LINK_CLASS, className)}>
+    <Link
+      href={`/securities/${securityId}`}
+      className={cn(GEM_LINK_CLASS, className)}
+    >
       {children}
     </Link>
   );
@@ -160,7 +163,10 @@ export function GemAccountLink({
 }) {
   if (!accountId) return <span className={className}>{children}</span>;
   return (
-    <Link href={`/accounts/${accountId}`} className={cn(GEM_LINK_CLASS, className)}>
+    <Link
+      href={`/accounts/${accountId}`}
+      className={cn(GEM_LINK_CLASS, className)}
+    >
       {children}
     </Link>
   );
@@ -198,7 +204,12 @@ export function GemStatRow({
   className?: string;
 }) {
   return (
-    <div className={cn('flex items-baseline justify-between gap-3 text-sm', className)}>
+    <div
+      className={cn(
+        "flex items-baseline justify-between gap-3 text-sm",
+        className,
+      )}
+    >
       <dt className="shrink-0 text-gray-500 dark:text-gray-400">{label}</dt>
       {/* Fund names run long ("iShares MSCI ACWI UCITS ETF USD Acc (IUSQ)") and
           a card is narrow. Wrapping keeps the whole name readable; truncating
@@ -220,20 +231,20 @@ export function GemBadge({
   children,
   className,
 }: {
-  tone: 'green' | 'gray' | 'red';
+  tone: "green" | "gray" | "red";
   children: ReactNode;
   className?: string;
 }) {
   const tones: Record<string, string> = {
     green:
-      'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 ring-green-600/20',
-    red: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 ring-red-600/20',
-    gray: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 ring-gray-500/20',
+      "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 ring-green-600/20",
+    red: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 ring-red-600/20",
+    gray: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 ring-gray-500/20",
   };
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset',
+        "inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset",
         tones[tone],
         className,
       )}
@@ -244,11 +255,20 @@ export function GemBadge({
 }
 
 /** Colour swatch tying a row or legend entry to its chart series. */
-export function GemSwatch({ colour, className }: { colour: string; className?: string }) {
+export function GemSwatch({
+  colour,
+  className,
+}: {
+  colour: string;
+  className?: string;
+}) {
   return (
     <span
       aria-hidden="true"
-      className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-full', className)}
+      className={cn(
+        "inline-block h-2.5 w-2.5 shrink-0 rounded-full",
+        className,
+      )}
       style={{ backgroundColor: colour }}
     />
   );
@@ -276,7 +296,10 @@ export function GemDonut({
 }) {
   const radius = (size - thickness) / 2;
   const circumference = 2 * Math.PI * radius;
-  const total = segments.reduce((sum, segment) => sum + Math.max(segment.percent, 0), 0);
+  const total = segments.reduce(
+    (sum, segment) => sum + Math.max(segment.percent, 0),
+    0,
+  );
   let offset = 0;
 
   return (
@@ -351,7 +374,7 @@ export function GemBar({
     <div
       aria-hidden="true"
       className={cn(
-        'h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700',
+        "h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700",
         className,
       )}
     >
@@ -388,10 +411,14 @@ export function GemEmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn('py-4 text-center', className)}>
-      <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{title}</p>
+    <div className={cn("py-4 text-center", className)}>
+      <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+        {title}
+      </p>
       {description && (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{description}</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {description}
+        </p>
       )}
       {action && <div className="mt-3 flex justify-center">{action}</div>}
     </div>
