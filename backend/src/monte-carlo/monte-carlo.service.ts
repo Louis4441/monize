@@ -223,8 +223,8 @@ export class MonteCarloService {
 
   async reorder(userId: string, scenarioIds: string[]): Promise<void> {
     // Defensive: reject anything that isn't a proper array. The DTO validates
-    // this via @IsArray, but we re-check here so the invariant is visible to
-    // static analysis (mirrors AccountsService.reorderFavourites).
+    // this via @IsArray + @ArrayMaxSize, but we re-check here so the invariant
+    // holds for any caller (mirrors AccountsService.reorderFavourites).
     if (!Array.isArray(scenarioIds)) {
       throw new BadRequestException(
         tr(
@@ -234,10 +234,14 @@ export class MonteCarloService {
       );
     }
     await withScopedDb(this.dataSource, async (m) => {
-      for (let i = 0; i < scenarioIds.length; i++) {
+      // for...of over .entries(), never `i < scenarioIds.length`: a request
+      // value's .length must not bound a loop inside this closure (CWE-834,
+      // CodeQL js/loop-bound-injection cannot see the isArray guard above
+      // through the withScopedDb callback).
+      for (const [i, scenarioId] of scenarioIds.entries()) {
         await m.update(
           MonteCarloScenario,
-          { id: scenarioIds[i], userId },
+          { id: scenarioId, userId },
           { sortOrder: i },
         );
       }
