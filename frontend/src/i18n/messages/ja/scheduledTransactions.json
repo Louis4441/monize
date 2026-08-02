@@ -124,7 +124,8 @@
       "amountInCurrency": "{currency} での金額",
       "rateCaption": "{date} のレート 1 {from} = {rate} {to} で {total} として投稿されます。",
       "noRateWarning": "{date} の {from} から {to} への為替レートが見つかりません。別の日付を選ぶか、レートを更新してください。",
-      "feeCaption": "{percent}% の外貨取引手数料（{fee}）が含まれます。"
+      "feeCaption": "{percent}% の外貨取引手数料（{fee}）が含まれます。",
+      "totalInCurrency": "{currency} での合計"
     }
   },
   "occurrencePicker": {

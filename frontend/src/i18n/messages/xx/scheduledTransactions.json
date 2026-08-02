@@ -124,7 +124,8 @@
       "amountInCurrency": "[XX-Amount in {currency}-XX]",
       "rateCaption": "[XX-Posts as {total} at 1 {from} = {rate} {to} on {date}.-XX]",
       "noRateWarning": "[XX-No exchange rate found for {from} to {to} on {date}. Pick another date, or refresh rates.-XX]",
-      "feeCaption": "[XX-Includes a {percent}% foreign transaction fee ({fee}).-XX]"
+      "feeCaption": "[XX-Includes a {percent}% foreign transaction fee ({fee}).-XX]",
+      "totalInCurrency": "[XX-Total in {currency}-XX]"
     }
   },
   "occurrencePicker": {

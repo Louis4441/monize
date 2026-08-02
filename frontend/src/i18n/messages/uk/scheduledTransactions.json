@@ -124,7 +124,8 @@
       "amountInCurrency": "Сума в {currency}",
       "rateCaption": "Буде проведено як {total} за курсом 1 {from} = {rate} {to} на {date}.",
       "noRateWarning": "Не знайдено курс обміну {from} на {to} на {date}. Виберіть іншу дату або оновіть курси.",
-      "feeCaption": "Включає комісію за закордонну операцію {percent}% ({fee})."
+      "feeCaption": "Включає комісію за закордонну операцію {percent}% ({fee}).",
+      "totalInCurrency": "Разом у {currency}"
     }
   },
   "occurrencePicker": {

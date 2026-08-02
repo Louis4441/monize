@@ -124,7 +124,8 @@
       "amountInCurrency": "Valor em {currency}",
       "rateCaption": "Será lançado como {total} à taxa 1 {from} = {rate} {to} de {date}.",
       "noRateWarning": "Nenhuma taxa de câmbio encontrada de {from} para {to} em {date}. Escolha outra data ou atualize as taxas.",
-      "feeCaption": "Inclui uma taxa de transação no exterior de {percent}% ({fee})."
+      "feeCaption": "Inclui uma taxa de transação no exterior de {percent}% ({fee}).",
+      "totalInCurrency": "Total em {currency}"
     }
   },
   "occurrencePicker": {

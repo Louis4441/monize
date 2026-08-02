@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline';
@@ -22,6 +22,7 @@ import { getLocalDateString } from '@/lib/utils';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import {
   roundToCents,
+  roundToDecimals,
   getCurrencySymbol,
   formatAmount,
   FX_RATE_DISPLAY_DECIMALS,
@@ -169,6 +170,10 @@ export function PostTransactionDialog({
   const [foreignAmount, setForeignAmount] = useState<number>(0);
   const [postFxRate, setPostFxRate] = useState<number | null>(null);
   const [postFxRateLoading, setPostFxRateLoading] = useState(false);
+  // Set once the user types a converted total of their own, so a later date
+  // tweak does not discard the rate that figure implies. Same guard, and the
+  // same reason, as `rateOverriddenRef` in TransactionForm.
+  const rateOverriddenRef = useRef(false);
 
   const postingAccount = useMemo(
     () => accounts.find((a) => a.id === scheduledTransaction.accountId) ?? null,
@@ -195,6 +200,7 @@ export function PostTransactionDialog({
   // account-currency amount from it.
   useEffect(() => {
     if (!isOpen || !isForeignPosting || !transactionDate) return;
+    if (rateOverriddenRef.current) return;
     let cancelled = false;
     setPostFxRateLoading(true);
     exchangeRatesApi
@@ -231,6 +237,24 @@ export function PostTransactionDialog({
     isForeignPosting && postFxRate != null
       ? convertForeign(foreignAmount, postFxRate)
       : null;
+
+  // User typed the account-currency total directly: back the fee out to the
+  // pre-fee base, derive the rate (10 dp) so it round-trips, and mark the rate
+  // overridden. Mirrors `handleConvertedTotalOverride` in TransactionForm --
+  // the posted row still satisfies originalAmount x exchangeRate ~ base, so the
+  // backend re-deriving the fee lands on the same total the user typed.
+  const handleConvertedTotalChange = (total: number | undefined) => {
+    if (total === undefined || !foreignAmount) return;
+    let base = total;
+    if (postFxFeePercent && postFxFeePercent > 0) {
+      // total = base - |base| * p; solve for base by its (matching) sign.
+      const p = postFxFeePercent / 100;
+      base = roundToCents(total >= 0 ? total / (1 - p) : total / (1 + p));
+    }
+    rateOverriddenRef.current = true;
+    setPostFxRate(roundToDecimals(base / foreignAmount, 10));
+    setAmount(roundToCents(total));
+  };
 
   // The cash impact that will actually post -- reflects per-occurrence edits
   // the user makes here, not just the base scheduled transaction's amount.
@@ -303,6 +327,7 @@ export function PostTransactionDialog({
           : 0,
       );
       setPostFxRate(null);
+      rateOverriddenRef.current = false;
       setCategoryId(nextOverride?.categoryId ?? scheduledTransaction.categoryId ?? '');
       setDescription(nextOverride?.description ?? scheduledTransaction.description ?? '');
       setIsSplit(nextOverride?.isSplit ?? scheduledTransaction.isSplit);
@@ -587,7 +612,11 @@ export function PostTransactionDialog({
   // pastes cleanly into other fields, e.g. when reconciling against a statement.
   const handleCopyAmount = async () => {
     try {
-      await navigator.clipboard.writeText(formatAmount(Math.abs(amount)));
+      // The button is attached to the Amount field, so it copies whatever that
+      // field is showing: the biller's own-currency figure while posting a
+      // foreign-currency schedule, the account-currency amount otherwise.
+      const copied = isForeignPosting ? foreignAmount : amount;
+      await navigator.clipboard.writeText(formatAmount(Math.abs(copied)));
       setAmountCopied(true);
       toast.success(t('postDialog.toasts.amountCopied'));
       window.setTimeout(() => setAmountCopied(false), 2000);
@@ -825,27 +854,67 @@ export function PostTransactionDialog({
           </>
         )}
 
-        {/* Amount — non-investment only */}
+        {/* Amount — non-investment only.
+
+            While posting a foreign-currency schedule this is the same pair of
+            fields the transaction form uses: the biller's amount on the left,
+            the account-currency total on the right, either one editable. Typing
+            in the right-hand field derives the rate rather than just overwriting
+            a number, so the posted row still reconciles.
+
+            The copy button sits in an items-stretch row with the Amount input
+            and takes its height from it (mt-6 clears the input's label); the
+            conversion caption is a sibling *below* that row, so it does not
+            stretch the button past the field it belongs to. */}
         {!isInvestmentKind && (
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <CurrencyInput
-              label={
-                isForeignPosting
-                  ? t('postDialog.fx.amountInCurrency', { currency: entryCurrency })
-                  : t('postDialog.amountLabel')
-              }
-              prefix={getCurrencySymbol(
-                isForeignPosting ? entryCurrency : scheduledTransaction.currencyCode,
-              )}
-              value={isForeignPosting ? foreignAmount : amount}
-              onChange={(value) =>
-                isForeignPosting
-                  ? setForeignAmount(roundToCents(value ?? 0))
-                  : setAmount(value ?? 0)
-              }
-              allowSignToggle
-            />
+        <div>
+          <div className={isForeignPosting ? 'grid grid-cols-1 md:grid-cols-2 gap-4 items-start' : ''}>
+            <div className="flex items-stretch gap-2">
+              <div className="flex-1 min-w-0">
+                <CurrencyInput
+                  label={
+                    isForeignPosting
+                      ? t('postDialog.fx.amountInCurrency', { currency: entryCurrency })
+                      : t('postDialog.amountLabel')
+                  }
+                  prefix={getCurrencySymbol(
+                    isForeignPosting ? entryCurrency : scheduledTransaction.currencyCode,
+                  )}
+                  value={isForeignPosting ? foreignAmount : amount}
+                  onChange={(value) =>
+                    isForeignPosting
+                      ? setForeignAmount(roundToCents(value ?? 0))
+                      : setAmount(value ?? 0)
+                  }
+                  allowSignToggle
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyAmount}
+                title={t('postDialog.copyAmount')}
+                aria-label={t('postDialog.copyAmount')}
+                className="shrink-0 self-stretch mt-6 flex items-center justify-center px-3 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                {amountCopied ? (
+                  <CheckIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                ) : (
+                  <ClipboardDocumentIcon className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+            {isForeignPosting && (
+              <CurrencyInput
+                label={t('postDialog.fx.totalInCurrency', {
+                  currency: scheduledTransaction.currencyCode,
+                })}
+                prefix={getCurrencySymbol(scheduledTransaction.currencyCode)}
+                value={foreignConversion ? foreignConversion.total : undefined}
+                onChange={handleConvertedTotalChange}
+                allowSignToggle
+              />
+            )}
+          </div>
             {isForeignPosting && (
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {foreignConversion ? (
@@ -887,20 +956,6 @@ export function PostTransactionDialog({
                 )}
               </p>
             )}
-          </div>
-          <button
-            type="button"
-            onClick={handleCopyAmount}
-            title={t('postDialog.copyAmount')}
-            aria-label={t('postDialog.copyAmount')}
-            className="shrink-0 flex items-center justify-center px-3 py-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-          >
-            {amountCopied ? (
-              <CheckIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-            ) : (
-              <ClipboardDocumentIcon className="w-5 h-5" />
-            )}
-          </button>
         </div>
         )}
 

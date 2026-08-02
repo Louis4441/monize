@@ -124,7 +124,8 @@
       "amountInCurrency": "Bedrag in {currency}",
       "rateCaption": "Wordt geboekt als {total} tegen 1 {from} = {rate} {to} op {date}.",
       "noRateWarning": "Geen wisselkoers gevonden voor {from} naar {to} op {date}. Kies een andere datum of vernieuw de koersen.",
-      "feeCaption": "Inclusief {percent}% kosten voor buitenlandse transactie ({fee})."
+      "feeCaption": "Inclusief {percent}% kosten voor buitenlandse transactie ({fee}).",
+      "totalInCurrency": "Totaal in {currency}"
     }
   },
   "occurrencePicker": {

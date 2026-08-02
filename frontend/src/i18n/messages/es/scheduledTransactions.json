@@ -124,7 +124,8 @@
       "amountInCurrency": "Monto en {currency}",
       "rateCaption": "Se registrará como {total} al tipo 1 {from} = {rate} {to} del {date}.",
       "noRateWarning": "No se encontró un tipo de cambio de {from} a {to} el {date}. Elige otra fecha o actualiza los tipos.",
-      "feeCaption": "Incluye una comisión por transacción en el extranjero del {percent}% ({fee})."
+      "feeCaption": "Incluye una comisión por transacción en el extranjero del {percent}% ({fee}).",
+      "totalInCurrency": "Total en {currency}"
     }
   },
   "occurrencePicker": {

@@ -40,6 +40,7 @@ vi.mock('@/lib/format', () => ({
   getCurrencySymbol: () => '$',
   getDecimalPlacesForCurrency: () => 2,
   roundToCents: (v: number) => Math.round(v * 100) / 100,
+  roundToDecimals: (v: number, d: number) => { const f = Math.pow(10, d); return Math.round(v * f) / f; },
   formatAmount: (v: number) => (v ?? 0).toFixed(2),
   formatAmountWithCommas: (v: number) => v?.toLocaleString() ?? '',
   parseAmount: (v: string) => parseFloat(v) || 0,
@@ -1830,5 +1831,170 @@ describe('PostTransactionDialog - foreign currency', () => {
 
     expect(mockGetRateForDate).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Amount')).toBeInTheDocument();
+  });
+});
+
+// ============================================================
+// Editing either side of the conversion, as the transaction form does
+// ============================================================
+describe('PostTransactionDialog - editing the converted total', () => {
+  const foreignSchedule = {
+    id: 's-fx2',
+    name: 'Netflix',
+    amount: -54.61,
+    currencyCode: 'CAD',
+    originalAmount: -40,
+    originalCurrencyCode: 'USD',
+    exchangeRate: 1.365234,
+    accountId: 'a1',
+    categoryId: 'c1',
+    description: '',
+    nextDueDate: '2026-03-01T00:00:00Z',
+    isTransfer: false,
+    isSplit: false,
+    account: { name: 'Checking' },
+  } as any;
+
+  const baseProps = {
+    isOpen: true,
+    scheduledTransaction: foreignSchedule,
+    categories: [{ id: 'c1', name: 'Entertainment', parentId: null }] as any[],
+    accounts: [{ id: 'a1', name: 'Checking', currentBalance: 5000, fxFeePercent: null }] as any[],
+    scheduledTransactions: [] as any[],
+    futureTransactions: [] as any[],
+    onClose: vi.fn(),
+    onPosted: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetRateForDate.mockResolvedValue(1.4);
+  });
+
+  const renderDialog = async (overrides: any = {}) => {
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<PostTransactionDialog {...baseProps} {...overrides} />);
+    });
+    await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+    return result!;
+  };
+
+  const post = async () => {
+    await act(async () => {
+      const buttons = screen.getAllByText('Post Transaction');
+      fireEvent.click(buttons[buttons.length - 1]);
+    });
+  };
+
+  it('shows both the foreign amount and the account-currency total', async () => {
+    await renderDialog();
+    expect(screen.getByLabelText('Amount in USD')).toBeInTheDocument();
+    const total = screen.getByLabelText('Total in CAD') as HTMLInputElement;
+    // -40 * 1.4
+    expect(total.value).toContain('56');
+  });
+
+  it('re-derives the total when the foreign amount changes', async () => {
+    await renderDialog();
+    const amountInput = screen.getByLabelText('Amount in USD');
+    await act(async () => {
+      fireEvent.change(amountInput, { target: { value: '-50' } });
+      fireEvent.blur(amountInput);
+    });
+    const total = screen.getByLabelText('Total in CAD') as HTMLInputElement;
+    expect(total.value).toContain('70');
+  });
+
+  it('derives the rate when the converted total is edited directly', async () => {
+    await renderDialog();
+    const total = screen.getByLabelText('Total in CAD');
+    await act(async () => {
+      fireEvent.change(total, { target: { value: '-60' } });
+      fireEvent.blur(total);
+    });
+    await post();
+
+    await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
+    // -60 / -40 = 1.5, so the row still satisfies original x rate = total.
+    expect(mockPostApi).toHaveBeenCalledWith(
+      's-fx2',
+      expect.objectContaining({ originalAmount: -40, exchangeRate: 1.5 }),
+    );
+  });
+
+  it('keeps a hand-typed rate when the posting date moves', async () => {
+    await renderDialog();
+    const total = screen.getByLabelText('Total in CAD');
+    await act(async () => {
+      fireEvent.change(total, { target: { value: '-60' } });
+      fireEvent.blur(total);
+    });
+
+    mockGetRateForDate.mockClear();
+    const dateInput = screen.getByLabelText('Transaction Date');
+    await act(async () => {
+      fireEvent.change(dateInput, { target: { value: '2026-03-15' } });
+    });
+
+    // The override stands; a date tweak must not silently discard it.
+    expect(mockGetRateForDate).not.toHaveBeenCalled();
+    await post();
+    await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
+    expect(mockPostApi.mock.calls[0][1].exchangeRate).toBe(1.5);
+  });
+
+  it('backs the account fee out of a typed total before deriving the rate', async () => {
+    await renderDialog({
+      accounts: [{ id: 'a1', name: 'Checking', currentBalance: 5000, fxFeePercent: 2.5 }],
+    });
+    const total = screen.getByLabelText('Total in CAD');
+    await act(async () => {
+      fireEvent.change(total, { target: { value: '-57.4' } });
+      fireEvent.blur(total);
+    });
+    await post();
+
+    await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
+    // -57.40 total with a 2.5% fee is a -56.00 base, so the rate is 1.4 --
+    // not -57.40 / -40 = 1.435, which would double-count the fee when the
+    // backend reapplies it.
+    expect(mockPostApi.mock.calls[0][1].exchangeRate).toBeCloseTo(1.4, 6);
+  });
+});
+
+describe('PostTransactionDialog - copy button sits flush with the Amount field', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetRateForDate.mockResolvedValue(null);
+  });
+
+  it('stretches the copy button to the input height instead of padding it to roughly match', () => {
+    render(
+      <PostTransactionDialog
+        isOpen
+        scheduledTransaction={{
+          id: 's1', name: 'Netflix', amount: -15.99, currencyCode: 'CAD',
+          accountId: 'a1', categoryId: 'c1', description: '',
+          nextDueDate: '2026-02-15T00:00:00Z', isTransfer: false, isSplit: false,
+          account: { name: 'Checking' },
+        } as any}
+        categories={[] as any[]}
+        accounts={[{ id: 'a1', name: 'Checking', currentBalance: 5000 }] as any[]}
+        scheduledTransactions={[]}
+        futureTransactions={[]}
+        onClose={vi.fn()}
+        onPosted={vi.fn()}
+      />,
+    );
+
+    const copy = screen.getByLabelText('Copy amount');
+    // The button carries no height of its own, so it has to stretch to the row
+    // and clear the input's label. `py-2.5` only approximated the input height
+    // and left the button visibly short of it.
+    expect(copy.className).toContain('self-stretch');
+    expect(copy.className).toContain('mt-6');
+    expect(copy.className).not.toContain('py-2.5');
+    expect(copy.parentElement?.className).toContain('items-stretch');
   });
 });

@@ -124,7 +124,8 @@
       "amountInCurrency": "Kwota w {currency}",
       "rateCaption": "Zostanie zaksięgowane jako {total} po kursie 1 {from} = {rate} {to} z dnia {date}.",
       "noRateWarning": "Nie znaleziono kursu wymiany z {from} na {to} w dniu {date}. Wybierz inną datę lub odśwież kursy.",
-      "feeCaption": "Zawiera opłatę za transakcję zagraniczną {percent}% ({fee})."
+      "feeCaption": "Zawiera opłatę za transakcję zagraniczną {percent}% ({fee}).",
+      "totalInCurrency": "Razem w {currency}"
     }
   },
   "occurrencePicker": {

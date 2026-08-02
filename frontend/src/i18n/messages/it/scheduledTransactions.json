@@ -124,7 +124,8 @@
       "amountInCurrency": "Importo in {currency}",
       "rateCaption": "Verrà registrata come {total} al tasso 1 {from} = {rate} {to} del {date}.",
       "noRateWarning": "Nessun tasso di cambio trovato da {from} a {to} il {date}. Scegli un'altra data oppure aggiorna i tassi.",
-      "feeCaption": "Include una commissione per transazione estera del {percent}% ({fee})."
+      "feeCaption": "Include una commissione per transazione estera del {percent}% ({fee}).",
+      "totalInCurrency": "Totale in {currency}"
     }
   },
   "occurrencePicker": {

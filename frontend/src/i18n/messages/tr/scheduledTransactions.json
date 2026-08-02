@@ -124,7 +124,8 @@
       "amountInCurrency": "{currency} cinsinden tutar",
       "rateCaption": "{date} tarihindeki 1 {from} = {rate} {to} kurundan {total} olarak kaydedilecek.",
       "noRateWarning": "{date} tarihinde {from} biriminden {to} birimine döviz kuru bulunamadı. Başka bir tarih seçin veya kurları yenileyin.",
-      "feeCaption": "%{percent} yurt dışı işlem ücreti ({fee}) içerir."
+      "feeCaption": "%{percent} yurt dışı işlem ücreti ({fee}) içerir.",
+      "totalInCurrency": "{currency} cinsinden toplam"
     }
   },
   "occurrencePicker": {

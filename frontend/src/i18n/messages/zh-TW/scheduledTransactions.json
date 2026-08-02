@@ -124,7 +124,8 @@
       "amountInCurrency": "以 {currency} 計的金額",
       "rateCaption": "將按 {date} 的匯率 1 {from} = {rate} {to} 過帳為 {total}。",
       "noRateWarning": "找不到 {date} 從 {from} 到 {to} 的匯率。請選擇其他日期，或重新整理匯率。",
-      "feeCaption": "包含 {percent}% 境外交易手續費（{fee}）。"
+      "feeCaption": "包含 {percent}% 境外交易手續費（{fee}）。",
+      "totalInCurrency": "以 {currency} 計的總額"
     }
   },
   "occurrencePicker": {

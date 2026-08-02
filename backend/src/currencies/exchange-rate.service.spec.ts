@@ -860,6 +860,80 @@ describe("ExchangeRateService", () => {
 
       expect(result).toBeNull();
     });
+
+    it("clamps a future date to today rather than hunting for a rate that cannot exist", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      const todayYMD = new Date().toISOString().slice(0, 10);
+
+      // A scheduled transaction posted ahead of time: there is no rate for its
+      // due date and there never will be until the day arrives, so today's is
+      // the answer -- the same figure the bills list is already showing.
+      const result = await service.getRateForDate("USD", "CAD", "2099-01-01");
+
+      expect(result).toBe(1.365);
+      const where = exchangeRateRepository.findOne.mock.calls[0][0].where;
+      expect(where.rateDate.value.toISOString().slice(0, 10)).toBe(todayYMD);
+      // No historical window: a future window contains nothing to choose from.
+      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+    });
+
+    it("carries the last trading day forward across a weekend", async () => {
+      // 2026-06-06 is a Saturday. The stored lookup is on-or-before, so it
+      // resolves to Friday's rate without any fetch.
+      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+
+      const result = await service.getRateForDate("USD", "CAD", "2026-06-06");
+
+      expect(result).toBe(1.365);
+      const where = exchangeRateRepository.findOne.mock.calls[0][0].where;
+      expect(where.rateDate.value.toISOString().slice(0, 10)).toBe(
+        "2026-06-06",
+      );
+      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+    });
+
+    it("takes the nearest day either side when the target predates the window", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.save.mockImplementation((data) => data);
+      // Nothing on or before the target: the nearest point is 2026-06-10, not
+      // the earliest one the series happens to start with.
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
+        {
+          date: new Date("2026-06-20"),
+          close: 4.4,
+          open: null,
+          high: null,
+          low: null,
+          volume: null,
+        },
+        {
+          date: new Date("2026-06-10"),
+          close: 4.3,
+          open: null,
+          high: null,
+          low: null,
+          volume: null,
+        },
+      ]);
+
+      const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
+
+      expect(result).toBe(4.3);
+    });
+
+    it("falls back to the latest stored rate of any date when the provider has nothing", async () => {
+      // The on-or-before lookup misses (the target predates every stored row),
+      // and the window comes back empty -- but the pair does have a rate.
+      exchangeRateRepository.findOne.mockImplementation((options: any) =>
+        options.where.rateDate ? null : mockExchangeRate,
+      );
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+
+      const result = await service.getRateForDate("USD", "CAD", "2019-01-01");
+
+      // A known rate from another day beats refusing the posting outright.
+      expect(result).toBe(1.365);
+    });
   });
 
   describe("getLatestRates", () => {

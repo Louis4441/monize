@@ -124,7 +124,8 @@
       "amountInCurrency": "Montant en {currency}",
       "rateCaption": "Sera enregistré pour {total} au taux 1 {from} = {rate} {to} du {date}.",
       "noRateWarning": "Aucun taux de change trouvé de {from} vers {to} le {date}. Choisissez une autre date ou actualisez les taux.",
-      "feeCaption": "Comprend des frais de transaction à l'étranger de {percent}% ({fee})."
+      "feeCaption": "Comprend des frais de transaction à l'étranger de {percent}% ({fee}).",
+      "totalInCurrency": "Total en {currency}"
     }
   },
   "occurrencePicker": {

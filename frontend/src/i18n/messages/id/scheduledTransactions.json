@@ -124,7 +124,8 @@
       "amountInCurrency": "Jumlah dalam {currency}",
       "rateCaption": "Akan diposting sebesar {total} pada kurs 1 {from} = {rate} {to} tanggal {date}.",
       "noRateWarning": "Tidak ada nilai tukar untuk {from} ke {to} pada {date}. Pilih tanggal lain, atau segarkan kurs.",
-      "feeCaption": "Termasuk biaya transaksi luar negeri {percent}% ({fee})."
+      "feeCaption": "Termasuk biaya transaksi luar negeri {percent}% ({fee}).",
+      "totalInCurrency": "Total dalam {currency}"
     }
   },
   "occurrencePicker": {

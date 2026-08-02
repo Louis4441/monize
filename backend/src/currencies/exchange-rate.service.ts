@@ -638,12 +638,22 @@ export class ExchangeRateService implements OnModuleInit {
    * rate that applied on the transaction's date -- essential for back-dated
    * transactions, where the latest snapshot can be far from the historical
    * rate. Precedence:
-   *   1. The stored rate on the closest date on or before the target
-   *      (carry-forward, matching how a missing weekend/holiday is handled).
+   *   0. A date in the future has no rate and never will until it arrives, so
+   *      the target is clamped to today and the answer is today's rate. Without
+   *      the clamp a future date fell through to a Yahoo window that contains
+   *      nothing, and the lookup returned null for a scheduled transaction
+   *      posted ahead of time.
+   *   1. The stored rate on the closest date on or before the target. This is
+   *      what makes a weekend or a holiday resolve: Saturday and Sunday carry
+   *      Friday's rate forward, which is the closest day that has one.
    *   2. A short historical daily window fetched from Yahoo around the target
    *      date; the value on the closest day on or before the target is used and
    *      persisted for reuse. The window (not the full "max" history) keeps the
-   *      request small and fast.
+   *      request small and fast. When the target predates every point in the
+   *      window, the nearest point in either direction wins.
+   *   3. The latest stored rate of any date, as a last resort, so a pair that
+   *      has a rate today still resolves for a date the provider has no data
+   *      for at all.
    * Returns null when no rate can be determined (so the caller can reject or
    * flag the operation rather than silently assuming 1.0).
    */
@@ -654,13 +664,19 @@ export class ExchangeRateService implements OnModuleInit {
   ): Promise<number | null> {
     if (from === to) return 1;
 
-    const target =
+    const requested =
       typeof date === "string"
         ? date.slice(0, 10)
         : date.toISOString().slice(0, 10);
+
+    // 0. Clamp a future date to today: today's rate is the best available
+    //    estimate, and it is the same figure the bills list is showing.
+    const todayYMD = new Date().toISOString().slice(0, 10);
+    const target = requested > todayYMD ? todayYMD : requested;
     const targetDate = new Date(`${target}T00:00:00.000Z`);
 
-    // 1. Closest stored rate on or before the target date.
+    // 1. Closest stored rate on or before the target date (carry-forward over
+    //    weekends and holidays).
     const stored = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(ExchangeRate).findOne({
         where: {
@@ -693,10 +709,19 @@ export class ExchangeRateService implements OnModuleInit {
         (a, b) => a.date.getTime() - b.date.getTime(),
       );
       const onOrBefore = sorted.filter((p) => p.date.getTime() <= targetTime);
-      // Fall back to the earliest available point when the target predates the
-      // series -- a best-effort rate is still far better than a silent 1.0.
+      // Prefer the closest day on or before the target -- a Saturday takes
+      // Friday's rate. When the target predates every point in the window, take
+      // the nearest point in either direction instead: a best-effort rate from
+      // the closest day the market traded beats a silent 1.0.
       const chosen =
-        onOrBefore.length > 0 ? onOrBefore[onOrBefore.length - 1] : sorted[0];
+        onOrBefore.length > 0
+          ? onOrBefore[onOrBefore.length - 1]
+          : sorted.reduce((best, point) =>
+              Math.abs(point.date.getTime() - targetTime) <
+              Math.abs(best.date.getTime() - targetTime)
+                ? point
+                : best,
+            );
       try {
         await this.saveRate(from, to, chosen.rate, chosen.date);
       } catch (error) {
@@ -709,7 +734,10 @@ export class ExchangeRateService implements OnModuleInit {
       return chosen.rate;
     }
 
-    return null;
+    // 3. Nothing for this date anywhere. A pair that has any stored rate at all
+    //    still resolves -- better a known rate from another day than refusing
+    //    the posting outright.
+    return this.getLatestRate(from, to);
   }
 
   /**

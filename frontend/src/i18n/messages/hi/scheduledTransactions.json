@@ -124,7 +124,8 @@
       "amountInCurrency": "{currency} में राशि",
       "rateCaption": "{date} की दर 1 {from} = {rate} {to} पर यह {total} के रूप में पोस्ट होगा।",
       "noRateWarning": "{date} को {from} से {to} के लिए कोई विनिमय दर नहीं मिली। दूसरी तिथि चुनें या दरें ताज़ा करें।",
-      "feeCaption": "इसमें {percent}% विदेशी लेनदेन शुल्क ({fee}) शामिल है।"
+      "feeCaption": "इसमें {percent}% विदेशी लेनदेन शुल्क ({fee}) शामिल है।",
+      "totalInCurrency": "{currency} में कुल"
     }
   },
   "occurrencePicker": {

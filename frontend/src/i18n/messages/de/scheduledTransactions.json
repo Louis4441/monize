@@ -124,7 +124,8 @@
       "amountInCurrency": "Betrag in {currency}",
       "rateCaption": "Wird als {total} gebucht, zum Kurs 1 {from} = {rate} {to} am {date}.",
       "noRateWarning": "Kein Wechselkurs für {from} zu {to} am {date} gefunden. Bitte ein anderes Datum wählen oder die Kurse aktualisieren.",
-      "feeCaption": "Enthält eine Fremdwährungsgebühr von {percent}% ({fee})."
+      "feeCaption": "Enthält eine Fremdwährungsgebühr von {percent}% ({fee}).",
+      "totalInCurrency": "Gesamt in {currency}"
     }
   },
   "occurrencePicker": {
