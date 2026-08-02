@@ -260,6 +260,67 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
+   * Bulk-upsert a daily rate series for a pair, in both directions.
+   *
+   * A provider call returns a whole daily series for the period asked for, and
+   * costs the same whether that is one day or a hundred. Persisting only the
+   * day that was wanted threw the rest away and sent the next lookup for a
+   * neighbouring date straight back out to the provider -- which is how a user
+   * stepping a date field backwards ran into rate limits. Storing the series
+   * makes one call cover the whole window.
+   *
+   * Both directions are written for the reason `saveRate` gives: a pair
+   * persisted one way only leaves the reverse lookup falling through to a live
+   * fetch forever.
+   */
+  private async persistRateSeries(
+    from: string,
+    to: string,
+    series: Array<{ date: Date; rate: number }>,
+  ): Promise<number> {
+    // One row per day, last value wins, ignoring anything unusable.
+    const byDay = new Map<string, { date: Date; rate: number }>();
+    for (const point of series) {
+      if (!isFinite(point.rate) || point.rate <= 0) continue;
+      byDay.set(point.date.toISOString().slice(0, 10), point);
+    }
+    const points = Array.from(byDay.values());
+    if (points.length === 0) return 0;
+
+    const rows: Array<[string, string, Date, number]> = [];
+    for (const point of points) {
+      rows.push([from, to, point.date, point.rate]);
+      rows.push([to, from, point.date, roundFxRate(1 / point.rate)]);
+    }
+
+    const batchSize = 500;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const values = batch
+        .map((_, idx) => {
+          const offset = idx * 4;
+          return `($${offset + 1}, $${offset + 2}, $${offset + 3}::DATE, $${offset + 4}, 'yahoo_finance')`;
+        })
+        .join(", ");
+      const params: any[] = [];
+      for (const [f, t, date, rate] of batch) params.push(f, t, date, rate);
+
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO exchange_rates (from_currency, to_currency, rate_date, rate, source)
+           VALUES ${values}
+           ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE SET
+             rate = EXCLUDED.rate,
+             source = EXCLUDED.source`,
+          params,
+        ),
+      );
+    }
+
+    return points.length;
+  }
+
+  /**
    * Refresh exchange rates for all currencies in use
    */
   async refreshAllRates(): Promise<RateRefreshSummary> {
@@ -532,33 +593,11 @@ export class ExchangeRateService implements OnModuleInit {
       }
 
       try {
-        // Bulk upsert using raw SQL for performance
-        const batchSize = 500;
-        for (let i = 0; i < filtered.length; i += batchSize) {
-          const batch = filtered.slice(i, i + batchSize);
-          const values = batch
-            .map((_, idx) => {
-              const offset = idx * 4;
-              return `($${offset + 1}, $${offset + 2}, $${offset + 3}::DATE, $${offset + 4}, 'yahoo_finance')`;
-            })
-            .join(", ");
-
-          const batchParams: any[] = [];
-          for (const r of batch) {
-            batchParams.push(from, to, r.date, r.rate);
-          }
-
-          await withScopedDb(this.dataSource, (manager) =>
-            manager.query(
-              `INSERT INTO exchange_rates (from_currency, to_currency, rate_date, rate, source)
-             VALUES ${values}
-             ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE SET
-               rate = EXCLUDED.rate,
-               source = EXCLUDED.source`,
-              batchParams,
-            ),
-          );
-        }
+        // Same bulk upsert the single-date lookup uses, which also writes the
+        // inverse pair -- this loop used to store one direction only, so a
+        // CAD->USD lookup went out to the provider even though the USD->CAD
+        // history had just been backfilled.
+        await this.persistRateSeries(from, to, filtered);
 
         this.logger.log(
           `Backfilled ${filtered.length} rates for ${from}/${to} (from ${cutoffDate.toISOString().substring(0, 10)})`,
@@ -689,14 +728,18 @@ export class ExchangeRateService implements OnModuleInit {
     );
     if (stored) return Number(stored.rate);
 
-    // 2. Fetch a short Yahoo window around the target (not the full "max"
-    //    history) and use the rate on the closest day on or before the target.
-    //    The lower bound reaches back two weeks so weekends/holidays before the
-    //    target still resolve; the upper bound adds two days to cover the target
-    //    itself (and minor timezone slack). Persist just the chosen point (and
-    //    its inverse, via saveRate) so a repeat lookup hits the database.
-    const windowStart = new Date(targetDate.getTime() - 14 * 86_400_000);
-    const windowEnd = new Date(targetDate.getTime() + 2 * 86_400_000);
+    // 2. Fetch a Yahoo window around the target (not the full "max" history)
+    //    and use the rate on the closest day on or before the target.
+    //
+    //    The window is wide because it costs nothing to be: one call returns
+    //    the whole daily series for the period, and every bar in it is
+    //    persisted below. Six weeks back and one forward means a user stepping
+    //    a date field through a month of history pays for a single fetch, and
+    //    the reverse pair is filled in at the same time. It was two weeks back
+    //    and one point kept, so neighbouring dates each went back out to the
+    //    provider and ran into its rate limits.
+    const windowStart = new Date(targetDate.getTime() - 45 * 86_400_000);
+    const windowEnd = new Date(targetDate.getTime() + 7 * 86_400_000);
     const series = await this.fetchYahooHistoricalRatesWindow(
       from,
       to,
@@ -723,10 +766,15 @@ export class ExchangeRateService implements OnModuleInit {
                 : best,
             );
       try {
-        await this.saveRate(from, to, chosen.rate, chosen.date);
+        // The whole window, not just the day that was asked for: the next
+        // lookup for any date in it is then a database read.
+        const stored = await this.persistRateSeries(from, to, series);
+        this.logger.log(
+          `Stored ${stored} daily ${from}/${to} rates around ${target} from one lookup`,
+        );
       } catch (error) {
         this.logger.warn(
-          `Could not persist historical rate ${from}->${to} for ${target}: ${
+          `Could not persist historical rates ${from}->${to} around ${target}: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );

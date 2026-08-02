@@ -844,12 +844,72 @@ describe("ExchangeRateService", () => {
       const [sym, fromDate, toDate] =
         yahooFinanceService.fetchHistoricalWindow.mock.calls[0];
       expect(sym).toBe("EURPLN=X");
-      // Window brackets the target date (~2 weeks before, ~2 days after).
+      // Window brackets the target date, and is wide enough to be worth
+      // storing: one call has to cover a run of nearby dates or a user
+      // stepping the date field hits the provider's rate limit.
       const target = new Date("2026-06-08T00:00:00.000Z").getTime();
-      expect((fromDate as Date).getTime()).toBeLessThan(target);
+      expect((fromDate as Date).getTime()).toBeLessThan(
+        target - 30 * 86_400_000,
+      );
       expect((toDate as Date).getTime()).toBeGreaterThanOrEqual(target);
-      // The chosen point is persisted for reuse (forward + inverse via saveRate).
-      expect(exchangeRateRepository.save).toHaveBeenCalled();
+    });
+
+    it("stores every day in the fetched window, both directions, not just the day asked for", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(null);
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
+        {
+          date: new Date("2026-06-05"),
+          close: 4.25,
+          open: null,
+          high: null,
+          low: null,
+          volume: null,
+        },
+        {
+          date: new Date("2026-06-09"),
+          close: 4.3,
+          open: null,
+          high: null,
+          low: null,
+          volume: null,
+        },
+      ]);
+
+      await service.getRateForDate("EUR", "PLN", "2026-06-08");
+
+      // One bulk upsert carrying both days in both directions. Keeping only
+      // the chosen point sent the next lookup for a neighbouring date straight
+      // back out to the provider, which is what ran into its rate limits.
+      const insert = dataSource.query.mock.calls.find((call: any[]) =>
+        String(call[0]).includes("INSERT INTO exchange_rates"),
+      );
+      expect(insert).toBeDefined();
+      const params = insert[1] as unknown[];
+      expect(params).toHaveLength(2 * 2 * 4); // 2 days x 2 directions x 4 columns
+
+      // Read the flat parameter list back as (from, to, date, rate) rows.
+      const rows: Array<[string, string, Date, number]> = [];
+      for (let i = 0; i < params.length; i += 4) {
+        rows.push(params.slice(i, i + 4) as [string, string, Date, number]);
+      }
+      const rowFor = (from: string, to: string, day: string) =>
+        rows.find(
+          (r) =>
+            r[0] === from &&
+            r[1] === to &&
+            r[2].toISOString().slice(0, 10) === day,
+        );
+
+      expect(rowFor("EUR", "PLN", "2026-06-05")?.[3]).toBe(4.25);
+      expect(rowFor("EUR", "PLN", "2026-06-09")?.[3]).toBe(4.3);
+      // The inverse pair is written too, so a PLN->EUR lookup is a DB read --
+      // and at rate precision, not money precision.
+      expect(rowFor("PLN", "EUR", "2026-06-05")?.[3]).toBe(
+        roundFxRate(1 / 4.25),
+      );
+      expect(rowFor("PLN", "EUR", "2026-06-09")?.[3]).toBe(
+        roundFxRate(1 / 4.3),
+      );
     });
 
     it("returns null when neither a stored rate nor a Yahoo window is available", async () => {

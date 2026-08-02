@@ -3574,6 +3574,53 @@ describe('TransactionForm', () => {
   });
 
   describe('foreign-currency entry', () => {
+    const pickEuro = async () => {
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Change entry currency'));
+      });
+      await waitFor(() => expect(screen.getByText(/Euro \(EUR\)/)).toBeInTheDocument());
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Euro \(EUR\)/));
+      });
+    };
+
+    it('does not claim "no exchange rate found" when the lookup itself failed', async () => {
+      mockGetRateForDate.mockRejectedValue(new Error('Request failed with status code 429'));
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+        />,
+      );
+      await waitFor(() => expect(mockAccountsGetAll).toHaveBeenCalled());
+      await pickEuro();
+      await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+      await act(async () => {}); // drain the rejection handler
+
+      // A throttled or offline request says nothing about whether a rate
+      // exists, so the panel stays quiet rather than asserting there is none.
+      expect(screen.queryByText(/No exchange rate found/)).not.toBeInTheDocument();
+    });
+
+    it('still says so when the server answers that no rate exists', async () => {
+      mockGetRateForDate.mockResolvedValue(null);
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+        />,
+      );
+      await waitFor(() => expect(mockAccountsGetAll).toHaveBeenCalled());
+      await pickEuro();
+      await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+      await waitFor(() =>
+        expect(screen.getByText(/No exchange rate found/)).toBeInTheDocument(),
+      );
+    });
+
     it('fetches the rate and shows the converted-amount panel after picking a foreign currency', async () => {
       render(
         <TransactionForm
