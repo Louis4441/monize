@@ -284,21 +284,30 @@ export function GemStrategyReport() {
   const savingForStrategy = useRef<string | null>(null);
   const handleSettingsSaving = useCallback(
     (saving: boolean) => {
-      // Taken from the report the form is *rendering*, not from whatever is
-      // selected when the save lands. The two are the same now that a stale
-      // form is unmounted, and reading the rendered one keeps it true even if
-      // that ever changes: an origin derived from the current selection would
-      // stamp scenario A's save with scenario B's key.
-      savingForKey.current = saving
-        ? `${range}|${data?.strategy.id ?? ""}`
-        : null;
+      // The key the report on screen was *loaded under*, straight from the
+      // hook -- not one rebuilt here out of the report's contents.
+      //
+      // Both name the report the form is rendering, which is the thing this
+      // has to be taken from, but only one of them is in the namespace the
+      // hook compares against. `requestKey` is built from the `strategyId`
+      // state, and that state is undefined until the user picks from the
+      // switcher, while a loaded report always carries a real id -- so on the
+      // ordinary single-scenario path the rebuilt key was `1Y|<uuid>` against
+      // a current key of `1Y|`, and every settings save was discarded as
+      // belonging to a selection nobody was on. Nothing refetched afterwards,
+      // so the page went on showing the configuration the user had just
+      // replaced.
+      //
+      // `dataKey` cannot drift from `requestKey` that way: it is the same
+      // string the hook stamped when the fetch committed.
+      savingForKey.current = saving ? dataKey : null;
       savingForStrategy.current = saving ? (data?.strategy.id ?? null) : null;
       // A save that ends without `onSaved` was refused. The navigation it was
       // carrying is not owed to a later, unrelated save.
       if (!saving) navigateAfterSave.current = null;
       setIsSaving(saving);
     },
-    [range, data?.strategy.id],
+    [dataKey, data?.strategy.id],
   );
 
   /**

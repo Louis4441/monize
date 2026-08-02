@@ -457,8 +457,74 @@ describe("GemStrategyService", () => {
       });
     });
 
+    it("falls back to the default scenario when the requested one is gone", async () => {
+      // A stale id -- a bookmark, or another tab that deleted the scenario --
+      // says nothing about the user's other scenarios. Answering with the
+      // unconfigured page hid every one of them and took the switcher with
+      // them, so there was no route back except reloading the page.
+      strategyRepo.findOne.mockImplementation(
+        ({ where }: { where: { id?: string } }) =>
+          Promise.resolve(where.id ? null : storedStrategy()),
+      );
+
+      const report = await service.getReport(userId, "1Y", "strategy-gone");
+
+      expect(report.strategy.id).toBe("strategy-1");
+      expect(report.strategies).toEqual([{ id: "strategy-1", name: "GEM" }]);
+    });
+
+    it("keeps the switcher when no scenario resolves at all", async () => {
+      // Past the retry budget the report has no strategy to describe, which is
+      // a claim about one scenario. `strategies: []` was a second claim -- that
+      // the user has none -- and it was made without looking.
+      strategyRepo.findOne.mockResolvedValue(null);
+      strategyRepo.find.mockResolvedValue([
+        storedStrategy(),
+        storedStrategy({ id: "strategy-2", name: "Quarterly" }),
+      ]);
+
+      const report = await service.getReport(userId, "1Y", "strategy-gone");
+
+      expect(report.strategy.id).toBeNull();
+      expect(report.strategies).toEqual([
+        { id: "strategy-1", name: "GEM" },
+        { id: "strategy-2", name: "Quarterly" },
+      ]);
+    });
+
+    it("rebuilds without the id when the scenario is deleted mid-report", async () => {
+      // The retry used to recurse with the same id, which re-asks for the
+      // scenario just established as gone: every attempt took the same path,
+      // so it could never pick up "whatever the user is looking at now".
+      signalService.materialize
+        .mockResolvedValueOnce({
+          signals: [],
+          legacyPeriods: 0,
+          configChanged: true,
+          strategyMissing: true,
+        })
+        .mockResolvedValueOnce({
+          signals: [storedSignal()],
+          legacyPeriods: 0,
+          configChanged: false,
+          strategyMissing: false,
+        });
+
+      const report = await service.getReport(userId, "1Y", "strategy-1");
+
+      const loads = strategyRepo.findOne.mock.calls.map(
+        ([options]: [{ where: { id?: string } }]) => options.where,
+      );
+      expect(loads[0]).toMatchObject({ id: "strategy-1" });
+      expect(loads[1]).not.toHaveProperty("id");
+      expect(report.strategy.id).toBe("strategy-1");
+    });
+
     it("returns the unconfigured shape for a user with no strategy", async () => {
       strategyRepo.findOne.mockResolvedValue(null);
+      // The switcher list comes from the same table: a user `findOne` cannot
+      // find a strategy for has none to list either.
+      strategyRepo.find.mockResolvedValue([]);
 
       const report = await service.getReport(userId);
 

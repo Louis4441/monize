@@ -397,6 +397,18 @@ export class GemSignalService {
       const isCurrentVersion = (signal: GemStrategySignal) =>
         signal.algorithmVersion === GEM_SIGNAL_ALGORITHM_VERSION;
       /**
+       * A row this configuration produced, under the rules in force now.
+       *
+       * One predicate, because every place that asks the question has to
+       * answer it the same way. It was written out four times and the fourth
+       * -- the `previousRole` chain -- checked only the date, which let a
+       * superseded row stand in for its own replacement and get stored as the
+       * predecessor of the next period. A shared function cannot drift; four
+       * copies of a two-clause condition demonstrably do.
+       */
+      const isThisConfiguration = (signal: GemStrategySignal) =>
+        isCurrentVersion(signal) && signal.configFingerprint === fingerprint;
+      /**
        * Rows an older version wrote, by period.
        *
        * They are not obstacles: the unique key carries the version, so this
@@ -425,13 +437,7 @@ export class GemSignalService {
           .map((signal) => [signal.evaluatedOn, signal]),
       );
       const answered = new Set(
-        stored
-          .filter(
-            (signal) =>
-              isCurrentVersion(signal) &&
-              signal.configFingerprint === fingerprint,
-          )
-          .map((signal) => signal.evaluatedOn),
+        stored.filter(isThisConfiguration).map((signal) => signal.evaluatedOn),
       );
 
       /**
@@ -452,11 +458,7 @@ export class GemSignalService {
        * the report rather than answered by an earlier set of rules.
        */
       const current = (rows: GemStrategySignal[]): GemMaterialization => {
-        const signals = rows.filter(
-          (signal) =>
-            isCurrentVersion(signal) &&
-            signal.configFingerprint === fingerprint,
-        );
+        const signals = rows.filter(isThisConfiguration);
         // Counted by *period*, not by row. A period can hold a superseded row
         // and its replacement at once, and the replacement being present is
         // exactly the case where nothing is missing from the history.
@@ -518,9 +520,18 @@ export class GemSignalService {
       // and `previousRole` is what the history table renders as "switched out
       // of". A period with no answered predecessor gets null, which is the
       // truth: this configuration has decided nothing before it.
+      //
+      // Keyed off the row, not off `answered`. Filtering on that set asked
+      // only whether the *date* had an answer, and a date can hold two rows:
+      // after a version bump the superseded row and its replacement sit on the
+      // same day, `stored` is ordered by date alone, and the last one to reach
+      // the `Map` wins. The old row could therefore be handed to the next
+      // period as its predecessor and written into the history as the role it
+      // switched out of -- a wrong BUY/HOLD/SWITCH, persisted, from rules no
+      // longer in force.
       const byEvaluatedOn = new Map(
         stored
-          .filter((signal) => answered.has(signal.evaluatedOn))
+          .filter(isThisConfiguration)
           .map((signal) => [signal.evaluatedOn, signal]),
       );
       const written: GemStrategySignal[] = [];
@@ -668,14 +679,21 @@ export class GemSignalService {
           // read, which reloads the configuration and evaluates them against
           // whatever the database holds by then. Abandoning is the only option
           // that neither invents a predecessor nor overwrites a stranger's row.
+          //
+          // Scoped to this algorithm version. The unique key carries it, so
+          // (strategy, date) selects more than one row once a version has been
+          // superseded -- and the row the insert actually collided with is the
+          // one this version wrote. Reading without the version could return
+          // the older row, fail the check below and abandon a materialization
+          // that had in fact lost the race to a perfectly valid winner.
           const winner = await repo.findOne({
-            where: { strategyId: strategy.id, evaluatedOn: period.evaluatedOn },
+            where: {
+              strategyId: strategy.id,
+              evaluatedOn: period.evaluatedOn,
+              algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
+            },
           });
-          if (
-            winner &&
-            isCurrentVersion(winner) &&
-            winner.configFingerprint === fingerprint
-          ) {
+          if (winner && isThisConfiguration(winner)) {
             byEvaluatedOn.set(period.evaluatedOn, winner);
             this.logger.debug(
               `GEM period ${period.evaluatedOn} was materialized concurrently`,

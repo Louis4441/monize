@@ -517,6 +517,45 @@ describe("GemSignalService", () => {
         expect(june?.previousRole).not.toBe("US_EQUITY");
       });
 
+      it("never takes previousRole from a row an older algorithm version wrote", async () => {
+        // A period can hold two rows: the one a superseded version wrote and
+        // its replacement. Both sit on the same date, `stored` is ordered by
+        // date alone, and the chain used to be seeded by asking only whether
+        // the *date* had an answer -- so whichever row happened to come last
+        // won the map. When that was the old one, the next period was stored
+        // naming a target the current rules never chose, and the history table
+        // renders exactly that as "switched out of".
+        const fingerprint = gemConfigFingerprint(strategy(), assets());
+        signalRepo.find.mockResolvedValue([
+          {
+            id: "sig-jun-current",
+            evaluatedOn: "2025-06-30",
+            targetRole: "SAFE",
+            targetSecurityId: "sec-ief",
+            configFingerprint: fingerprint,
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
+          },
+          // Ordered after its own replacement, which the (evaluatedOn DESC)
+          // read makes possible and nothing about the schema forbids.
+          {
+            id: "sig-jun-superseded",
+            evaluatedOn: "2025-06-30",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+            configFingerprint: fingerprint,
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION - 1,
+          },
+        ] as GemStrategySignal[]);
+
+        await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+        const july = savedSignals.find(
+          (row) => row.evaluatedOn === "2025-07-31",
+        );
+        expect(july).toBeDefined();
+        expect(july?.previousRole).toBe("SAFE");
+      });
+
       it("returns nothing the current configuration did not produce", async () => {
         // A period that cannot be recomputed keeps its old row on a date the
         // current calendar still uses. Returning it mixed a counterfactual
@@ -821,9 +860,88 @@ describe("GemSignalService", () => {
 
       // The row the loop skipped is fetched, and the next period follows it.
       expect(signalRepo.findOne).toHaveBeenCalledWith({
-        where: { strategyId: "strategy-1", evaluatedOn: "2023-08-31" },
+        where: {
+          strategyId: "strategy-1",
+          evaluatedOn: "2023-08-31",
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
+        },
       });
       expect(savedSignals[0]).toMatchObject({ previousRole: "US_EQUITY" });
+    });
+
+    it("reads the winner of the key this version writes, not a superseded row", async () => {
+      // (strategy, date) stopped selecting one row when the unique key took on
+      // the algorithm version. The insert collided with the row *this* version
+      // wrote, so that is the row to read back; an unversioned lookup could
+      // return the older one instead, fail the configuration check and abandon
+      // a materialization that had lost the race to a perfectly valid winner.
+      const fingerprint = gemConfigFingerprint(strategy(), assets());
+      const rows = [
+        // First, so an unversioned findOne would answer with this one.
+        {
+          id: "sig-superseded",
+          evaluatedOn: "2023-08-31",
+          targetRole: "US_EQUITY",
+          targetSecurityId: "sec-spy",
+          configFingerprint: "written-under-other-settings",
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION - 1,
+        },
+        {
+          id: "sig-winner",
+          evaluatedOn: "2023-08-31",
+          targetRole: "SAFE",
+          targetSecurityId: "sec-ief",
+          configFingerprint: fingerprint,
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
+        },
+      ] as GemStrategySignal[];
+      signalRepo.findOne.mockImplementation(
+        ({ where }: { where: Record<string, unknown> }) =>
+          Promise.resolve(
+            rows.find(
+              (row) =>
+                row.evaluatedOn === where.evaluatedOn &&
+                (where.algorithmVersion === undefined ||
+                  row.algorithmVersion === where.algorithmVersion),
+            ) ?? null,
+          ),
+      );
+      // The oldest period loses the key; every later one wins.
+      let attempt = 0;
+      signalRepo.createQueryBuilder.mockImplementation(() => {
+        let pending: Record<string, unknown> = {};
+        const builder = {
+          insert: () => builder,
+          values: (row: Record<string, unknown>) => {
+            pending = row;
+            return builder;
+          },
+          orIgnore: () => builder,
+          returning: () => builder,
+          execute: jest.fn(async () => {
+            attempt += 1;
+            const inserted =
+              attempt === 1
+                ? []
+                : [{ id: `sig-${pending.evaluatedOn as string}`, ...pending }];
+            savedSignals.push(...inserted);
+            return {
+              generatedMaps: inserted.length > 0 ? inserted : [{}],
+              raw: inserted,
+              identifiers: inserted,
+            };
+          }),
+        };
+        return builder;
+      });
+
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+      // The run carried on past the lost period rather than abandoning...
+      expect(savedSignals.length).toBeGreaterThan(0);
+      // ...and the period after it was chained onto the current version's row,
+      // not the superseded one.
+      expect(savedSignals[0]).toMatchObject({ previousRole: "SAFE" });
     });
 
     it("abandons the run when a row from another configuration wins the key", async () => {

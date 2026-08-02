@@ -230,6 +230,39 @@ carries the wider list of adversarial inputs, including the asynchronous ones):
 | Save for A starts, user selects B, A resolves | A's response is discarded and does not retire B's request |
 | A shown, B selected, B fails | the failure is shown; A is not presented as B |
 | Form dirty, user selects B | confirmation is asked for, or the draft survives |
+| Save on the default selection, nothing else happens | the response is adopted |
+
+**Both sides of that comparison must come from the same place.** The origin
+key a mutation captures and the key the loader is holding have to be produced
+by one expression, not by two that agree in the cases you happened to think
+about. Take the origin from what the loader actually stamped -- `dataKey` on
+`useReportData` -- and never rebuild it out of the rendered payload's fields.
+The GEM report built its page key from a `strategyId` *state* that stays unset
+until the user picks from a switcher, and the save's origin key from
+`data.strategy.id`, which is always a real id: the two could never match on
+the ordinary single-scenario path, so every settings save was discarded as
+belonging to a selection nobody was on, with no refetch behind it. A key
+comparison that silently drops the common case looks exactly like one that
+works.
+
+### Nothing interactive goes inside a `<button>` or an `<a>`
+
+The parser closes the outer element at the inner tag, so the click target ends
+wherever the nested control begins and the server's HTML stops matching what
+React builds -- a hydration mismatch. Fix it at the call site by making the
+two **siblings**: give the card a wrapper that carries the border and hover,
+and put the navigation button and the nested control inside it side by side.
+
+Do not fix it by demoting the inner control to a focusable `<span>`. A span's
+implicit role is generic, screen readers drop its `aria-label`, and the result
+is a tab stop that announces nothing -- which is how `InfoTooltip` came to be
+a `<button>` in the first place. Trading one defect for the other just moves
+it.
+
+`ui-conventions.test.ts` scans for this, and it is the kind of rule only a
+scan can hold: neither file is wrong on its own. Changing a shared component's
+trigger element is a change to every call site, so the guard is what tells you
+which ones.
 
 ### An unknown value must not render as a measured zero
 

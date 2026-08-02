@@ -149,6 +149,37 @@ describe("GemPortfolioCard", () => {
     expect(screen.getAllByText("Not available").length).toBeGreaterThan(0);
   });
 
+  it("draws no fill at all when compliance is unknown", () => {
+    // `width: ${percent ?? 0}%` drew "unknown" exactly like a measured 0%,
+    // and the shape is what most people read -- an empty meter says the
+    // portfolio holds none of the target instrument, which is an answer this
+    // card does not have. The unknown track has no fill element to mistake
+    // for one.
+    const { container } = render(
+      <GemPortfolioCard
+        position={gemPosition({ exactTargetPercent: null })}
+        noAccount={false}
+      />,
+    );
+    const meter = screen.getByRole("progressbar");
+    expect(meter.children).toHaveLength(0);
+    expect(container.querySelector('[style*="width"]')).toBeNull();
+  });
+
+  it("draws a fill of the measured width when compliance is known", () => {
+    // The other half of the pair: a real 0% still renders a fill element, so
+    // the test above is about the unknown case and not about zero.
+    render(
+      <GemPortfolioCard
+        position={gemPosition({ exactTargetPercent: 0 })}
+        noAccount={false}
+      />,
+    );
+    const meter = screen.getByRole("progressbar");
+    expect(meter.children).toHaveLength(1);
+    expect(meter.firstElementChild).toHaveStyle({ width: "0%" });
+  });
+
   it("shows no largest-position row for empty accounts", () => {
     render(
       <GemPortfolioCard

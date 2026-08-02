@@ -595,6 +595,62 @@ describe("GemStrategyReport", () => {
     });
 
     /**
+     * Invariant: a mutation's response is adopted whenever the selection it
+     * was produced for is still the one on screen -- and the default
+     * scenario, which nobody selected, is one of those selections.
+     *
+     * Canonical adversarial input: a request key whose two halves are built
+     * from different sources (testing contract, asynchronous).
+     *
+     * Minimal mutation: build the save's origin key from the report's own
+     * contents (`${range}|${data.strategy.id}`) instead of from the hook's
+     * `dataKey`. The page's key is `${range}|${strategyId ?? ""}` and
+     * `strategyId` is unset until the switcher is used, so the two never
+     * matched on the single-scenario path and every save was discarded.
+     */
+    it("shows the saved configuration on the scenario nobody selected", async () => {
+      const saved = gemReport();
+      saved.strategy = { ...saved.strategy, cadence: "QUARTERLY" };
+      mockUpdateConfig.mockResolvedValue(saved);
+      await renderReport();
+      // The header describes the configuration the report was loaded with.
+      expect(
+        screen.getByText("Evaluation frequency: monthly"),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+      // Any refetch would answer with the pre-save report, so the assertion
+      // below cannot pass by a second read happening to run.
+      mockGetReport.mockResolvedValue(gemReport());
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+      });
+      await act(async () => {});
+
+      // The save returns the re-evaluated strategy and the page takes it.
+      // Discarding it left the user looking at the configuration they had
+      // just replaced, with nothing scheduled to correct it.
+      await waitFor(() =>
+        expect(
+          screen.getByText("Evaluation frequency: quarterly"),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    /**
      * The dialog's own Save, which shares its label with the form's. The
      * dialog is rendered last, so it is the later of the two.
      */

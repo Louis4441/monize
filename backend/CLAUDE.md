@@ -112,6 +112,36 @@ A check capable of refusing a command belongs inside the transaction that perfor
 
 Give the operation the caller's precondition as a parameter -- the expected owner, scenario or revision -- and let it refuse before writing. Return the refusal distinguishably: "no such row", "not yours" and "done" are three answers, and folding two into `null` makes the caller guess. Tests assert the rejected response **and** the stored state; see `docs/financial-calculation-contract.md` section 7.
 
+## A predicate that decides which row counts is written once
+
+When "is this row the one we mean" takes more than one clause -- current
+algorithm version *and* matching configuration fingerprint, say -- name it and
+call it. Written out at each site it drifts, and the drift is invisible: the
+GEM signal service spelled the condition out four times, and the fourth asked
+only whether the *date* had an answer. A date can hold two rows once a unique
+key carries a version, so a superseded row could win the lookup and be stored
+as the next period's predecessor -- a wrong decision, persisted, from rules no
+longer in force.
+
+The same goes for the `where` clause that reads such a row back. A key that
+grew a column selects more than one row now; a query still written against the
+old key returns whichever the database offers first. Grep for reads of a
+unique key in the migration that widens it.
+
+## A fallback answers only the question it was asked
+
+A lookup that fails is a fact about *that* lookup. A stale scenario id that no
+longer resolves says nothing about the user's other scenarios, so an empty
+report hardcoding `strategies: []` made a second claim -- that there are none
+-- without looking, and took away the switcher that was the only route back.
+Fall back to the default rather than to nothing, and fill the surrounding
+fields from a real read.
+
+And a retry has to change something. `getReport` recursed with the same
+strategy id after establishing that the id was gone, so every attempt took the
+identical path: a retry whose inputs are unchanged is a comment claiming a
+recovery that cannot happen.
+
 ## Testing Conventions
 
 Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTestingModule` with mocks injected via `getRepositoryToken()`. E2E tests live in `test/` with helpers under `test/helpers/` (`auth-helper.ts`, `test-database.ts`, `test-factories.ts`).

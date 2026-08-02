@@ -162,13 +162,17 @@ export function GemReasoningSection({
                   equity: assetLabel(absolute.equity),
                   equityReturn: momentumText(absolute.equity.momentumPercent),
                   benchmark: assetLabel(absolute.benchmark),
-                  benchmarkReturn: momentumText(absolute.benchmark.momentumPercent),
+                  benchmarkReturn: momentumText(
+                    absolute.benchmark.momentumPercent,
+                  ),
                 })
               : t("gem.reasoning.step1AnswerRiskOff", {
                   equity: assetLabel(absolute.equity),
                   equityReturn: momentumText(absolute.equity.momentumPercent),
                   benchmark: assetLabel(absolute.benchmark),
-                  benchmarkReturn: momentumText(absolute.benchmark.momentumPercent),
+                  benchmarkReturn: momentumText(
+                    absolute.benchmark.momentumPercent,
+                  ),
                   safe: assetLabel(signal.target),
                 })}
           </p>

@@ -423,6 +423,24 @@ export class GemStrategyService {
     return { on: evaluatedOn.toISOString().slice(0, 10), days };
   }
 
+  /**
+   * The empty report, carrying whatever scenarios the user does have.
+   *
+   * `emptyReport` describes one strategy that is not there; it says nothing
+   * about the others, and hardcoding `strategies: []` claimed there were none.
+   * That is a claim about a second thing, it was wrong whenever this was
+   * reached with a stale id, and it removed the switcher -- the only control
+   * that could have got the user back to a scenario that does exist.
+   */
+  private async unconfiguredReport(
+    userId: string,
+  ): Promise<GemStrategyReportView> {
+    return {
+      ...this.emptyReport(this.buildAssetRefs([]), DEFAULT_STRATEGY_NAME),
+      strategies: await this.listStrategies(userId),
+    };
+  }
+
   /** The report a user with no configured strategy gets: shape, no invented data. */
   private emptyReport(
     refs: Map<GemAssetRole, GemAssetRef>,
@@ -497,7 +515,19 @@ export class GemStrategyService {
     const asOf = todayYMD();
     const loaded = await this.loadStrategy(userId, strategyId);
     if (!loaded) {
-      return this.emptyReport(this.buildAssetRefs([]), DEFAULT_STRATEGY_NAME);
+      // A named scenario that does not resolve is not the same thing as having
+      // no scenarios. It is a stale id -- a bookmark, another tab that deleted
+      // it -- and the user's remaining scenarios are untouched. Answering with
+      // the unconfigured page hid every one of them and took the switcher away
+      // with them, so the only route back was to reload the page.
+      //
+      // So: drop the id and report on the default scenario, which is what an
+      // unset id has always meant. Only when *that* finds nothing is the
+      // account genuinely unconfigured.
+      if (strategyId && attempt + 1 < GEM_REPORT_ATTEMPTS) {
+        return this.getReport(userId, range, undefined, attempt + 1);
+      }
+      return this.unconfiguredReport(userId);
     }
 
     const { strategy, assets, accounts } = loaded;
@@ -517,9 +547,14 @@ export class GemStrategyService {
     // actually looking at now -- another scenario, or none -- and if that is
     // gone too there is nothing to report but the unconfigured page.
     if (strategyMissing) {
+      // Rebuilt without the id. Recursing with it re-asks for the scenario
+      // that has just been established as gone: `loadStrategy` cannot find it,
+      // so every attempt takes the same path and the retry could never do what
+      // this comment says it does. Unset is what picks up "whatever the user
+      // is actually looking at now".
       return attempt + 1 < GEM_REPORT_ATTEMPTS
-        ? this.getReport(userId, range, strategyId, attempt + 1)
-        : this.emptyReport(this.buildAssetRefs([]), DEFAULT_STRATEGY_NAME);
+        ? this.getReport(userId, range, undefined, attempt + 1)
+        : this.unconfiguredReport(userId);
     }
     if (configChanged) {
       if (attempt + 1 < GEM_REPORT_ATTEMPTS) {

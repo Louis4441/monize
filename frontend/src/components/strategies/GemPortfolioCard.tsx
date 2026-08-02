@@ -110,20 +110,32 @@ export function GemPortfolioCard({
             {percent === null ? <GemUnknown /> : formatPercent(percent, 0)}
           </span>
         </div>
+        {/* An unknown figure gets a distinct empty track, not a fill of zero
+            width. `${percent ?? 0}%` drew the two identically, and the shape
+            is what most people read: a meter with nothing in it says the
+            portfolio holds none of the target instrument, which is a measured
+            answer this card does not have. The dashed outline has no fill at
+            all, so it cannot be mistaken for one at 0%. */}
         <div
           role="progressbar"
           aria-label={t("gem.portfolio.exactTarget")}
           aria-valuemin={0}
           aria-valuemax={100}
           {...(percent === null ? {} : { "aria-valuenow": percent })}
-          className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+          className={
+            percent === null
+              ? "h-2 w-full rounded-full border border-dashed border-gray-300 dark:border-gray-600"
+              : "h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+          }
         >
           {/* One neutral fill: the percentage above and the "change required"
               badge below already say whether this is good or bad. */}
-          <div
-            className="h-full rounded-full bg-gray-400 dark:bg-gray-500"
-            style={{ width: `${percent ?? 0}%` }}
-          />
+          {percent !== null && (
+            <div
+              className="h-full rounded-full bg-gray-400 dark:bg-gray-500"
+              style={{ width: `${percent}%` }}
+            />
+          )}
         </div>
       </div>
 
