@@ -176,10 +176,14 @@ export function buildPositionMath(
   } = { securityId: null, composition: EMPTY_COMPOSITION },
 ): GemPositionMath {
   const sized = holdings
-    .filter(
-      (holding) =>
-        Number.isFinite(holding.quantity) &&
-        Math.abs(holding.quantity) >= DUST_QUANTITY,
+    .filter((holding) =>
+      // A cash balance nobody could value is not dust -- it is a balance of
+      // unknown size, and dropping it would let the totals below report the
+      // securities alone as the whole portfolio.
+      holding.isCash && holding.marketValue === null
+        ? true
+        : Number.isFinite(holding.quantity) &&
+          Math.abs(holding.quantity) >= DUST_QUANTITY,
     )
     .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0));
 

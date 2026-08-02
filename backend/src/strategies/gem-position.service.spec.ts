@@ -295,7 +295,7 @@ describe("GemPositionService", () => {
     expect(result.action?.realizedGainLoss).toBeCloseTo(1100, 2);
   });
 
-  it("falls back to the inverse rate, then to parity", async () => {
+  it("falls back to the inverse rate", async () => {
     holdingRows = [
       {
         security_id: "sec-spy",
@@ -310,12 +310,60 @@ describe("GemPositionService", () => {
     exchangeRates.getLatestRate
       .mockResolvedValueOnce(null) // EUR -> USD unknown
       .mockResolvedValueOnce(0.5); // USD -> EUR known
-    let result = await build();
+    const result = await build();
     expect(result.position?.current?.marketValue).toBeCloseTo(2000, 2);
+  });
 
+  /**
+   * The adversarial case for the missing-rate rule
+   * (`docs/financial-calculation-contract.md` sections 3 and 4). This used to
+   * convert at a rate of 1: a 1,000 EUR position was reported as 1,000 USD,
+   * and because the report's figures are sums and ratios over these values,
+   * the total, the transfer value and the tax estimate were all wrong by the
+   * EUR/USD rate while reading as confident numbers.
+   */
+  it("reports an unconvertible holding as unvalued, never at parity", async () => {
+    holdingRows = [
+      {
+        security_id: "sec-spy",
+        symbol: "SPY",
+        name: "S&P 500 ETF",
+        quantity: "10",
+        cost_basis: "800",
+        currency_code: "EUR",
+      },
+    ];
+    priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
     exchangeRates.getLatestRate.mockResolvedValue(null);
-    result = await build();
-    expect(result.position?.current?.marketValue).toBeCloseTo(1000, 2);
+
+    const result = await build();
+
+    expect(result.position?.current?.marketValue).toBeNull();
+    expect(result.position?.totalMarketValue).toBeNull();
+    // Nothing is in the target, so the share held in it is 0% of a denominator
+    // that is itself unknown -- unknown, not "0% of 1,000".
+    expect(result.position?.exactTargetPercent).toBeNull();
+    expect(result.action?.transferValue).toBeNull();
+    expect(result.action?.realizedGainLoss).toBeNull();
+    expect(result.action?.estimatedTax).toBeNull();
+    // The switch is still required: an off-target holding says so without
+    // needing a price.
+    expect(result.action?.required).toBe(true);
+  });
+
+  it("reports an unconvertible cash balance as unvalued, never at parity", async () => {
+    cashRows = [{ current_balance: "5000", currency_code: "PLN" }];
+    exchangeRates.getLatestRate.mockResolvedValue(null);
+
+    const result = await build();
+
+    const cash = result.position?.holdings.find((held) => held.isCash);
+    // Kept, not dropped: an unvalued balance is a balance of unknown size, and
+    // dropping it would report the securities alone as the whole portfolio.
+    expect(cash).toBeDefined();
+    expect(cash?.marketValue).toBeNull();
+    expect(result.position?.totalMarketValue).toBeNull();
+    expect(result.action?.transferValue).toBeNull();
   });
 
   it("returns nothing when the strategy has no accounts", async () => {

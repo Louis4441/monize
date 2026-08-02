@@ -227,29 +227,49 @@ export class GemPositionService {
     return rows[0] ? toComposition(rows[0]) : EMPTY_COMPOSITION;
   }
 
-  /** Convert an amount from a security's currency into the report currency. */
+  /**
+   * Convert an amount from a security's currency into the report currency, or
+   * null when no rate is available in either direction.
+   *
+   * Null rather than a rate of 1. A missing exchange rate is missing data
+   * (`docs/financial-calculation-contract.md` sections 3 and 4), and passing
+   * the foreign amount through unconverted does not degrade gracefully here:
+   * every figure this report prints -- the total, the share held in the target
+   * instrument, what a switch moves, the gain it realizes -- is a ratio or a
+   * sum over these values, so one unconverted holding silently mis-states all
+   * of them. The arithmetic in `gem-position.util` already turns a null value
+   * into a null total, which is what the reader has to see.
+   */
   private async convert(
     amount: number,
     from: string,
     to: string,
-    cache: Map<string, number>,
-  ): Promise<number> {
+    cache: Map<string, number | null>,
+  ): Promise<number | null> {
     if (!from || from === to) return amount;
     const key = `${from}->${to}`;
-    let rate = cache.get(key);
-    if (rate === undefined) {
+    if (!cache.has(key)) {
       const direct = await this.exchangeRateService.getLatestRate(from, to);
       if (direct !== null) {
-        rate = direct;
+        cache.set(key, direct);
       } else {
         const reverse = await this.exchangeRateService.getLatestRate(to, from);
-        // No rate either way: fall back to 1 rather than dropping the holding,
-        // matching how the portfolio views degrade.
-        rate = reverse !== null && reverse !== 0 ? 1 / reverse : 1;
+        cache.set(key, reverse !== null && reverse !== 0 ? 1 / reverse : null);
       }
-      cache.set(key, rate);
     }
-    return amount * rate;
+    const rate = cache.get(key) ?? null;
+    return rate === null ? null : amount * rate;
+  }
+
+  /** `convert` rounded to money, keeping the unknown state. */
+  private async convertMoney(
+    amount: number,
+    from: string,
+    to: string,
+    cache: Map<string, number | null>,
+  ): Promise<number | null> {
+    const converted = await this.convert(amount, from, to, cache);
+    return converted === null ? null : roundMoney(converted);
   }
 
   async build(params: {
@@ -298,7 +318,7 @@ export class GemPositionService {
       ]),
     ]);
 
-    const rateCache = new Map<string, number>();
+    const rateCache = new Map<string, number | null>();
     const valued: GemHolding[] = [];
     for (const holding of aggregated) {
       const role = roleBySecurity.get(holding.securityId) ?? null;
@@ -306,24 +326,20 @@ export class GemPositionService {
       const marketValue =
         price === undefined
           ? null
-          : roundMoney(
-              await this.convert(
-                holding.quantity * price,
-                holding.currencyCode,
-                currencyCode,
-                rateCache,
-              ),
+          : await this.convertMoney(
+              holding.quantity * price,
+              holding.currencyCode,
+              currencyCode,
+              rateCache,
             );
       const costBasis =
         holding.costBasis === null
           ? null
-          : roundMoney(
-              await this.convert(
-                holding.costBasis,
-                holding.currencyCode,
-                currencyCode,
-                rateCache,
-              ),
+          : await this.convertMoney(
+              holding.costBasis,
+              holding.currencyCode,
+              currencyCode,
+              rateCache,
             );
       valued.push({
         role,
@@ -344,32 +360,40 @@ export class GemPositionService {
       userId,
       accounts.map((account) => account.id),
     );
-    const cashValue = sumMoney(
-      await Promise.all(
-        cashRows.map(async (row) =>
-          roundMoney(
-            await this.convert(
-              row.amount,
-              row.currencyCode,
-              currencyCode,
-              rateCache,
-            ),
+    const cashAmounts = await Promise.all(
+      // A zero balance is zero in every currency, so it needs no rate.
+      cashRows
+        .filter((row) => row.amount !== 0)
+        .map((row) =>
+          this.convertMoney(
+            row.amount,
+            row.currencyCode,
+            currencyCode,
+            rateCache,
           ),
         ),
-      ),
     );
-    if (cashValue > 0) {
+    // Cash is always "priced" (contract section 3) -- but a balance in a
+    // currency with no rate to the report currency is still an unknown amount
+    // of the report currency, and summing only the convertible balances would
+    // report a subtotal as the cash position.
+    const cashValue = cashAmounts.some((amount) => amount === null)
+      ? null
+      : sumMoney(cashAmounts as number[]);
+    if (cashValue === null || cashValue > 0) {
       valued.push({
         role: null,
         securityId: null,
         symbol: null,
         name: null,
         // Cash has no unit count; the amount stands in so the dust filter and
-        // the ordering treat it like any other position.
-        quantity: cashValue,
+        // the ordering treat it like any other position. Unknown reads as zero
+        // units here; `buildPositionMath` keeps an unvalued cash row anyway,
+        // because dropping it would hide the very balance it cannot value.
+        quantity: cashValue ?? 0,
         marketValue: cashValue,
-        // Cash is worth what it is worth: selling it realizes nothing, and a
-        // null basis here would make the whole switch's gain unknown.
+        // Cash is worth what it is worth: selling it realizes nothing. Unknown
+        // value means unknown basis -- the two are the same number.
         costBasis: cashValue,
         isCash: true,
       });

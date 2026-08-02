@@ -208,14 +208,26 @@ margin debt, not an asset the switch can move, and is ignored.
 
 - `holdings` is every position in the accounts, largest first, each tagged with
   the role it fills (`role: null` for one that fills none);
-- the "current" instrument is the largest holding -- what the accounts are
-  effectively in;
-- compliance is the share of the accounts' whole market value already in the
-  target's markets;
-- the transfer value is the **full** value of every holding not entirely in
-  those markets, and `action.fromCount` says how many instruments that spans;
+- `exactTargetPercent` is the share of the priced non-cash securities held in
+  the instrument the signal names -- **the strategy's actual instruction**, and
+  what decides `changeRequired`, what is sold, and when the operation is done;
+- `marketExposurePercent` is the estimated share of those securities exposed to
+  the target's *markets*, however it got there -- informational only, null
+  whenever any security cannot be placed, and never mixed with the figure above:
+  a world tracker a fifth in emerging markets gives a fifth of the exposure and
+  none of the compliance;
+- cash sits in neither denominator (see below), but it is off target, so it
+  still makes a change required and still funds the purchase;
+- `action.sellPositions` names every position the switch sells, largest first,
+  and the transfer value is the **full** value of each;
 - the realized result is that value minus its cost basis, and the tax estimate
   applies the configured rate to a gain only (a loss owes nothing).
+
+Both percentages are measured against the priced **non-cash** securities. Cash
+is out of the denominator because "how much of my equity allocation is in the
+right fund" is not a question idle cash belongs at the bottom of: a portfolio
+wholly in the target with a dividend just paid in would otherwise read as less
+than fully invested in a fund it is entirely invested in.
 
 **"Executed" is recorded against the signal; the operation is recomputed from
 the accounts.** The two can therefore disagree, and the report says so instead
@@ -226,7 +238,8 @@ it, so an account that received a deposit after a completed switch read as done
 with nothing to do.
 
 **Partial overlap is a diagnostic, never a fraction of a sale.** A fund 20% in
-the target's markets counts 20% towards compliance, and is still sold whole:
+the target's markets counts 20% towards `marketExposurePercent`, nothing
+towards `exactTargetPercent`, and is still sold whole:
 selling four fifths of it sells four fifths of its on-target sleeve too, so a
 pro-rated sale never reaches the 100% allocation the signal asks for.
 `action.partialMatchCount` says how many of the sold holdings were in that
@@ -255,6 +268,18 @@ unpriceable position into exactly 100% compliant, with `changeRequired` false --
 the report saying there was nothing to do about a position it could not see.
 Unknown says so, and holding an instrument other than the target still settles
 that a change is needed: what to do does not depend on being able to value it.
+
+**A missing exchange rate is missing data, not a rate of 1.** A holding priced
+in a currency with no stored rate to the report currency -- in either direction
+-- has an unknown market value and an unknown cost basis, and the totals above
+go unknown with it. The same holds for a cash balance: it is kept in the
+comparison as a position of unknown size rather than dropped, because dropping
+it would let the securities alone be reported as the whole portfolio. Passing
+the foreign amount through unconverted looked like graceful degradation and was
+not: every figure here is a sum or a ratio over these values, so one
+unconverted holding mis-states the total, the share held in the target, the
+transfer value and the tax at once, and all four still read as confident
+numbers.
 
 Prices come from `security_prices` (whatever provider filled them). Every
 *historical* series -- momentum, the performance chart, the backtest -- reads
