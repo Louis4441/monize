@@ -43,7 +43,23 @@ const accounts = [
   { id: 'a1', name: 'Chequing', accountType: 'CHEQUING' },
 ] as unknown as Account[];
 
-function renderModal(delegate: DelegateSummary = baseDelegate) {
+// What GET /accounts actually returns in own context: the caller's own
+// accounts plus accounts jointly shared *to* them by another owner.
+const accountsWithJoint = [
+  ...accounts,
+  {
+    id: 'j1',
+    name: 'Partner Savings',
+    accountType: 'SAVINGS',
+    isJoint: true,
+    ownerLabel: 'Partner',
+  },
+] as unknown as Account[];
+
+function renderModal(
+  delegate: DelegateSummary = baseDelegate,
+  accountList: Account[] = accounts,
+) {
   const submitRef = { current: null as (() => void) | null };
   const setFormDirty = vi.fn();
   const onSaved = vi.fn();
@@ -51,7 +67,7 @@ function renderModal(delegate: DelegateSummary = baseDelegate) {
   render(
     <DelegateAccessModal
       delegate={delegate}
-      accounts={accounts}
+      accounts={accountList}
       onCancel={onCancel}
       onSaved={onSaved}
       setFormDirty={setFormDirty}
@@ -75,6 +91,61 @@ describe('DelegateAccessModal', () => {
     expect(
       screen.getByRole('switch', { name: /Read access to Chequing/i }),
     ).toBeInTheDocument();
+  });
+
+  it('hides accounts delegated to the caller, joint ones included', () => {
+    renderModal(baseDelegate, accountsWithJoint);
+    // Own account is still offered...
+    expect(
+      screen.getByRole('switch', { name: /Read access to Chequing/i }),
+    ).toBeInTheDocument();
+    // ...but an account another owner shared with the caller is not, in any
+    // form: no row, no group header, no per-column "grant all" for its type.
+    expect(screen.queryByText('Partner Savings')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('switch', { name: /access to Partner Savings/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('switch', { name: /all Savings accounts/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the empty state when every visible account is delegated to the caller', () => {
+    renderModal(baseDelegate, accountsWithJoint.filter((a) => a.isJoint));
+    expect(
+      screen.getByText('No accounts to grant.'),
+    ).toBeInTheDocument();
+  });
+
+  it('never sends a delegated account in the grant payload', async () => {
+    // A grant on j1 cannot exist server-side, but the save is
+    // delete-and-recreate over the account list: were a delegated account to
+    // reach the list it would be re-shared onward on the next unrelated save.
+    renderModal(
+      {
+        ...baseDelegate,
+        grants: [
+          { accountId: 'a1', canRead: true },
+          { accountId: 'j1', canRead: true, isJoint: true },
+        ],
+      },
+      accountsWithJoint,
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('switch', { name: /Create access to Chequing/i }),
+      );
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'));
+    });
+
+    await waitFor(() =>
+      expect(delegationApi.setGrants).toHaveBeenCalledWith('g1', [
+        expect.objectContaining({ accountId: 'a1', canRead: true }),
+      ]),
+    );
   });
 
   it('Save is disabled until something changes', () => {
