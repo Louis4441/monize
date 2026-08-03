@@ -365,8 +365,8 @@ describe("AccountsController", () => {
 
     it("falls back to the owner's scope for a joint account after authorization", async () => {
       const { NotFoundException } = jest.requireActual("@nestjs/common");
-      mockAccountsService.getBalance!
-        .mockRejectedValueOnce(new NotFoundException())
+      mockAccountsService
+        .getBalance!.mockRejectedValueOnce(new NotFoundException())
         .mockResolvedValueOnce({ balance: 42 });
       mockJointAccounts.jointAccessFor.mockResolvedValue({
         ownerUserId: "owner-9",
@@ -1057,9 +1057,9 @@ describe("AccountsController", () => {
       ]);
 
       const active = await controller.findAll(mockReq, false);
-      expect(
-        active.some((a: { id: string }) => a.id === "joint-closed"),
-      ).toBe(false);
+      expect(active.some((a: { id: string }) => a.id === "joint-closed")).toBe(
+        false,
+      );
 
       const all = await controller.findAll(mockReq, true);
       expect(all.some((a: { id: string }) => a.id === "joint-closed")).toBe(

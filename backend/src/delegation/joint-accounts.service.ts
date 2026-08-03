@@ -419,9 +419,7 @@ export class JointAccountsService {
         where: { delegateUserId: realUserId, accountId },
       });
       if (excluded && !existing) {
-        await repo.save(
-          repo.create({ delegateUserId: realUserId, accountId }),
-        );
+        await repo.save(repo.create({ delegateUserId: realUserId, accountId }));
       } else if (!excluded && existing) {
         await repo.delete({ id: existing.id });
       }

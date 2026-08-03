@@ -611,9 +611,9 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
         const rows = await asAppRole(identity(DELEGATE), (m) =>
           m.query("SELECT account_id FROM monthly_account_balances"),
         );
-        expect(
-          rows.map((r: { account_id: string }) => r.account_id),
-        ).toEqual([ownerAccounts[0].id]);
+        expect(rows.map((r: { account_id: string }) => r.account_id)).toEqual([
+          ownerAccounts[0].id,
+        ]);
       });
 
       it("exposes splits and tag links only through the granted account", async () => {

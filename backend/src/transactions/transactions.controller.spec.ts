@@ -9,6 +9,8 @@ describe("TransactionsController", () => {
   let controller: TransactionsController;
   let mockService: Record<string, jest.Mock>;
   let mockJointAccounts: Record<string, jest.Mock>;
+  let mockJointRegister: Record<string, jest.Mock>;
+  let mockCrossOwnerAccess: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   // Valid UUIDs for testing
@@ -51,6 +53,22 @@ describe("TransactionsController", () => {
       jointAccessFor: jest.fn(),
     };
 
+    mockJointRegister = {
+      // Own rows by default, so existing own-context tests take the
+      // ordinary owner-scoped paths untouched.
+      ownsRow: jest.fn().mockResolvedValue(true),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+      markCleared: jest.fn(),
+    };
+
+    mockCrossOwnerAccess = {
+      readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
+      // Own accounts by default, matching mockJointRegister.ownsRow above.
+      isAccountOwnedBy: jest.fn().mockResolvedValue(true),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TransactionsController],
       providers: [
@@ -67,15 +85,18 @@ describe("TransactionsController", () => {
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           provide: require("../delegation/cross-owner-access.service")
             .CrossOwnerAccessService,
-          useValue: {
-            readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
-          },
+          useValue: mockCrossOwnerAccess,
         },
         {
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           provide: require("../delegation/joint-accounts.service")
             .JointAccountsService,
           useValue: mockJointAccounts,
+        },
+        {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("./joint-register.service").JointRegisterService,
+          useValue: mockJointRegister,
         },
       ],
     }).compile();
@@ -93,6 +114,60 @@ describe("TransactionsController", () => {
 
       expect(result).toEqual(expected);
       expect(mockService.create).toHaveBeenCalledWith("user-1", dto);
+    });
+  });
+
+  describe("joint register branching (own context)", () => {
+    it("routes create for a foreign account through the joint path", async () => {
+      mockCrossOwnerAccess.isAccountOwnedBy.mockResolvedValue(false);
+      mockJointRegister.create.mockResolvedValue({ id: "tx-9" });
+      const dto = { accountId: uuid1, amount: -5 } as never;
+
+      const result = await controller.create(
+        { user: { id: "user-1", realUserId: "user-1" } },
+        dto,
+      );
+
+      expect(result).toEqual({ id: "tx-9" });
+      expect(mockJointRegister.create).toHaveBeenCalledWith("user-1", dto);
+      expect(mockService.create).not.toHaveBeenCalled();
+    });
+
+    it("routes update/remove/clear for an unowned row through the joint path", async () => {
+      mockJointRegister.ownsRow.mockResolvedValue(false);
+      const req = { user: { id: "user-1", realUserId: "user-1" } };
+
+      await controller.update(req, "tx-1", { amount: -2 } as never);
+      expect(mockJointRegister.update).toHaveBeenCalledWith("user-1", "tx-1", {
+        amount: -2,
+      });
+      expect(mockService.update).not.toHaveBeenCalled();
+
+      await controller.remove(req, "tx-1");
+      expect(mockJointRegister.remove).toHaveBeenCalledWith("user-1", "tx-1");
+      expect(mockService.remove).not.toHaveBeenCalled();
+
+      await controller.markCleared(req, "tx-1", { isCleared: true } as never);
+      expect(mockJointRegister.markCleared).toHaveBeenCalledWith(
+        "user-1",
+        "tx-1",
+        true,
+      );
+      expect(mockService.markCleared).not.toHaveBeenCalled();
+    });
+
+    it("never consults the joint path while acting", async () => {
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "deleg-1", isActing: true },
+      };
+      mockService.update.mockResolvedValue({ id: "tx-1" });
+
+      await controller.update(actingReq, "tx-1", { amount: -2 } as never);
+
+      expect(mockJointRegister.ownsRow).not.toHaveBeenCalled();
+      expect(mockService.update).toHaveBeenCalledWith("owner-1", "tx-1", {
+        amount: -2,
+      });
     });
   });
 

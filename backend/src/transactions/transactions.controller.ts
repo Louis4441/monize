@@ -36,6 +36,8 @@ import {
 import { DelegateTransferMaskInterceptor } from "../delegation/interceptors/delegate-transfer-mask.interceptor";
 import { DelegationService } from "../delegation/delegation.service";
 import { JointAccountsService } from "../delegation/joint-accounts.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
+import { JointRegisterService } from "./joint-register.service";
 import { TransactionStatus } from "./entities/transaction.entity";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
 import { UpdateTransactionDto } from "./dto/update-transaction.dto";
@@ -165,6 +167,8 @@ export class TransactionsController {
     private readonly transactionsService: TransactionsService,
     private readonly delegationService: DelegationService,
     private readonly jointAccounts: JointAccountsService,
+    private readonly crossOwnerAccess: CrossOwnerAccessService,
+    private readonly jointRegister: JointRegisterService,
   ) {}
 
   @Post()
@@ -175,7 +179,24 @@ export class TransactionsController {
   @AllowDelegate()
   @DelegatedAccountParam("accountId")
   @DelegateRequires("create")
-  create(@Request() req, @Body() createTransactionDto: CreateTransactionDto) {
+  async create(
+    @Request() req,
+    @Body() createTransactionDto: CreateTransactionDto,
+  ) {
+    // Own context targeting an account the caller does not own: the joint
+    // register path (authorizes the joint grant, then writes as the owner).
+    if (
+      !req.user.isActing &&
+      !(await this.crossOwnerAccess.isAccountOwnedBy(
+        createTransactionDto.accountId,
+        req.user.id,
+      ))
+    ) {
+      return this.jointRegister.create(
+        req.user.realUserId ?? req.user.id,
+        createTransactionDto,
+      );
+    }
     return this.transactionsService.create(req.user.id, createTransactionDto);
   }
 
@@ -421,7 +442,8 @@ export class TransactionsController {
     } else {
       // Own context: joint accounts read natively (joint-accounts spec).
       const realUserId = req.user.realUserId ?? req.user.id;
-      const jointSet = await this.jointAccounts.jointAccountIdSetFor(realUserId);
+      const jointSet =
+        await this.jointAccounts.jointAccountIdSetFor(realUserId);
       if (jointSet.size > 0) {
         if (
           effectiveAccountIds?.length === 1 &&
@@ -1247,11 +1269,25 @@ export class TransactionsController {
   @AllowDelegate()
   @DelegatedTransactionParam("id")
   @DelegateRequires("edit")
-  update(
+  async update(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() updateTransactionDto: UpdateTransactionDto,
   ) {
+    // Own context on a row the caller does not own: the joint register path
+    // (authorizes the joint grant, then writes as the owner). An explicit
+    // ownership probe, not a NotFound catch -- the owner-scoped update also
+    // 404s on missing categories/payees, which must not be misrouted.
+    if (
+      !req.user.isActing &&
+      !(await this.jointRegister.ownsRow(req.user.id, id))
+    ) {
+      return this.jointRegister.update(
+        req.user.realUserId ?? req.user.id,
+        id,
+        updateTransactionDto,
+      );
+    }
     return this.transactionsService.update(
       req.user.id,
       id,
@@ -1272,7 +1308,13 @@ export class TransactionsController {
   @AllowDelegate()
   @DelegatedTransactionParam("id")
   @DelegateRequires("delete")
-  remove(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
+  async remove(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
+    if (
+      !req.user.isActing &&
+      !(await this.jointRegister.ownsRow(req.user.id, id))
+    ) {
+      return this.jointRegister.remove(req.user.realUserId ?? req.user.id, id);
+    }
     return this.transactionsService.remove(req.user.id, id);
   }
 
@@ -1285,11 +1327,21 @@ export class TransactionsController {
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 404, description: "Transaction not found" })
-  markCleared(
+  async markCleared(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() markClearedDto: MarkClearedDto,
   ) {
+    if (
+      !req.user.isActing &&
+      !(await this.jointRegister.ownsRow(req.user.id, id))
+    ) {
+      return this.jointRegister.markCleared(
+        req.user.realUserId ?? req.user.id,
+        id,
+        markClearedDto.isCleared,
+      );
+    }
     return this.transactionsService.markCleared(
       req.user.id,
       id,
