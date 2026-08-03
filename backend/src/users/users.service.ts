@@ -39,6 +39,7 @@ import {
   OidcReauthService,
   type OidcReauthPurpose,
 } from "../auth/oidc/oidc-reauth.service";
+import { toUserProfile } from "./user-profile";
 
 @Injectable()
 export class UsersService {
@@ -141,14 +142,7 @@ export class UsersService {
     }
 
     const saved = await this.scoped(User, (repo) => repo.save(user));
-    const {
-      passwordHash,
-      resetToken,
-      resetTokenExpiry,
-      twoFactorSecret,
-      ...rest
-    } = saved;
-    return { ...rest, hasPassword: !!passwordHash };
+    return toUserProfile(saved);
   }
 
   async getPreferences(userId: string): Promise<UserPreference> {
