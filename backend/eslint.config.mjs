@@ -53,6 +53,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/import/mny/mny-staging.service.ts",
   "src/mcp/mcp-http.controller.ts",
   "src/mcp/tools/transactions.tool.ts",
+  // Joint accounts (N1): refreshing a stale joint account's current-month
+  // snapshot runs recalculateAccount under withUserContext(ownerUserId) so
+  // the owner-keyed mab rows are written with the correct identity.
+  "src/net-worth/net-worth.service.ts",
   "src/notifications/bill-reminder.service.ts",
   "src/oauth/oauth-interaction.controller.ts",
   "src/oauth/oauth-provider.service.ts",

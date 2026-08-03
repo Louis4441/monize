@@ -76,7 +76,7 @@ are the grant flags AND-ed with this policy, so the UI and the service can never
 | Joint account, grantee exclusion row present | no |
 | Joint account with owner's `exclude_from_net_worth = true` | yes -- the owner flag governs the owner's view only |
 | Plain (non-joint) granted account | no -- never natively aggregated |
-| Joint account whose currency has no FX rate to the grantee's default | the affected total is `null`, never a partial sum ("a subtotal is not a total") |
+| Joint account whose currency has no FX rate to the grantee's default | identical to an own account in that currency: the existing net-worth conversion (`convertWithRateLookup` with its documented raw-amount fallback) applies unchanged. Joint rows introduce no new missing-data path, and changing the shared fallback would alter same-owner behavior, which the governing invariant forbids |
 
 Owner's net worth is unchanged in every case. `monthly_account_balances` rows for a joint account
 are owner-maintained; when a grantee read finds the current month missing or stale the service
