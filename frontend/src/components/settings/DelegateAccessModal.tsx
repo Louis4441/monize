@@ -16,6 +16,7 @@ import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Button } from '@/components/ui/Button';
+import { Tabs } from '@/components/ui/Tabs';
 
 const logger = createLogger('DelegateAccessModal');
 
@@ -332,27 +333,17 @@ export function DelegateAccessModal({
         </p>
       </div>
 
-      <div
-        role="tablist"
-        className="flex gap-1 border-b border-gray-200 dark:border-gray-700 px-2"
-      >
-        {tabs.map((tabItem) => (
-          <button
-            key={tabItem.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === tabItem.key}
-            onClick={() => setTab(tabItem.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              tab === tabItem.key
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-            }`}
-          >
-            {tabItem.label}
-          </button>
-        ))}
-      </div>
+      {/* The shared tab bar, which this markup was the model for -- keeping a
+          second copy of it meant keeping a copy without the roving tabindex or
+          the arrow keys. */}
+      <Tabs
+        tabs={tabs}
+        value={tab}
+        onChange={setTab}
+        idPrefix="delegate-access"
+        ariaLabel={t('title')}
+        className="px-2"
+      />
 
       <div className="overflow-y-auto px-4 py-3 h-[65vh]">
         {tab === 'sections' && (
