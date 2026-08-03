@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { sumConverted, type ConvertedTotal } from '@/lib/currency-total';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Account, AccountType } from '@/types/account';
@@ -102,10 +104,18 @@ interface AccountListProps {
    */
   unpricedHoldingCounts?: Map<string, number>;
   defaultCurrency: string;
-  convertToDefault: (value: number, fromCurrency: string) => number;
+  /** Returns `null` when no rate for the pair is known. */
+  convertToDefault: (value: number, fromCurrency: string) => number | null;
   onEdit: (account: Account) => void;
   onRefresh: () => void;
 }
+
+/** A group with nothing in it: complete, and zero. */
+const EMPTY_CONVERTED_TOTAL: ConvertedTotal = {
+  value: 0,
+  missingCurrencies: [],
+  excludedCount: 0,
+};
 
 export function AccountList({ accounts, institutions, brokerageMarketValues, unpricedHoldingCounts, defaultCurrency, convertToDefault, onEdit, onRefresh }: AccountListProps) {
   const t = useTranslations('accounts');
@@ -406,25 +416,34 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
   // threaded through the summary cards above the list to mean anything -- a
   // known gap recorded in the plan, not something this row total invents.
   const groupTotals = useMemo(() => {
-    const totals = new Map<AccountType, number>();
+    // A group total is partial when one of its accounts has no rate to the
+    // display currency; `sumConverted` keeps the subtotal and the missing pairs
+    // together so the header can mark it instead of quietly under-reporting.
+    const totals = new Map<AccountType, ConvertedTotal>();
     for (const { type, accounts: groupAccounts } of groupedAccounts) {
-      let totalUnits = 0;
-      for (const logical of groupAccounts) {
-        const members = logical.cash
-          ? [logical.primary, logical.cash]
-          : [logical.primary];
-        for (const account of members) {
-          const rawBalance =
+      // Sum over each entity's underlying ledgers (a brokerage pair is primary
+      // plus its cash sub-account) so the arithmetic is exactly what it was
+      // when the pair was two rows. An unpriced holding is already excluded
+      // from the brokerage market value -- that gap is surfaced by the row's
+      // unpriced count, not by nulling the group total. A missing exchange
+      // rate, by contrast, makes the total a subtotal, which `sumConverted`
+      // records so the header can mark it.
+      const members = groupAccounts.flatMap((logical) =>
+        logical.cash ? [logical.primary, logical.cash] : [logical.primary],
+      );
+      totals.set(
+        type,
+        sumConverted(
+          members,
+          (account) =>
             account.accountSubType === 'INVESTMENT_BROKERAGE'
               ? brokerageMarketValues?.get(account.id) ?? 0
               : (Number(account.currentBalance) || 0) +
-                (Number(account.futureTransactionsSum) || 0);
-          const converted = convertToDefault(rawBalance, account.currencyCode);
-          // Accumulate in 1/10000 units to avoid floating-point drift.
-          totalUnits += Math.round(converted * 10000);
-        }
-      }
-      totals.set(type, totalUnits / 10000);
+                (Number(account.futureTransactionsSum) || 0),
+          (account) => account.currencyCode,
+          convertToDefault,
+        ),
+      );
     }
     return totals;
   }, [groupedAccounts, brokerageMarketValues, convertToDefault]);
@@ -433,7 +452,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
   // indices so AccountRow alternation continues to look right across groups.
   const renderItems = useMemo(() => {
     type Item =
-      | { kind: 'header'; type: AccountType; count: number; total: number; isCollapsed: boolean }
+      | { kind: 'header'; type: AccountType; count: number; total: ConvertedTotal; isCollapsed: boolean }
       | { kind: 'row'; logical: LogicalAccount; index: number };
     const items: Item[] = [];
     let rowIndex = 0;
@@ -445,7 +464,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
         // One entry per account the user has -- a pair counts once, which is
         // what `countLogicalAccounts` counted when these were two rows.
         count: groupAccounts.length,
-        total: groupTotals.get(type) ?? 0,
+        total: groupTotals.get(type) ?? EMPTY_CONVERTED_TOTAL,
         isCollapsed,
       });
       if (!isCollapsed) {
@@ -872,12 +891,14 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
                   <td className={`${cellPadding} text-right whitespace-nowrap`}>
                     <span
                       className={`text-sm font-medium ${
-                        item.total >= 0
+                        item.total.value >= 0
                           ? 'text-gray-700 dark:text-gray-200'
                           : 'text-red-600 dark:text-red-400'
                       }`}
                     >
-                      {formatCurrencyBase(item.total, defaultCurrency)}
+                      <PartialTotal total={item.total} displayCurrency={defaultCurrency}>
+                        {formatCurrencyBase(item.total.value, defaultCurrency)}
+                      </PartialTotal>
                     </span>
                   </td>
                   <td

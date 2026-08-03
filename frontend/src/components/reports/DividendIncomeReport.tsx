@@ -320,7 +320,7 @@ export function DividendIncomeReport() {
   const displayCurrency = selectedAccount?.currencyCode || defaultCurrency;
   const isForeign = displayCurrency !== defaultCurrency;
 
-  const getTxAmount = useCallback((tx: InvestmentTransaction): number => {
+  const getTxAmount = useCallback((tx: InvestmentTransaction): number | null => {
     const amount = Math.abs(tx.totalAmount);
     if (isSingleAccount) {
       // Single account selected: native currency, no conversion needed
@@ -721,15 +721,18 @@ export function DividendIncomeReport() {
   }, [securityData, securitySort.sortField, securitySort.sortDirection]);
 
   const totals = useMemo(() => {
+    // A headline figure goes unknown (null), not silently short, when any of its
+    // components could not be converted -- one missing rate makes the whole
+    // figure unknown, the same rule the monthly and daily buckets follow.
     const dividends = filteredTransactions
       .filter((t) => t.action === 'DIVIDEND')
-      .reduce((sum, t) => sum + getTxAmount(t), 0);
+      .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const interest = filteredTransactions
       .filter((t) => t.action === 'INTEREST')
-      .reduce((sum, t) => sum + getTxAmount(t), 0);
+      .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const manualCapitalGains = filteredTransactions
       .filter((t) => t.action === 'CAPITAL_GAIN')
-      .reduce((sum, t) => sum + getTxAmount(t), 0);
+      .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const periodCapitalGains = filteredCapitalGains.reduce<number | null>(
       (sum, entry) => addOrUnknown(sum, convertCapitalGain(entry)),
       0,
@@ -739,7 +742,7 @@ export function DividendIncomeReport() {
       dividends,
       interest,
       capitalGains: totalGains,
-      total: addOrUnknown(dividends + interest, totalGains),
+      total: addOrUnknown(addOrUnknown(dividends, interest), totalGains),
     };
   }, [filteredTransactions, filteredCapitalGains, getTxAmount, convertCapitalGain]);
 

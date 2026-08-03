@@ -13,6 +13,8 @@ import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { PortfolioSummary } from '@/types/investment';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { sumConverted } from '@/lib/currency-total';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useReportData } from '@/hooks/useReportData';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
@@ -139,11 +141,19 @@ export function AccountBalancesReport() {
     let assets = 0;
     let liabilities = 0;
 
+    // An account with no rate to the display currency is excluded and its
+    // currency named, so the headline figures are marked as subtotals rather
+    // than under-reporting silently.
+    const missing = new Set<string>();
     filteredAccounts.forEach((acc) => {
       const rawBalance = acc.accountSubType === 'INVESTMENT_BROKERAGE'
         ? (brokerageMarketValues.get(acc.id) ?? 0)
         : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0);
       const convertedBalance = convertToDefault(rawBalance, acc.currencyCode);
+      if (convertedBalance === null) {
+        missing.add(acc.currencyCode);
+        return;
+      }
 
       if (LIABILITY_TYPES.includes(acc.accountType)) {
         liabilities += Math.abs(convertedBalance);
@@ -152,7 +162,12 @@ export function AccountBalancesReport() {
       }
     });
 
-    return { assets, liabilities, netWorth: assets - liabilities };
+    return {
+      assets,
+      liabilities,
+      netWorth: assets - liabilities,
+      missingCurrencies: [...missing],
+    };
   }, [filteredAccounts, brokerageMarketValues, convertToDefault]);
 
   // Build chart data
@@ -163,12 +178,10 @@ export function AccountBalancesReport() {
       groupedAccounts.forEach((entries, type) => {
         const total = entries.reduce((sum, entry) => {
           if (entry.combinedValue === null) return sum;
-          return (
-            sum +
-            Math.abs(
-              convertToDefault(entry.combinedValue, entry.primary.currencyCode),
-            )
-          );
+          const converted = convertToDefault(entry.combinedValue, entry.primary.currencyCode);
+          // No rate, no slice: a bar sized from the unconverted amount would be
+          // in the wrong currency, and a zero-size one reads as a measured zero.
+          return converted === null ? sum : sum + Math.abs(converted);
         }, 0);
         if (total > 0) {
           data.push({
@@ -184,9 +197,9 @@ export function AccountBalancesReport() {
       const data: Array<{ name: string; value: number; color: string }> = [];
       logicalAccounts.forEach((entry, idx) => {
         if (entry.combinedValue === null) return;
-        const converted = Math.abs(
-          convertToDefault(entry.combinedValue, entry.primary.currencyCode),
-        );
+        const rawConverted = convertToDefault(entry.combinedValue, entry.primary.currencyCode);
+        if (rawConverted === null) return;
+        const converted = Math.abs(rawConverted);
         if (converted > 0) {
           data.push({
             name: entry.displayName,
@@ -435,19 +448,24 @@ export function AccountBalancesReport() {
         <>
           {Array.from(groupedAccounts.entries()).map(([type, entries]) => {
             const isLiabilityGroup = LIABILITY_TYPES.includes(type);
-            // Summed over the underlying ledgers, so the arithmetic is what it
-            // was when the pair was two rows. Deliberately not combinedValue,
-            // which goes null on an unpriced holding: a nullable group total
-            // has to be threaded through the summary cards to mean anything.
-            const groupTotal = entries.reduce((sum, entry) => {
-              const members = entry.cash ? [entry.primary, entry.cash] : [entry.primary];
-              return sum + members.reduce((memberSum, acc) => {
-                const rawBalance = acc.accountSubType === 'INVESTMENT_BROKERAGE'
+            // Group subtotal, summed over each entity's underlying ledgers (a
+            // brokerage pair is primary plus its cash sub-account) so the
+            // arithmetic is what it was when the pair was two rows. An account
+            // with no rate is left out and the header marks the figure partial;
+            // an unpriced holding is already excluded from the brokerage market
+            // value, so that gap is surfaced by the row, not by this total.
+            const members = entries.flatMap((entry) =>
+              entry.cash ? [entry.primary, entry.cash] : [entry.primary],
+            );
+            const groupTotal = sumConverted(
+              members,
+              (acc) =>
+                acc.accountSubType === 'INVESTMENT_BROKERAGE'
                   ? (brokerageMarketValues.get(acc.id) ?? 0)
-                  : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0);
-                return memberSum + convertToDefault(rawBalance, acc.currencyCode);
-              }, 0);
-            }, 0);
+                  : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0),
+              (acc) => acc.currencyCode,
+              convertToDefault,
+            );
 
             return (
               <div key={type} className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
@@ -458,7 +476,11 @@ export function AccountBalancesReport() {
                   <span className={`font-semibold ${
                     isLiabilityGroup ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                   }`}>
-                    {formatCurrency(isLiabilityGroup ? Math.abs(groupTotal) : groupTotal)}
+                    <PartialTotal total={groupTotal} displayCurrency={defaultCurrency}>
+                      {formatCurrency(
+                        isLiabilityGroup ? Math.abs(groupTotal.value) : groupTotal.value,
+                      )}
+                    </PartialTotal>
                   </span>
                 </div>
                 <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -521,11 +543,21 @@ export function AccountBalancesReport() {
                               }`}>
                                 {formatCurrency(isLiabilityGroup ? Math.abs(combined) : combined, acc.currencyCode)}
                               </div>
-                              {acc.currencyCode !== defaultCurrency && (
-                                <div className="text-xs text-gray-400 dark:text-gray-500">
-                                  {'\u2248 '}{formatCurrency(convertToDefault(Math.abs(combined), acc.currencyCode), defaultCurrency)}
-                                </div>
-                              )}
+                              {acc.currencyCode !== defaultCurrency &&
+                                (() => {
+                                  // Nothing rather than the unconverted amount under
+                                  // the display currency's symbol.
+                                  const approx = convertToDefault(
+                                    Math.abs(combined),
+                                    acc.currencyCode,
+                                  );
+                                  if (approx === null) return null;
+                                  return (
+                                    <div className="text-xs text-gray-400 dark:text-gray-500">
+                                      {'\u2248 '}{formatCurrency(approx, defaultCurrency)}
+                                    </div>
+                                  );
+                                })()}
                             </>
                           )}
                         </div>
