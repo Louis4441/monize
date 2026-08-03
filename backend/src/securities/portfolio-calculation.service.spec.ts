@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   CategorisedAccounts,
   PortfolioCalculationService,
@@ -11,6 +13,7 @@ import {
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { HoldingWithMarketValue } from "./portfolio.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { applyActionToQuantity } from "./investment-replay.util";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -2876,5 +2879,27 @@ describe("PortfolioCalculationService.calculateTWR", () => {
     const twr = await runTwr("EUR", null);
 
     expect(twr).toBeNull();
+  });
+
+  // The sub-period walk listed SPLIT under "no quantity change", so from the
+  // split forward it valued the pre-split share count: a 2-for-1 on a 100-share
+  // position kept reporting 100 shares, halving the position's contribution to
+  // every sub-period value after it. The other holdings replays multiplied.
+  // Upstream folds every other walk through `applyActionToQuantity`; the guard
+  // in `investment-replay.guard.spec.ts` only catches a hand-rolled SPLIT
+  // *case*, and this walk omitted SPLIT via a comment, so it needs its own pin.
+  it("folds a split through the shared reducer in the sub-period walk", () => {
+    expect(applyActionToQuantity(100, InvestmentAction.SPLIT, 2)).toBe(200);
+
+    const source = readFileSync(
+      join(__dirname, "portfolio-calculation.service.ts"),
+      "utf8",
+    );
+    const walk = source.slice(source.indexOf("async calculateTWR("));
+    expect(walk).toContain("applyActionToQuantity(current, tx.action, qty)");
+    // ...and no longer decides for itself.
+    expect(walk).not.toContain(
+      "DIVIDEND, INTEREST, CAPITAL_GAIN, SPLIT: no quantity change",
+    );
   });
 });
