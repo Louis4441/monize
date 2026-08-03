@@ -591,7 +591,11 @@ export class DelegationService {
           canResetPassword: await this.canOwnerResetDelegatePassword(
             d.delegateUserId,
           ),
+          // Gates the Joint toggle client-side; setGrants re-checks.
+          isFullAccount: await this.isFullAccount(d.delegateUserId),
         },
+        // isJoint must round-trip: setGrants is delete-and-recreate, so a
+        // client saving a matrix without it would silently clear the flag.
         grants: (d.grants ?? [])
           .filter((g) => g.canRead)
           .map((g) => ({
@@ -600,6 +604,7 @@ export class DelegationService {
             canCreate: g.canCreate,
             canEdit: g.canEdit,
             canDelete: g.canDelete,
+            isJoint: g.isJoint,
           })),
         capabilities: this.toCapabilitySet(d),
         sections: this.toSectionSet(d),
@@ -1094,6 +1099,28 @@ export class DelegationService {
           ),
         );
       }
+      if (!g.canRead && g.isJoint) {
+        throw new BadRequestException(
+          tr(
+            "errors.delegation.jointRequiresRead",
+            "READ access is required to mark an account as joint",
+          ),
+        );
+      }
+    }
+
+    // Joint visibility is only offered to delegates who are full Monize
+    // accounts -- never an owner-provisioned credential identity.
+    if (
+      grants.some((g) => g.canRead && g.isJoint) &&
+      !(await this.isFullAccount(delegation.delegateUserId))
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.delegation.jointRequiresFullAccount",
+          "Joint accounts can only be shared with users who have their own Monize account",
+        ),
+      );
     }
 
     // Only grants that include READ represent actual access.
@@ -1128,6 +1155,7 @@ export class DelegationService {
             canCreate: !!g.canCreate,
             canEdit: !!g.canEdit,
             canDelete: !!g.canDelete,
+            isJoint: !!g.isJoint,
           }),
         );
         await manager.save(rows);

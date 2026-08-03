@@ -358,7 +358,64 @@ describe("DelegationService", () => {
         canCreate: true,
         canEdit: false,
         canDelete: true,
+        isJoint: false,
       });
+    });
+
+    it("rejects a joint flag without READ", async () => {
+      delegatesRepo.findOne.mockResolvedValue({ id: "g1", ownerUserId: "o1" });
+      await expect(
+        service.setGrants("o1", "g1", [
+          { accountId: "a1", canRead: false, isJoint: true },
+        ]),
+      ).rejects.toThrow(/READ access is required to mark an account as joint/);
+    });
+
+    it("rejects a joint flag for a delegate who is not a full account", async () => {
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        ownerUserId: "o1",
+        delegateUserId: "d1",
+      });
+      // isFullAccount(d1): no accounts, no delegations of their own, not admin.
+      accountsRepo.count = jest.fn().mockResolvedValue(0);
+      delegatesRepo.count = jest.fn().mockResolvedValue(0);
+      usersRepo.findOne.mockResolvedValue({ id: "d1", role: "user" });
+
+      await expect(
+        service.setGrants("o1", "g1", [
+          { accountId: "a1", canRead: true, isJoint: true },
+        ]),
+      ).rejects.toThrow(/their own Monize account/);
+    });
+
+    it("persists isJoint for a full-account delegate", async () => {
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        ownerUserId: "o1",
+        delegateUserId: "d1",
+      });
+      accountsRepo.count = jest.fn().mockResolvedValue(2); // owns accounts
+      delegatesRepo.count = jest.fn().mockResolvedValue(0);
+      usersRepo.findOne.mockResolvedValue({ id: "d1", role: "user" });
+      accountsRepo.find.mockResolvedValue([{ id: "a1" }, { id: "a2" }]);
+      const saved: any[] = [];
+      const manager = {
+        delete: jest.fn(),
+        create: jest.fn((_e, v) => v),
+        save: jest.fn((rows) => saved.push(...rows)),
+      };
+      installTransactionMock(manager);
+
+      await service.setGrants("o1", "g1", [
+        { accountId: "a1", canRead: true, canCreate: true, isJoint: true },
+        { accountId: "a2", canRead: true },
+      ]);
+
+      expect(saved.map((r) => [r.accountId, r.isJoint])).toEqual([
+        ["a1", true],
+        ["a2", false],
+      ]);
     });
   });
 
@@ -598,6 +655,7 @@ describe("DelegationService", () => {
           lastName: null,
           hasPassword: true,
           canResetPassword: true,
+          isFullAccount: false,
         },
         grants: [
           {
@@ -644,6 +702,26 @@ describe("DelegationService", () => {
         reports: true,
         ai: false,
       });
+    });
+
+    it("returns isJoint on every grant so a resave cannot silently clear it", async () => {
+      // setGrants is delete-and-recreate: if this listing dropped isJoint,
+      // the modal's next unchanged save would wipe every joint flag.
+      delegatesRepo.find.mockResolvedValue([
+        {
+          id: "g1",
+          status: "active",
+          createdAt: new Date("2026-01-01"),
+          delegateUserId: "d1",
+          delegate: { email: "d@e.f", passwordHash: "h" },
+          grants: [
+            { accountId: "a1", canRead: true, isJoint: true },
+            { accountId: "a2", canRead: true, isJoint: false },
+          ],
+        },
+      ]);
+      const res = await service.listDelegates("o1");
+      expect(res[0].grants.map((g) => g.isJoint)).toEqual([true, false]);
     });
   });
 
