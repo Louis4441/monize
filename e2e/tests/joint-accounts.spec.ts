@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures';
+import { loginUser } from '../helpers/auth';
 import { gotoStable } from '../helpers/nav';
 import {
   createApiClient,
@@ -68,7 +69,17 @@ test.describe('Joint accounts', () => {
       expect(jointRow?.jointPermissions?.canDelete).toBe(false);
 
       // And the account page shows it with the Joint badge, natively.
+      //
+      // The page needs a UI login, not the API-only one above: the auth store
+      // persists `isAuthenticated` to localStorage, so a context authenticated
+      // by cookies alone still fails ProtectedRoute's check and bounces to
+      // /login. Logging in here (rather than at the top) also keeps the
+      // grantee a full account by the time the delegation banner reads its
+      // contexts -- with no account of their own they would have exactly one
+      // context and be auto-switched into the owner's, which is the opposite
+      // of what this test is about.
       const granteePage = await granteeContext.newPage();
+      await loginUser(granteePage, email, password);
       await gotoStable(granteePage, '/accounts');
       const row = granteePage.locator('tr', { hasText: jointName });
       await expect(row).toBeVisible({ timeout: 15000 });
