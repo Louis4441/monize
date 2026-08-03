@@ -17,6 +17,7 @@ describe("AccountDelegateGuard", () => {
   let reflector: Record<string, jest.Mock>;
   let jwtService: Record<string, jest.Mock>;
   let delegationService: Record<string, jest.Mock>;
+  let crossOwnerAccess: Record<string, jest.Mock>;
 
   const makeContext = (req: any) =>
     ({
@@ -37,10 +38,14 @@ describe("AccountDelegateGuard", () => {
       hasCapability: jest.fn(),
       hasSection: jest.fn(),
     };
+    crossOwnerAccess = {
+      isAccountOwnedBy: jest.fn().mockResolvedValue(false),
+    };
     guard = new AccountDelegateGuard(
       reflector as any,
       jwtService as any,
       delegationService as any,
+      crossOwnerAccess as any,
     );
   });
 
@@ -541,6 +546,182 @@ describe("AccountDelegateGuard", () => {
       "acc-1",
       "create",
     );
+  });
+
+  describe("cross-owner relaxation (own-account bypass)", () => {
+    const delegateSub = "d1111111-1111-4111-8111-111111111111";
+
+    const actingToken = () => {
+      jwtService.verify.mockReturnValue({
+        sub: delegateSub,
+        actingAsUserId: "01111111-1111-4111-8111-111111111111",
+        delegationId: "g1",
+      });
+    };
+
+    it("passes a transfer-body account owned by the real user without a grant row", async () => {
+      actingToken();
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_TRANSFER_BODY_KEY)
+          return ["fromAccountId", "toAccountId"];
+        if (key === DELEGATE_OPERATION_KEY) return "create";
+        return undefined;
+      });
+      // from-acc is the owner's (grant present); own-acc belongs to the
+      // delegate personally (no grant row exists, ownership bypasses).
+      crossOwnerAccess.isAccountOwnedBy.mockImplementation(
+        async (accId: string) => accId === "own-acc",
+      );
+      delegationService.hasAccountPermission.mockImplementation(
+        async (_g: string, accId: string) => accId === "from-acc",
+      );
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: { fromAccountId: "from-acc", toAccountId: "own-acc" },
+      });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(crossOwnerAccess.isAccountOwnedBy).toHaveBeenCalledWith(
+        "own-acc",
+        delegateSub,
+      );
+      // The owned account never reaches the grant check.
+      expect(delegationService.hasAccountPermission).not.toHaveBeenCalledWith(
+        "g1",
+        "own-acc",
+        "create",
+      );
+    });
+
+    it("passes a transfer-param leg owned by the real user without a grant row", async () => {
+      actingToken();
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_TRANSFER_PARAM_KEY) return "id";
+        if (key === DELEGATE_OPERATION_KEY) return "edit";
+        return undefined;
+      });
+      delegationService.accountIdsForTransfer.mockResolvedValue([
+        "owner-acc",
+        "own-acc",
+      ]);
+      crossOwnerAccess.isAccountOwnedBy.mockImplementation(
+        async (accId: string) => accId === "own-acc",
+      );
+      delegationService.hasAccountPermission.mockImplementation(
+        async (_g: string, accId: string) => accId === "owner-acc",
+      );
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        params: { id: "tx-1" },
+      });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it("passes a scheduled-write leg owned by the real user without a grant row", async () => {
+      actingToken();
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_SCHEDULED_PARAM_KEY) return "id";
+        if (key === DELEGATE_OPERATION_KEY) return "edit";
+        return undefined;
+      });
+      delegationService.accountIdsForScheduled.mockResolvedValue([
+        "owner-acc",
+        "own-acc",
+      ]);
+      crossOwnerAccess.isAccountOwnedBy.mockImplementation(
+        async (accId: string) => accId === "own-acc",
+      );
+      delegationService.hasAccountPermission.mockImplementation(
+        async (_g: string, accId: string) => accId === "owner-acc",
+      );
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        params: { id: "s-1" },
+      });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it("scheduled READ keeps the strict check (no ownership probe)", async () => {
+      actingToken();
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_SCHEDULED_PARAM_KEY) return "id";
+        return undefined;
+      });
+      delegationService.accountIdsForScheduled.mockResolvedValue(["a1", "a2"]);
+      delegationService.hasAccountPermission.mockResolvedValue(true);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        params: { id: "s-1" },
+      });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(crossOwnerAccess.isAccountOwnedBy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT relax @DelegatedAccountParam for the delegate's own account", async () => {
+      actingToken();
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_ACCOUNT_PARAM_KEY) return "accountId";
+        if (key === DELEGATE_OPERATION_KEY) return "create";
+        return undefined;
+      });
+      crossOwnerAccess.isAccountOwnedBy.mockResolvedValue(true);
+      delegationService.hasAccountPermission.mockResolvedValue(false);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: { accountId: "own-acc" },
+      });
+      await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(crossOwnerAccess.isAccountOwnedBy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT relax @DelegatedTransactionParam for the delegate's own account", async () => {
+      actingToken();
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_TRANSACTION_PARAM_KEY) return "id";
+        if (key === DELEGATE_OPERATION_KEY) return "edit";
+        return undefined;
+      });
+      delegationService.accountIdForTransaction.mockResolvedValue("own-acc");
+      crossOwnerAccess.isAccountOwnedBy.mockResolvedValue(true);
+      delegationService.hasAccountPermission.mockResolvedValue(false);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        params: { id: "tx-1" },
+      });
+      await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(crossOwnerAccess.isAccountOwnedBy).not.toHaveBeenCalled();
+    });
+
+    it("still denies a transfer account that is neither owned nor granted", async () => {
+      actingToken();
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_TRANSFER_BODY_KEY)
+          return ["fromAccountId", "toAccountId"];
+        if (key === DELEGATE_OPERATION_KEY) return "create";
+        return undefined;
+      });
+      crossOwnerAccess.isAccountOwnedBy.mockResolvedValue(false);
+      delegationService.hasAccountPermission.mockImplementation(
+        async (_g: string, accId: string) => accId === "from-acc",
+      );
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: { fromAccountId: "from-acc", toAccountId: "third-party" },
+      });
+      await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
   });
 
   it("skips the grant check when the account id is absent", async () => {

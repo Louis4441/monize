@@ -383,6 +383,12 @@
       "transaction": "Transaction"
     },
     "transferAmountNote": "Amount must be positive for transfers",
+    "transferCandidates": {
+      "sharedWithYou": "Shared with you",
+      "yourAccounts": "Your accounts",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "The other side of this transfer is in an account that's no longer shared with you. Its amount, date, and accounts are locked, but you can still edit this transaction's own details.",
     "transferCategoryNote": "Optional. The transfer still won't count as income or expense, but this category lets it appear in the monthly category breakdown (e.g. monthly investment contributions).",
     "amountReceivedNote": "Amount received after currency conversion",
     "splitTransaction": "Split Transaction",

@@ -383,6 +383,12 @@
       "transaction": "Transaksi"
     },
     "transferAmountNote": "Jumlah harus positif untuk transfer",
+    "transferCandidates": {
+      "sharedWithYou": "Dibagikan dengan Anda",
+      "yourAccounts": "Akun Anda",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "Sisi lain dari transfer ini berada di akun yang tidak lagi dibagikan dengan Anda. Jumlah, tanggal, dan akunnya terkunci, tetapi Anda masih dapat mengedit detail transaksi ini.",
     "amountReceivedNote": "Jumlah diterima setelah konversi mata uang",
     "splitTransaction": "Transaksi Terbagi",
     "splitDisabledDuringTour": "Tidak tersedia selama tur berpandu",

@@ -383,6 +383,12 @@
       "transaction": "交易"
     },
     "transferAmountNote": "轉帳金額必須為正數",
+    "transferCandidates": {
+      "sharedWithYou": "與您分享",
+      "yourAccounts": "您的科目",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "此轉帳的另一方位於不再與您分享的科目中。其金額、日期和科目已鎖定，但您仍可以編輯此交易本身的詳細資訊。",
     "amountReceivedNote": "貨幣換算後的收到金額",
     "splitTransaction": "分割交易",
     "splitDisabledDuringTour": "導覽引導期間無法使用",

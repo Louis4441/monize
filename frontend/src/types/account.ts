@@ -168,6 +168,24 @@ export interface AccountSummary {
   netWorth: number;
 }
 
+/**
+ * An account the real user can use as the other side of a cross-owner
+ * transfer: own context lists accounts shared to them (with per-op grant
+ * flags), acting context lists their own accounts. Carries no balances.
+ */
+export interface TransferCandidate {
+  id: string;
+  name: string;
+  currencyCode: string;
+  accountType: AccountType;
+  accountSubType: AccountSubType | null;
+  isClosed: boolean;
+  ownerLabel: string;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+}
+
 // Loan amortization types
 export interface LoanPreviewData {
   loanAmount: number;

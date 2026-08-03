@@ -4,6 +4,7 @@ import {
   CreateAccountData,
   UpdateAccountData,
   AccountSummary,
+  TransferCandidate,
   InvestmentAccountPair,
   LoanPreviewData,
   AmortizationPreview,
@@ -50,6 +51,15 @@ export const accountsApi = {
       },
       120_000, // 2 min
     );
+  },
+
+  // Accounts the real user can use as the other side of a cross-owner
+  // transfer (own context: shared to them; acting: their own accounts).
+  getTransferCandidates: async (): Promise<TransferCandidate[]> => {
+    const response = await apiClient.get<TransferCandidate[]>(
+      '/accounts/transfer-candidates',
+    );
+    return response.data;
   },
 
   // Get account by ID

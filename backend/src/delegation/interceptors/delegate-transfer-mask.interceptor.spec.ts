@@ -3,7 +3,7 @@ import { DelegateTransferMaskInterceptor } from "./delegate-transfer-mask.interc
 
 describe("DelegateTransferMaskInterceptor", () => {
   let interceptor: DelegateTransferMaskInterceptor;
-  let delegationService: Record<string, jest.Mock>;
+  let crossOwnerAccess: Record<string, jest.Mock>;
 
   const ctxFor = (user: any) =>
     ({
@@ -12,22 +12,100 @@ describe("DelegateTransferMaskInterceptor", () => {
     }) as any;
   const handlerOf = (body: unknown) => ({ handle: () => of(body) }) as any;
 
+  const actingUser = {
+    id: "owner-1",
+    realUserId: "delegate-1",
+    isActing: true,
+    delegationId: "g1",
+  };
+  const normalUser = { id: "user-1", realUserId: "user-1", isActing: false };
+
   beforeEach(() => {
-    delegationService = { readableAccountIds: jest.fn() };
-    interceptor = new DelegateTransferMaskInterceptor(delegationService as any);
+    crossOwnerAccess = { readableAccountIdSetFor: jest.fn() };
+    interceptor = new DelegateTransferMaskInterceptor(crossOwnerAccess as any);
   });
 
-  it("passes through for a non-delegate request", async () => {
-    const body = [{ id: "t1", isTransfer: true }];
+  it("fast path: a non-acting user with no cross-owner rows never hits the grants query", async () => {
+    const body = {
+      data: [
+        { id: "t1", isTransfer: false },
+        {
+          id: "t2",
+          userId: "user-1",
+          isTransfer: true,
+          linkedTransaction: { userId: "user-1", accountId: "a2" },
+        },
+      ],
+    };
     const out = await lastValueFrom(
-      interceptor.intercept(ctxFor({ isActing: false }), handlerOf(body)),
+      interceptor.intercept(ctxFor(normalUser), handlerOf(body)),
     );
     expect(out).toBe(body);
-    expect(delegationService.readableAccountIds).not.toHaveBeenCalled();
+    expect(crossOwnerAccess.readableAccountIdSetFor).not.toHaveBeenCalled();
   });
 
-  it("masks a transfer counterpart the delegate cannot READ", async () => {
-    delegationService.readableAccountIds.mockResolvedValue(["a1"]);
+  it("passes through for an unauthenticated request", async () => {
+    const body = [{ id: "t1", isTransfer: true }];
+    const out = await lastValueFrom(
+      interceptor.intercept(ctxFor(undefined), handlerOf(body)),
+    );
+    expect(out).toBe(body);
+    expect(crossOwnerAccess.readableAccountIdSetFor).not.toHaveBeenCalled();
+  });
+
+  it("masks a post-unshare findOne for a NON-acting user: account name, balance and auto payee", async () => {
+    crossOwnerAccess.readableAccountIdSetFor.mockResolvedValue(new Set(["a1"]));
+    const body = {
+      id: "t1",
+      userId: "user-1",
+      isTransfer: true,
+      payeeName: "Transfer to Owner Savings",
+      linkedTransaction: {
+        userId: "owner-2",
+        accountId: "a2",
+        account: { id: "a2", name: "Owner Savings", currentBalance: 12345.67 },
+      },
+    };
+    const out: any = await lastValueFrom(
+      interceptor.intercept(ctxFor(normalUser), handlerOf(body)),
+    );
+    expect(crossOwnerAccess.readableAccountIdSetFor).toHaveBeenCalledWith(
+      "user-1",
+    );
+    // The full Account load (balance included) is replaced by the stub.
+    expect(out.linkedTransaction.account).toEqual({
+      id: "a2",
+      name: "Hidden account",
+    });
+    expect(out.payeeName).toBe("Transfer to Hidden account");
+  });
+
+  it("keeps a readable cross-owner counterpart unmasked (connected pair)", async () => {
+    crossOwnerAccess.readableAccountIdSetFor.mockResolvedValue(
+      new Set(["a1", "a2"]),
+    );
+    const body = [
+      {
+        id: "t1",
+        userId: "user-1",
+        isTransfer: true,
+        payeeName: "Transfer to Owner Savings",
+        linkedTransaction: {
+          userId: "owner-2",
+          accountId: "a2",
+          account: { id: "a2", name: "Owner Savings" },
+        },
+      },
+    ];
+    const out: any = await lastValueFrom(
+      interceptor.intercept(ctxFor(normalUser), handlerOf(body)),
+    );
+    expect(out[0].linkedTransaction.account.name).toBe("Owner Savings");
+    expect(out[0].payeeName).toBe("Transfer to Owner Savings");
+  });
+
+  it("masks a transfer counterpart the acting delegate cannot READ (unchanged behavior)", async () => {
+    crossOwnerAccess.readableAccountIdSetFor.mockResolvedValue(new Set(["a1"]));
     const body = {
       data: [
         {
@@ -42,10 +120,10 @@ describe("DelegateTransferMaskInterceptor", () => {
       ],
     };
     const out: any = await lastValueFrom(
-      interceptor.intercept(
-        ctxFor({ isActing: true, delegationId: "g1" }),
-        handlerOf(body),
-      ),
+      interceptor.intercept(ctxFor(actingUser), handlerOf(body)),
+    );
+    expect(crossOwnerAccess.readableAccountIdSetFor).toHaveBeenCalledWith(
+      "delegate-1",
     );
     expect(out.data[0].linkedTransaction.account).toEqual({
       id: "a2",
@@ -54,8 +132,10 @@ describe("DelegateTransferMaskInterceptor", () => {
     expect(out.data[0].payeeName).toBe("Transfer to Hidden account");
   });
 
-  it("does not mask when the counterpart is readable", async () => {
-    delegationService.readableAccountIds.mockResolvedValue(["a1", "a2"]);
+  it("does not mask when the counterpart is readable while acting", async () => {
+    crossOwnerAccess.readableAccountIdSetFor.mockResolvedValue(
+      new Set(["a1", "a2"]),
+    );
     const body = [
       {
         id: "t1",
@@ -68,17 +148,14 @@ describe("DelegateTransferMaskInterceptor", () => {
       },
     ];
     const out: any = await lastValueFrom(
-      interceptor.intercept(
-        ctxFor({ isActing: true, delegationId: "g1" }),
-        handlerOf(body),
-      ),
+      interceptor.intercept(ctxFor(actingUser), handlerOf(body)),
     );
     expect(out[0].linkedTransaction.account.name).toBe("Savings");
     expect(out[0].payeeName).toBe("Transfer to Savings");
   });
 
   it("masks a single transaction object and ignores non-transfers", async () => {
-    delegationService.readableAccountIds.mockResolvedValue([]);
+    crossOwnerAccess.readableAccountIdSetFor.mockResolvedValue(new Set());
     const body = {
       id: "t1",
       isTransfer: true,
@@ -89,10 +166,7 @@ describe("DelegateTransferMaskInterceptor", () => {
       },
     };
     const out: any = await lastValueFrom(
-      interceptor.intercept(
-        ctxFor({ isActing: true, delegationId: "g1" }),
-        handlerOf(body),
-      ),
+      interceptor.intercept(ctxFor(actingUser), handlerOf(body)),
     );
     expect(out.linkedTransaction.account.name).toBe("Hidden account");
     expect(out.payeeName).toBe("Transfer from Hidden account");

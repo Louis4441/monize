@@ -28,6 +28,7 @@ import { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import { AccountsService } from "./accounts.service";
 import { DelegationService } from "../delegation/delegation.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
 import {
   AllowDelegate,
   DelegatedAccountParam,
@@ -116,7 +117,28 @@ export class AccountsController {
     private readonly statementCycleService: StatementCycleService,
     private readonly balanceForecastService: BalanceForecastService,
     private readonly delegationService: DelegationService,
+    private readonly crossOwnerAccess: CrossOwnerAccessService,
   ) {}
+
+  // NOTE: static route -- must be declared before the :id param routes.
+  @Get("transfer-candidates")
+  @ApiOperation({
+    summary:
+      "Accounts the real user can use as the other side of a cross-owner transfer",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Own context: accounts shared to the user (with per-op grant flags). Acting context: the user's own accounts.",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  @AllowDelegate()
+  getTransferCandidates(@Request() req) {
+    return this.crossOwnerAccess.transferCandidatesFor(
+      req.user.realUserId ?? req.user.id,
+      req.user.id,
+    );
+  }
 
   @Post()
   @ApiOperation({ summary: "Create a new account" })
@@ -427,6 +449,7 @@ export class AccountsController {
         req.user.id,
         id,
         { expandSplits: shouldExpandSplits, dateFormat: df },
+        req.user.realUserId ?? req.user.id,
       );
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("X-Content-Type-Options", "nosniff");
@@ -444,6 +467,7 @@ export class AccountsController {
         req.user.id,
         id,
         { dateFormat: df },
+        req.user.realUserId ?? req.user.id,
       );
       res.setHeader("Content-Type", "application/x-qif; charset=utf-8");
       res.setHeader("X-Content-Type-Options", "nosniff");

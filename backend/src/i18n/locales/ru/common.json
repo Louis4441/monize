@@ -1,5 +1,6 @@
 {
   "ok": "OK",
+  "sharedAccountLabel": "Общий счёт",
   "accountSuffix": {
     "cash": "Наличные",
     "brokerage": "Брокерский"

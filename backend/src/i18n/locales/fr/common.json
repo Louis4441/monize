@@ -1,5 +1,6 @@
 {
   "ok": "OK",
+  "sharedAccountLabel": "Compte partagé",
   "accountSuffix": {
     "cash": "Espèces",
     "brokerage": "Courtage"

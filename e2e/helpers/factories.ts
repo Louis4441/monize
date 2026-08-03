@@ -361,14 +361,16 @@ export function createDelegate(
   });
 }
 
-// Grant the delegate read access to a specific account.
+// Grant the delegate read access to a specific account, plus any of the
+// per-operation write grants (create/edit/delete) the test needs.
 export function grantDelegateAccount(
   api: ApiClient,
   delegateId: string,
   accountId: string,
+  flags: { canCreate?: boolean; canEdit?: boolean; canDelete?: boolean } = {},
 ): Promise<void> {
   return api.put<void>(`/delegation/delegates/${delegateId}/grants`, {
-    grants: [{ accountId, canRead: true }],
+    grants: [{ accountId, canRead: true, ...flags }],
   });
 }
 

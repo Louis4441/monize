@@ -383,6 +383,12 @@
       "transaction": "Giao tác"
     },
     "transferAmountNote": "Số tiền phải là dương cho chuyển khoản",
+    "transferCandidates": {
+      "sharedWithYou": "Được chia sẻ với bạn",
+      "yourAccounts": "Tài khoản của bạn",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "Phía bên kia của khoản chuyển khoản này nằm trong tài khoản không còn được chia sẻ với bạn. Số tiền, ngày và tài khoản đã bị khóa, nhưng bạn vẫn có thể chỉnh sửa chi tiết của giao dịch này.",
     "amountReceivedNote": "Số tiền nhận sau khi quy đổi tiền tệ",
     "splitTransaction": "Chia giao tác",
     "splitDisabledDuringTour": "Không khả dụng trong lúc hướng dẫn",

@@ -42,6 +42,7 @@ import { CreateTransactionSplitDto } from "./dto/create-transaction-split.dto";
 import { UpdateSplitsDto } from "./dto/update-splits.dto";
 import { CreateTransferDto } from "./dto/create-transfer.dto";
 import { UpdateTransferDto } from "./dto/update-transfer.dto";
+import { TransferActor } from "./transaction-transfer.service";
 import { GetRecentTransactionsDto } from "./dto/get-recent-transactions.dto";
 import { BulkReconcileDto } from "./dto/bulk-reconcile.dto";
 import { BulkUpdateDto, BulkDeleteDto } from "./dto/bulk-update.dto";
@@ -136,6 +137,21 @@ function parseTransactionStatuses(
     }
   }
   return statuses.length > 0 ? (statuses as TransactionStatus[]) : undefined;
+}
+
+/**
+ * The acting identity for transfer endpoints: the effective user is the
+ * ledger being operated on (the owner while a delegate is acting), the real
+ * user is the authenticated human whose delegations decide cross-owner
+ * access. For a normal user both are the same id.
+ */
+function transferActorFrom(req: {
+  user: { id: string; realUserId?: string };
+}): TransferActor {
+  return {
+    effectiveUserId: req.user.id,
+    realUserId: req.user.realUserId ?? req.user.id,
+  };
 }
 
 @ApiTags("Transactions")
@@ -1125,6 +1141,7 @@ export class TransactionsController {
     return this.transactionsService.createTransfer(
       req.user.id,
       createTransferDto,
+      transferActorFrom(req),
     );
   }
 
@@ -1361,7 +1378,11 @@ export class TransactionsController {
   @AllowDelegate()
   @DelegatedTransactionParam("id")
   getLinkedTransaction(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
-    return this.transactionsService.getLinkedTransaction(req.user.id, id);
+    return this.transactionsService.getLinkedTransaction(
+      req.user.id,
+      id,
+      transferActorFrom(req),
+    );
   }
 
   @Delete(":id/transfer")
@@ -1377,7 +1398,11 @@ export class TransactionsController {
   @DelegatedTransferParam("id")
   @DelegateRequires("delete")
   removeTransfer(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
-    return this.transactionsService.removeTransfer(req.user.id, id);
+    return this.transactionsService.removeTransfer(
+      req.user.id,
+      id,
+      transferActorFrom(req),
+    );
   }
 
   @Patch(":id/transfer")
@@ -1404,6 +1429,7 @@ export class TransactionsController {
       req.user.id,
       id,
       updateTransferDto,
+      transferActorFrom(req),
     );
   }
 }

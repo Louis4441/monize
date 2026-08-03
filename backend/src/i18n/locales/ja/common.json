@@ -1,5 +1,6 @@
 {
   "ok": "OK",
+  "sharedAccountLabel": "共有口座",
   "accountSuffix": {
     "cash": "現金",
     "brokerage": "証券"

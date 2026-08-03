@@ -5,86 +5,67 @@ import {
   NestInterceptor,
 } from "@nestjs/common";
 import { Request } from "express";
-import { Observable, from, switchMap } from "rxjs";
+import { Observable, from, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
-import { DelegationService } from "../delegation.service";
-
-const HIDDEN = "Hidden account";
+import { CrossOwnerAccessService } from "../cross-owner-access.service";
+import {
+  maskTransactionsAgainst,
+  payloadHasCrossOwnerTransfer,
+} from "../transfer-mask.util";
 
 /**
- * 2B: when a delegate (acting as owner) reads transactions, any transfer
- * whose counterpart account they lack READ on must be masked so the other
- * side shows "Hidden account" instead of the real account/name.
+ * Masks transfer counterparts the reader cannot READ: the linked leg's
+ * account is replaced with the "Hidden account" stub and the auto payee tail
+ * is rewritten (see transfer-mask.util.ts).
  *
- * Runs after the route handler, so req.user is populated by JwtStrategy.
- * Non-delegate requests pass straight through.
+ * Originally delegate-only (2B). With cross-owner transfers a NON-acting user
+ * can also hold a leg whose counterpart they lost access to (unshare), so the
+ * interceptor now runs for every authenticated user -- with a load-bearing
+ * fast path: the payload is scanned first, and the grants query only runs
+ * when the request is acting-as-owner OR some row is a transfer with a
+ * cross-owner linked leg. Ordinary same-owner traffic never pays a DB hit.
+ *
+ * The readable set is keyed by the REAL user (own accounts + can_read
+ * grants across all their active delegations), so a delegate legitimately
+ * keeps seeing their own counterpart account while acting.
  */
 @Injectable()
 export class DelegateTransferMaskInterceptor implements NestInterceptor {
-  constructor(private readonly delegationService: DelegationService) {}
+  constructor(private readonly crossOwnerAccess: CrossOwnerAccessService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType() !== "http") return next.handle();
-    const req = context
-      .switchToHttp()
-      .getRequest<
-        Request & { user?: { isActing?: boolean; delegationId?: string } }
-      >();
+    const req = context.switchToHttp().getRequest<
+      Request & {
+        user?: {
+          id?: string;
+          realUserId?: string;
+          isActing?: boolean;
+          delegationId?: string;
+        };
+      }
+    >();
     const user = req.user;
-    if (!user?.isActing || !user.delegationId) {
+    if (!user?.id) {
       return next.handle();
     }
-    const delegationId = user.delegationId;
+    const isActing = !!user.isActing && !!user.delegationId;
+    const realUserId = user.realUserId ?? user.id;
 
     return next.handle().pipe(
-      switchMap((body) =>
-        from(this.delegationService.readableAccountIds(delegationId)).pipe(
-          map((readableIds) => {
-            const readable = new Set(readableIds);
-            this.maskPayload(body, readable);
+      switchMap((body) => {
+        if (!isActing && !payloadHasCrossOwnerTransfer(body)) {
+          return of(body);
+        }
+        return from(
+          this.crossOwnerAccess.readableAccountIdSetFor(realUserId),
+        ).pipe(
+          map((readable) => {
+            maskTransactionsAgainst(readable, body);
             return body;
           }),
-        ),
-      ),
-    );
-  }
-
-  private maskPayload(body: unknown, readable: Set<string>): void {
-    if (Array.isArray(body)) {
-      body.forEach((t) => this.maskTransaction(t, readable));
-      return;
-    }
-    if (body && typeof body === "object") {
-      const obj = body as Record<string, unknown>;
-      if (Array.isArray(obj.data)) {
-        (obj.data as unknown[]).forEach((t) =>
-          this.maskTransaction(t, readable),
         );
-        return;
-      }
-      this.maskTransaction(body, readable);
-    }
-  }
-
-  private maskTransaction(tx: unknown, readable: Set<string>): void {
-    if (!tx || typeof tx !== "object") return;
-    const t = tx as Record<string, any>;
-    const linked = t.linkedTransaction as Record<string, any> | undefined;
-    if (!t.isTransfer || !linked) return;
-    const otherAccountId: string | undefined = linked.accountId;
-    if (!otherAccountId || readable.has(otherAccountId)) return;
-
-    if (linked.account && typeof linked.account === "object") {
-      linked.account = { id: linked.accountId, name: HIDDEN };
-    }
-    if (typeof linked.accountName === "string") {
-      linked.accountName = HIDDEN;
-    }
-    // The visible row's auto payee name embeds the counterpart account name
-    // ("Transfer to/from <name>") -- rewrite the trailing name.
-    if (typeof t.payeeName === "string") {
-      const m = /^(Transfer (?:to|from) ).+/.exec(t.payeeName);
-      if (m) t.payeeName = `${m[1]}${HIDDEN}`;
-    }
+      }),
+    );
   }
 }

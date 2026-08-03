@@ -1,5 +1,6 @@
 {
   "ok": "好",
+  "sharedAccountLabel": "共享账户",
   "accountSuffix": {
     "cash": "现金",
     "brokerage": "证券"

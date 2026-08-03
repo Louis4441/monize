@@ -566,11 +566,30 @@ export class TransactionBulkUpdateService {
     });
     const splitLegIds = new Set(owningSplits.map((s) => s.linkedTransactionId));
 
+    const candidateLinkedIds = transfers
+      .filter((t) => !splitLegIds.has(t.id))
+      .map((t) => t.linkedTransactionId)
+      .filter((id): id is string => id !== null);
+
+    // A cross-owner counterpart belongs to another user; tag ids are per-user
+    // reference data, so only same-user linked legs may be synced. (The
+    // field sync in syncLinkedTransfers is additionally user-filtered in its
+    // UPDATE, but the tag path hands these ids straight to the bulk tag
+    // writer.)
+    const plainLinkedIds =
+      candidateLinkedIds.length === 0
+        ? candidateLinkedIds
+        : (
+            await repo
+              .createQueryBuilder("t")
+              .select(["t.id"])
+              .where("t.id IN (:...ids)", { ids: candidateLinkedIds })
+              .andWhere("t.userId = :userId", { userId })
+              .getMany()
+          ).map((t) => t.id);
+
     return {
-      plainLinkedIds: transfers
-        .filter((t) => !splitLegIds.has(t.id))
-        .map((t) => t.linkedTransactionId)
-        .filter((id): id is string => id !== null),
+      plainLinkedIds,
       owningSplitIds: owningSplits.map((s) => s.id),
     };
   }

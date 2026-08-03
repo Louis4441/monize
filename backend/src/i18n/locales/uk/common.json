@@ -1,5 +1,6 @@
 {
   "ok": "OK",
+  "sharedAccountLabel": "Спільний рахунок",
   "accountSuffix": {
     "cash": "Готівка",
     "brokerage": "Брокерський"
