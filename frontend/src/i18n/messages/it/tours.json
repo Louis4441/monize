@@ -35,8 +35,6 @@
   "settings": {
     "title": "Tour guidati",
     "description": "Scopri le funzioni dell'app passo dopo passo.",
-    "showList": "Mostra i tour ({count})",
-    "hideList": "Nascondi i tour",
     "start": "Avvia",
     "restart": "Rivedi",
     "statusNotViewed": "Non visualizzato",

@@ -35,8 +35,6 @@
   "settings": {
     "title": "Przewodniki po aplikacji",
     "description": "Poznaj funkcje aplikacji krok po kroku.",
-    "showList": "Pokaż przewodniki ({count})",
-    "hideList": "Ukryj przewodniki",
     "start": "Rozpocznij",
     "restart": "Powtórz",
     "statusNotViewed": "Nieobejrzany",

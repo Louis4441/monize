@@ -35,8 +35,6 @@
   "settings": {
     "title": "Visitas guiadas",
     "description": "Percorra as funcionalidades da aplicação passo a passo.",
-    "showList": "Mostrar visitas guiadas ({count})",
-    "hideList": "Ocultar visitas guiadas",
     "start": "Iniciar",
     "restart": "Repetir",
     "statusNotViewed": "Não visto",

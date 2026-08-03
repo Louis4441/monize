@@ -35,8 +35,6 @@
   "settings": {
     "title": "Tur berpandu",
     "description": "Pelajari fitur-fitur aplikasi langkah demi langkah.",
-    "showList": "Tampilkan tur ({count})",
-    "hideList": "Sembunyikan tur",
     "start": "Mulai",
     "restart": "Ulangi",
     "statusNotViewed": "Belum dilihat",

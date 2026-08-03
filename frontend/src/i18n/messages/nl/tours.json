@@ -35,8 +35,6 @@
   "settings": {
     "title": "Begeleide rondleidingen",
     "description": "Doorloop de functies van de app stap voor stap.",
-    "showList": "Rondleidingen tonen ({count})",
-    "hideList": "Rondleidingen verbergen",
     "start": "Starten",
     "restart": "Opnieuw doen",
     "statusNotViewed": "Niet bekeken",

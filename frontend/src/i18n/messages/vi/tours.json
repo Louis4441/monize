@@ -35,8 +35,6 @@
   "settings": {
     "title": "Hướng dẫn sử dụng",
     "description": "Tìm hiểu các tính năng của ứng dụng theo từng bước.",
-    "showList": "Hiện hướng dẫn ({count})",
-    "hideList": "Ẩn hướng dẫn",
     "start": "Bắt đầu",
     "restart": "Xem lại",
     "statusNotViewed": "Chưa xem",

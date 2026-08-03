@@ -35,8 +35,6 @@
   "settings": {
     "title": "Recorridos guiados",
     "description": "Recorre las funciones de la aplicación paso a paso.",
-    "showList": "Mostrar recorridos ({count})",
-    "hideList": "Ocultar recorridos",
     "start": "Iniciar",
     "restart": "Repetir",
     "statusNotViewed": "No visto",

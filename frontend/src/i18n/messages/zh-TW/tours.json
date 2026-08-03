@@ -35,8 +35,6 @@
   "settings": {
     "title": "導覽引導",
     "description": "逐步了解應用程式的各項功能。",
-    "showList": "顯示導覽（{count}）",
-    "hideList": "隱藏導覽",
     "start": "開始",
     "restart": "重新查看",
     "statusNotViewed": "未檢視",

@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "[XX-Settings sections-XX]",
     "profile": "[XX-Profile-XX]",
     "preferences": "[XX-Preferences-XX]",
+    "tours": "[XX-Guided Tours-XX]",
     "notifications": "[XX-Notifications-XX]",
     "security": "[XX-Security-XX]",
     "sharedAccess": "[XX-Shared Access-XX]",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "[XX-Shared Access-XX]",
       "description": "[XX-Grant another person granular access to specific accounts.-XX]"
+    },
+    "toursCard": {
+      "title": "[XX-Guided Tours-XX]",
+      "description": "[XX-Every walkthrough Monize offers, with what you have already seen. Start or retake any of them.-XX]"
     },
     "emergencyAccessCard": {
       "title": "[XX-Emergency Access-XX]",

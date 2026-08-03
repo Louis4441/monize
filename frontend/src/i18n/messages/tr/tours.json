@@ -35,8 +35,6 @@
   "settings": {
     "title": "Rehberli turlar",
     "description": "Uygulamanın özelliklerini adım adım keşfedin.",
-    "showList": "Turları göster ({count})",
-    "hideList": "Turları gizle",
     "start": "Başlat",
     "restart": "Tekrar al",
     "statusNotViewed": "Görüntülenmedi",
