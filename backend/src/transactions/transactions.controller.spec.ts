@@ -8,6 +8,7 @@ import { DelegationService } from "../delegation/delegation.service";
 describe("TransactionsController", () => {
   let controller: TransactionsController;
   let mockService: Record<string, jest.Mock>;
+  let mockJointAccounts: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   // Valid UUIDs for testing
@@ -45,6 +46,11 @@ describe("TransactionsController", () => {
       getFxFeeSummary: jest.fn(),
     };
 
+    mockJointAccounts = {
+      jointAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
+      jointAccessFor: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TransactionsController],
       providers: [
@@ -64,6 +70,12 @@ describe("TransactionsController", () => {
           useValue: {
             readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
           },
+        },
+        {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("../delegation/joint-accounts.service")
+            .JointAccountsService,
+          useValue: mockJointAccounts,
         },
       ],
     }).compile();
@@ -174,6 +186,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -209,6 +222,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -238,6 +252,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -279,6 +294,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -321,6 +337,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -365,6 +382,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -380,7 +398,9 @@ describe("TransactionsController", () => {
 
       const calls = mockService.findAll.mock.calls as unknown[][];
       const lastCall = calls[calls.length - 1];
-      expect(lastCall[lastCall.length - 1]).toBe(true);
+      // hasAttachments sits just before the trailing jointAccountIds arg.
+      expect(lastCall[lastCall.length - 2]).toBe(true);
+      expect(lastCall[lastCall.length - 1]).toEqual([]);
     });
 
     // ── Validation tests ────────────────────────────────────────
@@ -565,7 +585,51 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
+    });
+
+    it("substitutes the owner's scope for a single joint account register", async () => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+      mockJointAccounts.jointAccountIdSetFor.mockResolvedValue(
+        new Set([uuid1]),
+      );
+      mockJointAccounts.jointAccessFor.mockResolvedValue({
+        ownerUserId: "owner-9",
+        via: "delegation",
+      });
+
+      await controller.findAll(mockReq, uuid1);
+
+      expect(mockJointAccounts.jointAccessFor).toHaveBeenCalledWith(
+        "user-1",
+        uuid1,
+        "read",
+      );
+      const call = mockService.findAll.mock.calls[0];
+      expect(call[0]).toBe("owner-9"); // the owner's register, byte-identical
+      expect(call[1]).toEqual([uuid1]);
+      expect(call[call.length - 1]).toEqual([]); // no widened predicate
+    });
+
+    it("widens the register scope with authorized joint ids for mixed lists", async () => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+      mockJointAccounts.jointAccountIdSetFor.mockResolvedValue(
+        new Set([uuid2]),
+      );
+
+      // Unfiltered list: every joint id participates.
+      await controller.findAll(mockReq);
+      let call = mockService.findAll.mock.calls[0];
+      expect(call[0]).toBe("user-1");
+      expect(call[call.length - 1]).toEqual([uuid2]);
+
+      // Mixed explicit filter: only requested ids that are joint pass.
+      await controller.findAll(mockReq, undefined, `${uuid1},${uuid2}`);
+      call = mockService.findAll.mock.calls[1];
+      expect(call[1]).toEqual([uuid1, uuid2]);
+      expect(call[call.length - 1]).toEqual([uuid2]);
+      expect(mockJointAccounts.jointAccessFor).not.toHaveBeenCalled();
     });
 
     it("rejects an unknown reconciliation status", async () => {
@@ -623,7 +687,7 @@ describe("TransactionsController", () => {
       const result = await controller.findOne(mockReq, "tx-1");
 
       expect(result).toEqual(expected);
-      expect(mockService.findOne).toHaveBeenCalledWith("user-1", "tx-1");
+      expect(mockService.findOne).toHaveBeenCalledWith("user-1", "tx-1", []);
     });
   });
 
@@ -1313,6 +1377,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 

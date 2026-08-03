@@ -35,6 +35,7 @@ import {
 } from "../delegation/decorators/delegate-access.decorator";
 import { DelegateTransferMaskInterceptor } from "../delegation/interceptors/delegate-transfer-mask.interceptor";
 import { DelegationService } from "../delegation/delegation.service";
+import { JointAccountsService } from "../delegation/joint-accounts.service";
 import { TransactionStatus } from "./entities/transaction.entity";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
 import { UpdateTransactionDto } from "./dto/update-transaction.dto";
@@ -163,6 +164,7 @@ export class TransactionsController {
   constructor(
     private readonly transactionsService: TransactionsService,
     private readonly delegationService: DelegationService,
+    private readonly jointAccounts: JointAccountsService,
   ) {}
 
   @Post()
@@ -387,6 +389,8 @@ export class TransactionsController {
     const tagKeyFilter = parseTagKeyFilter(tagKey, tagKeyOp, tagKeyValue);
 
     let effectiveAccountIds = parseIds(accountIds, accountId);
+    let registerUserId = req.user.id;
+    let jointAccountIds: string[] = [];
     if (req.user.isActing) {
       // A delegate only ever sees transactions for the accounts they were
       // granted READ on. Intersect any requested ids with the readable set;
@@ -414,10 +418,38 @@ export class TransactionsController {
           },
         };
       }
+    } else {
+      // Own context: joint accounts read natively (joint-accounts spec).
+      const realUserId = req.user.realUserId ?? req.user.id;
+      const jointSet = await this.jointAccounts.jointAccountIdSetFor(realUserId);
+      if (jointSet.size > 0) {
+        if (
+          effectiveAccountIds?.length === 1 &&
+          jointSet.has(effectiveAccountIds[0])
+        ) {
+          // A single joint account's register: authorize, then serve the
+          // OWNER's register for that account. Every count, target-page and
+          // running-balance path then behaves byte-identically to the
+          // owner's own view -- no widened predicates in the money math.
+          const access = await this.jointAccounts.jointAccessFor(
+            realUserId,
+            effectiveAccountIds[0],
+            "read",
+          );
+          registerUserId = access.ownerUserId;
+        } else {
+          // Mixed or unfiltered list: widen the register scope by exactly
+          // the authorized joint ids (intersected with any explicit filter).
+          jointAccountIds =
+            effectiveAccountIds && effectiveAccountIds.length > 0
+              ? effectiveAccountIds.filter((id) => jointSet.has(id))
+              : [...jointSet];
+        }
+      }
     }
 
     return this.transactionsService.findAll(
-      req.user.id,
+      registerUserId,
       effectiveAccountIds,
       startDate,
       endDate,
@@ -437,6 +469,7 @@ export class TransactionsController {
       tagKeyFilter,
       parseCurrencyCodes(originalCurrencyCodes),
       hasAttachments,
+      jointAccountIds,
     );
   }
 
@@ -1186,8 +1219,15 @@ export class TransactionsController {
   @ApiResponse({ status: 404, description: "Transaction not found" })
   @AllowDelegate()
   @DelegatedTransactionParam("id")
-  findOne(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
-    return this.transactionsService.findOne(req.user.id, id);
+  async findOne(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
+    const jointIds = req.user.isActing
+      ? []
+      : [
+          ...(await this.jointAccounts.jointAccountIdSetFor(
+            req.user.realUserId ?? req.user.id,
+          )),
+        ];
+    return this.transactionsService.findOne(req.user.id, id, jointIds);
   }
 
   @Patch(":id")
