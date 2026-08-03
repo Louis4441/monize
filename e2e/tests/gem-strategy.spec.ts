@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import {
   createInvestmentAccountPair,
@@ -97,6 +98,21 @@ async function configuredStrategy(api: ApiClient) {
   return { pair, us, exUs, em, safe };
 }
 
+/**
+ * The report is on screen once its tab bar is.
+ *
+ * Not the page title: the `<h1>` is the *scenario* name ("GEM" by default, or
+ * whatever the user called it), and "GEM Strategy" is breadcrumb text rather
+ * than a heading. The tab bar is named, is present in every state including
+ * first-run, and only renders once the read model has arrived -- which is the
+ * thing these tests need to wait for.
+ */
+function reportReady(page: Page) {
+  return expect(
+    page.getByRole('tablist', { name: 'GEM strategy sections' }),
+  ).toBeVisible({ timeout: 20000 });
+}
+
 test.describe('GEM strategy report', () => {
   test('renders the report for a configured strategy', async ({
     authedPage: page,
@@ -105,9 +121,7 @@ test.describe('GEM strategy report', () => {
     const { us } = await configuredStrategy(api);
     await page.goto('/reports/gem-strategy');
 
-    await expect(
-      page.getByRole('heading', { name: 'GEM Strategy' }),
-    ).toBeVisible({ timeout: 20000 });
+    await reportReady(page);
     // The signal materialized from the seeded closes, and it names the winner.
     await expect(page.getByText(us.symbol).first()).toBeVisible({
       timeout: 20000,
@@ -120,9 +134,7 @@ test.describe('GEM strategy report', () => {
   }) => {
     await configuredStrategy(api);
     await page.goto('/reports/gem-strategy');
-    await expect(
-      page.getByRole('heading', { name: 'GEM Strategy' }),
-    ).toBeVisible({ timeout: 20000 });
+    await reportReady(page);
 
     await page.getByRole('tab', { name: 'Settings' }).click();
     const cadence = page.getByLabel('Evaluation frequency');
@@ -151,18 +163,22 @@ test.describe('GEM strategy report', () => {
     await api.post('/strategies/gem', { name: 'E2E second scenario' });
 
     await page.goto('/reports/gem-strategy');
-    await expect(
-      page.getByRole('heading', { name: 'GEM Strategy' }),
-    ).toBeVisible({ timeout: 20000 });
+    await reportReady(page);
+
+    // The default scenario is the one on screen to begin with.
+    const currentScenario = page.getByRole('heading', { level: 1 });
+    await expect(currentScenario).toHaveText('GEM');
 
     await page.getByRole('button', { name: 'Switch scenario' }).click();
     await page.getByText('E2E second scenario').first().click();
 
-    // The page is now a report of the scenario picked, and its settings are the
-    // new scenario's -- unconfigured, so the roles come back unassigned.
-    await expect(
-      page.getByText('E2E second scenario').first(),
-    ).toBeVisible({ timeout: 20000 });
+    // The page is now a report *of* the scenario picked -- asserted on the
+    // heading, which is the scenario's own name. Asserting that the text is
+    // visible somewhere would have passed without the click: the switcher had
+    // already listed it.
+    await expect(currentScenario).toHaveText('E2E second scenario', {
+      timeout: 20000,
+    });
   });
 
   test('records the operation as executed', async ({
@@ -198,9 +214,7 @@ test.describe('GEM strategy report', () => {
     // accounts, no instruments.
     await page.goto('/reports/gem-strategy');
 
-    await expect(
-      page.getByRole('heading', { name: 'GEM Strategy' }),
-    ).toBeVisible({ timeout: 20000 });
+    await reportReady(page);
     await expect(page.getByText('No signal yet')).toBeVisible({
       timeout: 20000,
     });
