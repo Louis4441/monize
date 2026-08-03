@@ -179,6 +179,10 @@
     "unsupportedBackupVersion": "Nicht unterstützte Sicherungsversion: {{ version }}. Erwartet: {{ expected }}",
     "missingExportedAt": "Ungültiges Sicherungsformat: exportedAt fehlt",
     "tableNotAllowed": "Tabelle {{ table }} ist bei der Sicherungswiederherstellung nicht zulässig",
+    "encryptionNotConfigured": "Server ist nicht für Verschlüsselung konfiguriert (AI_ENCRYPTION_KEY fehlt)",
+    "backupPasswordOidcOnly": "Sicherungspasswort ist nur für OIDC-Benutzer konfigurierbar; lokale Benutzer verwenden ihr Anmeldepasswort",
+    "backupPasswordTooShort": "Sicherungspasswort muss mindestens {{ minLength }} Zeichen lang sein",
+    "backupPasswordBreached": "Dieses Passwort wurde in einem Datenleck gefunden. Bitte wählen Sie ein anderes Passwort.",
     "restoreBodyMustBeFile": "Anfrage-Body muss eine Sicherungsdatei sein"
   },
   "budgets": {

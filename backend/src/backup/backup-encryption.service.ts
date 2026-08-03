@@ -1,10 +1,18 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
+import { PasswordBreachService } from "../auth/password-breach.service";
 import { tr } from "../i18n/translate";
+
+const MIN_BACKUP_PASSWORD_LENGTH = 12;
 
 /**
  * What the automatic backup for a user should be encrypted with. Three answers,
@@ -23,16 +31,22 @@ export type BackupPasswordResolution =
  * Owns the stored copy of a user's backup password that the auto-backup cron
  * needs in order to encrypt what it writes.
  *
- * There is nothing for the user to switch on. A backup is encrypted with the
- * password they already have, and the only moment the server ever sees that
- * password in plaintext is when they type it -- so it is captured there
+ * For a local-auth account there is nothing to switch on. A backup is encrypted
+ * with the password they already have, and the only moment the server ever sees
+ * that password in plaintext is when they type it -- so it is captured there
  * (`rememberLoginPassword`, called on registration, login and password change)
  * rather than asked for a second time in Settings.
  *
+ * An OIDC account has no password of ours to capture, so nothing can be
+ * automatic: those users set a dedicated backup password in Settings
+ * (`setBackupPasswordForOidcUser`), or leave their backups unencrypted. Both
+ * management methods refuse a local-auth account rather than pretending -- a
+ * local user who "disabled" encryption would have it back at their next login,
+ * because that is where the copy is captured.
+ *
  * Storage shape: `users.backup_password_enc` holds the password ciphertext
  * encrypted with AI_ENCRYPTION_KEY, and `backup_encryption_enabled` records
- * that a usable copy is there. OIDC accounts have no password of their own, so
- * they have nothing to store and their backups are written unencrypted.
+ * that a usable copy is there.
  */
 @Injectable()
 export class BackupEncryptionService {
@@ -41,6 +55,7 @@ export class BackupEncryptionService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly aiEncryption: AiEncryptionService,
+    private readonly passwordBreach: PasswordBreachService,
   ) {}
 
   /**
@@ -59,12 +74,49 @@ export class BackupEncryptionService {
   }
 
   /**
-   * Whether this user's backups are encrypted. Read-only: the export screen
-   * needs it to know whether to ask for the password before downloading.
+   * Whether this user's backups are encrypted, and whether they are the one who
+   * decides. The export screen needs the first to know whether to ask for the
+   * password before downloading; Settings needs the second to know whether to
+   * offer the controls at all, since a local-auth account is managed for them.
    */
-  async getStatus(userId: string): Promise<{ enabled: boolean }> {
+  async getStatus(
+    userId: string,
+  ): Promise<{ enabled: boolean; manageable: boolean }> {
     const user = await this.requireUser(userId);
-    return { enabled: user.backupEncryptionEnabled };
+    return {
+      enabled: user.backupEncryptionEnabled,
+      manageable: user.authProvider === "oidc",
+    };
+  }
+
+  /**
+   * OIDC accounts: set or replace the dedicated password their backups are
+   * encrypted with. There is no login password of ours to capture for these
+   * users, so this is the only way their backups can be encrypted at all.
+   */
+  async setBackupPasswordForOidcUser(
+    userId: string,
+    newBackupPassword: string,
+  ): Promise<void> {
+    const user = await this.requireManageableUser(userId);
+    await this.validatePasswordStrength(newBackupPassword);
+    if (!this.aiEncryption.isConfigured()) {
+      throw new BadRequestException(
+        tr(
+          "errors.backup.encryptionNotConfigured",
+          "Server is not configured for encryption (AI_ENCRYPTION_KEY missing)",
+        ),
+      );
+    }
+    user.backupPasswordEnc = this.aiEncryption.encrypt(newBackupPassword);
+    user.backupEncryptionEnabled = true;
+    await this.scoped(User, (repo) => repo.save(user));
+  }
+
+  /** OIDC accounts: stop encrypting backups and drop the stored password. */
+  async disableForOidcUser(userId: string): Promise<void> {
+    await this.requireManageableUser(userId);
+    await this.forgetStoredPassword(userId);
   }
 
   /**
@@ -159,6 +211,46 @@ export class BackupEncryptionService {
       user.backupPasswordEnc = null;
       await repo.save(user);
     });
+  }
+
+  /**
+   * The user, provided their backup encryption is theirs to manage. A
+   * local-auth account is refused rather than half-obeyed: its password is
+   * recaptured at every login, so anything set or cleared here would be
+   * overwritten by the next sign-in.
+   */
+  private async requireManageableUser(userId: string): Promise<User> {
+    const user = await this.requireUser(userId);
+    if (user.authProvider !== "oidc") {
+      throw new BadRequestException(
+        tr(
+          "errors.backup.backupPasswordOidcOnly",
+          "Backup password is only configurable for OIDC users; local users use their login password",
+        ),
+      );
+    }
+    return user;
+  }
+
+  private async validatePasswordStrength(password: string): Promise<void> {
+    if (!password || password.length < MIN_BACKUP_PASSWORD_LENGTH) {
+      throw new BadRequestException(
+        tr(
+          "errors.backup.backupPasswordTooShort",
+          `Backup password must be at least ${MIN_BACKUP_PASSWORD_LENGTH} characters`,
+          { minLength: MIN_BACKUP_PASSWORD_LENGTH },
+        ),
+      );
+    }
+    const breached = await this.passwordBreach.isBreached(password);
+    if (breached) {
+      throw new BadRequestException(
+        tr(
+          "errors.backup.backupPasswordBreached",
+          "This password has been found in a data breach. Please choose a different password.",
+        ),
+      );
+    }
   }
 
   private async requireUser(userId: string): Promise<User> {

@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Backup e Restauração",
+    "encryption": {
+      "heading": "Criptografia de Backup",
+      "descriptionOidc": "Criptografe backups manuais e automáticos com uma senha de backup dedicada que você define aqui. A senha é necessária para a restauração.",
+      "loading": "Carregando...",
+      "enabledBadge": "Ativada",
+      "changePasswordButton": "Alterar Senha de Backup",
+      "disableButton": "Desativar",
+      "setPasswordButton": "Definir Senha de Backup",
+      "setupModal": {
+        "titleOidc": "Definir Senha de Backup",
+        "descriptionOidc": "Escolha uma senha que será usada para criptografar seus backups. Guarde-a em local seguro -- você precisará dela para a restauração.",
+        "placeholderOidc": "Nova senha de backup (12+ caracteres)",
+        "savingButton": "Salvando...",
+        "confirmButton": "Confirmar"
+      },
+      "toasts": {
+        "enabled": "Backups criptografados ativados",
+        "disabled": "Backups criptografados desativados",
+        "enableFailed": "Falha ao ativar a criptografia",
+        "disableFailed": "Falha ao desativar a criptografia"
+      }
+    },
     "export": {
       "heading": "Criar Backup",
       "description": "Baixe um backup completo dos seus dados financeiros. Inclui contas, transações, categorias, beneficiários, orçamentos, investimentos e todos os outros dados do usuário.",

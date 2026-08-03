@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Kopia zapasowa i przywracanie",
+    "encryption": {
+      "heading": "Szyfrowanie kopii zapasowej",
+      "descriptionOidc": "Szyfruj ręczne i automatyczne kopie zapasowe dedykowanym hasłem kopii ustawionym tutaj. Hasło jest wymagane do przywrócenia.",
+      "loading": "Wczytywanie...",
+      "enabledBadge": "Włączone",
+      "changePasswordButton": "Zmień hasło kopii zapasowej",
+      "disableButton": "Wyłącz",
+      "setPasswordButton": "Ustaw hasło kopii zapasowej",
+      "setupModal": {
+        "titleOidc": "Ustaw hasło kopii zapasowej",
+        "descriptionOidc": "Wybierz hasło, które będzie używane do szyfrowania kopii zapasowych. Zapisz je w bezpiecznym miejscu -- będzie potrzebne do przywrócenia.",
+        "placeholderOidc": "Nowe hasło kopii zapasowej (12+ znaków)",
+        "savingButton": "Zapisywanie...",
+        "confirmButton": "Potwierdź"
+      },
+      "toasts": {
+        "enabled": "Włączono szyfrowane kopie zapasowe",
+        "disabled": "Wyłączono szyfrowane kopie zapasowe",
+        "enableFailed": "Nie udało się włączyć szyfrowania",
+        "disableFailed": "Nie udało się wyłączyć szyfrowania"
+      }
+    },
     "export": {
       "heading": "Utwórz kopię zapasową",
       "description": "Pobierz pełną kopię zapasową swoich danych finansowych. Obejmuje ona konta, transakcje, kategorie, odbiorców, budżety, inwestycje oraz wszystkie inne dane użytkownika.",

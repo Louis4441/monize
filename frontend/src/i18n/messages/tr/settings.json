@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Yedekleme ve Geri Yükleme",
+    "encryption": {
+      "heading": "Yedekleme Şifreleme",
+      "descriptionOidc": "Manuel ve otomatik yedeklemeleri burada ayarladığınız özel bir yedekleme şifresiyle şifreleyin. Geri yükleme için şifre gereklidir.",
+      "loading": "Yükleniyor...",
+      "enabledBadge": "Etkin",
+      "changePasswordButton": "Yedekleme Şifresini Değiştir",
+      "disableButton": "Devre Dışı Bırak",
+      "setPasswordButton": "Yedekleme Şifresi Ayarla",
+      "setupModal": {
+        "titleOidc": "Yedekleme Şifresi Ayarla",
+        "descriptionOidc": "Yedeklemelerinizi şifrelemek için kullanılacak şifreyi seçin. Güvenli bir yere kaydedin -- geri yükleme için ihtiyacınız olacak.",
+        "placeholderOidc": "Yeni yedekleme şifresi (en az 12 karakter)",
+        "savingButton": "Kaydediliyor...",
+        "confirmButton": "Onayla"
+      },
+      "toasts": {
+        "enabled": "Şifreli yedeklemeler etkinleştirildi",
+        "disabled": "Şifreli yedeklemeler devre dışı bırakıldı",
+        "enableFailed": "Şifreleme etkinleştirilemedi",
+        "disableFailed": "Şifreleme devre dışı bırakılamadı"
+      }
+    },
     "export": {
       "heading": "Yedekleme Oluştur",
       "description": "Finansal verilerinizin tam yedeğini indirin. Bu, hesapları, işlemleri, kategorileri, alacaklıları, bütçeleri, yatırımları ve diğer tüm kullanıcı verilerini içerir.",

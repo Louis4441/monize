@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Sao lưu & Khôi phục",
+    "encryption": {
+      "heading": "Mã hóa sao lưu",
+      "descriptionOidc": "Mã hóa các bản sao lưu thủ công và tự động bằng mật khẩu sao lưu chuyên dụng bạn đặt ở đây. Mật khẩu được yêu cầu để khôi phục.",
+      "loading": "Đang tải...",
+      "enabledBadge": "Đã bật",
+      "changePasswordButton": "Thay đổi mật khẩu sao lưu",
+      "disableButton": "Tắt",
+      "setPasswordButton": "Đặt mật khẩu sao lưu",
+      "setupModal": {
+        "titleOidc": "Đặt mật khẩu sao lưu",
+        "descriptionOidc": "Chọn mật khẩu sẽ được dùng để mã hóa các bản sao lưu. Lưu nó ở nơi an toàn -- bạn sẽ cần nó để khôi phục.",
+        "placeholderOidc": "Mật khẩu sao lưu mới (12+ ký tự)",
+        "savingButton": "Đang lưu...",
+        "confirmButton": "Xác nhận"
+      },
+      "toasts": {
+        "enabled": "Sao lưu mã hóa đã được bật",
+        "disabled": "Sao lưu mã hóa đã bị tắt",
+        "enableFailed": "Không thể bật mã hóa",
+        "disableFailed": "Không thể tắt mã hóa"
+      }
+    },
     "export": {
       "heading": "Tạo sao lưu",
       "description": "Tải xuống bản sao lưu đầy đủ dữ liệu tài chính của bạn. Bao gồm tài khoản, giao tác, danh mục, người nhận, ngân sách, đầu tư và tất cả dữ liệu người dùng khác.",

@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Backup & Wiederherstellung",
+    "encryption": {
+      "heading": "Backup-Verschlüsselung",
+      "descriptionOidc": "Manuelle und automatische Backups mit einem hier festgelegten Backup-Passwort verschlüsseln. Das Passwort ist für die Wiederherstellung erforderlich.",
+      "loading": "Wird geladen...",
+      "enabledBadge": "Aktiviert",
+      "changePasswordButton": "Backup-Passwort ändern",
+      "disableButton": "Deaktivieren",
+      "setPasswordButton": "Backup-Passwort festlegen",
+      "setupModal": {
+        "titleOidc": "Backup-Passwort festlegen",
+        "descriptionOidc": "Wählen Sie ein Passwort, das zum Verschlüsseln Ihrer Backups verwendet wird. Bewahren Sie es sicher auf -- Sie benötigen es für die Wiederherstellung.",
+        "placeholderOidc": "Neues Backup-Passwort (mind. 12 Zeichen)",
+        "savingButton": "Wird gespeichert...",
+        "confirmButton": "Bestätigen"
+      },
+      "toasts": {
+        "enabled": "Verschlüsselte Backups aktiviert",
+        "disabled": "Verschlüsselte Backups deaktiviert",
+        "enableFailed": "Verschlüsselung konnte nicht aktiviert werden",
+        "disableFailed": "Verschlüsselung konnte nicht deaktiviert werden"
+      }
+    },
     "export": {
       "heading": "Backup erstellen",
       "description": "Laden Sie ein vollständiges Backup Ihrer Finanzdaten herunter. Dies umfasst Konten, Buchungen, Kategorien, Zahlungsempfänger, Budgets, Investments und alle weiteren Benutzerdaten.",

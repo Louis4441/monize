@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Backup & Restore",
+    "encryption": {
+      "heading": "Backup Encryption",
+      "descriptionOidc": "Encrypt manual and automatic backups with a dedicated backup password you set here. The password is required to restore.",
+      "loading": "Loading...",
+      "enabledBadge": "Enabled",
+      "changePasswordButton": "Change Backup Password",
+      "disableButton": "Disable",
+      "setPasswordButton": "Set Backup Password",
+      "setupModal": {
+        "titleOidc": "Set Backup Password",
+        "descriptionOidc": "Choose a password that will be used to encrypt your backups. Save it somewhere safe, because you will need it to restore.",
+        "placeholderOidc": "New backup password (12+ chars)",
+        "savingButton": "Saving...",
+        "confirmButton": "Confirm"
+      },
+      "toasts": {
+        "enabled": "Encrypted backups enabled",
+        "disabled": "Encrypted backups disabled",
+        "enableFailed": "Failed to enable encryption",
+        "disableFailed": "Failed to disable encryption"
+      }
+    },
     "export": {
       "heading": "Create Backup",
       "description": "Download a complete backup of your financial data. This includes accounts, transactions, categories, payees, budgets, investments, and all other user data.",

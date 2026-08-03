@@ -202,16 +202,21 @@ has drifted is written back to the defaults, an unchanged one is not written at
 all, and `lastBackup*`/`nextBackupAt` are left alone so enrollment never
 re-triggers a backup.
 
-Backups are encrypted with the user's own password, and the server only ever
-holds that in plaintext at the moment they type it: `rememberLoginPassword` is
-called from registration, login and change-password, and nothing asks the user
-to configure encryption. A stored copy is checked against the account's current
-password hash before it is used (`resolveBackupPassword`) -- encrypting with a
-password the user has since changed produces a file that looks like a backup
-and cannot be opened. That resolution has three outcomes, not two: nothing
-stored (write plaintext), a usable password (encrypt), and stored-but-
-undecryptable (refuse, because the previous backups are encrypted and silently
-downgrading is worse than failing).
+Backups are encrypted with the user's own password. For a local-auth account
+the server only ever holds that in plaintext at the moment they type it, so
+`rememberLoginPassword` captures it from registration, login and
+change-password and nothing asks them to configure anything. An OIDC account
+has no password of ours, so those users set a dedicated one in Settings
+(`setBackupPasswordForOidcUser`) or go unencrypted; `getStatus().manageable` is
+what the UI gates that section on, and both management methods refuse a
+local-auth caller rather than accepting a change the next login would undo.
+
+A stored copy is checked against the account's current password hash before it
+is used (`resolveBackupPassword`) -- encrypting with a password the user has
+since changed produces a file that looks like a backup and cannot be opened.
+That resolution has three outcomes, not two: nothing stored (write plaintext), a
+usable password (encrypt), and stored-but-undecryptable (refuse, because the
+previous backups are encrypted and silently downgrading is worse than failing).
 
 ## Cron Jobs
 

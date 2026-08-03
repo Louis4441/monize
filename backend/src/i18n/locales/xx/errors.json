@@ -187,6 +187,10 @@
     "unsupportedBackupVersion": "[XX-Unsupported backup version: {{ version }}. Expected {{ expected }}-XX]",
     "missingExportedAt": "[XX-Invalid backup format: missing exportedAt-XX]",
     "tableNotAllowed": "[XX-Table {{ table }} is not allowed in backup restore-XX]",
+    "encryptionNotConfigured": "[XX-Server is not configured for encryption (AI_ENCRYPTION_KEY missing)-XX]",
+    "backupPasswordOidcOnly": "[XX-Backup password is only configurable for OIDC users; local users use their login password-XX]",
+    "backupPasswordTooShort": "[XX-Backup password must be at least {{ minLength }} characters-XX]",
+    "backupPasswordBreached": "[XX-This password has been found in a data breach. Please choose a different password.-XX]",
     "restoreBodyMustBeFile": "[XX-Request body must be a backup file-XX]"
   },
   "budgets": {

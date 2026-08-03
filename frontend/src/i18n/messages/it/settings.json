@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Backup e ripristino",
+    "encryption": {
+      "heading": "Crittografia backup",
+      "descriptionOidc": "Cifra i backup manuali e automatici con una password dedicata che imposti qui. La password è necessaria per il ripristino.",
+      "loading": "Caricamento...",
+      "enabledBadge": "Attiva",
+      "changePasswordButton": "Cambia password backup",
+      "disableButton": "Disattiva",
+      "setPasswordButton": "Imposta password backup",
+      "setupModal": {
+        "titleOidc": "Imposta password backup",
+        "descriptionOidc": "Scegli una password per cifrare i tuoi backup. Salvala in un posto sicuro -- ti servirà per il ripristino.",
+        "placeholderOidc": "Nuova password backup (12+ caratteri)",
+        "savingButton": "Salvataggio...",
+        "confirmButton": "Conferma"
+      },
+      "toasts": {
+        "enabled": "Backup cifrati attivati",
+        "disabled": "Backup cifrati disattivati",
+        "enableFailed": "Impossibile attivare la cifratura",
+        "disableFailed": "Impossibile disattivare la cifratura"
+      }
+    },
     "export": {
       "heading": "Crea backup",
       "description": "Scarica un backup completo dei tuoi dati finanziari. Include conti, transazioni, categorie, beneficiari, budget, investimenti e tutti gli altri dati utente.",

@@ -319,23 +319,153 @@ describe('BackupRestoreSection', () => {
     });
   });
 
-  describe('encryption status', () => {
-    it('offers no way to configure encryption', async () => {
+  describe('backup password section', () => {
+    it('offers a local-auth user nothing to configure', async () => {
       (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
         enabled: true,
+        manageable: false,
       });
 
       await renderSection(localUser);
 
-      // Encryption is automatic: the server keeps the password the user typed
-      // at sign-in. There is nothing here to switch on, off or change.
+      // Their backups are encrypted with the login password the server
+      // captured at sign-in, so there is nothing to switch on, off or change.
       await waitFor(() =>
         expect(screen.getByText('Download Backup')).toBeInTheDocument(),
       );
-      expect(screen.queryByText('Enable Encrypted Backups')).toBeNull();
+      expect(screen.queryByText('Backup Encryption')).toBeNull();
       expect(screen.queryByText('Set Backup Password')).toBeNull();
       expect(screen.queryByText('Change Backup Password')).toBeNull();
       expect(screen.queryByText('Disable')).toBeNull();
+    });
+
+    it('offers an OIDC user a password to set', async () => {
+      (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+        enabled: false,
+        manageable: true,
+      });
+
+      await renderSection(oidcUser);
+
+      // No login password of ours exists for them, so this is the only way
+      // their backups can be encrypted at all.
+      await waitFor(() =>
+        expect(screen.getByText('Set Backup Password')).toBeInTheDocument(),
+      );
+    });
+
+    it('sets the password an OIDC user types', async () => {
+      (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ enabled: false, manageable: true })
+        .mockResolvedValueOnce({ enabled: true, manageable: true });
+      (backupApi.setBackupPassword as ReturnType<typeof vi.fn>).mockResolvedValue(
+        undefined,
+      );
+
+      await renderSection(oidcUser);
+      await waitFor(() =>
+        expect(screen.getByText('Set Backup Password')).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByText('Set Backup Password'));
+
+      fireEvent.change(screen.getByPlaceholderText(/New backup password/), {
+        target: { value: 'a-strong-backup-password' },
+      });
+      fireEvent.click(screen.getByText('Confirm'));
+
+      await waitFor(() =>
+        expect(backupApi.setBackupPassword).toHaveBeenCalledWith(
+          'a-strong-backup-password',
+        ),
+      );
+      await waitFor(() =>
+        expect(screen.getByText('Enabled')).toBeInTheDocument(),
+      );
+    });
+
+    it('shows an error toast when setting the password fails', async () => {
+      (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+        enabled: false,
+        manageable: true,
+      });
+      (backupApi.setBackupPassword as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('breached'),
+      );
+
+      await renderSection(oidcUser);
+      await waitFor(() =>
+        expect(screen.getByText('Set Backup Password')).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByText('Set Backup Password'));
+      fireEvent.change(screen.getByPlaceholderText(/New backup password/), {
+        target: { value: 'hunter2hunter2' },
+      });
+      fireEvent.click(screen.getByText('Confirm'));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Failed to enable encryption'),
+      );
+    });
+
+    it('lets an OIDC user change the password or turn it off', async () => {
+      (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ enabled: true, manageable: true })
+        .mockResolvedValueOnce({ enabled: false, manageable: true });
+      (backupApi.disableEncryption as ReturnType<typeof vi.fn>).mockResolvedValue(
+        undefined,
+      );
+
+      await renderSection(oidcUser);
+      await waitFor(() =>
+        expect(screen.getByText('Change Backup Password')).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByText('Disable'));
+
+      await waitFor(() => expect(backupApi.disableEncryption).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(screen.getByText('Set Backup Password')).toBeInTheDocument(),
+      );
+    });
+
+    it('shows an error toast when disabling fails', async () => {
+      (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+        enabled: true,
+        manageable: true,
+      });
+      (backupApi.disableEncryption as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('boom'),
+      );
+
+      await renderSection(oidcUser);
+      await waitFor(() => expect(screen.getByText('Disable')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Disable'));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Failed to disable encryption'),
+      );
+    });
+
+    it('closes the password modal on Cancel without calling the API', async () => {
+      (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+        enabled: false,
+        manageable: true,
+      });
+
+      await renderSection(oidcUser);
+      await waitFor(() =>
+        expect(screen.getByText('Set Backup Password')).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByText('Set Backup Password'));
+      expect(
+        screen.getByPlaceholderText(/New backup password/),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Cancel'));
+
+      expect(
+        screen.queryByPlaceholderText(/New backup password/),
+      ).not.toBeInTheDocument();
+      expect(backupApi.setBackupPassword).not.toHaveBeenCalled();
     });
 
     it('will not export while the encryption status is unknown', async () => {
@@ -358,6 +488,7 @@ describe('BackupRestoreSection', () => {
     it('prompts for an encryption password when encryption is enabled, then downloads with .mzbe extension', async () => {
       (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
         enabled: true,
+        manageable: false,
       });
       const mockBlob = new Blob(['encrypted'], { type: 'application/octet-stream' });
       (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue(mockBlob);
@@ -387,6 +518,7 @@ describe('BackupRestoreSection', () => {
     it('export password prompt Cancel closes without exporting', async () => {
       (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
         enabled: true,
+        manageable: false,
       });
       await renderSection(localUser);
       await waitFor(() =>
@@ -582,6 +714,7 @@ describe('BackupRestoreSection', () => {
     it('Enter on the export-password input triggers export', async () => {
       (backupApi.getEncryptionStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
         enabled: true,
+        manageable: false,
       });
       (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue(
         new Blob(['x']),

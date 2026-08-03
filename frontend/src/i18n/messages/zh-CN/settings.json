@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "备份与恢复",
+    "encryption": {
+      "heading": "备份加密",
+      "descriptionOidc": "使用您在此处设置的专用备份密码加密手动和自动备份。恢复时需要此密码。",
+      "loading": "加载中...",
+      "enabledBadge": "已启用",
+      "changePasswordButton": "更改备份密码",
+      "disableButton": "禁用",
+      "setPasswordButton": "设置备份密码",
+      "setupModal": {
+        "titleOidc": "设置备份密码",
+        "descriptionOidc": "选择用于加密备份的密码。请妥善保存——恢复时需要此密码。",
+        "placeholderOidc": "新备份密码（至少 12 位）",
+        "savingButton": "保存中...",
+        "confirmButton": "确认"
+      },
+      "toasts": {
+        "enabled": "加密备份已启用",
+        "disabled": "加密备份已禁用",
+        "enableFailed": "启用加密失败",
+        "disableFailed": "禁用加密失败"
+      }
+    },
     "export": {
       "heading": "创建备份",
       "description": "下载完整的财务数据备份。包括账户、交易、分类、收款人、预算、投资及所有其他用户数据。",

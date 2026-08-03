@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Cópia de Segurança e Restauro",
+    "encryption": {
+      "heading": "Encriptação de Cópia de Segurança",
+      "descriptionOidc": "Encripte cópias de segurança manuais e automáticas com uma palavra-passe de cópia de segurança dedicada que define aqui. A palavra-passe é necessária para o restauro.",
+      "loading": "A carregar...",
+      "enabledBadge": "Ativada",
+      "changePasswordButton": "Alterar Palavra-passe de Cópia de Segurança",
+      "disableButton": "Desativar",
+      "setPasswordButton": "Definir Palavra-passe de Cópia de Segurança",
+      "setupModal": {
+        "titleOidc": "Definir Palavra-passe de Cópia de Segurança",
+        "descriptionOidc": "Escolha uma palavra-passe que será utilizada para encriptar as suas cópias de segurança. Guarde-a num local seguro -- precisará dela para o restauro.",
+        "placeholderOidc": "Nova palavra-passe de cópia de segurança (12+ caracteres)",
+        "savingButton": "A guardar...",
+        "confirmButton": "Confirmar"
+      },
+      "toasts": {
+        "enabled": "Cópias de segurança encriptadas ativadas",
+        "disabled": "Cópias de segurança encriptadas desativadas",
+        "enableFailed": "Falha ao ativar a encriptação",
+        "disableFailed": "Falha ao desativar a encriptação"
+      }
+    },
     "export": {
       "heading": "Criar Cópia de Segurança",
       "description": "Transfira uma cópia de segurança completa dos seus dados financeiros. Inclui contas, transações, categorias, beneficiários, orçamentos, investimentos e todos os outros dados do utilizador.",

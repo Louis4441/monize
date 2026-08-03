@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "[XX-Backup & Restore-XX]",
+    "encryption": {
+      "heading": "[XX-Backup Encryption-XX]",
+      "descriptionOidc": "[XX-Encrypt manual and automatic backups with a dedicated backup password you set here. The password is required to restore.-XX]",
+      "loading": "[XX-Loading...-XX]",
+      "enabledBadge": "[XX-Enabled-XX]",
+      "changePasswordButton": "[XX-Change Backup Password-XX]",
+      "disableButton": "[XX-Disable-XX]",
+      "setPasswordButton": "[XX-Set Backup Password-XX]",
+      "setupModal": {
+        "titleOidc": "[XX-Set Backup Password-XX]",
+        "descriptionOidc": "[XX-Choose a password that will be used to encrypt your backups. Save it somewhere safe, because you will need it to restore.-XX]",
+        "placeholderOidc": "[XX-New backup password (12+ chars)-XX]",
+        "savingButton": "[XX-Saving...-XX]",
+        "confirmButton": "[XX-Confirm-XX]"
+      },
+      "toasts": {
+        "enabled": "[XX-Encrypted backups enabled-XX]",
+        "disabled": "[XX-Encrypted backups disabled-XX]",
+        "enableFailed": "[XX-Failed to enable encryption-XX]",
+        "disableFailed": "[XX-Failed to disable encryption-XX]"
+      }
+    },
     "export": {
       "heading": "[XX-Create Backup-XX]",
       "description": "[XX-Download a complete backup of your financial data. This includes accounts, transactions, categories, payees, budgets, investments, and all other user data.-XX]",

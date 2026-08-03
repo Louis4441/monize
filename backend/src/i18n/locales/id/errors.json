@@ -179,6 +179,10 @@
     "unsupportedBackupVersion": "Versi cadangan tidak didukung: {{ version }}. Diharapkan {{ expected }}",
     "missingExportedAt": "Format cadangan tidak valid: exportedAt tidak ada",
     "tableNotAllowed": "Tabel {{ table }} tidak diizinkan dalam pemulihan cadangan",
+    "encryptionNotConfigured": "Server tidak dikonfigurasi untuk enkripsi (AI_ENCRYPTION_KEY tidak ada)",
+    "backupPasswordOidcOnly": "Kata sandi cadangan hanya dapat dikonfigurasi untuk pengguna OIDC; pengguna lokal menggunakan kata sandi masuk mereka",
+    "backupPasswordTooShort": "Kata sandi cadangan harus minimal {{ minLength }} karakter",
+    "backupPasswordBreached": "Kata sandi ini ditemukan dalam kebocoran data. Pilih kata sandi yang berbeda.",
     "restoreBodyMustBeFile": "Isi permintaan harus berupa file cadangan"
   },
   "budgets": {

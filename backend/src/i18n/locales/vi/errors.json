@@ -179,6 +179,10 @@
     "unsupportedBackupVersion": "Phiên bản sao lưu không được hỗ trợ: {{ version }}. Dự kiến {{ expected }}",
     "missingExportedAt": "Định dạng sao lưu không hợp lệ: thiếu exportedAt",
     "tableNotAllowed": "Bảng {{ table }} không được phép trong khôi phục sao lưu",
+    "encryptionNotConfigured": "Máy chủ chưa được cấu hình cho mã hóa (thiếu AI_ENCRYPTION_KEY)",
+    "backupPasswordOidcOnly": "Mật khẩu sao lưu chỉ có thể cấu hình cho người dùng OIDC; người dùng cục bộ sử dụng mật khẩu đăng nhập của họ",
+    "backupPasswordTooShort": "Mật khẩu sao lưu phải có ít nhất {{ minLength }} ký tự",
+    "backupPasswordBreached": "Mật khẩu này đã bị phát hiện trong một vụ rò rỉ dữ liệu. Vui lòng chọn mật khẩu khác.",
     "restoreBodyMustBeFile": "Nội dung yêu cầu phải là tệp sao lưu"
   },
   "budgets": {

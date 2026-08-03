@@ -93,6 +93,13 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
   const [restoreResult, setRestoreResult] = useState<RestoreResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Backup password setup. Only reachable for an account the server reports as
+  // manageable: a local-auth user's backups are encrypted with the login
+  // password it captured at sign-in, so there is nothing here for them.
+  const [showEncryptionSetup, setShowEncryptionSetup] = useState(false);
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupSaving, setSetupSaving] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     backupApi
@@ -149,6 +156,35 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
       return;
     }
     await runExport();
+  };
+
+  const closeEncryptionSetup = () => {
+    setShowEncryptionSetup(false);
+    setSetupPassword('');
+  };
+
+  const handleSetBackupPassword = async () => {
+    setSetupSaving(true);
+    try {
+      await backupApi.setBackupPassword(setupPassword);
+      setEncryption(await backupApi.getEncryptionStatus());
+      closeEncryptionSetup();
+      toast.success(t('encryption.toasts.enabled'));
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('encryption.toasts.enableFailed')));
+    } finally {
+      setSetupSaving(false);
+    }
+  };
+
+  const handleDisableEncryption = async () => {
+    try {
+      await backupApi.disableEncryption();
+      setEncryption(await backupApi.getEncryptionStatus());
+      toast.success(t('encryption.toasts.disabled'));
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('encryption.toasts.disableFailed')));
+    }
   };
 
   const closeRestoreForm = () => {
@@ -216,6 +252,47 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
       <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
         {t('heading')}
       </h2>
+
+      {/* Backup password -- OIDC accounts only. A local-auth account's backups
+          are encrypted with the login password the server captured at sign-in,
+          so there is nothing to set, change or switch off. */}
+      {encryption?.manageable && (
+        <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+            {t('encryption.heading')}
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {t('encryption.descriptionOidc')}
+          </p>
+
+          {encryption.enabled ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                {t('encryption.enabledBadge')}
+              </span>
+              <Button
+                variant="outline"
+                onClick={() => setShowEncryptionSetup(true)}
+              >
+                {t('encryption.changePasswordButton')}
+              </Button>
+              <Button variant="outline" onClick={handleDisableEncryption}>
+                {t('encryption.disableButton')}
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={() => setShowEncryptionSetup(true)}>
+              {t('encryption.setPasswordButton')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {encryptionLoading && (
+        <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+          {t('encryption.loading')}
+        </p>
+      )}
 
       {/* Export Section */}
       <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
@@ -360,6 +437,43 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
           </div>
         )}
       </div>
+
+      {/* Backup password modal */}
+      <Modal
+        isOpen={showEncryptionSetup}
+        onClose={closeEncryptionSetup}
+        maxWidth="sm"
+      >
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            {t('encryption.setupModal.titleOidc')}
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {t('encryption.setupModal.descriptionOidc')}
+          </p>
+          <Input
+            type="password"
+            value={setupPassword}
+            onChange={(e) => setSetupPassword(e.target.value)}
+            placeholder={t('encryption.setupModal.placeholderOidc')}
+          />
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={closeEncryptionSetup}
+              disabled={setupSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSetBackupPassword}
+              disabled={setupSaving || !setupPassword}
+            >
+              {setupSaving ? t('encryption.setupModal.savingButton') : t('encryption.setupModal.confirmButton')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Export-time password prompt (when encryption is enabled) */}
       <Modal

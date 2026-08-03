@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Sauvegarde et restauration",
+    "encryption": {
+      "heading": "Chiffrement des sauvegardes",
+      "descriptionOidc": "Chiffrez les sauvegardes manuelles et automatiques avec un mot de passe de sauvegarde dédié que vous définissez ici. Le mot de passe est requis pour la restauration.",
+      "loading": "Chargement...",
+      "enabledBadge": "Activé",
+      "changePasswordButton": "Changer le mot de passe de sauvegarde",
+      "disableButton": "Désactiver",
+      "setPasswordButton": "Définir le mot de passe de sauvegarde",
+      "setupModal": {
+        "titleOidc": "Définir le mot de passe de sauvegarde",
+        "descriptionOidc": "Choisissez un mot de passe qui sera utilisé pour chiffrer vos sauvegardes. Conservez-le dans un endroit sûr — vous en aurez besoin pour restaurer.",
+        "placeholderOidc": "Nouveau mot de passe de sauvegarde (12+ caractères)",
+        "savingButton": "Enregistrement...",
+        "confirmButton": "Confirmer"
+      },
+      "toasts": {
+        "enabled": "Sauvegardes chiffrées activées",
+        "disabled": "Sauvegardes chiffrées désactivées",
+        "enableFailed": "Échec de l'activation du chiffrement",
+        "disableFailed": "Échec de la désactivation du chiffrement"
+      }
+    },
     "export": {
       "heading": "Créer une sauvegarde",
       "description": "Téléchargez une sauvegarde complète de vos données financières. Cela inclut les comptes, les transactions, les catégories, les bénéficiaires, les budgets, les investissements et toutes les autres données utilisateur.",

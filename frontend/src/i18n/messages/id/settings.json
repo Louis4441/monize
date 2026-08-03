@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Cadangkan & Pulihkan",
+    "encryption": {
+      "heading": "Enkripsi Cadangan",
+      "descriptionOidc": "Enkripsi cadangan manual dan otomatis dengan kata sandi cadangan khusus yang Anda tetapkan di sini. Kata sandi diperlukan untuk pemulihan.",
+      "loading": "Memuat...",
+      "enabledBadge": "Aktif",
+      "changePasswordButton": "Ubah Kata Sandi Cadangan",
+      "disableButton": "Nonaktifkan",
+      "setPasswordButton": "Tetapkan Kata Sandi Cadangan",
+      "setupModal": {
+        "titleOidc": "Tetapkan Kata Sandi Cadangan",
+        "descriptionOidc": "Pilih kata sandi yang akan digunakan untuk mengenkripsi cadangan Anda. Simpan di tempat yang aman -- Anda akan membutuhkannya untuk pemulihan.",
+        "placeholderOidc": "Kata sandi cadangan baru (12+ karakter)",
+        "savingButton": "Menyimpan...",
+        "confirmButton": "Konfirmasi"
+      },
+      "toasts": {
+        "enabled": "Cadangan terenkripsi diaktifkan",
+        "disabled": "Cadangan terenkripsi dinonaktifkan",
+        "enableFailed": "Gagal mengaktifkan enkripsi",
+        "disableFailed": "Gagal menonaktifkan enkripsi"
+      }
+    },
     "export": {
       "heading": "Buat Cadangan",
       "description": "Unduh cadangan lengkap data keuangan Anda. Ini mencakup akun, transaksi, kategori, penerima, anggaran, investasi, dan semua data pengguna lainnya.",

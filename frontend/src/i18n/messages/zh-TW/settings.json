@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "備份與還原",
+    "encryption": {
+      "heading": "備份加密",
+      "descriptionOidc": "使用您在此設定的專用備份密碼加密手動和自動備份。還原時需要此密碼。",
+      "loading": "載入中...",
+      "enabledBadge": "已啟用",
+      "changePasswordButton": "更改備份密碼",
+      "disableButton": "停用",
+      "setPasswordButton": "設定備份密碼",
+      "setupModal": {
+        "titleOidc": "設定備份密碼",
+        "descriptionOidc": "選擇用於加密備份的密碼。請妥善保存，還原時需要此密碼。",
+        "placeholderOidc": "新備份密碼（12+ 個字元）",
+        "savingButton": "儲存中...",
+        "confirmButton": "確認"
+      },
+      "toasts": {
+        "enabled": "加密備份已啟用",
+        "disabled": "加密備份已停用",
+        "enableFailed": "啟用加密失敗",
+        "disableFailed": "停用加密失敗"
+      }
+    },
     "export": {
       "heading": "建立備份",
       "description": "下載您財務資料的完整備份。包含科目、交易、類別、收款人、預算、投資及所有其他使用者資料。",

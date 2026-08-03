@@ -26,6 +26,8 @@ describe("BackupController", () => {
 
     mockBackupEncryption = {
       getStatus: jest.fn(),
+      setBackupPasswordForOidcUser: jest.fn(),
+      disableForOidcUser: jest.fn(),
     };
 
     mockSupportBackup = {
@@ -272,14 +274,34 @@ describe("BackupController", () => {
     });
   });
 
-  describe("encryption status", () => {
+  describe("encryption endpoints", () => {
     it("getEncryptionStatus delegates to the encryption service", async () => {
-      mockBackupEncryption.getStatus.mockResolvedValue({ enabled: true });
+      mockBackupEncryption.getStatus.mockResolvedValue({
+        enabled: true,
+        manageable: false,
+      });
       const result = await controller.getEncryptionStatus({
         user: { id: userId },
       });
       expect(mockBackupEncryption.getStatus).toHaveBeenCalledWith(userId);
-      expect(result).toEqual({ enabled: true });
+      expect(result).toEqual({ enabled: true, manageable: false });
+    });
+
+    it("setBackupPassword delegates with the new password", async () => {
+      await controller.setBackupPassword(
+        { user: { id: userId } },
+        { backupPassword: "long-good-password" },
+      );
+      expect(
+        mockBackupEncryption.setBackupPasswordForOidcUser,
+      ).toHaveBeenCalledWith(userId, "long-good-password");
+    });
+
+    it("disableEncryption delegates", async () => {
+      await controller.disableEncryption({ user: { id: userId } });
+      expect(mockBackupEncryption.disableForOidcUser).toHaveBeenCalledWith(
+        userId,
+      );
     });
   });
 });

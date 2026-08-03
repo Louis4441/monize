@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "バックアップと復元",
+    "encryption": {
+      "heading": "バックアップ暗号化",
+      "descriptionOidc": "ここで設定した専用のバックアップパスワードで手動および自動バックアップを暗号化します。復元にはパスワードが必要です。",
+      "loading": "読み込み中...",
+      "enabledBadge": "有効",
+      "changePasswordButton": "バックアップパスワードを変更",
+      "disableButton": "無効化",
+      "setPasswordButton": "バックアップパスワードを設定",
+      "setupModal": {
+        "titleOidc": "バックアップパスワードを設定",
+        "descriptionOidc": "バックアップの暗号化に使用するパスワードを選択してください。安全な場所に保存してください — 復元に必要です。",
+        "placeholderOidc": "新しいバックアップパスワード（12文字以上）",
+        "savingButton": "保存中...",
+        "confirmButton": "確認"
+      },
+      "toasts": {
+        "enabled": "暗号化バックアップを有効化しました",
+        "disabled": "暗号化バックアップを無効化しました",
+        "enableFailed": "暗号化の有効化に失敗しました",
+        "disableFailed": "暗号化の無効化に失敗しました"
+      }
+    },
     "export": {
       "heading": "バックアップを作成",
       "description": "財務データの完全なバックアップをダウンロードします。口座、取引、カテゴリ、支払先、予算、投資、その他すべてのユーザーデータが含まれます。",

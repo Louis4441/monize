@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   UseGuards,
   Request,
@@ -22,6 +23,7 @@ import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { SupportBackupService } from "./support-backup/support-backup.service";
 import { CreateSupportBackupDto } from "./support-backup/dto/create-support-backup.dto";
+import { SetBackupPasswordDto } from "./dto/backup-encryption.dto";
 import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
 import { tr } from "../i18n/translate";
 
@@ -171,5 +173,31 @@ export class BackupController {
   @ApiResponse({ status: 200, description: "Encryption status returned" })
   async getEncryptionStatus(@Request() req) {
     return this.backupEncryption.getStatus(req.user.id);
+  }
+
+  @Post("encryption/backup-password")
+  @DemoRestricted()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Set or update the dedicated backup password (OIDC users only; local users' backups are encrypted with their login password automatically)",
+  })
+  @ApiResponse({ status: 200, description: "Backup password set" })
+  async setBackupPassword(@Request() req, @Body() dto: SetBackupPasswordDto) {
+    await this.backupEncryption.setBackupPasswordForOidcUser(
+      req.user.id,
+      dto.backupPassword,
+    );
+    return { enabled: true };
+  }
+
+  @Delete("encryption")
+  @DemoRestricted()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Disable encrypted backups (OIDC users only)" })
+  @ApiResponse({ status: 200, description: "Encryption disabled" })
+  async disableEncryption(@Request() req) {
+    await this.backupEncryption.disableForOidcUser(req.user.id);
+    return { enabled: false };
   }
 }

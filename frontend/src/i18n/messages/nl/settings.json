@@ -501,6 +501,28 @@
   },
   "backupRestore": {
     "heading": "Back-up en herstel",
+    "encryption": {
+      "heading": "Back-upversleuteling",
+      "descriptionOidc": "Versleutel handmatige en automatische back-ups met een speciaal back-upwachtwoord dat je hier instelt. Het wachtwoord is vereist voor herstel.",
+      "loading": "Laden...",
+      "enabledBadge": "Ingeschakeld",
+      "changePasswordButton": "Back-upwachtwoord wijzigen",
+      "disableButton": "Uitschakelen",
+      "setPasswordButton": "Back-upwachtwoord instellen",
+      "setupModal": {
+        "titleOidc": "Back-upwachtwoord instellen",
+        "descriptionOidc": "Kies een wachtwoord dat wordt gebruikt om jouw back-ups te versleutelen. Bewaar het op een veilige plek -- je hebt het nodig voor herstel.",
+        "placeholderOidc": "Nieuw back-upwachtwoord (12+ tekens)",
+        "savingButton": "Opslaan...",
+        "confirmButton": "Bevestigen"
+      },
+      "toasts": {
+        "enabled": "Versleutelde back-ups ingeschakeld",
+        "disabled": "Versleutelde back-ups uitgeschakeld",
+        "enableFailed": "Inschakelen van versleuteling mislukt",
+        "disableFailed": "Uitschakelen van versleuteling mislukt"
+      }
+    },
     "export": {
       "heading": "Back-up aanmaken",
       "description": "Download een volledige back-up van jouw financiële gegevens. Dit omvat rekeningen, transacties, categorieën, begunstigden, budgetten, beleggingen en alle andere gebruikersgegevens.",

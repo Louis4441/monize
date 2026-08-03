@@ -206,10 +206,27 @@ describe('backupApi', () => {
   });
 
   it('getEncryptionStatus calls GET /backup/encryption', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: { enabled: true } });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { enabled: true, manageable: false },
+    });
     const result = await backupApi.getEncryptionStatus();
     expect(apiClient.get).toHaveBeenCalledWith('/backup/encryption');
-    expect(result).toEqual({ enabled: true });
+    expect(result).toEqual({ enabled: true, manageable: false });
+  });
+
+  it('setBackupPassword posts the new password', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { enabled: true } });
+    await backupApi.setBackupPassword('a-strong-password');
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/backup/encryption/backup-password',
+      { backupPassword: 'a-strong-password' },
+    );
+  });
+
+  it('disableEncryption issues DELETE /backup/encryption', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: { enabled: false } });
+    await backupApi.disableEncryption();
+    expect(apiClient.delete).toHaveBeenCalledWith('/backup/encryption');
   });
 });
 
