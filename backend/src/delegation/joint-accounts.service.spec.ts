@@ -9,6 +9,8 @@ import {
 } from "./joint-accounts.service";
 import { CrossOwnerAccessService } from "./cross-owner-access.service";
 import { Account } from "../accounts/entities/account.entity";
+import { Category } from "../categories/entities/category.entity";
+import { Payee } from "../payees/entities/payee.entity";
 import { User } from "../users/entities/user.entity";
 import { AccountDelegate } from "./entities/account-delegate.entity";
 import { AccountDelegateGrant } from "./entities/account-delegate-grant.entity";
@@ -29,6 +31,8 @@ describe("JointAccountsService", () => {
   let grantsRepo: Record<string, jest.Mock>;
   let usersRepo: Record<string, jest.Mock>;
   let exclusionsRepo: Record<string, jest.Mock>;
+  let categoriesRepo: Record<string, jest.Mock>;
+  let payeesRepo: Record<string, jest.Mock>;
   let manager: Record<string, jest.Mock>;
 
   const GRANTEE = "11111111-1111-4111-8111-111111111111";
@@ -88,12 +92,16 @@ describe("JointAccountsService", () => {
       create: jest.fn((v) => v),
       delete: jest.fn(),
     };
+    categoriesRepo = { find: jest.fn().mockResolvedValue([]) };
+    payeesRepo = { find: jest.fn().mockResolvedValue([]) };
     const scoped = createScopedDbMocks([
       [Account, accountsRepo as never],
       [AccountDelegate, delegatesRepo as never],
       [AccountDelegateGrant, grantsRepo as never],
       [User, usersRepo as never],
       [DelegateNetWorthExclusion, exclusionsRepo as never],
+      [Category, categoriesRepo as never],
+      [Payee, payeesRepo as never],
     ]);
     manager = scoped.manager;
     crossOwner = { accountAccessFor: jest.fn() };
@@ -306,6 +314,53 @@ describe("JointAccountsService", () => {
 
       const read = await service.jointAccessFor(GRANTEE, ACCOUNT_ID, "read");
       expect(read.via).toBe("delegation");
+    });
+  });
+
+  describe("jointReferenceData", () => {
+    beforeEach(() => {
+      crossOwner.accountAccessFor.mockResolvedValue({
+        account: chequing,
+        ownerUserId: OWNER,
+        via: "delegation",
+      });
+      delegatesRepo.findOne.mockResolvedValue({
+        ...activeDelegation,
+        payeesCanCreate: true,
+        categoriesCanCreate: false,
+      });
+      grantsRepo.findOne.mockResolvedValue(grant());
+    });
+
+    it("returns the OWNER's picker lists with the delegation capability flags", async () => {
+      categoriesRepo.find.mockResolvedValue([{ id: "c1", name: "Groceries" }]);
+      payeesRepo.find.mockResolvedValue([{ id: "p1", name: "Metro" }]);
+
+      const result = await service.jointReferenceData(GRANTEE, ACCOUNT_ID);
+
+      expect(result.categories).toEqual([{ id: "c1", name: "Groceries" }]);
+      expect(result.payees).toEqual([{ id: "p1", name: "Metro" }]);
+      expect(result.payeesCanCreate).toBe(true);
+      expect(result.categoriesCanCreate).toBe(false);
+      expect(categoriesRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: OWNER }),
+        }),
+      );
+      expect(payeesRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: OWNER, isActive: true }),
+        }),
+      );
+    });
+
+    it("404s a plain grant before any reference data is read", async () => {
+      grantsRepo.findOne.mockResolvedValue(null);
+      await expect(
+        service.jointReferenceData(GRANTEE, ACCOUNT_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(categoriesRepo.find).not.toHaveBeenCalled();
+      expect(payeesRepo.find).not.toHaveBeenCalled();
     });
   });
 

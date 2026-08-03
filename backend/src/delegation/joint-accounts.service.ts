@@ -11,6 +11,8 @@ import { roundMoney } from "../common/round.util";
 import { todayYMD } from "../common/date-utils";
 import { tr } from "../i18n/translate";
 import { Account } from "../accounts/entities/account.entity";
+import { Category } from "../categories/entities/category.entity";
+import { Payee } from "../payees/entities/payee.entity";
 import { User } from "../users/entities/user.entity";
 import { AccountDelegate } from "./entities/account-delegate.entity";
 import { AccountDelegateGrant } from "./entities/account-delegate-grant.entity";
@@ -424,6 +426,75 @@ export class JointAccountsService {
         await repo.delete({ id: existing.id });
       }
     });
+  }
+
+  /**
+   * The owner's category and payee pickers for a joint account's register
+   * (reference-data policy R1): a joint row belongs to the owner and may only
+   * carry the owner's category/payee ids, so the grantee picks from the
+   * owner's lists. Serves picker fields only -- no usage stats, no balances.
+   * The capability flags tell the client whether free-text payee entry (an
+   * owner-ledger auto-create) is offered.
+   */
+  async jointReferenceData(
+    realUserId: string,
+    accountId: string,
+  ): Promise<{
+    categories: Array<
+      Pick<
+        Category,
+        "id" | "name" | "parentId" | "icon" | "color" | "isIncome" | "isSystem"
+      >
+    >;
+    payees: Array<Pick<Payee, "id" | "name" | "defaultCategoryId">>;
+    payeesCanCreate: boolean;
+    categoriesCanCreate: boolean;
+  }> {
+    const access = await this.jointAccessFor(realUserId, accountId, "read");
+
+    const delegation = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AccountDelegate).findOne({
+        where: {
+          ownerUserId: access.ownerUserId,
+          delegateUserId: realUserId,
+          status: "active",
+        },
+      }),
+    );
+
+    // Readable in the grantee's own session: the migration-134
+    // delegation-scoped read arms cover these tables under enforcement.
+    const [categories, payees] = await withScopedDb(
+      this.dataSource,
+      (manager) =>
+        Promise.all([
+          manager.getRepository(Category).find({
+            where: { userId: access.ownerUserId },
+            select: [
+              "id",
+              "name",
+              "parentId",
+              "icon",
+              "color",
+              "isIncome",
+              "isSystem",
+            ],
+            order: { name: "ASC" },
+          }),
+          manager.getRepository(Payee).find({
+            where: { userId: access.ownerUserId, isActive: true },
+            select: ["id", "name", "defaultCategoryId"],
+            order: { name: "ASC" },
+          }),
+        ]),
+    );
+
+    return {
+      categories,
+      payees,
+      payeesCanCreate: !!delegation?.payeesCanCreate,
+      categoriesCanCreate: !!delegation?.categoriesCanCreate,
+    };
   }
 
   /** Grant flags masked by the v1 account-type write policy. */
