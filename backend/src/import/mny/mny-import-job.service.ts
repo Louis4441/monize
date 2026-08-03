@@ -1,6 +1,7 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { ConflictException, Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { DataSource } from "typeorm";
+import { DataSource, QueryFailedError } from "typeorm";
+import { tr } from "../../i18n/translate";
 import {
   runOutsideActiveScopedManager,
   withScopedDb,
@@ -9,7 +10,7 @@ import {
   withSystemContext,
   withUserContext,
 } from "../../common/db/with-context";
-import { ImportJob } from "./entities/import-job.entity";
+import { ImportJob, ONE_ACTIVE_JOB_INDEX } from "./entities/import-job.entity";
 import { MnyImportError } from "./mny-errors";
 import { MnyImportProgress, MnyImportResult } from "./model/mny-import-job";
 import { MnyImportOptions } from "./model/mny-import-options";
@@ -22,10 +23,12 @@ import { MnyImportOptions } from "./model/mny-import-options";
  * body runs as an unawaited in-process task under `withUserContext`. The wizard
  * polls the row.
  *
- * Two things make that safe on Kubernetes, where every replica runs the same
- * code: the claim is atomic, so two pods racing to start the same job produce one
- * winner; and a running job heartbeats, so a job whose pod died is reaped into
- * `failed` + retryable instead of appearing to run forever.
+ * Three things make that safe on Kubernetes, where every replica runs the same
+ * code: the insert is guarded by a partial unique index, so two *requests*
+ * racing to start an import produce one job; the claim is atomic, so two pods
+ * racing over that one job produce one winner; and a running job heartbeats, so
+ * a job whose pod died is reaped into `failed` + retryable instead of appearing
+ * to run forever.
  */
 
 /** A job with no heartbeat for this long is presumed dead. */
@@ -39,6 +42,40 @@ export const JOB_STALLED_ERROR_KEY = "mnyJobStalled";
 
 /** i18n key for a failure with no more specific parse error. */
 export const JOB_FAILED_ERROR_KEY = "mnyImportFailed";
+
+/** PostgreSQL SQLSTATE for a unique violation. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * True when this error is the one-active-import-per-user index refusing an
+ * INSERT, rather than any other unique constraint on the table.
+ *
+ * Matching on the constraint name and not merely on the SQLSTATE matters: a
+ * different violation means something the caller has no business reporting as
+ * "an import is already running".
+ */
+export function isActiveJobConflict(error: unknown): boolean {
+  if (!(error instanceof QueryFailedError)) {
+    return false;
+  }
+  const driver = error.driverError as
+    | { code?: string; constraint?: string }
+    | undefined;
+  return (
+    driver?.code === UNIQUE_VIOLATION &&
+    driver?.constraint === ONE_ACTIVE_JOB_INDEX
+  );
+}
+
+/** The 409 the wizard already renders when a second import is refused. */
+export function importAlreadyRunningException(): ConflictException {
+  return new ConflictException(
+    tr(
+      "errors.import.mnyImportAlreadyRunning",
+      "An import is already running. Wait for it to finish before starting another.",
+    ),
+  );
+}
 
 /** What a job body can report while it runs. */
 export interface JobRunContext {
@@ -72,25 +109,61 @@ export class MnyImportJobService {
 
   constructor(private dataSource: DataSource) {}
 
-  /** Creates a `pending` job. Returns the row the wizard will poll. */
+  /**
+   * Creates a `pending` job, or throws 409 when this user already has one in
+   * flight. Returns the row the wizard will poll.
+   *
+   * The refusal is the INSERT itself, not a preceding count: `hasActiveJob`
+   * followed by `create` is two transactions, and two concurrent starts can
+   * both read zero before either writes -- which imported the same staged file
+   * twice, with fresh transaction UUIDs each time so nothing deduplicated the
+   * second run. The partial unique index makes the loser block on the winner
+   * and then fail, so the check and the write are one atomic act.
+   */
   async create(
     userId: string,
     stagedFileId: string,
     options: MnyImportOptions,
   ): Promise<ImportJob> {
-    return withScopedDb(this.dataSource, async (manager) => {
-      const repo = manager.getRepository(ImportJob);
-      return repo.save(
-        repo.create({
-          userId,
-          stagedFileId,
-          sourceFormat: "mny",
-          status: "pending",
-          options,
-          retryable: false,
-        }),
-      );
-    });
+    try {
+      return await withScopedDb(this.dataSource, async (manager) => {
+        const repo = manager.getRepository(ImportJob);
+        return repo.save(
+          repo.create({
+            userId,
+            stagedFileId,
+            sourceFormat: "mny",
+            status: "pending",
+            options,
+            retryable: false,
+          }),
+        );
+      });
+    } catch (error) {
+      if (isActiveJobConflict(error)) {
+        throw importAlreadyRunningException();
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes a job that never started, releasing this user's import slot.
+   *
+   * `start` creates the row *before* the optional destructive wipe, so the wipe
+   * runs under the same lock the import does -- but a wipe that fails
+   * re-authentication must not leave the user holding a slot for a job that
+   * will never run. Restricted to `pending`: a claimed job belongs to its
+   * worker, which reports its own outcome.
+   */
+  async discard(userId: string, jobId: string): Promise<void> {
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `DELETE FROM import_jobs
+          WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
+        [jobId, userId],
+      ),
+    );
   }
 
   /** The job, or null when it never existed or belongs to another user. */
@@ -103,8 +176,11 @@ export class MnyImportJobService {
   }
 
   /**
-   * True when this user already has an import in flight. The wizard's Start
-   * button is guarded by this, so a double-click cannot import a file twice.
+   * True when this user already has an import in flight.
+   *
+   * Advisory only: it answers the question a moment before the answer can
+   * change, so it buys a friendly 409 without an INSERT attempt and nothing
+   * more. The guarantee lives in `create`'s unique index.
    */
   async hasActiveJob(userId: string): Promise<boolean> {
     const count = await withScopedDb(this.dataSource, (manager) =>
