@@ -625,7 +625,8 @@
       "revokeFailed": "デリゲートの取り消しに失敗しました",
       "resetPasswordFailed": "パスワードのリセットに失敗しました",
       "copyFailed": "クリップボードにコピーできませんでした"
-    }
+    },
+    "jointLabel": "{count, plural, other {# 件の共同口座}}"
   },
   "delegateAccessModal": {
     "title": "アクセスを編集",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "付与する口座がありません。",
-      "grantAll": "すべて付与"
+      "grantAll": "すべて付与",
+      "jointRequiresFullAccount": "共同口座は、自分のMonizeアカウントを持つユーザーとのみ共有できます"
     },
     "shared": {
       "description": "支払先、カテゴリ、タグの読み取りは常に許可されています。これは作成/編集/削除を制御します。"

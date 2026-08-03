@@ -625,7 +625,8 @@
       "revokeFailed": "Nie udało się odwołać pełnomocnika",
       "resetPasswordFailed": "Nie udało się zresetować hasła",
       "copyFailed": "Nie udało się skopiować do schowka"
-    }
+    },
+    "jointLabel": "{count, plural, one {# wspólne konto} few {# wspólne konta} many {# wspólnych kont} other {# wspólnego konta}}"
   },
   "delegateAccessModal": {
     "title": "Edytuj dostęp",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Brak kont do przyznania.",
-      "grantAll": "Przyznaj wszystkie"
+      "grantAll": "Przyznaj wszystkie",
+      "jointRequiresFullAccount": "Wspólne konta można udostępniać tylko użytkownikom, którzy mają własne konto Monize"
     },
     "shared": {
       "description": "ODCZYT odbiorców, kategorii i tagów jest zawsze dozwolony. To steruje tworzeniem/edycją/usuwaniem."

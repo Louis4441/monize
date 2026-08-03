@@ -625,7 +625,8 @@
       "revokeFailed": "Gagal mencabut delegasi",
       "resetPasswordFailed": "Gagal mengatur ulang kata sandi",
       "copyFailed": "Tidak dapat menyalin ke papan klip"
-    }
+    },
+    "jointLabel": "{count, plural, other {# akun bersama}}"
   },
   "delegateAccessModal": {
     "title": "Edit akses",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Tidak ada akun untuk diberikan.",
-      "grantAll": "Berikan semua"
+      "grantAll": "Berikan semua",
+      "jointRequiresFullAccount": "Akun bersama hanya dapat dibagikan dengan pengguna yang memiliki akun Monize sendiri"
     },
     "shared": {
       "description": "BACA penerima, kategori dan tag selalu diizinkan. Ini mengendalikan buat/edit/hapus."

@@ -14,26 +14,26 @@ The governing invariants in the design doc apply to every task. If a change alte
 
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
-| S1 | Spec + task docs (this file) | -- | none | [ ] |
-| D1 | Migration: `is_joint` flag + `delegate_net_worth_exclusions` table + RLS | S1 | inert | [ ] |
-| D2 | Migration: delegate-read RLS arms for native reads | D1 | inert* | [ ] |
-| B1 | `JointAccountsService` | D1 | inert | [ ] |
-| B2 | `is_joint` through `setGrants` / `listDelegates` | B1 | inert | [ ] |
-| B3 | Union account list + account-level endpoints | B1, B2 | neutral | [ ] |
-| B4 | Native register read scoping | B1, D2 | neutral | [ ] |
-| B5 | Grantee reference-data endpoint | B1 | inert | [ ] |
-| W1 | `JointRegisterService`: grantee create/update/delete | B1, B4, B5 | inert | [ ] |
-| W2 | Transfers on joint accounts: verify freeze/reconnect (tests only) | B3, B4 | none | [ ] |
-| N1 | Grantee net worth includes joint accounts | B1, D1, D2 | neutral | [ ] |
-| N2 | Report-surface scope statement + AI/MCP exclusion assertion | N1 | none | [ ] |
-| F1 | Frontend types + API client | B3 | inert | [ ] |
-| F2 | Account list badges, attribution, filter, gated actions | F1 | inert | [ ] |
-| F3 | Detail page + register UX (owner pickers, permission gating) | F1, B4, B5, W1 | neutral | [ ] |
-| F4 | Owner management UI (Joint column, shared-with summary) | F1, B2 | inert | [ ] |
-| F5 | Frontend permission-gating unit coverage | F2, F3 | none | [ ] |
-| V1 | Backend integration suite (`joint-accounts.integration.spec.ts`) | W1, W2, N1 | none | [ ] |
-| V2 | Playwright e2e journey (`e2e/tests/joint-accounts.spec.ts`) | F2-F4, V1 | none | [ ] |
-| Q1 | Full-locale i18n pass (final acceptance commit) | all above | none | [ ] |
+| S1 | Spec + task docs (this file) | -- | none | [x] |
+| D1 | Migration: `is_joint` flag + `delegate_net_worth_exclusions` table + RLS | S1 | inert | [x] |
+| D2 | Migration: delegate-read RLS arms for native reads | D1 | inert* | [x] |
+| B1 | `JointAccountsService` | D1 | inert | [x] |
+| B2 | `is_joint` through `setGrants` / `listDelegates` | B1 | inert | [x] |
+| B3 | Union account list + account-level endpoints | B1, B2 | neutral | [x] |
+| B4 | Native register read scoping | B1, D2 | neutral | [x] |
+| B5 | Grantee reference-data endpoint | B1 | inert | [x] |
+| W1 | `JointRegisterService`: grantee create/update/delete | B1, B4, B5 | inert | [x] |
+| W2 | Transfers on joint accounts: verify freeze/reconnect (tests only) | B3, B4 | none | [x] |
+| N1 | Grantee net worth includes joint accounts | B1, D1, D2 | neutral | [x] |
+| N2 | Report-surface scope statement + AI/MCP exclusion assertion | N1 | none | [x] |
+| F1 | Frontend types + API client | B3 | inert | [x] |
+| F2 | Account list badges, attribution, filter, gated actions | F1 | inert | [x] |
+| F3 | Detail page + register UX (owner pickers, permission gating) | F1, B4, B5, W1 | neutral | [x] |
+| F4 | Owner management UI (Joint column, shared-with summary) | F1, B2 | inert | [x] |
+| F5 | Frontend permission-gating unit coverage | F2, F3 | none | [x] |
+| V1 | Backend integration suite (`joint-accounts.integration.spec.ts`) | W1, W2, N1 | none | [x] |
+| V2 | Playwright e2e journey (`e2e/tests/joint-accounts.spec.ts`) | F2-F4, V1 | none | [x] |
+| Q1 | Full-locale i18n pass (final acceptance commit) | all above | none | [x] |
 
 *D2 is behavior-neutral at `RLS_MODE=off`/`shadow`; on an enforcing deployment its read arms are
 live on deploy -- read-only widening gated on an active `can_read` grant, matching the app-layer

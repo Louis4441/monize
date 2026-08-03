@@ -252,9 +252,7 @@ export class NetWorthService {
     );
     const populatedIds = new Set(populated.map((p) => p.accountId));
 
-    const stale = scope.accounts.filter(
-      (a) => !populatedIds.has(a.accountId),
-    );
+    const stale = scope.accounts.filter((a) => !populatedIds.has(a.accountId));
     await Promise.all(
       stale.map(({ accountId, ownerUserId }) =>
         withUserContext(ownerUserId, () =>

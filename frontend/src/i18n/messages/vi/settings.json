@@ -625,7 +625,8 @@
       "revokeFailed": "Không thể thu hồi đại diện",
       "resetPasswordFailed": "Không thể đặt lại mật khẩu",
       "copyFailed": "Không thể sao chép vào clipboard"
-    }
+    },
+    "jointLabel": "{count, plural, other {# tài khoản chung}}"
   },
   "delegateAccessModal": {
     "title": "Chỉnh sửa quyền truy cập",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Không có tài khoản nào để cấp.",
-      "grantAll": "Cấp tất cả"
+      "grantAll": "Cấp tất cả",
+      "jointRequiresFullAccount": "Tài khoản chung chỉ có thể được chia sẻ với người dùng có tài khoản Monize riêng"
     },
     "shared": {
       "description": "Đọc người nhận, danh mục và thẻ luôn được phép. Đây là các điều khiển tạo/chỉnh sửa/xóa."

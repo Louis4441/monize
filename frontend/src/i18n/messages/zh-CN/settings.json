@@ -625,7 +625,8 @@
       "revokeFailed": "撤销委托人失败",
       "resetPasswordFailed": "重置密码失败",
       "copyFailed": "无法复制到剪贴板"
-    }
+    },
+    "jointLabel": "{count, plural, other {# 个联名账户}}"
   },
   "delegateAccessModal": {
     "title": "编辑访问权限",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "无账户可授权。",
-      "grantAll": "授权全部"
+      "grantAll": "授权全部",
+      "jointRequiresFullAccount": "联名账户只能与拥有自己 Monize 账户的用户共享"
     },
     "shared": {
       "description": "收款人、分类和标签的读取权限始终允许。这些控制创建/编辑/删除权限。"
