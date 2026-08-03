@@ -12,12 +12,16 @@
 -- updating the foreign balance) run under the narrow withSystemContext bypass
 -- after in-code authorization -- safer than write-widening policies.
 --
--- No ENABLE ROW LEVEL SECURITY statement: transactions is already enabled
--- everywhere (123_rls_enable.sql on migrated databases, schema.sql's dynamic
--- enable loop on fresh installs); this migration replaces the policy only.
+-- The ENABLE below is a no-op everywhere -- transactions is already enabled
+-- (123_rls_enable.sql on migrated databases, schema.sql's dynamic enable loop
+-- on fresh installs) -- but the post-123 convention requires every policy
+-- migration to ship its own enable, and the T1 harness
+-- (rls-harness.integration.spec.ts) enforces that mechanically.
 --
 -- Behavior-neutral at RLS_MODE=off/shadow (the app connects as the table
 -- owner, so policies are not consulted).
+
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS transactions_isolation ON transactions;
 CREATE POLICY transactions_isolation ON transactions
