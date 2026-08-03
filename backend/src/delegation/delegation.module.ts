@@ -4,6 +4,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 
 import { DelegationService } from "./delegation.service";
+import { CrossOwnerAccessService } from "./cross-owner-access.service";
 import { DelegationController } from "./delegation.controller";
 import { AccountDelegateGuard } from "./guards/account-delegate.guard";
 import { DelegateTransferMaskInterceptor } from "./interceptors/delegate-transfer-mask.interceptor";
@@ -36,6 +37,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
   controllers: [DelegationController],
   providers: [
     DelegationService,
+    CrossOwnerAccessService,
     AccountDelegateGuard,
     DelegateTransferMaskInterceptor,
     DelegateScheduledTransferMaskInterceptor,
@@ -45,6 +47,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
   ],
   exports: [
     DelegationService,
+    CrossOwnerAccessService,
     AccountDelegateGuard,
     DelegateTransferMaskInterceptor,
     DelegateScheduledTransferMaskInterceptor,

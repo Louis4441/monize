@@ -213,7 +213,7 @@ export function AppHeader() {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             {/* Mobile hamburger menu button */}
-            <div className="lg:hidden">
+            <div className="xl:hidden">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 mr-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
@@ -264,16 +264,16 @@ export function AppHeader() {
 
             <button
               onClick={() => router.push('/dashboard')}
-              className="hidden lg:flex items-center gap-2 text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              className="hidden xl:flex items-center gap-2 text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
             >
               <Image src="/icons/monize-logo.svg" alt="Monize" width={32} height={32} className="rounded" priority />
-              <span className="hidden lg:inline">Monize</span>
+              <span className="hidden xl:inline">Monize</span>
             </button>
             {(!isDelegateView ||
               visibleNavLinks.length > 0 ||
               visibleToolsLinks.length > 0 ||
               showAiMenu) && (
-            <nav className="hidden lg:ml-8 lg:flex lg:items-center lg:space-x-4">
+            <nav className="hidden xl:ml-8 xl:flex xl:items-center xl:space-x-4">
               {visibleNavLinks.map((link) => (
                 <button
                   key={link.href}

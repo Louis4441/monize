@@ -383,6 +383,12 @@
       "transaction": "Transactie"
     },
     "transferAmountNote": "Bedrag moet positief zijn voor overboekingen",
+    "transferCandidates": {
+      "sharedWithYou": "Met je gedeeld",
+      "yourAccounts": "Je rekeningen",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "De andere kant van deze overboeking staat op een rekening die niet meer met je wordt gedeeld. Het bedrag, de datum en de rekeningen zijn vergrendeld, maar je kunt de details van deze transactie nog steeds bewerken.",
     "amountReceivedNote": "Ontvangen bedrag na valutaomrekening",
     "splitTransaction": "Transactie splitsen",
     "splitDisabledDuringTour": "Niet beschikbaar tijdens de begeleide rondleiding",

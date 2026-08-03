@@ -490,6 +490,70 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
       );
       expect(rows[0].n).toBe(0);
     });
+
+    describe("delegate READ arm on transactions (migration 132)", () => {
+      let grantedTxId: string;
+      let ungrantedTxId: string;
+
+      beforeAll(async () => {
+        // One transaction in the granted account, one in the ungranted one.
+        const granted = seeder.buildInsert("transactions", OWNER, {
+          account_id: ownerAccounts[0].id,
+        });
+        const [g] = await dataSource.query(granted.sql, granted.values);
+        grantedTxId = g.id;
+        const ungranted = seeder.buildInsert("transactions", OWNER, {
+          account_id: ownerAccounts[1].id,
+        });
+        const [u] = await dataSource.query(ungranted.sql, ungranted.values);
+        ungrantedTxId = u.id;
+      });
+
+      it("exposes the granted account's transactions to the delegate's own session", async () => {
+        const rows = await asAppRole(identity(DELEGATE), (m) =>
+          m.query("SELECT id FROM transactions"),
+        );
+        expect(rows.map((r: { id: string }) => r.id)).toEqual([grantedTxId]);
+      });
+
+      it("keeps the ungranted account's transactions hidden from the delegate", async () => {
+        const rows = await asAppRole(identity(DELEGATE), (m) =>
+          m.query("SELECT count(*)::int AS n FROM transactions WHERE id = $1", [
+            ungrantedTxId,
+          ]),
+        );
+        expect(rows[0].n).toBe(0);
+      });
+
+      it("hides everything again when the delegation is revoked", async () => {
+        await dataSource.query(
+          "UPDATE account_delegates SET status = 'revoked' WHERE id = $1",
+          [delegationId],
+        );
+        try {
+          const rows = await asAppRole(identity(DELEGATE), (m) =>
+            m.query("SELECT count(*)::int AS n FROM transactions"),
+          );
+          expect(rows[0].n).toBe(0);
+        } finally {
+          await dataSource.query(
+            "UPDATE account_delegates SET status = 'active' WHERE id = $1",
+            [delegationId],
+          );
+        }
+      });
+
+      it("keeps WITH CHECK owner-only: the read grant does not allow inserts", async () => {
+        const insert = seeder.buildInsert("transactions", OWNER, {
+          account_id: ownerAccounts[0].id,
+        });
+        await expect(
+          asAppRole(identity(DELEGATE), (m) =>
+            m.query(insert.sql, insert.values),
+          ),
+        ).rejects.toThrow(/row-level security/i);
+      });
+    });
   });
 
   describe("GUC scope -- withScopedDb's identity dies with its transaction", () => {

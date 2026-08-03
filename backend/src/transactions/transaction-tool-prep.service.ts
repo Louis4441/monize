@@ -492,6 +492,7 @@ export class TransactionToolPrepService {
           "A transfer cannot be converted into a split transaction.",
         );
       }
+      await this.assertNotCrossOwnerTransfer(userId, existing);
       // A transfer carries an optional spending category on both legs (the web
       // UI supports this). Resolve a provided category name to an id so the
       // edit persists it, matching the standard-transaction path.
@@ -556,7 +557,44 @@ export class TransactionToolPrepService {
     userId: string,
     transactionId: string,
   ): Promise<DeleteTransactionPreview> {
+    const existing = await this.transactionsService.findOne(
+      userId,
+      transactionId,
+    );
+    if (this.transferService.isTransfer(existing)) {
+      await this.assertNotCrossOwnerTransfer(userId, existing);
+    }
     return this.transactionsService.previewDelete(userId, transactionId);
+  }
+
+  /**
+   * The assistant's transfer edit/delete flows are same-owner only for now: a
+   * transfer whose counterpart leg is not the effective user's row is refused
+   * with a clear error at preview time, before any confirm descriptor is
+   * signed. One check here covers both the AI executor and the MCP server
+   * (shared prep service, per the CLAUDE.md shared-AI-tools rule).
+   */
+  private async assertNotCrossOwnerTransfer(
+    userId: string,
+    transaction: { linkedTransactionId?: string | null },
+  ): Promise<void> {
+    if (!transaction.linkedTransactionId) return;
+    try {
+      await this.transactionsService.findOne(
+        userId,
+        transaction.linkedTransactionId,
+      );
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new BadRequestException(
+          tr(
+            "errors.ai.crossOwnerTransferUnsupported",
+            "This transfer involves another user's account, which the assistant can't edit or delete yet. Use the Transactions screen instead.",
+          ),
+        );
+      }
+      throw err;
+    }
   }
 
   /**

@@ -1,5 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { TransactionTransferService } from "./transaction-transfer.service";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
@@ -9,7 +13,9 @@ import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
 import { isTransactionInFuture } from "../common/date-utils";
+import { withSystemContext } from "../common/db/with-context";
 import {
   createScopedDbMocks,
   DataSourceMock,
@@ -18,6 +24,17 @@ import {
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
+
+// Passthrough spy: cross-owner writes must enter the audited system context;
+// same-owner writes must not.
+jest.mock("../common/db/with-context", () => {
+  const actual = jest.requireActual("../common/db/with-context");
+  return { ...actual, withSystemContext: jest.fn(actual.withSystemContext) };
+});
+
+const mockedWithSystemContext = withSystemContext as jest.MockedFunction<
+  typeof withSystemContext
+>;
 
 jest.mock("../common/date-utils", () => ({
   isTransactionInFuture: jest.fn().mockReturnValue(false),
@@ -40,17 +57,21 @@ describe("TransactionTransferService", () => {
   let mockDataSource: DataSourceMock;
 
   const mockFindOne = jest.fn();
+  let crossOwnerAccess: Record<string, jest.Mock>;
+  let actionHistoryService: Record<string, jest.Mock>;
 
   const mockFromAccount = {
     id: "from-account",
     name: "Checking",
     currencyCode: "USD",
+    userId: "user-1",
   };
 
   const mockToAccount = {
     id: "to-account",
     name: "Savings",
     currencyCode: "USD",
+    userId: "user-1",
   };
 
   const baseTransferDto = {
@@ -126,6 +147,34 @@ describe("TransactionTransferService", () => {
       triggerDebouncedRecalc: jest.fn(),
     };
 
+    // Default: both accounts owned by user-1, mirroring the old owner-scoped
+    // findOne. Cross-owner tests override per account id.
+    crossOwnerAccess = {
+      accountAccessFor: jest
+        .fn()
+        .mockImplementation(async (realUserId: string, accountId: string) => {
+          const account =
+            accountId === "from-account"
+              ? mockFromAccount
+              : accountId === "to-account"
+                ? mockToAccount
+                : {
+                    id: accountId,
+                    name: "Unknown",
+                    currencyCode: "USD",
+                    userId: "user-1",
+                  };
+          return {
+            account,
+            ownerUserId: account.userId,
+            via: account.userId === realUserId ? "own" : "delegation",
+          };
+        }),
+    };
+
+    actionHistoryService = { record: jest.fn().mockResolvedValue(null) };
+
+    mockedWithSystemContext.mockClear();
     mockFindOne.mockReset();
 
     const tenantMocks = createScopedDbMocks([
@@ -169,10 +218,8 @@ describe("TransactionTransferService", () => {
         { provide: PayeesService, useValue: payeesService },
         { provide: NetWorthService, useValue: netWorthService },
         { provide: DataSource, useValue: mockDataSource },
-        {
-          provide: ActionHistoryService,
-          useValue: { record: jest.fn().mockResolvedValue(null) },
-        },
+        { provide: ActionHistoryService, useValue: actionHistoryService },
+        { provide: CrossOwnerAccessService, useValue: crossOwnerAccess },
       ],
     }).compile();
 
@@ -233,6 +280,164 @@ describe("TransactionTransferService", () => {
 
       expect(result.fromTransaction.id).toBe("from-tx-id");
       expect(result.toTransaction.id).toBe("to-tx-id");
+    });
+
+    it("writes both legs with the effective user's id and no system context on the same-owner path", async () => {
+      mockFindOne
+        .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+        .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+
+      await service.createTransfer("user-1", baseTransferDto, mockFindOne, {
+        effectiveUserId: "user-1",
+        realUserId: "user-1",
+      });
+
+      const [fromCreate, toCreate] = transactionsRepository.create.mock.calls;
+      expect(fromCreate[0].userId).toBe("user-1");
+      expect(toCreate[0].userId).toBe("user-1");
+      expect(mockedWithSystemContext).not.toHaveBeenCalled();
+      // Exactly today's single history record, under the effective user.
+      expect(actionHistoryService.record).toHaveBeenCalledTimes(1);
+      expect(actionHistoryService.record).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({
+          descriptionKey: "createdTransfer",
+          descriptionParams: {
+            amount: expect.any(String),
+            from: "Checking",
+            to: "Savings",
+          },
+        }),
+      );
+      // Result legs loaded through the same owner-scoped findOne as before.
+      expect(mockFindOne).toHaveBeenNthCalledWith(1, "user-1", "from-tx-id");
+      expect(mockFindOne).toHaveBeenNthCalledWith(2, "user-1", "to-tx-id");
+    });
+
+    describe("cross-owner", () => {
+      const foreignToAccount = {
+        id: "to-account",
+        name: "Owner Savings",
+        currencyCode: "USD",
+        userId: "owner-2",
+      };
+
+      beforeEach(() => {
+        crossOwnerAccess.accountAccessFor.mockImplementation(
+          async (realUserId: string, accountId: string) => {
+            const account =
+              accountId === "from-account" ? mockFromAccount : foreignToAccount;
+            return {
+              account,
+              ownerUserId: account.userId,
+              via: account.userId === realUserId ? "own" : "delegation",
+            };
+          },
+        );
+        transactionsRepository.save
+          .mockReset()
+          .mockResolvedValueOnce({ id: "from-tx-id" })
+          .mockResolvedValueOnce({ id: "to-tx-id" });
+        mockFindOne
+          .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+          .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+      });
+
+      const crossDto = {
+        ...baseTransferDto,
+        categoryId: "cat-1",
+        payeeId: "payee-1",
+      };
+      const actor = { effectiveUserId: "user-1", realUserId: "user-1" };
+
+      it("writes each leg with its account owner's user id inside a system-context transaction", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        const [fromCreate, toCreate] = transactionsRepository.create.mock.calls;
+        expect(fromCreate[0].userId).toBe("user-1");
+        expect(toCreate[0].userId).toBe("owner-2");
+        expect(mockedWithSystemContext).toHaveBeenCalled();
+
+        // Balances still update both accounts.
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "from-account",
+          -500,
+        );
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "to-account",
+          500,
+        );
+      });
+
+      it("authorizes both accounts for the REAL user with the create op", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, {
+          effectiveUserId: "user-1",
+          realUserId: "real-9",
+        });
+        expect(crossOwnerAccess.accountAccessFor).toHaveBeenCalledWith(
+          "real-9",
+          "from-account",
+          "create",
+        );
+        expect(crossOwnerAccess.accountAccessFor).toHaveBeenCalledWith(
+          "real-9",
+          "to-account",
+          "create",
+        );
+      });
+
+      it("applies category and payee to effective-user legs only", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        const [fromCreate, toCreate] = transactionsRepository.create.mock.calls;
+        expect(fromCreate[0].categoryId).toBe("cat-1");
+        expect(fromCreate[0].payeeId).toBe("payee-1");
+        expect(toCreate[0].categoryId).toBeNull();
+        expect(toCreate[0].payeeId).toBeNull();
+      });
+
+      it("loads each result leg as its owner and recalcs net worth per owner", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        expect(mockFindOne).toHaveBeenNthCalledWith(1, "user-1", "from-tx-id");
+        expect(mockFindOne).toHaveBeenNthCalledWith(2, "owner-2", "to-tx-id");
+        expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
+          "from-account",
+          "user-1",
+        );
+        expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
+          "to-account",
+          "owner-2",
+        );
+      });
+
+      it("records history per owner, masking the foreign account name in the counterpart's entry", async () => {
+        await service.createTransfer("user-1", crossDto, mockFindOne, actor);
+
+        expect(actionHistoryService.record).toHaveBeenCalledTimes(2);
+        // Actor's own entry names both accounts.
+        expect(actionHistoryService.record).toHaveBeenCalledWith(
+          "user-1",
+          expect.objectContaining({
+            entityId: "from-tx-id",
+            descriptionParams: expect.objectContaining({
+              from: "Checking",
+              to: "Owner Savings",
+            }),
+          }),
+        );
+        // Counterpart owner's entry masks the actor's account name.
+        expect(actionHistoryService.record).toHaveBeenCalledWith(
+          "owner-2",
+          expect.objectContaining({
+            entityId: "to-tx-id",
+            descriptionParams: expect.objectContaining({
+              from: "Shared account",
+              to: "Owner Savings",
+            }),
+          }),
+        );
+      });
     });
 
     it("throws when source and destination accounts are the same", async () => {
@@ -2257,6 +2462,358 @@ describe("TransactionTransferService", () => {
       await expect(
         service.previewUpdateTransfer("user-1", "x", {}, findOne as any),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("cross-owner update / remove / linked (frozen-link spec)", () => {
+    const actor = { effectiveUserId: "user-1", realUserId: "user-1" };
+    const foreignAccount = {
+      id: "to-account",
+      name: "Owner Savings",
+      currencyCode: "USD",
+      userId: "owner-2",
+    };
+
+    let ownLeg: any;
+    let foreignLeg: any;
+
+    beforeEach(() => {
+      ownLeg = {
+        id: "own-leg",
+        userId: "user-1",
+        accountId: "from-account",
+        amount: -500,
+        exchangeRate: 1,
+        transactionDate: "2026-01-15",
+        currencyCode: "USD",
+        isTransfer: true,
+        linkedTransactionId: "foreign-leg",
+        payeeId: null,
+        payeeName: "Transfer to Owner Savings",
+        account: mockFromAccount,
+      };
+      foreignLeg = {
+        id: "foreign-leg",
+        userId: "owner-2",
+        accountId: "to-account",
+        amount: 500,
+        exchangeRate: 1,
+        transactionDate: "2026-01-15",
+        currencyCode: "USD",
+        isTransfer: true,
+        linkedTransactionId: "own-leg",
+        payeeId: null,
+        payeeName: "Transfer from Checking",
+        account: foreignAccount,
+      };
+
+      // Owner-scoped findOne: the effective user reaches only their own leg.
+      mockFindOne.mockImplementation(async (userId: string, id: string) => {
+        if (userId === "user-1" && id === "own-leg") return ownLeg;
+        if (userId === "owner-2" && id === "foreign-leg") return foreignLeg;
+        throw new NotFoundException("Transaction not found");
+      });
+
+      // loadLegById's unscoped read.
+      transactionsRepository.findOne.mockImplementation(async (opts: any) =>
+        opts?.where?.id === "foreign-leg" ? foreignLeg : null,
+      );
+
+      mockedWithSystemContext.mockClear();
+    });
+
+    const connect = () =>
+      crossOwnerAccess.accountAccessFor.mockResolvedValue({
+        account: foreignAccount,
+        ownerUserId: "owner-2",
+        via: "delegation",
+      });
+
+    const freeze = () =>
+      crossOwnerAccess.accountAccessFor.mockRejectedValue(
+        new NotFoundException("Account not found"),
+      );
+
+    const denyOp = () =>
+      crossOwnerAccess.accountAccessFor.mockRejectedValue(
+        new ForbiddenException("not granted"),
+      );
+
+    describe("updateTransfer (connected)", () => {
+      beforeEach(connect);
+
+      it("mirrors the amount across both legs and rebalances both accounts under system context", async () => {
+        await service.updateTransfer(
+          "user-1",
+          "own-leg",
+          { amount: 600 },
+          mockFindOne,
+          actor,
+        );
+
+        expect(mockedWithSystemContext).toHaveBeenCalled();
+        expect(transactionsRepository.update).toHaveBeenCalledWith("own-leg", {
+          amount: -600,
+        });
+        expect(transactionsRepository.update).toHaveBeenCalledWith(
+          "foreign-leg",
+          { amount: 600 },
+        );
+        // Old amounts reversed, new applied.
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "from-account",
+          500,
+        );
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "to-account",
+          -500,
+        );
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "from-account",
+          -600,
+        );
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "to-account",
+          600,
+        );
+        expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
+          "from-account",
+          "user-1",
+        );
+        expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
+          "to-account",
+          "owner-2",
+        );
+      });
+
+      it("requires the edit grant for the REAL user on the counterpart account", async () => {
+        await service.updateTransfer(
+          "user-1",
+          "own-leg",
+          { description: "note" },
+          mockFindOne,
+          { effectiveUserId: "user-1", realUserId: "real-9" },
+        );
+        expect(crossOwnerAccess.accountAccessFor).toHaveBeenCalledWith(
+          "real-9",
+          "to-account",
+          "edit",
+        );
+      });
+
+      it("keeps status, category and payee off the foreign leg", async () => {
+        await service.updateTransfer(
+          "user-1",
+          "own-leg",
+          {
+            status: "CLEARED" as any,
+            categoryId: "cat-1",
+            payeeId: "payee-1",
+            description: "shared note",
+          },
+          mockFindOne,
+          actor,
+        );
+
+        expect(transactionsRepository.update).toHaveBeenCalledWith("own-leg", {
+          status: "CLEARED",
+          categoryId: "cat-1",
+          payeeId: "payee-1",
+          description: "shared note",
+        });
+        // The foreign leg mirrors only the shared fields.
+        expect(transactionsRepository.update).toHaveBeenCalledWith(
+          "foreign-leg",
+          { description: "shared note" },
+        );
+      });
+
+      it("rejects account moves with crossOwnerAccountMoveLocked", async () => {
+        await expect(
+          service.updateTransfer(
+            "user-1",
+            "own-leg",
+            { toAccountId: "somewhere-else" },
+            mockFindOne,
+            actor,
+          ),
+        ).rejects.toThrow(/cannot be moved/);
+        expect(transactionsRepository.update).not.toHaveBeenCalled();
+      });
+
+      it("loads each result leg as its owner", async () => {
+        const result = await service.updateTransfer(
+          "user-1",
+          "own-leg",
+          { description: "x" },
+          mockFindOne,
+          actor,
+        );
+        expect(result.fromTransaction.id).toBe("own-leg");
+        expect(result.toTransaction.id).toBe("foreign-leg");
+        expect(mockFindOne).toHaveBeenCalledWith("owner-2", "foreign-leg");
+      });
+    });
+
+    describe("updateTransfer (frozen)", () => {
+      beforeEach(freeze);
+
+      it("allows presentational own-leg edits without touching the counterpart or balances", async () => {
+        const result = await service.updateTransfer(
+          "user-1",
+          "own-leg",
+          {
+            description: "mine",
+            status: "CLEARED" as any,
+            categoryId: "cat-1",
+          },
+          mockFindOne,
+          actor,
+        );
+
+        expect(transactionsRepository.update).toHaveBeenCalledTimes(1);
+        expect(transactionsRepository.update).toHaveBeenCalledWith("own-leg", {
+          description: "mine",
+          status: "CLEARED",
+          categoryId: "cat-1",
+        });
+        expect(accountsService.updateBalance).not.toHaveBeenCalled();
+        // Own leg returned in both slots -- nothing mirrored.
+        expect(result.fromTransaction.id).toBe("own-leg");
+        expect(result.toTransaction.id).toBe("own-leg");
+      });
+
+      it("accepts resent-but-unchanged structural fields", async () => {
+        await expect(
+          service.updateTransfer(
+            "user-1",
+            "own-leg",
+            {
+              amount: 500,
+              transactionDate: "2026-01-15",
+              fromAccountId: "from-account",
+              toAccountId: "to-account",
+              description: "still fine",
+            },
+            mockFindOne,
+            actor,
+          ),
+        ).resolves.toBeDefined();
+      });
+
+      it.each([
+        [{ amount: 999 }],
+        [{ transactionDate: "2026-02-01" }],
+        [{ toAccountId: "elsewhere" }],
+        [{ exchangeRate: 2 }],
+        [{ toAmount: 750 }],
+      ])(
+        "rejects the structural change %j with crossOwnerTransferLocked",
+        async (dto) => {
+          await expect(
+            service.updateTransfer(
+              "user-1",
+              "own-leg",
+              dto as any,
+              mockFindOne,
+              actor,
+            ),
+          ).rejects.toThrow(/locked/);
+          expect(transactionsRepository.update).not.toHaveBeenCalled();
+          expect(accountsService.updateBalance).not.toHaveBeenCalled();
+        },
+      );
+
+      it("propagates 403 when the counterpart is readable but edit is not granted", async () => {
+        denyOp();
+        await expect(
+          service.updateTransfer(
+            "user-1",
+            "own-leg",
+            { description: "x" },
+            mockFindOne,
+            actor,
+          ),
+        ).rejects.toThrow(ForbiddenException);
+      });
+    });
+
+    describe("removeTransfer (cross-owner)", () => {
+      it("connected: removes both legs and reverses both balances under system context", async () => {
+        connect();
+
+        await service.removeTransfer("user-1", "own-leg", mockFindOne, actor);
+
+        expect(crossOwnerAccess.accountAccessFor).toHaveBeenCalledWith(
+          "user-1",
+          "to-account",
+          "delete",
+        );
+        expect(transactionsRepository.remove).toHaveBeenCalledTimes(2);
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "to-account",
+          -500,
+        );
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "from-account",
+          500,
+        );
+        expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
+          "to-account",
+          "owner-2",
+        );
+      });
+
+      it("frozen: removes the own leg only and reverses only the own balance", async () => {
+        freeze();
+
+        await service.removeTransfer("user-1", "own-leg", mockFindOne, actor);
+
+        expect(transactionsRepository.remove).toHaveBeenCalledTimes(1);
+        expect(transactionsRepository.remove).toHaveBeenCalledWith(ownLeg);
+        expect(accountsService.updateBalance).toHaveBeenCalledTimes(1);
+        expect(accountsService.updateBalance).toHaveBeenCalledWith(
+          "from-account",
+          500,
+        );
+      });
+
+      it("propagates 403 when the counterpart is readable but delete is not granted", async () => {
+        denyOp();
+        await expect(
+          service.removeTransfer("user-1", "own-leg", mockFindOne, actor),
+        ).rejects.toThrow(ForbiddenException);
+        expect(transactionsRepository.remove).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("getLinkedTransaction (cross-owner)", () => {
+      it("returns the counterpart when the real user can read its account", async () => {
+        connect();
+        const result = await service.getLinkedTransaction(
+          "user-1",
+          "own-leg",
+          mockFindOne,
+          actor,
+        );
+        expect(result).toBe(foreignLeg);
+        expect(crossOwnerAccess.accountAccessFor).toHaveBeenCalledWith(
+          "user-1",
+          "to-account",
+          "read",
+        );
+      });
+
+      it("returns null when the counterpart account is unreadable", async () => {
+        freeze();
+        const result = await service.getLinkedTransaction(
+          "user-1",
+          "own-leg",
+          mockFindOne,
+          actor,
+        );
+        expect(result).toBeNull();
+      });
     });
   });
 });

@@ -25,8 +25,14 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { TransactionSplitService } from "./transaction-split.service";
 import {
   TransactionTransferService,
+  TransferActor,
   TransferResult,
 } from "./transaction-transfer.service";
+import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
+import {
+  maskTransactionsAgainst,
+  payloadHasCrossOwnerTransfer,
+} from "../delegation/transfer-mask.util";
 import { TransactionReconciliationService } from "./transaction-reconciliation.service";
 import { TransactionAnalyticsService } from "./transaction-analytics.service";
 import {
@@ -209,6 +215,7 @@ export class TransactionsService {
     private bulkUpdateService: TransactionBulkUpdateService,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
+    private crossOwnerAccess: CrossOwnerAccessService,
   ) {}
 
   /**
@@ -2478,28 +2485,31 @@ export class TransactionsService {
   async createTransfer(
     userId: string,
     createTransferDto: CreateTransferDto,
+    actor?: TransferActor,
   ): Promise<TransferResult> {
     const result = await this.transferService.createTransfer(
       userId,
       createTransferDto,
       this.findOne.bind(this),
+      actor,
     );
 
     if (createTransferDto.tagIds && createTransferDto.tagIds.length > 0) {
-      await this.tagsService.setTransactionTags(
-        result.fromTransaction.id,
-        createTransferDto.tagIds,
-        userId,
-      );
-      await this.tagsService.setTransactionTags(
-        result.toTransaction.id,
-        createTransferDto.tagIds,
-        userId,
-      );
+      // Tags are per-user reference data: never write the effective user's
+      // tag ids onto a cross-owner counterpart leg.
+      const refresh = async (leg: Transaction) => {
+        if (leg.userId !== userId) return leg;
+        await this.tagsService.setTransactionTags(
+          leg.id,
+          createTransferDto.tagIds!,
+          userId,
+        );
+        return this.findOne(userId, leg.id);
+      };
 
       return {
-        fromTransaction: await this.findOne(userId, result.fromTransaction.id),
-        toTransaction: await this.findOne(userId, result.toTransaction.id),
+        fromTransaction: await refresh(result.fromTransaction),
+        toTransaction: await refresh(result.toTransaction),
       };
     }
 
@@ -2509,19 +2519,26 @@ export class TransactionsService {
   async getLinkedTransaction(
     userId: string,
     transactionId: string,
+    actor?: TransferActor,
   ): Promise<Transaction | null> {
     return this.transferService.getLinkedTransaction(
       userId,
       transactionId,
       this.findOne.bind(this),
+      actor,
     );
   }
 
-  async removeTransfer(userId: string, transactionId: string): Promise<void> {
+  async removeTransfer(
+    userId: string,
+    transactionId: string,
+    actor?: TransferActor,
+  ): Promise<void> {
     return this.transferService.removeTransfer(
       userId,
       transactionId,
       this.findOne.bind(this),
+      actor,
     );
   }
 
@@ -2571,25 +2588,30 @@ export class TransactionsService {
     userId: string,
     transactionId: string,
     updateDto: Partial<UpdateTransferDto>,
+    actor?: TransferActor,
   ): Promise<TransferResult> {
     const result = await this.transferService.updateTransfer(
       userId,
       transactionId,
       updateDto,
       this.findOne.bind(this),
+      actor,
     );
 
     if (updateDto.tagIds !== undefined) {
-      await this.tagsService.setTransactionTags(
-        result.fromTransaction.id,
-        updateDto.tagIds,
-        userId,
-      );
-      await this.tagsService.setTransactionTags(
-        result.toTransaction.id,
-        updateDto.tagIds,
-        userId,
-      );
+      // Tags are per-user reference data: cross-owner counterpart legs keep
+      // their own owner's tags, so only effective-user legs are synced.
+      for (const legId of new Set(
+        [result.fromTransaction, result.toTransaction]
+          .filter((leg) => leg.userId === userId)
+          .map((leg) => leg.id),
+      )) {
+        await this.tagsService.setTransactionTags(
+          legId,
+          updateDto.tagIds,
+          userId,
+        );
+      }
 
       // When the edited leg belongs to a split transfer, mirror the tags onto
       // the owning split so the source transaction's split reflects them too
@@ -2607,9 +2629,11 @@ export class TransactionsService {
         );
       }
 
+      const refresh = (leg: Transaction) =>
+        leg.userId === userId ? this.findOne(userId, leg.id) : leg;
       return {
-        fromTransaction: await this.findOne(userId, result.fromTransaction.id),
-        toTransaction: await this.findOne(userId, result.toTransaction.id),
+        fromTransaction: await refresh(result.fromTransaction),
+        toTransaction: await refresh(result.toTransaction),
       };
     }
 
@@ -2744,6 +2768,16 @@ export class TransactionsService {
       sortBy,
       sortDirection,
     );
+
+    // AI/MCP responses bypass the HTTP mask interceptor, so cross-owner
+    // counterparts the user cannot read are masked here, before projection
+    // (rewrites the auto payee tail on the visible leg). Pure-payload fast
+    // path first: same-owner result sets never pay the grants query.
+    if (payloadHasCrossOwnerTransfer(result.data)) {
+      const readable =
+        await this.crossOwnerAccess.readableAccountIdSetFor(userId);
+      maskTransactionsAgainst(readable, result.data);
+    }
 
     const transactions = result.data.flatMap((t): LlmTransactionRow[] => {
       const rows: LlmTransactionRow[] =

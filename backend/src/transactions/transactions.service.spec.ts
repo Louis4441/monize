@@ -238,6 +238,30 @@ describe("TransactionsService", () => {
             reverseAndRemoveEmbedded: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          // Same-owner default: every account resolves as owned by the caller,
+          // mirroring the pre-cross-owner owner-scoped findOne.
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("../delegation/cross-owner-access.service")
+            .CrossOwnerAccessService,
+          useValue: {
+            accountAccessFor: jest
+              .fn()
+              .mockImplementation(
+                async (realUserId: string, accountId: string) => ({
+                  account: {
+                    userId: realUserId,
+                    ...(await accountsService.findOne(realUserId, accountId)),
+                  },
+                  ownerUserId: realUserId,
+                  via: "own",
+                }),
+              ),
+            readableAccountIdSetFor: jest
+              .fn()
+              .mockImplementation(async () => new Set<string>()),
+          },
+        },
         TransactionSplitService,
         TransactionTransferService,
         TransactionReconciliationService,
@@ -1420,6 +1444,62 @@ describe("TransactionsService", () => {
         status: TransactionStatus.CLEARED,
         reconciledDate: null,
       });
+    });
+  });
+
+  describe("transfer wrapper tag gating (cross-owner)", () => {
+    const ownLeg = { id: "own-leg", userId: "user-1" } as any;
+    const foreignLeg = { id: "foreign-leg", userId: "owner-2" } as any;
+
+    it("createTransfer applies tags to effective-user legs only", async () => {
+      jest
+        .spyOn((service as any).transferService, "createTransfer")
+        .mockResolvedValue({
+          fromTransaction: ownLeg,
+          toTransaction: foreignLeg,
+        });
+      transactionsRepository.findOne.mockResolvedValue(ownLeg);
+
+      const result = await service.createTransfer("user-1", {
+        fromAccountId: "account-1",
+        toAccountId: "account-2",
+        transactionDate: "2026-01-15",
+        amount: 200,
+        fromCurrencyCode: "USD",
+        tagIds: ["tag-1"],
+      } as any);
+
+      expect(tagsService.setTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
+        "own-leg",
+        ["tag-1"],
+        "user-1",
+      );
+      // The foreign leg is passed through untouched, not re-fetched as user-1.
+      expect(result.toTransaction).toBe(foreignLeg);
+    });
+
+    it("updateTransfer syncs tags to effective-user legs only", async () => {
+      jest
+        .spyOn((service as any).transferService, "updateTransfer")
+        .mockResolvedValue({
+          fromTransaction: ownLeg,
+          toTransaction: foreignLeg,
+        });
+      transactionsRepository.findOne.mockResolvedValue(ownLeg);
+      splitsRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.updateTransfer("user-1", "own-leg", {
+        tagIds: ["tag-1"],
+      } as any);
+
+      expect(tagsService.setTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
+        "own-leg",
+        ["tag-1"],
+        "user-1",
+      );
+      expect(result.toTransaction).toBe(foreignLeg);
     });
   });
 
@@ -5757,6 +5837,7 @@ describe("TransactionsService", () => {
       };
 
       transactionsRepository.findOne.mockResolvedValueOnce(fromTx); // findOne for the transaction
+      transactionsRepository.findOne.mockResolvedValueOnce(toTx); // cross-owner routing probe (same-owner: hit)
       mockQueryRunner.manager.findOne.mockResolvedValueOnce(toTx); // queryRunner finds linked transaction
 
       // Not a parent split child
@@ -6142,6 +6223,68 @@ describe("TransactionsService", () => {
       expect(plain?.categoryName).toBe("Dining");
       expect(plain?.isSplit).toBeUndefined();
       expect(result.total).toBe(2);
+    });
+
+    it("masks a cross-owner counterpart the user cannot read (AI/MCP shared read)", async () => {
+      const crossOwnerAccess = (service as any).crossOwnerAccess;
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-cross",
+            userId: "user-1",
+            transactionDate: "2025-01-15",
+            payeeName: "Transfer to Owner Savings",
+            amount: -100,
+            account: { name: "Checking" },
+            status: "CLEARED",
+            isTransfer: true,
+            linkedTransaction: {
+              userId: "owner-2",
+              accountId: "a2",
+              account: { id: "a2", name: "Owner Savings" },
+            },
+          },
+        ],
+        pagination: { total: 1, hasMore: false },
+      } as any);
+
+      const result = await service.getLlmTransactionRows("user-1", {});
+
+      expect(crossOwnerAccess.readableAccountIdSetFor).toHaveBeenCalledWith(
+        "user-1",
+      );
+      expect(result.transactions[0].payeeName).toBe(
+        "Transfer to Hidden account",
+      );
+    });
+
+    it("never queries grants for same-owner rows (fast path)", async () => {
+      const crossOwnerAccess = (service as any).crossOwnerAccess;
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-own",
+            userId: "user-1",
+            transactionDate: "2025-01-15",
+            payeeName: "Transfer to Savings",
+            amount: -100,
+            account: { name: "Checking" },
+            status: "CLEARED",
+            isTransfer: true,
+            linkedTransaction: {
+              userId: "user-1",
+              accountId: "a2",
+              account: { id: "a2", name: "Savings" },
+            },
+          },
+        ],
+        pagination: { total: 1, hasMore: false },
+      } as any);
+
+      const result = await service.getLlmTransactionRows("user-1", {});
+
+      expect(crossOwnerAccess.readableAccountIdSetFor).not.toHaveBeenCalled();
+      expect(result.transactions[0].payeeName).toBe("Transfer to Savings");
     });
 
     it("applies min/max amount filters to the expanded rows", async () => {

@@ -23,6 +23,7 @@ import {
   DelegateSection,
 } from "../decorators/delegate-access.decorator";
 import { DelegationService } from "../delegation.service";
+import { CrossOwnerAccessService } from "../cross-owner-access.service";
 import { withDelegateContext } from "../../common/db/with-context";
 
 const SECTION_LABELS: Record<DelegateSection, string> = {
@@ -61,6 +62,7 @@ export class AccountDelegateGuard implements CanActivate {
     private reflector: Reflector,
     private jwtService: JwtService,
     private delegationService: DelegationService,
+    private crossOwnerAccess: CrossOwnerAccessService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -158,11 +160,7 @@ export class AccountDelegateGuard implements CanActivate {
       for (const key of transferBodyKeys) {
         const accountId = this.resolveAccountId(req, key);
         if (accountId) {
-          await this.assertPermission(
-            payload.delegationId,
-            accountId,
-            operation,
-          );
+          await this.assertTransferPermission(payload, accountId, operation);
         }
       }
     }
@@ -178,11 +176,7 @@ export class AccountDelegateGuard implements CanActivate {
           await this.delegationService.accountIdsForTransfer(txId);
         // Unknown transfer: let the owner-scoped service return 404.
         for (const accountId of accountIds) {
-          await this.assertPermission(
-            payload.delegationId,
-            accountId,
-            operation,
-          );
+          await this.assertTransferPermission(payload, accountId, operation);
         }
       }
     }
@@ -203,11 +197,18 @@ export class AccountDelegateGuard implements CanActivate {
         const gated =
           operation === "read" ? accountIds.slice(0, 1) : accountIds;
         for (const accountId of gated) {
-          await this.assertPermission(
-            payload.delegationId,
-            accountId,
-            operation,
-          );
+          // Reads keep the strict check (the primary account is always the
+          // owner's); scheduled WRITES get the cross-owner relaxation so a
+          // delegate can hold their own account as the other leg.
+          if (operation === "read") {
+            await this.assertPermission(
+              payload.delegationId,
+              accountId,
+              operation,
+            );
+          } else {
+            await this.assertTransferPermission(payload, accountId, operation);
+          }
         }
       }
     }
@@ -257,6 +258,27 @@ export class AccountDelegateGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  /**
+   * Cross-owner transfers: in the transfer and scheduled-write blocks an
+   * account owned by the REAL user (payload.sub) passes without a grant row --
+   * a delegate may name their own account as the other leg of a transfer. The
+   * authoritative per-leg authorization lives in CrossOwnerAccessService at
+   * the service layer; this guard stays as defense-in-depth for acting tokens.
+   * @DelegatedAccountParam / @DelegatedTransactionParam are deliberately NOT
+   * relaxed: a plain POST /transactions while acting writes owner-attributed
+   * rows, so a delegate must never target their own account there.
+   */
+  private async assertTransferPermission(
+    payload: any,
+    accountId: string,
+    operation: DelegateOperation,
+  ): Promise<void> {
+    if (await this.crossOwnerAccess.isAccountOwnedBy(accountId, payload.sub)) {
+      return;
+    }
+    await this.assertPermission(payload.delegationId, accountId, operation);
   }
 
   private async assertPermission(

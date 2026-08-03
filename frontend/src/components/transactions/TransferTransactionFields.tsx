@@ -9,10 +9,11 @@ import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { Transaction } from '@/types/transaction';
-import { Account } from '@/types/account';
+import { Account, TransferCandidate } from '@/types/account';
 import { Payee } from '@/types/payee';
 import { getCurrencySymbol } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
+import { useAuthStore } from '@/store/authStore';
 
 interface CrossCurrencyInfo {
   fromCurrency: string;
@@ -28,6 +29,8 @@ interface TransferTransactionFieldsProps {
   watchedAmount: number;
   watchedCurrencyCode: string;
   accounts: Account[];
+  /** Cross-owner transfer targets beyond the effective user's own accounts. */
+  transferCandidates?: TransferCandidate[];
   setValue: UseFormSetValue<any>;
   transferToAccountId: string;
   setTransferToAccountId: (id: string) => void;
@@ -55,6 +58,7 @@ export function TransferTransactionFields({
   watchedAmount,
   watchedCurrencyCode,
   accounts,
+  transferCandidates,
   setValue,
   transferToAccountId,
   setTransferToAccountId,
@@ -75,15 +79,74 @@ export function TransferTransactionFields({
   createdAtSlot,
 }: TransferTransactionFieldsProps) {
   const t = useTranslations('transactions');
-  // A delegate may only have READ on one side of a transfer; the other
-  // account is not in `accounts` (and the backend masked it). Surface it as
-  // a read-only "Hidden account" option so the field is not blank.
+  const isActing = useAuthStore((state) => !!state.actingAsUserId);
+  const isEdit = !!transaction;
+
+  // Cross-owner targets, gated by the per-account grant the current mode
+  // needs (create vs edit). Closed candidates only stay visible while
+  // selected, mirroring the own-account dropdown rule.
+  const eligibleCandidates = (transferCandidates ?? []).filter(
+    (candidate) =>
+      (isEdit ? candidate.canEdit : candidate.canCreate) &&
+      candidate.accountSubType !== 'INVESTMENT_BROKERAGE' &&
+      (!candidate.isClosed ||
+        candidate.id === watchedAccountId ||
+        candidate.id === transferToAccountId),
+  );
+
+  // Appended group: separator, disabled group label, then the candidates.
+  const candidateOptions = (excludeId: string) => {
+    const list = eligibleCandidates.filter((c) => c.id !== excludeId);
+    if (list.length === 0) return [];
+    return [
+      {
+        value: '__candidates-separator__',
+        label:
+          '────────────────────',
+        disabled: true,
+      },
+      {
+        value: '__candidates-label__',
+        label: isActing
+          ? t('form.transferCandidates.yourAccounts')
+          : t('form.transferCandidates.sharedWithYou'),
+        disabled: true,
+      },
+      ...list.map((c) => ({
+        value: c.id,
+        label: t('form.transferCandidates.optionLabel', {
+          name: c.name,
+          currency: c.currencyCode,
+          owner: c.ownerLabel,
+        }),
+      })),
+    ];
+  };
+
+  // A user may only have READ on one side of a transfer (or none, after
+  // unshare); the other account is in neither `accounts` nor the candidate
+  // list, and the backend masked it. Surface it as a read-only
+  // "Hidden account" option so the field is not blank.
   const hiddenAccountOption = (id: string) => {
-    if (!id || accounts.some((a) => a.id === id)) return [];
+    if (
+      !id ||
+      accounts.some((a) => a.id === id) ||
+      eligibleCandidates.some((c) => c.id === id)
+    ) {
+      return [];
+    }
     const masked =
       transaction?.linkedTransaction?.account?.name || 'Hidden account';
     return [{ value: id, label: masked, disabled: true }];
   };
+
+  // Frozen link: the counterpart resolved to the hidden-account stub, so the
+  // backend will reject structural edits -- disable From/To/Amount/Date up
+  // front and keep only presentational fields editable.
+  const counterpartLocked =
+    isEdit &&
+    (hiddenAccountOption(watchedAccountId).length > 0 ||
+      hiddenAccountOption(transferToAccountId).length > 0);
 
   return (
     <div className="space-y-4">
@@ -93,10 +156,17 @@ export function TransferTransactionFields({
           label={t('form.fields.date')}
           error={errors.transactionDate?.message as string | undefined}
           onDateChange={(date) => setValue('transactionDate', date, { shouldDirty: true, shouldValidate: true })}
+          disabled={counterpartLocked}
           {...register('transactionDate')}
         />
         {createdAtSlot}
       </div>
+
+      {counterpartLocked && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {t('form.crossOwnerLockedNote')}
+        </p>
+      )}
 
       {/* Row 2: From and To Accounts side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -104,6 +174,7 @@ export function TransferTransactionFields({
           label={t('form.fields.fromAccount')}
           error={errors.accountId?.message as string | undefined}
           value={watchedAccountId || ''}
+          disabled={counterpartLocked}
           options={[
             { value: '', label: t('form.placeholders.selectAccount') },
             ...hiddenAccountOption(watchedAccountId),
@@ -113,12 +184,14 @@ export function TransferTransactionFields({
                 account.accountSubType !== 'INVESTMENT_BROKERAGE' &&
                 (!account.isClosed || account.id === watchedAccountId),
             ),
+            ...candidateOptions(transferToAccountId),
           ]}
           {...register('accountId')}
         />
         <Select
           label={t('form.fields.toAccount')}
           value={transferToAccountId}
+          disabled={counterpartLocked}
           onChange={(e) => {
             setTransferToAccountId(e.target.value);
             setTransferTargetAmount(undefined);
@@ -133,6 +206,7 @@ export function TransferTransactionFields({
                 account.accountSubType !== 'INVESTMENT_BROKERAGE' &&
                 (!account.isClosed || account.id === transferToAccountId),
             ),
+            ...candidateOptions(watchedAccountId),
           ]}
         />
       </div>
@@ -146,6 +220,7 @@ export function TransferTransactionFields({
             value={watchedAmount}
             onChange={(value) => setValue('amount', value !== undefined ? Math.abs(value) : 0, { shouldValidate: true })}
             allowNegative={false}
+            disabled={counterpartLocked}
             error={errors.amount?.message as string | undefined}
           />
           {!crossCurrencyInfo && (
@@ -164,6 +239,7 @@ export function TransferTransactionFields({
               value={transferTargetAmount}
               onChange={(value) => setTransferTargetAmount(value !== undefined ? Math.abs(value) : undefined)}
               allowNegative={false}
+              disabled={counterpartLocked}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t('form.amountReceivedNote')}

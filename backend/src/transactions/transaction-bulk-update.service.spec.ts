@@ -312,10 +312,16 @@ describe("TransactionBulkUpdateService", () => {
           .fn()
           .mockResolvedValue([{ linkedTransactionId: "tx-2-linked" }]),
       });
+      // Cross-owner filter: the linked leg belongs to the same user.
+      const ownLinkedQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-2-linked" }]),
+      });
       const syncUpdateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       });
-      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(syncFindQb)
+        .mockReturnValue(ownLinkedQb);
       mockManagerCreateQueryBuilder
         .mockReturnValueOnce(updateQb)
         .mockReturnValueOnce(syncUpdateQb);
@@ -480,10 +486,16 @@ describe("TransactionBulkUpdateService", () => {
           .fn()
           .mockResolvedValue([{ linkedTransactionId: "tx-1-linked" }]),
       });
+      // Cross-owner filter: the linked leg belongs to the same user.
+      const ownLinkedQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1-linked" }]),
+      });
       const syncUpdateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       });
-      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(syncFindQb)
+        .mockReturnValue(ownLinkedQb);
       mockManagerCreateQueryBuilder
         .mockReturnValueOnce(updateQb)
         .mockReturnValueOnce(syncUpdateQb);
@@ -923,7 +935,13 @@ describe("TransactionBulkUpdateService", () => {
             { id: "tx-1", linkedTransactionId: "tx-1-linked" },
           ]),
       });
-      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
+      // Cross-owner filter: the mirror leg belongs to the same user.
+      const ownLinkedQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1-linked" }]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(syncFindQb)
+        .mockReturnValue(ownLinkedQb);
       // No owning split: a plain transfer leg.
       mockManagerFind.mockResolvedValue([]);
 
@@ -943,6 +961,55 @@ describe("TransactionBulkUpdateService", () => {
         userId,
       );
       expect(tagsService.setSplitTagsBulk).not.toHaveBeenCalled();
+    });
+
+    it("never writes bulk tags onto a cross-owner counterpart leg", async () => {
+      const tx1 = makeTransaction({
+        id: "tx-1",
+        isTransfer: true,
+        linkedTransactionId: "foreign-linked",
+      });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }]),
+      });
+      const exclusionsQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx1]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(exclusionsQb);
+
+      const syncFindQb = createMockQueryBuilder({
+        getMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: "tx-1", linkedTransactionId: "foreign-linked" },
+          ]),
+      });
+      // Ownership filter: the linked row belongs to another user, so the
+      // same-user probe finds nothing to sync.
+      const ownLinkedQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(syncFindQb)
+        .mockReturnValue(ownLinkedQb);
+      mockManagerFind.mockResolvedValue([]);
+
+      await service.bulkUpdate(userId, {
+        mode: "ids",
+        transactionIds: ["tx-1"],
+        tagIds: ["tag-a"],
+      });
+
+      // Only the batch's own rows are tagged; the foreign counterpart is not.
+      expect(tagsService.setTransactionTagsBulk).toHaveBeenCalledTimes(1);
+      expect(tagsService.setTransactionTagsBulk).toHaveBeenCalledWith(
+        ["tx-1"],
+        ["tag-a"],
+        userId,
+      );
     });
 
     it("applies filters in filter mode", async () => {

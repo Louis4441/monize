@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import {
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
 } from "@nestjs/common";
 import { TransactionToolPrepService } from "./transaction-tool-prep.service";
 import { AccountsService } from "../accounts/accounts.service";
@@ -708,6 +709,60 @@ describe("TransactionToolPrepService", () => {
       const result = await service.prepareDeleteBulk(userId, ["t1", "t2"]);
       expect(result.okRows).toEqual([{ transactionId: "t1" }]);
       expect(result.skipped).toHaveLength(1);
+    });
+  });
+
+  describe("cross-owner transfer refusal (both AI and MCP surfaces)", () => {
+    // The transfer's counterpart leg is not the effective user's row: the
+    // owner-scoped findOne of the linked id misses.
+    const crossOwnerTransfer = () => {
+      transactions.findOne.mockImplementation(
+        async (_u: string, id: string) => {
+          if (id === "t1") {
+            return { id: "t1", isTransfer: true, linkedTransactionId: "t2" };
+          }
+          throw new NotFoundException("Transaction not found");
+        },
+      );
+    };
+
+    it("prepareUpdate refuses a cross-owner transfer with a clear error", async () => {
+      crossOwnerTransfer();
+      await expect(
+        service.prepareUpdate(userId, { transactionId: "t1", amount: 100 }),
+      ).rejects.toThrow(/another user's account/);
+      expect(transfer.previewUpdateTransfer).not.toHaveBeenCalled();
+    });
+
+    it("prepareDelete refuses a cross-owner transfer with the same error", async () => {
+      crossOwnerTransfer();
+      await expect(service.prepareDelete(userId, "t1")).rejects.toThrow(
+        /another user's account/,
+      );
+      expect(transactions.previewDelete).not.toHaveBeenCalled();
+    });
+
+    it("still previews a same-owner transfer update", async () => {
+      transactions.findOne.mockImplementation(async (_u: string, id: string) =>
+        id === "t1"
+          ? { id: "t1", isTransfer: true, linkedTransactionId: "t2" }
+          : { id: "t2", isTransfer: true, linkedTransactionId: "t1" },
+      );
+      const result = await service.prepareUpdate(userId, {
+        transactionId: "t1",
+        amount: 100,
+      });
+      expect(result.kind).toBe("transfer");
+    });
+
+    it("still previews a same-owner transfer delete", async () => {
+      transactions.findOne.mockImplementation(async (_u: string, id: string) =>
+        id === "t1"
+          ? { id: "t1", isTransfer: true, linkedTransactionId: "t2" }
+          : { id: "t2", isTransfer: true, linkedTransactionId: "t1" },
+      );
+      const preview = await service.prepareDelete(userId, "t1");
+      expect(preview.transactionId).toBe("t1");
     });
   });
 

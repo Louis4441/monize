@@ -383,6 +383,12 @@
       "transaction": "Транзакція"
     },
     "transferAmountNote": "Сума для переказів має бути позитивною",
+    "transferCandidates": {
+      "sharedWithYou": "Доступні вам",
+      "yourAccounts": "Ваші рахунки",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "Інша сторона цього переказу знаходиться на рахунку, яким з вами більше не діляться. Його сума, дата та рахунки заблоковані, але ви все ще можете редагувати деталі цієї транзакції.",
     "amountReceivedNote": "Отримана сума після конвертації валюти",
     "splitTransaction": "Розподілити транзакцію",
     "splitDisabledDuringTour": "Недоступно під час інтерактивного туру",

@@ -1,5 +1,6 @@
 {
   "ok": "OK",
+  "sharedAccountLabel": "Conto condiviso",
   "accountSuffix": {
     "cash": "Contanti",
     "brokerage": "Intermediazione"

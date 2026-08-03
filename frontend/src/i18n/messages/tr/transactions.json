@@ -383,6 +383,12 @@
       "transaction": "İşlem"
     },
     "transferAmountNote": "Transferler için tutar pozitif olmalıdır",
+    "transferCandidates": {
+      "sharedWithYou": "Sizinle paylaşılan",
+      "yourAccounts": "Hesaplarınız",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "Bu transferin diğer tarafı artık sizinle paylaşılmayan bir hesapta. Tutarı, tarihi ve hesapları kilitli, ancak bu işlemin kendi ayrıntılarını yine de düzenleyebilirsiniz.",
     "amountReceivedNote": "Para birimi dönüşümünden sonra alınan tutar",
     "splitTransaction": "İşlemi Böl",
     "splitDisabledDuringTour": "Rehberli tur sırasında kullanılamaz",

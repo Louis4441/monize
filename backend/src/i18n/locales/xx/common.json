@@ -1,5 +1,6 @@
 {
   "ok": "[XX-OK-XX]",
+  "sharedAccountLabel": "[XX-Shared account-XX]",
   "accountSuffix": {
     "cash": "[XX-Cash-XX]",
     "brokerage": "[XX-Brokerage-XX]"

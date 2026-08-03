@@ -383,6 +383,12 @@
       "transaction": "交易"
     },
     "transferAmountNote": "转账金额必须为正数",
+    "transferCandidates": {
+      "sharedWithYou": "与您共享",
+      "yourAccounts": "您的账户",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "此转账的另一方位于不再与您共享的账户中。其金额、日期和账户已锁定，但您仍可以编辑此交易自身的详细信息。",
     "amountReceivedNote": "货币兑换后收到的金额",
     "splitTransaction": "拆分交易",
     "splitDisabledDuringTour": "引导式导览期间不可用",

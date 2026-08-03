@@ -16,6 +16,7 @@ describe("AccountsController", () => {
   let mockStatementCycleService: Record<string, jest.Mock>;
   let mockBalanceForecastService: Record<string, jest.Mock>;
   let mockDelegationService: Record<string, jest.Mock>;
+  let mockCrossOwnerAccess: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   beforeEach(async () => {
@@ -60,6 +61,10 @@ describe("AccountsController", () => {
       reorderDelegateFavourites: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockCrossOwnerAccess = {
+      transferCandidatesFor: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AccountsController],
       providers: [
@@ -91,10 +96,50 @@ describe("AccountsController", () => {
           provide: DelegationService,
           useValue: mockDelegationService,
         },
+        {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("../delegation/cross-owner-access.service")
+            .CrossOwnerAccessService,
+          useValue: mockCrossOwnerAccess,
+        },
       ],
     }).compile();
 
     controller = module.get<AccountsController>(AccountsController);
+  });
+
+  describe("getTransferCandidates()", () => {
+    it("own context: passes the same id as real and effective user", async () => {
+      const candidates = [{ id: "acc-1", name: "Shared", canCreate: true }];
+      mockCrossOwnerAccess.transferCandidatesFor.mockResolvedValue(candidates);
+
+      const result = await controller.getTransferCandidates({
+        user: { id: "user-1", realUserId: "user-1" },
+      });
+
+      expect(result).toBe(candidates);
+      expect(mockCrossOwnerAccess.transferCandidatesFor).toHaveBeenCalledWith(
+        "user-1",
+        "user-1",
+      );
+    });
+
+    it("acting context: passes the delegate as real user and the owner as effective", async () => {
+      await controller.getTransferCandidates({
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+      });
+
+      expect(mockCrossOwnerAccess.transferCandidatesFor).toHaveBeenCalledWith(
+        "delegate-1",
+        "owner-1",
+      );
+    });
+
+    it("returns empty results untouched", async () => {
+      await expect(
+        controller.getTransferCandidates({ user: { id: "user-1" } }),
+      ).resolves.toEqual([]);
+    });
   });
 
   describe("create()", () => {
@@ -595,6 +640,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: true, dateFormat: undefined },
+        "user-1",
       );
       expect(mockRes.setHeader).toHaveBeenCalledWith(
         "Content-Type",
@@ -628,6 +674,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: false, dateFormat: undefined },
+        "user-1",
       );
     });
 
@@ -650,6 +697,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: false, dateFormat: undefined },
+        "user-1",
       );
     });
 
@@ -672,6 +720,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { dateFormat: undefined },
+        "user-1",
       );
       expect(mockRes.setHeader).toHaveBeenCalledWith(
         "Content-Type",
@@ -701,6 +750,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { expandSplits: true, dateFormat: "DD/MM/YYYY" },
+        "user-1",
       );
     });
 
@@ -723,6 +773,7 @@ describe("AccountsController", () => {
         "user-1",
         "account-1",
         { dateFormat: "YYYY-MM-DD" },
+        "user-1",
       );
     });
 

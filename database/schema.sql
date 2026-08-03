@@ -813,6 +813,8 @@ CREATE TABLE account_delegate_grants (
 );
 
 CREATE INDEX idx_adg_delegation ON account_delegate_grants(delegation_id);
+-- The transactions policy arm and CrossOwnerAccessService probe by account.
+CREATE INDEX idx_adg_account ON account_delegate_grants(account_id);
 
 -- A delegate's account favourites, independent of the owner's
 -- accounts.is_favourite (which stays owner-scoped).
@@ -1628,7 +1630,6 @@ DECLARE
         'securities',
         'tags',
         'transaction_attachments',
-        'transactions',
         'user_currency_preferences'
     ];
 BEGIN
@@ -1642,6 +1643,26 @@ BEGIN
         );
     END LOOP;
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- transactions -- direct ownership plus a delegate READ arm (migration 132).
+--
+-- Rows in an account covered by an active can_read grant are visible to the
+-- delegate's own session (app.real_user_id), which is what lets a cross-owner
+-- transfer counterpart -- and the acting delegate's linkedTransaction join --
+-- load under enforcement. WITH CHECK stays owner-only: cross-owner writes run
+-- under the audited withSystemContext bypass after in-code authorization.
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS transactions_isolation ON transactions;
+CREATE POLICY transactions_isolation ON transactions
+  USING (user_id = (SELECT app_current_user_id())
+      OR (SELECT app_bypass_rls())
+      OR EXISTS (SELECT 1 FROM account_delegate_grants g
+                 JOIN account_delegates d ON d.id = g.delegation_id
+                 WHERE g.account_id = transactions.account_id
+                   AND g.can_read AND d.status = 'active'
+                   AND d.delegate_user_id = (SELECT app_real_user_id())))
+  WITH CHECK (user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls()));
 
 -- ---------------------------------------------------------------------------
 -- Group B: keyed by the AUTHENTICATED user (4 tables)

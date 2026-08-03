@@ -383,6 +383,12 @@
       "transaction": "लेन-देन"
     },
     "transferAmountNote": "ट्रांसफर के लिए राशि सकारात्मक होनी चाहिए",
+    "transferCandidates": {
+      "sharedWithYou": "आपके साथ साझा",
+      "yourAccounts": "आपके खाते",
+      "optionLabel": "{name} ({currency}) — {owner}"
+    },
+    "crossOwnerLockedNote": "इस ट्रांसफर का दूसरा पक्ष ऐसे खाते में है जो अब आपके साथ साझा नहीं है। इसकी राशि, तारीख और खाते लॉक हैं, लेकिन आप अभी भी इस लेन-देन के अपने विवरण संपादित कर सकते हैं।",
     "amountReceivedNote": "मुद्रा रूपांतरण के बाद प्राप्त राशि",
     "splitTransaction": "लेन-देन विभाजित करें",
     "splitDisabledDuringTour": "निर्देशित टूर के दौरान उपलब्ध नहीं",
