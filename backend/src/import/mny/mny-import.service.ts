@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -24,6 +23,7 @@ import {
   JOB_FAILED_ERROR_KEY,
   JobRunContext,
   MnyImportJobService,
+  importAlreadyRunningException,
 } from "./mny-import-job.service";
 import { MnyParsedFile, MnyParserService } from "./mny-parser.service";
 import { MnyStagingService } from "./mny-staging.service";
@@ -72,10 +72,13 @@ import {
  * because the job service publishes it on its own connection -- see
  * `runOutsideActiveScopedManager`.
  *
- * The optional "start fresh" wipe happens in `start`, **before** the job exists,
- * for a security reason as much as an ordering one: `UsersService.deleteData`
+ * The optional "start fresh" wipe happens in `start`, outside the job body, for
+ * a security reason as much as an ordering one: `UsersService.deleteData`
  * re-authenticates, and its credentials must never be written into
- * `import_jobs.options`.
+ * `import_jobs.options`. It runs *after* the job row is inserted, though: the
+ * row is this user's import lock, and a destructive operation performed before
+ * the lock is held is one two concurrent requests can both perform. A wipe that
+ * fails takes the row back out with it.
  */
 
 /** `holdings.quantity` is `decimal(20,8)`. */
@@ -126,33 +129,44 @@ export class MnyImportService {
       );
     }
 
+    // Advisory: it saves a doomed INSERT and gives the same 409, but it cannot
+    // decide anything -- two requests can both read false here. `jobs.create`
+    // is what actually refuses, on the database's own unique index.
     if (await this.jobs.hasActiveJob(userId)) {
-      throw new ConflictException(
-        tr(
-          "errors.import.mnyImportAlreadyRunning",
-          "An import is already running. Wait for it to finish before starting another.",
-        ),
-      );
+      throw importAlreadyRunningException();
     }
 
     const options = resolveImportOptions(input.options);
 
-    // Before the job row exists, and never with the credentials in tow: a
-    // failed re-authentication must fail the request, not a background job.
+    // The job row is the lock, so it is taken *before* the destructive wipe:
+    // with the wipe first, two concurrent starts could both pass the advisory
+    // check and both delete the user's data before either row existed.
+    const job = await this.jobs.create(userId, staged.id, options);
+
+    // Still outside the job body, and never with the credentials in tow:
+    // `deleteData` re-authenticates, so running it in the body would mean
+    // writing the user's password into `import_jobs.options`, and a failed
+    // re-authentication must fail the request rather than a background job.
     if (options.wipeExistingData) {
-      await this.usersService.deleteData(userId, {
-        password: input.wipeCredentials?.password,
-        oidcIdToken: input.wipeCredentials?.oidcIdToken,
-        deleteAccounts: true,
-        deleteCategories: true,
-        deletePayees: true,
-      });
+      try {
+        await this.usersService.deleteData(userId, {
+          password: input.wipeCredentials?.password,
+          oidcIdToken: input.wipeCredentials?.oidcIdToken,
+          deleteAccounts: true,
+          deleteCategories: true,
+          deletePayees: true,
+        });
+      } catch (error) {
+        // The request is refused, so the slot it took must go back: leaving the
+        // row pending would block every import this user starts for the five
+        // minutes until the reaper sweeps it.
+        await this.jobs.discard(userId, job.id).catch(() => undefined);
+        throw error;
+      }
       this.logger.log(
         `Wiped existing data for user ${userId} before .mny import`,
       );
     }
-
-    const job = await this.jobs.create(userId, staged.id, options);
 
     // Unawaited on purpose (design ADR-3): the request returns the job id and
     // the wizard polls. `withUserContext` keeps an identity for the async chain

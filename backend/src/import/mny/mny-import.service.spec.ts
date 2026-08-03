@@ -5,7 +5,11 @@ import { CurrenciesService } from "../../currencies/currencies.service";
 import { UsersService } from "../../users/users.service";
 import { ImportPostProcessingService } from "../import-post-processing.service";
 import { MnyStagedFileMissingError } from "./mny-errors";
-import { JobRunContext, MnyImportJobService } from "./mny-import-job.service";
+import {
+  JobRunContext,
+  MnyImportJobService,
+  importAlreadyRunningException,
+} from "./mny-import-job.service";
 import { MnyImportService } from "./mny-import.service";
 import { MnyParsedFile, MnyParserService } from "./mny-parser.service";
 import { MnyStagingService } from "./mny-staging.service";
@@ -266,6 +270,7 @@ describe("MnyImportService", () => {
     jobs = {
       hasActiveJob: jest.fn().mockResolvedValue(false),
       create: jest.fn().mockResolvedValue({ id: "job-1" }),
+      discard: jest.fn().mockResolvedValue(undefined),
       runClaimed: jest.fn().mockResolvedValue(true),
       fail: jest.fn().mockResolvedValue(undefined),
     };
@@ -368,6 +373,33 @@ describe("MnyImportService", () => {
       expect(jobs.create).not.toHaveBeenCalled();
     });
 
+    it("passes the 409 through when only the insert catches the race", async () => {
+      // The advisory count sees nothing, because the other request has not
+      // committed yet; `create` refuses on the unique index instead. This is
+      // the only path that can distinguish a real concurrent start.
+      jobs.create.mockRejectedValue(importAlreadyRunningException());
+
+      await expect(
+        service.start("user-1", { stagedFileId: "staged-1" }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(jobs.runClaimed).not.toHaveBeenCalled();
+    });
+
+    it("does not wipe when the losing request's insert is refused", async () => {
+      // The wipe is behind the lock, so the request that did not get the job
+      // row cannot delete the winner's data out from under it.
+      jobs.create.mockRejectedValue(importAlreadyRunningException());
+
+      await expect(
+        service.start("user-1", {
+          stagedFileId: "staged-1",
+          options: { wipeExistingData: true },
+          wipeCredentials: { password: "hunter2" },
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(usersService.deleteData).not.toHaveBeenCalled();
+    });
+
     it("creates the job with resolved options and starts it in the background", async () => {
       const job = await service.start("user-1", { stagedFileId: "staged-1" });
 
@@ -384,7 +416,7 @@ describe("MnyImportService", () => {
       );
     });
 
-    it("wipes before the job exists, and never stores the credentials", async () => {
+    it("wipes only once the job row holds the lock, and never stores the credentials", async () => {
       await service.start("user-1", {
         stagedFileId: "staged-1",
         options: { wipeExistingData: true },
@@ -402,8 +434,14 @@ describe("MnyImportService", () => {
       // import_jobs.options.
       const [, , options] = jobs.create.mock.calls[0];
       expect(JSON.stringify(options)).not.toContain("hunter2");
+      // The row is this user's import lock, so a destructive wipe runs behind
+      // it -- never before it, where two concurrent requests could both wipe.
+      expect(jobs.create.mock.invocationCallOrder[0]).toBeLessThan(
+        usersService.deleteData.mock.invocationCallOrder[0],
+      );
+      // ...and still outside the job body, so the password is never persisted.
       expect(usersService.deleteData.mock.invocationCallOrder[0]).toBeLessThan(
-        jobs.create.mock.invocationCallOrder[0],
+        jobs.runClaimed.mock.invocationCallOrder[0],
       );
     });
 
@@ -416,7 +454,34 @@ describe("MnyImportService", () => {
           options: { wipeExistingData: true },
         }),
       ).rejects.toThrow("bad password");
-      expect(jobs.create).not.toHaveBeenCalled();
+      expect(jobs.runClaimed).not.toHaveBeenCalled();
+    });
+
+    it("gives the import slot back when the wipe is refused", async () => {
+      // Otherwise the pending row it took blocks every import this user starts
+      // until the reaper sweeps it five minutes later -- for a job that will
+      // never run, over a request that already returned an error.
+      usersService.deleteData.mockRejectedValue(new Error("bad password"));
+
+      await expect(
+        service.start("user-1", {
+          stagedFileId: "staged-1",
+          options: { wipeExistingData: true },
+        }),
+      ).rejects.toThrow("bad password");
+      expect(jobs.discard).toHaveBeenCalledWith("user-1", "job-1");
+    });
+
+    it("still reports the wipe failure when the slot cannot be given back", async () => {
+      usersService.deleteData.mockRejectedValue(new Error("bad password"));
+      jobs.discard.mockRejectedValue(new Error("pool exhausted"));
+
+      await expect(
+        service.start("user-1", {
+          stagedFileId: "staged-1",
+          options: { wipeExistingData: true },
+        }),
+      ).rejects.toThrow("bad password");
     });
 
     it("does not wipe when the option is off", async () => {

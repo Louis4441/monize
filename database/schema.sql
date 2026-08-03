@@ -1330,6 +1330,10 @@ CREATE TABLE import_jobs (
 CREATE INDEX idx_import_jobs_user ON import_jobs(user_id);
 CREATE INDEX idx_import_jobs_staged_file ON import_jobs(staged_file_id);
 CREATE INDEX idx_import_jobs_running_heartbeat ON import_jobs(heartbeat_at) WHERE status = 'running';
+-- One in-flight import per user, enforced here rather than by a read-then-insert
+-- in the service: two concurrent starts would otherwise both see no active job
+-- and import the same staged file twice.
+CREATE UNIQUE INDEX idx_import_jobs_one_active_per_user ON import_jobs(user_id) WHERE status IN ('pending', 'running');
 
 CREATE TRIGGER update_import_jobs_updated_at BEFORE UPDATE ON import_jobs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
