@@ -1,15 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import {
-  BadRequestException,
-  NotFoundException,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
-import { PasswordBreachService } from "../auth/password-breach.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -22,7 +17,6 @@ describe("BackupEncryptionService", () => {
   let service: BackupEncryptionService;
   let usersRepo: Record<string, jest.Mock>;
   let aiEncryption: Record<string, jest.Mock>;
-  let passwordBreach: Record<string, jest.Mock>;
 
   const userId = "user-1";
 
@@ -47,9 +41,6 @@ describe("BackupEncryptionService", () => {
       encrypt: jest.fn((s: string) => `enc:${s}`),
       decrypt: jest.fn((s: string) => s.replace(/^enc:/, "")),
     };
-    passwordBreach = {
-      isBreached: jest.fn().mockResolvedValue(false),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,28 +51,20 @@ describe("BackupEncryptionService", () => {
         },
         BackupEncryptionService,
         { provide: AiEncryptionService, useValue: aiEncryption },
-        { provide: PasswordBreachService, useValue: passwordBreach },
       ],
     }).compile();
 
     service = module.get(BackupEncryptionService);
   });
 
+  afterEach(() => jest.clearAllMocks());
+
   describe("getStatus", () => {
-    it("reports enabled flag and needsBackupPassword=false for local user", async () => {
+    it("reports the enabled flag", async () => {
       usersRepo.findOne.mockResolvedValue(
         makeUser({ backupEncryptionEnabled: true }),
       );
-      const status = await service.getStatus(userId);
-      expect(status).toEqual({ enabled: true, needsBackupPassword: false });
-    });
-
-    it("reports needsBackupPassword=true for OIDC user without stored password", async () => {
-      usersRepo.findOne.mockResolvedValue(
-        makeUser({ authProvider: "oidc", passwordHash: null }),
-      );
-      const status = await service.getStatus(userId);
-      expect(status.needsBackupPassword).toBe(true);
+      expect(await service.getStatus(userId)).toEqual({ enabled: true });
     });
 
     it("throws when user not found", async () => {
@@ -92,111 +75,141 @@ describe("BackupEncryptionService", () => {
     });
   });
 
-  describe("enableForLocalUser", () => {
-    it("verifies password, stores encrypted copy, and turns on the flag", async () => {
+  describe("rememberLoginPassword", () => {
+    it("stores the encrypted password and turns encryption on", async () => {
       const user = makeUser();
       usersRepo.findOne.mockResolvedValue(user);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      await service.enableForLocalUser(userId, "my-password");
+      await service.rememberLoginPassword(userId, "hunter2hunter2");
 
-      expect(aiEncryption.encrypt).toHaveBeenCalledWith("my-password");
+      expect(aiEncryption.encrypt).toHaveBeenCalledWith("hunter2hunter2");
       expect(usersRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
+          backupPasswordEnc: "enc:hunter2hunter2",
           backupEncryptionEnabled: true,
-          backupPasswordEnc: "enc:my-password",
         }),
       );
     });
 
-    it("rejects an invalid password", async () => {
-      usersRepo.findOne.mockResolvedValue(makeUser());
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-      await expect(service.enableForLocalUser(userId, "bad")).rejects.toThrow(
-        UnauthorizedException,
-      );
-      expect(usersRepo.save).not.toHaveBeenCalled();
-    });
-
-    it("refuses OIDC users", async () => {
-      usersRepo.findOne.mockResolvedValue(
-        makeUser({ authProvider: "oidc", passwordHash: null }),
-      );
-      await expect(service.enableForLocalUser(userId, "any")).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it("refuses when AI_ENCRYPTION_KEY is missing", async () => {
-      usersRepo.findOne.mockResolvedValue(makeUser());
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      aiEncryption.isConfigured.mockReturnValue(false);
-      await expect(service.enableForLocalUser(userId, "ok")).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-  });
-
-  describe("setBackupPasswordForOidcUser", () => {
-    it("requires minimum length", async () => {
-      usersRepo.findOne.mockResolvedValue(
-        makeUser({ authProvider: "oidc", passwordHash: null }),
-      );
-      await expect(
-        service.setBackupPasswordForOidcUser(userId, "short"),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it("rejects breached passwords", async () => {
-      usersRepo.findOne.mockResolvedValue(
-        makeUser({ authProvider: "oidc", passwordHash: null }),
-      );
-      passwordBreach.isBreached.mockResolvedValue(true);
-      await expect(
-        service.setBackupPasswordForOidcUser(userId, "a-long-enough-password"),
-      ).rejects.toThrow(/data breach/i);
-    });
-
-    it("stores the encrypted password and enables encryption", async () => {
-      usersRepo.findOne.mockResolvedValue(
-        makeUser({ authProvider: "oidc", passwordHash: null }),
-      );
-      await service.setBackupPasswordForOidcUser(userId, "long-good-password");
-      expect(usersRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          backupEncryptionEnabled: true,
-          backupPasswordEnc: "enc:long-good-password",
-        }),
-      );
-    });
-
-    it("refuses local users", async () => {
-      usersRepo.findOne.mockResolvedValue(makeUser());
-      await expect(
-        service.setBackupPasswordForOidcUser(userId, "long-good-password"),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it("refuses when AI_ENCRYPTION_KEY is missing", async () => {
-      usersRepo.findOne.mockResolvedValue(
-        makeUser({ authProvider: "oidc", passwordHash: null }),
-      );
-      aiEncryption.isConfigured.mockReturnValue(false);
-      await expect(
-        service.setBackupPasswordForOidcUser(userId, "long-good-password"),
-      ).rejects.toThrow(/AI_ENCRYPTION_KEY/);
-    });
-  });
-
-  describe("disable", () => {
-    it("clears the flag and stored password", async () => {
+    it("replaces a stored copy that no longer matches", async () => {
       usersRepo.findOne.mockResolvedValue(
         makeUser({
           backupEncryptionEnabled: true,
-          backupPasswordEnc: "enc:something",
+          backupPasswordEnc: "enc:old-password",
         }),
       );
-      await service.disable(userId);
+
+      await service.rememberLoginPassword(userId, "new-password");
+
+      expect(usersRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ backupPasswordEnc: "enc:new-password" }),
+      );
+    });
+
+    it("does not write when the stored copy already matches", async () => {
+      usersRepo.findOne.mockResolvedValue(
+        makeUser({
+          backupEncryptionEnabled: true,
+          backupPasswordEnc: "enc:hunter2hunter2",
+        }),
+      );
+
+      await service.rememberLoginPassword(userId, "hunter2hunter2");
+
+      // Every sign-in passes through here; an unchanged password must not
+      // turn each one into a users-table write.
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("replaces a stored copy it cannot decrypt", async () => {
+      aiEncryption.decrypt.mockImplementation(() => {
+        throw new Error("bad key");
+      });
+      usersRepo.findOne.mockResolvedValue(
+        makeUser({
+          backupEncryptionEnabled: true,
+          backupPasswordEnc: "enc:unreadable",
+        }),
+      );
+
+      await service.rememberLoginPassword(userId, "hunter2hunter2");
+
+      expect(usersRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ backupPasswordEnc: "enc:hunter2hunter2" }),
+      );
+    });
+
+    it("stores nothing for an OIDC account", async () => {
+      usersRepo.findOne.mockResolvedValue(
+        makeUser({ authProvider: "oidc", passwordHash: null }),
+      );
+
+      await service.rememberLoginPassword(userId, "hunter2hunter2");
+
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("stores nothing when the server has no encryption key", async () => {
+      aiEncryption.isConfigured.mockReturnValue(false);
+      usersRepo.findOne.mockResolvedValue(makeUser());
+
+      await service.rememberLoginPassword(userId, "hunter2hunter2");
+
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("swallows a storage failure rather than breaking sign-in", async () => {
+      usersRepo.findOne.mockResolvedValue(makeUser());
+      usersRepo.save.mockRejectedValue(new Error("db down"));
+
+      await expect(
+        service.rememberLoginPassword(userId, "hunter2hunter2"),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("resolveBackupPassword", () => {
+    it("returns 'none' when nothing is stored", async () => {
+      expect(await service.resolveBackupPassword(makeUser())).toEqual({
+        status: "none",
+      });
+    });
+
+    it("returns the password when it still matches the login password", async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.resolveBackupPassword(
+        makeUser({
+          backupEncryptionEnabled: true,
+          backupPasswordEnc: "enc:hunter2hunter2",
+        }),
+      );
+
+      expect(result).toEqual({
+        status: "password",
+        password: "hunter2hunter2",
+      });
+    });
+
+    it("drops a stale copy rather than encrypting with a password the user has changed", async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      usersRepo.findOne.mockResolvedValue(
+        makeUser({
+          backupEncryptionEnabled: true,
+          backupPasswordEnc: "enc:old-password",
+        }),
+      );
+
+      const result = await service.resolveBackupPassword(
+        makeUser({
+          backupEncryptionEnabled: true,
+          backupPasswordEnc: "enc:old-password",
+        }),
+      );
+
+      // A backup encrypted with a forgotten password is a file the user
+      // cannot open; better an unencrypted one until the next sign-in.
+      expect(result).toEqual({ status: "none" });
       expect(usersRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           backupEncryptionEnabled: false,
@@ -204,31 +217,26 @@ describe("BackupEncryptionService", () => {
         }),
       );
     });
-  });
 
-  describe("syncOnPasswordChange", () => {
-    it("re-encrypts the stored password under the new value", async () => {
-      usersRepo.findOne.mockResolvedValue(
+    it("reports 'unrecoverable' when the stored copy cannot be decrypted", async () => {
+      aiEncryption.decrypt.mockImplementation(() => {
+        throw new Error("bad key");
+      });
+
+      const result = await service.resolveBackupPassword(
         makeUser({
           backupEncryptionEnabled: true,
-          backupPasswordEnc: "enc:old-password",
+          backupPasswordEnc: "enc:unreadable",
         }),
       );
-      await service.syncOnPasswordChange(userId, "new-password");
-      expect(aiEncryption.encrypt).toHaveBeenCalledWith("new-password");
-      expect(usersRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ backupPasswordEnc: "enc:new-password" }),
-      );
+
+      // Distinct from "none": the caller must refuse rather than silently
+      // writing plaintext where it used to write ciphertext.
+      expect(result).toEqual({ status: "unrecoverable" });
     });
 
-    it("is a no-op when encryption is disabled", async () => {
-      usersRepo.findOne.mockResolvedValue(makeUser());
-      await service.syncOnPasswordChange(userId, "new");
-      expect(usersRepo.save).not.toHaveBeenCalled();
-    });
-
-    it("is a no-op for OIDC users (they manage their backup password separately)", async () => {
-      usersRepo.findOne.mockResolvedValue(
+    it("skips the login-password check for an OIDC account", async () => {
+      const result = await service.resolveBackupPassword(
         makeUser({
           authProvider: "oidc",
           passwordHash: null,
@@ -236,33 +244,37 @@ describe("BackupEncryptionService", () => {
           backupPasswordEnc: "enc:dedicated",
         }),
       );
-      await service.syncOnPasswordChange(userId, "ignored");
-      expect(usersRepo.save).not.toHaveBeenCalled();
-    });
 
-    it("is a no-op when AI_ENCRYPTION_KEY is missing", async () => {
+      expect(result).toEqual({ status: "password", password: "dedicated" });
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("forgetStoredPassword", () => {
+    it("clears the stored copy", async () => {
       usersRepo.findOne.mockResolvedValue(
-        makeUser({ backupEncryptionEnabled: true }),
+        makeUser({
+          backupEncryptionEnabled: true,
+          backupPasswordEnc: "enc:whatever",
+        }),
       );
-      aiEncryption.isConfigured.mockReturnValue(false);
-      await service.syncOnPasswordChange(userId, "new");
-      expect(usersRepo.save).not.toHaveBeenCalled();
+
+      await service.forgetStoredPassword(userId);
+
+      expect(usersRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          backupEncryptionEnabled: false,
+          backupPasswordEnc: null,
+        }),
+      );
     });
 
-    it("is a no-op when the user has disappeared", async () => {
+    it("is a no-op for a user that no longer exists", async () => {
       usersRepo.findOne.mockResolvedValue(null);
-      await service.syncOnPasswordChange(userId, "new");
-      expect(usersRepo.save).not.toHaveBeenCalled();
-    });
-
-    it("does not throw if save fails -- password change must still succeed", async () => {
-      usersRepo.findOne.mockResolvedValue(
-        makeUser({ backupEncryptionEnabled: true }),
-      );
-      usersRepo.save.mockRejectedValue(new Error("db down"));
       await expect(
-        service.syncOnPasswordChange(userId, "new"),
-      ).resolves.not.toThrow();
+        service.forgetStoredPassword(userId),
+      ).resolves.toBeUndefined();
+      expect(usersRepo.save).not.toHaveBeenCalled();
     });
   });
 });

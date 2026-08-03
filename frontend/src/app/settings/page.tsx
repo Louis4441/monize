@@ -40,7 +40,10 @@ const SETTINGS_SECTION_IDS = [
   { id: 'api-access', navKey: 'apiAccess', demoVisible: false },
   { id: 'ai-settings', navKey: 'aiSettings', href: '/settings/ai', demoVisible: false },
   { id: 'backup-restore', navKey: 'backupRestore', demoVisible: false },
-  { id: 'auto-backup', navKey: 'autoBackup', demoVisible: false },
+  // Automatic backups decide what the server writes to its own filesystem, so
+  // only an administrator configures them. Everyone else is enrolled on the
+  // deployment defaults by the backend and never sees the section.
+  { id: 'auto-backup', navKey: 'autoBackup', demoVisible: false, adminOnly: true },
   { id: 'help', navKey: 'help', demoVisible: false },
   { id: 'about', navKey: 'about', demoVisible: true },
   { id: 'danger-zone', navKey: 'dangerZone', variant: 'danger' as const, demoVisible: false },
@@ -163,8 +166,11 @@ function OwnerSettingsView() {
   const [smtpConfigured, setSmtpConfigured] = useState(false);
   const [force2fa, setForce2fa] = useState(false);
   const isDemoMode = useDemoStore((s) => s.isDemoMode);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
 
-  const allSettingsSections = useMemo<readonly (SettingsSection & { demoVisible: boolean })[]>(
+  const allSettingsSections = useMemo<
+    readonly (SettingsSection & { demoVisible: boolean; adminOnly: boolean })[]
+  >(
     () =>
       SETTINGS_SECTION_IDS.map((s) => ({
         id: s.id,
@@ -172,16 +178,18 @@ function OwnerSettingsView() {
         href: 'href' in s ? s.href : undefined,
         variant: 'variant' in s ? s.variant : undefined,
         demoVisible: s.demoVisible,
+        adminOnly: 'adminOnly' in s ? s.adminOnly : false,
       })),
     [tNav],
   );
 
   const visibleSections = useMemo<readonly SettingsSection[]>(() => {
+    const sections = allSettingsSections.filter((s) => !s.adminOnly || isAdmin);
     if (isDemoMode) {
-      return allSettingsSections.filter((s) => s.demoVisible);
+      return sections.filter((s) => s.demoVisible);
     }
-    return allSettingsSections;
-  }, [isDemoMode, allSettingsSections]);
+    return sections;
+  }, [isDemoMode, isAdmin, allSettingsSections]);
 
   const sectionIds = useMemo(
     () => visibleSections.map((s) => s.id),
@@ -377,7 +385,7 @@ function OwnerSettingsView() {
               </div>
             )}
 
-            {!isDemoMode && (
+            {!isDemoMode && isAdmin && (
               <div id="auto-backup" className="scroll-mt-32 lg:scroll-mt-22">
                 <AutoBackupSection />
               </div>

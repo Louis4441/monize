@@ -187,6 +187,32 @@ Server-rendered strings (exception messages, email copy) are localized via `nest
 
 `node-oidc-provider` prints its own `oidc-provider NOTICE:`/`WARNING:` lines with bare `console.info`/`console.warn`, so they land in the backend logs unformatted, outside the Nest `Logger`. Every such notice means a config option was left at its default -- fix the config rather than the log line. In particular, `ttl` needs an explicit number for every artifact the provider can issue (`AccessToken`, `AuthorizationCode`, `IdToken`, `RefreshToken`, `Grant`, `Interaction`, `Session`); the guard test in `src/oauth/oauth-provider.service.spec.ts` fails when one is missing.
 
+## Automatic backups are an operator setting, not a user preference
+
+The auto-backup endpoints live on `AutoBackupController`, whose class-level
+`@Roles("admin")` is the whole access rule -- put a new endpoint there and it is
+admin-only without anyone remembering to say so. Manual export/restore, which
+touches only the caller's own data, stays on `BackupController` for everyone.
+
+Every other user is enrolled on the deployment defaults by
+`AutoBackupService.enrollManagedUsers`, which runs at the top of the hourly
+cron: nobody but an admin can switch the feature on, so without it a non-admin
+would silently have no backups. It reconciles rather than seeds -- a row that
+has drifted is written back to the defaults, an unchanged one is not written at
+all, and `lastBackup*`/`nextBackupAt` are left alone so enrollment never
+re-triggers a backup.
+
+Backups are encrypted with the user's own password, and the server only ever
+holds that in plaintext at the moment they type it: `rememberLoginPassword` is
+called from registration, login and change-password, and nothing asks the user
+to configure encryption. A stored copy is checked against the account's current
+password hash before it is used (`resolveBackupPassword`) -- encrypting with a
+password the user has since changed produces a file that looks like a backup
+and cannot be opened. That resolution has three outcomes, not two: nothing
+stored (write plaintext), a usable password (encrypt), and stored-but-
+undecryptable (refuse, because the previous backups are encrypted and silently
+downgrading is worse than failing).
+
 ## Cron Jobs
 
 Cron jobs use `@Cron()` from `@nestjs/schedule` and run **in the API process** -- `ScheduleModule.forRoot()` is registered in `app.module.ts`; there is no separate scheduler process (on k8s with more than one backend replica, every replica fires every cron). For the full schedule, see `docs/cron-jobs.md` or grep `@Cron(`.

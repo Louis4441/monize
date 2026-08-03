@@ -116,9 +116,13 @@ async function normalizeBlobError(error: unknown): Promise<never> {
   throw error;
 }
 
+/**
+ * Whether this account's backups are encrypted. Read-only: encryption is
+ * automatic -- the server keeps a copy of the password the user typed at
+ * sign-in and encrypts with it -- so there is nothing to turn on or off.
+ */
 export interface BackupEncryptionStatus {
   enabled: boolean;
-  needsBackupPassword: boolean;
 }
 
 // Error code surfaced by the backend when an encrypted backup can't be
@@ -243,20 +247,6 @@ export const backupApi = {
       '/backup/encryption',
     );
     return response.data;
-  },
-
-  enableLocalEncryption: async (password: string): Promise<void> => {
-    await apiClient.post('/backup/encryption/enable-local', { password });
-  },
-
-  setBackupPassword: async (backupPassword: string): Promise<void> => {
-    await apiClient.post('/backup/encryption/backup-password', {
-      backupPassword,
-    });
-  },
-
-  disableEncryption: async (): Promise<void> => {
-    await apiClient.delete('/backup/encryption');
   },
 
   getAutoBackupSettings: async (): Promise<AutoBackupSettings> => {

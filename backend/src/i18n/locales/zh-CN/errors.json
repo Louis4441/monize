@@ -179,11 +179,6 @@
     "unsupportedBackupVersion": "不支持的备份版本：{{ version }}。预期版本：{{ expected }}",
     "missingExportedAt": "无效的备份格式：缺少 exportedAt",
     "tableNotAllowed": "表 {{ table }} 不允许在备份恢复中使用",
-    "localAuthRequired": "需要本地密码认证",
-    "encryptionNotConfigured": "服务器未配置加密（缺少 AI_ENCRYPTION_KEY）",
-    "backupPasswordOidcOnly": "备份密码仅适用于 OIDC 用户；本地用户使用登录密码",
-    "backupPasswordTooShort": "备份密码至少需要 {{ minLength }} 个字符",
-    "backupPasswordBreached": "此密码已在数据泄露中被发现。请选择其他密码。",
     "restoreBodyMustBeFile": "请求正文必须是备份文件"
   },
   "budgets": {

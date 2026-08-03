@@ -2,15 +2,12 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException } from "@nestjs/common";
 import { BackupController } from "./backup.controller";
 import { BackupService } from "./backup.service";
-import { AutoBackupService } from "./auto-backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { SupportBackupService } from "./support-backup/support-backup.service";
-import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
 
 describe("BackupController", () => {
   let controller: BackupController;
   let mockBackupService: Record<string, jest.Mock>;
-  let mockAutoBackupService: Record<string, jest.Mock>;
   let mockBackupEncryption: Record<string, jest.Mock>;
   let mockSupportBackup: Record<string, jest.Mock>;
 
@@ -27,19 +24,8 @@ describe("BackupController", () => {
       restoreData: jest.fn(),
     };
 
-    mockAutoBackupService = {
-      getSettings: jest.fn(),
-      updateSettings: jest.fn(),
-      validateFolder: jest.fn(),
-      browseFolders: jest.fn(),
-      runManualBackup: jest.fn(),
-    };
-
     mockBackupEncryption = {
       getStatus: jest.fn(),
-      enableForLocalUser: jest.fn(),
-      setBackupPasswordForOidcUser: jest.fn(),
-      disable: jest.fn(),
     };
 
     mockSupportBackup = {
@@ -53,10 +39,6 @@ describe("BackupController", () => {
         {
           provide: BackupService,
           useValue: mockBackupService,
-        },
-        {
-          provide: AutoBackupService,
-          useValue: mockAutoBackupService,
         },
         {
           provide: BackupEncryptionService,
@@ -290,146 +272,14 @@ describe("BackupController", () => {
     });
   });
 
-  describe("encryption endpoints", () => {
+  describe("encryption status", () => {
     it("getEncryptionStatus delegates to the encryption service", async () => {
-      mockBackupEncryption.getStatus.mockResolvedValue({
-        enabled: true,
-        needsBackupPassword: false,
-      });
+      mockBackupEncryption.getStatus.mockResolvedValue({ enabled: true });
       const result = await controller.getEncryptionStatus({
         user: { id: userId },
       });
       expect(mockBackupEncryption.getStatus).toHaveBeenCalledWith(userId);
-      expect(result).toEqual({ enabled: true, needsBackupPassword: false });
-    });
-
-    it("enableLocalEncryption delegates with the password", async () => {
-      await controller.enableLocalEncryption(
-        { user: { id: userId } },
-        { password: "pw" },
-      );
-      expect(mockBackupEncryption.enableForLocalUser).toHaveBeenCalledWith(
-        userId,
-        "pw",
-      );
-    });
-
-    it("setBackupPassword delegates with the new password", async () => {
-      await controller.setBackupPassword(
-        { user: { id: userId } },
-        { backupPassword: "long-good-password" },
-      );
-      expect(
-        mockBackupEncryption.setBackupPasswordForOidcUser,
-      ).toHaveBeenCalledWith(userId, "long-good-password");
-    });
-
-    it("disableEncryption delegates", async () => {
-      await controller.disableEncryption({ user: { id: userId } });
-      expect(mockBackupEncryption.disable).toHaveBeenCalledWith(userId);
-    });
-  });
-
-  describe("getAutoBackupSettings", () => {
-    it("should delegate to autoBackupService.getSettings", async () => {
-      const settings = new AutoBackupSettings();
-      settings.userId = userId;
-      settings.enabled = false;
-      mockAutoBackupService.getSettings.mockResolvedValue(settings);
-
-      const result = await controller.getAutoBackupSettings({
-        user: { id: userId },
-      });
-
-      expect(mockAutoBackupService.getSettings).toHaveBeenCalledWith(userId);
-      expect(result).toBe(settings);
-    });
-  });
-
-  describe("updateAutoBackupSettings", () => {
-    it("should delegate to autoBackupService.updateSettings", async () => {
-      const dto = { folderPath: "/backups", frequency: "daily" as const };
-      const settings = new AutoBackupSettings();
-      settings.userId = userId;
-      settings.folderPath = "/backups";
-      mockAutoBackupService.updateSettings.mockResolvedValue(settings);
-
-      const result = await controller.updateAutoBackupSettings(
-        { user: { id: userId } },
-        dto,
-      );
-
-      expect(mockAutoBackupService.updateSettings).toHaveBeenCalledWith(
-        userId,
-        dto,
-      );
-      expect(result).toBe(settings);
-    });
-  });
-
-  describe("validateFolder", () => {
-    it("should delegate to autoBackupService.validateFolder", async () => {
-      mockAutoBackupService.validateFolder.mockResolvedValue({ valid: true });
-
-      const result = await controller.validateFolder({
-        folderPath: "/backups",
-      });
-
-      expect(mockAutoBackupService.validateFolder).toHaveBeenCalledWith(
-        "/backups",
-      );
-      expect(result).toEqual({ valid: true });
-    });
-
-    it("should return validation error for invalid folder", async () => {
-      mockAutoBackupService.validateFolder.mockResolvedValue({
-        valid: false,
-        error: "Folder does not exist",
-      });
-
-      const result = await controller.validateFolder({
-        folderPath: "/nonexistent",
-      });
-
-      expect(result).toEqual({ valid: false, error: "Folder does not exist" });
-    });
-  });
-
-  describe("browseFolders", () => {
-    it("should delegate to autoBackupService.browseFolders", async () => {
-      const expected = {
-        current: "/backups",
-        directories: ["daily", "weekly"],
-      };
-      mockAutoBackupService.browseFolders.mockResolvedValue(expected);
-
-      const result = await controller.browseFolders({
-        folderPath: "/backups",
-      });
-
-      expect(mockAutoBackupService.browseFolders).toHaveBeenCalledWith(
-        "/backups",
-      );
-      expect(result).toEqual(expected);
-    });
-  });
-
-  describe("runAutoBackup", () => {
-    it("should delegate to autoBackupService.runManualBackup", async () => {
-      const expected = {
-        message: "Backup completed successfully",
-        filename: "monize-backup-2026-04-02T10-00-00.json.gz",
-      };
-      mockAutoBackupService.runManualBackup.mockResolvedValue(expected);
-
-      const result = await controller.runAutoBackup({
-        user: { id: userId },
-      });
-
-      expect(mockAutoBackupService.runManualBackup).toHaveBeenCalledWith(
-        userId,
-      );
-      expect(result).toEqual(expected);
+      expect(result).toEqual({ enabled: true });
     });
   });
 });

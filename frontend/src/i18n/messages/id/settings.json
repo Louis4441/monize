@@ -439,10 +439,13 @@
   "autoBackup": {
     "heading": "Pencadangan Otomatis",
     "description": "Cadangkan data Anda secara otomatis ke folder sesuai jadwal. Karena Monize berjalan di Docker, Anda harus memetakan folder host ke dalam kontainer sebagai volume (misalnya, -v /host/backups:/data/backups).",
+    "adminManagedNote": "Hanya administrator yang dapat mengubah pengaturan ini. Semua pengguna lain dicadangkan secara otomatis dengan jadwal dan kebijakan retensi yang sama, masing-masing ke folder sendiri.",
     "loadingText": "Memuat...",
     "enableLabel": "Aktifkan pencadangan otomatis",
     "backupFolderLabel": "Folder Cadangan",
     "backupFolderPlaceholder": "/data/backups",
+    "perUserFolderHelp": "Cadangan setiap pengguna disimpan di folder mereka sendiri di dalam folder ini, dinamai sesuai ID pengguna.",
+    "perUserFolderHelpWithPath": "Cadangan setiap pengguna disimpan di folder mereka sendiri di dalam folder ini, dinamai sesuai ID pengguna. Milik Anda: {path}",
     "browseButton": "Jelajahi...",
     "validateButton": "Validasi",
     "validatingButton": "Memvalidasi...",
@@ -498,33 +501,6 @@
   },
   "backupRestore": {
     "heading": "Cadangkan & Pulihkan",
-    "encryption": {
-      "heading": "Enkripsi Cadangan",
-      "descriptionOidc": "Enkripsi cadangan manual dan otomatis dengan kata sandi cadangan khusus yang Anda tetapkan di sini. Kata sandi diperlukan untuk pemulihan.",
-      "descriptionLocal": "Enkripsi cadangan manual dan otomatis dengan kata sandi login Anda. Kata sandi diperlukan untuk pemulihan.",
-      "loading": "Memuat...",
-      "enabledBadge": "Aktif",
-      "changePasswordButton": "Ubah Kata Sandi Cadangan",
-      "disableButton": "Nonaktifkan",
-      "setPasswordButton": "Tetapkan Kata Sandi Cadangan",
-      "enableEncryptedButton": "Aktifkan Cadangan Terenkripsi",
-      "setupModal": {
-        "titleOidc": "Tetapkan Kata Sandi Cadangan",
-        "titleLocal": "Aktifkan Cadangan Terenkripsi",
-        "descriptionOidc": "Pilih kata sandi yang akan digunakan untuk mengenkripsi cadangan Anda. Simpan di tempat yang aman -- Anda akan membutuhkannya untuk pemulihan.",
-        "descriptionLocal": "Konfirmasi kata sandi login Anda. Ini akan digunakan untuk mengenkripsi semua cadangan (manual dan otomatis).",
-        "placeholderOidc": "Kata sandi cadangan baru (12+ karakter)",
-        "placeholderLocal": "Kata sandi login Anda",
-        "savingButton": "Menyimpan...",
-        "confirmButton": "Konfirmasi"
-      },
-      "toasts": {
-        "enabled": "Cadangan terenkripsi diaktifkan",
-        "disabled": "Cadangan terenkripsi dinonaktifkan",
-        "enableFailed": "Gagal mengaktifkan enkripsi",
-        "disableFailed": "Gagal menonaktifkan enkripsi"
-      }
-    },
     "export": {
       "heading": "Buat Cadangan",
       "description": "Unduh cadangan lengkap data keuangan Anda. Ini mencakup akun, transaksi, kategori, penerima, anggaran, investasi, dan semua data pengguna lainnya.",

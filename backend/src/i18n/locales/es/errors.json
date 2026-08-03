@@ -179,11 +179,6 @@
     "unsupportedBackupVersion": "Versión de copia de seguridad no admitida: {{ version }}. Se esperaba {{ expected }}",
     "missingExportedAt": "Formato de copia de seguridad no válido: falta exportedAt",
     "tableNotAllowed": "La tabla {{ table }} no está permitida en la restauración de copia de seguridad",
-    "localAuthRequired": "Se requiere autenticación con contraseña local",
-    "encryptionNotConfigured": "El servidor no está configurado para cifrado (falta AI_ENCRYPTION_KEY)",
-    "backupPasswordOidcOnly": "La contraseña de copia de seguridad solo es configurable para usuarios OIDC; los usuarios locales usan su contraseña de inicio de sesión",
-    "backupPasswordTooShort": "La contraseña de copia de seguridad debe tener al menos {{ minLength }} caracteres",
-    "backupPasswordBreached": "Esta contraseña se encontró en una filtración de datos. Elige una contraseña diferente.",
     "restoreBodyMustBeFile": "El cuerpo de la solicitud debe ser un archivo de copia de seguridad"
   },
   "budgets": {

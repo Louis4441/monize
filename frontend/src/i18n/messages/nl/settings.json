@@ -439,10 +439,13 @@
   "autoBackup": {
     "heading": "Automatische back-up",
     "description": "Maak automatisch een back-up van jouw gegevens naar een map op een schema. Omdat Monize in Docker draait, moet je een hostmap als volume in de container koppelen (bijv. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Alleen beheerders kunnen deze instellingen wijzigen. Alle andere gebruikers worden automatisch volgens hetzelfde schema en bewaarbeleid geback-upt, elk in een eigen map.",
     "loadingText": "Laden...",
     "enableLabel": "Automatische back-ups inschakelen",
     "backupFolderLabel": "Back-upmap",
     "backupFolderPlaceholder": "/data/backups",
+    "perUserFolderHelp": "De back-ups van elke gebruiker komen in een eigen map binnen deze map, genoemd naar hun gebruikers-ID.",
+    "perUserFolderHelpWithPath": "De back-ups van elke gebruiker komen in een eigen map binnen deze map, genoemd naar hun gebruikers-ID. De jouwe: {path}",
     "browseButton": "Bladeren...",
     "validateButton": "Valideren",
     "validatingButton": "Valideren...",
@@ -498,33 +501,6 @@
   },
   "backupRestore": {
     "heading": "Back-up en herstel",
-    "encryption": {
-      "heading": "Back-upversleuteling",
-      "descriptionOidc": "Versleutel handmatige en automatische back-ups met een speciaal back-upwachtwoord dat je hier instelt. Het wachtwoord is vereist voor herstel.",
-      "descriptionLocal": "Versleutel handmatige en automatische back-ups met jouw inlogwachtwoord. Het wachtwoord is vereist voor herstel.",
-      "loading": "Laden...",
-      "enabledBadge": "Ingeschakeld",
-      "changePasswordButton": "Back-upwachtwoord wijzigen",
-      "disableButton": "Uitschakelen",
-      "setPasswordButton": "Back-upwachtwoord instellen",
-      "enableEncryptedButton": "Versleutelde back-ups inschakelen",
-      "setupModal": {
-        "titleOidc": "Back-upwachtwoord instellen",
-        "titleLocal": "Versleutelde back-ups inschakelen",
-        "descriptionOidc": "Kies een wachtwoord dat wordt gebruikt om jouw back-ups te versleutelen. Bewaar het op een veilige plek -- je hebt het nodig voor herstel.",
-        "descriptionLocal": "Bevestig jouw inlogwachtwoord. Het wordt gebruikt om alle back-ups (handmatig en automatisch) te versleutelen.",
-        "placeholderOidc": "Nieuw back-upwachtwoord (12+ tekens)",
-        "placeholderLocal": "Jouw inlogwachtwoord",
-        "savingButton": "Opslaan...",
-        "confirmButton": "Bevestigen"
-      },
-      "toasts": {
-        "enabled": "Versleutelde back-ups ingeschakeld",
-        "disabled": "Versleutelde back-ups uitgeschakeld",
-        "enableFailed": "Inschakelen van versleuteling mislukt",
-        "disableFailed": "Uitschakelen van versleuteling mislukt"
-      }
-    },
     "export": {
       "heading": "Back-up aanmaken",
       "description": "Download een volledige back-up van jouw financiële gegevens. Dit omvat rekeningen, transacties, categorieën, begunstigden, budgetten, beleggingen en alle andere gebruikersgegevens.",

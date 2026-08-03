@@ -439,10 +439,13 @@
   "autoBackup": {
     "heading": "自动备份",
     "description": "按计划自动将数据备份到文件夹。由于 Monize 在 Docker 中运行，您必须将主机文件夹作为卷映射到容器中（例如：-v /host/backups:/data/backups）。",
+    "adminManagedNote": "只有管理员可以更改这些设置。其他所有用户都会按照相同的计划和保留策略自动备份到各自的文件夹中。",
     "loadingText": "加载中...",
     "enableLabel": "启用自动备份",
     "backupFolderLabel": "备份文件夹",
     "backupFolderPlaceholder": "/data/backups",
+    "perUserFolderHelp": "每位用户的备份都会存放在此文件夹内以其用户 ID 命名的专属文件夹中。",
+    "perUserFolderHelpWithPath": "每位用户的备份都会存放在此文件夹内以其用户 ID 命名的专属文件夹中。您的：{path}",
     "browseButton": "浏览...",
     "validateButton": "验证",
     "validatingButton": "验证中...",
@@ -498,33 +501,6 @@
   },
   "backupRestore": {
     "heading": "备份与恢复",
-    "encryption": {
-      "heading": "备份加密",
-      "descriptionOidc": "使用您在此处设置的专用备份密码加密手动和自动备份。恢复时需要此密码。",
-      "descriptionLocal": "使用您的登录密码加密手动和自动备份。恢复时需要此密码。",
-      "loading": "加载中...",
-      "enabledBadge": "已启用",
-      "changePasswordButton": "更改备份密码",
-      "disableButton": "禁用",
-      "setPasswordButton": "设置备份密码",
-      "enableEncryptedButton": "启用加密备份",
-      "setupModal": {
-        "titleOidc": "设置备份密码",
-        "titleLocal": "启用加密备份",
-        "descriptionOidc": "选择用于加密备份的密码。请妥善保存——恢复时需要此密码。",
-        "descriptionLocal": "确认您的登录密码。它将用于加密所有备份（手动和自动）。",
-        "placeholderOidc": "新备份密码（至少 12 位）",
-        "placeholderLocal": "您的登录密码",
-        "savingButton": "保存中...",
-        "confirmButton": "确认"
-      },
-      "toasts": {
-        "enabled": "加密备份已启用",
-        "disabled": "加密备份已禁用",
-        "enableFailed": "启用加密失败",
-        "disableFailed": "禁用加密失败"
-      }
-    },
     "export": {
       "heading": "创建备份",
       "description": "下载完整的财务数据备份。包括账户、交易、分类、收款人、预算、投资及所有其他用户数据。",

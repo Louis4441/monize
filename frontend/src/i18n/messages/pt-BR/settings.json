@@ -439,10 +439,13 @@
   "autoBackup": {
     "heading": "Backup Automático",
     "description": "Faça backups automáticos dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize roda no Docker, você precisa mapear uma pasta do host para o contêiner como volume (ex.: -v /host/backups:/data/backups).",
+    "adminManagedNote": "Apenas administradores podem alterar essas configurações. Todos os outros usuários são copiados automaticamente com o mesmo agendamento e política de retenção, cada um em sua própria pasta.",
     "loadingText": "Carregando...",
     "enableLabel": "Ativar backups automáticos",
     "backupFolderLabel": "Pasta de Backup",
     "backupFolderPlaceholder": "/data/backups",
+    "perUserFolderHelp": "Os backups de cada usuário ficam em uma pasta própria dentro desta, com o nome do ID do usuário.",
+    "perUserFolderHelpWithPath": "Os backups de cada usuário ficam em uma pasta própria dentro desta, com o nome do ID do usuário. O seu: {path}",
     "browseButton": "Procurar...",
     "validateButton": "Validar",
     "validatingButton": "Validando...",
@@ -498,33 +501,6 @@
   },
   "backupRestore": {
     "heading": "Backup e Restauração",
-    "encryption": {
-      "heading": "Criptografia de Backup",
-      "descriptionOidc": "Criptografe backups manuais e automáticos com uma senha de backup dedicada que você define aqui. A senha é necessária para a restauração.",
-      "descriptionLocal": "Criptografe backups manuais e automáticos com sua senha de login. A senha é necessária para a restauração.",
-      "loading": "Carregando...",
-      "enabledBadge": "Ativada",
-      "changePasswordButton": "Alterar Senha de Backup",
-      "disableButton": "Desativar",
-      "setPasswordButton": "Definir Senha de Backup",
-      "enableEncryptedButton": "Ativar Backups Criptografados",
-      "setupModal": {
-        "titleOidc": "Definir Senha de Backup",
-        "titleLocal": "Ativar Backups Criptografados",
-        "descriptionOidc": "Escolha uma senha que será usada para criptografar seus backups. Guarde-a em local seguro -- você precisará dela para a restauração.",
-        "descriptionLocal": "Confirme sua senha de login. Ela será usada para criptografar todos os backups (manuais e automáticos).",
-        "placeholderOidc": "Nova senha de backup (12+ caracteres)",
-        "placeholderLocal": "Sua senha de login",
-        "savingButton": "Salvando...",
-        "confirmButton": "Confirmar"
-      },
-      "toasts": {
-        "enabled": "Backups criptografados ativados",
-        "disabled": "Backups criptografados desativados",
-        "enableFailed": "Falha ao ativar a criptografia",
-        "disableFailed": "Falha ao desativar a criptografia"
-      }
-    },
     "export": {
       "heading": "Criar Backup",
       "description": "Baixe um backup completo dos seus dados financeiros. Inclui contas, transações, categorias, beneficiários, orçamentos, investimentos e todos os outros dados do usuário.",

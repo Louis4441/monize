@@ -179,11 +179,6 @@
     "unsupportedBackupVersion": "Непідтримувана версія резервної копії: {{ version }}. Очікується {{ expected }}",
     "missingExportedAt": "Недійсний формат резервної копії: відсутній exportedAt",
     "tableNotAllowed": "Таблиця {{ table }} не дозволена для відновлення з резервної копії",
-    "localAuthRequired": "Необхідна автентифікація за допомогою локального пароля",
-    "encryptionNotConfigured": "Сервер не налаштовано для шифрування (відсутній AI_ENCRYPTION_KEY)",
-    "backupPasswordOidcOnly": "Пароль резервної копії можна налаштувати лише для користувачів OIDC; локальні користувачі використовують свій пароль входу",
-    "backupPasswordTooShort": "Пароль резервної копії має містити щонайменше {{ minLength }} символів",
-    "backupPasswordBreached": "Цей пароль знайдено у витоку даних. Будь ласка, виберіть інший пароль.",
     "restoreBodyMustBeFile": "Тіло запиту має бути файлом резервної копії"
   },
   "budgets": {

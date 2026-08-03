@@ -439,10 +439,13 @@
   "autoBackup": {
     "heading": "Backup automatico",
     "description": "Esegui automaticamente il backup dei tuoi dati in una cartella secondo una pianificazione. Poiché Monize gira in Docker, devi mappare una cartella dell'host nel container come volume (es. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Solo gli amministratori possono modificare queste impostazioni. Tutti gli altri utenti vengono salvati automaticamente con la stessa pianificazione e politica di conservazione, ciascuno in una cartella propria.",
     "loadingText": "Caricamento...",
     "enableLabel": "Attiva backup automatici",
     "backupFolderLabel": "Cartella di backup",
     "backupFolderPlaceholder": "/data/backups",
+    "perUserFolderHelp": "I backup di ogni utente vengono salvati in una cartella dedicata all'interno di questa, denominata con il suo ID utente.",
+    "perUserFolderHelpWithPath": "I backup di ogni utente vengono salvati in una cartella dedicata all'interno di questa, denominata con il suo ID utente. La tua: {path}",
     "browseButton": "Sfoglia...",
     "validateButton": "Convalida",
     "validatingButton": "Convalida in corso...",
@@ -498,33 +501,6 @@
   },
   "backupRestore": {
     "heading": "Backup e ripristino",
-    "encryption": {
-      "heading": "Crittografia backup",
-      "descriptionOidc": "Cifra i backup manuali e automatici con una password dedicata che imposti qui. La password è necessaria per il ripristino.",
-      "descriptionLocal": "Cifra i backup manuali e automatici con la tua password di accesso. La password è necessaria per il ripristino.",
-      "loading": "Caricamento...",
-      "enabledBadge": "Attiva",
-      "changePasswordButton": "Cambia password backup",
-      "disableButton": "Disattiva",
-      "setPasswordButton": "Imposta password backup",
-      "enableEncryptedButton": "Attiva backup cifrati",
-      "setupModal": {
-        "titleOidc": "Imposta password backup",
-        "titleLocal": "Attiva backup cifrati",
-        "descriptionOidc": "Scegli una password per cifrare i tuoi backup. Salvala in un posto sicuro -- ti servirà per il ripristino.",
-        "descriptionLocal": "Conferma la tua password di accesso. Verrà usata per cifrare tutti i backup (manuali e automatici).",
-        "placeholderOidc": "Nuova password backup (12+ caratteri)",
-        "placeholderLocal": "La tua password di accesso",
-        "savingButton": "Salvataggio...",
-        "confirmButton": "Conferma"
-      },
-      "toasts": {
-        "enabled": "Backup cifrati attivati",
-        "disabled": "Backup cifrati disattivati",
-        "enableFailed": "Impossibile attivare la cifratura",
-        "disableFailed": "Impossibile disattivare la cifratura"
-      }
-    },
     "export": {
       "heading": "Crea backup",
       "description": "Scarica un backup completo dei tuoi dati finanziari. Include conti, transazioni, categorie, beneficiari, budget, investimenti e tutti gli altri dati utente.",

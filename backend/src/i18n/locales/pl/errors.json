@@ -179,11 +179,6 @@
     "unsupportedBackupVersion": "Nieobsługiwana wersja kopii zapasowej: {{ version }}. Oczekiwano {{ expected }}",
     "missingExportedAt": "Nieprawidłowy format kopii zapasowej: brak exportedAt",
     "tableNotAllowed": "Tabela {{ table }} nie jest dozwolona podczas przywracania kopii zapasowej",
-    "localAuthRequired": "Wymagane jest uwierzytelnianie lokalnym hasłem",
-    "encryptionNotConfigured": "Serwer nie jest skonfigurowany do szyfrowania (brak AI_ENCRYPTION_KEY)",
-    "backupPasswordOidcOnly": "Hasło kopii zapasowej można skonfigurować tylko dla użytkowników OIDC; użytkownicy lokalni używają swojego hasła logowania",
-    "backupPasswordTooShort": "Hasło kopii zapasowej musi mieć co najmniej {{ minLength }} znaków",
-    "backupPasswordBreached": "To hasło zostało znalezione w wycieku danych. Wybierz inne hasło.",
     "restoreBodyMustBeFile": "Treść żądania musi być plikiem kopii zapasowej"
   },
   "budgets": {
