@@ -179,7 +179,6 @@
     "unsupportedBackupVersion": "Неподдерживаемая версия резервной копии: {{ version }}. Ожидается {{ expected }}",
     "missingExportedAt": "Недопустимый формат резервной копии: отсутствует exportedAt",
     "tableNotAllowed": "Таблица {{ table }} не разрешена при восстановлении из резервной копии",
-    "localAuthRequired": "Требуется аутентификация с локальным паролем",
     "encryptionNotConfigured": "Сервер не настроен для шифрования (AI_ENCRYPTION_KEY отсутствует)",
     "backupPasswordOidcOnly": "Пароль резервной копии можно настраивать только для пользователей OIDC; локальные пользователи используют пароль для входа",
     "backupPasswordTooShort": "Пароль резервной копии должен содержать не менее {{ minLength }} символов",

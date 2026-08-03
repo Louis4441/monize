@@ -179,7 +179,6 @@
     "unsupportedBackupVersion": "Version de sauvegarde non prise en charge : {{ version }}. Attendu : {{ expected }}",
     "missingExportedAt": "Format de sauvegarde invalide : exportedAt manquant",
     "tableNotAllowed": "La table {{ table }} n'est pas autorisée dans la restauration de sauvegarde",
-    "localAuthRequired": "L'authentification par mot de passe local est requise",
     "encryptionNotConfigured": "Le serveur n'est pas configuré pour le chiffrement (AI_ENCRYPTION_KEY manquant)",
     "backupPasswordOidcOnly": "Le mot de passe de sauvegarde n'est configurable que pour les utilisateurs OIDC ; les utilisateurs locaux utilisent leur mot de passe de connexion",
     "backupPasswordTooShort": "Le mot de passe de sauvegarde doit comporter au moins {{ minLength }} caractères",

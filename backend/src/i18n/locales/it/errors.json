@@ -179,7 +179,6 @@
     "unsupportedBackupVersion": "Versione backup non supportata: {{ version }}. Attesa {{ expected }}",
     "missingExportedAt": "Formato backup non valido: exportedAt mancante",
     "tableNotAllowed": "La tabella {{ table }} non è consentita nel ripristino del backup",
-    "localAuthRequired": "L'autenticazione con password locale è obbligatoria",
     "encryptionNotConfigured": "Il server non è configurato per la cifratura (AI_ENCRYPTION_KEY mancante)",
     "backupPasswordOidcOnly": "La password di backup è configurabile solo per gli utenti OIDC; gli utenti locali usano la password di accesso",
     "backupPasswordTooShort": "La password di backup deve contenere almeno {{ minLength }} caratteri",

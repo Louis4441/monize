@@ -179,7 +179,6 @@
     "unsupportedBackupVersion": "不支援的備份版本：{{ version }}。預期版本：{{ expected }}",
     "missingExportedAt": "無效的備份格式：缺少 exportedAt",
     "tableNotAllowed": "備份還原不允許資料表 {{ table }}",
-    "localAuthRequired": "需要本機密碼驗證",
     "encryptionNotConfigured": "伺服器未設定加密功能（缺少 AI_ENCRYPTION_KEY）",
     "backupPasswordOidcOnly": "備份密碼僅適用於 OIDC 使用者；本機使用者使用其登入密碼",
     "backupPasswordTooShort": "備份密碼至少需要 {{ minLength }} 個字元",

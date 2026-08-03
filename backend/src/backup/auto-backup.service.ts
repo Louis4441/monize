@@ -3,7 +3,9 @@ import { ConfigService } from "@nestjs/config";
 import {
   DataSource,
   EntityTarget,
+  In,
   LessThanOrEqual,
+  Not,
   ObjectLiteral,
   Repository,
 } from "typeorm";
@@ -13,7 +15,10 @@ import { promises as fs, readdirSync, unlinkSync, copyFileSync } from "fs";
 import { resolve } from "path";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
 import { BackupService } from "./backup.service";
+import { BackupEncryptionService } from "./backup-encryption.service";
 import { User } from "../users/entities/user.entity";
+import { DemoModeService } from "../common/demo-mode.service";
+import { isShardableId, shardedSegments } from "../common/shard-path.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import {
   UpdateAutoBackupSettingsDto,
@@ -22,6 +27,13 @@ import {
 import { tr } from "../i18n/translate";
 
 const BACKUP_FILE_PREFIX = "monize-backup-";
+
+/**
+ * Role that may see and change automatic backup settings. Everyone else is
+ * enrolled on the deployment defaults by `enrollManagedUsers` and never sees
+ * the feature -- see the class comment.
+ */
+const BACKUP_ADMIN_ROLE = "admin";
 
 /**
  * Folder automatic backups are written to when BACKUP_CONTAINER_DIR is unset.
@@ -51,6 +63,10 @@ const FREQUENCY_HOURS: Record<AutoBackupFrequency, number> = {
 
 interface BackupFile {
   name: string;
+  /** Directory the file was found in -- the user's folder, or the legacy flat base. */
+  dir: string;
+  /** True for a file written by a version that wrote flat into the base folder. */
+  legacy: boolean;
   date: Date;
   tier: "daily" | "weekly" | "monthly";
 }
@@ -65,6 +81,24 @@ function parseYearMonthString(ym: string): Date | null {
   return isNaN(date.getTime()) ? null : date;
 }
 
+/**
+ * Automatic backups: scheduling, retention, and where the files land.
+ *
+ * **Layout.** Each user's backups live in their own folder under the configured
+ * base, fanned out by user id exactly the way attachment bytes are:
+ * `<BACKUP_CONTAINER_DIR>/<ab>/<cd>/<userId>/monize-backup-daily-<date>.json.gz`
+ * (see `common/shard-path.util.ts`). The filenames carry only a tier and a
+ * date, so a flat shared folder gave every user the same name for the same day
+ * -- whoever ran last overwrote the others, and one user's retention pass
+ * deleted another's files. The per-user folder is what makes a backup belong to
+ * somebody.
+ *
+ * **Who configures it.** Only an administrator sees the settings (the endpoints
+ * live on `AutoBackupController`, behind `@Roles("admin")`). Every other user is
+ * enrolled automatically on the deployment defaults by `enrollManagedUsers`, so
+ * their data is protected without them having to ask -- and without them being
+ * able to point backups at a folder the operator did not mount.
+ */
 @Injectable()
 export class AutoBackupService {
   private readonly logger = new Logger(AutoBackupService.name);
@@ -76,6 +110,8 @@ export class AutoBackupService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly backupService: BackupService,
+    private readonly backupEncryption: BackupEncryptionService,
+    private readonly demoMode: DemoModeService,
     config: ConfigService,
   ) {
     this.defaultFolderPath = this.resolveConfiguredFolderPath(
@@ -116,12 +152,52 @@ export class AutoBackupService {
   }
 
   /**
-   * The folder a backup should be written to: the user's own choice when they
-   * have one, otherwise the deployment-wide default.
+   * The base folder backups are filed under: the configured choice when there
+   * is one, otherwise the deployment-wide default. This is never the folder
+   * written to -- see `userFolderPath`.
    */
   private resolveFolderPath(folderPath: string | null | undefined): string {
     const trimmed = folderPath?.trim();
     return trimmed ? trimmed : this.defaultFolderPath;
+  }
+
+  /**
+   * The folder one user's backup files live in: `<base>/<ab>/<cd>/<userId>`.
+   *
+   * User ids are server-generated UUIDs, but they are validated before they
+   * reach the filesystem all the same, and the resolved path is asserted to be
+   * inside the base folder (CWE-22).
+   */
+  private userFolderPath(basePath: string, userId: string): string {
+    if (!isShardableId(userId)) {
+      throw new BadRequestException(
+        tr(
+          "errors.backup.pathTraversal",
+          `Path traversal detected: ${userId}`,
+          {
+            filename: userId,
+          },
+        ),
+      );
+    }
+    return this.safePath(basePath, shardedSegments(userId).join("/"));
+  }
+
+  /**
+   * Resolve, create and check the folder this user's backups go in, returning
+   * it. The base folder must already be usable (only the deployment default is
+   * created on demand, so a typo in an operator-chosen path still surfaces);
+   * the per-user folder underneath is created on first use, the way attachment
+   * shard directories are.
+   */
+  private async ensureUserFolder(
+    basePath: string,
+    userId: string,
+  ): Promise<string> {
+    await this.assertFolderWritable(basePath);
+    const userFolder = this.userFolderPath(basePath, userId);
+    await this.assertFolderWritable(userFolder, { createIfMissing: true });
+    return userFolder;
   }
 
   /** Settings for a user with no persisted row yet (not saved by this method). */
@@ -143,19 +219,37 @@ export class AutoBackupService {
     return defaults;
   }
 
+  /**
+   * Attach the read-only `resolvedFolderPath` -- the per-user folder the files
+   * actually land in -- so the settings screen can show where to look. Computed
+   * on every read rather than stored: the layout is derived from the base
+   * folder and the user id, and a persisted copy could disagree with both.
+   */
+  private withResolvedFolder(settings: AutoBackupSettings): AutoBackupSettings {
+    const basePath = this.resolveFolderPath(settings.folderPath);
+    let resolvedFolderPath: string | undefined;
+    try {
+      resolvedFolderPath = this.userFolderPath(basePath, settings.userId);
+    } catch {
+      // A base path the operator has since made invalid must not break the
+      // settings screen; the folder validation on save reports it properly.
+      resolvedFolderPath = undefined;
+    }
+    return Object.assign(new AutoBackupSettings(), settings, {
+      folderPath: basePath,
+      resolvedFolderPath,
+    });
+  }
+
   async getSettings(userId: string): Promise<AutoBackupSettings> {
     const existing = await this.scoped(AutoBackupSettings, (repo) =>
       repo.findOne({
         where: { userId },
       }),
     );
-    if (!existing) return this.defaultSettingsFor(userId);
-
     // Report the folder backups are actually written to, so a stored row that
     // never had one chosen shows the deployment default instead of a blank.
-    return Object.assign(new AutoBackupSettings(), existing, {
-      folderPath: this.resolveFolderPath(existing.folderPath),
-    });
+    return this.withResolvedFolder(existing ?? this.defaultSettingsFor(userId));
   }
 
   async updateSettings(
@@ -202,7 +296,10 @@ export class AutoBackupService {
         // Persist the resolved folder so the stored row always records where
         // backups actually go, even when the user never picked one.
         settings.folderPath = this.resolveFolderPath(settings.folderPath);
-        await this.assertFolderWritable(settings.folderPath);
+        // Create and check the user's own folder now, so a base folder that is
+        // readable but not writable is reported at save time rather than at
+        // 02:00 as a failed backup.
+        await this.ensureUserFolder(settings.folderPath, userId);
         settings.nextBackupAt = this.calculateNextBackupAt(
           settings.frequency as AutoBackupFrequency,
           settings.backupTime,
@@ -214,7 +311,10 @@ export class AutoBackupService {
       }
     }
 
-    return this.scoped(AutoBackupSettings, (repo) => repo.save(settings));
+    const saved = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.save(settings),
+    );
+    return this.withResolvedFolder(saved);
   }
 
   async validateFolder(
@@ -287,16 +387,12 @@ export class AutoBackupService {
       )) ?? this.defaultSettingsFor(userId);
     settings.folderPath = this.resolveFolderPath(settings.folderPath);
 
-    await this.assertFolderWritable(settings.folderPath);
+    const userFolder = await this.ensureUserFolder(settings.folderPath, userId);
     const timezone = settings.timezone || "UTC";
-    const filename = await this.exportToFile(
-      userId,
-      settings.folderPath,
-      timezone,
-    );
-    this.copyToWeeklyIfNeeded(settings.folderPath, filename, timezone);
-    this.copyToMonthlyIfNeeded(settings.folderPath, filename, timezone);
-    this.enforceRetention(settings.folderPath, settings);
+    const filename = await this.exportToFile(userId, userFolder, timezone);
+    this.copyToWeeklyIfNeeded(userFolder, filename, timezone);
+    this.copyToMonthlyIfNeeded(userFolder, filename, timezone);
+    this.enforceRetention(userFolder, settings.folderPath, settings);
 
     settings.lastBackupAt = new Date();
     settings.lastBackupStatus = "success";
@@ -317,6 +413,7 @@ export class AutoBackupService {
   @Cron("0 * * * *")
   async handleAutoBackupCron(): Promise<void> {
     const now = new Date();
+    await this.enrollManagedUsers(now);
     // RLS (task C2): cross-user fan-out over every user's due backup settings.
     const dueSettings = await withSystemContext(() =>
       this.scoped(AutoBackupSettings, (repo) =>
@@ -336,16 +433,19 @@ export class AutoBackupService {
     for (const settings of dueSettings) {
       try {
         settings.folderPath = this.resolveFolderPath(settings.folderPath);
-        await this.assertFolderWritable(settings.folderPath);
+        const userFolder = await this.ensureUserFolder(
+          settings.folderPath,
+          settings.userId,
+        );
         const timezone = settings.timezone || "UTC";
         // RLS (task C2): the export reads this user's entire dataset, and the
         // settings write below is that user's row -- both under a user context.
         const filename = await withUserContext(settings.userId, () =>
-          this.exportToFile(settings.userId, settings.folderPath, timezone),
+          this.exportToFile(settings.userId, userFolder, timezone),
         );
-        this.copyToWeeklyIfNeeded(settings.folderPath, filename, timezone);
-        this.copyToMonthlyIfNeeded(settings.folderPath, filename, timezone);
-        this.enforceRetention(settings.folderPath, settings);
+        this.copyToWeeklyIfNeeded(userFolder, filename, timezone);
+        this.copyToMonthlyIfNeeded(userFolder, filename, timezone);
+        this.enforceRetention(userFolder, settings.folderPath, settings);
 
         settings.lastBackupAt = now;
         settings.lastBackupStatus = "success";
@@ -383,9 +483,124 @@ export class AutoBackupService {
     }
   }
 
+  /**
+   * Put every non-admin user on the deployment's default backup schedule.
+   *
+   * Automatic backups are not a per-user preference: only an administrator can
+   * see or change the settings, so anybody else would silently have no backups
+   * at all unless something enrolled them. This runs at the top of the hourly
+   * cron rather than at registration so that users who already existed -- and
+   * anyone demoted out of the admin role later -- are covered too, with no
+   * migration to write and nothing to re-run by hand.
+   *
+   * The row is fully managed: it is written back to the defaults whenever it
+   * has drifted, which is also how a row left over from when the feature was
+   * user-configurable gets brought into line. `lastBackup*` and `nextBackupAt`
+   * are the schedule's own bookkeeping and are never reset, so an enrolled user
+   * is not re-backed-up every hour.
+   */
+  private async enrollManagedUsers(now: Date): Promise<void> {
+    // Demo data is regenerated daily and every visitor is a separate user, so
+    // enrolling them would write throwaway exports for accounts that are about
+    // to be deleted.
+    if (this.demoMode.isDemo) return;
+
+    // RLS: reading every user and writing rows that are not the caller's is
+    // cross-user work by definition.
+    const managedUserIds = await withSystemContext(async () => {
+      const users = await this.scoped(User, (repo) =>
+        repo.find({
+          select: { id: true },
+          where: { role: Not(BACKUP_ADMIN_ROLE), isActive: true },
+        }),
+      );
+      return users.map((u) => u.id);
+    });
+    if (managedUserIds.length === 0) return;
+
+    const existing = await withSystemContext(() =>
+      this.scoped(AutoBackupSettings, (repo) =>
+        repo.find({ where: { userId: In(managedUserIds) } }),
+      ),
+    );
+    const byUserId = new Map(existing.map((s) => [s.userId, s]));
+
+    for (const userId of managedUserIds) {
+      const current = byUserId.get(userId);
+      const managed = this.applyManagedDefaults(current, userId, now);
+      if (!managed) continue;
+      try {
+        await withUserContext(userId, () =>
+          this.scoped(AutoBackupSettings, (repo) => repo.save(managed)),
+        );
+        this.logger.log(
+          `Enrolled user ${userId} in automatic backups on the deployment defaults`,
+        );
+      } catch (error) {
+        // One user's row failing must not stop the others from being enrolled,
+        // nor the backups that are already due from running.
+        this.logger.error(
+          `Failed to enroll user ${userId} in automatic backups: ${error.message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * The managed form of `current` when it differs from the deployment defaults,
+   * or `null` when it is already correct -- so a settled deployment writes
+   * nothing on the hourly tick.
+   */
+  private applyManagedDefaults(
+    current: AutoBackupSettings | undefined,
+    userId: string,
+    now: Date,
+  ): AutoBackupSettings | null {
+    const defaults = this.defaultSettingsFor(userId);
+    const managed = Object.assign(
+      new AutoBackupSettings(),
+      current ?? defaults,
+      {
+        enabled: true,
+        folderPath: defaults.folderPath,
+        frequency: defaults.frequency,
+        backupTime: defaults.backupTime,
+        timezone: defaults.timezone,
+        retentionDaily: defaults.retentionDaily,
+        retentionWeekly: defaults.retentionWeekly,
+        retentionMonthly: defaults.retentionMonthly,
+      },
+    );
+    // A managed row with no next run would never be picked up by the cron.
+    if (!managed.nextBackupAt) {
+      managed.nextBackupAt = this.calculateNextBackupAt(
+        managed.frequency as AutoBackupFrequency,
+        managed.backupTime,
+        managed.timezone,
+        now,
+      );
+    }
+    if (!current) return managed;
+    const changed = (
+      [
+        "enabled",
+        "folderPath",
+        "frequency",
+        "backupTime",
+        "timezone",
+        "retentionDaily",
+        "retentionWeekly",
+        "retentionMonthly",
+        "nextBackupAt",
+      ] as const
+    ).some((key) => current[key] !== managed[key]);
+    return changed ? managed : null;
+  }
+
+  /** Write one export into `userFolder` and return the filename written. */
   private async exportToFile(
     userId: string,
-    folderPath: string,
+    userFolder: string,
     timezone: string,
   ): Promise<string> {
     const user = await this.scoped(User, (repo) =>
@@ -399,12 +614,14 @@ export class AutoBackupService {
       );
     }
 
-    const encryptionPassword =
-      this.backupService.resolveStoredBackupPassword(user) ?? undefined;
-    if (user.backupEncryptionEnabled && !encryptionPassword) {
-      // User opted into encryption but we can't recover the password
-      // (likely AI_ENCRYPTION_KEY rotated). Fail loud rather than silently
-      // writing an unencrypted backup.
+    // Backups are encrypted with the user's own password whenever the server
+    // holds a usable copy of it -- there is nothing for them to switch on.
+    const resolution = await this.backupEncryption.resolveBackupPassword(user);
+    if (resolution.status === "unrecoverable") {
+      // A password is stored but cannot be decrypted (typically
+      // AI_ENCRYPTION_KEY was rotated). Their previous backups are encrypted,
+      // so quietly writing this one in plaintext would be a downgrade nobody
+      // sees. Fail loud instead.
       throw new BadRequestException(
         tr(
           "errors.backup.encryptedPasswordDecryptFailed",
@@ -412,11 +629,13 @@ export class AutoBackupService {
         ),
       );
     }
+    const encryptionPassword =
+      resolution.status === "password" ? resolution.password : undefined;
 
     const dateStr = this.getLocalDateString(new Date(), timezone);
     const ext = encryptionPassword ? "mzbe" : "json.gz";
     const filename = `${BACKUP_FILE_PREFIX}daily-${dateStr}.${ext}`;
-    const filepath = this.safePath(folderPath, filename);
+    const filepath = this.safePath(userFolder, filename);
 
     const payload = await this.backupService.exportToBuffer(
       userId,
@@ -483,50 +702,73 @@ export class AutoBackupService {
     }
   }
 
-  private enforceRetention(
-    folderPath: string,
-    settings: AutoBackupSettings,
-  ): void {
+  /** Backup files found directly in `dir`, tagged with where they came from. */
+  private collectBackupFiles(dir: string, legacy: boolean): BackupFile[] {
     let entries: string[];
     try {
-      entries = readdirSync(folderPath);
+      entries = readdirSync(dir);
     } catch {
-      return;
+      return [];
     }
 
-    const dailyFiles: BackupFile[] = [];
-    const weeklyFiles: BackupFile[] = [];
-    const monthlyFiles: BackupFile[] = [];
-
+    const files: BackupFile[] = [];
     for (const name of entries) {
       const dailyMatch = DAILY_FILE_PATTERN.exec(name);
       if (dailyMatch) {
         const date = parseDateString(dailyMatch[1]);
-        if (date) dailyFiles.push({ name, date, tier: "daily" });
+        if (date) files.push({ name, dir, legacy, date, tier: "daily" });
         continue;
       }
       const weeklyMatch = WEEKLY_FILE_PATTERN.exec(name);
       if (weeklyMatch) {
         const date = parseDateString(weeklyMatch[1]);
-        if (date) weeklyFiles.push({ name, date, tier: "weekly" });
+        if (date) files.push({ name, dir, legacy, date, tier: "weekly" });
         continue;
       }
       const monthlyMatch = MONTHLY_FILE_PATTERN.exec(name);
       if (monthlyMatch) {
         const date = parseYearMonthString(monthlyMatch[1]);
-        if (date) monthlyFiles.push({ name, date, tier: "monthly" });
+        if (date) files.push({ name, dir, legacy, date, tier: "monthly" });
         continue;
       }
     }
+    return files;
+  }
+
+  /**
+   * Delete backups past the retention limit of their tier, newest kept.
+   *
+   * Two directories are swept: the user's own folder, and the flat base folder
+   * where a version before per-user folders wrote. Those legacy filenames carry
+   * no user id, so they were already shared -- every user's pass has always
+   * deleted whatever it found there -- and sweeping them alongside the new
+   * layout ages them out as sharded backups accumulate, rather than stranding
+   * them under a limit that no longer looks at them. On an equal date the
+   * legacy copy is the one deleted, so the file that is definitely this user's
+   * is the one kept.
+   */
+  private enforceRetention(
+    userFolder: string,
+    basePath: string,
+    settings: AutoBackupSettings,
+  ): void {
+    const files = [
+      ...this.collectBackupFiles(userFolder, false),
+      ...this.collectBackupFiles(basePath, true),
+    ];
 
     // Sort each tier newest first and delete beyond retention limit
-    const deleteExcess = (files: BackupFile[], limit: number) => {
-      const sorted = [...files].sort(
-        (a, b) => b.date.getTime() - a.date.getTime(),
-      );
+    const deleteExcess = (tier: BackupFile["tier"], limit: number) => {
+      const sorted = files
+        .filter((f) => f.tier === tier)
+        .sort(
+          (a, b) =>
+            b.date.getTime() - a.date.getTime() ||
+            Number(a.legacy) - Number(b.legacy),
+        );
       for (let i = limit; i < sorted.length; i++) {
         try {
-          unlinkSync(this.safePath(folderPath, sorted[i].name));
+          unlinkSync(this.safePath(sorted[i].dir, sorted[i].name));
           this.logger.log(`Retention: deleted old backup ${sorted[i].name}`);
         } catch (err) {
           this.logger.warn(
@@ -536,9 +778,9 @@ export class AutoBackupService {
       }
     };
 
-    deleteExcess(dailyFiles, settings.retentionDaily);
-    deleteExcess(weeklyFiles, settings.retentionWeekly);
-    deleteExcess(monthlyFiles, settings.retentionMonthly);
+    deleteExcess("daily", settings.retentionDaily);
+    deleteExcess("weekly", settings.retentionWeekly);
+    deleteExcess("monthly", settings.retentionMonthly);
   }
 
   private getLocalDateString(date: Date, timezone: string): string {
@@ -725,11 +967,15 @@ export class AutoBackupService {
 
   /**
    * Ensure `safePath` is an existing directory. The configured default folder
-   * is created on first use so a deployment only has to mount the volume;
-   * user-chosen folders must already exist, since creating arbitrary paths on
-   * demand would mask typos.
+   * is created on first use so a deployment only has to mount the volume, and
+   * so are the per-user folders underneath a base that already checks out
+   * (`createIfMissing`); any other chosen folder must already exist, since
+   * creating arbitrary paths on demand would mask typos.
    */
-  private async assertDirectoryExists(safePath: string): Promise<void> {
+  private async assertDirectoryExists(
+    safePath: string,
+    createIfMissing = false,
+  ): Promise<void> {
     try {
       const stat = await fs.stat(safePath);
       if (!stat.isDirectory()) {
@@ -753,7 +999,7 @@ export class AutoBackupService {
           ),
         );
       }
-      if (safePath !== this.defaultFolderPath) {
+      if (!createIfMissing && safePath !== this.defaultFolderPath) {
         throw new BadRequestException(
           tr(
             "errors.backup.folderNotExistVolume",
@@ -781,12 +1027,15 @@ export class AutoBackupService {
     }
   }
 
-  private async assertFolderWritable(folderPath: string): Promise<void> {
+  private async assertFolderWritable(
+    folderPath: string,
+    { createIfMissing = false }: { createIfMissing?: boolean } = {},
+  ): Promise<void> {
     // Re-validate defensively: this method is also invoked with folder paths
     // read back from the database (originally user-supplied), so CWE-22
     // sanitization must run every time before we touch the filesystem.
     const safePath = this.validateFolderPath(folderPath);
-    await this.assertDirectoryExists(safePath);
+    await this.assertDirectoryExists(safePath, createIfMissing);
 
     // Test write access by creating and removing a temporary file
     const testFile = this.safePath(

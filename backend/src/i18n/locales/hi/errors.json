@@ -179,7 +179,6 @@
     "unsupportedBackupVersion": "असमर्थित बैकअप संस्करण: {{ version }}। अपेक्षित {{ expected }}",
     "missingExportedAt": "अमान्य बैकअप प्रारूप: exportedAt अनुपस्थित है",
     "tableNotAllowed": "तालिका {{ table }} को बैकअप पुनर्स्थापना में अनुमति नहीं है",
-    "localAuthRequired": "स्थानीय पासवर्ड प्रमाणीकरण आवश्यक है",
     "encryptionNotConfigured": "सर्वर एन्क्रिप्शन के लिए कॉन्फ़िगर नहीं है (AI_ENCRYPTION_KEY अनुपस्थित है)",
     "backupPasswordOidcOnly": "बैकअप पासवर्ड केवल OIDC उपयोगकर्ताओं के लिए कॉन्फ़िगर करने योग्य है; स्थानीय उपयोगकर्ता अपने लॉगिन पासवर्ड का उपयोग करते हैं",
     "backupPasswordTooShort": "बैकअप पासवर्ड कम से कम {{ minLength }} अक्षरों का होना चाहिए",

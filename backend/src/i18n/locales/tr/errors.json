@@ -179,7 +179,6 @@
     "unsupportedBackupVersion": "Desteklenmeyen yedek sürümü: {{ version }}. Beklenen: {{ expected }}",
     "missingExportedAt": "Geçersiz yedek biçimi: exportedAt eksik",
     "tableNotAllowed": "{{ table }} tablosuna yedek geri yüklemede izin verilmiyor",
-    "localAuthRequired": "Yerel şifre kimlik doğrulaması gereklidir",
     "encryptionNotConfigured": "Sunucu şifreleme için yapılandırılmamış (AI_ENCRYPTION_KEY eksik)",
     "backupPasswordOidcOnly": "Yedek şifresi yalnızca OIDC kullanıcıları için yapılandırılabilir; yerel kullanıcılar giriş şifrelerini kullanır",
     "backupPasswordTooShort": "Yedek şifresi en az {{ minLength }} karakter olmalıdır",
