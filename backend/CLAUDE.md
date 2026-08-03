@@ -128,6 +128,32 @@ grew a column selects more than one row now; a query still written against the
 old key returns whichever the database offers first. Grep for reads of a
 unique key in the migration that widens it.
 
+## A joint account is only shared where somebody remembered to share it
+
+`transaction.userId = :userId` is the wrong ownership predicate for any
+own-context read a delegate can reach: a jointly shared account's rows belong
+to the **owner**, so the grantee matches none of them and the endpoint returns
+a confident empty answer rather than an error. That is how the register got the
+joint scope on day one while the summary, grouped totals and monthly totals
+beside it did not -- a joint account's detail page drew a full balance chart
+with an empty cash flow, no top categories and no top payees under it.
+
+Own-context reads resolve their scope through
+`TransactionsController.resolveOwnContextJointScope` (the accounts controller's
+equivalents are `jointAccountIdSetFor` for list reads and a `NotFoundException`
+fallback through `jointAccessFor` for `:id` reads, as on `getBalance` and
+`getBalanceForecast`). Filtered to exactly one joint account, the query runs as
+the owner so every derived value -- category descendant expansion, the search
+term parsed in the user's number/date format, the money math -- is byte-identical
+to the owner's own view; anything else keeps the caller's scope and widens it by
+the already-authorized joint ids, never by raw request input. The widened
+predicate itself is written once per service (`registerScope`,
+`analyticsScope`).
+
+An endpoint that deliberately stays owner-only says so where it is skipped:
+`tag-key-breakdown` does, because tags are personal and a joint row never
+carries the grantee's.
+
 ## A money value carries the currency it was calculated into
 
 Not the currency of the account it is filed under. `InvestmentTransaction.exchangeRate`

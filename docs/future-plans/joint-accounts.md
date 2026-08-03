@@ -120,11 +120,18 @@ reappears. The joint flag itself is not auto-restored by a plain re-share; the o
 
 Non-banking joint types read-only; no grantee tags/splits/attachments on joint rows; attachments,
 scheduled transactions and holdings on joint accounts not natively visible; no native category
-creation; transaction analytics, built-in/custom reports and **all AI Assistant + MCP tools**
-exclude joint rows (the two AI layers change together or not at all -- "not at all" in v1);
-investment breakdowns exclude joint INVESTMENT accounts (the plain net-worth total includes
-them); grantee CSV/QIF export deferred; the joint toggle is offered only for delegates who are
-full Monize accounts (`isFullAccount`), never owner-managed credential identities.
+creation; built-in/custom reports and **all AI Assistant + MCP tools** exclude joint rows (the two
+AI layers change together or not at all -- "not at all" in v1); investment breakdowns exclude
+joint INVESTMENT accounts (the plain net-worth total includes them); grantee CSV/QIF export
+deferred; the joint toggle is offered only for delegates who are full Monize accounts
+(`isFullAccount`), never owner-managed credential identities.
+
+The account-scoped transaction analytics -- `GET /transactions/summary`, `/grouped-totals` and
+`/monthly-totals` -- were a v1 cut and are no longer: they take the same own-context joint scope
+as the register (see B4), because a joint account's detail page draws its cash-flow, top-categories
+and top-payees panels from them and rendered all three empty beside a populated balance chart.
+`/transactions/tag-key-breakdown` stays owner-only on purpose -- tags are personal, and a joint row
+never carries the grantee's.
 
 ## Companion task list
 

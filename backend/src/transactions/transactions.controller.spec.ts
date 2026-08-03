@@ -11,6 +11,7 @@ describe("TransactionsController", () => {
   let mockJointAccounts: Record<string, jest.Mock>;
   let mockJointRegister: Record<string, jest.Mock>;
   let mockCrossOwnerAccess: Record<string, jest.Mock>;
+  let mockDelegationService: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   // Valid UUIDs for testing
@@ -41,6 +42,7 @@ describe("TransactionsController", () => {
       updateTransfer: jest.fn(),
       getSummary: jest.fn(),
       getGroupedTotals: jest.fn(),
+      getMonthlyTotals: jest.fn(),
       getTagKeyBreakdown: jest.fn(),
       getRecurringCharges: jest.fn(),
       bulkUpdate: jest.fn(),
@@ -63,6 +65,10 @@ describe("TransactionsController", () => {
       markCleared: jest.fn(),
     };
 
+    mockDelegationService = {
+      readableAccountIds: jest.fn().mockResolvedValue([]),
+    };
+
     mockCrossOwnerAccess = {
       readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
       // Own accounts by default, matching mockJointRegister.ownsRow above.
@@ -79,7 +85,7 @@ describe("TransactionsController", () => {
         DelegateTransferMaskInterceptor,
         {
           provide: DelegationService,
-          useValue: { readableAccountIds: jest.fn().mockResolvedValue([]) },
+          useValue: mockDelegationService,
         },
         {
           // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -1062,6 +1068,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -1087,6 +1094,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -1120,19 +1128,20 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [uuid1, uuid2],
+        [],
       );
     });
 
-    it("rejects invalid date in summary startDate", () => {
-      expect(() =>
+    it("rejects invalid date in summary startDate", async () => {
+      await expect(
         controller.getSummary(mockReq, undefined, undefined, "notadate"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects invalid UUID in summary accountIds", () => {
-      expect(() =>
+    it("rejects invalid UUID in summary accountIds", async () => {
+      await expect(
         controller.getSummary(mockReq, undefined, "bad-uuid"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
     it("parses amountFrom and amountTo as floats for summary", async () => {
@@ -1164,11 +1173,12 @@ describe("TransactionsController", () => {
         10.5,
         99.99,
         undefined,
+        [],
       );
     });
 
-    it("rejects non-numeric amountFrom in summary", () => {
-      expect(() =>
+    it("rejects non-numeric amountFrom in summary", async () => {
+      await expect(
         controller.getSummary(
           mockReq,
           undefined,
@@ -1182,11 +1192,11 @@ describe("TransactionsController", () => {
           undefined,
           "abc",
         ),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects non-numeric amountTo in summary", () => {
-      expect(() =>
+    it("rejects non-numeric amountTo in summary", async () => {
+      await expect(
         controller.getSummary(
           mockReq,
           undefined,
@@ -1201,7 +1211,7 @@ describe("TransactionsController", () => {
           undefined,
           "xyz",
         ),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -1247,6 +1257,7 @@ describe("TransactionsController", () => {
         amountTo: 0,
         limit: 25,
         includeUnreconciledBeforeStart: false,
+        jointAccountIds: [],
       });
     });
 
@@ -1275,20 +1286,20 @@ describe("TransactionsController", () => {
       );
     });
 
-    it("rejects a missing or invalid groupBy", () => {
-      expect(() => controller.getGroupedTotals(mockReq)).toThrow(
+    it("rejects a missing or invalid groupBy", async () => {
+      await expect(controller.getGroupedTotals(mockReq)).rejects.toThrow(
         BadRequestException,
       );
-      expect(() => controller.getGroupedTotals(mockReq, "month")).toThrow(
-        BadRequestException,
-      );
+      await expect(
+        controller.getGroupedTotals(mockReq, "month"),
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects an invalid date and a non-positive limit", () => {
-      expect(() =>
+    it("rejects an invalid date and a non-positive limit", async () => {
+      await expect(
         controller.getGroupedTotals(mockReq, "payee", undefined, "notadate"),
-      ).toThrow(BadRequestException);
-      expect(() =>
+      ).rejects.toThrow(BadRequestException);
+      await expect(
         controller.getGroupedTotals(
           mockReq,
           "payee",
@@ -1303,7 +1314,111 @@ describe("TransactionsController", () => {
           undefined,
           "0",
         ),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // A joint account's detail page draws its cash flow, top categories and top
+  // payees from these three endpoints. Before they resolved the joint scope
+  // they ran under the grantee's own user id, which owns none of the rows, so
+  // the panels rendered empty beside a populated balance chart.
+  describe("joint accounts in analytics endpoints", () => {
+    beforeEach(() => {
+      mockService.getSummary.mockResolvedValue({});
+      mockService.getGroupedTotals.mockResolvedValue([]);
+      mockService.getMonthlyTotals.mockResolvedValue([]);
+      mockJointAccounts.jointAccountIdSetFor.mockResolvedValue(
+        new Set([uuid1]),
+      );
+      mockJointAccounts.jointAccessFor.mockResolvedValue({
+        ownerUserId: "owner-9",
+        via: "delegation",
+      });
+    });
+
+    it("runs the summary as the owner for a single joint account", async () => {
+      await controller.getSummary(mockReq, uuid1);
+
+      expect(mockJointAccounts.jointAccessFor).toHaveBeenCalledWith(
+        "user-1",
+        uuid1,
+        "read",
+      );
+      const call = mockService.getSummary.mock.calls[0];
+      expect(call[0]).toBe("owner-9");
+      expect(call[1]).toEqual([uuid1]);
+      expect(call[10]).toEqual([]);
+    });
+
+    it("runs grouped totals as the owner for a single joint account", async () => {
+      await controller.getGroupedTotals(mockReq, "category", uuid1);
+
+      expect(mockService.getGroupedTotals).toHaveBeenCalledWith(
+        "owner-9",
+        expect.objectContaining({
+          accountIds: [uuid1],
+          jointAccountIds: [],
+        }),
+      );
+    });
+
+    it("runs monthly totals as the owner for a single joint account", async () => {
+      await controller.getMonthlyTotals(mockReq, uuid1);
+
+      const call = mockService.getMonthlyTotals.mock.calls[0];
+      expect(call[0]).toBe("owner-9");
+      expect(call[1]).toEqual([uuid1]);
+      expect(call[10]).toEqual([]);
+    });
+
+    it("widens an unfiltered query by the authorized joint ids instead", async () => {
+      await controller.getMonthlyTotals(mockReq);
+
+      const call = mockService.getMonthlyTotals.mock.calls[0];
+      expect(call[0]).toBe("user-1");
+      expect(call[10]).toEqual([uuid1]);
+      expect(mockJointAccounts.jointAccessFor).not.toHaveBeenCalled();
+    });
+
+    it("intersects a mixed account filter with the authorized joint ids", async () => {
+      await controller.getGroupedTotals(mockReq, "payee", `${uuid1},${uuid2}`);
+
+      expect(mockService.getGroupedTotals).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({
+          accountIds: [uuid1, uuid2],
+          jointAccountIds: [uuid1],
+        }),
+      );
+      expect(mockJointAccounts.jointAccessFor).not.toHaveBeenCalled();
+    });
+
+    it("never widens for an account that was not jointly granted", async () => {
+      await controller.getSummary(mockReq, uuid2);
+
+      const call = mockService.getSummary.mock.calls[0];
+      expect(call[0]).toBe("user-1");
+      expect(call[10]).toEqual([]);
+      expect(mockJointAccounts.jointAccessFor).not.toHaveBeenCalled();
+    });
+
+    it("keeps the acting delegate's readable set out of the joint path", async () => {
+      mockDelegationService.readableAccountIds.mockResolvedValue([uuid2]);
+
+      await controller.getMonthlyTotals({
+        user: {
+          id: "owner-1",
+          realUserId: "user-1",
+          isActing: true,
+          delegationId: "del-1",
+        },
+      } as never);
+
+      const call = mockService.getMonthlyTotals.mock.calls[0];
+      expect(call[0]).toBe("owner-1");
+      expect(call[1]).toEqual([uuid2]);
+      expect(call[10]).toEqual([]);
+      expect(mockJointAccounts.jointAccountIdSetFor).not.toHaveBeenCalled();
     });
   });
 
@@ -1668,6 +1783,7 @@ describe("TransactionsController", () => {
         -50,
         1000,
         undefined,
+        [],
       );
     });
 

@@ -417,10 +417,14 @@ describe("AccountsController", () => {
   });
 
   describe("getBalanceForecast()", () => {
-    it("delegates to balanceForecastService with a clamped horizon", () => {
+    it("delegates to balanceForecastService with a clamped horizon", async () => {
       mockBalanceForecastService.getBalanceForecast.mockReturnValue("forecast");
 
-      const result = controller.getBalanceForecast(mockReq, "account-1", 30);
+      const result = await controller.getBalanceForecast(
+        mockReq,
+        "account-1",
+        30,
+      );
 
       expect(result).toBe("forecast");
       expect(
@@ -428,16 +432,57 @@ describe("AccountsController", () => {
       ).toHaveBeenCalledWith("user-1", "account-1", 30);
     });
 
-    it("defaults the horizon to 90 days and clamps to 730", () => {
-      controller.getBalanceForecast(mockReq, "account-1", undefined);
+    it("defaults the horizon to 90 days and clamps to 730", async () => {
+      await controller.getBalanceForecast(mockReq, "account-1", undefined);
       expect(
         mockBalanceForecastService.getBalanceForecast,
       ).toHaveBeenLastCalledWith("user-1", "account-1", 90);
 
-      controller.getBalanceForecast(mockReq, "account-1", 5000);
+      await controller.getBalanceForecast(mockReq, "account-1", 5000);
       expect(
         mockBalanceForecastService.getBalanceForecast,
       ).toHaveBeenLastCalledWith("user-1", "account-1", 730);
+    });
+
+    it("falls back to the owner's scope for a joint account after authorization", async () => {
+      // Without this the grantee's balance chart stops at today while the
+      // owner's carries a forward line, and the projected-balance card
+      // silently reports today's balance as the projection.
+      const { NotFoundException } = jest.requireActual("@nestjs/common");
+      mockBalanceForecastService.getBalanceForecast
+        .mockRejectedValueOnce(new NotFoundException())
+        .mockResolvedValueOnce({ points: [] });
+      mockJointAccounts.jointAccessFor.mockResolvedValue({
+        ownerUserId: "owner-9",
+        via: "delegation",
+      });
+
+      const result = await controller.getBalanceForecast(mockReq, "joint-1");
+
+      expect(result).toEqual({ points: [] });
+      expect(mockJointAccounts.jointAccessFor).toHaveBeenCalledWith(
+        "user-1",
+        "joint-1",
+        "read",
+      );
+      expect(
+        mockBalanceForecastService.getBalanceForecast,
+      ).toHaveBeenLastCalledWith("owner-9", "joint-1", 90);
+    });
+
+    it("re-raises the 404 while acting, never taking the joint path", async () => {
+      const { NotFoundException } = jest.requireActual("@nestjs/common");
+      mockBalanceForecastService.getBalanceForecast.mockRejectedValueOnce(
+        new NotFoundException(),
+      );
+
+      await expect(
+        controller.getBalanceForecast(
+          { user: { id: "owner-1", realUserId: "d1", isActing: true } },
+          "joint-1",
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockJointAccounts.jointAccessFor).not.toHaveBeenCalled();
     });
   });
 

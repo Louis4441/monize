@@ -2415,6 +2415,7 @@ export class TransactionsService {
     amountFrom?: number,
     amountTo?: number,
     tagIds?: string[],
+    jointAccountIds?: string[],
   ) {
     return this.analyticsService.getSummary(
       userId,
@@ -2429,6 +2430,7 @@ export class TransactionsService {
       undefined,
       undefined,
       tagIds,
+      jointAccountIds,
     );
   }
 
@@ -2447,6 +2449,7 @@ export class TransactionsService {
       amountTo?: number;
       limit?: number;
       includeUnreconciledBeforeStart?: boolean;
+      jointAccountIds?: string[];
     },
   ) {
     return this.analyticsService.getGroupedTotals(userId, params);
@@ -2500,6 +2503,7 @@ export class TransactionsService {
     amountFrom?: number,
     amountTo?: number,
     tagIds?: string[],
+    jointAccountIds?: string[],
   ) {
     return this.analyticsService.getMonthlyTotals(
       userId,
@@ -2512,6 +2516,7 @@ export class TransactionsService {
       amountFrom,
       amountTo,
       tagIds,
+      jointAccountIds,
     );
   }
 

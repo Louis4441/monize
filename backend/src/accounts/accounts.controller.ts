@@ -692,17 +692,34 @@ export class AccountsController {
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 404, description: "Account not found" })
-  getBalanceForecast(
+  async getBalanceForecast(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
     @Query("days", new ParseIntPipe({ optional: true })) days?: number,
   ) {
     const horizon = Math.min(Math.max(days ?? 90, 1), 730);
-    return this.balanceForecastService.getBalanceForecast(
-      req.user.id,
-      id,
-      horizon,
-    );
+    try {
+      return await this.balanceForecastService.getBalanceForecast(
+        req.user.id,
+        id,
+        horizon,
+      );
+    } catch (err) {
+      if (!(err instanceof NotFoundException) || req.user.isActing) throw err;
+      // Joint fallback (same shape as getBalance): authorize, then project
+      // with the owner's scope so the grantee's balance chart carries the
+      // same forward line the owner's does instead of stopping at today.
+      const access = await this.jointAccounts.jointAccessFor(
+        req.user.realUserId ?? req.user.id,
+        id,
+        "read",
+      );
+      return this.balanceForecastService.getBalanceForecast(
+        access.ownerUserId,
+        id,
+        horizon,
+      );
+    }
   }
 
   @Get(":id/interest-paid")

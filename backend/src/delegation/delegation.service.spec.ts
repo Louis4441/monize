@@ -515,6 +515,12 @@ describe("DelegationService", () => {
   });
 
   describe("getAvailableContexts", () => {
+    beforeEach(() => {
+      // No grants assigned unless a case says otherwise; the joint-only
+      // filter reads them for every delegation.
+      grantsRepo.find.mockResolvedValue([]);
+    });
+
     it("returns [] when the user does not exist", async () => {
       usersRepo.findOne.mockResolvedValue(null);
       await expect(service.getAvailableContexts("u1")).resolves.toEqual([]);
@@ -600,6 +606,146 @@ describe("DelegationService", () => {
       expect(res).toHaveLength(1);
       expect(res[0].isSelf).toBe(false);
       expect(res[0].label).toBe("o1");
+    });
+
+    describe("joint-only delegations", () => {
+      /** A full-account grantee with one active delegation from "o1". */
+      function arrangeGrantee(delegation: Record<string, unknown> = {}) {
+        usersRepo.findOne.mockImplementation(({ where }: any) =>
+          where.id === "u1"
+            ? { id: "u1", firstName: "Del", isDelegateOnly: false }
+            : { id: "o1", firstName: "Own", twoFactorSecret: null },
+        );
+        delegatesRepo.find.mockResolvedValue([
+          {
+            id: "g1",
+            ownerUserId: "o1",
+            owner: { id: "o1", firstName: "Own" },
+            ...delegation,
+          },
+        ]);
+        accountsRepo.exists.mockResolvedValue(true);
+        prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
+      }
+
+      it("drops the owner context when every readable grant is joint", async () => {
+        arrangeGrantee();
+        grantsRepo.find.mockResolvedValue([
+          { delegationId: "g1", accountId: "a1", canRead: true, isJoint: true },
+          { delegationId: "g1", accountId: "a2", canRead: true, isJoint: true },
+        ]);
+
+        // Nothing to switch between: both accounts are already native.
+        await expect(service.getAvailableContexts("u1")).resolves.toEqual([]);
+      });
+
+      it("keeps the owner context when a readable grant is not joint", async () => {
+        arrangeGrantee();
+        grantsRepo.find.mockResolvedValue([
+          { delegationId: "g1", accountId: "a1", canRead: true, isJoint: true },
+          {
+            delegationId: "g1",
+            accountId: "a2",
+            canRead: true,
+            isJoint: false,
+          },
+        ]);
+
+        const res = await service.getAvailableContexts("u1");
+        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+      });
+
+      it.each([
+        ["billsCanRead"],
+        ["investmentsCanRead"],
+        ["budgetsCanRead"],
+        ["reportsCanRead"],
+        ["aiCanRead"],
+      ])("keeps the owner context when %s is granted", async (field) => {
+        arrangeGrantee({ [field]: true });
+        grantsRepo.find.mockResolvedValue([
+          { delegationId: "g1", accountId: "a1", canRead: true, isJoint: true },
+        ]);
+
+        const res = await service.getAvailableContexts("u1");
+        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+      });
+
+      it.each([
+        ["payeesCanCreate"],
+        ["payeesCanEdit"],
+        ["payeesCanDelete"],
+        ["categoriesCanCreate"],
+        ["categoriesCanEdit"],
+        ["categoriesCanDelete"],
+        ["tagsCanCreate"],
+        ["tagsCanEdit"],
+        ["tagsCanDelete"],
+      ])(
+        "keeps the owner context when the %s capability is granted",
+        async (field) => {
+          arrangeGrantee({ [field]: true });
+          grantsRepo.find.mockResolvedValue([
+            {
+              delegationId: "g1",
+              accountId: "a1",
+              canRead: true,
+              isJoint: true,
+            },
+          ]);
+
+          const res = await service.getAvailableContexts("u1");
+          expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+        },
+      );
+
+      it("keeps a delegation whose grants are not assigned yet", async () => {
+        // No joint share stands in for the context, so hiding it would leave
+        // the delegate unable to switch in once the owner grants something.
+        arrangeGrantee();
+        grantsRepo.find.mockResolvedValue([]);
+
+        const res = await service.getAvailableContexts("u1");
+        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+      });
+
+      it("keeps a joint-only owner the caller is currently acting as", async () => {
+        // Hiding the context the user is standing in would strip the only
+        // control that gets them back to their own account.
+        arrangeGrantee();
+        grantsRepo.find.mockResolvedValue([
+          { delegationId: "g1", accountId: "a1", canRead: true, isJoint: true },
+        ]);
+
+        const res = await service.getAvailableContexts("u1", "o1");
+        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+      });
+
+      it("drops only the joint-only owner, keeping the other owner's context", async () => {
+        usersRepo.findOne.mockImplementation(({ where }: any) =>
+          where.id === "u1"
+            ? { id: "u1", firstName: "Del", isDelegateOnly: false }
+            : { id: where.id, firstName: where.id, twoFactorSecret: null },
+        );
+        delegatesRepo.find.mockResolvedValue([
+          { id: "g1", ownerUserId: "o1", owner: { id: "o1", firstName: "O1" } },
+          { id: "g2", ownerUserId: "o2", owner: { id: "o2", firstName: "O2" } },
+        ]);
+        accountsRepo.exists.mockResolvedValue(true);
+        prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
+        grantsRepo.find.mockResolvedValue([
+          { delegationId: "g1", accountId: "a1", canRead: true, isJoint: true },
+          {
+            delegationId: "g2",
+            accountId: "a2",
+            canRead: true,
+            isJoint: false,
+          },
+        ]);
+
+        const res = await service.getAvailableContexts("u1");
+        expect(res.map((c) => c.userId)).toEqual(["u1", "o2"]);
+      });
     });
   });
 

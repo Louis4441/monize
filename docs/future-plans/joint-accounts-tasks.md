@@ -92,6 +92,12 @@ One scoping helper in `transactions.service.ts` -- own-context predicate
 count, page-for-transaction and running/projected balances. Mask interceptor spec proves a joint
 counterpart is not masked and the same payload is masked post-revoke.
 
+The same predicate lives once more in `transaction-analytics.service.ts` (`analyticsScope`), and
+`TransactionsController.resolveOwnContextJointScope` is the single decision that feeds both: a
+query filtered to exactly one joint account runs as the OWNER, anything else keeps the caller's
+scope and widens it by the authorized joint ids. Any new own-context endpoint that scopes reads by
+`transaction.userId` calls that helper -- the register and its analytics have to see the same rows.
+
 ### B5 -- Reference data
 
 `GET /delegation/joint-accounts/:accountId/reference-data`: owner's categories + payees (picker
