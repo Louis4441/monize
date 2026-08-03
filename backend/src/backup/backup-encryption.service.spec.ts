@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import * as path from "path";
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
@@ -140,6 +142,36 @@ describe("BackupEncryptionService", () => {
       // Every sign-in passes through here; an unchanged password must not
       // turn each one into a users-table write.
       expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("compares the stored copy in constant time", async () => {
+      // CWE-208: a plain `===` on a decrypted secret returns as soon as two
+      // bytes differ. Scanning the source is what holds this, because the
+      // timing difference itself is not observable from a unit test.
+      const source = readFileSync(
+        path.join(__dirname, "backup-encryption.service.ts"),
+        "utf8",
+      );
+      expect(source).toContain("timingSafeEqual");
+      expect(source).not.toMatch(/decrypt\([^)]*\)\s*===/);
+    });
+
+    it("still recognises a matching stored copy of any length", async () => {
+      // The digests compared are always 32 bytes, so a password shorter or
+      // longer than the stored one must not throw out of timingSafeEqual.
+      for (const password of ["a", "hunter2hunter2", "x".repeat(200)]) {
+        usersRepo.save.mockClear();
+        usersRepo.findOne.mockResolvedValue(
+          makeUser({
+            backupEncryptionEnabled: true,
+            backupPasswordEnc: `enc:${password}`,
+          }),
+        );
+
+        await service.rememberLoginPassword(userId, password);
+
+        expect(usersRepo.save).not.toHaveBeenCalled();
+      }
     });
 
     it("replaces a stored copy it cannot decrypt", async () => {

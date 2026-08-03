@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { createHash, timingSafeEqual } from "crypto";
 import * as bcrypt from "bcryptjs";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
@@ -13,6 +14,21 @@ import { PasswordBreachService } from "../auth/password-breach.service";
 import { tr } from "../i18n/translate";
 
 const MIN_BACKUP_PASSWORD_LENGTH = 12;
+
+/**
+ * Whether two secrets are the same, in time that does not depend on how far
+ * they agree (CWE-208). Both sides are hashed first so the buffers are always
+ * 32 bytes: `timingSafeEqual` throws on a length mismatch, and comparing raw
+ * passwords would leak their length through that branch.
+ *
+ * Same convention as `ai-actions.service.ts` and `csrf.util.ts`; a plain `===`
+ * on a decrypted secret is what the security scan flags.
+ */
+function secretsMatch(a: string, b: string): boolean {
+  const digest = (value: string) =>
+    createHash("sha256").update(value, "utf8").digest();
+  return timingSafeEqual(digest(a), digest(b));
+}
 
 /**
  * What the automatic backup for a user should be encrypted with. Three answers,
@@ -142,7 +158,12 @@ export class BackupEncryptionService {
       // login does not touch the users table.
       if (user.backupEncryptionEnabled && user.backupPasswordEnc) {
         try {
-          if (this.aiEncryption.decrypt(user.backupPasswordEnc) === password) {
+          if (
+            secretsMatch(
+              this.aiEncryption.decrypt(user.backupPasswordEnc),
+              password,
+            )
+          ) {
             return;
           }
         } catch {
