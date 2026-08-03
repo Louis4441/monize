@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/Button';
 
 const logger = createLogger('DelegateAccessModal');
 
-type GrantOp = 'canRead' | 'canCreate' | 'canEdit' | 'canDelete';
+type GrantOp = 'canRead' | 'canCreate' | 'canEdit' | 'canDelete' | 'isJoint';
 type CapOp = 'create' | 'edit' | 'delete';
 type CapResource = 'payees' | 'categories' | 'tags';
 type SectionKey = 'bills' | 'investments' | 'budgets' | 'reports' | 'ai';
@@ -30,6 +30,7 @@ interface DraftGrant {
   canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  isJoint: boolean;
 }
 
 interface Draft {
@@ -43,6 +44,9 @@ const GRANT_OPS: { key: GrantOp; label: string }[] = [
   { key: 'canCreate', label: 'Create' },
   { key: 'canEdit', label: 'Edit' },
   { key: 'canDelete', label: 'Delete' },
+  // Joint: with Read, the account appears natively in the delegate's own
+  // account list. Only offered for delegates with a full Monize account.
+  { key: 'isJoint', label: 'Joint' },
 ];
 
 const CAP_RESOURCES: { key: CapResource; label: string }[] = [
@@ -86,7 +90,13 @@ const SECTION_FIELD: Record<SectionKey, keyof DelegateSectionFlags> = {
 };
 
 function emptyGrant(): DraftGrant {
-  return { canRead: false, canCreate: false, canEdit: false, canDelete: false };
+  return {
+    canRead: false,
+    canCreate: false,
+    canEdit: false,
+    canDelete: false,
+    isJoint: false,
+  };
 }
 
 function buildInitialDraft(delegate: DelegateSummary): Draft {
@@ -97,6 +107,9 @@ function buildInitialDraft(delegate: DelegateSummary): Draft {
       canCreate: !!g.canCreate,
       canEdit: !!g.canEdit,
       canDelete: !!g.canDelete,
+      // Must round-trip: the save is delete-and-recreate server-side, so a
+      // draft that dropped this flag would silently clear every joint share.
+      isJoint: !!g.isJoint,
     };
   }
   const caps = delegate.capabilities;
@@ -128,6 +141,7 @@ function applyGrantRule(
     next.canCreate = false;
     next.canEdit = false;
     next.canDelete = false;
+    next.isJoint = false;
   }
   if (op !== 'canRead' && value) {
     next.canRead = true;
@@ -170,6 +184,9 @@ export function DelegateAccessModal({
   const [draft, setDraft] = useState<Draft>(baseline);
   const [tab, setTab] = useState<Tab>('accounts');
   const [saving, setSaving] = useState(false);
+  // Joint shares require the delegate to be a full Monize account; the
+  // server re-checks on save (setGrants rejects otherwise).
+  const jointAllowed = !!delegate.delegate.isFullAccount;
 
   const groupedAccounts = useMemo(() => {
     const groups = new Map<AccountType, Account[]>();
@@ -414,6 +431,11 @@ export function DelegateAccessModal({
                           <label
                             key={o.key}
                             className="flex items-center gap-1.5"
+                            title={
+                              o.key === 'isJoint' && !jointAllowed
+                                ? t('accounts.jointRequiresFullAccount')
+                                : undefined
+                            }
                           >
                             <ToggleSwitch
                               size="sm"
@@ -423,6 +445,7 @@ export function DelegateAccessModal({
                                     o.key
                                   ],
                               )}
+                              disabled={o.key === 'isJoint' && !jointAllowed}
                               onChange={(v) =>
                                 setColumnForAccounts(ids, o.key, v)
                               }
@@ -447,12 +470,18 @@ export function DelegateAccessModal({
                                 <label
                                   key={o.key}
                                   className="flex items-center gap-1.5"
+                                  title={
+                                    o.key === 'isJoint' && !jointAllowed
+                                      ? t('accounts.jointRequiresFullAccount')
+                                      : undefined
+                                  }
                                 >
                                   <ToggleSwitch
                                     size="sm"
                                     checked={!!g[o.key]}
                                     disabled={
-                                      o.key !== 'canRead' && !g.canRead
+                                      (o.key !== 'canRead' && !g.canRead) ||
+                                      (o.key === 'isJoint' && !jointAllowed)
                                     }
                                     onChange={(v) =>
                                       setGrant(a.id, o.key, v)

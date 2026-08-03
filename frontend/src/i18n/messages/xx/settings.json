@@ -625,7 +625,8 @@
       "revokeFailed": "[XX-Failed to revoke delegate-XX]",
       "resetPasswordFailed": "[XX-Failed to reset password-XX]",
       "copyFailed": "[XX-Could not copy to clipboard-XX]"
-    }
+    },
+    "jointLabel": "[XX-{count, plural, one {# joint account} other {# joint accounts}}-XX]"
   },
   "delegateAccessModal": {
     "title": "[XX-Edit access-XX]",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "[XX-No accounts to grant.-XX]",
-      "grantAll": "[XX-Grant all-XX]"
+      "grantAll": "[XX-Grant all-XX]",
+      "jointRequiresFullAccount": "[XX-Joint accounts can only be shared with users who have their own Monize account-XX]"
     },
     "shared": {
       "description": "[XX-READ of payees, categories and tags is always allowed. These control create/edit/delete.-XX]"
