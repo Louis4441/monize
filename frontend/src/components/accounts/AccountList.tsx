@@ -17,6 +17,7 @@ import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
 import { useTableDensity, nextDensity, type DensityLevel } from '@/hooks/useTableDensity';
 import { SortIcon } from '@/components/ui/SortIcon';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { formatAccountType, countLogicalAccounts } from '@/lib/account-utils';
 
 type SortField = 'name' | 'type' | 'balance' | 'status';
@@ -714,17 +715,19 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
                 </select>
               )}
 
-              {/* Joint filter -- only shown when something is shared to the caller */}
+              {/* Joint filter -- only shown when something is shared to the
+                  caller. The switch and its text are siblings, not nested:
+                  ToggleSwitch is a <button>, which a <label> cannot label. */}
               {hasJointAccounts && (
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                  <input
-                    type="checkbox"
+                <div className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  <ToggleSwitch
+                    size="sm"
                     checked={filterJoint === 'joint'}
-                    onChange={(e) => setFilterJoint(e.target.checked ? 'joint' : '')}
-                    className="rounded border-gray-300 dark:border-gray-600"
+                    onChange={(v) => setFilterJoint(v ? 'joint' : '')}
+                    label={t('list.filterJoint')}
                   />
-                  {t('list.filterJoint')}
-                </label>
+                  <span>{t('list.filterJoint')}</span>
+                </div>
               )}
             </div>
           </div>
