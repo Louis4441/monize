@@ -171,6 +171,57 @@ export class TransactionsController {
     private readonly jointRegister: JointRegisterService,
   ) {}
 
+  /**
+   * The own-context read scope for a transaction query (joint-accounts spec):
+   * which user id the query runs as, and the already-authorized joint account
+   * ids its ownership predicate may be widened by. One definition on purpose
+   * -- the register, its summary, its grouped totals and its monthly totals
+   * must see the same rows, or a joint account's detail page shows a balance
+   * chart with no cash flow, categories or payees beside it.
+   *
+   * A query filtered to exactly one joint account runs entirely as the OWNER,
+   * so every derived value (category descendant expansion, number/date-format
+   * parsing of the search term, the money math) behaves byte-identically to
+   * the owner's own view. A mixed or unfiltered query keeps the caller's own
+   * scope and widens it by exactly the authorized joint ids.
+   *
+   * Acting delegates never take this path: their scope is the delegation's
+   * readable set, resolved by each endpoint that allows delegate access. The
+   * guard is here rather than only at the call sites because widening an
+   * OWNER-scoped query by the delegate's own joint ids would mix two ledgers.
+   */
+  private async resolveOwnContextJointScope(
+    req: { user: { id: string; realUserId?: string; isActing?: boolean } },
+    requestedAccountIds?: string[],
+  ): Promise<{ userId: string; jointAccountIds: string[] }> {
+    if (req.user.isActing) {
+      return { userId: req.user.id, jointAccountIds: [] };
+    }
+    const realUserId = req.user.realUserId ?? req.user.id;
+    const jointSet = await this.jointAccounts.jointAccountIdSetFor(realUserId);
+    if (jointSet.size === 0) {
+      return { userId: req.user.id, jointAccountIds: [] };
+    }
+    if (
+      requestedAccountIds?.length === 1 &&
+      jointSet.has(requestedAccountIds[0])
+    ) {
+      const access = await this.jointAccounts.jointAccessFor(
+        realUserId,
+        requestedAccountIds[0],
+        "read",
+      );
+      return { userId: access.ownerUserId, jointAccountIds: [] };
+    }
+    return {
+      userId: req.user.id,
+      jointAccountIds:
+        requestedAccountIds && requestedAccountIds.length > 0
+          ? requestedAccountIds.filter((id) => jointSet.has(id))
+          : [...jointSet],
+    };
+  }
+
   @Post()
   @ApiOperation({ summary: "Create a new transaction" })
   @ApiResponse({ status: 201, description: "Transaction created successfully" })
@@ -441,33 +492,12 @@ export class TransactionsController {
       }
     } else {
       // Own context: joint accounts read natively (joint-accounts spec).
-      const realUserId = req.user.realUserId ?? req.user.id;
-      const jointSet =
-        await this.jointAccounts.jointAccountIdSetFor(realUserId);
-      if (jointSet.size > 0) {
-        if (
-          effectiveAccountIds?.length === 1 &&
-          jointSet.has(effectiveAccountIds[0])
-        ) {
-          // A single joint account's register: authorize, then serve the
-          // OWNER's register for that account. Every count, target-page and
-          // running-balance path then behaves byte-identically to the
-          // owner's own view -- no widened predicates in the money math.
-          const access = await this.jointAccounts.jointAccessFor(
-            realUserId,
-            effectiveAccountIds[0],
-            "read",
-          );
-          registerUserId = access.ownerUserId;
-        } else {
-          // Mixed or unfiltered list: widen the register scope by exactly
-          // the authorized joint ids (intersected with any explicit filter).
-          jointAccountIds =
-            effectiveAccountIds && effectiveAccountIds.length > 0
-              ? effectiveAccountIds.filter((id) => jointSet.has(id))
-              : [...jointSet];
-        }
-      }
+      const scope = await this.resolveOwnContextJointScope(
+        req,
+        effectiveAccountIds,
+      );
+      registerUserId = scope.userId;
+      jointAccountIds = scope.jointAccountIds;
     }
 
     return this.transactionsService.findAll(
@@ -558,7 +588,7 @@ export class TransactionsController {
     description: "Transaction summary retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getSummary(
+  async getSummary(
     @Request() req,
     @Query("accountId") accountId?: string,
     @Query("accountIds") accountIds?: string,
@@ -598,9 +628,17 @@ export class TransactionsController {
       );
     }
 
+    const effectiveAccountIds = parseIds(accountIds, accountId);
+    // Own context: a jointly shared account's money-in/money-out reads the
+    // same rows its register does.
+    const scope = await this.resolveOwnContextJointScope(
+      req,
+      effectiveAccountIds,
+    );
+
     return this.transactionsService.getSummary(
-      req.user.id,
-      parseIds(accountIds, accountId),
+      scope.userId,
+      effectiveAccountIds,
       startDate,
       endDate,
       parseCategoryIds(categoryIds ?? categoryId),
@@ -609,6 +647,7 @@ export class TransactionsController {
       parsedAmountFrom,
       parsedAmountTo,
       parseUuids(tagIdsParam),
+      scope.jointAccountIds,
     );
   }
 
@@ -685,7 +724,7 @@ export class TransactionsController {
     description: "Grouped totals retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getGroupedTotals(
+  async getGroupedTotals(
     @Request() req,
     @Query("groupBy") groupBy?: string,
     @Query("accountIds") accountIds?: string,
@@ -745,9 +784,17 @@ export class TransactionsController {
       );
     }
 
-    return this.transactionsService.getGroupedTotals(req.user.id, {
+    const effectiveAccountIds = parseUuids(accountIds);
+    // Own context: a jointly shared account's top categories / top payees
+    // read the same rows its register does.
+    const scope = await this.resolveOwnContextJointScope(
+      req,
+      effectiveAccountIds,
+    );
+
+    return this.transactionsService.getGroupedTotals(scope.userId, {
       groupBy,
-      accountIds: parseUuids(accountIds),
+      accountIds: effectiveAccountIds,
       startDate,
       endDate,
       categoryIds: parseCategoryIds(categoryIds),
@@ -758,6 +805,7 @@ export class TransactionsController {
       amountTo: parsedAmountTo,
       limit: parsedLimit,
       includeUnreconciledBeforeStart: includeUnreconciledBeforeStart === "true",
+      jointAccountIds: scope.jointAccountIds,
     });
   }
 
@@ -1009,6 +1057,8 @@ export class TransactionsController {
     }
 
     let effectiveAccountIds = parseUuids(accountIds);
+    let totalsUserId = req.user.id;
+    let jointAccountIds: string[] = [];
     if (req.user.isActing) {
       const readable = await this.delegationService.readableAccountIds(
         req.user.delegationId,
@@ -1019,10 +1069,19 @@ export class TransactionsController {
           ? effectiveAccountIds.filter((id) => readableSet.has(id))
           : readable;
       if (effectiveAccountIds.length === 0) return [];
+    } else {
+      // Own context: a jointly shared account's cash flow reads the same rows
+      // its register does.
+      const scope = await this.resolveOwnContextJointScope(
+        req,
+        effectiveAccountIds,
+      );
+      totalsUserId = scope.userId;
+      jointAccountIds = scope.jointAccountIds;
     }
 
     return this.transactionsService.getMonthlyTotals(
-      req.user.id,
+      totalsUserId,
       effectiveAccountIds,
       startDate,
       endDate,
@@ -1032,6 +1091,7 @@ export class TransactionsController {
       parsedAmountFrom,
       parsedAmountTo,
       parseUuids(tagIdsParam),
+      jointAccountIds,
     );
   }
 

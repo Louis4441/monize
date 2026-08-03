@@ -75,6 +75,25 @@ const SECTION_FIELD: Record<DelegateSection, keyof AccountDelegate> = {
   ai: "aiCanRead",
 };
 
+/**
+ * Every boolean on a delegation that makes the owner's context worth entering:
+ * the section reads, and the reference-data manage capabilities that put a
+ * Tools entry in the delegate's nav. Both are derived rather than listed --
+ * SECTION_FIELDS from the SECTION_FIELD map, CAPABILITY_FIELDS from the
+ * resource x operation product the entity's columns already follow -- so a new
+ * grantable flag cannot be missed by the joint-only check.
+ */
+const SECTION_FIELDS: ReadonlyArray<keyof AccountDelegate> =
+  Object.values(SECTION_FIELD);
+
+const CAPABILITY_FIELDS: ReadonlyArray<keyof AccountDelegate> = (
+  ["payees", "categories", "tags"] as const
+).flatMap((resource) =>
+  (["Create", "Edit", "Delete"] as const).map(
+    (op) => `${resource}Can${op}` as keyof AccountDelegate,
+  ),
+);
+
 export type DelegateOperation = "read" | "create" | "edit" | "delete";
 
 /**
@@ -414,20 +433,73 @@ export class DelegationService {
   // --- Login / switch context ---
 
   /**
+   * Whether switching into this delegation's owner context would show the
+   * grantee anything they do not already have natively. A purely joint share
+   * offers nothing: every readable account already appears in the grantee's
+   * own context, no whole-section read was granted, and no reference-data
+   * manage capability was granted -- so the owner context is dropped from the
+   * switcher rather than offering a switch between two views of the same
+   * accounts. A grant that is readable but not joint, any section, or any
+   * manage capability makes the context reachable only by switching, so it
+   * stays.
+   *
+   * A delegation with nothing readable yet (freshly invited, grants not
+   * assigned) is NOT joint-only: it has no joint share to stand in for the
+   * context, and hiding it would leave the delegate unable to switch in at
+   * all once the owner grants something.
+   */
+  private isJointOnlyDelegation(
+    delegation: AccountDelegate,
+    grants: AccountDelegateGrant[],
+  ): boolean {
+    if (SECTION_FIELDS.some((f) => !!delegation[f])) return false;
+    if (CAPABILITY_FIELDS.some((f) => !!delegation[f])) return false;
+    const readable = grants.filter((g) => g.canRead);
+    return readable.length > 0 && readable.every((g) => g.isJoint);
+  }
+
+  /**
    * Contexts the authenticated user can operate in. Returns an empty array
    * for a normal user with no delegations (so login behaviour is unchanged).
+   *
+   * `actingAsUserId` is the owner the caller is currently acting as, if any.
+   * Its context is never filtered out: a switcher that hides the context the
+   * user is standing in is a one-way door, and the way back to their own
+   * account is the switcher.
    */
-  async getAvailableContexts(userId: string): Promise<AvailableContext[]> {
+  async getAvailableContexts(
+    userId: string,
+    actingAsUserId?: string | null,
+  ): Promise<AvailableContext[]> {
     const user = await this.scoped(User, (repo) =>
       repo.findOne({ where: { id: userId } }),
     );
     if (!user) return [];
 
-    const delegations = await this.scoped(AccountDelegate, (repo) =>
+    const allDelegations = await this.scoped(AccountDelegate, (repo) =>
       repo.find({
         where: { delegateUserId: user.id, status: "active" },
         relations: ["owner"],
       }),
+    );
+
+    if (allDelegations.length === 0) return [];
+
+    // Drop the owner contexts that are purely joint shares: those accounts are
+    // already in the grantee's own context, so offering a switch to them
+    // presents a chooser whose two sides show the same thing.
+    const grantsByDelegation = await this.scoped(AccountDelegateGrant, (repo) =>
+      repo.find({
+        where: { delegationId: In(allDelegations.map((d) => d.id)) },
+      }),
+    );
+    const delegations = allDelegations.filter(
+      (d) =>
+        d.ownerUserId === actingAsUserId ||
+        !this.isJointOnlyDelegation(
+          d,
+          grantsByDelegation.filter((g) => g.delegationId === d.id),
+        ),
     );
 
     if (delegations.length === 0) return [];
