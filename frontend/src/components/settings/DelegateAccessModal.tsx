@@ -189,9 +189,20 @@ export function DelegateAccessModal({
   // server re-checks on save (setGrants rejects otherwise).
   const jointAllowed = !!delegate.delegate.isFullAccount;
 
+  // Only accounts the caller owns can be re-shared. `GET /accounts` returns a
+  // union in own context -- own accounts plus accounts jointly shared *to* the
+  // caller (`isJoint`), which belong to another owner. Those are neither
+  // visible nor assignable here: a delegate must not be able to pass on access
+  // they were given. The server refuses them too (setGrants -> 403), so an
+  // unfiltered list could only ever offer a toggle that fails the save.
+  const grantableAccounts = useMemo(
+    () => accounts.filter((a) => !a.isJoint),
+    [accounts],
+  );
+
   const groupedAccounts = useMemo(() => {
     const groups = new Map<AccountType, Account[]>();
-    for (const a of accounts) {
+    for (const a of grantableAccounts) {
       const list = groups.get(a.accountType) ?? [];
       list.push(a);
       groups.set(a.accountType, list);
@@ -202,16 +213,16 @@ export function DelegateAccessModal({
     return Array.from(groups.entries()).sort((x, y) =>
       formatAccountType(x[0], tc).localeCompare(formatAccountType(y[0], tc)),
     );
-  }, [accounts, tc]);
+  }, [grantableAccounts, tc]);
 
   const baselineGrantArray = useMemo(
-    () => grantsToArray(accounts, baseline.grants),
-    [accounts, baseline],
+    () => grantsToArray(grantableAccounts, baseline.grants),
+    [grantableAccounts, baseline],
   );
 
   // Diffs against the baseline drive both the dirty flag and the batched save.
   const grantChanged =
-    JSON.stringify(grantsToArray(accounts, draft.grants)) !==
+    JSON.stringify(grantsToArray(grantableAccounts, draft.grants)) !==
     JSON.stringify(baselineGrantArray);
 
   const capabilityPatch: DelegateCapabilities = {};
@@ -303,7 +314,7 @@ export function DelegateAccessModal({
         calls.push(
           delegationApi.setGrants(
             delegate.id,
-            grantsToArray(accounts, draft.grants),
+            grantsToArray(grantableAccounts, draft.grants),
           ),
         );
       }
@@ -393,7 +404,7 @@ export function DelegateAccessModal({
 
         {tab === 'accounts' && (
           <div className="space-y-3">
-            {accounts.length === 0 ? (
+            {grantableAccounts.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {t('accounts.noAccounts')}
               </p>
