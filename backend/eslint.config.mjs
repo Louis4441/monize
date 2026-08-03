@@ -38,6 +38,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/database/seed.service.ts",
   "src/delegation/cross-owner-access.service.ts",
   "src/delegation/guards/account-delegate.guard.ts",
+  // Joint accounts: one system-context read, the owner-label lookup (the
+  // grantee's session cannot see the owner's users row under enforcement;
+  // only the display label leaves the method).
+  "src/delegation/joint-accounts.service.ts",
   "src/emergency-access/emergency-access-claim.controller.ts",
   "src/emergency-access/emergency-access-monitor.service.ts",
   "src/import/mny/mny-import-job.service.ts",
