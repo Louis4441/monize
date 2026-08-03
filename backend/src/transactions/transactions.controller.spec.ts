@@ -8,6 +8,9 @@ import { DelegationService } from "../delegation/delegation.service";
 describe("TransactionsController", () => {
   let controller: TransactionsController;
   let mockService: Record<string, jest.Mock>;
+  let mockJointAccounts: Record<string, jest.Mock>;
+  let mockJointRegister: Record<string, jest.Mock>;
+  let mockCrossOwnerAccess: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   // Valid UUIDs for testing
@@ -45,6 +48,27 @@ describe("TransactionsController", () => {
       getFxFeeSummary: jest.fn(),
     };
 
+    mockJointAccounts = {
+      jointAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
+      jointAccessFor: jest.fn(),
+    };
+
+    mockJointRegister = {
+      // Own rows by default, so existing own-context tests take the
+      // ordinary owner-scoped paths untouched.
+      ownsRow: jest.fn().mockResolvedValue(true),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+      markCleared: jest.fn(),
+    };
+
+    mockCrossOwnerAccess = {
+      readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
+      // Own accounts by default, matching mockJointRegister.ownsRow above.
+      isAccountOwnedBy: jest.fn().mockResolvedValue(true),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TransactionsController],
       providers: [
@@ -61,9 +85,18 @@ describe("TransactionsController", () => {
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           provide: require("../delegation/cross-owner-access.service")
             .CrossOwnerAccessService,
-          useValue: {
-            readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
-          },
+          useValue: mockCrossOwnerAccess,
+        },
+        {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("../delegation/joint-accounts.service")
+            .JointAccountsService,
+          useValue: mockJointAccounts,
+        },
+        {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          provide: require("./joint-register.service").JointRegisterService,
+          useValue: mockJointRegister,
         },
       ],
     }).compile();
@@ -81,6 +114,60 @@ describe("TransactionsController", () => {
 
       expect(result).toEqual(expected);
       expect(mockService.create).toHaveBeenCalledWith("user-1", dto);
+    });
+  });
+
+  describe("joint register branching (own context)", () => {
+    it("routes create for a foreign account through the joint path", async () => {
+      mockCrossOwnerAccess.isAccountOwnedBy.mockResolvedValue(false);
+      mockJointRegister.create.mockResolvedValue({ id: "tx-9" });
+      const dto = { accountId: uuid1, amount: -5 } as never;
+
+      const result = await controller.create(
+        { user: { id: "user-1", realUserId: "user-1" } },
+        dto,
+      );
+
+      expect(result).toEqual({ id: "tx-9" });
+      expect(mockJointRegister.create).toHaveBeenCalledWith("user-1", dto);
+      expect(mockService.create).not.toHaveBeenCalled();
+    });
+
+    it("routes update/remove/clear for an unowned row through the joint path", async () => {
+      mockJointRegister.ownsRow.mockResolvedValue(false);
+      const req = { user: { id: "user-1", realUserId: "user-1" } };
+
+      await controller.update(req, "tx-1", { amount: -2 } as never);
+      expect(mockJointRegister.update).toHaveBeenCalledWith("user-1", "tx-1", {
+        amount: -2,
+      });
+      expect(mockService.update).not.toHaveBeenCalled();
+
+      await controller.remove(req, "tx-1");
+      expect(mockJointRegister.remove).toHaveBeenCalledWith("user-1", "tx-1");
+      expect(mockService.remove).not.toHaveBeenCalled();
+
+      await controller.markCleared(req, "tx-1", { isCleared: true } as never);
+      expect(mockJointRegister.markCleared).toHaveBeenCalledWith(
+        "user-1",
+        "tx-1",
+        true,
+      );
+      expect(mockService.markCleared).not.toHaveBeenCalled();
+    });
+
+    it("never consults the joint path while acting", async () => {
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "deleg-1", isActing: true },
+      };
+      mockService.update.mockResolvedValue({ id: "tx-1" });
+
+      await controller.update(actingReq, "tx-1", { amount: -2 } as never);
+
+      expect(mockJointRegister.ownsRow).not.toHaveBeenCalled();
+      expect(mockService.update).toHaveBeenCalledWith("owner-1", "tx-1", {
+        amount: -2,
+      });
     });
   });
 
@@ -174,6 +261,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -209,6 +297,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -238,6 +327,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -279,6 +369,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -321,6 +412,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -365,6 +457,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 
@@ -380,7 +473,9 @@ describe("TransactionsController", () => {
 
       const calls = mockService.findAll.mock.calls as unknown[][];
       const lastCall = calls[calls.length - 1];
-      expect(lastCall[lastCall.length - 1]).toBe(true);
+      // hasAttachments sits just before the trailing jointAccountIds arg.
+      expect(lastCall[lastCall.length - 2]).toBe(true);
+      expect(lastCall[lastCall.length - 1]).toEqual([]);
     });
 
     // ── Validation tests ────────────────────────────────────────
@@ -565,7 +660,51 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
+    });
+
+    it("substitutes the owner's scope for a single joint account register", async () => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+      mockJointAccounts.jointAccountIdSetFor.mockResolvedValue(
+        new Set([uuid1]),
+      );
+      mockJointAccounts.jointAccessFor.mockResolvedValue({
+        ownerUserId: "owner-9",
+        via: "delegation",
+      });
+
+      await controller.findAll(mockReq, uuid1);
+
+      expect(mockJointAccounts.jointAccessFor).toHaveBeenCalledWith(
+        "user-1",
+        uuid1,
+        "read",
+      );
+      const call = mockService.findAll.mock.calls[0];
+      expect(call[0]).toBe("owner-9"); // the owner's register, byte-identical
+      expect(call[1]).toEqual([uuid1]);
+      expect(call[call.length - 1]).toEqual([]); // no widened predicate
+    });
+
+    it("widens the register scope with authorized joint ids for mixed lists", async () => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+      mockJointAccounts.jointAccountIdSetFor.mockResolvedValue(
+        new Set([uuid2]),
+      );
+
+      // Unfiltered list: every joint id participates.
+      await controller.findAll(mockReq);
+      let call = mockService.findAll.mock.calls[0];
+      expect(call[0]).toBe("user-1");
+      expect(call[call.length - 1]).toEqual([uuid2]);
+
+      // Mixed explicit filter: only requested ids that are joint pass.
+      await controller.findAll(mockReq, undefined, `${uuid1},${uuid2}`);
+      call = mockService.findAll.mock.calls[1];
+      expect(call[1]).toEqual([uuid1, uuid2]);
+      expect(call[call.length - 1]).toEqual([uuid2]);
+      expect(mockJointAccounts.jointAccessFor).not.toHaveBeenCalled();
     });
 
     it("rejects an unknown reconciliation status", async () => {
@@ -623,7 +762,7 @@ describe("TransactionsController", () => {
       const result = await controller.findOne(mockReq, "tx-1");
 
       expect(result).toEqual(expected);
-      expect(mockService.findOne).toHaveBeenCalledWith("user-1", "tx-1");
+      expect(mockService.findOne).toHaveBeenCalledWith("user-1", "tx-1", []);
     });
   });
 
@@ -1313,6 +1452,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        [],
       );
     });
 

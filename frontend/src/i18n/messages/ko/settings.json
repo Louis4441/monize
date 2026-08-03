@@ -625,7 +625,8 @@
       "revokeFailed": "위임자 취소에 실패했습니다",
       "resetPasswordFailed": "비밀번호 재설정에 실패했습니다",
       "copyFailed": "클립보드에 복사할 수 없습니다"
-    }
+    },
+    "jointLabel": "{count, plural, other {공동 계좌 #개}}"
   },
   "delegateAccessModal": {
     "title": "접근 편집",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "부여할 계정이 없습니다.",
-      "grantAll": "모두 부여"
+      "grantAll": "모두 부여",
+      "jointRequiresFullAccount": "공동 계좌는 자신의 Monize 계정이 있는 사용자와만 공유할 수 있습니다"
     },
     "shared": {
       "description": "수취인, 카테고리 및 태그의 읽기는 항상 허용됩니다. 생성/편집/삭제를 제어합니다."

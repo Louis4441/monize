@@ -625,7 +625,8 @@
       "revokeFailed": "撤銷委派人失敗",
       "resetPasswordFailed": "重置密碼失敗",
       "copyFailed": "無法複製至剪貼簿"
-    }
+    },
+    "jointLabel": "{count, plural, other {# 個聯名帳戶}}"
   },
   "delegateAccessModal": {
     "title": "編輯存取",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "無可授予的科目。",
-      "grantAll": "授予全部"
+      "grantAll": "授予全部",
+      "jointRequiresFullAccount": "聯名帳戶只能與擁有自己 Monize 帳戶的使用者共享"
     },
     "shared": {
       "description": "收款人、類別和標籤的讀取始終允許。這些控制建立/編輯/刪除。"

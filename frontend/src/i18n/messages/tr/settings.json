@@ -625,7 +625,8 @@
       "revokeFailed": "Temsilci iptal edilemedi",
       "resetPasswordFailed": "Şifre sıfırlanamadı",
       "copyFailed": "Panoya kopyalanamadı"
-    }
+    },
+    "jointLabel": "{count, plural, other {# ortak hesap}}"
   },
   "delegateAccessModal": {
     "title": "Erişimi düzenle",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Verilecek hesap yok.",
-      "grantAll": "Tümüne ver"
+      "grantAll": "Tümüne ver",
+      "jointRequiresFullAccount": "Ortak hesaplar yalnızca kendi Monize hesabı olan kullanıcılarla paylaşılabilir"
     },
     "shared": {
       "description": "Alacaklılar, kategoriler ve etiketlerin OKUNMASI her zaman izin verilir. Bunlar oluşturma/düzenleme/silmeyi kontrol eder."

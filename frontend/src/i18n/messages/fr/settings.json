@@ -625,7 +625,8 @@
       "revokeFailed": "Échec de la révocation du délégué",
       "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
       "copyFailed": "Impossible de copier dans le presse-papiers"
-    }
+    },
+    "jointLabel": "{count, plural, one {# compte joint} other {# comptes joints}}"
   },
   "delegateAccessModal": {
     "title": "Modifier l'accès",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Aucun compte à accorder.",
-      "grantAll": "Tout accorder"
+      "grantAll": "Tout accorder",
+      "jointRequiresFullAccount": "Les comptes joints ne peuvent être partagés qu'avec des utilisateurs disposant de leur propre compte Monize"
     },
     "shared": {
       "description": "La lecture des bénéficiaires, des catégories et des étiquettes est toujours autorisée. Ces options contrôlent la création/modification/suppression."

@@ -625,7 +625,8 @@
       "revokeFailed": "Widerruf des Delegierten fehlgeschlagen",
       "resetPasswordFailed": "Passwort konnte nicht zurückgesetzt werden",
       "copyFailed": "Kopieren in die Zwischenablage nicht möglich"
-    }
+    },
+    "jointLabel": "{count, plural, one {# Gemeinschaftskonto} other {# Gemeinschaftskonten}}"
   },
   "delegateAccessModal": {
     "title": "Zugriff bearbeiten",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Keine Konten zum Gewähren.",
-      "grantAll": "Alle gewähren"
+      "grantAll": "Alle gewähren",
+      "jointRequiresFullAccount": "Gemeinschaftskonten können nur mit Benutzern geteilt werden, die ein eigenes Monize-Konto haben"
     },
     "shared": {
       "description": "LESEN von Zahlungsempfängern, Kategorien und Tags ist immer erlaubt. Diese steuern Erstellen/Bearbeiten/Löschen."

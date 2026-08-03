@@ -625,7 +625,8 @@
       "revokeFailed": "Falha ao revogar delegado",
       "resetPasswordFailed": "Falha ao redefinir senha",
       "copyFailed": "Não foi possível copiar para a área de transferência"
-    }
+    },
+    "jointLabel": "{count, plural, one {# conta conjunta} other {# contas conjuntas}}"
   },
   "delegateAccessModal": {
     "title": "Editar acesso",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Sem contas para conceder.",
-      "grantAll": "Conceder todas"
+      "grantAll": "Conceder todas",
+      "jointRequiresFullAccount": "Contas conjuntas só podem ser compartilhadas com usuários que tenham a própria conta Monize"
     },
     "shared": {
       "description": "A LEITURA de beneficiários, categorias e etiquetas é sempre permitida. Estes controlam criar/editar/excluir."

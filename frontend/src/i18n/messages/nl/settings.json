@@ -625,7 +625,8 @@
       "revokeFailed": "Intrekken van gedelegeerde mislukt",
       "resetPasswordFailed": "Opnieuw instellen van wachtwoord mislukt",
       "copyFailed": "Kopiëren naar klembord mislukt"
-    }
+    },
+    "jointLabel": "{count, plural, one {# gezamenlijke rekening} other {# gezamenlijke rekeningen}}"
   },
   "delegateAccessModal": {
     "title": "Toegang bewerken",
@@ -639,7 +640,8 @@
     },
     "accounts": {
       "noAccounts": "Geen rekeningen om te verlenen.",
-      "grantAll": "Alles verlenen"
+      "grantAll": "Alles verlenen",
+      "jointRequiresFullAccount": "Gezamenlijke rekeningen kunnen alleen worden gedeeld met gebruikers die een eigen Monize-account hebben"
     },
     "shared": {
       "description": "LEZEN van begunstigden, categorieën en labels is altijd toegestaan. Dit regelt aanmaken/bewerken/verwijderen."
