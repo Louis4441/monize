@@ -1,7 +1,8 @@
+import { Module } from "@nestjs/common";
 import { TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
+import { NetWorthService } from "@/net-worth/net-worth.service";
 import { GemPriceService } from "@/strategies/gem-price.service";
-import { StrategiesModule } from "@/strategies/strategies.module";
 import { GemStrategy } from "@/strategies/entities/gem-strategy.entity";
 import {
   GEM_SIGNAL_ALGORITHM_VERSION,
@@ -16,6 +17,33 @@ import {
   createTestUserDirect,
 } from "../helpers/integration-setup";
 import { withUserContext } from "@/common/db/with-context";
+
+/**
+ * Just the collaborators this suite touches -- deliberately not
+ * `StrategiesModule`.
+ *
+ * That module imports `SecuritiesModule`, and entering the graph from there
+ * leaves `HoldingsService` undefined in `InvestmentTransactionsService`'s
+ * constructor metadata: a circular import whose resolution order depends on
+ * which module is the entry point, so the app boots fine and this suite did not.
+ * `GemPriceService` needs nothing but the `DataSource` that
+ * `TypeOrmModule.forRoot` already provides globally, and the ON CONFLICT test
+ * goes through a repository, so none of that graph is needed here.
+ *
+ * `NetWorthService` is stubbed because the shared harness silences its debounced
+ * recalculation on whatever graph it is handed, and would otherwise fail to find
+ * it in a module this small.
+ */
+@Module({
+  providers: [
+    GemPriceService,
+    {
+      provide: NetWorthService,
+      useValue: { triggerDebouncedRecalc: () => {} },
+    },
+  ],
+})
+class GemPriceTestModule {}
 
 /**
  * The two most safety-critical database interactions in the GEM layer, against a
@@ -41,13 +69,17 @@ describe("GEM prices and signal materialization (integration)", () => {
   let userId: string;
 
   beforeAll(async () => {
-    module = await createIntegrationModule([StrategiesModule]);
+    module = await createIntegrationModule([GemPriceTestModule]);
     prices = module.get(GemPriceService);
     dataSource = module.get(DataSource);
   });
 
   afterAll(async () => {
-    await module.close();
+    // Guarded: a `beforeAll` that threw leaves this undefined, and calling
+    // `close()` on it replaces the real error with a TypeError and buries the
+    // suite under teardown noise -- which is exactly how the first CI run
+    // reported this file.
+    if (module) await module.close();
   });
 
   beforeEach(async () => {
@@ -264,10 +296,7 @@ describe("GEM prices and signal materialization (integration)", () => {
     });
 
     /** The insert materialization performs, with the semantics under test. */
-    const insertIgnoringConflict = (
-      strategyId: string,
-      fingerprint: string,
-    ) =>
+    const insertIgnoringConflict = (strategyId: string, fingerprint: string) =>
       withUserContext(userId, async () => {
         const repo = dataSource.getRepository(GemStrategySignal);
         const result = await repo
