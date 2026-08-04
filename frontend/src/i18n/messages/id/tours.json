@@ -241,6 +241,69 @@
             "body": "Setiap tautan yang menuju dialog lama sekarang mendarat di sini: widget harga di dasbor membuka halaman ini langsung pada tab Riwayat harga. Ini halaman sungguhan, jadi Anda bisa menandainya dan kembali lagi."
           }
         }
+      },
+      "gemStrategy": {
+        "title": "GEM: aturan yang memilih satu instrumen per periode",
+        "steps": {
+          "welcome": {
+            "title": "Mengenal strategi GEM",
+            "body": "Sebulan atau sekuartal sekali, GEM membandingkan pergerakan tiga pasar saham dan satu aset aman, lalu menyebut satu instrumen yang perlu dipegang sampai pemeriksaan berikutnya. Ketika saham bergerak terlalu lemah, GEM menyebut aset aman."
+          },
+          "findReport": {
+            "title": "Temukan GEM di Laporan",
+            "body": "Buka laporan **Strategi GEM** di sini. Laporan ini ada di kategori **Investasi**. Laporan tetap tersedia meski Anda belum punya instrumen investasi atau posisi yang dicatat di Monize.",
+            "fallbackBody": "Kartu laporan tidak terlihat sekarang, biasanya karena filter. Pilih **Berikutnya** dan tur akan membuka laporan GEM secara langsung. Nanti Anda dapat menemukannya di **Laporan**, kategori **Investasi**."
+          },
+          "page": {
+            "title": "Satu laporan, empat pertanyaan",
+            "body": "Di bagian atas, **skenario** berarti sekumpulan pilihan GEM yang tersimpan, bukan order, catatan transaksi, atau rekening sekuritas. Halaman ini menjawab empat pertanyaan: apa yang dipilih strategi sekarang? mengapa? apakah portofolio pada rekening terpilih sudah sesuai? apa yang perlu berubah? GEM biasanya menunjuk satu instrumen sampai evaluasi bulanan atau kuartalan berikutnya."
+          },
+          "summary": {
+            "title": "Empat kartu sekilas",
+            "body": "**Sinyal saat ini** adalah instrumen yang dipilih oleh aturan. **Portofolio Anda** membandingkan target itu dengan apa yang tercatat di rekening strategi. **Untuk dipindahkan** memperkirakan nilai yang mungkin perlu berubah. **Aset strategi** menunjukkan instrumen mana yang mengisi setiap peran. Informasi yang tidak ada ditampilkan sebagai tidak ada, bukan sebagai nol."
+          },
+          "action": {
+            "title": "Saran, bukan order otomatis",
+            "body": "Grafik membandingkan instrumen yang ditetapkan. **Apa yang harus saya lakukan?** menerjemahkan sinyal menjadi kemungkinan operasi jual lalu beli, serta memperkirakan pajak dan komisi bila datanya cukup. Monize tidak pernah mengirim order ke broker Anda. Setelah benar-benar bertransaksi melalui broker, catat transaksinya di Monize; baru gunakan **Tandai sudah dilakukan** hanya sebagai catatan bahwa Anda menjalankan sinyal itu."
+          },
+          "reasoning": {
+            "title": "Mengapa GEM memilih ini?",
+            "body": "Di sini „momentum“ hanya berarti bagaimana harga berubah selama periode lampau yang dipilih. GEM pertama-tama memeriksa apakah instrumen saham Amerika Serikat mengalahkan tolok ukur bebas risiko yang dipakai sebagai pembanding. Jika ya, GEM memilih yang terkuat di antara instrumen Amerika Serikat, pasar maju di luar Amerika Serikat, dan pasar berkembang. Jika tidak, GEM memilih aset aman. **Mengapa sinyal ini?** dan riwayat sinyal menunjukkan seluruh keputusan, bukan sekadar kode akhir."
+          },
+          "tabs": {
+            "title": "Kembali ke Ringkasan untuk melihat hasilnya",
+            "body": "Pilih **Ringkasan** untuk melihat apa yang dihasilkan konfigurasi ini. Tab lainnya juga baik untuk diketahui: **Sinyal** menampilkan keputusan sebelumnya, **Portofolio saya** menjelaskan apa yang tercatat di rekening terpilih, dan **Backtest** menunjukkan bagaimana aturan akan berperilaku pada harga historis yang tersedia; itu model, bukan ramalan atau janji."
+          },
+          "openSettings": {
+            "title": "Buka pengaturan skenario",
+            "body": "Pilih **Ubah pengaturan**: kita siapkan dulu strateginya, baru setelah itu membaca sesuatu darinya. Konfigurasi yang kosong menghasilkan laporan yang kosong, jadi di sinilah tempat yang berguna untuk memulai. Tidak ada apa pun di layar ini yang membeli instrumen atau mengubah sesuatu di broker Anda."
+          },
+          "accounts": {
+            "title": "Pilih rekening yang dibandingkan",
+            "body": "**Rekening strategi** adalah rekening investasi yang termasuk dalam skenario GEM ini. Hanya posisi dan kas yang tercatat di rekening tersebut yang dipakai untuk perbandingan portofolio dan perkiraan nilai yang perlu dipindahkan. Belum punya rekening investasi? Biarkan daftarnya kosong. GEM masih bisa menghitung sinyal, tetapi tidak bisa membandingkannya dengan portofolio Anda yang sebenarnya."
+          },
+          "timingAndCosts": {
+            "title": "Pilih seberapa jauh GEM menengok ke belakang",
+            "body": "**Frekuensi evaluasi** menentukan apakah GEM mengambil keputusan baru setiap bulan atau setiap kuartal. **Jendela momentum (bulan)** hanyalah jumlah bulan lampau yang harganya dibandingkan; nilai bawaannya 12. **Tarif pajak (%)** dan **Komisi per transaksi** bersifat opsional dan hanya memengaruhi perkiraan biaya; keduanya tidak mengubah sinyal. Biarkan kosong jika Anda tidak tahu."
+          },
+          "addInstruments": {
+            "title": "Belum punya instrumen? Mulai di sini",
+            "body": "GEM butuh satu instrumen di setiap peran agar bisa memutuskan apa pun. Ketika sebuah peran kosong, kartu **Peran dan instrumen** menawarkan jalan singkat yang menambahkan ETF contoh. Pertama, di **Pencatatan yang ditambahkan**, pilih kawasan yang benar-benar dapat ditransaksikan broker Anda: **Amerika** atau **Eropa (UCITS)**. Tombol tambah langsung membuat catatan instrumen di Monize, bahkan sebelum Anda menyimpan konfigurasi GEM; tombol itu tidak membeli apa pun. Hanya peran yang kosong yang diisi, dan instrumen yang cocok dan sudah ada di daftar Anda dapat dipakai ulang. Periksa setiap simbol, bursa, dan mata uang. Contoh-contoh ini bukan rekomendasi. Jika jalan singkat itu tidak muncul, peran Anda sudah terisi dan Anda bisa memeriksanya di bawah.",
+            "fallbackBody": "Formulir pengaturan belum termuat, jadi tur tidak dapat menunjuk kartu peran. Tidak ada pengaturan yang diubah. Gunakan tombol coba lagi di halaman ini, atau ulangi tur nanti dari **Tur berpandu** di **Pengaturan**."
+          },
+          "roles": {
+            "title": "Lima peran, satu sasaran",
+            "body": "Lima pemilih ini adalah yang diisi oleh jalan singkat tadi, dan yang Anda atur sendiri bila tidak memakainya. Tiga peran saham mewakili Amerika Serikat (**S&P 500**), **Pasar maju di luar AS**, dan **Pasar berkembang**. **Aset aman** adalah yang akan dipegang GEM ketika saham gagal melewati uji keamanan. **Tolok ukur bebas risiko** hanyalah pembanding untuk uji itu dan boleh dibiarkan kosong; saat itu aset aman menjalankan kedua tugas. Ini lima tugas dalam perhitungan, bukan lima investasi yang GEM harapkan Anda pegang sekaligus. Sasarannya tetap satu instrumen setiap kali."
+          },
+          "save": {
+            "title": "Periksa sebelum menyimpan",
+            "body": "Periksa daftar rekening, setiap pencatatan, dan mata uangnya, lalu **Simpan konfigurasi** untuk menyimpan skenario dan menghitung ulang laporan dari riwayat harga yang tersedia. Penyimpanan inilah yang memberi langkah-langkah berikutnya sesuatu untuk ditampilkan. Itu tetap tidak mengirim order apa pun, dan Anda tidak perlu menyimpan untuk menyelesaikan tur ini. Jika harga tidak ada atau terlalu lama, Monize menampilkan bahwa sinyal tidak tersedia daripada menebak."
+          },
+          "finish": {
+            "title": "Kembalilah pada evaluasi berikutnya",
+            "body": "GEM mengambil satu keputusan per periode, dan tanggal evaluasi berikutnya ada di bagian atas laporan. Sampai hari itu tidak ada yang perlu dilakukan. Ketika tiba, periksa apakah sinyalnya berubah; jika ya, lakukan transaksinya melalui broker Anda dan catat di Monize agar perbandingan portofolio tetap cocok. Anda dapat mengulangi tur ini kapan saja dari **Tur berpandu** di **Pengaturan**."
+          }
+        }
       }
     }
   }
