@@ -75,6 +75,26 @@ All copy and data live in plain arrays near the top of `assets/js/app.js`:
 `TIMELINE`, `FEATURES`, `TOUR`, `REPORTS`, `QA`, `CODE`, `STACK`, `SECURITY`, `FORMATS`, `FAQ`, `GALLERY`, `MARQUEE`, `BUDGET`.
 Add a feature card or a gallery image by adding one line - no rebuild, just refresh.
 
+The content arrays hold **text, never markup.** Nothing in `app.js` assigns a
+string to `innerHTML`: nodes are built with `el(tag, className, ...children)`
+and placed with `fill(node, ...)` / `clear(node)`, so no entry in those arrays
+can be parsed as HTML. Three conventions follow from that, and each replaced
+markup that used to live in the data:
+
+- Emphasis in `QA` answers is written as `*asterisks*`; `rich()` turns those
+  runs into `<b>`.
+- `CODE` samples are `[className, text]` token pairs (`''` plain, `'c'` comment,
+  `'k'` key, `'s'` string) rather than pre-highlighted HTML. Write the text
+  literally - `&&` and `<`, not `&amp;&amp;` and `&lt;` - because nothing
+  unescapes entities on the way in.
+- Randomness uses `rnd()`, which is `crypto.getRandomValues`, not `Math.random`.
+
+This is enforced, not just documented: `frontend/src/test/website-dom-safety.test.ts`
+scans every file in `assets/js/` and fails on an `innerHTML`/`outerHTML`
+assignment, `insertAdjacentHTML`, `document.write`, or `Math.random`. The site
+has no build step, no framework escaping and no CSP behind it, so the DOM-builder
+shape is the whole defence - and Bearer fails the pipeline on the alternative.
+
 Brand colour is `--brand` in `styles.css` (teal `#4fa091`, taken from the app logo).
 
 ## Licence
