@@ -399,7 +399,7 @@ export class BackupRestoreService {
       // possession of the session that was already required (P2-005). Bound to
       // "restore-backup" specifically: an artifact minted to delete data must not
       // authorize overwriting everything instead.
-      this.oidcReauth.consume(user.id, "restore-backup", input.oidcIdToken);
+      await this.oidcReauth.consume(user.id, "restore-backup", input.oidcIdToken);
     } else if (!user.passwordHash) {
       // Local account with no password (admin-provisioned, reset not completed).
       // This fell off the end of the else-if chain and proved nothing at all.
