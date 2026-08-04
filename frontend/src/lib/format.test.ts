@@ -17,6 +17,7 @@ import {
   formatShareQuantity,
   formatSignedPercent,
   gainLossColor,
+  balanceColor,
 } from './format';
 
 describe('getCurrencySymbol', () => {
@@ -545,5 +546,17 @@ describe('gainLossColor', () => {
 
   it('returns red classes for negative values', () => {
     expect(gainLossColor(-1)).toBe('text-red-600 dark:text-red-400');
+  });
+});
+
+describe('balanceColor', () => {
+  it('returns neutral body classes for non-negative balances', () => {
+    expect(balanceColor(0)).toBe('text-gray-900 dark:text-gray-100');
+    expect(balanceColor(250)).toBe('text-gray-900 dark:text-gray-100');
+  });
+
+  it('returns red classes for negative balances', () => {
+    expect(balanceColor(-0.01)).toBe('text-red-600 dark:text-red-400');
+    expect(balanceColor(-1500)).toBe('text-red-600 dark:text-red-400');
   });
 });
