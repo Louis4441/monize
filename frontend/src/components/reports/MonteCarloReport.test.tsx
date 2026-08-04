@@ -1753,6 +1753,7 @@ describe('MonteCarloReport', () => {
         prefetch: vi.fn(),
         refresh: vi.fn(),
         forward: vi.fn(),
+        bfcacheId: 'test-bfcache-id',
       } as ReturnType<typeof nav.useRouter>);
 
       await renderReport();
