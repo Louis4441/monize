@@ -27,8 +27,14 @@
 import { readdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = new URL('..', import.meta.url).pathname;
+// `.pathname` on a file:// URL is percent-encoded (a space becomes `%20`) and
+// `fs` wants a real OS path, not a URL component -- `fileURLToPath` decodes it.
+// A repo checked out under a path with a space (not exotic: "My Drive", "Moje
+// glupoty") reads that literal `%20` as a directory name and ENOENTs on the
+// very first `readdirSync`.
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MIGRATIONS = join(REPO_ROOT, 'database', 'migrations');
 
 /**
