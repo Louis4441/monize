@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Ayarlar bölümleri",
     "profile": "Profil",
     "preferences": "Tercihler",
+    "tours": "Rehberli Turlar",
     "notifications": "Bildirimler",
     "security": "Güvenlik",
     "sharedAccess": "Paylaşılan Erişim",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Paylaşılan Erişim",
       "description": "Başka bir kişiye belirli hesaplara ayrıntılı erişim verin."
+    },
+    "toursCard": {
+      "title": "Rehberli Turlar",
+      "description": "Monize'in sunduğu tüm turlar ve hangilerini gördüğünüz. İstediğinizi başlatın ya da tekrar alın."
     },
     "emergencyAccessCard": {
       "title": "Acil Durum Erişimi",

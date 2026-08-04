@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Các phần cài đặt",
     "profile": "Hồ sơ",
     "preferences": "Sở thích",
+    "tours": "Hướng dẫn sử dụng",
     "notifications": "Thông báo",
     "security": "Bảo mật",
     "sharedAccess": "Truy cập chia sẻ",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Truy cập chia sẻ",
       "description": "Cấp cho người khác quyền truy cập chi tiết vào các tài khoản cụ thể."
+    },
+    "toursCard": {
+      "title": "Hướng dẫn sử dụng",
+      "description": "Tất cả phần hướng dẫn Monize cung cấp, kèm những phần bạn đã xem. Bắt đầu hoặc xem lại bất kỳ phần nào."
     },
     "emergencyAccessCard": {
       "title": "Truy cập khẩn cấp",

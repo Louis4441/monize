@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Sekcje ustawień",
     "profile": "Profil",
     "preferences": "Preferencje",
+    "tours": "Przewodniki po aplikacji",
     "notifications": "Powiadomienia",
     "security": "Zabezpieczenia",
     "sharedAccess": "Dostęp współdzielony",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Dostęp współdzielony",
       "description": "Przyznaj innej osobie szczegółowy dostęp do wybranych kont."
+    },
+    "toursCard": {
+      "title": "Przewodniki po aplikacji",
+      "description": "Wszystkie przewodniki, które oferuje Monize, wraz z tym, co już obejrzałeś. Uruchom lub powtórz dowolny z nich."
     },
     "emergencyAccessCard": {
       "title": "Dostęp awaryjny",

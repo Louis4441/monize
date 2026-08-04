@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "設定區段",
     "profile": "個人資料",
     "preferences": "偏好設定",
+    "tours": "導覽引導",
     "notifications": "通知",
     "security": "安全性",
     "sharedAccess": "共用存取",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "共用存取",
       "description": "授予另一個人對特定科目的細粒度存取。"
+    },
+    "toursCard": {
+      "title": "導覽引導",
+      "description": "Monize 提供的所有導覽，以及你已經看過的部分。可以開始或重新查看其中任一個。"
     },
     "emergencyAccessCard": {
       "title": "緊急存取",

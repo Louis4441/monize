@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Sezioni impostazioni",
     "profile": "Profilo",
     "preferences": "Preferenze",
+    "tours": "Tour guidati",
     "notifications": "Notifiche",
     "security": "Sicurezza",
     "sharedAccess": "Accesso condiviso",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Accesso condiviso",
       "description": "Concedi a un'altra persona accesso granulare a conti specifici."
+    },
+    "toursCard": {
+      "title": "Tour guidati",
+      "description": "Tutti i tour offerti da Monize, con quelli che hai già visto. Avvia o rivedi quello che vuoi."
     },
     "emergencyAccessCard": {
       "title": "Accesso di emergenza",
