@@ -2,19 +2,28 @@ node_modules
 .next
 .git
 .gitignore
-*.md
-.env*
-!.env.example
 coverage
-*.log
 .vscode
 .idea
-*.test.tsx
-*.test.ts
-*.spec.tsx
-*.spec.ts
 src/test/
-vitest.config.*
+
+# A pattern with no slash matches only the context root -- Docker does not walk
+# it down the tree the way .gitignore does. Every filename glob below therefore
+# carries an explicit globstar, and `src/test/dockerignore.test.ts` fails the
+# build on one that does not. `*.test.tsx` without it left all 600-odd tests
+# under src/ in the builder while src/test/ was correctly excluded, so
+# `next build` -- which type-checks them as of 16.3 -- failed on the helpers
+# that were not there.
+**/*.md
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/*.test.tsx
+**/*.test.ts
+**/*.spec.tsx
+**/*.spec.ts
+**/vitest.config.*
 
 # Microsoft Money files: never belong in an image
-*.mny
+**/*.mny

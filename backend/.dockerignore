@@ -2,14 +2,22 @@ node_modules
 dist
 .git
 .gitignore
-*.md
-.env*
-!.env.example
 coverage
 .nyc_output
-*.log
 .vscode
 .idea
 test
-*.spec.ts
-*.mny
+
+# A pattern with no slash matches only the context root -- Docker does not walk
+# it down the tree. Every filename glob carries an explicit **/, and the
+# frontend's `dockerignore.test.ts` fails the build on one that does not.
+# `*.spec.ts` without it shipped every spec under src/ into the image.
+**/*.md
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/*.spec.ts
+
+# Microsoft Money files: never belong in an image
+**/*.mny
