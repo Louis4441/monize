@@ -31,8 +31,32 @@ function add(parent,child){
   }
   parent.appendChild(child.nodeType ? child : document.createTextNode(String(child)));
 }
+/* Every tag this page builds, each constructed from a literal. A parameterised
+   `document.createElement(t)` is a dynamic HTML sink to any scanner reading the
+   file -- it cannot know the argument is hardcoded at all ~20 call sites -- and
+   the map costs nothing while making the vocabulary explicit and failing loudly
+   on a typo instead of silently creating an <HTMLUnknownElement>. */
+var TAGS = {
+  b:          function(){ return document.createElement('b'); },
+  button:     function(){ return document.createElement('button'); },
+  code:       function(){ return document.createElement('code'); },
+  details:    function(){ return document.createElement('details'); },
+  div:        function(){ return document.createElement('div'); },
+  figcaption: function(){ return document.createElement('figcaption'); },
+  figure:     function(){ return document.createElement('figure'); },
+  h3:         function(){ return document.createElement('h3'); },
+  h4:         function(){ return document.createElement('h4'); },
+  i:          function(){ return document.createElement('i'); },
+  img:        function(){ return document.createElement('img'); },
+  p:          function(){ return document.createElement('p'); },
+  small:      function(){ return document.createElement('small'); },
+  span:       function(){ return document.createElement('span'); },
+  summary:    function(){ return document.createElement('summary'); }
+};
 var el = function(t,c){
-  var n=document.createElement(t);
+  var make = Object.prototype.hasOwnProperty.call(TAGS,t) && TAGS[t];
+  if(!make) throw new Error('el: unknown tag "'+t+'" -- add it to TAGS');
+  var n=make();
   if(c) n.className=c;
   for(var i=2;i<arguments.length;i++) add(n,arguments[i]);
   return n;
@@ -74,7 +98,7 @@ function wireShot(img){
   return img;
 }
 function shot(name,alt){
-  var i=document.createElement('img'); i.alt=alt||''; i.setAttribute('data-shot',name); return wireShot(i);
+  var i=el('img'); i.alt=alt||''; i.setAttribute('data-shot',name); return wireShot(i);
 }
 function full(name){ var i=$('[data-shot="'+name+'"]'); return (i&&i.dataset.fb)? WIKI+name+'.png' : LOCAL+name+'.png'; }
 

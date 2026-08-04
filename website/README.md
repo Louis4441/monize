@@ -89,9 +89,17 @@ markup that used to live in the data:
   unescapes entities on the way in.
 - Randomness uses `rnd()`, which is `crypto.getRandomValues`, not `Math.random`.
 
+Tag names live in the `TAGS` map, which constructs each one from a literal
+`document.createElement('div')`. Adding an element the page has not used before
+means adding a line there first - `el()` throws on an unknown tag rather than
+quietly producing an `HTMLUnknownElement`. A parameterised
+`document.createElement(t)` reads as a dynamic HTML sink to any scanner, which
+cannot see that every call site passes a hardcoded tag.
+
 This is enforced, not just documented: `frontend/src/test/website-dom-safety.test.ts`
 scans every file in `assets/js/` and fails on an `innerHTML`/`outerHTML`
-assignment, `insertAdjacentHTML`, `document.write`, or `Math.random`. The site
+assignment, `insertAdjacentHTML`, `document.write`, `Math.random`, or a
+`document.createElement` whose tag is not a literal. The site
 has no build step, no framework escaping and no CSP behind it, so the DOM-builder
 shape is the whole defence - and Bearer fails the pipeline on the alternative.
 

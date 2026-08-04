@@ -48,6 +48,13 @@ const BANNED: Array<{ pattern: RegExp; why: string }> = [
     pattern: /\bMath\.random\s*\(/,
     why: 'use the crypto-backed rnd() helper (CWE-330), even for decoration',
   },
+  {
+    // `document.createElement(t)` is a dynamic HTML sink to a scanner reading
+    // the file: it cannot see that every call site passes a hardcoded tag.
+    // Every tag goes through the literal constructors in the TAGS map.
+    pattern: /\bdocument\.createElement\s*\(\s*(?!['"])/,
+    why: 'createElement with a non-literal tag -- go through el(), whose TAGS map constructs each tag from a literal',
+  },
 ];
 
 function jsFiles(): string[] {
