@@ -68,6 +68,8 @@ The point is that the next agent inherits the correction. A fix that lives only 
 
 **Asynchronous data belongs to the request that produced it.** A payload without its request key cannot be told apart from the previous payload, so every action offered beside it may be aimed at the wrong thing. Keep the pair together, adopt a mutation's response only when its captured origin still matches the current selection, and never treat a failed lookup as an empty result. `frontend/CLAUDE.md` has the full rule and the regression matrix.
 
+**`.dockerignore` is not `.gitignore`: a filename glob needs an explicit `**/`.** A pattern with no slash is matched against the path relative to the build context and nothing else, so `*.spec.ts` excludes a spec beside the Dockerfile and none under `src/`. Git would have walked it down the tree; Docker does not, and nothing says so until something reads the files that were supposed to be gone -- `src/test/` (a directory path, so it matched) was excluded while every test importing `@/test/render` was copied in, and `next build` type-checks those as of 16.3. Give every filename glob a leading globstar, including its negation (`!**/.env.example`); `frontend/src/test/dockerignore.test.ts` scans all three files and fails on a bare one.
+
 **A doc that names an identifier is making a claim about the source.** Renaming or deleting a field, flag or helper means grepping `docs/` and every `CLAUDE.md` in the same commit. A document describing a model that no longer exists is worse than none: it gets read, believed, and built on. The same goes for a comment asserting that *every* call site does something -- that is a scanning test, not a comment.
 
 ### Running the suites locally -- two ways a green branch reads as red
