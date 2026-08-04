@@ -218,7 +218,12 @@ export function PostTransactionDialog({
       exchangeRatesApi
         .getRateForDate(entryCurrency, scheduledTransaction.currencyCode, transactionDate)
         .then((rate) => {
-          if (cancelled) return;
+          // `cancelled` only trips when this effect's own deps change; typing
+          // a converted total does not, so a lookup started before the user
+          // overrode the rate is still in flight when it resolves. Without
+          // this check its answer -- for a rate the request itself made
+          // stale -- overwrote the one the user just derived.
+          if (cancelled || rateOverriddenRef.current) return;
           setPostFxRate(rate);
           // The server answered: `null` here really does mean no rate exists
           // for this pair and date, so the warning is a fact.
@@ -226,7 +231,7 @@ export function PostTransactionDialog({
           setPostFxRateLoading(false);
         })
         .catch(() => {
-          if (cancelled) return;
+          if (cancelled || rateOverriddenRef.current) return;
           // The request itself failed (offline, throttled, timed out). That is
           // not evidence about the rate, so the preview goes blank rather than
           // claiming none exists -- and posting still works, because the
@@ -274,6 +279,12 @@ export function PostTransactionDialog({
       base = roundToCents(total >= 0 ? total / (1 - p) : total / (1 + p));
     }
     rateOverriddenRef.current = true;
+    // A lookup can still be in flight -- its own .then/.catch now checks the
+    // ref above, but the loading spinner and any earlier failure banner are
+    // this render's problem, not that request's, and must clear the moment
+    // the manual value becomes authoritative.
+    setPostFxRateLoading(false);
+    setRateLookupFailed(false);
     setPostFxRate(roundToDecimals(base / foreignAmount, 10));
     setAmount(roundToCents(total));
   };

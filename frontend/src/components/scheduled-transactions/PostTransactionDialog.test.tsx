@@ -1931,6 +1931,64 @@ describe('PostTransactionDialog - editing the converted total', () => {
     );
   });
 
+  it('does not let a stale rate lookup overwrite a manually derived rate', async () => {
+    // The lookup that was already in flight when the user typed a total
+    // resolves *after* the override -- its answer must not un-derive the
+    // rate the user just entered.
+    let resolveRate!: (rate: number | null) => void;
+    mockGetRateForDate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRate = resolve;
+      }),
+    );
+    await renderDialog();
+
+    const total = screen.getByLabelText('Total in CAD');
+    await act(async () => {
+      fireEvent.change(total, { target: { value: '-60' } });
+      fireEvent.blur(total);
+    });
+
+    await act(async () => {
+      resolveRate(1.4);
+    });
+    await post();
+
+    await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
+    expect(mockPostApi).toHaveBeenCalledWith(
+      's-fx2',
+      expect.objectContaining({ originalAmount: -40, exchangeRate: 1.5 }),
+    );
+  });
+
+  it('does not let a stale lookup failure clear a manually derived rate', async () => {
+    let rejectRate!: (error: Error) => void;
+    mockGetRateForDate.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectRate = reject;
+      }),
+    );
+    await renderDialog();
+
+    const total = screen.getByLabelText('Total in CAD');
+    await act(async () => {
+      fireEvent.change(total, { target: { value: '-60' } });
+      fireEvent.blur(total);
+    });
+
+    await act(async () => {
+      rejectRate(new Error('late lookup failure'));
+      await Promise.resolve();
+    });
+    await post();
+
+    await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
+    expect(mockPostApi).toHaveBeenCalledWith(
+      's-fx2',
+      expect.objectContaining({ originalAmount: -40, exchangeRate: 1.5 }),
+    );
+  });
+
   it('keeps a hand-typed rate when the posting date moves', async () => {
     await renderDialog();
     const total = screen.getByLabelText('Total in CAD');
