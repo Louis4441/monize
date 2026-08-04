@@ -200,6 +200,20 @@ export function gainLossColor(value: number): string {
 }
 
 /**
+ * Tailwind text-colour classes for an account balance: neutral (the body text
+ * colour) when >= 0, red when negative. The sign is the whole story -- a
+ * balance is coloured by what it is, never by the account's type. A credit card
+ * carrying a credit (positive) is not in the red, and a chequing account that is
+ * overdrawn (negative) is, so branching on liability-vs-asset gets both wrong.
+ * Unlike `gainLossColor`, a non-negative balance is not a gain and does not go
+ * green -- most accounts are in credit most of the time, and colouring that
+ * spends the emphasis on the ordinary case.
+ */
+export function balanceColor(value: number): string {
+  return value < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100';
+}
+
+/**
  * Format a number to the specified decimal places for display in inputs.
  * Defaults to 2 decimal places.
  */

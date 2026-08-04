@@ -13,6 +13,7 @@ import { Account } from '@/types/account';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { formatAccountType, maskAccountNumber } from '@/lib/account-utils';
 import { getOrdinal } from '@/lib/ordinal';
+import { balanceColor } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/InstitutionLogo';
@@ -70,9 +71,6 @@ export function AccountInfoWidget({
   }
 
   const isCreditCard = account.accountType === 'CREDIT_CARD';
-  const isLiability = ['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'].includes(
-    account.accountType,
-  );
   const balance = currentBalance ?? (Number(account.currentBalance) || 0);
   // Prefer the linked institution's canonical name; fall back to the legacy
   // free-text field stored on the account.
@@ -204,13 +202,7 @@ export function AccountInfoWidget({
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {t('accountWidget.currentBalance')}
         </p>
-        <p
-          className={`text-2xl font-bold ${
-            balance < 0 || isLiability
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-gray-900 dark:text-gray-100'
-          }`}
-        >
+        <p className={`text-2xl font-bold ${balanceColor(balance)}`}>
           {formatCurrency(balance, account.currencyCode)}
         </p>
       </div>

@@ -110,6 +110,21 @@ Give each field an explicit `id` when two on the same screen share a label. Both
 
 Do not put the click on a button around the symbol or the name instead. It looks identical and is not: the rest of the row -- all the cell padding, every other column -- becomes dead, and clicking a row "does nothing" for the majority of its area. Controls *inside* the row (a favourite star, `RowActions`) must `stopPropagation` so they act on themselves; both already do.
 
+### An account balance is coloured by its sign -- `balanceColor`, never by account type
+
+`balanceColor` (`lib/format.ts`) is the one rule: negative is red, everything
+else is the neutral body colour. Do not add `|| isLiability` (or any
+`accountType` test) to that condition. A credit card sitting at a credit balance
+is not in the red, and the transactions sidebar painted every liability red
+regardless of what it held; the same branch also left an overdrawn chequing
+account looking fine on the days its sign was the only thing that had changed.
+The sign already carries the meaning -- the account type adds nothing the number
+does not say.
+
+`gainLossColor` is the sibling for a *change* in value (green when up), not for
+a balance: most accounts are in credit most of the time, and green there spends
+the emphasis on the ordinary case.
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 Two patterns, depending on where it lives:

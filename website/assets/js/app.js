@@ -16,7 +16,73 @@ var GH      = 'https://github.com/kenlasko/monize';
 
 var $  = function(s,r){ return (r||document).querySelector(s); };
 var $$ = function(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
-var el = function(t,c,h){ var n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n; };
+
+/* ---------- DOM building ----------
+   Nothing on this page assigns a built-up string to innerHTML. Every node is
+   constructed here, and every piece of copy arrives as a text node, so no
+   value from the content model below can ever be parsed as markup (CWE-79).
+   el(tag, className, ...children): a child is a Node, a string (becomes text),
+   an array of either, or null (skipped). */
+function add(parent,child){
+  if(child==null) return;
+  if(Object.prototype.toString.call(child)==='[object Array]'){
+    for(var i=0;i<child.length;i++) add(parent,child[i]);
+    return;
+  }
+  parent.appendChild(child.nodeType ? child : document.createTextNode(String(child)));
+}
+/* Every tag this page builds, each constructed from a literal. A parameterised
+   `document.createElement(t)` is a dynamic HTML sink to any scanner reading the
+   file -- it cannot know the argument is hardcoded at all ~20 call sites -- and
+   the map costs nothing while making the vocabulary explicit and failing loudly
+   on a typo instead of silently creating an <HTMLUnknownElement>. */
+var TAGS = {
+  b:          function(){ return document.createElement('b'); },
+  button:     function(){ return document.createElement('button'); },
+  code:       function(){ return document.createElement('code'); },
+  details:    function(){ return document.createElement('details'); },
+  div:        function(){ return document.createElement('div'); },
+  figcaption: function(){ return document.createElement('figcaption'); },
+  figure:     function(){ return document.createElement('figure'); },
+  h3:         function(){ return document.createElement('h3'); },
+  h4:         function(){ return document.createElement('h4'); },
+  i:          function(){ return document.createElement('i'); },
+  img:        function(){ return document.createElement('img'); },
+  p:          function(){ return document.createElement('p'); },
+  small:      function(){ return document.createElement('small'); },
+  span:       function(){ return document.createElement('span'); },
+  summary:    function(){ return document.createElement('summary'); }
+};
+var el = function(t,c){
+  var make = Object.prototype.hasOwnProperty.call(TAGS,t) && TAGS[t];
+  if(!make) throw new Error('el: unknown tag "'+t+'" -- add it to TAGS');
+  var n=make();
+  if(c) n.className=c;
+  for(var i=2;i<arguments.length;i++) add(n,arguments[i]);
+  return n;
+};
+/* Empty a node. Replaces `node.innerHTML=''`, which is the same sink even when
+   the string is a literal, and reads as one to anyone scanning for it. */
+function clear(n){ while(n.firstChild) n.removeChild(n.firstChild); return n; }
+/* Empty a node and put these children in it -- the replacement for every
+   `node.innerHTML = <something built>` this file used to do. */
+function fill(n){
+  clear(n);
+  for(var i=1;i<arguments.length;i++) add(n,arguments[i]);
+  return n;
+}
+/* Emphasis in the sample copy is written as *asterisks*, not <b> tags, so the
+   answer text stays plain data. Returns an array of text nodes and <b>s. */
+function rich(s){
+  return String(s).split('*').map(function(part,i){
+    return i%2 ? el('b',null,part) : document.createTextNode(part);
+  });
+}
+/* The coin rain is decorative, but Math.random is the wrong default to leave
+   lying around in a file people copy from (CWE-330). Float in [0,1). */
+function rnd(){
+  var a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]/4294967296;
+}
 
 function wireShot(img){
   var n = img.getAttribute('data-shot'); if(!n) return img;
@@ -25,15 +91,14 @@ function wireShot(img){
   img.onerror=function(){
     if(!img.dataset.fb){ img.dataset.fb='1'; img.src=WIKI+n+'.png'; return; }
     if(img.dataset.miss||img.id) return; img.dataset.miss='1';
-    var ph=document.createElement('div'); ph.className='shotmiss';
-    ph.innerHTML='<span>Screenshot pending</span><code>'+n+'.png</code>';
+    var ph=el('div','shotmiss', el('span',null,'Screenshot pending'), el('code',null,n+'.png'));
     if(img.parentNode) img.parentNode.replaceChild(ph,img);
   };
   img.src = LOCAL+n+'.png';
   return img;
 }
 function shot(name,alt){
-  var i=document.createElement('img'); i.alt=alt||''; i.setAttribute('data-shot',name); return wireShot(i);
+  var i=el('img'); i.alt=alt||''; i.setAttribute('data-shot',name); return wireShot(i);
 }
 function full(name){ var i=$('[data-shot="'+name+'"]'); return (i&&i.dataset.fb)? WIKI+name+'.png' : LOCAL+name+'.png'; }
 
@@ -124,27 +189,81 @@ var REPORTS = 'Spending by Category|Spending;Spending by Payee|Spending;Monthly 
 var RCOLOR = {Spending:'#3b82f6',Income:'#22c55e','Net Worth':'#a855f7',Tax:'#f59e0b',Debt:'#ef4444',
  Investment:'#4fa091',Insights:'#ec4899',Maintenance:'#94a3b8',Budget:'#eab308',Bills:'#06b6d4'};
 
+/* Answers are plain text. *Asterisks* mark the emphasised runs; rich() turns
+   those into <b> elements, so no markup is stored in the copy itself. */
 var QA = [
- ['How much did I spend last month?','You spent <b>$3,214.66</b> across 47 transactions in July — about 8% below your 6-month average. The biggest movers were Groceries ($612), Travel ($1,279) and Fuel ($208).'],
- ['What are my top 5 expense categories this year?','Year to date: <b>Rent/Mortgage $16,590</b>, Groceries $4,118, Travel $2,589, Fuel $1,046 and Car Insurance $1,110. Those five are 86% of all spending.'],
- ['What are my current account balances?','Chequing <b>$4,236.14</b> · Emergency Fund $21,000 · Vacation Fund $5,600 · Wallet $150 · Visa Rewards +$130.55 · Mastercard −$2,006.44 · Mortgage −$377,024.55. Net worth: <b>$494,187.44</b>.'],
+ ['How much did I spend last month?','You spent *$3,214.66* across 47 transactions in July — about 8% below your 6-month average. The biggest movers were Groceries ($612), Travel ($1,279) and Fuel ($208).'],
+ ['What are my top 5 expense categories this year?','Year to date: *Rent/Mortgage $16,590*, Groceries $4,118, Travel $2,589, Fuel $1,046 and Car Insurance $1,110. Those five are 86% of all spending.'],
+ ['What are my current account balances?','Chequing *$4,236.14* · Emergency Fund $21,000 · Vacation Fund $5,600 · Wallet $150 · Visa Rewards +$130.55 · Mastercard −$2,006.44 · Mortgage −$377,024.55. Net worth: *$494,187.44*.'],
  ['Compare my spending this month vs last month','August is pacing at $1,882 versus $3,215 for the whole of July. Restaurants are up 34%, but Travel is down $1,110 now that the trip has settled.'],
- ['Show my net worth trend for the last 12 months','Net worth moved from $408.2K to <b>$490.8K</b> — up $82.6K (+20.2%). Growth came mostly from mortgage principal repayment and a +$72.9K swing in the portfolio.'],
- ['How much have I saved this year compared to my income?','Income $33,843, expenses $26,349, so you have banked <b>$7,494</b> — a <b>22.1%</b> savings rate, comfortably ahead of your 15% target.']
+ ['Show my net worth trend for the last 12 months','Net worth moved from $408.2K to *$490.8K* — up $82.6K (+20.2%). Growth came mostly from mortgage principal repayment and a +$72.9K swing in the portfolio.'],
+ ['How much have I saved this year compared to my income?','Income $33,843, expenses $26,349, so you have banked *$7,494* — a *22.1%* savings rate, comfortably ahead of your 15% target.']
 ];
 
+/* Each sample is a list of [className, text] tokens rather than a blob of
+   pre-highlighted HTML: '' is unstyled, 'c' comment, 'k' key, 's' string.
+   The text is literal -- no entities to unescape, because nothing is parsed. */
 var CODE = [
- ['Docker Compose','<span class="c"># 1 — grab it</span>\ngit clone https://github.com/kenlasko/monize.git\ncd monize\n\n<span class="c"># 2 — configure</span>\ncp .env.example .env\n<span class="c">#   POSTGRES_PASSWORD=…</span>\n<span class="c">#   JWT_SECRET=$(openssl rand -base64 32)</span>\n<span class="c">#   PUBLIC_APP_URL=https://money.example.com</span>\n\n<span class="c"># 3 — run it</span>\ndocker compose -f docker-compose.prod.yml up -d\n\n<span class="c"># frontend published on :3000 (FRONTEND_PORT)</span>\n<span class="c"># backend stays internal on :3000 (BACKEND_PORT)</span>'],
- ['Kubernetes','<span class="c"># Helm charts ship in the repo</span>\nhelm install monize ./helm\n\n<span class="c"># health probes for your cluster</span>\n<span class="k">livenessProbe</span>:  /api/v1/health/live\n<span class="k">readinessProbe</span>: /api/v1/health/ready\n\n<span class="c"># frontend pod</span>\n- <span class="k">name</span>: INTERNAL_API_URL\n  <span class="k">value</span>: <span class="s">"http://monize-backend-service:3001"</span>\n- <span class="k">name</span>: PUBLIC_APP_URL\n  <span class="k">value</span>: <span class="s">"https://money.example.com"</span>'],
- ['Local dev','<span class="c"># backend</span>\ncd backend &amp;&amp; npm install\ncreatedb monize\npsql monize &lt; ../database/schema.sql\nnpm run start:dev\n\n<span class="c"># frontend, second terminal</span>\ncd frontend &amp;&amp; npm install\ncp ../.env.example .env.local\nnpm run dev'],
- ['Demo stack','<span class="c"># the same stack that powers demo.monize.net</span>\ndocker compose -f docker-compose.demo.yml up -d\n\n<span class="c"># seeded sample data, DEMO_MODE=true,</span>\n<span class="c"># and a full reset every day at 04:00 UTC</span>']
+ ['Docker Compose',[
+  ['c','# 1 — grab it'],
+  ['','\ngit clone https://github.com/kenlasko/monize.git\ncd monize\n\n'],
+  ['c','# 2 — configure'],
+  ['','\ncp .env.example .env\n'],
+  ['c','#   POSTGRES_PASSWORD=…'],
+  ['','\n'],
+  ['c','#   JWT_SECRET=$(openssl rand -base64 32)'],
+  ['','\n'],
+  ['c','#   PUBLIC_APP_URL=https://money.example.com'],
+  ['','\n\n'],
+  ['c','# 3 — run it'],
+  ['','\ndocker compose -f docker-compose.prod.yml up -d\n\n'],
+  ['c','# frontend published on :3000 (FRONTEND_PORT)'],
+  ['','\n'],
+  ['c','# backend stays internal on :3000 (BACKEND_PORT)']
+ ]],
+ ['Kubernetes',[
+  ['c','# Helm charts ship in the repo'],
+  ['','\nhelm install monize ./helm\n\n'],
+  ['c','# health probes for your cluster'],
+  ['','\n'],
+  ['k','livenessProbe'],
+  ['',':  /api/v1/health/live\n'],
+  ['k','readinessProbe'],
+  ['',': /api/v1/health/ready\n\n'],
+  ['c','# frontend pod'],
+  ['','\n- '],
+  ['k','name'],
+  ['',': INTERNAL_API_URL\n  '],
+  ['k','value'],
+  ['',': '],
+  ['s','"http://monize-backend-service:3001"'],
+  ['','\n- '],
+  ['k','name'],
+  ['',': PUBLIC_APP_URL\n  '],
+  ['k','value'],
+  ['',': '],
+  ['s','"https://money.example.com"']
+ ]],
+ ['Local dev',[
+  ['c','# backend'],
+  ['','\ncd backend && npm install\ncreatedb monize\npsql monize < ../database/schema.sql\nnpm run start:dev\n\n'],
+  ['c','# frontend, second terminal'],
+  ['','\ncd frontend && npm install\ncp ../.env.example .env.local\nnpm run dev']
+ ]],
+ ['Demo stack',[
+  ['c','# the same stack that powers demo.monize.net'],
+  ['','\ndocker compose -f docker-compose.demo.yml up -d\n\n'],
+  ['c','# seeded sample data, DEMO_MODE=true,'],
+  ['','\n'],
+  ['c','# and a full reset every day at 04:00 UTC']
+ ]]
 ];
 
 var STACK  = ['Next.js 16','React 19','TypeScript','Tailwind CSS','Zustand','Recharts','NestJS','TypeORM','PostgreSQL 16+','Passport.js','Node.js 24'];
 var STACK2 = ['Docker Compose','Helm charts','Swagger / OpenAPI','Server-Sent Events','MCP server','SMTP notifications','Yahoo Finance prices','E2E test suite','ZAP security scans'];
 
 var SECURITY = [
- ['🔑','SSO &amp; local auth','OIDC with Authentik, Authelia or Pocket-ID, or bcrypt-hashed local credentials.'],
+ ['🔑','SSO & local auth','OIDC with Authentik, Authelia or Pocket-ID, or bcrypt-hashed local credentials.'],
  ['📲','2FA that sticks','TOTP with backup codes and trusted devices, plus an optional force-2FA policy.'],
  ['🍪','Hardened sessions','JWTs in httpOnly cookies, refresh-token rotation and configurable “remember me”.'],
  ['🛡️','Locked down','Rate limiting, account lockout, breached-password checks, Helmet headers and CORS control.']
@@ -207,7 +326,7 @@ var BUDGET=[
   rows:[['Rent/Mortgage',2370,2370],['Groceries',744.02,700],['Restaurants',162.40,180],['Fuel',188.11,240],['Travel',669.57,600],['Streaming Services',48.97,60]]}
 ];
 
-window.__MZ = {LOCAL:LOCAL,WIKI:WIKI,REPORAW:REPORAW,DEMO:DEMO,GH:GH,$:$,$$:$$,el:el,wireShot:wireShot,shot:shot,full:full,
+window.__MZ = {LOCAL:LOCAL,WIKI:WIKI,REPORAW:REPORAW,DEMO:DEMO,GH:GH,$:$,$$:$$,el:el,clear:clear,fill:fill,rich:rich,rnd:rnd,wireShot:wireShot,shot:shot,full:full,
  TIMELINE:TIMELINE,FCATS:FCATS,FEATURES:FEATURES,TOUR:TOUR,REPORTS:REPORTS,RCOLOR:RCOLOR,QA:QA,CODE:CODE,
  STACK:STACK,STACK2:STACK2,SECURITY:SECURITY,FORMATS:FORMATS,FAQ:FAQ,GALCATS:GALCATS,GALLERY:GALLERY,MARQUEE:MARQUEE,BUDGET:BUDGET};
 })();
@@ -218,7 +337,7 @@ window.__MZ = {LOCAL:LOCAL,WIKI:WIKI,REPORAW:REPORAW,DEMO:DEMO,GH:GH,$:$,$$:$$,e
 /* ---------- behaviour ---------- */
 (function(){
 'use strict';
-var M=window.__MZ, $=M.$, $$=M.$$, el=M.el, shot=M.shot;
+var M=window.__MZ, $=M.$, $$=M.$$, el=M.el, shot=M.shot, clear=M.clear, fill=M.fill, rich=M.rich, rnd=M.rnd;
 
 /* theme */
 var root=document.documentElement, saved=null;
@@ -283,11 +402,15 @@ fetch('https://api.github.com/repos/kenlasko/monize').then(function(r){ return r
 /* ---------- timeline ---------- */
 var tl=$('#tl'), tlCard=$('#tlCard');
 M.TIMELINE.forEach(function(s,i){
-  var n=el('div','tl-i'+(i===0?' on':''),'<div class="dot">'+s.em+'</div><div class="yr">'+s.yr+'</div><div class="lb">'+s.lb+'</div>');
+  var n=el('div','tl-i'+(i===0?' on':''),
+    el('div','dot',s.em), el('div','yr',s.yr), el('div','lb',s.lb));
   n.addEventListener('click',function(){ $$('.tl-i',tl).forEach(function(x){x.classList.remove('on');}); n.classList.add('on'); paintTl(i); });
   tl.appendChild(n);
 });
-function paintTl(i){ var s=M.TIMELINE[i]; tlCard.innerHTML='<h3>'+s.yr+' — '+s.t+'</h3><p>'+s.d+'</p>'; }
+function paintTl(i){
+  var s=M.TIMELINE[i];
+  fill(tlCard, el('h3',null,s.yr+' — '+s.t), el('p',null,s.d));
+}
 paintTl(0);
 
 /* ---------- features ---------- */
@@ -298,9 +421,9 @@ M.FCATS.forEach(function(c){
   fchips.appendChild(b);
 });
 function paintF(){
-  fgrid.innerHTML='';
+  clear(fgrid);
   M.FEATURES.filter(function(f){ return fcat==='all'||f[0]===fcat; }).forEach(function(f,i){
-    var c=el('div','card rv','<div class="ico">'+f[1]+'</div><h3>'+f[2]+'</h3><p>'+f[3]+'</p>');
+    var c=el('div','card rv', el('div','ico',f[1]), el('h3',null,f[2]), el('p',null,f[3]));
     c.style.transitionDelay=Math.min(i*35,420)+'ms';
     fgrid.appendChild(c); watch(c);
   });
@@ -311,37 +434,53 @@ paintF();
 var rail=$('#rail'), thumbs=$('#thumbs'), stImg=$('#stImg'), ti=0, si=0, timer=null;
 function shots(t){ return t.shots ? t.shots.split('|').map(function(p){ var k=p.split(':'); return {n:k[0],c:k[1]}; }) : []; }
 M.TOUR.forEach(function(t,i){
-  var b=el('button',i===0?'on':'','<span class="em">'+t.em+'</span>'+t.name);
+  var b=el('button',i===0?'on':'', el('span','em',t.em), t.name);
   b.addEventListener('click',function(){ ti=i; si=0; paintTour(); });
   rail.appendChild(b);
 });
 var bmi=0;
 function mny(v){ return '$'+v.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+/* A progress bar: the fill width is the only thing that varies, so it is set as
+   a style property rather than interpolated into a style attribute string. */
+function bar(cls,pct){
+  var i=el('i'); i.style.width=Math.min(100,pct)+'%';
+  return el('div','bar'+cls, i);
+}
+function kpi(label,value,cls){ return el('div', null, el('span',null,label), el('b',cls||null,value)); }
 function budgetMock(){
   var b=M.BUDGET[bmi], pct=Math.round(b.spent/b.total*1000)/10;
-  var h='<div class="mock"><div class="mock-hd"><div><h4>'+b.m+' Budget</h4><span class="tiny">'+b.style+' \u00b7 Active</span></div>';
-  h+='<div class="mock-sw">'+M.BUDGET.map(function(x,i){ return '<button data-b="'+i+'" class="'+(i===bmi?'on':'')+'">'+x.m+'</button>'; }).join('')+'</div></div>';
-  h+='<div class="mock-kpi"><div><span>Spent</span><b>'+mny(b.spent)+'</b></div><div><span>Budget</span><b>'+mny(b.total)+'</b></div>';
-  h+='<div><span>'+(b.days?'Safe to spend today':'Period closed')+'</span><b class="up">'+(b.days?mny(b.safe):mny(b.total-b.spent)+' left')+'</b></div></div>';
-  h+='<div class="bar'+(b.spent>b.total?' over':'')+'"><i style="width:'+Math.min(100,pct)+'%"></i></div>';
-  h+='<p class="tiny" style="margin:9px 0 4px">'+pct+'% of plan used'+(b.days?' \u00b7 '+b.days+' days left':'')+'</p><div class="mock-rows">';
-  b.rows.forEach(function(r){ var p=Math.round(r[1]/r[2]*100), over=r[1]>r[2];
-    h+='<div class="mock-row"><div><div class="nm">'+r[0]+'</div><div class="bar'+(over?' over':'')+'"><i style="width:'+Math.min(100,p)+'%"></i></div></div>';
-    h+='<div class="amt'+(over?' down':'')+'">'+mny(r[1])+'<small>of '+mny(r[2])+' \u00b7 '+p+'%</small></div></div>'; });
-  return h+'</div></div>';
+  var sw=el('div','mock-sw', M.BUDGET.map(function(x,i){
+    var btn=el('button', i===bmi?'on':'', x.m); btn.setAttribute('data-b',i); return btn;
+  }));
+  var head=el('div','mock-hd',
+    el('div',null, el('h4',null,b.m+' Budget'), el('span','tiny',b.style+' \u00b7 Active')), sw);
+  var kpis=el('div','mock-kpi',
+    kpi('Spent',mny(b.spent)),
+    kpi('Budget',mny(b.total)),
+    kpi(b.days?'Safe to spend today':'Period closed',
+        b.days?mny(b.safe):mny(b.total-b.spent)+' left','up'));
+  var note=el('p','tiny', pct+'% of plan used'+(b.days?' \u00b7 '+b.days+' days left':''));
+  note.style.margin='9px 0 4px';
+  var rows=el('div','mock-rows', b.rows.map(function(r){
+    var p=Math.round(r[1]/r[2]*100), over=r[1]>r[2];
+    return el('div','mock-row',
+      el('div',null, el('div','nm',r[0]), bar(over?' over':'',p)),
+      el('div','amt'+(over?' down':''), mny(r[1]), el('small',null,'of '+mny(r[2])+' \u00b7 '+p+'%')));
+  }));
+  return el('div','mock', head, kpis, bar(b.spent>b.total?' over':'',pct), note, rows);
 }
 function paintTour(){
   var t=M.TOUR[ti], ss=shots(t), stBody=$('#stBody');
   $$('button',rail).forEach(function(b,i){ b.classList.toggle('on',i===ti); });
   $('#stTitle').textContent=t.name; $('#stDesc').textContent=t.desc; $('#stUrl').textContent='demo.monize.net'+t.url;
-  thumbs.innerHTML='';
+  clear(thumbs);
   if(!ss.length){
-    stBody.classList.add('is-mock'); stBody.innerHTML=budgetMock();
+    stBody.classList.add('is-mock'); fill(stBody, budgetMock());
     $$('.mock-sw button',stBody).forEach(function(b){ b.addEventListener('click',function(){ bmi=+b.getAttribute('data-b'); paintTour(); }); });
     return;
   }
   stBody.classList.remove('is-mock');
-  if(!$('#stImg')) stBody.innerHTML='<img id="stImg" alt="">';
+  if(!$('#stImg')){ var ni=el('img'); ni.id='stImg'; ni.alt=''; fill(stBody, ni); }
   var im=$('#stImg');
   ss.forEach(function(s,i){
     var b=el('button',i===si?'on':''); b.appendChild(shot(s.n,s.c)); b.title=s.c;
@@ -382,12 +521,13 @@ rcats.forEach(function(c){
 });
 $('#repSearch').addEventListener('input',function(){ rq=this.value.toLowerCase().trim(); paintR(); });
 function paintR(){
-  var g=$('#repGrid'); g.innerHTML='';
+  var g=clear($('#repGrid'));
   var list=reps.filter(function(r){
     return (rcat==='All'||r.c===rcat) && (!rq || r.n.toLowerCase().indexOf(rq)>-1 || r.c.toLowerCase().indexOf(rq)>-1);
   });
   list.forEach(function(r){
-    var n=el('div','rep','<span class="d" style="background:'+M.RCOLOR[r.c]+'"></span><span><b>'+r.n+'</b><small>'+r.c+'</small></span>');
+    var dot=el('span','d'); dot.style.background=M.RCOLOR[r.c];
+    var n=el('div','rep', dot, el('span',null, el('b',null,r.n), el('small',null,r.c)));
     g.appendChild(n);
   });
   $('#repMsg').textContent = list.length ? 'Showing '+list.length+' of '+reps.length+' reports' : 'No report matches that — but the custom report builder will.';
@@ -396,15 +536,15 @@ paintR();
 
 /* ---------- AI chat ---------- */
 var msgs=$('#msgs'), busy=false;
-function push(cls,html){ var m=el('div','msg '+cls,html); msgs.appendChild(m); msgs.scrollTop=msgs.scrollHeight; return m; }
+function push(cls,body){ var m=el('div','msg '+cls,body); msgs.appendChild(m); msgs.scrollTop=msgs.scrollHeight; return m; }
 push('ai','Hi — I can answer questions about your spending, income, balances and net worth. Pick one below and I will run the numbers.');
 M.QA.forEach(function(qa){
   var b=el('button',null,qa[0]);
   b.addEventListener('click',function(){
     if(busy) return; busy=true;
     push('me',qa[0]);
-    var t=push('ai','<span class="typing"><i></i><i></i><i></i></span>');
-    setTimeout(function(){ t.innerHTML=qa[1]; msgs.scrollTop=msgs.scrollHeight; busy=false; },900);
+    var t=push('ai', el('span','typing', el('i'), el('i'), el('i')));
+    setTimeout(function(){ fill(t, rich(qa[1])); msgs.scrollTop=msgs.scrollHeight; busy=false; },900);
   });
   $('#sugg').appendChild(b);
 });
@@ -417,7 +557,7 @@ var MSTEPS=[['Upload','import-upload-step','Drop in one or many files: .mny, QIF
  ['Reconcile','import-complete-step','Every balance is checked back against the source file.']];
 var mi=0;
 MSTEPS.forEach(function(s,i){
-  var b=el('button',i===0?'on':'','<span class="n">'+(i+1)+'</span>'+s[0]);
+  var b=el('button',i===0?'on':'', el('span','n',i+1), s[0]);
   b.addEventListener('click',function(){ mi=i; paintM(); });
   $('#mSteps').appendChild(b);
 });
@@ -429,7 +569,9 @@ function paintM(){
 }
 paintM();
 $('#mImg').addEventListener('click',function(){ openLB(MSTEPS.map(function(s){return {n:s[1],c:s[2]};}),mi); });
-M.FORMATS.forEach(function(f){ $('#fmtCards').appendChild(el('div','card','<div class="ico">'+f[0]+'</div><h3>'+f[1]+'</h3><p>'+f[2]+'</p>')); });
+M.FORMATS.forEach(function(f){
+  $('#fmtCards').appendChild(el('div','card', el('div','ico',f[0]), el('h3',null,f[1]), el('p',null,f[2])));
+});
 
 /* ---------- code tabs ---------- */
 var ci=0;
@@ -447,16 +589,20 @@ cp.addEventListener('click',function(){
 $('#codeTabs').appendChild(cp);
 function paintC(){
   $$('#codeTabs button:not(.cp)').forEach(function(b,i){ b.classList.toggle('on',i===ci); });
-  $('#codeBody').innerHTML=M.CODE[ci][1];
+  fill($('#codeBody'), M.CODE[ci][1].map(function(tok){
+    return tok[0] ? el('span',tok[0],tok[1]) : document.createTextNode(tok[1]);
+  }));
 }
 paintC();
 M.STACK.forEach(function(s){ $('#stack').appendChild(el('span',null,s)); });
 M.STACK2.forEach(function(s){ $('#stack2').appendChild(el('span',null,s)); });
-M.SECURITY.forEach(function(s){ $('#secGrid').appendChild(el('div','card','<div class="ico">'+s[0]+'</div><h3>'+s[1]+'</h3><p>'+s[2]+'</p>')); });
+M.SECURITY.forEach(function(s){
+  $('#secGrid').appendChild(el('div','card', el('div','ico',s[0]), el('h3',null,s[1]), el('p',null,s[2])));
+});
 
 /* ---------- FAQ ---------- */
 M.FAQ.forEach(function(f){
-  $('#faqList').appendChild(el('details',null,'<summary>'+f[0]+'</summary><div class="body">'+f[1]+'</div>'));
+  $('#faqList').appendChild(el('details',null, el('summary',null,f[0]), el('div','body',f[1])));
 });
 
 /* ---------- gallery ---------- */
@@ -467,7 +613,7 @@ M.GALCATS.forEach(function(c){
   $('#galChips').appendChild(b);
 });
 function paintG(){
-  var g=$('#gal'); g.innerHTML='';
+  var g=clear($('#gal'));
   var list=M.GALLERY.filter(function(x){ return gcat==='all'||x[0]===gcat; });
   list.forEach(function(x,i){
     var f=el('figure'); f.appendChild(shot(x[1],x[2])); f.appendChild(el('figcaption',null,x[2]));
@@ -521,8 +667,8 @@ function rain(){
     (function(i){
       setTimeout(function(){
         var c=el('div','coin',chars[i%chars.length]);
-        c.style.left=Math.random()*98+'vw';
-        c.style.animationDuration=(2.2+Math.random()*1.8)+'s';
+        c.style.left=rnd()*98+'vw';
+        c.style.animationDuration=(2.2+rnd()*1.8)+'s';
         document.body.appendChild(c);
         setTimeout(function(){ c.remove(); },4200);
       },i*70);

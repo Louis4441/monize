@@ -80,6 +80,65 @@ describe('AccountInfoWidget', () => {
     expect(amount.className).toContain('text-red-600');
   });
 
+  // The balance is coloured by its sign alone. Branching on the account type
+  // painted every liability red regardless of what it held, so a paid-off or
+  // overpaid credit card was reported as debt.
+  it.each([
+    ['CREDIT_CARD'],
+    ['LOAN'],
+    ['MORTGAGE'],
+    ['LINE_OF_CREDIT'],
+  ] as const)('does not style a positive %s balance in red', (accountType) => {
+    render(
+      <AccountInfoWidget
+        account={makeAccount({ accountType, currentBalance: 250 })}
+        onEdit={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    );
+    const amount = screen.getByText('CAD 250.00');
+    expect(amount.className).not.toContain('text-red');
+    expect(amount.className).toContain('text-gray-900');
+  });
+
+  it('styles a zero credit-card balance neutrally', () => {
+    render(
+      <AccountInfoWidget
+        account={makeAccount({ accountType: 'CREDIT_CARD' })}
+        currentBalance={0}
+        onEdit={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    );
+    const amount = screen.getByText('CAD 0.00');
+    expect(amount.className).not.toContain('text-red');
+  });
+
+  it('styles a negative chequing balance in red', () => {
+    render(
+      <AccountInfoWidget
+        account={makeAccount({ accountType: 'CHEQUING', currentBalance: -120.75 })}
+        onEdit={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    );
+    const amount = screen.getByText('CAD -120.75');
+    expect(amount.className).toContain('text-red-600');
+  });
+
+  it('styles a negative credit-card balance in red', () => {
+    render(
+      <AccountInfoWidget
+        account={makeAccount({ accountType: 'CREDIT_CARD' })}
+        currentBalance={-1500}
+        onEdit={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    );
+    const amount = screen.getByText('CAD -1500.00');
+    expect(amount.className).toContain('text-red-600');
+  });
+
   it('calls onEdit when the pencil button is clicked', () => {
     const onEdit = vi.fn();
     render(<AccountInfoWidget account={makeAccount()} onEdit={onEdit} onCollapse={vi.fn()} />);

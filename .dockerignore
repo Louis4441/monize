@@ -17,6 +17,11 @@
 **/.vscode
 **/.idea
 
+# The marketing site is static files deployed to Cloudflare Pages, not part of
+# either image. The backend context is the repo root, so without this its
+# assets ride along into the image for nothing.
+website
+
 # Secrets and local env (the image gets config via runtime env vars)
 **/.env
 **/.env.*
