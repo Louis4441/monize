@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Розділи налаштувань",
     "profile": "Профіль",
     "preferences": "Налаштування",
+    "tours": "Інтерактивні тури",
     "notifications": "Сповіщення",
     "security": "Безпека",
     "sharedAccess": "Спільний доступ",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Спільний доступ",
       "description": "Надайте іншій особі детальний доступ до конкретних рахунків."
+    },
+    "toursCard": {
+      "title": "Інтерактивні тури",
+      "description": "Усі тури Monize і те, що ви вже пройшли. Запустіть будь-який із них або пройдіть знову."
     },
     "emergencyAccessCard": {
       "title": "Екстрений доступ",

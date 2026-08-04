@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Instellingssecties",
     "profile": "Profiel",
     "preferences": "Voorkeuren",
+    "tours": "Begeleide rondleidingen",
     "notifications": "Meldingen",
     "security": "Beveiliging",
     "sharedAccess": "Gedeelde toegang",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Gedeelde toegang",
       "description": "Verleen een andere persoon gedetailleerde toegang tot specifieke rekeningen."
+    },
+    "toursCard": {
+      "title": "Begeleide rondleidingen",
+      "description": "Alle rondleidingen die Monize biedt, met wat je al hebt gezien. Start of doe er een opnieuw."
     },
     "emergencyAccessCard": {
       "title": "Noodtoegang",

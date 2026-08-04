@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "設定セクション",
     "profile": "プロフィール",
     "preferences": "設定",
+    "tours": "ガイド付きツアー",
     "notifications": "通知",
     "security": "セキュリティ",
     "sharedAccess": "共有アクセス",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "共有アクセス",
       "description": "別のユーザーに特定の口座へのきめ細かいアクセスを付与します。"
+    },
+    "toursCard": {
+      "title": "ガイド付きツアー",
+      "description": "Monize のツアーの一覧と、すでに見たかどうかがわかります。どれでも開始したり、もう一度見たりできます。"
     },
     "emergencyAccessCard": {
       "title": "緊急アクセス",

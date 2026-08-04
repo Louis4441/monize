@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Secções das definições",
     "profile": "Perfil",
     "preferences": "Preferências",
+    "tours": "Visitas guiadas",
     "notifications": "Notificações",
     "security": "Segurança",
     "sharedAccess": "Acesso Partilhado",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Acesso Partilhado",
       "description": "Conceda a outra pessoa acesso granular a contas específicas."
+    },
+    "toursCard": {
+      "title": "Visitas guiadas",
+      "description": "Todas as visitas guiadas que o Monize oferece, com aquilo que já viu. Inicie ou repita qualquer uma delas."
     },
     "emergencyAccessCard": {
       "title": "Acesso de Emergência",

@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Разделы настроек",
     "profile": "Профиль",
     "preferences": "Настройки",
+    "tours": "Обучающие туры",
     "notifications": "Уведомления",
     "security": "Безопасность",
     "sharedAccess": "Общий доступ",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Общий доступ",
       "description": "Предоставьте другому человеку детальный доступ к определённым счетам."
+    },
+    "toursCard": {
+      "title": "Обучающие туры",
+      "description": "Все туры Monize и то, что вы уже прошли. Запустите любой из них или пройдите заново."
     },
     "emergencyAccessCard": {
       "title": "Экстренный доступ",

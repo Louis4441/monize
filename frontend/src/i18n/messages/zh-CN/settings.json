@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "设置分区",
     "profile": "个人资料",
     "preferences": "偏好设置",
+    "tours": "引导式导览",
     "notifications": "通知",
     "security": "安全",
     "sharedAccess": "共享访问",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "共享访问",
       "description": "授予他人对特定账户的细粒度访问权限。"
+    },
+    "toursCard": {
+      "title": "引导式导览",
+      "description": "Monize 提供的所有导览，以及你已经看过的部分。可以开始或重新查看其中任意一个。"
     },
     "emergencyAccessCard": {
       "title": "紧急访问",

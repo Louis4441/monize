@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Einstellungsbereiche",
     "profile": "Profil",
     "preferences": "Einstellungen",
+    "tours": "Geführte Touren",
     "notifications": "Benachrichtigungen",
     "security": "Sicherheit",
     "sharedAccess": "Gemeinsamer Zugriff",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Gemeinsamer Zugriff",
       "description": "Einer anderen Person gezielten Zugriff auf bestimmte Konten gewähren."
+    },
+    "toursCard": {
+      "title": "Geführte Touren",
+      "description": "Alle Rundgänge, die Monize bietet, samt dem, was Sie bereits gesehen haben. Starten oder wiederholen Sie eine beliebige Tour."
     },
     "emergencyAccessCard": {
       "title": "Notfallzugang",

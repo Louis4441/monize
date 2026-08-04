@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "Bagian pengaturan",
     "profile": "Profil",
     "preferences": "Preferensi",
+    "tours": "Tur Berpandu",
     "notifications": "Notifikasi",
     "security": "Keamanan",
     "sharedAccess": "Akses Bersama",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "Akses Bersama",
       "description": "Berikan orang lain akses terperinci ke akun tertentu."
+    },
+    "toursCard": {
+      "title": "Tur Berpandu",
+      "description": "Semua tur yang ditawarkan Monize, lengkap dengan yang sudah Anda lihat. Mulai atau ulangi salah satunya."
     },
     "emergencyAccessCard": {
       "title": "Akses Darurat",

@@ -282,6 +282,18 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('links the Guided Tours card at the tours page', async () => {
+    render(<SettingsPage />);
+    await waitFor(() => {
+      // The card, not the nav entry: the nav link is an in-page anchor.
+      const card = screen
+        .getAllByText('Guided Tours')
+        .map((el) => el.closest('a'))
+        .find((a) => a?.getAttribute('href') === '/settings/tours');
+      expect(card).toBeTruthy();
+    });
+  });
+
   it('wraps sections with id attributes for scroll targets', async () => {
     const { container } = render(<SettingsPage />);
     await waitFor(() => {

@@ -654,6 +654,7 @@
     "sectionsAriaLabel": "सेटिंग अनुभाग",
     "profile": "प्रोफ़ाइल",
     "preferences": "प्राथमिकताएं",
+    "tours": "निर्देशित टूर",
     "notifications": "सूचनाएं",
     "security": "सुरक्षा",
     "sharedAccess": "साझा पहुंच",
@@ -675,6 +676,10 @@
     "sharedAccessCard": {
       "title": "साझा पहुंच",
       "description": "किसी अन्य व्यक्ति को विशिष्ट खातों तक दानेदार पहुंच दें।"
+    },
+    "toursCard": {
+      "title": "निर्देशित टूर",
+      "description": "Monize के सभी टूर, साथ में वे भी जो आप देख चुके हैं। इनमें से कोई भी शुरू करें या दोबारा लें।"
     },
     "emergencyAccessCard": {
       "title": "आपातकालीन पहुंच",
