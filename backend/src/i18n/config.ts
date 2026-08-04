@@ -45,7 +45,9 @@ export const SUPPORTED_LOCALE_CODES: readonly string[] = [
 /**
  * Regional variants and the base locale they inherit from. A variant catalog
  * holds only the keys that differ from its base; nestjs-i18n falls back to
- * `fallbackLanguage` ('en') for the rest. Mirrors the frontend `base` field in
+ * `fallbackLanguage` ('en') for the rest. `en-CA` deliberately has no
+ * `locales/en-CA/` folder -- 'en' is already the Canadian-flavoured base, so
+ * every key would be a duplicate. Mirrors the frontend `base` field in
  * `frontend/src/i18n/config.ts`. Used by the parity test to apply subset
  * (rather than full-mirror) checks to variant locales.
  */

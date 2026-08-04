@@ -36,6 +36,9 @@ const ALL_LOCALES: readonly SupportedLocale[] = [
   { code: "de", label: "Deutsch", dir: "ltr" },
   { code: "en", label: "English", dir: "ltr" },
   { code: "en-US", label: "English (US)", dir: "ltr", base: "en" },
+  // Deliberately has no `messages/en-CA/` folder: `en` is already the
+  // Canadian-flavoured base, so every key would be a duplicate. Absent is the
+  // intended state -- see `messages/README.md` "Regional variants".
   { code: "en-CA", label: "English (Canada)", dir: "ltr", base: "en" },
   { code: "en-GB", label: "English (UK)", dir: "ltr", base: "en" },
   { code: "es", label: "Español", dir: "ltr" },
