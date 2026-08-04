@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monize — self-hosted personal finance that actually balances</title>
+<meta name="description" content="Monize is a free, open-source, self-hosted personal finance manager: 10 account types, 46 reports, budgets, investments, bills, multi-currency, Microsoft Money and Quicken import, and an optional AI assistant.">
+<meta name="theme-color" content="#4fa091">
+<link rel="icon" type="image/svg+xml" href="assets/img/monize-logo.svg">
+<link rel="apple-touch-icon" href="assets/img/monize-logo.svg">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Monize">
+<meta property="og:title" content="Monize — self-hosted personal finance that actually balances">
+<meta property="og:description" content="Your money, your server. Accounts, budgets, investments, bills, 46 reports, multi-currency and Microsoft Money import. Free and open source.">
+<meta property="og:url" content="https://monize.net/">
+<meta property="og:image" content="https://raw.githubusercontent.com/wiki/kenlasko/monize/images/dashboard-overview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+<link rel="dns-prefetch" href="https://api.github.com">
+<link rel="stylesheet" href="assets/css/styles.css">
+<script>(function(){try{var t=localStorage.getItem("mz-theme");if(!t){t=window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+</head>
+<body>
+
+<div class="bgfx"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span></div>
+<div id="prog"></div>
+
+<header id="hdr">
+  <a class="brand" href="#top" id="brand"><img class="logo" src="assets/img/monize-logo.svg" alt="Monize logo" data-fallback="repo:frontend/public/icons/monize-logo.svg"><span>Monize</span></a>
+  <nav id="nav">
+    <a href="#why">Why</a><a href="#features">Features</a><a href="#tour">Screens</a><a href="#reports">Reports</a>
+    <a href="#ai">AI</a><a href="#migrate">Migrate</a><a href="#selfhost">Self-host</a><a href="#faq">FAQ</a>
+  </nav>
+  <div class="hdr-cta">
+    <button id="theme" class="icobtn" title="Toggle light / dark" aria-label="Toggle colour theme">☾</button>
+    <a class="btn ghost" href="https://github.com/kenlasko/monize" target="_blank" rel="noopener">GitHub <span class="pill" id="stars">★ 221</span></a>
+    <a class="btn primary" href="https://demo.monize.net" target="_blank" rel="noopener">Live demo</a>
+    <button id="burger" class="icobtn only-m" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<main>
+<section class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="badge">◆ Self-hosted · <b>AGPL-3.0</b> · Docker &amp; Kubernetes ready</span>
+      <h1>Every dollar accounted for — <span class="grad">on your own server.</span></h1>
+      <p class="lede">Monize is a modern personal finance manager built to finally replace Microsoft&nbsp;Money and Quicken. Accounts, transactions, budgets, investments, bills, 46 reports and an AI assistant — all running on hardware <em>you</em> control.</p>
+      <div class="row">
+        <a class="btn primary big" href="https://demo.monize.net" target="_blank" rel="noopener">▶ Play with the live demo</a>
+        <a class="btn ghost big" href="https://github.com/kenlasko/monize" target="_blank" rel="noopener">★ Get it on GitHub</a>
+      </div>
+      <p class="tiny" style="margin-top:14px">No sign-up needed. The demo resets every day at 4:00&nbsp;AM UTC — click everything.</p>
+      <ul class="stats" id="stats">
+        <li><b data-to="46" data-suffix="">0</b><span>built-in reports</span></li>
+        <li><b data-to="10" data-suffix="">0</b><span>account types</span></li>
+        <li><b data-to="22" data-suffix="">0</b><span>languages &amp; locales</span></li>
+        <li><b data-to="30" data-suffix=" yrs">0</b><span>of data migrated</span></li>
+      </ul>
+    </div>
+    <div class="hero-art" id="heroArt">
+      <div class="frame">
+        <div class="frame-bar"><i></i><i></i><i></i><span class="url">demo.monize.net/dashboard</span></div>
+        <div class="frame-body"><img data-shot="dashboard-overview" alt="The Monize dashboard showing net worth, favourite accounts, upcoming bills and top movers"></div>
+      </div>
+      <div class="float f1"><span class="k">Net worth</span><span class="v">$1,144,810 <small class="up">▲5.66%</small></span></div>
+      <div class="float f2"><span class="k">Safe to spend today</span><span class="v up">$235.52</span></div>
+      <div class="float f3"><span class="k">Due tomorrow</span><span class="v down">−$196.99</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="marq" aria-hidden="true"><div class="marq-in" id="marq"></div></div>
+
+<section class="sec" id="why">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Why Monize exists</span>
+      <h2>Thirty years of data. <span class="grad">Zero discrepancies.</span></h2>
+      <p>Monize started as one stubborn requirement: retire Microsoft Money without losing a single penny of history. Click through the story.</p>
+    </div>
+    <div class="tl rv" id="tl"></div>
+    <div class="tl-card rv" id="tlCard"></div>
+  </div>
+</section>
+
+<section class="sec" id="features">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Features</span>
+      <h2>Everything a finance nerd asked for</h2>
+      <p>Filter by what you care about — Monize was built feature-by-feature against a 30-year Microsoft Money wishlist.</p>
+    </div>
+    <div class="tagrow rv" id="fchips"></div>
+    <div class="grid g3" id="fgrid"></div>
+  </div>
+</section>
+
+<section class="sec" id="tour">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Interactive tour</span>
+      <h2>See every screen</h2>
+      <p>Pick a screen on the left, flip through the thumbnails, click any shot to blow it up. Try <span class="kbd">←</span> <span class="kbd">→</span> too.</p>
+    </div>
+    <div class="tour rv">
+      <div class="rail" id="rail"></div>
+      <div>
+        <div class="stage-cap"><div><h3 id="stTitle">Dashboard</h3><p id="stDesc"></p></div>
+          <button class="btn ghost" id="autoplay" title="Auto-advance the tour">⏵ Autoplay</button></div>
+        <div class="frame stage">
+          <div class="frame-bar"><i></i><i></i><i></i><span class="url" id="stUrl">demo.monize.net/dashboard</span></div>
+          <div class="frame-body" id="stBody"><img id="stImg" alt=""></div>
+        </div>
+        <div class="thumbs" id="thumbs"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="reports">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Reporting</span>
+      <h2><span id="repCount">46</span> reports out of the box</h2>
+      <p>Server-side aggregated, chart-or-table, exportable — plus a custom report builder for whatever is missing. Search the whole catalogue:</p>
+    </div>
+    <div class="rep-top rv">
+      <label class="search">🔍<input id="repSearch" type="search" placeholder="Try “dividend”, “budget”, “net worth”…" aria-label="Search reports"></label>
+    </div>
+    <div class="tagrow rv" id="repChips"></div>
+    <div class="rep-grid" id="repGrid"></div>
+    <p class="count" id="repMsg"></p>
+    <div class="grid g3 rv" style="margin-top:34px">
+      <figure class="card" style="padding:0;overflow:hidden"><img data-shot="report-net-worth" alt="Net worth report"><figcaption style="padding:12px 16px;color:var(--mut);font-size:.85rem">Net worth over time</figcaption></figure>
+      <figure class="card" style="padding:0;overflow:hidden"><img data-shot="report-spending-category" alt="Spending by category report"><figcaption style="padding:12px 16px;color:var(--mut);font-size:.85rem">Spending by category</figcaption></figure>
+      <figure class="card" style="padding:0;overflow:hidden"><img data-shot="custom-report-builder" alt="Custom report builder"><figcaption style="padding:12px 16px;color:var(--mut);font-size:.85rem">Custom report builder</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="ai">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">AI, on your terms</span>
+      <h2>Ask your finances a question</h2>
+      <p>Bring your own provider — Claude, GPT, or a local Ollama model. Nothing leaves your server beyond what answers the question you asked.</p>
+    </div>
+    <div class="chat rv">
+      <div class="chat-box">
+        <div class="chat-hd"><span class="dotlive"></span> Monize AI Assistant <span class="pill" style="margin-left:auto">demo</span></div>
+        <div class="msgs" id="msgs"></div>
+        <div class="sugg" id="sugg"></div>
+      </div>
+      <div>
+        <ul class="ai-list">
+          <li><span class="tick">✔</span><span><b>Multi-provider.</b> Anthropic, OpenAI, Ollama, Ollama Cloud or any OpenAI-compatible endpoint, with a priority-based fallback chain.</span></li>
+          <li><span class="tick">✔</span><span><b>Eighteen tools.</b> Transactions, accounts, categories, payees, budgets, upcoming bills, portfolio, capital gains, period comparison, report generation, charts and a calculator — plus guarded write tools for transactions, payees and securities.</span></li>
+          <li><span class="tick">✔</span><span><b>Streaming answers.</b> Responses arrive token-by-token over Server-Sent Events.</span></li>
+          <li><span class="tick">✔</span><span><b>Keys stay encrypted.</b> Per-user API keys sealed with AES-256-GCM; usage, tokens and cost tracked per request.</span></li>
+          <li><span class="tick">✔</span><span><b>Spending insights.</b> Automatic anomaly, trend, subscription, new-recurring, budget-pace and seasonal detection.</span></li>
+          <li><span class="tick">✔</span><span><b>MCP server built in.</b> Point Claude Desktop straight at your own ledger.</span></li>
+        </ul>
+        <div class="grid g2" style="margin-top:18px">
+          <figure class="card" style="padding:0;overflow:hidden;cursor:zoom-in"><img data-shot="ai-chat" alt="AI assistant chat"></figure>
+          <figure class="card" style="padding:0;overflow:hidden;cursor:zoom-in"><img data-shot="ai-settings" alt="AI provider settings"></figure>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="migrate">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Migration</span>
+      <h2>Bring the whole shoebox</h2>
+      <p>Point Monize at a Microsoft Money <code>.mny</code> file or a Quicken QIF export and it reads the lot — accounts, splits, transfers, investments, price history, exchange rates and scheduled bills — then reconciles every balance against the source.</p>
+    </div>
+    <div class="steps rv" id="mSteps"></div>
+    <div class="frame rv"><div class="frame-bar"><i></i><i></i><i></i><span class="url">demo.monize.net/import</span></div>
+      <div class="frame-body shotview"><img id="mImg" alt="Import wizard step"></div></div>
+    <p class="count" id="mCap"></p>
+    <div class="grid g4 rv" style="margin-top:26px" id="fmtCards"></div>
+  </div>
+</section>
+
+<section class="sec" id="selfhost">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Self-hosting</span>
+      <h2>Up and running in one command</h2>
+      <p>Two containers and a Postgres database. Runs happily on a NAS, a VPS, or — like the author&apos;s — a Kubernetes cluster.</p>
+    </div>
+    <div class="grid g2 rv" style="grid-template-columns:1.15fr .85fr;align-items:start">
+      <div class="code-wrap">
+        <div class="code-tabs" id="codeTabs"></div>
+        <pre id="codeBody"></pre>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px"><h3>Prerequisites</h3>
+          <p>Docker &amp; Docker Compose · PostgreSQL 16+ · Node 24 only if you build from source.</p></div>
+        <h3 style="margin:18px 0 10px">Stack</h3>
+        <div class="stack" id="stack"></div>
+        <h3 style="margin:20px 0 10px">Also included</h3>
+        <div class="stack" id="stack2"></div>
+      </div>
+    </div>
+    <div class="grid g4 rv" style="margin-top:30px" id="secGrid"></div>
+  </div>
+</section>
+
+<section class="sec" id="gallery">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Screenshot dump</span>
+      <h2>The whole app, in pictures</h2>
+      <p>Because feature lists lie and screenshots don&apos;t. Click any image to enlarge.</p>
+    </div>
+    <div class="tagrow rv" id="galChips"></div>
+    <div class="gal" id="gal"></div>
+  </div>
+</section>
+
+<section class="sec" id="faq">
+  <div class="wrap">
+    <div class="sec-h rv"><span class="eyebrow">Questions</span><h2>Frequently asked</h2></div>
+    <div class="faq" id="faqList"></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <div class="cta rv">
+      <h2>Retire your spreadsheet. Retire Microsoft Money.</h2>
+      <p class="mut" style="max-width:52ch;margin:0 auto 26px">Take the demo for a spin, then run it yourself in about five minutes.</p>
+      <div class="row" style="justify-content:center">
+        <a class="btn primary big" href="https://demo.monize.net" target="_blank" rel="noopener">▶ Open the live demo</a>
+        <a class="btn ghost big" href="https://github.com/kenlasko/monize" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="btn ghost big" href="https://github.com/kenlasko/monize/wiki" target="_blank" rel="noopener">📖 Read the wiki</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="fgrid">
+      <div>
+        <div class="brand" style="margin-bottom:10px"><img class="logo" src="assets/img/monize-logo.svg" alt="" data-fallback="repo:frontend/public/icons/monize-logo.svg"><span>Monize</span></div>
+        <p style="max-width:34ch">Self-hosted personal finance management. Your accounts, your data, your server.</p>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="https://demo.monize.net" target="_blank" rel="noopener">Live demo</a></li>
+        <li><a href="#tour">Screens</a></li><li><a href="#reports">Reports</a></li><li><a href="#ai">AI assistant</a></li></ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/kenlasko/monize" target="_blank" rel="noopener">GitHub repository</a></li>
+        <li><a href="https://github.com/kenlasko/monize/wiki" target="_blank" rel="noopener">Wiki &amp; docs</a></li>
+        <li><a href="https://github.com/kenlasko/monize/issues" target="_blank" rel="noopener">Issues</a></li>
+        <li><a href="https://github.com/kenlasko/monize/discussions" target="_blank" rel="noopener">Discussions</a></li></ul></div>
+      <div><h4>Get started</h4><ul>
+        <li><a href="https://github.com/kenlasko/monize/wiki/Getting-Started" target="_blank" rel="noopener">Installation</a></li>
+        <li><a href="https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money" target="_blank" rel="noopener">From Microsoft Money</a></li>
+        <li><a href="https://github.com/kenlasko/monize/wiki/Importing-from-Quicken" target="_blank" rel="noopener">From Quicken</a></li>
+        <li><a href="https://github.com/kenlasko/monize/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0 licence</a></li></ul></div>
+    </div>
+    <div class="fbot"><span>© <span id="yr"></span> Monize. Released under the AGPL-3.0 licence.</span>
+      <span>Screenshots from the public demo &amp; project wiki.</span></div>
+  </div>
+</footer>
+
+<div id="lb" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
+  <button class="icobtn x" id="lbX" aria-label="Close">✕</button>
+  <button class="icobtn pv" id="lbP" aria-label="Previous">‹</button>
+  <button class="icobtn nx" id="lbN" aria-label="Next">›</button>
+  <div><img id="lbImg" alt=""><div class="lbcap" id="lbCap"></div></div>
+</div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>

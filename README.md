@@ -63,8 +63,8 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 
 ## Features
 ### Account Management
-- Multiple account types: Chequing, Savings, Credit Cards, Loans, Mortgages, Line of Credit
-- Investment accounts with brokerage support
+- Ten account types: Chequing, Savings, Credit Card, Loan, Mortgage, Line of Credit, Investment, Cash, Asset and Other
+- Investment accounts with brokerage and investment-cash sub-types
 - Support for multiple currencies per account
 - Track balances, credit limits, and interest rates
 - Credit card statement dates: configurable due date and settlement date (billing cycle closing date)
@@ -85,8 +85,8 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 - Data reset: wipe financial data and re-import without losing your user account or settings
 
 ### Investment Features
-- Track stocks, bonds, ETFs, and mutual funds
-- Support for US and Canadian exchanges (NYSE, NASDAQ, TSX, TSXV)
+- Track stocks, bonds, ETFs, mutual funds, options, GICs and cryptocurrency
+- Exchange-aware symbol resolution for North American, European and Asian markets (NYSE, NASDAQ, AMEX, ARCA, TSX, TSX-V, CSE, NEO, LSE, Frankfurt, XETRA, Euronext Paris, ASX, Tokyo, HKEX)
 - Daily price updates from Yahoo Finance
 - Manual price management: add, edit, and delete individual price entries
 - Price backfill from transaction history (uses buy/sell prices when market data unavailable)
@@ -95,14 +95,14 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 - Historical price backfill
 
 ### Multi-Currency Support
-- Support for multiple currencies (USD, CAD, EUR, GBP, JPY, CHF, AUD, CNY and others for starters)
+- 44 currencies with built-in symbol and formatting metadata (USD, CAD, EUR, GBP, JPY, CHF, AUD, CNY and more), created on demand rather than pre-seeded
 - Daily exchange rate updates
 - Automatic currency conversion for reporting
 - Per-account currency settings
 
 ### Multi-Language Support
 - Full user interface translation, including server-generated messages and emails
-- Available languages: English, German (Deutsch), Spanish (Español), French (Français), Italian (Italiano), Dutch (Nederlands), Polish (Polski), Portuguese (Português) and Brazilian Portuguese (Português do Brasil)
+- Available languages (22 locales): English (with US, Canadian and UK variants), German (Deutsch), Spanish (Español), French (Français), Hindi (हिन्दी), Indonesian (Bahasa Indonesia), Italian (Italiano), Japanese (日本語), Korean (한국어), Dutch (Nederlands), Polish (Polski), Portuguese (Português), Brazilian Portuguese (Português do Brasil), Russian (Русский), Turkish (Türkçe), Ukrainian (Українська), Vietnamese (Tiếng Việt), Simplified Chinese (简体中文) and Traditional Chinese (繁體中文)
 - Language can be chosen on the sign-in and registration screens and in Settings -> Preferences
 
 ### Scheduled Transactions
@@ -112,7 +112,7 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 - Bill payment history tracking
 
 ### Reports
-- **Built-in Reports** (server-side aggregated):
+- **Built-in Reports** -- 46 across ten categories (spending, income, net worth, tax, debt, investment, insights, maintenance, budget, bills), all server-side aggregated. A sample:
   - Spending by Category / Payee
   - Income by Source
   - Monthly Spending Trend
@@ -246,7 +246,7 @@ monize/
 ### Prerequisites
 
 - Docker and Docker Compose
-- Node.js 20+ (for local development)
+- Node.js 24 (for local development -- matches the container images)
 - PostgreSQL 16+ (if running without Docker)
 
 ### Quick Start with Docker
