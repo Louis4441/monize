@@ -9,9 +9,17 @@ import { AppModule } from "./app.module";
 import { OAuthProviderService } from "./oauth/oauth-provider.service";
 import { oauthDebugLogger } from "./oauth/oauth-debug-logger.middleware";
 import { isOidcProviderPath } from "./oauth/oidc-provider-paths";
+import { installOidcProviderLogBridge } from "./oauth/oidc-provider-log-bridge";
 import { DataSource } from "typeorm";
 import { parseRlsMode } from "./common/db/rls-config";
 import { assertRuntimeRoleSafe } from "./common/db/runtime-role-check";
+
+// node-oidc-provider writes its notices straight to console.info/console.warn,
+// which would otherwise be the only unformatted lines in the log. Installed
+// before anything can import or instantiate the provider.
+installOidcProviderLogBridge();
+
+const logger = new Logger("Bootstrap");
 
 // Configure pg to return DATE types as strings instead of Date objects
 // This prevents timezone-related date shifting issues
@@ -55,7 +63,10 @@ if (process.env.NODE_ENV !== "production") {
     ) {
       return;
     }
-    console.error("Uncaught exception:", err);
+    logger.error(
+      "Uncaught exception",
+      err instanceof Error ? err.stack : String(err),
+    );
     process.exit(1);
   });
 }
@@ -90,6 +101,8 @@ async function assertRuntimeRoleOrExit(dataSource: DataSource): Promise<void> {
 }
 
 async function bootstrap() {
+  logger.log("Starting application");
+
   const app = await NestFactory.create(AppModule);
 
   // RLS_MODE=enforce promises a database-level tenant boundary. Selecting the
@@ -344,7 +357,6 @@ async function bootstrap() {
   server.requestTimeout = 600000; // 10 minutes
   server.headersTimeout = 605000; // must be > requestTimeout
 
-  const logger = new Logger("Bootstrap");
   const port = process.env.PORT || 3001;
   await app.listen(port);
 

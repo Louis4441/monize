@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { DEFAULT_APP_USER } from "./rls-config";
 
 /**
@@ -22,7 +23,7 @@ export interface SqlClient {
   ): Promise<{ rows?: unknown[] } | unknown>;
 }
 
-/** Minimal logger surface (matches both `console` and NestJS `Logger`). */
+/** Minimal logger surface (matches NestJS `Logger` and any test double). */
 export interface RoleProvisionLogger {
   log(message: string): void;
   warn(message: string): void;
@@ -189,7 +190,11 @@ export interface ProvisionAppRoleOptions {
  */
 export async function provisionAppRole(
   client: SqlClient,
-  { appUser, appPassword, logger = console }: ProvisionAppRoleOptions,
+  {
+    appUser,
+    appPassword,
+    logger = new Logger("AppRole"),
+  }: ProvisionAppRoleOptions,
 ): Promise<void> {
   const roleName = appUser || DEFAULT_APP_USER;
 

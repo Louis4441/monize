@@ -125,6 +125,13 @@ export default tseslint.config(
       "src/common/db/scoped-db.ts",
     ],
     rules: {
+      // Every line the server writes goes through the NestJS Logger, so the
+      // whole log carries the same `[Nest] pid - date LEVEL [Context] message`
+      // shape. `Logger` works outside an application context, so the pre-boot
+      // scripts (db-init, db-migrate, seed) use it too. The one sanctioned
+      // exception is the oidc-provider log bridge, which has to hold the real
+      // console methods to forward everything that is not a provider notice.
+      "no-console": "error",
       "no-restricted-imports": [
         "error",
         { paths: [BAN_INJECT_REPOSITORY], patterns: [BAN_WITH_CONTEXT] },

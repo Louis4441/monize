@@ -7,18 +7,21 @@
  * Run with: npx ts-node -r tsconfig-paths/register src/database/add-skip-price-updates-column.ts
  */
 
+import { Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import * as dotenv from "dotenv";
 import * as path from "path";
 
 dotenv.config({ path: path.join(__dirname, "../../../.env") });
 
+const logger = new Logger("AddSkipPriceUpdatesColumn");
+
 function requiredEnv(...names: string[]): string {
   for (const name of names) {
     const value = process.env[name];
     if (value) return value;
   }
-  console.error(`Missing required environment variable: ${names.join(" or ")}`);
+  logger.error(`Missing required environment variable: ${names.join(" or ")}`);
   process.exit(1);
 }
 
@@ -33,7 +36,7 @@ async function addSkipPriceUpdatesColumn() {
   });
 
   await dataSource.initialize();
-  console.log("Database connected");
+  logger.log("Database connected");
 
   try {
     // Check if column already exists
@@ -44,7 +47,7 @@ async function addSkipPriceUpdatesColumn() {
     `);
 
     if (columnExists.length > 0) {
-      console.log("Column skip_price_updates already exists");
+      logger.log("Column skip_price_updates already exists");
       return;
     }
 
@@ -54,10 +57,15 @@ async function addSkipPriceUpdatesColumn() {
       ADD COLUMN skip_price_updates BOOLEAN NOT NULL DEFAULT false
     `);
 
-    console.log("Added skip_price_updates column to securities table");
+    logger.log("Added skip_price_updates column to securities table");
   } finally {
     await dataSource.destroy();
   }
 }
 
-addSkipPriceUpdatesColumn().catch(console.error);
+addSkipPriceUpdatesColumn().catch((error) =>
+  logger.error(
+    "Failed to add skip_price_updates column",
+    error instanceof Error ? error.stack : String(error),
+  ),
+);

@@ -1,7 +1,10 @@
+import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "../app.module";
 import { SeedService } from "./seed.service";
 import { DemoSeedService } from "./demo-seed.service";
+
+const logger = new Logger("Seed");
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -15,11 +18,14 @@ async function bootstrap() {
       const seedService = app.get(SeedService);
       await seedService.seedAll();
     }
-    console.log("\n🎉 Seeding completed!");
+    logger.log("Seeding completed");
     await app.close();
     process.exit(0);
   } catch (error) {
-    console.error("\n❌ Seeding failed:", error);
+    logger.error(
+      "Seeding failed",
+      error instanceof Error ? error.stack : String(error),
+    );
     await app.close();
     process.exit(1);
   }

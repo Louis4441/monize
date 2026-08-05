@@ -234,9 +234,26 @@ Changing what a service computes and seeing every test pass means the change is 
 
 Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context (jobs, schedulers, tests). Render emails with an `EmailT` translator (`emailTranslator(i18n, recipientLang)` from `src/i18n/email-translator.ts`) so copy matches the recipient's stored locale rather than the request's. Catalogs live in `src/i18n/locales/{locale}/*.json`, one folder per supported locale; the authoritative locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts` (root `CLAUDE.md` enumerates them) -- keep it in sync with the frontend's. The `en-*` entries are lean regional variants (declared in `LOCALE_BASES`): they hold only the keys that differ from `en` and fall back to it per key. Adding or changing a string means updating every locale -- the parity test `src/i18n/locales.parity.spec.ts` fails otherwise -- then regenerating the pseudo-locale with `npm run i18n:pseudo`. Full contributor flow: `src/i18n/README.md`.
 
+## Every line in the log has the same shape
+
+`[Nest] pid - date LEVEL [Context] message`, produced by the NestJS `Logger`.
+That includes the lines written before the app exists: `Logger` works outside an
+application context, so `db-init`, `db-migrate`, `db-demo-check` and the seeders
+each construct `new Logger("<Context>")` rather than calling `console`. Backend
+`src/` bans `console` outright (`no-console`, `eslint.config.mjs`); the only
+exception is `oauth/oidc-provider-log-bridge.ts`, which has to hold the real
+console methods in order to forward everything that is not a provider notice.
+
+`docker-entrypoint.sh` prints nothing itself. A shell `echo` is the one line in
+the container log with no timestamp, level or context, and an inline `node -e`
+blob cannot reach the `Logger` without restating its format -- so each step logs
+for itself and the entrypoint just runs the steps.
+`src/startup-logging.spec.ts` scans for both mistakes and for a `console` call in
+any pre-boot script.
+
 ## OAuth / OIDC provider
 
-`node-oidc-provider` prints its own `oidc-provider NOTICE:`/`WARNING:` lines with bare `console.info`/`console.warn`, so they land in the backend logs unformatted, outside the Nest `Logger`. Every such notice means a config option was left at its default -- fix the config rather than the log line. In particular, `ttl` needs an explicit number for every artifact the provider can issue (`AccessToken`, `AuthorizationCode`, `IdToken`, `RefreshToken`, `Grant`, `Interaction`, `Session`); the guard test in `src/oauth/oauth-provider.service.spec.ts` fails when one is missing.
+`node-oidc-provider` prints its own `oidc-provider NOTICE:`/`WARNING:` lines with bare `console.info`/`console.warn`, outside the Nest `Logger`. The library exposes no logger hook, so `oauth/oidc-provider-log-bridge.ts` -- installed at the top of `main.ts`, before anything can instantiate the provider -- re-routes exactly those lines to a `[OidcProvider]` logger and passes any other console output through untouched. That fixes the formatting only: every such notice still means a config option was left at its default, so fix the config rather than treating the bridge as the answer. In particular, `ttl` needs an explicit number for every artifact the provider can issue (`AccessToken`, `AuthorizationCode`, `IdToken`, `RefreshToken`, `Grant`, `Interaction`, `Session`); the guard test in `src/oauth/oauth-provider.service.spec.ts` fails when one is missing.
 
 ## Automatic backups are an operator setting, not a user preference
 

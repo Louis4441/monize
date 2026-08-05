@@ -1,4 +1,5 @@
 import fs from "fs";
+import { Logger } from "@nestjs/common";
 
 // Mock pg Client
 const mockQuery = jest.fn();
@@ -36,16 +37,18 @@ describe("db-migrate runMigrations()", () => {
   let statSyncSpy: jest.SpyInstance;
   let readdirSyncSpy: jest.SpyInstance;
   let readFileSyncSpy: jest.SpyInstance;
-  let consoleSpy: jest.SpyInstance;
-  let consoleErrorSpy: jest.SpyInstance;
+  let logSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockConnect.mockResolvedValue(undefined);
     mockEnd.mockResolvedValue(undefined);
 
-    consoleSpy = jest.spyOn(console, "log").mockImplementation();
-    consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+    // The runner logs through the Nest Logger so its output matches the rest
+    // of the boot sequence; spying on console here would catch nothing.
+    logSpy = jest.spyOn(Logger.prototype, "log").mockImplementation();
+    errorSpy = jest.spyOn(Logger.prototype, "error").mockImplementation();
 
     // Default: no migrations directory found
     existsSyncSpy = jest.spyOn(fs, "existsSync").mockReturnValue(false);
@@ -61,8 +64,8 @@ describe("db-migrate runMigrations()", () => {
     statSyncSpy.mockRestore();
     readdirSyncSpy.mockRestore();
     readFileSyncSpy.mockRestore();
-    consoleSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it("skips when no migrations directory is found", async () => {
@@ -70,8 +73,8 @@ describe("db-migrate runMigrations()", () => {
 
     await runMigrations();
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "No migrations directory found. Skipping migrations.",
+    expect(logSpy).toHaveBeenCalledWith(
+      "No migrations directory found; skipping migrations",
     );
     expect(mockQuery).not.toHaveBeenCalledWith(
       expect.stringContaining("CREATE TABLE IF NOT EXISTS"),
@@ -106,8 +109,8 @@ describe("db-migrate runMigrations()", () => {
 
     await runMigrations();
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "Database is up to date. No pending migrations.",
+    expect(logSpy).toHaveBeenCalledWith(
+      "Database is up to date; no pending migrations",
     );
     // Should NOT have called BEGIN (no migrations to apply)
     expect(mockQuery).not.toHaveBeenCalledWith("BEGIN");
@@ -149,9 +152,7 @@ describe("db-migrate runMigrations()", () => {
       ["002_add_users.sql"],
     );
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "Applied 2 migration(s) successfully.",
-    );
+    expect(logSpy).toHaveBeenCalledWith("Applied 2 migration(s) successfully");
   });
 
   it("applies only pending migrations (skips already-applied)", async () => {
@@ -182,9 +183,7 @@ describe("db-migrate runMigrations()", () => {
       ["001_init.sql"],
     );
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "Applied 1 migration(s) successfully.",
-    );
+    expect(logSpy).toHaveBeenCalledWith("Applied 1 migration(s) successfully");
   });
 
   it("rolls back and exits on migration failure, naming the file and the SQL error", async () => {
@@ -207,7 +206,7 @@ describe("db-migrate runMigrations()", () => {
     await runMigrations();
 
     expect(mockQuery).toHaveBeenCalledWith("ROLLBACK");
-    const report = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+    const report = errorSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(report).toContain("Migration failed: 001_bad.sql");
     expect(report).toContain('syntax error at or near "INVALID"');
     expect(report).toContain("42601 (syntax_error)");
@@ -233,7 +232,7 @@ describe("db-migrate runMigrations()", () => {
 
     await runMigrations();
 
-    const report = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+    const report = errorSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(report).toContain("Migration failed: 002_bad.sql");
     expect(report).toContain(
       "1 migration(s) applied successfully before this one",
@@ -245,7 +244,7 @@ describe("db-migrate runMigrations()", () => {
 
     await runMigrations();
 
-    const report = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+    const report = errorSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(report).toContain(
       "Migration runner failed before or between migrations.",
     );
@@ -275,9 +274,7 @@ describe("db-migrate runMigrations()", () => {
       "INSERT INTO schema_migrations (filename) VALUES ($1)",
       ["001_init.sql"],
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "Applied 1 migration(s) successfully.",
-    );
+    expect(logSpy).toHaveBeenCalledWith("Applied 1 migration(s) successfully");
   });
 
   it("always closes the client connection", async () => {

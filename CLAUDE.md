@@ -47,7 +47,7 @@ Every user-facing string must be internationalized -- no hardcoded literals in t
 ### Code Style
 - No emojis in code, comments, or documentation
 - Immutability always -- never mutate objects or arrays
-- No `console.log` in production code; use NestJS `Logger` class
+- No `console.log` in production code; use NestJS `Logger` class -- including the scripts that run before the app boots and the `docker-entrypoint.sh` steps, so the whole startup log has one shape (backend `no-console` lint rule + `backend/src/startup-logging.spec.ts`)
 - Use proxy, not middleware (middleware is deprecated in this project)
 
 ### Follow the existing pattern, and pin it down when you miss it
