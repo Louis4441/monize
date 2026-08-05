@@ -56,7 +56,6 @@ index.html                     the whole page
 404.html                       friendly not-found page
 _headers                       security headers + long cache on /assets/*
 _redirects                     /demo /github /docs /wiki /issues short links
-.assetsignore                  keeps README.md and scripts/ out of the upload
 robots.txt, sitemap.xml        change the domain if it is not monize.net
 assets/css/styles.css          all styling, light + dark themes
 assets/js/app.js               all interactivity and page data
