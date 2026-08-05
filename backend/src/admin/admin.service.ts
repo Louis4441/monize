@@ -33,6 +33,18 @@ import { accountInviteTemplate } from "../notifications/email-templates";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { toUserProfile, UserProfile } from "../users/user-profile";
 
+/**
+ * The admin create-user response: the complete profile plus the fields only
+ * this flow produces. Named so removing a required admin field from the
+ * allowlist fails to compile here, at the response construction site, rather
+ * than surfacing as a missing property in the admin UI.
+ */
+type CreatedAdminUserProfile = UserProfile & {
+  temporaryPassword: string | undefined;
+  invited: boolean;
+  upgraded: boolean;
+};
+
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
@@ -47,11 +59,11 @@ export class AdminService {
     private readonly i18n: I18nService,
   ) {}
 
-  async findAllUsers() {
+  async findAllUsers(): Promise<UserProfile[]> {
     return withSystemContext(() => this.findAllUsersWithinContext());
   }
 
-  private async findAllUsersWithinContext() {
+  private async findAllUsersWithinContext(): Promise<UserProfile[]> {
     // Hide owner-managed delegate identities -- users that exist solely
     // because an account owner added them via Shared Access. Those rows
     // are managed from the owner's Shared Access page. The is_delegate_only
@@ -68,11 +80,13 @@ export class AdminService {
     return users.map((user) => toUserProfile(user));
   }
 
-  async createUser(dto: CreateUserDto) {
+  async createUser(dto: CreateUserDto): Promise<CreatedAdminUserProfile> {
     return withSystemContext(() => this.createUserWithinContext(dto));
   }
 
-  private async createUserWithinContext(dto: CreateUserDto) {
+  private async createUserWithinContext(
+    dto: CreateUserDto,
+  ): Promise<CreatedAdminUserProfile> {
     const email = dto.email.toLowerCase().trim();
     const role = dto.role === "admin" ? "admin" : "user";
 
@@ -221,7 +235,11 @@ export class AdminService {
     };
   }
 
-  async updateUserRole(adminId: string, targetUserId: string, role: string) {
+  async updateUserRole(
+    adminId: string,
+    targetUserId: string,
+    role: string,
+  ): Promise<UserProfile> {
     return withSystemContext(() =>
       this.updateUserRoleWithinContext(adminId, targetUserId, role),
     );
@@ -231,7 +249,7 @@ export class AdminService {
     adminId: string,
     targetUserId: string,
     role: string,
-  ) {
+  ): Promise<UserProfile> {
     if (adminId === targetUserId) {
       throw new ForbiddenException(
         tr(
@@ -297,7 +315,7 @@ export class AdminService {
     adminId: string,
     targetUserId: string,
     isActive: boolean,
-  ) {
+  ): Promise<UserProfile> {
     if (adminId === targetUserId) {
       throw new ForbiddenException(
         tr(

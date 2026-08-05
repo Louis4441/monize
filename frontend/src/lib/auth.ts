@@ -1,5 +1,5 @@
 import apiClient from './api';
-import { LoginCredentials, RegisterData, AuthResponse, TwoFactorSetupResponse, BackupCodesResponse, TrustedDevice, PersonalAccessToken, CreatePatData, CreatePatResponse } from '@/types/auth';
+import { LoginCredentials, RegisterData, AuthResponse, TwoFactorSetupResponse, BackupCodesResponse, TrustedDevice, PersonalAccessToken, CreatePatData, CreatePatResponse, User, SelfUserProfile } from '@/types/auth';
 
 export interface AuthMethods {
   local: boolean;
@@ -25,16 +25,19 @@ export const authApi = {
     await apiClient.post('/auth/logout');
   },
 
-  getProfile: async () => {
-    const response = await apiClient.get('/auth/profile');
+  // Acting-context profile: identifies whose finances are on screen. While a
+  // delegate is acting this omits the owner's credential-state fields, so the
+  // return type keeps them optional.
+  getProfile: async (): Promise<User | null> => {
+    const response = await apiClient.get<User | null>('/auth/profile');
     return response.data;
   },
 
   // Authenticated user's OWN profile (delegate id, never the owner) -- the
   // Security view uses this while acting as a delegate so it manages the
-  // actor's credentials, not the owner's.
-  getSelfProfile: async () => {
-    const response = await apiClient.get('/auth/me-self');
+  // actor's credentials, not the owner's. Always a complete row.
+  getSelfProfile: async (): Promise<SelfUserProfile | null> => {
+    const response = await apiClient.get<SelfUserProfile | null>('/auth/me-self');
     return response.data;
   },
 

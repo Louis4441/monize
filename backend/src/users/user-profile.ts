@@ -39,8 +39,19 @@ export const PROFILE_FIELDS = [
   "backupEncryptionEnabled",
 ] as const satisfies readonly (keyof User)[];
 
-export type UserProfile = Pick<User, (typeof PROFILE_FIELDS)[number]> & {
+type ProfileField = (typeof PROFILE_FIELDS)[number];
+
+export type UserProfile = Pick<User, ProfileField> & {
   hasPassword: boolean;
+};
+
+/**
+ * The profile of a narrowed `select` result: every field, `hasPassword`
+ * included, is present only when the caller actually loaded the column it
+ * derives from. "Not selected" stays absent rather than becoming a value.
+ */
+export type PartialUserProfile = Partial<Pick<User, ProfileField>> & {
+  hasPassword?: boolean;
 };
 
 /**
@@ -59,22 +70,40 @@ export const SELF_ONLY_PROFILE_FIELDS = [
   "backupEncryptionEnabled",
 ] as const;
 
+type SelfOnlyProfileField = (typeof SELF_ONLY_PROFILE_FIELDS)[number];
+
+export type DelegatedUserProfile = Omit<UserProfile, SelfOnlyProfileField>;
+
+export type PartialDelegatedUserProfile = Omit<
+  PartialUserProfile,
+  SelfOnlyProfileField
+>;
+
 /**
  * Serialize `user` for the account holder or an administrator managing the row.
  *
  * Takes a `Partial<User>` because several callers pass a narrowed `select`
  * result: an absent column stays absent rather than becoming an explicit
- * `undefined` the client has to tell apart from "not set".
+ * `undefined` the client has to tell apart from "not set". That includes
+ * `hasPassword` -- a row whose `passwordHash` was never selected has an
+ * *unknown* credential state, and reporting `false` would tell the client a
+ * settled fact nobody looked up. The `in` check is deliberate: it preserves
+ * "was the column selected", which `!== undefined` cannot distinguish from a
+ * selected-but-null hash.
  */
-export function toUserProfile(user: Partial<User>): UserProfile {
+export function toUserProfile(user: User): UserProfile;
+export function toUserProfile(user: Partial<User>): PartialUserProfile;
+export function toUserProfile(user: Partial<User>): PartialUserProfile {
   const profile: Record<string, unknown> = {};
   for (const field of PROFILE_FIELDS) {
     if (field in user) {
       profile[field] = user[field];
     }
   }
-  profile.hasPassword = !!user.passwordHash;
-  return profile as UserProfile;
+  if ("passwordHash" in user) {
+    profile.hasPassword = !!user.passwordHash;
+  }
+  return profile as PartialUserProfile;
 }
 
 /**
@@ -82,15 +111,16 @@ export function toUserProfile(user: Partial<User>): UserProfile {
  * the UI needs to show whose finances are on screen, without the owner's
  * credential state.
  */
+export function toDelegatedUserProfile(user: User): DelegatedUserProfile;
 export function toDelegatedUserProfile(
   user: Partial<User>,
-): Omit<UserProfile, (typeof SELF_ONLY_PROFILE_FIELDS)[number]> {
+): PartialDelegatedUserProfile;
+export function toDelegatedUserProfile(
+  user: Partial<User>,
+): PartialDelegatedUserProfile {
   const delegated: Record<string, unknown> = { ...toUserProfile(user) };
   for (const field of SELF_ONLY_PROFILE_FIELDS) {
     delete delegated[field];
   }
-  return delegated as Omit<
-    UserProfile,
-    (typeof SELF_ONLY_PROFILE_FIELDS)[number]
-  >;
+  return delegated as PartialDelegatedUserProfile;
 }

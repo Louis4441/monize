@@ -32,7 +32,7 @@ describe('authApi', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { id: 'u-1' } });
     const result = await authApi.getProfile();
     expect(apiClient.get).toHaveBeenCalledWith('/auth/profile');
-    expect(result.id).toBe('u-1');
+    expect(result?.id).toBe('u-1');
   });
 
   it('getAuthMethods fetches /auth/methods', async () => {
