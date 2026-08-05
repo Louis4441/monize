@@ -16,6 +16,11 @@ npx serve .          # or: python -m http.server 8080
 
 ## Deploy to Cloudflare Pages (free plan)
 
+The site is a Pages project. There is no `wrangler.jsonc` and no Workers build:
+a Workers config in this folder makes Cloudflare's Workers Builds pick the site
+up and deploy it a second way, alongside Pages. Deploy it through one of the
+three options below and leave the folder without one.
+
 ### Option A - drag and drop (fastest, ~60 seconds)
 
 1. Cloudflare dashboard -> **Workers & Pages** -> **Create** -> **Pages** -> **Upload assets**.
@@ -51,6 +56,7 @@ index.html                     the whole page
 404.html                       friendly not-found page
 _headers                       security headers + long cache on /assets/*
 _redirects                     /demo /github /docs /wiki /issues short links
+.assetsignore                  keeps README.md and scripts/ out of the upload
 robots.txt, sitemap.xml        change the domain if it is not monize.net
 assets/css/styles.css          all styling, light + dark themes
 assets/js/app.js               all interactivity and page data
