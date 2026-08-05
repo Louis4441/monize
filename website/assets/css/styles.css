@@ -154,7 +154,7 @@ main,header,footer{position:relative;z-index:1}
 .stage-cap{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin:16px 0 12px}
 .stage-cap h3{margin:0 0 4px}
 .stage-cap p{margin:0;color:var(--mut);font-size:.93rem}
-.thumbs{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:thin}
+.thumbs{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 2px 10px;scrollbar-width:thin}
 .thumbs button{flex:0 0 132px;border:1px solid var(--line);background:var(--card2);border-radius:10px;overflow:hidden;cursor:pointer;padding:0;transition:.18s;position:relative;height:84px}
 .thumbs button img{width:100%;height:100%;object-fit:cover;object-position:top}
 .thumbs button.on{border-color:var(--teal);box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 22%,transparent)}
@@ -209,7 +209,7 @@ html[data-theme=light] .code-wrap{background:#0d1424}
 .code-tabs button{border:0;background:transparent;color:var(--mut);padding:7px 13px;border-radius:8px;font:700 .84rem var(--ff);cursor:pointer}
 .code-tabs button.on{background:var(--card);color:var(--txt)}
 .code-tabs .cp{margin-left:auto;border:1px solid var(--line);background:var(--card)}
-pre{margin:0;padding:20px;overflow-x:auto;font:.85rem/1.7 var(--mono);color:#cfe0ff}
+pre{margin:0;padding:20px;overflow-x:auto;overscroll-behavior-x:contain;font:.85rem/1.7 var(--mono);color:#cfe0ff}
 pre .c{color:#6b83ad}pre .k{color:#7fd6c1}pre .s{color:#f0b571}
 /* The self-hosting split. This lives in a class, not in a style attribute on the
    element: an inline grid-template-columns outranks every media query below, so
@@ -275,7 +275,7 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
   .g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}
   .rep-grid{grid-template-columns:repeat(2,1fr)}
   .tour{grid-template-columns:1fr}
-  .rail{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px}
+  .rail{position:static;flex-direction:row;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:6px}
   .rail button{flex:0 0 auto}
   .chat{grid-template-columns:1fr}
   .selfhost-grid{grid-template-columns:1fr}
@@ -291,6 +291,44 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
 @media (max-width:640px){
   .sec{padding:60px 0}
   .g4,.g3,.g2,.rep-grid{grid-template-columns:1fr}
+  /* Two lists here are long -- twenty-eight feature cards and forty-two gallery
+     screenshots -- and one column of either is a couple of screens of
+     thumb-scrolling to get past a section nobody has to read in full. Both
+     become a snapping horizontal strip on a phone, the shape the tour rail and
+     the filmstrip above already use.
+     - the selector names its consumers instead of being a bare `.strip`: the
+       collapse rule a line up sets grid-template-columns at the same
+       specificity, and .gal sets columns further down, so a single class would
+       win on source order alone. Putting a third list in a strip means adding it
+       here as well as in the markup, which website-mobile-layout.test.ts checks.
+     - display:grid is what turns the gallery's masonry off. A multi-column
+       container is not a grid container, so nothing else here would reach it.
+     - grid-template-columns has to be cleared, not just overridden: an explicit
+       track list sizes the first items and grid-auto-columns only picks up the
+       implicit ones after it, so `1fr` would keep card one full width and put
+       the strip's own width behind it.
+     - the scroller is the list itself, a block child of .wrap, so it is exactly
+       as wide as the gutter allows and cannot widen the document the way a
+       scroller inside a 1fr track does (see the min-width:0 note above).
+     - the reveal slides up 24px, which reads as a card entering from below a row
+       it is not in, and overflow-y clips it besides. In a strip it is a fade. */
+  .grid.strip,.gal.strip{
+    display:grid;columns:auto;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;
+    overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
+    scroll-snap-type:x mandatory;scrollbar-width:thin;padding:4px 0 12px}
+  .strip>*{scroll-snap-align:start;min-width:0}
+  .strip>.rv{transform:none}
+  /* The gallery's pictures are its content, so they crop to one height rather
+     than making every figure as tall as the tallest screenshot -- the trade the
+     filmstrip already makes, and the shot is a click away from full size. Both
+     axes have to be given: object-fit crops the picture to the element's box,
+     but a height alone leaves the box itself at whatever the aspect ratio makes
+     it, so a portrait screenshot sat in a 106px-wide box with the rest of the
+     card blank beside it. The missing-shot placeholder takes the same height, or
+     a category with no local copies yet is a different shape from one with. */
+  .gal.strip figure{margin:0}
+  .gal.strip figure img,.gal.strip figure .shotmiss{width:100%;height:186px;object-fit:cover;object-position:top}
+  .gal.strip figure .shotmiss{padding:14px}
   .stats{grid-template-columns:repeat(2,auto);gap:16px 22px}
   .gal{columns:1}
   .tl{grid-template-columns:repeat(2,1fr);gap:18px 0}.tl::before{display:none}
