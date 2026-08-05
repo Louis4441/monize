@@ -382,7 +382,7 @@ Never use synchronous `act(() => {...})` for calls that trigger async side-effec
 
 **Global mocks** (`test/setup.ts`): `next/navigation` (useRouter, usePathname, useSearchParams), `react-hot-toast`, `localStorage`, `window.scrollTo`, `window.matchMedia`.
 
-**Test file naming:** `Component.test.tsx` (co-located with component).
+**Test file naming:** named after the component and co-located with it, e.g. `AccountForm.test.tsx` beside `AccountForm.tsx`.
 
 ## Theme
 

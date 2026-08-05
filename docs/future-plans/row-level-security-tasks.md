@@ -1072,7 +1072,7 @@ in PR; no handler left unwrapped (grep `@Cron` count == enumerated count).
   the wrapper. A wrapper-usage test asserts `resetDemoData`'s raw SQL runs under `{ system: true }`.
   Seed/demo-seed/demo-reset specs green (56 + the new assertion), build + lint clean.
 
-**Scope:** `database/seed.service.ts`, `demo-seed.service.ts`, daily demo reset entry. Wrapping only,
+**Scope:** `backend/src/database/seed.service.ts`, `demo-seed.service.ts`, daily demo reset entry. Wrapping only,
 before R7 refactors the database module.
 
 **Do:** wrap whole seed/reset flows in `withSystemContext` (raw cross-user SQL keeps working under
