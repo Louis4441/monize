@@ -16,6 +16,11 @@ npx serve .          # or: python -m http.server 8080
 
 ## Deploy to Cloudflare Pages (free plan)
 
+The site is a Pages project. There is no `wrangler.jsonc` and no Workers build:
+a Workers config in this folder makes Cloudflare's Workers Builds pick the site
+up and deploy it a second way, alongside Pages. Deploy it through one of the
+three options below and leave the folder without one.
+
 ### Option A - drag and drop (fastest, ~60 seconds)
 
 1. Cloudflare dashboard -> **Workers & Pages** -> **Create** -> **Pages** -> **Upload assets**.
