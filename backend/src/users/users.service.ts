@@ -35,6 +35,10 @@ import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { CurrenciesService } from "../currencies/currencies.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { DemoModeService } from "../common/demo-mode.service";
+import {
+  OidcReauthService,
+  type OidcReauthPurpose,
+} from "../auth/oidc/oidc-reauth.service";
 
 @Injectable()
 export class UsersService {
@@ -45,6 +49,7 @@ export class UsersService {
     private passwordBreachService: PasswordBreachService,
     private moduleRef: ModuleRef,
     private demoModeService: DemoModeService,
+    private oidcReauth: OidcReauthService,
   ) {}
 
   /**
@@ -381,6 +386,56 @@ export class UsersService {
     await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
   }
 
+  /**
+   * Second proof of identity for a destructive action.
+   *
+   * One method for both providers, because the three branches used to disagree
+   * about what counts as proof and the weakest one decided:
+   *
+   * - OIDC accounts presented a client-supplied string, and any non-empty value
+   *   was accepted -- the frontend literally sent `"oidc-session-confirmed"`.
+   *   The second factor collapsed into possession of the session (P2-005). Now a
+   *   signed, action-bound, one-time artifact minted by the OIDC callback after a
+   *   `prompt=login` round trip.
+   * - Local accounts with a password: unchanged, bcrypt comparison.
+   * - Local accounts with NO password (admin-provisioned, reset not yet
+   *   completed) fell off the end of the `else if` and were required to prove
+   *   nothing at all. That branch now refuses, which is what the step-up service
+   *   has always done for the same state.
+   */
+  private async reauthenticate(
+    user: User,
+    purpose: OidcReauthPurpose,
+    dto: { password?: string; oidcIdToken?: string } | undefined,
+  ): Promise<void> {
+    if (user.authProvider === "oidc") {
+      this.oidcReauth.consume(user.id, purpose, dto?.oidcIdToken);
+      return;
+    }
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        tr(
+          "errors.users.reauthUnavailable",
+          "Finish setting up your account password before using this action.",
+        ),
+      );
+    }
+    if (!dto?.password) {
+      throw new UnauthorizedException(
+        tr(
+          "errors.users.passwordRequiredForDelete",
+          "Password is required to confirm this action",
+        ),
+      );
+    }
+    const isValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedException(
+        tr("errors.users.invalidPassword", "Invalid password"),
+      );
+    }
+  }
+
   async deleteAccount(
     userId: string,
     dto?: { password?: string; oidcIdToken?: string },
@@ -394,32 +449,8 @@ export class UsersService {
       );
     }
 
-    // SECURITY: Re-authenticate before account deletion
-    if (user.authProvider === "oidc") {
-      if (!dto?.oidcIdToken) {
-        throw new UnauthorizedException(
-          tr(
-            "errors.users.oidcReauthRequired",
-            "OIDC re-authentication is required to confirm account deletion",
-          ),
-        );
-      }
-    } else if (user.passwordHash) {
-      if (!dto?.password) {
-        throw new UnauthorizedException(
-          tr(
-            "errors.users.passwordRequiredForDelete",
-            "Password is required to confirm account deletion",
-          ),
-        );
-      }
-      const isValid = await bcrypt.compare(dto.password, user.passwordHash);
-      if (!isValid) {
-        throw new UnauthorizedException(
-          tr("errors.users.invalidPassword", "Invalid password"),
-        );
-      }
-    }
+    // SECURITY: Re-authenticate before account deletion.
+    await this.reauthenticate(user, "delete-account", dto);
 
     // SECURITY: Prevent the last admin from self-deleting, which would leave
     // the system with no administrator.
@@ -493,9 +524,17 @@ export class UsersService {
     return { downgraded: false };
   }
 
+  /**
+   * `reauthPurpose` names the action the caller's re-authentication artifact must
+   * have been minted for. It defaults to the Settings "delete my data" flow; the
+   * .mny import's wipe-first mode passes its own, so an artifact obtained for one
+   * cannot silently drive the other -- they present different confirmations to
+   * the user and one of them is followed by an import.
+   */
   async deleteData(
     userId: string,
     dto: DeleteDataDto,
+    reauthPurpose: OidcReauthPurpose = "delete-data",
   ): Promise<{ deleted: Record<string, number> }> {
     const user = await this.scoped(User, (repo) =>
       repo.findOne({ where: { id: userId } }),
@@ -506,34 +545,8 @@ export class UsersService {
       );
     }
 
-    // SECURITY: Re-authenticate before destructive operation
-    if (user.authProvider === "oidc") {
-      if (!dto.oidcIdToken) {
-        throw new UnauthorizedException(
-          tr(
-            "errors.users.oidcReauthRequiredForDataDelete",
-            "OIDC re-authentication is required to confirm data deletion",
-          ),
-        );
-      }
-    } else if (user.passwordHash) {
-      if (!dto.password) {
-        throw new UnauthorizedException(
-          tr(
-            "errors.users.passwordRequiredForDataDelete",
-            "Password is required to confirm data deletion",
-          ),
-        );
-      }
-      const isValid = await bcrypt.compare(dto.password, user.passwordHash);
-      if (!isValid) {
-        throw new UnauthorizedException(
-          tr("errors.users.invalidPassword", "Invalid password"),
-        );
-      }
-      // The frontend obtains a fresh OIDC token via the re-auth flow.
-      // The presence of a valid JWT session + the OIDC token confirms identity.
-    }
+    // SECURITY: Re-authenticate before destructive operation.
+    await this.reauthenticate(user, reauthPurpose, dto);
 
     const deleted = await withScopedDb(this.dataSource, (manager) =>
       this.runOwnedDataDeletes(userId, dto, manager),

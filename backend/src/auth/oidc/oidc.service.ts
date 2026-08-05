@@ -62,9 +62,21 @@ export class OidcService implements OnModuleInit {
   }
 
   /**
-   * Generate authorization URL for OIDC login
+   * Generate authorization URL for OIDC login.
+   *
+   * `forceReauthentication` adds `prompt=login` and `max_age=0`, which ask the
+   * provider to challenge the user again rather than silently re-using its
+   * existing session. That is the whole point of a re-authentication: without it
+   * the round trip is a redirect the user never notices, and it proves nothing
+   * beyond what the Monize session already proved (P2-005). Both parameters are
+   * sent because providers honour them unevenly -- `prompt=login` is the RFC 6749
+   * spelling, `max_age=0` the OIDC Core one.
    */
-  getAuthorizationUrl(state: string, nonce: string): string {
+  getAuthorizationUrl(
+    state: string,
+    nonce: string,
+    { forceReauthentication = false }: { forceReauthentication?: boolean } = {},
+  ): string {
     if (!this.config) {
       throw new Error("OIDC client not initialized");
     }
@@ -74,6 +86,7 @@ export class OidcService implements OnModuleInit {
       scope: "openid profile email",
       state,
       nonce,
+      ...(forceReauthentication ? { prompt: "login", max_age: "0" } : {}),
     });
 
     return url.href;
@@ -148,50 +161,6 @@ export class OidcService implements OnModuleInit {
     );
 
     return userInfo as unknown as Record<string, unknown>;
-  }
-
-  /**
-   * Verify an OIDC ID token's claims without full JWKS signature verification.
-   * Checks that the token is a valid JWT, issued by the configured provider,
-   * intended for our client, not expired, and belongs to the expected subject.
-   */
-  verifyIdTokenClaims(idToken: string, expectedSubject: string): boolean {
-    try {
-      const parts = idToken.split(".");
-      if (parts.length !== 3) return false;
-
-      const payload = JSON.parse(
-        Buffer.from(parts[1], "base64url").toString("utf-8"),
-      );
-
-      // Verify issuer matches configured OIDC provider
-      if (this.config) {
-        const expectedIssuer = this.config.serverMetadata().issuer;
-        if (payload.iss !== expectedIssuer) return false;
-      }
-
-      // Verify audience includes our client ID
-      const clientId = this.configService.get<string>("OIDC_CLIENT_ID");
-      if (clientId) {
-        const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-        if (!aud.includes(clientId)) return false;
-      }
-
-      // Verify token is not expired (with 60s clock skew tolerance)
-      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000) - 60) {
-        return false;
-      }
-
-      // Verify subject matches the expected OIDC subject
-      if (payload.sub !== expectedSubject) return false;
-
-      return true;
-    } catch (err) {
-      this.logger.debug(
-        `ID token claim verification failed: ${err instanceof Error ? err.message : err}`,
-      );
-      return false;
-    }
   }
 
   /**
