@@ -103,17 +103,6 @@ function shot(name,alt){
 function full(name){ var i=$('[data-shot="'+name+'"]'); return (i&&i.dataset.fb)? WIKI+name+'.png' : LOCAL+name+'.png'; }
 
 /* ---------- content ---------- */
-var TIMELINE = [
- {yr:'1995', lb:'Microsoft Money', em:'💾', t:'One job, one ledger',
-  d:'A first job in tech support, a credit-card balance to kill, and a copy of Microsoft Money. Every single transaction typed in by hand — which meant knowing exactly where every penny went.'},
- {yr:'2010', lb:'End of the line', em:'⚠️', t:'The last version ships',
-  d:'Microsoft Money is discontinued. Thirty years of history is now trapped in software that runs on exactly one machine, with no mobile app and no automation.'},
- {yr:'2025', lb:'Vibe-coded', em:'🤖', t:'Nothing else measured up',
-  d:'Every hosted and self-hosted alternative had a deal-breaker: no mortgages, no brokerage accounts, no multi-currency, no QIF import. So Monize got built from a requirements list instead of a roadmap.'},
- {yr:'Today', lb:'Retired at last', em:'🏁', t:'30+ years imported, zero discrepancies',
-  d:'A full .mny file import brought across every account, split, transfer, investment and price — then reconciled each balance against the original. Microsoft Money is finally switched off.'}
-];
-
 var FCATS = [['all','Everything'],['accounts','Accounts'],['tx','Transactions'],['inv','Investments'],
  ['budget','Budgets'],['reports','Reports'],['ai','AI'],['sec','Security'],['import','Import'],['host','Self-hosting']];
 
@@ -327,7 +316,7 @@ var BUDGET=[
 ];
 
 window.__MZ = {LOCAL:LOCAL,WIKI:WIKI,REPORAW:REPORAW,DEMO:DEMO,GH:GH,$:$,$$:$$,el:el,clear:clear,fill:fill,rich:rich,rnd:rnd,wireShot:wireShot,shot:shot,full:full,
- TIMELINE:TIMELINE,FCATS:FCATS,FEATURES:FEATURES,TOUR:TOUR,REPORTS:REPORTS,RCOLOR:RCOLOR,QA:QA,CODE:CODE,
+ FCATS:FCATS,FEATURES:FEATURES,TOUR:TOUR,REPORTS:REPORTS,RCOLOR:RCOLOR,QA:QA,CODE:CODE,
  STACK:STACK,STACK2:STACK2,SECURITY:SECURITY,FORMATS:FORMATS,FAQ:FAQ,GALCATS:GALCATS,GALLERY:GALLERY,MARQUEE:MARQUEE,BUDGET:BUDGET};
 })();
 
@@ -431,20 +420,6 @@ mtxt.forEach(function(t){ mq.appendChild(el('span',null,t)); });
 fetch('https://api.github.com/repos/kenlasko/monize').then(function(r){ return r.json(); }).then(function(d){
   if(d && d.stargazers_count) $('#stars').textContent='★ '+d.stargazers_count;
 }).catch(function(){});
-
-/* ---------- timeline ---------- */
-var tl=$('#tl'), tlCard=$('#tlCard');
-M.TIMELINE.forEach(function(s,i){
-  var n=el('div','tl-i'+(i===0?' on':''),
-    el('div','dot',s.em), el('div','yr',s.yr), el('div','lb',s.lb));
-  n.addEventListener('click',function(){ $$('.tl-i',tl).forEach(function(x){x.classList.remove('on');}); n.classList.add('on'); paintTl(i); });
-  tl.appendChild(n);
-});
-function paintTl(i){
-  var s=M.TIMELINE[i];
-  fill(tlCard, el('h3',null,s.yr+' — '+s.t), el('p',null,s.d));
-}
-paintTl(0);
 
 /* ---------- features ---------- */
 var fchips=$('#fchips'), fgrid=asStrip($('#fgrid'),'Features — scroll sideways for more'), fcat='all';

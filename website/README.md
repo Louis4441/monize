@@ -77,7 +77,7 @@ instead of a broken image. Dropping the PNG into `assets/img/screenshots/` fixes
 ## Editing
 
 All copy and data live in plain arrays near the top of `assets/js/app.js`:
-`TIMELINE`, `FEATURES`, `TOUR`, `REPORTS`, `QA`, `CODE`, `STACK`, `SECURITY`, `FORMATS`, `FAQ`, `GALLERY`, `MARQUEE`, `BUDGET`.
+`FEATURES`, `TOUR`, `REPORTS`, `QA`, `CODE`, `STACK`, `SECURITY`, `FORMATS`, `FAQ`, `GALLERY`, `MARQUEE`, `BUDGET`.
 Add a feature card or a gallery image by adding one line - no rebuild, just refresh.
 
 The content arrays hold **text, never markup.** Nothing in `app.js` assigns a

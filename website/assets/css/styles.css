@@ -127,18 +127,6 @@ main,header,footer{position:relative;z-index:1}
 .chip:hover{color:var(--txt);transform:translateY(-2px)}
 .chip.on{background:linear-gradient(135deg,var(--acc),#2563eb);border-color:transparent;color:#fff}
 
-/* timeline */
-.tl{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;margin:0 0 26px}
-.tl::before{content:"";position:absolute;left:6%;right:6%;top:19px;height:2px;background:var(--line)}
-.tl-i{text-align:center;cursor:pointer;position:relative;padding-top:0}
-.tl-i .dot{width:40px;height:40px;margin:0 auto 12px;border-radius:50%;background:var(--card);border:2px solid var(--line);display:grid;place-items:center;font-size:1rem;transition:.25s;position:relative;z-index:1}
-.tl-i.on .dot{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 25%,var(--card));transform:scale(1.12);box-shadow:0 0 0 8px color-mix(in srgb,var(--teal) 12%,transparent)}
-.tl-i .yr{font-weight:800;font-size:.95rem}
-.tl-i .lb{font-size:.8rem;color:var(--mut)}
-.tl-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:26px;min-height:120px}
-.tl-card h3{margin-bottom:6px}
-.tl-card p{color:var(--mut);margin:0}
-
 /* tour */
 .tour{display:grid;grid-template-columns:230px 1fr;gap:22px;align-items:start}
 .rail{display:flex;flex-direction:column;gap:6px;position:sticky;top:96px}
@@ -331,7 +319,6 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
   .gal.strip figure .shotmiss{padding:14px}
   .stats{grid-template-columns:repeat(2,auto);gap:16px 22px}
   .gal{columns:1}
-  .tl{grid-template-columns:repeat(2,1fr);gap:18px 0}.tl::before{display:none}
   .fgrid{grid-template-columns:1fr}
   .float{display:none}
   /* Give the picture the width of the phone: 14px of gutter, the close button
