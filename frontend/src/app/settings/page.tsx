@@ -84,7 +84,7 @@ function DelegateSecurityView() {
     ])
       .then(([self, status, methods]) => {
         if (cancelled) return;
-        setUser(self as User);
+        setUser(self);
         setTwoFactorEnabled(!!status.enabled);
         setForce2fa(!!methods.force2fa);
       })

@@ -31,6 +31,19 @@ import {
 import { EmailService } from "../notifications/email.service";
 import { accountInviteTemplate } from "../notifications/email-templates";
 import { CreateUserDto } from "./dto/create-user.dto";
+import { toUserProfile, UserProfile } from "../users/user-profile";
+
+/**
+ * The admin create-user response: the complete profile plus the fields only
+ * this flow produces. Named so removing a required admin field from the
+ * allowlist fails to compile here, at the response construction site, rather
+ * than surfacing as a missing property in the admin UI.
+ */
+type CreatedAdminUserProfile = UserProfile & {
+  temporaryPassword: string | undefined;
+  invited: boolean;
+  upgraded: boolean;
+};
 
 @Injectable()
 export class AdminService {
@@ -46,11 +59,11 @@ export class AdminService {
     private readonly i18n: I18nService,
   ) {}
 
-  async findAllUsers() {
+  async findAllUsers(): Promise<UserProfile[]> {
     return withSystemContext(() => this.findAllUsersWithinContext());
   }
 
-  private async findAllUsersWithinContext() {
+  private async findAllUsersWithinContext(): Promise<UserProfile[]> {
     // Hide owner-managed delegate identities -- users that exist solely
     // because an account owner added them via Shared Access. Those rows
     // are managed from the owner's Shared Access page. The is_delegate_only
@@ -64,34 +77,16 @@ export class AdminService {
         order: { createdAt: "ASC" },
       }),
     );
-    return users.map((user) => {
-      const {
-        passwordHash,
-        resetToken,
-        resetTokenExpiry,
-        twoFactorSecret,
-        ...rest
-      } = user;
-      return { ...rest, hasPassword: !!passwordHash };
-    });
+    return users.map((user) => toUserProfile(user));
   }
 
-  private sanitizeUser(user: User) {
-    const {
-      passwordHash,
-      resetToken,
-      resetTokenExpiry,
-      twoFactorSecret,
-      ...rest
-    } = user;
-    return { ...rest, hasPassword: !!passwordHash };
-  }
-
-  async createUser(dto: CreateUserDto) {
+  async createUser(dto: CreateUserDto): Promise<CreatedAdminUserProfile> {
     return withSystemContext(() => this.createUserWithinContext(dto));
   }
 
-  private async createUserWithinContext(dto: CreateUserDto) {
+  private async createUserWithinContext(
+    dto: CreateUserDto,
+  ): Promise<CreatedAdminUserProfile> {
     const email = dto.email.toLowerCase().trim();
     const role = dto.role === "admin" ? "admin" : "user";
 
@@ -233,14 +228,18 @@ export class AdminService {
     }
 
     return {
-      ...this.sanitizeUser(saved),
+      ...toUserProfile(saved),
       temporaryPassword,
       invited: !!inviteToken,
       upgraded,
     };
   }
 
-  async updateUserRole(adminId: string, targetUserId: string, role: string) {
+  async updateUserRole(
+    adminId: string,
+    targetUserId: string,
+    role: string,
+  ): Promise<UserProfile> {
     return withSystemContext(() =>
       this.updateUserRoleWithinContext(adminId, targetUserId, role),
     );
@@ -250,7 +249,7 @@ export class AdminService {
     adminId: string,
     targetUserId: string,
     role: string,
-  ) {
+  ): Promise<UserProfile> {
     if (adminId === targetUserId) {
       throw new ForbiddenException(
         tr(
@@ -299,19 +298,14 @@ export class AdminService {
       targetUser.role = role;
       return repo.save(targetUser);
     });
-    return this.sanitizeUser(saved);
+    return toUserProfile(saved);
   }
 
   async updateUserStatus(
     adminId: string,
     targetUserId: string,
     isActive: boolean,
-  ): Promise<
-    Omit<
-      User,
-      "passwordHash" | "resetToken" | "resetTokenExpiry" | "twoFactorSecret"
-    > & { hasPassword: boolean }
-  > {
+  ): Promise<UserProfile> {
     return withSystemContext(() =>
       this.updateUserStatusWithinContext(adminId, targetUserId, isActive),
     );
@@ -321,7 +315,7 @@ export class AdminService {
     adminId: string,
     targetUserId: string,
     isActive: boolean,
-  ) {
+  ): Promise<UserProfile> {
     if (adminId === targetUserId) {
       throw new ForbiddenException(
         tr(
@@ -356,7 +350,7 @@ export class AdminService {
       await this.revokeSessionsAndTokens(targetUserId);
     }
 
-    return this.sanitizeUser(saved);
+    return toUserProfile(saved);
   }
 
   async deleteUser(

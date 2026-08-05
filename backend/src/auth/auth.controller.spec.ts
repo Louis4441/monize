@@ -18,6 +18,10 @@ import { encrypt, derivePurposeKey } from "./crypto.util";
 import { I18nService } from "nestjs-i18n";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { OidcReauthService } from "./oidc/oidc-reauth.service";
+import { SELF_ONLY_PROFILE_FIELDS } from "../users/user-profile";
+import { fullyPopulatedUser } from "../users/user-profile.test-util";
+import { UsersController } from "../users/users.controller";
+import { UsersService } from "../users/users.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -99,24 +103,9 @@ describe("AuthController", () => {
       generateBackupCodes: jest.fn(),
       confirmOidcLink: jest.fn(),
       getCsrfKey: jest.fn().mockReturnValue("test-csrf-key"),
-      sanitizeUser: jest.fn().mockImplementation((user) => {
-        const {
-          passwordHash,
-          resetToken,
-          resetTokenExpiry,
-          twoFactorSecret,
-          pendingTwoFactorSecret,
-          failedLoginAttempts,
-          lockedUntil,
-          backupCodes,
-          oidcLinkPending,
-          oidcLinkToken,
-          oidcLinkExpiresAt,
-          pendingOidcSubject,
-          ...sanitized
-        } = user;
-        return { ...sanitized, hasPassword: !!passwordHash };
-      }),
+      // No sanitizeUser mock: the profile endpoints call the real
+      // toUserProfile/toDelegatedUserProfile allowlist directly, so these
+      // tests exercise the actual serializer rather than a re-implementation.
     };
 
     oidcService = {
@@ -608,9 +597,11 @@ describe("AuthController", () => {
       expect(result).not.toHaveProperty("oidcLinkToken");
       expect(result).not.toHaveProperty("oidcLinkExpiresAt");
       expect(result).not.toHaveProperty("pendingOidcSubject");
-      expect(result!.hasPassword).toBe(true);
-      expect(result!.email).toBe("test@example.com");
-      expect(result!.id).toBe("user-1");
+      expect(result).toMatchObject({
+        hasPassword: true,
+        email: "test@example.com",
+        id: "user-1",
+      });
     });
 
     it("hasPassword is false when passwordHash is null", async () => {
@@ -622,7 +613,7 @@ describe("AuthController", () => {
 
       const result = await controller.getProfile(reqWithUser);
 
-      expect(result!.hasPassword).toBe(false);
+      expect(result).toMatchObject({ hasPassword: false });
     });
 
     it("returns null when the user no longer exists", async () => {
@@ -632,6 +623,101 @@ describe("AuthController", () => {
       const result = await controller.getProfile(reqWithUser);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("profile serialization", () => {
+    it("omits the owner's credential state while a delegate is acting", async () => {
+      const owner = fullyPopulatedUser({
+        id: "owner-1",
+        passwordHash: "$2b$10$owner-hash",
+        mustChangePassword: true,
+        isDelegateOnly: true,
+        backupEncryptionEnabled: true,
+      });
+      authService.getUserById.mockResolvedValue(owner);
+
+      const result = await controller.getProfile({
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+      });
+
+      expect(result).toMatchObject({
+        id: "owner-1",
+        email: owner.email,
+        firstName: owner.firstName,
+      });
+      for (const field of SELF_ONLY_PROFILE_FIELDS) {
+        expect(result).not.toHaveProperty(field);
+      }
+      expect(JSON.stringify(result)).not.toContain("LEAK-");
+    });
+
+    it("returns the complete profile when acting as self", async () => {
+      const user = fullyPopulatedUser({
+        id: "user-1",
+        passwordHash: "$2b$10$user-hash",
+      });
+      authService.getUserById.mockResolvedValue(user);
+
+      const result = await controller.getProfile({
+        user: { id: "user-1", realUserId: "user-1", isActing: false },
+      });
+
+      expect(result).toMatchObject({ id: "user-1", hasPassword: true });
+      expect(JSON.stringify(result)).not.toContain("LEAK-");
+    });
+
+    it("returns the delegate's own full profile from /auth/me-self", async () => {
+      const delegate = fullyPopulatedUser({
+        id: "delegate-1",
+        passwordHash: "$2b$10$delegate-hash",
+        mustChangePassword: false,
+      });
+      authService.getUserById.mockResolvedValue(delegate);
+
+      const result = await controller.getSelfProfile({
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+      });
+
+      expect(authService.getUserById).toHaveBeenCalledWith("delegate-1");
+      expect(result).toMatchObject({
+        id: "delegate-1",
+        hasPassword: true,
+        mustChangePassword: false,
+      });
+      expect(JSON.stringify(result)).not.toContain("LEAK-");
+    });
+
+    // The P2-003 blocker existed because /auth/profile and /users/me answered
+    // the same acting-context question with different field sets. This is not
+    // an HTTP-level test (the repo's e2e infrastructure is documented broken
+    // in backend/CLAUDE.md and nothing in CI runs it); it drives both real
+    // controller methods with the same request shape and the same owner row,
+    // which pins the parity the two routes' serialization can drift on.
+    it("removes the same fields from /auth/profile and /users/me while acting", async () => {
+      const owner = fullyPopulatedUser({ id: "owner-1" });
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+      };
+      authService.getUserById.mockResolvedValue(owner);
+      const usersController = new UsersController({
+        findById: jest.fn().mockResolvedValue(owner),
+      } as unknown as UsersService);
+
+      const authProfile = await controller.getProfile(actingReq);
+      const usersProfile = await usersController.getProfile(actingReq);
+
+      expect(authProfile).toMatchObject({ id: "owner-1", email: owner.email });
+      expect(usersProfile).toMatchObject({ id: "owner-1", email: owner.email });
+      expect(Object.keys(authProfile as object).sort()).toEqual(
+        Object.keys(usersProfile as object).sort(),
+      );
+      for (const field of SELF_ONLY_PROFILE_FIELDS) {
+        expect(authProfile).not.toHaveProperty(field);
+        expect(usersProfile).not.toHaveProperty(field);
+      }
+      expect(JSON.stringify(authProfile)).not.toContain("LEAK-");
+      expect(JSON.stringify(usersProfile)).not.toContain("LEAK-");
     });
   });
 
@@ -1445,14 +1531,14 @@ describe("AuthController", () => {
   });
 
   describe("getSelfProfile", () => {
-    it("loads and sanitizes the real (delegate) user, never the owner", async () => {
-      const delegateUser = { id: "delegate-1", email: "d@x.com" } as any;
+    it("loads and serializes the real (delegate) user, never the owner", async () => {
+      const delegateUser = fullyPopulatedUser({
+        id: "delegate-1",
+        email: "d@x.com",
+      });
       (authService as any).getUserById = jest
         .fn()
         .mockResolvedValue(delegateUser);
-      (authService as any).sanitizeUser = jest
-        .fn()
-        .mockReturnValue({ id: "delegate-1", email: "d@x.com" });
       const actingReq = {
         user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
       };
@@ -1462,7 +1548,8 @@ describe("AuthController", () => {
       expect((authService as any).getUserById).toHaveBeenCalledWith(
         "delegate-1",
       );
-      expect(result).toEqual({ id: "delegate-1", email: "d@x.com" });
+      expect(result).toMatchObject({ id: "delegate-1", email: "d@x.com" });
+      expect(result).not.toHaveProperty("passwordHash");
     });
   });
 

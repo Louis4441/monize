@@ -66,6 +66,7 @@ import { generateCsrfToken, getCsrfCookieOptions } from "../common/csrf.util";
 import { encrypt, decrypt, derivePurposeKey } from "./crypto.util";
 import { withSystemContext } from "../common/db/with-context";
 import { tr } from "../i18n/translate";
+import { toDelegatedUserProfile, toUserProfile } from "../users/user-profile";
 
 @ApiTags("Authentication")
 @Controller("auth")
@@ -709,11 +710,14 @@ export class AuthController {
     // req.user comes from the JWT strategy, which only carries the lightweight
     // auth state (id/isActive/role/mustChangePassword) -- not profile fields
     // like firstName/email. Load the full user so the profile is complete.
-    // req.user.id is the owner's id when acting as a delegate, which is the
-    // profile the caller expects here.
+    // req.user.id is the owner's id while acting. The identification fields
+    // belong in the acting-context profile, but the owner's credential state
+    // does not -- the delegate's own copies live behind /auth/me-self.
     const user = await this.authService.getUserById(req.user.id);
     if (!user) return null;
-    return this.authService.sanitizeUser(user);
+    return req.user.isActing
+      ? toDelegatedUserProfile(user)
+      : toUserProfile(user);
   }
 
   @Get("me-self")
@@ -726,9 +730,11 @@ export class AuthController {
       "Used by Security settings while acting as a delegate.",
   })
   async getSelfProfile(@Request() req) {
+    // realUserId is always the authenticated identity, so this row is the
+    // caller's own: the full profile, credential-state booleans included.
     const user = await this.authService.getUserById(req.user.realUserId);
     if (!user) return null;
-    return this.authService.sanitizeUser(user);
+    return toUserProfile(user);
   }
 
   @Get("contexts")

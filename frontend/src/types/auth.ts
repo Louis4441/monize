@@ -1,20 +1,47 @@
 import type { ColorTheme } from '@/lib/color-themes';
 
+/**
+ * The acting-context profile (`GET /auth/profile`, `GET /users/me`). While a
+ * delegate is acting for an owner, the backend intentionally omits the owner's
+ * credential-state fields (`hasPassword`, `mustChangePassword`,
+ * `isDelegateOnly`, `backupEncryptionEnabled`) -- so they are optional here,
+ * and any guard reading them must treat absence as "unknown", not as false.
+ * Credential controls belong on the authenticated user's own profile from
+ * `GET /auth/me-self`, which is `SelfUserProfile`.
+ */
 export interface User {
   id: string;
   email: string;
   firstName?: string;
   lastName?: string;
   authProvider: 'local' | 'oidc';
-  hasPassword: boolean;
+  hasPassword?: boolean;
   role: 'admin' | 'user';
   isActive: boolean;
-  mustChangePassword: boolean;
+  mustChangePassword?: boolean;
+  isDelegateOnly?: boolean;
+  backupEncryptionEnabled?: boolean;
   emailVerified?: boolean;
   createdAt: string;
   updatedAt: string;
   lastLogin?: string;
 }
+
+/**
+ * The authenticated user's OWN profile (`GET /auth/me-self`, and the `user`
+ * in auth responses): always a complete row, so the credential-state
+ * booleans are guaranteed present.
+ */
+export type SelfUserProfile = User &
+  Required<
+    Pick<
+      User,
+      | 'hasPassword'
+      | 'mustChangePassword'
+      | 'isDelegateOnly'
+      | 'backupEncryptionEnabled'
+    >
+  >;
 
 export interface AdminUser {
   id: string;
@@ -30,6 +57,26 @@ export interface AdminUser {
   updatedAt: string;
   lastLogin: string | null;
 }
+
+type Assert<T extends true> = T;
+type IsAssignable<From, To> = [From] extends [To] ? true : false;
+
+/**
+ * Administrators receive complete rows, so AdminUser keeps its
+ * credential-state booleans *required* -- exactly as on the authenticated
+ * user's own profile. AdminUser is deliberately not a full SelfUserProfile
+ * (its identification fields are nullable, and the admin list omits
+ * delegate-only rows), so the shared contract asserted here is exactly the
+ * credential state. This is a frontend-side consistency check between two
+ * frontend types; the backend's own return annotations are the cross-package
+ * half of the guarantee.
+ */
+type _AdminUserCarriesRequiredCredentialState = Assert<
+  IsAssignable<
+    Pick<AdminUser, 'hasPassword' | 'mustChangePassword'>,
+    Pick<SelfUserProfile, 'hasPassword' | 'mustChangePassword'>
+  >
+>;
 
 export interface LoginCredentials {
   email: string;

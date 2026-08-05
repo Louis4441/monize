@@ -277,7 +277,7 @@ function EmergencyAccessSection() {
   useEffect(() => {
     authApi
       .getSelfProfile()
-      .then((u: User) => setSelfUser(u))
+      .then((u) => setSelfUser(u))
       .catch((err) => {
         logger.error('Failed to load self profile for step-up', err);
       });

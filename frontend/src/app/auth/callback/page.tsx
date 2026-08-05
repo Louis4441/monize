@@ -93,6 +93,11 @@ function CallbackContent() {
         // For both flows, fetch the user profile to validate authentication
         try {
           const user = await authApi.getProfile();
+          // A null profile means the authenticated user's row no longer
+          // exists -- treat it like any other failed callback.
+          if (!user) {
+            throw new Error('Profile unavailable after authentication');
+          }
 
           // For OIDC, we don't have the token in JS (it's httpOnly)
           // Store a placeholder to indicate we're authenticated via cookie
