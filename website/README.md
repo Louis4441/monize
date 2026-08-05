@@ -54,7 +54,7 @@ There is nothing to compile, so builds finish instantly and stay inside the free
 ```
 index.html                     the whole page
 404.html                       friendly not-found page
-_headers                       security headers + long cache on /assets/*
+_headers                       security headers + revalidate-always caching
 _redirects                     /demo /github /docs /wiki /issues short links
 robots.txt, sitemap.xml        change the domain if it is not monize.net
 assets/css/styles.css          all styling, light + dark themes
