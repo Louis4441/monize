@@ -1,8 +1,16 @@
+import { Logger } from "@nestjs/common";
 import { Client } from "pg";
 import * as fs from "fs";
 import * as path from "path";
 
 const MIGRATIONS_DIRNAME = "migrations";
+
+/**
+ * The migration runner is its own process, but its output shares the container
+ * log with the Nest app, so it logs through the Nest `Logger` (usable outside
+ * an application context) instead of `console`.
+ */
+const logger = new Logger("DbMigrate");
 
 /** Where a human goes when a migration fails at startup. */
 const RUNBOOK = "docs/database-migrations.md";
@@ -254,6 +262,8 @@ function safePath(base: string, relative: string): string | null {
 }
 
 export async function runMigrations() {
+  logger.log("Running database migrations");
+
   const client = new Client({
     host: process.env.DATABASE_HOST || "localhost",
     port: parseInt(process.env.DATABASE_PORT || "5432", 10),
@@ -288,7 +298,7 @@ export async function runMigrations() {
     }
 
     if (!migrationsDir) {
-      console.log("No migrations directory found. Skipping migrations.");
+      logger.log("No migrations directory found; skipping migrations");
       return;
     }
 
@@ -321,12 +331,12 @@ export async function runMigrations() {
 
       const filePath = safePath(migrationsDir, file);
       if (!filePath) {
-        console.error(`Skipping invalid migration filename: ${file}`);
+        logger.error(`Skipping invalid migration filename: ${file}`);
         continue;
       }
       const sql = fs.readFileSync(filePath, "utf8");
 
-      console.log(`Applying migration: ${file}`);
+      logger.log(`Applying migration: ${file}`);
       try {
         await client.query("BEGIN");
         await client.query(sql);
@@ -338,7 +348,7 @@ export async function runMigrations() {
         count++;
       } catch (err) {
         await client.query("ROLLBACK");
-        console.error(
+        logger.error(
           formatMigrationFailure({
             file,
             filePath,
@@ -352,12 +362,12 @@ export async function runMigrations() {
     }
 
     if (count > 0) {
-      console.log(`Applied ${count} migration(s) successfully.`);
+      logger.log(`Applied ${count} migration(s) successfully`);
     } else {
-      console.log("Database is up to date. No pending migrations.");
+      logger.log("Database is up to date; no pending migrations");
     }
   } catch (error) {
-    console.error(formatRunnerFailure(error));
+    logger.error(formatRunnerFailure(error));
     process.exit(1);
   } finally {
     await client.end();

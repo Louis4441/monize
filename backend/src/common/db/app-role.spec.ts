@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import {
   APP_ROLE_GRANTS_SQL,
   APP_ROLE_NAME_GUC,
@@ -80,10 +81,14 @@ describe("provisionAppRole", () => {
     expect(logger.log).not.toHaveBeenCalled();
   });
 
-  it("defaults the logger to console when none is provided", async () => {
+  it("defaults to the Nest Logger when none is provided, so the line is formatted like the rest of startup", async () => {
     const { client } = makeClient();
-    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const logSpy = jest
+      .spyOn(Logger.prototype, "log")
+      .mockImplementation(() => {});
+    const warnSpy = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => {});
     try {
       await provisionAppRole(client, {
         appUser: "monize_app",

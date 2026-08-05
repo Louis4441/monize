@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Client } from "pg";
 import * as fs from "fs";
 import * as path from "path";
@@ -5,10 +6,18 @@ import { provisionAppRole } from "./common/db/app-role";
 
 const SCHEMA_FILENAME = "schema.sql";
 
+/**
+ * db-init runs as its own process before the Nest app, but its output ends up
+ * in the same container log, so it uses the Nest `Logger` (which works outside
+ * an application context) rather than `console` -- otherwise the first lines of
+ * every startup are the only unformatted ones in the file.
+ */
+const logger = new Logger("DbInit");
+
 function requiredEnv(name: string, fallback?: string): string {
   const value = process.env[name] || fallback;
   if (!value) {
-    console.error(`Missing required environment variable: ${name}`);
+    logger.error(`Missing required environment variable: ${name}`);
     process.exit(1);
   }
   return value;
@@ -30,6 +39,8 @@ function safePath(base: string, relative: string): string | null {
 }
 
 async function initDatabase() {
+  logger.log("Checking database initialization");
+
   const client = new Client({
     host: process.env.DATABASE_HOST || "localhost",
     port: parseInt(process.env.DATABASE_PORT || "5432", 10),
@@ -42,13 +53,13 @@ async function initDatabase() {
   // warning raised when the owner cannot create the runtime role on CNPG).
   client.on("notice", (msg) => {
     if (msg?.message) {
-      console.warn(`Postgres: ${msg.message}`);
+      logger.warn(`Postgres: ${msg.message}`);
     }
   });
 
   try {
     await client.connect();
-    console.log("Connected to database");
+    logger.log("Connected to database");
 
     // RLS role + grants (Phase 1). Runs on EVERY startup, BEFORE the
     // "tables already exist" early return below -- placed after it, the block
@@ -59,6 +70,7 @@ async function initDatabase() {
     await provisionAppRole(client, {
       appUser: process.env.DATABASE_APP_USER,
       appPassword: process.env.DATABASE_APP_PASSWORD,
+      logger,
     });
 
     // Check if tables already exist
@@ -71,11 +83,11 @@ async function initDatabase() {
     `);
 
     if (result.rows[0].exists) {
-      console.log("Database tables already exist. Skipping initialization.");
+      logger.log("Database tables already exist; skipping initialization");
       return;
     }
 
-    console.log("Tables not found. Initializing database...");
+    logger.log("Tables not found; initializing database");
 
     // Try multiple possible locations for schema.sql
     // All base directories are trusted (derived from __dirname or cwd)
@@ -96,18 +108,25 @@ async function initDatabase() {
     }
 
     if (!schemaPath) {
-      console.error("schema.sql not found. Searched directories:");
-      baseDirs.forEach((d) => console.error(`  - ${d}`));
+      logger.error(
+        [
+          "schema.sql not found. Searched directories:",
+          ...baseDirs.map((d) => `  - ${d}`),
+        ].join("\n"),
+      );
       process.exit(1);
     }
 
-    console.log(`Using schema from: ${schemaPath}`);
+    logger.log(`Using schema from: ${schemaPath}`);
     const schema = fs.readFileSync(schemaPath, "utf8");
 
     await client.query(schema);
-    console.log("Database initialized successfully!");
+    logger.log("Database initialized successfully");
   } catch (error) {
-    console.error("Database initialization failed:", error);
+    logger.error(
+      "Database initialization failed",
+      error instanceof Error ? error.stack : String(error),
+    );
     process.exit(1);
   } finally {
     await client.end();

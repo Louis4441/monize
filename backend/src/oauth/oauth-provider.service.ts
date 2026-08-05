@@ -188,9 +188,11 @@ export class OAuthProviderService implements OnModuleInit {
       },
       // Every artifact this provider can issue needs an explicit TTL. Leaving
       // one out does not just inherit a default silently — node-oidc-provider
-      // calls its built-in TTL function and prints a raw
-      // "oidc-provider NOTICE: default ttl.<Model> function called ..." line
-      // straight to console.info, bypassing the Nest Logger and its formatting.
+      // calls its built-in TTL function and emits an
+      // "oidc-provider NOTICE: default ttl.<Model> function called ..." line.
+      // oidc-provider-log-bridge.ts normalizes how such a line is printed, but
+      // the notice itself still means a default was left in place: fix the
+      // config, not the log line.
       // The remaining defaults (ClientCredentials, DeviceCode,
       // BackchannelAuthenticationRequest) belong to grants/features this
       // provider does not enable, so they are never reached.

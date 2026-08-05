@@ -9,18 +9,21 @@
  * Run with: npx ts-node -r tsconfig-paths/register src/database/fix-linked-transactions.ts
  */
 
+import { Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import * as dotenv from "dotenv";
 import * as path from "path";
 
 dotenv.config({ path: path.join(__dirname, "../../../.env") });
 
+const logger = new Logger("FixLinkedTransactions");
+
 function requiredEnv(...names: string[]): string {
   for (const name of names) {
     const value = process.env[name];
     if (value) return value;
   }
-  console.error(`Missing required environment variable: ${names.join(" or ")}`);
+  logger.error(`Missing required environment variable: ${names.join(" or ")}`);
   process.exit(1);
 }
 
@@ -35,7 +38,7 @@ async function fixLinkedTransactions() {
   });
 
   await dataSource.initialize();
-  console.log("Database connected");
+  logger.log("Database connected");
 
   try {
     // Find all splits that have a linkedTransactionId (these are transfer splits)
@@ -49,7 +52,7 @@ async function fixLinkedTransactions() {
         AND t.is_transfer = true
     `);
 
-    console.log("Fixed linked transactions:", result);
+    logger.log(`Fixed linked transactions: ${JSON.stringify(result)}`);
 
     // Verify the fix
     const verification = await dataSource.query(`
@@ -60,10 +63,15 @@ async function fixLinkedTransactions() {
         AND t.is_transfer = true
     `);
 
-    console.log("Remaining unfixed transactions:", verification[0].count);
+    logger.log(`Remaining unfixed transactions: ${verification[0].count}`);
   } finally {
     await dataSource.destroy();
   }
 }
 
-fixLinkedTransactions().catch(console.error);
+fixLinkedTransactions().catch((error) =>
+  logger.error(
+    "Failed to fix linked transactions",
+    error instanceof Error ? error.stack : String(error),
+  ),
+);
