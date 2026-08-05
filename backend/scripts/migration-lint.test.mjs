@@ -7,6 +7,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
 import {
   RULES,
   stripComments,
@@ -255,8 +256,10 @@ test("every rule has a unique id", () => {
 });
 
 test("the repository's migrations lint clean", () => {
+  // fileURLToPath, not `.pathname` -- a file:// URL percent-encodes a space,
+  // and lintDirectory hands that straight to `fs`, which does not decode it.
   const { files, findings } = lintDirectory(
-    new URL("../../database/migrations", import.meta.url).pathname,
+    fileURLToPath(new URL("../../database/migrations", import.meta.url)),
   );
   assert.ok(files.length > 0, "expected migrations to be found");
   assert.deepEqual(

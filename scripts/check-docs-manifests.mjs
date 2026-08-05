@@ -25,8 +25,13 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = new URL('..', import.meta.url).pathname;
+// `.pathname` on a file:// URL is percent-encoded (a space becomes `%20`) and
+// `fs` wants a real OS path, not a URL component -- `fileURLToPath` decodes
+// it. A repo checked out under a path with a space (not exotic: "My Drive")
+// reads that literal `%20` as a directory name and fails on the first read.
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** Documents whose commands and tables are treated as canonical instructions. */
 const DOCS = [
