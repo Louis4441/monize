@@ -338,6 +338,84 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
     expect(feb.unrealizedGain).toBe(500);
   });
 
+  it("reports unknown boundary values when the security currency cannot be converted (P5-009)", async () => {
+    // A USD security in a CAD account with no USD/CAD rate in either direction.
+    // The security's value at each month boundary is therefore unknown, so the
+    // capital gain measured between them is unknown too.
+    //
+    // The rate used to fall back to 1, which valued 100 USD shares as 100 CAD
+    // and produced a confident gain figure from an arbitrary conversion.
+    exchangeRateService.getLatestRate.mockResolvedValue(null);
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy",
+        action: InvestmentAction.BUY,
+        transactionDate: "2023-12-15",
+        quantity: 100,
+        price: 50,
+        totalAmount: 5000,
+        security: {
+          id: securityId,
+          symbol: "ABC",
+          name: "ABC Corp",
+          currencyCode: "USD",
+        },
+      } as never),
+    ]);
+    priceRepo.query.mockResolvedValue(
+      priceRows([
+        { date: "2023-12-31", price: 50 },
+        { date: "2024-01-31", price: 55 },
+      ]),
+    );
+
+    const result = await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+    });
+
+    expect(result).toHaveLength(1);
+    const jan = result[0];
+    expect(jan.startValue).toBeNull();
+    expect(jan.endValue).toBeNull();
+    expect(jan.unrealizedGain).toBeNull();
+    expect(jan.totalCapitalGain).toBeNull();
+    // Realized gain comes from each transaction's own stored rate, so it stays
+    // known -- there were no sales, and zero is the right answer for that.
+    expect(jan.realizedGain).toBe(0);
+  });
+
+  it("still computes gains when the security and account share a currency", async () => {
+    // The same-currency path must not be caught by the missing-rate handling:
+    // rate 1 is correct here because the codes are equal, and no lookup happens.
+    exchangeRateService.getLatestRate.mockResolvedValue(null);
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy",
+        action: InvestmentAction.BUY,
+        transactionDate: "2023-12-15",
+        quantity: 100,
+        price: 50,
+        totalAmount: 5000,
+      }),
+    ]);
+    priceRepo.query.mockResolvedValue(
+      priceRows([
+        { date: "2023-12-31", price: 50 },
+        { date: "2024-01-31", price: 55 },
+      ]),
+    );
+
+    const result = await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+    });
+
+    expect(result[0].totalCapitalGain).toBe(500);
+    expect(result[0].startValue).toBe(5000);
+    expect(result[0].endValue).toBe(5500);
+  });
+
   it("decomposes a SELL month into realized + unrealized capital gains", async () => {
     // Hold 100 shares at avg cost $50 since Dec.
     // Feb: price goes $50 -> $60, sell 40 shares mid-month at $60 (proceeds 2400),
@@ -799,6 +877,62 @@ describe("PortfolioCalculationService.primeLiveRates", () => {
 
     expect(holdingsRepo.createQueryBuilder).not.toHaveBeenCalled();
     expect(rateCache.get("USD->CAD")).toBe(1.37);
+  });
+});
+
+describe("PortfolioCalculationService.convertToDefault", () => {
+  let service: PortfolioCalculationService;
+  let exchangeRateService: { getLatestRate: jest.Mock };
+
+  beforeEach(() => {
+    exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
+    service = buildService([], exchangeRateService);
+  });
+
+  it("returns zero for a zero amount without looking for a rate", async () => {
+    // Zero converts to zero at any rate, so it needs none. Asking for one turned
+    // an empty foreign account -- no cash, no holdings, nothing invested -- into
+    // an unresolvable pair that made the whole portfolio's totals unknown. A
+    // settled question must not be reported as one that could not be worked out.
+    const result = await service.convertToDefault(
+      0,
+      "EUR",
+      "CAD",
+      new Map<string, number>(),
+    );
+
+    expect(result).toBe(0);
+    expect(exchangeRateService.getLatestRate).not.toHaveBeenCalled();
+  });
+
+  it("still reports a non-zero amount with no rate as unknown", async () => {
+    // The control: the zero shortcut must not become a general fallback.
+    const result = await service.convertToDefault(
+      100,
+      "EUR",
+      "CAD",
+      new Map<string, number>(),
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("caches the absence of a rate, resolving a missing pair once per cache", async () => {
+    // A portfolio with 50 holdings in one unrated currency used to re-run both
+    // lookups (direct + inverse) and re-log the warning for every holding.
+    const cache = new Map<string, number | null>();
+
+    expect(await service.convertToDefault(100, "EUR", "CAD", cache)).toBeNull();
+    expect(await service.convertToDefault(250, "EUR", "CAD", cache)).toBeNull();
+    expect(await service.convertToDefault(999, "EUR", "CAD", cache)).toBeNull();
+
+    // Direct + inverse for the first call only; the cached null answers the rest.
+    expect(exchangeRateService.getLatestRate).toHaveBeenCalledTimes(2);
+  });
+
+  it("a cached absence does not shadow the zero shortcut", async () => {
+    const cache = new Map<string, number | null>([["EUR->CAD", null]]);
+    expect(await service.convertToDefault(0, "EUR", "CAD", cache)).toBe(0);
   });
 });
 
@@ -2342,5 +2476,119 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
     const result = await valuation(lot({ quantity: 10.00001 }));
 
     expect(result.holdingsWithValues[0].costBasisAccountCurrency).toBe(900);
+  });
+
+  it("names the pair that actually failed when a basis cannot reach the account currency", async () => {
+    // USD security in a PLN account, user default PLN, no USD->PLN rate. The
+    // failed conversion is USD->PLN; recording it as accountCurrency->default
+    // filed the gap under the degenerate "PLN->PLN" -- a pair that is not
+    // missing -- so the report pointed the user (and any AI consumer) at a rate
+    // that did not need fixing while never naming the one that did.
+    const usdHolding = {
+      ...holdingRow,
+      security: { ...holdingRow.security, currencyCode: "USD" },
+    };
+    const holdingRepo = { find: jest.fn().mockResolvedValue([usdHolding]) };
+    const txRepo = { find: jest.fn().mockResolvedValue([]) };
+    const accountRepo = { find: jest.fn().mockResolvedValue([]) };
+    const service = buildService(
+      [
+        [Holding, holdingRepo],
+        [InvestmentTransaction, txRepo],
+        [Account, accountRepo],
+      ],
+      { getLatestRate: jest.fn().mockResolvedValue(null) },
+    );
+    jest
+      .spyOn(service, "calculateCostBasisLotsInAccountCurrency")
+      .mockResolvedValue(new Map());
+
+    const result = await service.calculateHoldingsWithValues(
+      userId,
+      ["acct-1"],
+      "PLN",
+      new Map(),
+      async () => new Map([["sec-a", 50]]),
+    );
+
+    expect(result.holdingsWithValues[0].costBasisAccountCurrency).toBeNull();
+    expect(result.fxComplete).toBe(false);
+    expect(result.missingRatePairs).toContain("USD->PLN");
+    expect(result.missingRatePairs).not.toContain("PLN->PLN");
+  });
+});
+
+describe("PortfolioCalculationService.calculateTWR", () => {
+  const userId = "user-1";
+
+  const buys = (currencyCode: string) => [
+    {
+      id: "tx-1",
+      userId,
+      accountId: "acct-1",
+      securityId: "sec-a",
+      security: { id: "sec-a", currencyCode },
+      action: InvestmentAction.BUY,
+      transactionDate: "2024-01-02",
+      quantity: 10,
+      price: 10,
+      createdAt: new Date("2024-01-02"),
+    },
+    {
+      id: "tx-2",
+      userId,
+      accountId: "acct-1",
+      securityId: "sec-a",
+      security: { id: "sec-a", currencyCode },
+      action: InvestmentAction.BUY,
+      transactionDate: "2024-02-02",
+      quantity: 10,
+      price: 12,
+      createdAt: new Date("2024-02-02"),
+    },
+  ];
+
+  const runTwr = async (currencyCode: string, latestRate: number | null) => {
+    const txRepo = { find: jest.fn().mockResolvedValue(buys(currencyCode)) };
+    const service = buildService([[InvestmentTransaction, txRepo]], {
+      getLatestRate: jest.fn().mockResolvedValue(latestRate),
+    });
+    jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
+      new Map([
+        [
+          "sec-a",
+          [
+            { date: "2024-01-02", price: 10 },
+            { date: "2024-02-02", price: 12 },
+          ],
+        ],
+      ]),
+    );
+    return service.calculateTWR(
+      userId,
+      ["acct-1"],
+      "USD",
+      new Map(),
+      async () => new Map([["sec-a", 15]]),
+    );
+  };
+
+  it("computes a chained return when every period value converts", async () => {
+    const twr = await runTwr("USD", 1);
+
+    // 100 -> 120 at the second buy (factor 1.2), 240 -> 300 today (1.25):
+    // chained (1.2 * 1.25) - 1 = 50%.
+    expect(twr).toBeCloseTo(50, 5);
+  });
+
+  it("returns null when a period value omitted an unconvertible position", async () => {
+    // EUR security, USD reporting, no EUR->USD rate. Every period value is
+    // then a knownSubtotal that silently omitted the position, and unlike the
+    // summary's totals the chained ratio carries no missingRatePairs field a
+    // consumer could check -- so the only honest answer is unknown, the same
+    // treatment CAGR gets from its completeness gate.
+    const twr = await runTwr("EUR", null);
+
+    expect(twr).toBeNull();
   });
 });

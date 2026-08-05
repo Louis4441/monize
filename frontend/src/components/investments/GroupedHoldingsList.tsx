@@ -370,8 +370,10 @@ const HoldingRow = memo(function HoldingRow({
     holding.marketValue !== null
       ? convert(holding.marketValue, holding.currencyCode, accountCurrency)
       : null;
+  // A gain needs both sides known: an unconvertible basis makes it unknown,
+  // not "market value minus zero".
   const gainLossAcct =
-    marketValueAcct !== null
+    marketValueAcct !== null && holding.costBasisAccountCurrency !== null
       ? marketValueAcct - holding.costBasisAccountCurrency
       : null;
 

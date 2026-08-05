@@ -134,8 +134,10 @@ export interface HoldingWithMarketValue {
   /**
    * Cost basis in the holding account's currency, calculated using the
    * historical exchange rates stored on the original BUY transactions.
+   * `null` when no rate exists to denominate the basis in the account's
+   * currency: unknown, never 0 and never the native amount relabelled.
    */
-  costBasisAccountCurrency: number;
+  costBasisAccountCurrency: number | null;
   currentPrice: number | null;
   marketValue: number | null;
   gainLoss: number | null;
@@ -550,13 +552,21 @@ export interface CapitalGainEntry {
   securityCurrencyCode: string | null;
   startQuantity: number;
   endQuantity: number;
-  startValue: number;
-  endValue: number;
+  /**
+   * Period-boundary market values in the account's currency, and the gains
+   * derived from them. `null` when the security's currency could not be
+   * converted into the account's: the value at each boundary is unknown, so a
+   * gain measured between them is too -- never 0, never the native amount
+   * relabelled. `buys`, `sells` and `realizedGain` stay known: they come from
+   * the exchange rate stored on each transaction.
+   */
+  startValue: number | null;
+  endValue: number | null;
   buys: number;
   sells: number;
   realizedGain: number;
-  unrealizedGain: number;
-  totalCapitalGain: number;
+  unrealizedGain: number | null;
+  totalCapitalGain: number | null;
 }
 
 // --- Performance comparison (Security Performance report) -------------------
