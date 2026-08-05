@@ -60,8 +60,36 @@ export const APP_ROLE_PASSWORD_GUC = "monize.app_password";
  * database what the connection actually is, and refuses to serve traffic on a
  * wrong answer.
  */
+/**
+ * `NOINHERIT` is defence in depth for RR3-001, not the fix.
+ *
+ * PostgreSQL decides table ownership with `has_privs_of_role`, which walks
+ * *inheritable* memberships -- so a role that inherits the owner's privileges is
+ * an owner for the RLS check and bypasses every policy without ever issuing
+ * `SET ROLE`. `NOINHERIT` makes that the role's default, which helps.
+ *
+ * It cannot be the whole answer, for three reasons that all apply here: the
+ * deployment may provision the role declaratively (CNPG `managed.roles`) where
+ * this SQL never runs; PostgreSQL 16 stores inheritance on each membership grant,
+ * so `GRANT owner TO app WITH INHERIT TRUE` overrides the role default; and the
+ * `ALTER` below degrades to a warning without `CREATEROLE`. The startup check is
+ * what actually refuses to serve -- this only narrows the default.
+ */
 export const APP_ROLE_ATTRIBUTES =
-  "LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION";
+  "LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION NOINHERIT";
+
+/**
+ * The `NO<x>` half of `APP_ROLE_ATTRIBUTES`, i.e. the attributes an operator must
+ * strip when provisioning declaratively. Derived from the one attribute string so
+ * the insufficient-privilege warning below cannot drift behind the contract the
+ * runtime verifier enforces (RR7-002: the warning hand-listed four of these and
+ * silently dropped `NOREPLICATION` and `NOINHERIT`, so an operator who followed it
+ * into `managed.roles` rebuilt a role that later failed enforce-mode startup).
+ * `app-role.spec.ts` asserts every one of these appears in the warning text.
+ */
+export const APP_ROLE_FORBIDDEN_ATTRIBUTE_TOKENS = APP_ROLE_ATTRIBUTES.split(
+  /\s+/,
+).filter((token) => token.startsWith("NO"));
 
 /**
  * Create the role if absent, else converge its attributes and rotate its
@@ -84,7 +112,7 @@ BEGIN
     EXECUTE format('ALTER ROLE %I ${APP_ROLE_ATTRIBUTES} PASSWORD %L', role_name, role_pw);
   END IF;
 EXCEPTION WHEN insufficient_privilege THEN
-  RAISE WARNING 'Insufficient privilege to create/alter role %; provision it declaratively via CNPG managed.roles (spec.managed.roles) with NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS.', role_name;
+  RAISE WARNING 'Insufficient privilege to create/alter role %; provision it declaratively via CNPG managed.roles (spec.managed.roles) with ${APP_ROLE_FORBIDDEN_ATTRIBUTE_TOKENS.join(" ")}.', role_name;
 END $$;
 `.trim();
 

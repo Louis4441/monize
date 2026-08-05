@@ -9,6 +9,7 @@ import {
   SqlClient,
 } from "./app-role";
 import { DEFAULT_APP_USER } from "./rls-config";
+import { FORBIDDEN_RUNTIME_ATTRIBUTES } from "./runtime-role-check";
 
 function makeClient() {
   const calls: Array<{ text: string; params?: unknown[] }> = [];
@@ -113,6 +114,62 @@ describe("provisionAppRole", () => {
 });
 
 describe("app-role SQL", () => {
+  it("has a runtime check for every forbidden attribute it provisions (RR5-001)", () => {
+    // The parity guard. `APP_ROLE_ATTRIBUTES` strips a set of NO<x> attributes,
+    // and the startup verifier must reject each of them -- provisioning can be
+    // skipped (declarative CNPG), fail soft (no CREATEROLE), or drift, so the
+    // verifier is the real control. REPLICATION was provisioned off and never
+    // checked, so a REPLICATION role passed startup and could hold WAL.
+    //
+    // Derived from the two sources rather than hand-listed, so a new NO<x> in
+    // provisioning without a runtime fact fails here.
+    const provisionedOff = (
+      APP_ROLE_ATTRIBUTES.match(/\bNO[A-Z]+\b/g) ?? []
+    ).map((token) => token.slice(2));
+
+    // NOINHERIT is defence in depth for inherited ownership, not a forbidden
+    // attribute in its own right (a role may legitimately hold INHERIT), so it is
+    // handled by the ownership arms rather than the forbidden-attribute list.
+    const shouldBeChecked = provisionedOff.filter((a) => a !== "INHERIT");
+    const checked = FORBIDDEN_RUNTIME_ATTRIBUTES.map((a) => a.label);
+
+    for (const attr of shouldBeChecked) {
+      expect(checked).toContain(attr);
+    }
+    // ...and nothing checked that provisioning does not also strip, so the two
+    // stay a matched pair.
+    for (const label of checked) {
+      expect(provisionedOff).toContain(label);
+    }
+  });
+
+  it("names every stripped attribute in the insufficient-privilege warning (RR7-002)", () => {
+    // The fallback path for declarative CNPG provisioning: when the owner lacks
+    // CREATEROLE, the ALTER fails soft and this warning is the only instruction
+    // the operator gets. It hand-listed four of the six NO<x> attributes and
+    // dropped NOREPLICATION and NOINHERIT, so an operator following it into
+    // managed.roles rebuilt a role that later failed enforce-mode startup.
+    //
+    // Derived from APP_ROLE_ATTRIBUTES, so the warning cannot drift behind it.
+    const warning = APP_ROLE_UPSERT_SQL.slice(
+      APP_ROLE_UPSERT_SQL.indexOf("RAISE WARNING"),
+    );
+    const stripped = APP_ROLE_ATTRIBUTES.match(/\bNO[A-Z]+\b/g) ?? [];
+    expect(stripped.length).toBeGreaterThan(0);
+    for (const token of stripped) {
+      expect(warning).toContain(token);
+    }
+  });
+
+  it("provisions the role NOINHERIT, so it does not inherit an owner by default", () => {
+    // Defence in depth for RR3-001: an inherited owner bypasses RLS with no SET
+    // ROLE at all. Not the fix -- a per-membership `WITH INHERIT TRUE` overrides
+    // the role default, and declarative provisioning skips this SQL entirely --
+    // which is why the startup check tests reachability rather than trusting it.
+    expect(APP_ROLE_ATTRIBUTES).toContain("NOINHERIT");
+    expect(APP_ROLE_UPSERT_SQL).toContain("NOINHERIT");
+  });
+
   it("uses %I / %L formatting and no FOR ROLE clause", () => {
     expect(APP_ROLE_UPSERT_SQL).toContain(
       `format('CREATE ROLE %I ${APP_ROLE_ATTRIBUTES} PASSWORD %L'`,
