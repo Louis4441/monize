@@ -172,10 +172,13 @@ describe("cron doc grammar", () => {
   it("resolves CronExpression members through the installed enum", () => {
     // Resolved via the import, so the doc tracks the scheduler actually
     // running, not a copy of its values.
-    const parsed = parseCronDecorators(`  @Cron(CronExpression.EVERY_DAY_AT_6AM)`);
+    const parsed = parseCronDecorators(
+      `  @Cron(CronExpression.EVERY_DAY_AT_6AM)`,
+    );
     expect(parsed.schedules).toEqual([CronExpression.EVERY_DAY_AT_6AM]);
-    expect(parseCronDecorators(`  @Cron(CronExpression.NO_SUCH_MEMBER)`).problems)
-      .toHaveLength(1);
+    expect(
+      parseCronDecorators(`  @Cron(CronExpression.NO_SUCH_MEMBER)`).problems,
+    ).toHaveLength(1);
   });
 
   it("counts a decorator it cannot parse, so the mismatch is loud", () => {
@@ -248,85 +251,93 @@ const REPO_ROOT = findRepoRoot(__dirname);
 
 const describeTree = REPO_ROOT || process.env.CI ? describe : describe.skip;
 
-describeTree("docs/cron-jobs.md matches the @Cron handlers in the source", () => {
-  interface TreeData {
-    declared: Map<string, StemSchedules>;
-    unparseable: string[];
-    documented: Map<string, string[]>;
-    rowCount: number;
-  }
-  let cached: TreeData | undefined;
-
-  const load = (): TreeData => {
-    if (cached) return cached;
-    const root = requireRepoRoot(REPO_ROOT);
-    const sources = gitListFiles(root, "-- backend/src").filter(
-      (f) => f.endsWith(".ts") && !f.endsWith(".spec.ts"),
-    );
-    const unparseable: string[] = [];
-    const parsedFiles = sources.map((path) => {
-      const parsed = parseCronDecorators(readFileSync(join(root, path), "utf8"));
-      if (parsed.anchors !== parsed.schedules.length || parsed.problems.length) {
-        unparseable.push(
-          `${path}: ${parsed.anchors} @Cron line(s), ${parsed.schedules.length} parsed${
-            parsed.problems.length ? `; ${parsed.problems.join("; ")}` : ""
-          }`,
-        );
-      }
-      return { path, schedules: parsed.schedules };
-    });
-    const declared = aggregateByStem(parsedFiles);
-    const rows = parseCronDocRows(
-      readFileSync(join(root, "docs", "cron-jobs.md"), "utf8"),
-    );
-    const documented = new Map<string, string[]>();
-    for (const { stem, schedule } of rows) {
-      documented.set(stem, [...(documented.get(stem) ?? []), schedule]);
+describeTree(
+  "docs/cron-jobs.md matches the @Cron handlers in the source",
+  () => {
+    interface TreeData {
+      declared: Map<string, StemSchedules>;
+      unparseable: string[];
+      documented: Map<string, string[]>;
+      rowCount: number;
     }
-    cached = { declared, unparseable, documented, rowCount: rows.length };
-    return cached;
-  };
+    let cached: TreeData | undefined;
 
-  it("finds handlers and rows at all, so the comparisons are not vacuous", () => {
-    // Either side reading empty would make every assertion below pass.
-    const { declared, documented, rowCount } = load();
-    expect(declared.size).toBeGreaterThan(10);
-    expect(documented.size).toBeGreaterThan(10);
-    expect(rowCount).toBeGreaterThanOrEqual(20);
-    expect(declared.has("auto-backup.service")).toBe(true);
-  });
+    const load = (): TreeData => {
+      if (cached) return cached;
+      const root = requireRepoRoot(REPO_ROOT);
+      const sources = gitListFiles(root, "-- backend/src").filter(
+        (f) => f.endsWith(".ts") && !f.endsWith(".spec.ts"),
+      );
+      const unparseable: string[] = [];
+      const parsedFiles = sources.map((path) => {
+        const parsed = parseCronDecorators(
+          readFileSync(join(root, path), "utf8"),
+        );
+        if (
+          parsed.anchors !== parsed.schedules.length ||
+          parsed.problems.length
+        ) {
+          unparseable.push(
+            `${path}: ${parsed.anchors} @Cron line(s), ${parsed.schedules.length} parsed${
+              parsed.problems.length ? `; ${parsed.problems.join("; ")}` : ""
+            }`,
+          );
+        }
+        return { path, schedules: parsed.schedules };
+      });
+      const declared = aggregateByStem(parsedFiles);
+      const rows = parseCronDocRows(
+        readFileSync(join(root, "docs", "cron-jobs.md"), "utf8"),
+      );
+      const documented = new Map<string, string[]>();
+      for (const { stem, schedule } of rows) {
+        documented.set(stem, [...(documented.get(stem) ?? []), schedule]);
+      }
+      cached = { declared, unparseable, documented, rowCount: rows.length };
+      return cached;
+    };
 
-  it("parses every @Cron decorator it counts", () => {
-    // A decorator outside the grammar must be a red test naming the file, not
-    // a row that quietly never gets demanded.
-    expect(load().unparseable).toEqual([]);
-  });
+    it("finds handlers and rows at all, so the comparisons are not vacuous", () => {
+      // Either side reading empty would make every assertion below pass.
+      const { declared, documented, rowCount } = load();
+      expect(declared.size).toBeGreaterThan(10);
+      expect(documented.size).toBeGreaterThan(10);
+      expect(rowCount).toBeGreaterThanOrEqual(20);
+      expect(declared.has("auto-backup.service")).toBe(true);
+    });
 
-  it("documents every service that declares a @Cron handler", () => {
-    const { declared, documented } = load();
-    const undocumented = [...declared.keys()]
-      .filter((stem) => !documented.has(stem))
-      .sort();
-    // A scheduled job nobody knows about is one nobody checks the RLS context,
-    // the multi-replica behaviour or the failure mode of.
-    expect(undocumented).toEqual([]);
-  });
+    it("parses every @Cron decorator it counts", () => {
+      // A decorator outside the grammar must be a red test naming the file, not
+      // a row that quietly never gets demanded.
+      expect(load().unparseable).toEqual([]);
+    });
 
-  it("names no service that has stopped having one", () => {
-    const { declared, documented } = load();
-    const stale = [...documented.keys()]
-      .filter((stem) => !declared.has(stem))
-      .sort();
-    // `auth.service` sat here after its @Cron moved to `token.service`, so the
-    // table pointed at a file with no schedule in it.
-    expect(stale).toEqual([]);
-  });
+    it("documents every service that declares a @Cron handler", () => {
+      const { declared, documented } = load();
+      const undocumented = [...declared.keys()]
+        .filter((stem) => !documented.has(stem))
+        .sort();
+      // A scheduled job nobody knows about is one nobody checks the RLS context,
+      // the multi-replica behaviour or the failure mode of.
+      expect(undocumented).toEqual([]);
+    });
 
-  it("documents each handler's exact expression, timezone included", () => {
-    // One row per handler, expression compared verbatim: this is what stops
-    // the table claiming midnight for an hourly job, or reading complete when
-    // a service quietly grew a second schedule.
-    const { declared, documented } = load();
-    expect(scheduleDiscrepancies(declared, documented)).toEqual([]);
-  });
-});
+    it("names no service that has stopped having one", () => {
+      const { declared, documented } = load();
+      const stale = [...documented.keys()]
+        .filter((stem) => !declared.has(stem))
+        .sort();
+      // `auth.service` sat here after its @Cron moved to `token.service`, so the
+      // table pointed at a file with no schedule in it.
+      expect(stale).toEqual([]);
+    });
+
+    it("documents each handler's exact expression, timezone included", () => {
+      // One row per handler, expression compared verbatim: this is what stops
+      // the table claiming midnight for an hourly job, or reading complete when
+      // a service quietly grew a second schedule.
+      const { declared, documented } = load();
+      expect(scheduleDiscrepancies(declared, documented)).toEqual([]);
+    });
+  },
+);

@@ -24,7 +24,10 @@ const rulesOf = (sql) => lintSql(sql).findings.map((f) => f.rule);
 const clean = (sql) => assert.deepEqual(lintSql(sql).findings, []);
 const flags = (sql, rule) => {
   const found = rulesOf(sql);
-  assert.ok(found.includes(rule), `expected rule "${rule}", got ${JSON.stringify(found)}`);
+  assert.ok(
+    found.includes(rule),
+    `expected rule "${rule}", got ${JSON.stringify(found)}`,
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -66,7 +69,9 @@ test("splitStatements keeps a semicolon inside a dollar-quoted body out of the t
   assert.equal(topLevel.length, 2);
   assert.ok(topLevel[0].text.includes("DO $$"));
   // The body's statements are present too, tagged with their enclosing block.
-  assert.ok(statements.some((s) => s.blockText && s.text.includes("PERFORM 2")));
+  assert.ok(
+    statements.some((s) => s.blockText && s.text.includes("PERFORM 2")),
+  );
 });
 
 test("splitStatements blanks the body out of the wrapper statement text", () => {
@@ -84,8 +89,14 @@ test("normalizeIdentifier strips quotes and schema qualification", () => {
 test("isBlockGuarded recognizes catalog probes and IF EXISTS tests only", () => {
   assert.equal(isBlockGuarded(null), false);
   assert.equal(isBlockGuarded("BEGIN PERFORM 1; END"), false);
-  assert.equal(isBlockGuarded("IF NOT EXISTS (SELECT 1 FROM pg_trigger) THEN"), true);
-  assert.equal(isBlockGuarded("IF EXISTS (SELECT 1 FROM information_schema.columns)"), true);
+  assert.equal(
+    isBlockGuarded("IF NOT EXISTS (SELECT 1 FROM pg_trigger) THEN"),
+    true,
+  );
+  assert.equal(
+    isBlockGuarded("IF EXISTS (SELECT 1 FROM information_schema.columns)"),
+    true,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -93,14 +104,23 @@ test("isBlockGuarded recognizes catalog probes and IF EXISTS tests only", () => 
 // ---------------------------------------------------------------------------
 
 test("CREATE TABLE without IF NOT EXISTS is flagged", () => {
-  flags("CREATE TABLE widgets (id UUID PRIMARY KEY);", "create-table-without-if-not-exists");
+  flags(
+    "CREATE TABLE widgets (id UUID PRIMARY KEY);",
+    "create-table-without-if-not-exists",
+  );
   clean("CREATE TABLE IF NOT EXISTS widgets (id UUID PRIMARY KEY);");
 });
 
 test("CREATE INDEX without IF NOT EXISTS is flagged, unique and concurrent included", () => {
   flags("CREATE INDEX idx_a ON t(a);", "create-index-without-if-not-exists");
-  flags("CREATE UNIQUE INDEX idx_a ON t(a);", "create-index-without-if-not-exists");
-  flags("CREATE INDEX CONCURRENTLY idx_a ON t(a);", "create-index-without-if-not-exists");
+  flags(
+    "CREATE UNIQUE INDEX idx_a ON t(a);",
+    "create-index-without-if-not-exists",
+  );
+  flags(
+    "CREATE INDEX CONCURRENTLY idx_a ON t(a);",
+    "create-index-without-if-not-exists",
+  );
   clean("CREATE INDEX IF NOT EXISTS idx_a ON t(a);");
   clean("CREATE UNIQUE INDEX IF NOT EXISTS idx_a ON t(a);");
 });
@@ -110,7 +130,9 @@ test("ADD COLUMN without IF NOT EXISTS is flagged once per column", () => {
     "ALTER TABLE t ADD COLUMN a INT, ADD COLUMN IF NOT EXISTS b INT, ADD COLUMN c INT;",
   ).findings;
   assert.equal(findings.length, 2);
-  assert.ok(findings.every((f) => f.rule === "add-column-without-if-not-exists"));
+  assert.ok(
+    findings.every((f) => f.rule === "add-column-without-if-not-exists"),
+  );
   clean("ALTER TABLE t ADD COLUMN IF NOT EXISTS a INT;");
 });
 
@@ -184,14 +206,25 @@ END $$;`);
 });
 
 test("enum value, type, function, view, sequence, extension and schema DDL are covered", () => {
-  flags("ALTER TYPE mood ADD VALUE 'sad';", "enum-add-value-without-if-not-exists");
+  flags(
+    "ALTER TYPE mood ADD VALUE 'sad';",
+    "enum-add-value-without-if-not-exists",
+  );
   clean("ALTER TYPE mood ADD VALUE IF NOT EXISTS 'sad';");
   flags("CREATE TYPE mood AS ENUM ('ok');", "create-type-without-guard");
-  flags("CREATE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;", "create-function-without-or-replace");
-  clean("CREATE OR REPLACE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;");
+  flags(
+    "CREATE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;",
+    "create-function-without-or-replace",
+  );
+  clean(
+    "CREATE OR REPLACE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;",
+  );
   flags("CREATE VIEW v AS SELECT 1;", "create-view-without-or-replace");
   clean("CREATE OR REPLACE VIEW v AS SELECT 1;");
-  flags("CREATE MATERIALIZED VIEW mv AS SELECT 1;", "create-view-without-or-replace");
+  flags(
+    "CREATE MATERIALIZED VIEW mv AS SELECT 1;",
+    "create-view-without-or-replace",
+  );
   flags("CREATE SEQUENCE s;", "create-object-without-if-not-exists");
   flags("CREATE EXTENSION pg_trgm;", "create-object-without-if-not-exists");
   clean("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
@@ -271,10 +304,7 @@ test("the other statements that bind a role are flagged too", () => {
     "ALTER FUNCTION f(VARCHAR) OWNER TO monize_app;",
     "role-or-grant-statement",
   );
-  flags(
-    "REASSIGN OWNED BY old_owner TO new_owner;",
-    "role-or-grant-statement",
-  );
+  flags("REASSIGN OWNED BY old_owner TO new_owner;", "role-or-grant-statement");
   flags("SET ROLE monize_app;", "role-or-grant-statement");
   flags("SET LOCAL ROLE monize_app;", "role-or-grant-statement");
   flags("SET SESSION AUTHORIZATION monize_app;", "role-or-grant-statement");
@@ -282,7 +312,9 @@ test("the other statements that bind a role are flagged too", () => {
   // RESET names no role, and the words inside a string literal are data, not a
   // statement.
   clean("RESET ROLE;");
-  clean("INSERT INTO notes (body) VALUES ('never SET ROLE in a migration') ON CONFLICT DO NOTHING;");
+  clean(
+    "INSERT INTO notes (body) VALUES ('never SET ROLE in a migration') ON CONFLICT DO NOTHING;",
+  );
 });
 
 test("the shipped migrations satisfy the role rule", () => {
@@ -294,7 +326,10 @@ test("the shipped migrations satisfy the role rule", () => {
     new URL("../../database/migrations", import.meta.url),
   );
   const { files, findings } = lintDirectory(migrationsDir);
-  assert.ok(files.length > 100, `expected the real migrations, got ${files.length} file(s)`);
+  assert.ok(
+    files.length > 100,
+    `expected the real migrations, got ${files.length} file(s)`,
+  );
   assert.deepEqual(
     findings.filter((f) => f.rule === "role-or-grant-statement"),
     [],
@@ -348,9 +383,15 @@ test("a disable pragma without a reason, or naming an unknown rule, is itself a 
   const noReason = lintSql(
     "-- migration-lint-disable-next-line insert-without-on-conflict\nINSERT INTO t (a) VALUES (1);",
   ).findings;
-  assert.ok(noReason.some((f) => f.rule === "pragma" && /needs a reason/.test(f.message)));
+  assert.ok(
+    noReason.some(
+      (f) => f.rule === "pragma" && /needs a reason/.test(f.message),
+    ),
+  );
 
-  const unknown = collectPragmas("-- migration-lint-disable-next-line no-such-rule: why\n");
+  const unknown = collectPragmas(
+    "-- migration-lint-disable-next-line no-such-rule: why\n",
+  );
   assert.ok(unknown.problems.some((p) => /unknown lint rule/.test(p.message)));
 });
 

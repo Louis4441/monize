@@ -125,7 +125,11 @@ export function splitStatements(sql, offset = 0, blockText = null) {
     const raw = sql.slice(from, to);
     if (!raw.trim()) return;
     const lead = /^\s*/.exec(raw)[0].length;
-    statements.push({ text: raw.slice(lead), start: offset + from + lead, blockText });
+    statements.push({
+      text: raw.slice(lead),
+      start: offset + from + lead,
+      blockText,
+    });
   };
   while (i < sql.length) {
     if (sql[i] === "'") {
@@ -147,11 +151,17 @@ export function splitStatements(sql, offset = 0, blockText = null) {
       // out of the wrapper's text -- otherwise every statement inside a
       // conditional block would also be judged as unguarded wrapper text.
       const outerRaw =
-        sql.slice(start, bodyStart) + " ".repeat(bodyEnd - bodyStart) + sql.slice(bodyEnd, stop);
+        sql.slice(start, bodyStart) +
+        " ".repeat(bodyEnd - bodyStart) +
+        sql.slice(bodyEnd, stop);
       const outerLead = /^\s*/.exec(outerRaw)[0].length;
       const outerText = outerRaw.slice(outerLead);
       if (outerText.trim()) {
-        statements.push({ text: outerText, start: offset + start + outerLead, blockText });
+        statements.push({
+          text: outerText,
+          start: offset + start + outerLead,
+          blockText,
+        });
       }
       statements.push(...splitStatements(body, bodyOffset, outerText + body));
       i = stop + 1;
@@ -217,9 +227,18 @@ export function normalizeIdentifier(raw) {
 export function collectDrops(statements, upToIndex) {
   const drops = new Set();
   const patterns = [
-    { kind: "trigger", regex: /\bDROP\s+TRIGGER\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi },
-    { kind: "policy", regex: /\bDROP\s+POLICY\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi },
-    { kind: "constraint", regex: /\bDROP\s+CONSTRAINT\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi },
+    {
+      kind: "trigger",
+      regex: /\bDROP\s+TRIGGER\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi,
+    },
+    {
+      kind: "policy",
+      regex: /\bDROP\s+POLICY\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi,
+    },
+    {
+      kind: "constraint",
+      regex: /\bDROP\s+CONSTRAINT\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi,
+    },
   ];
   for (let i = 0; i < upToIndex; i++) {
     const { text } = statements[i];
@@ -292,7 +311,10 @@ export const RULES = [
       if (ctx.blockGuarded) return [];
       const kinds =
         "TABLE|INDEX|TRIGGER|POLICY|VIEW|TYPE|SEQUENCE|CONSTRAINT|COLUMN|FUNCTION|EXTENSION|SCHEMA|MATERIALIZED\\s+VIEW";
-      const regex = new RegExp(`\\bDROP\\s+(${kinds})\\s+(?!IF\\s+EXISTS)`, "gi");
+      const regex = new RegExp(
+        `\\bDROP\\s+(${kinds})\\s+(?!IF\\s+EXISTS)`,
+        "gi",
+      );
       const messages = [];
       for (const match of text.matchAll(regex)) {
         messages.push(`DROP ${match[1].toUpperCase()} without IF EXISTS`);
@@ -305,9 +327,15 @@ export const RULES = [
     check(text, ctx) {
       if (ctx.blockGuarded) return [];
       const messages = [];
-      for (const match of text.matchAll(/\bADD\s+CONSTRAINT\s+([A-Za-z0-9_"]+)/gi)) {
+      for (const match of text.matchAll(
+        /\bADD\s+CONSTRAINT\s+([A-Za-z0-9_"]+)/gi,
+      )) {
         const name = normalizeIdentifier(match[1]);
-        if (ctx.drops.has(`constraint:${name}`) || ctx.drops.has("constraint:%i")) continue;
+        if (
+          ctx.drops.has(`constraint:${name}`) ||
+          ctx.drops.has("constraint:%i")
+        )
+          continue;
         messages.push(
           `ADD CONSTRAINT ${match[1]} is not preceded by DROP CONSTRAINT IF EXISTS ${match[1]}`,
         );
@@ -325,7 +353,8 @@ export const RULES = [
       )) {
         if (/\bCREATE\s+OR\s+REPLACE\s+TRIGGER\b/i.test(text)) continue;
         const name = normalizeIdentifier(match[1]);
-        if (ctx.drops.has(`trigger:${name}`) || ctx.drops.has("trigger:%i")) continue;
+        if (ctx.drops.has(`trigger:${name}`) || ctx.drops.has("trigger:%i"))
+          continue;
         messages.push(
           `CREATE TRIGGER ${match[1]} is neither preceded by DROP TRIGGER IF EXISTS ${match[1]} nor inside a pg_trigger existence check`,
         );
@@ -338,9 +367,12 @@ export const RULES = [
     check(text, ctx) {
       if (ctx.blockGuarded) return [];
       const messages = [];
-      for (const match of text.matchAll(/\bCREATE\s+POLICY\s+(%I|[A-Za-z0-9_"]+)/gi)) {
+      for (const match of text.matchAll(
+        /\bCREATE\s+POLICY\s+(%I|[A-Za-z0-9_"]+)/gi,
+      )) {
         const name = normalizeIdentifier(match[1]);
-        if (ctx.drops.has(`policy:${name}`) || ctx.drops.has("policy:%i")) continue;
+        if (ctx.drops.has(`policy:${name}`) || ctx.drops.has("policy:%i"))
+          continue;
         messages.push(
           `CREATE POLICY ${match[1]} is not preceded by DROP POLICY IF EXISTS ${match[1]}`,
         );
@@ -398,8 +430,12 @@ export const RULES = [
       if (ctx.blockGuarded) return [];
       const messages = [];
       for (const kind of ["SEQUENCE", "EXTENSION", "SCHEMA"]) {
-        const regex = new RegExp(`\\bCREATE\\s+${kind}\\s+(?!IF\\s+NOT\\s+EXISTS)`, "i");
-        if (regex.test(text)) messages.push(`CREATE ${kind} without IF NOT EXISTS`);
+        const regex = new RegExp(
+          `\\bCREATE\\s+${kind}\\s+(?!IF\\s+NOT\\s+EXISTS)`,
+          "i",
+        );
+        if (regex.test(text))
+          messages.push(`CREATE ${kind} without IF NOT EXISTS`);
       }
       return messages;
     },
@@ -481,16 +517,24 @@ export const RULES = [
         const list = /\b(?:TO|FROM)\s+([\s\S]+)$/i.exec(grant[2]);
         const grantees = list
           ? list[1]
-              .replace(/\b(?:WITH|GRANTED\s+BY|CASCADE|RESTRICT)\b[\s\S]*$/i, "")
+              .replace(
+                /\b(?:WITH|GRANTED\s+BY|CASCADE|RESTRICT)\b[\s\S]*$/i,
+                "",
+              )
               .split(",")
               .map((entry) => {
-                const token = /^(?:GROUP\s+)?([A-Za-z_"][\w"$]*)/i.exec(entry.trim());
+                const token = /^(?:GROUP\s+)?([A-Za-z_"][\w"$]*)/i.exec(
+                  entry.trim(),
+                );
                 // An entry the grammar cannot read is not provably PUBLIC, so
                 // it flags rather than passes.
                 return token ? normalizeIdentifier(token[1]) : "";
               })
           : [];
-        if (grantees.length === 0 || grantees.some((name) => name !== "public")) {
+        if (
+          grantees.length === 0 ||
+          grantees.some((name) => name !== "public")
+        ) {
           messages.push(
             `${grant[1].toUpperCase()} to a named role in a migration crash-loops startup where the role does not exist; only PUBLIC is safe (it always resolves)`,
           );
@@ -516,14 +560,18 @@ export function collectPragmas(sql) {
   const problems = [];
   const lines = sql.split("\n");
   lines.forEach((line, index) => {
-    const match = new RegExp(`--\\s*${DISABLE_PRAGMA}\\s+([a-z0-9-]+)\\s*(:\\s*(.*))?$`, "i").exec(
-      line,
-    );
+    const match = new RegExp(
+      `--\\s*${DISABLE_PRAGMA}\\s+([a-z0-9-]+)\\s*(:\\s*(.*))?$`,
+      "i",
+    ).exec(line);
     if (!match) return;
     const ruleId = match[1];
     const reason = (match[3] || "").trim();
     if (!RULES.some((r) => r.id === ruleId)) {
-      problems.push({ line: index + 1, message: `unknown lint rule "${ruleId}" in disable pragma` });
+      problems.push({
+        line: index + 1,
+        message: `unknown lint rule "${ruleId}" in disable pragma`,
+      });
       return;
     }
     if (!reason) {
@@ -601,18 +649,26 @@ function main() {
   console.log(`Migration idempotency lint: ${files.length} file(s) in ${dir}`);
 
   if (findings.length === 0) {
-    console.log("OK -- every migration body is re-runnable against an up-to-date database.");
+    console.log(
+      "OK -- every migration body is re-runnable against an up-to-date database.",
+    );
     return;
   }
 
   console.error("");
   for (const finding of findings) {
-    console.error(`FAIL: ${finding.file}:${finding.line} [${finding.rule}] ${finding.message}`);
+    console.error(
+      `FAIL: ${finding.file}:${finding.line} [${finding.rule}] ${finding.message}`,
+    );
   }
   // Two failure families, two remedies. Naming only the idempotency one sent a
   // reader of a role/grant finding looking for an IF NOT EXISTS clause to add.
-  const hasRoleFinding = findings.some((f) => f.rule === "role-or-grant-statement");
-  const hasIdempotencyFinding = findings.some((f) => f.rule !== "role-or-grant-statement");
+  const hasRoleFinding = findings.some(
+    (f) => f.rule === "role-or-grant-statement",
+  );
+  const hasIdempotencyFinding = findings.some(
+    (f) => f.rule !== "role-or-grant-statement",
+  );
   const remedies = [];
   if (hasIdempotencyFinding) {
     remedies.push(
@@ -636,7 +692,10 @@ function main() {
   process.exit(1);
 }
 
-if (process.argv[1] && statSync(process.argv[1], { throwIfNoEntry: false })?.isFile()) {
+if (
+  process.argv[1] &&
+  statSync(process.argv[1], { throwIfNoEntry: false })?.isFile()
+) {
   const invoked = fileURLToPath(import.meta.url);
   if (process.argv[1] === invoked) main();
 }

@@ -240,9 +240,9 @@ describe("doc path grammar", () => {
     );
     expect(kinds(".controller.spec.ts")).toBe("not-path"); // an extension, named
     expect(kinds("/app/dist/main.js")).toBe("not-path");
-    expect(kinds("https://github.com/kenlasko/monize/blob/main/README.md")).toBe(
-      "not-path",
-    );
+    expect(
+      kinds("https://github.com/kenlasko/monize/blob/main/README.md"),
+    ).toBe("not-path");
   });
 
   it("flags a plan claim whose basename lives elsewhere, and only that", () => {
@@ -257,7 +257,10 @@ describe("doc path grammar", () => {
     );
     // The guard's own motivating defect, now in scope.
     expect(
-      planProblem("backend/src/ai/query/transaction-tool-prep.service.ts", index),
+      planProblem(
+        "backend/src/ai/query/transaction-tool-prep.service.ts",
+        index,
+      ),
     ).toContain("backend/src/transactions/transaction-tool-prep.service.ts");
     // A genuinely planned file exists nowhere, and passes.
     expect(planProblem("docs/rls.md", index)).toBeNull();
@@ -309,7 +312,9 @@ describeTree("docs name files that exist", () => {
         basename(f) === "CLAUDE.md" ||
         (/^docs\/[^/]+\.md$/.test(f) && basename(f) !== "CLAUDE.md"),
     );
-    const planDocs = tracked.filter((f) => /^docs\/future-plans\/[^/]+\.md$/.test(f));
+    const planDocs = tracked.filter((f) =>
+      /^docs\/future-plans\/[^/]+\.md$/.test(f),
+    );
     cached = { index, contractDocs, planDocs };
     return cached;
   };
