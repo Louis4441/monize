@@ -110,6 +110,32 @@ shape is the whole defence - and Bearer fails the pipeline on the alternative.
 
 Brand colour is `--brand` in `styles.css` (teal `#4fa091`, taken from the app logo).
 
+## Layout on a phone
+
+A long list of cards does not collapse to one column below the phone breakpoint --
+it becomes a horizontal strip. The features section is twenty-eight cards, and
+stacked that is a screen and a half of thumb-scrolling to reach the next section.
+`.feat-strip` in the `max-width:640px` block is the shape to copy: clear
+`grid-template-columns`, `grid-auto-flow:column` with a `grid-auto-columns` under
+100% so the next card peeks, `overflow-x:auto`, and `scroll-snap-type:x`.
+
+Two rules come with it, and both are scanned by
+`frontend/src/test/website-mobile-layout.test.ts`:
+
+- **Every sideways scroller sets `overscroll-behavior-x:contain`.** A swipe that
+  reaches the end of a strip otherwise chains outward until the browser takes it
+  as a back-navigation gesture, off the site.
+- **A strip whose contents are replaced rewinds its own `scrollLeft`.** A scroll
+  offset survives a repaint, clamped to the new content, so filtering the features
+  down to two cards left the strip parked at the end of the two. Move the
+  container's own `scrollLeft` -- never `scrollIntoView`, which scrolls every
+  scrollable ancestor up to the document.
+
+Nothing inside a feature card is focusable, so the strip takes a `tabindex` and a
+name while it can scroll -- asked of the element (`scrollWidth > clientWidth`)
+rather than by repeating the breakpoint in JavaScript, so the two files cannot
+disagree after a breakpoint moves.
+
 ## Licence
 
 Same spirit as the app: AGPL-3.0. Screenshots and the Monize name belong to the Monize project.

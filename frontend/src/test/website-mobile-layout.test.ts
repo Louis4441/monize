@@ -58,6 +58,47 @@ function markup(source: string): string {
   }
 }
 
+interface Rule {
+  selectors: string;
+  declarations: string;
+}
+
+/**
+ * Every `selector { declarations }` pair in a stylesheet, at-rule bodies
+ * included: `[^{}]+` cannot cross a brace, so an `@media` opener never matches
+ * as a selector and the rules nested inside it are found on their own.
+ */
+function rules(css: string): Rule[] {
+  return Array.from(css.matchAll(/([^{}]+)\{([^{}]*)\}/g)).map(([, selectors, declarations]) => ({
+    selectors: selectors.trim(),
+    declarations,
+  }));
+}
+
+/**
+ * The rules that apply at the phone breakpoint. A regex cannot match a nested
+ * brace pair, so the body of each `@media` is taken by counting braces out from
+ * the one that opened it.
+ */
+function phoneRules(css: string): Rule[] {
+  const stripped = code(css);
+  const opener = /@media([^{]*)\{/g;
+  const found: Rule[] = [];
+
+  for (let at = opener.exec(stripped); at; at = opener.exec(stripped)) {
+    const start = at.index + at[0].length;
+    let end = start;
+    for (let depth = 1; end < stripped.length && depth > 0; end++) {
+      if (stripped[end] === '{') depth++;
+      else if (stripped[end] === '}') depth--;
+    }
+    if (/max-width\s*:\s*640px/.test(at[1])) found.push(...rules(stripped.slice(start, end - 1)));
+    opener.lastIndex = end;
+  }
+
+  return found;
+}
+
 function filesIn(dir: string, ext: string): string[] {
   return readdirSync(join(SITE, dir))
     .filter((name) => name.endsWith(ext))
@@ -131,6 +172,69 @@ describe('website layout holds on a phone', () => {
         'whole unscrolled length there and widens the document past the phone -- which moves every ' +
         'position:fixed overlay with it.',
     ).toEqual([]);
+  });
+
+  /**
+   * The features section is twenty-eight cards. Collapsed to a single column it
+   * is a screen and a half of thumb-scrolling to reach the next section, so on a
+   * phone it is a horizontal strip instead. Two files have to agree for that to
+   * happen -- the class in the markup and the rule in the phone breakpoint --
+   * and either one alone leaves the long column back in place, looking like
+   * nothing was changed rather than like something is broken.
+   */
+  it('turns the feature list into a horizontal strip on a phone', () => {
+    const tag = markup(readFileSync(join(SITE, 'index.html'), 'utf8')).match(/<div[^>]*\bid="fgrid"[^>]*>/);
+    expect(tag, 'the feature list (#fgrid) is gone from index.html -- update this guard with it').not.toBeNull();
+    expect(
+      tag![0],
+      '#fgrid must carry the feat-strip class, which is what the phone breakpoint styles as a scroller',
+    ).toMatch(/class="[^"]*\bfeat-strip\b/);
+
+    const declared = phoneRules(readFileSync(join(SITE, 'assets', 'css', 'styles.css'), 'utf8'))
+      .filter(({ selectors }) => /\bfeat-strip\b/.test(selectors))
+      .map(({ declarations }) => declarations)
+      .join(';');
+
+    const required: Array<[RegExp, string]> = [
+      [/grid-auto-flow\s*:\s*column/, 'grid-auto-flow:column -- lays the cards along one row instead of one per row'],
+      [
+        /grid-template-columns\s*:\s*none/,
+        'grid-template-columns:none -- an explicit track list sizes the leading items and grid-auto-columns only ' +
+          'picks up the implicit ones after it, so the collapsed 1fr would keep the first card full width',
+      ],
+      [
+        /overflow-x\s*:\s*(auto|scroll)/,
+        'overflow-x:auto -- without it the row is an overflow, not a scroller, and the cards are simply unreachable',
+      ],
+      [/scroll-snap-type\s*:\s*x/, 'scroll-snap-type:x -- a swipe lands on a card rather than between two'],
+    ];
+
+    const missing = required.flatMap(([pattern, why]) => (pattern.test(declared) ? [] : [why]));
+    expect(missing, `the .feat-strip rule in the phone breakpoint is missing:\n  ${missing.join('\n  ')}`).toEqual([]);
+  });
+
+  /**
+   * A horizontal scroller that reaches its end hands the rest of the gesture to
+   * its ancestors, and on a phone the ancestor that takes it is the browser: a
+   * swipe past the last feature card is a back-navigation off the site. Every
+   * sideways scroller on the page has to keep its own overscroll.
+   */
+  it('keeps a sideways swipe inside the strip that receives it', () => {
+    const css = code(readFileSync(join(SITE, 'assets', 'css', 'styles.css'), 'utf8'));
+    const scrollers = rules(css).filter(({ declarations }) => /overflow-x\s*:\s*(auto|scroll)/.test(declarations));
+
+    // A guard that silently scans nothing passes forever.
+    expect(scrollers.length).toBeGreaterThan(0);
+
+    const leaky = scrollers
+      .filter(({ declarations }) => !/overscroll-behavior(-x)?\s*:\s*(contain|none)/.test(declarations))
+      .map(
+        ({ selectors }) =>
+          `${selectors} scrolls horizontally without overscroll-behavior-x:contain -- a swipe past its end ` +
+          'chains to the page and then to the browser gesture, which navigates away from the site',
+      );
+
+    expect(leaky, leaky.join('\n')).toEqual([]);
   });
 
   it('sizes elements against their container, not the viewport', () => {

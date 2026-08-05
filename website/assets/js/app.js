@@ -420,6 +420,24 @@ M.FCATS.forEach(function(c){
   b.addEventListener('click',function(){ fcat=c[0]; $$('.chip',fchips).forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); paintF(); });
   fchips.appendChild(b);
 });
+/* Below the phone breakpoint the grid is a horizontal strip (see .feat-strip in
+   styles.css). Nothing inside a feature card is focusable, so on the browsers
+   that do not make a scroller focusable by themselves the strip is unreachable
+   from a keyboard -- it takes a tab stop and a name. Asking the element whether
+   it can scroll, rather than repeating `640px` here, keeps the two files from
+   disagreeing after a breakpoint moves: the strip is focusable exactly while
+   there is something to scroll to. */
+function syncFStrip(){
+  if(fgrid.scrollWidth-fgrid.clientWidth>1){
+    fgrid.setAttribute('tabindex','0');
+    fgrid.setAttribute('role','group');
+    fgrid.setAttribute('aria-label','Features — scroll sideways for more');
+  }else{
+    fgrid.removeAttribute('tabindex');
+    fgrid.removeAttribute('role');
+    fgrid.removeAttribute('aria-label');
+  }
+}
 function paintF(){
   clear(fgrid);
   M.FEATURES.filter(function(f){ return fcat==='all'||f[0]===fcat; }).forEach(function(f,i){
@@ -427,8 +445,16 @@ function paintF(){
     c.style.transitionDelay=Math.min(i*35,420)+'ms';
     fgrid.appendChild(c); watch(c);
   });
+  /* A scroll offset survives its contents being replaced, clamped to whatever
+     the new content allows -- so filtering twenty-eight cards down to two left
+     the strip parked at the end of the two. Rewind it. Moving the strip's own
+     scrollLeft cannot move anything but the strip, which is why this is not
+     scrollIntoView. */
+  fgrid.scrollLeft=0;
+  syncFStrip();
 }
 paintF();
+addEventListener('resize',syncFStrip,{passive:true});
 
 /* ---------- interactive tour ---------- */
 var rail=$('#rail'), thumbs=$('#thumbs'), stImg=$('#stImg'), ti=0, si=0, timer=null;
