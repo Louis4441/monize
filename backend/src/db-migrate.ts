@@ -2,6 +2,8 @@ import { Logger } from "@nestjs/common";
 import { Client } from "pg";
 import * as fs from "fs";
 import * as path from "path";
+import { applyAppRoleGrants } from "./common/db/app-role";
+import { acquireDbLifecycleLock } from "./common/db/advisory-locks";
 
 const MIGRATIONS_DIRNAME = "migrations";
 
@@ -275,6 +277,13 @@ export async function runMigrations() {
   try {
     await client.connect();
 
+    // The same lock db-init takes, for the same reason and against the same
+    // races: two migrators both reading the pending set before either commits,
+    // and an initializer applying schema.sql while a migrator replays migrations
+    // on top of it. The applied-filename read below therefore happens after any
+    // other process has finished, so a follower simply finds nothing pending.
+    await acquireDbLifecycleLock(client);
+
     // Find migrations directory
     // All base directories are trusted (derived from __dirname or cwd)
     const baseDirs = [
@@ -366,6 +375,15 @@ export async function runMigrations() {
     } else {
       logger.log("Database is up to date; no pending migrations");
     }
+
+    // Converge the runtime role's grants now that the DDL has run. db-init
+    // granted before these migrations existed, so an object a migration creates
+    // in this very boot -- and whose EXECUTE it revokes from PUBLIC -- would be
+    // ungranted until the next restart. Unconditional: cheap, idempotent, and
+    // running it only when `count > 0` would miss a database repaired by hand.
+    await applyAppRoleGrants(client, {
+      appUser: process.env.DATABASE_APP_USER,
+    });
   } catch (error) {
     logger.error(formatRunnerFailure(error));
     process.exit(1);

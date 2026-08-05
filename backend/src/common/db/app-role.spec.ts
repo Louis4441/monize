@@ -1,4 +1,6 @@
 import { Logger } from "@nestjs/common";
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   APP_ROLE_ATTRIBUTES,
   APP_ROLE_GRANTS_SQL,
@@ -6,6 +8,7 @@ import {
   APP_ROLE_NAME_GUC,
   APP_ROLE_PASSWORD_GUC,
   APP_ROLE_UPSERT_SQL,
+  assertRuntimeRoleIsSafe,
   provisionAppRole,
   SqlClient,
 } from "./app-role";
@@ -184,6 +187,197 @@ describe("app-role SQL", () => {
       "ALTER DEFAULT PRIVILEGES IN SCHEMA public",
     );
     expect(APP_ROLE_GRANTS_SQL).not.toMatch(/FOR ROLE/i);
+  });
+
+  it("creates the role without any RLS-exempting attribute", () => {
+    // Already PostgreSQL's defaults; named so that a future edit adding
+    // SUPERUSER or BYPASSRLS has to delete an explicit NO.
+    for (const attribute of [
+      "NOSUPERUSER",
+      "NOBYPASSRLS",
+      "NOCREATEDB",
+      "NOCREATEROLE",
+      "NOREPLICATION",
+    ]) {
+      expect(APP_ROLE_UPSERT_SQL).toContain(attribute);
+    }
+  });
+
+  it("revokes the runtime role's access to migration bookkeeping", () => {
+    // The blanket "ALL TABLES IN SCHEMA public" grant includes
+    // schema_migrations, so runtime credentials could insert a filename (the next
+    // deployment then skips required DDL) or delete one (a migration body
+    // re-runs). No application code touches the table.
+    //
+    // Write privileges only: #1063 landed the revoke keeping SELECT, and this
+    // test used to assert REVOKE ALL because that is what the audit-03 branch
+    // wrote. The difference is read access to a ledger of filenames, which is not
+    // the thing being protected -- forging or deleting a row is -- so the merged
+    // narrower revoke stands and the assertion follows it.
+    expect(APP_ROLE_GRANTS_SQL).toMatch(
+      /REVOKE INSERT, UPDATE, DELETE ON public\.%I FROM %I/,
+    );
+    // Guarded on the table's existence: the grants run on every startup,
+    // including before the table has been created.
+    expect(APP_ROLE_GRANTS_SQL).toContain("relname = infra_table");
+  });
+
+  it("orders the revoke after the blanket grant", () => {
+    // A revoke that ran first would be undone by the grant that followed it.
+    const grantAt = APP_ROLE_GRANTS_SQL.indexOf(
+      "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES",
+    );
+    const revokeAt = APP_ROLE_GRANTS_SQL.indexOf(
+      "REVOKE INSERT, UPDATE, DELETE ON public.%I",
+    );
+    expect(grantAt).toBeGreaterThan(-1);
+    expect(revokeAt).toBeGreaterThan(grantAt);
+  });
+});
+
+describe("assertRuntimeRoleIsSafe", () => {
+  const safeRow = {
+    rolsuper: false,
+    rolbypassrls: false,
+    rolcreatedb: false,
+    rolcreaterole: false,
+    rolreplication: false,
+    owns_tables: false,
+    owns_database: false,
+    inherits_bypass: false,
+  };
+
+  function clientReturning(row: Record<string, boolean> | undefined) {
+    return {
+      query: jest.fn().mockResolvedValue({ rows: row ? [row] : [] }),
+    };
+  }
+
+  const logger = { log: jest.fn(), warn: jest.fn() };
+
+  beforeEach(() => {
+    logger.log.mockClear();
+    logger.warn.mockClear();
+  });
+
+  it("accepts an unprivileged non-owner role", async () => {
+    await expect(
+      assertRuntimeRoleIsSafe(clientReturning(safeRow), {
+        appUser: "monize_app",
+        databaseName: "monize",
+        logger,
+      }),
+    ).resolves.toBeUndefined();
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining("verified as non-owner"),
+    );
+  });
+
+  /**
+   * The reachability predicate, asserted on the SQL text because no unit-level
+   * double can tell `USAGE` from `MEMBER` -- only PostgreSQL can, and the
+   * difference is a whole class of unsafe role.
+   *
+   * `USAGE` asks whether another role's privileges are *immediately* available
+   * through `INHERIT`. Role membership permits `SET ROLE` by default, so
+   * `GRANT owner TO app WITH INHERIT FALSE, SET TRUE` made `USAGE` false while
+   * `SET ROLE owner` still succeeded: the check passed a login that could become
+   * the database owner on request. `MEMBER` is "direct or indirect membership",
+   * i.e. exactly the right to `SET ROLE`, and `USAGE` implies it.
+   */
+  describe("the reachability predicate", () => {
+    const sql = readFileSync(join(__dirname, "app-role.ts"), "utf-8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+
+    it("asks about membership, not only inheritance", () => {
+      const safetyQuery =
+        /RUNTIME_ROLE_SAFETY_SQL = `([\s\S]*?)`\.trim\(\)/.exec(sql);
+      expect(safetyQuery).not.toBeNull();
+      const body = safetyQuery![1];
+
+      // Three reachability questions: table owner, database owner, powerful role.
+      const calls = body.match(/pg_has_role\([^)]*\)/g) ?? [];
+      expect(calls).toHaveLength(3);
+      for (const call of calls) {
+        expect(call).toContain("'MEMBER'");
+        expect(call).not.toContain("'USAGE'");
+      }
+    });
+  });
+
+  /**
+   * Each of these exempts a role from its own policies, and startup used to
+   * validate only the configured name and password -- so enforcement reported
+   * itself as on while every policy was bypassed. That is worse than `off`, which
+   * is at least a state somebody chose.
+   */
+  it.each([
+    ["rolsuper", "SUPERUSER"],
+    ["rolbypassrls", "BYPASSRLS"],
+    ["owns_database", "owns the database"],
+    ["owns_tables", "owns tables in schema public"],
+    ["inherits_bypass", "member of a SUPERUSER or BYPASSRLS role"],
+  ])("refuses to start when %s", async (flag, expectedReason) => {
+    await expect(
+      assertRuntimeRoleIsSafe(clientReturning({ ...safeRow, [flag]: true }), {
+        appUser: "monize_app",
+        databaseName: "monize",
+        logger,
+      }),
+    ).rejects.toThrow(new RegExp(expectedReason, "i"));
+  });
+
+  it("names every problem at once rather than one per restart", async () => {
+    await expect(
+      assertRuntimeRoleIsSafe(
+        clientReturning({
+          ...safeRow,
+          rolsuper: true,
+          rolbypassrls: true,
+          owns_tables: true,
+        }),
+        { appUser: "monize_app", databaseName: "monize", logger },
+      ),
+    ).rejects.toThrow(/SUPERUSER.*BYPASSRLS.*owns tables/s);
+  });
+
+  it("refuses to start when the role does not exist", async () => {
+    await expect(
+      assertRuntimeRoleIsSafe(clientReturning(undefined), {
+        appUser: "monize_app",
+        databaseName: "monize",
+        logger,
+      }),
+    ).rejects.toThrow(/requires the runtime role 'monize_app' to exist/);
+  });
+
+  it("warns but starts on attributes that do not bypass RLS", async () => {
+    await expect(
+      assertRuntimeRoleIsSafe(
+        clientReturning({
+          ...safeRow,
+          rolcreatedb: true,
+          rolreplication: true,
+        }),
+        { appUser: "monize_app", databaseName: "monize", logger },
+      ),
+    ).resolves.toBeUndefined();
+    // Refusing here would block a boot over something that grants no exemption;
+    // saying nothing would hide that the role was provisioned as something else.
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("CREATEDB, REPLICATION"),
+    );
+  });
+
+  it("falls back to the default role name", async () => {
+    const client = clientReturning(safeRow);
+    await assertRuntimeRoleIsSafe(client, {
+      appUser: undefined,
+      databaseName: "monize",
+      logger,
+    });
+    expect(client.query.mock.calls[0][1]).toEqual([DEFAULT_APP_USER, "monize"]);
   });
 });
 
