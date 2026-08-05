@@ -9,7 +9,11 @@ pointing at nothing, and a de-identified artifact carrying a user's name.
 Read this before changing anything under `backend/src/backup/`.
 
 For what was done about each audit finding that produced these rules -- including
-the one deliberately left open -- see `docs/audit-phase-3-response.md`.
+the ones deliberately left open -- see the issues those findings were filed as
+(#1069, #1070, #1071, #1073) and, for the full response, the audit branch's
+`claude/detailed-error-review-4pbug7:docs/audit-phase-3-response.md`. That path is
+branch-qualified on purpose: it is not a claim about this tree, and the doc-path
+guard reads it as such.
 
 ## 1. What travels in a backup
 

@@ -20,7 +20,6 @@ jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
->>>>>>> 367d560c9 (Harden manual backup and restore: integrity, self-contained artifacts, bounded memory)
 jest.mock("stream/promises", () => ({
   pipeline: jest.fn().mockResolvedValue(undefined),
 }));
@@ -1214,14 +1213,6 @@ describe("AutoBackupService", () => {
 
       await service.handleAutoBackupCron();
 
-<<<<<<< HEAD
-      expect(fsPromises.rename).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.stringContaining(
-          `${DEFAULT_BACKUP_CONTAINER_DIR}/${userShard}/monize-backup-daily-`,
-        ),
-      );
-=======
       expect(await listBackups(folderFor())).toEqual([
         expect.stringMatching(/^monize-backup-daily-/),
       ]);
@@ -1248,34 +1239,32 @@ describe("AutoBackupService", () => {
       expect(await listBackups(folderFor(otherUserId))).toHaveLength(1);
     });
 
-    it("gives two writes for the same user and day distinct temp files (FV-004)", async () => {
-      // `.<filename>.partial-<pid>` looked unique and was not: a manual backup and
-      // the scheduled one for the same user, day and extension collide inside a
-      // single process, and across replicas sharing a volume PIDs collide outright.
-      // The loser's rename then fails with ENOENT -- or its cleanup unlinks the
-      // temp file the winner is about to rename -- so a legitimate run fails.
-      const settings = createSettings({
-        enabled: true,
-        folderPath: "",
-        nextBackupAt: new Date(Date.now() - 3600000),
-      });
-      mockSettingsRepo.find.mockResolvedValue([settings]);
-      setupExportMocks();
+    it("leaves one artifact and no temp files after two runs on the same day (FV-004)", async () => {
+      // #1061 established that a pid-based temp name is not unique: a manual and a
+      // scheduled backup for the same user, day and extension collide inside one
+      // process, and two replicas sharing a volume can hold the same pid. The
+      // loser's rename then fails with ENOENT -- or its cleanup unlinks the file
+      // the winner is about to rename -- so a run that was going to succeed fails.
+      //
+      // That fix now lives in `atomic-file.ts` (a UUID in the temp name), so what
+      // is checked here is the observable consequence rather than the call: two
+      // runs leave exactly one final artifact, replacing our own same-day file as
+      // intended, and no intermediate file behind.
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: "",
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+      ]);
 
       await service.handleAutoBackupCron();
       await service.handleAutoBackupCron();
 
-      const tempPaths = (
-        fsPromises.rename as unknown as jest.Mock
-      ).mock.calls.map((c: unknown[]) => c[0] as string);
-      expect(tempPaths).toHaveLength(2);
-      expect(new Set(tempPaths).size).toBe(2);
-      // The FINAL path is still the same file -- replacing our own same-day
-      // backup is intended. It is only the intermediate name that is private.
-      const finalPaths = (
-        fsPromises.rename as unknown as jest.Mock
-      ).mock.calls.map((c: unknown[]) => c[1] as string);
-      expect(new Set(finalPaths).size).toBe(1);
+      const left = await listBackups(folderFor());
+      expect(left).toHaveLength(1);
+      expect(left[0]).toMatch(/^monize-backup-daily-/);
+      expect(left.filter((n) => n.startsWith("."))).toEqual([]);
     });
 
     it("should mark status as failed on error and continue", async () => {

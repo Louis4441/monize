@@ -326,4 +326,37 @@ describe("atomic backup file writes", () => {
       expect(isTempBackupName(observed!)).toBe(true);
     });
   });
+
+  /**
+   * A guard rather than a behaviour test, and #1061 (FV-004) is why: a temp name
+   * built from the pid alone looked unique and was not, because two replicas
+   * sharing a volume can hold the same pid. A single-process test cannot
+   * demonstrate that collision, so what is checked is that the name carries
+   * something a second process cannot reproduce.
+   */
+  it("gives every write a temp name no other process can be holding", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "monize-atomic-uuid-"));
+    const seen = new Set<string>();
+    const originalRename = fs.rename;
+    const spy = jest
+      .spyOn(fs, "rename")
+      .mockImplementation(async (from, to) => {
+        seen.add(String(from));
+        return originalRename(from as string, to as string);
+      });
+    try {
+      await writeFileAtomic(join(dir, "a.json"), Buffer.from("1"));
+      await writeFileAtomic(join(dir, "a.json"), Buffer.from("2"));
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(seen.size).toBe(2);
+    for (const temp of seen) {
+      // 8-4-4-4-12 hex: a UUID, not just a pid and a counter.
+      expect(temp).toMatch(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
+      );
+    }
+  });
 });
