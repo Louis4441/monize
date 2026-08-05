@@ -21,6 +21,9 @@ import { join } from 'node:path';
  *    868px wide on a 390px screen. Every `position:fixed` overlay sizes to that
  *    containing block, so the lightbox centred its picture at x=434 -- two
  *    thirds of it past the right-hand edge of the phone.
+ *  - a two-column hero collapsing to one put its screenshot last, below four
+ *    stat tiles and roughly a screen and a half down. Reported as the site
+ *    having no picture on mobile, which is what a picture nobody reaches is.
  *
  * It lives here for the same reason `website-dom-safety.test.ts` does: the
  * frontend's Vitest is the nearest JavaScript test runner to `website/`.
@@ -110,6 +113,33 @@ function mediaRules(css: string, accepts: (maxWidth: number) => boolean): Rule[]
 /** The rules that apply at the phone breakpoint. */
 function phoneRules(css: string): Rule[] {
   return mediaRules(css, (maxWidth) => maxWidth === 640);
+}
+
+/**
+ * The rules outside every at-rule, i.e. the ones that apply at any width. A
+ * bare `rules()` over the whole sheet reaches inside `@media` bodies too --
+ * `[^{}]+` never matches the `@media` opener itself, so its children are
+ * indistinguishable from top-level rules once they are in the list.
+ */
+function topLevelRules(css: string): Rule[] {
+  const stripped = code(css);
+  const opener = /@[a-z-]+[^{;]*\{/gi;
+  const kept: string[] = [];
+  let from = 0;
+
+  for (let at = opener.exec(stripped); at; at = opener.exec(stripped)) {
+    kept.push(stripped.slice(from, at.index));
+    let end = at.index + at[0].length;
+    for (let depth = 1; end < stripped.length && depth > 0; end++) {
+      if (stripped[end] === '{') depth++;
+      else if (stripped[end] === '}') depth--;
+    }
+    from = end;
+    opener.lastIndex = end;
+  }
+  kept.push(stripped.slice(from));
+
+  return rules(kept.join('\n'));
 }
 
 function styles(): string {
@@ -380,6 +410,87 @@ describe('website layout holds on a phone', () => {
       );
 
     expect(leaky, leaky.join('\n')).toEqual([]);
+  });
+
+  /**
+   * The hero is two columns of copy and screenshot on a desktop and one column
+   * on a phone, and stacking it put the picture last -- under the badge, the
+   * headline, the lede, both buttons, the fine print and four stat tiles, about
+   * a screen and a half below the fold. A hero image nobody scrolls to is a
+   * hero image nobody sees, and the report it produced was that the marketing
+   * site has no picture on mobile rather than that it is in the wrong place.
+   *
+   * So the copy is two blocks with the art between them, and the fix is only
+   * held by the named areas: drop `grid-template-areas` from either breakpoint
+   * and the three children fall straight back into document order, which looks
+   * deliberate and is the original defect at the desktop end. Both orders are
+   * checked here -- the phone's, because that is the bug, and the desktop's,
+   * because the split is invisible there only while the art spans both rows.
+   */
+  it('puts the hero screenshot between the lede and the buttons on a phone', () => {
+    const html = markup(readFileSync(join(SITE, 'index.html'), 'utf8'));
+    const hero = html.match(/<div class="wrap hero-grid">([\s\S]*?)\n {2}<\/div>/);
+    expect(hero, 'the hero grid is gone from index.html -- update this guard with it').not.toBeNull();
+
+    const regions = ['hero-copy-top', 'hero-art', 'hero-copy-bottom'];
+    const inMarkup = regions.filter((region) => new RegExp(`class="${region}"`).test(hero![1]));
+    expect(
+      inMarkup,
+      `the hero must be ${regions.join(', ')} -- one block of copy cannot have the picture inserted into the ` +
+        'middle of it, and splitting the copy is what lets the phone layout place the picture after the lede',
+    ).toEqual(regions);
+
+    /** The area names of a `grid-template-areas` value, row by row. */
+    const areaRows = (declarations: string): string[][] =>
+      Array.from(declarations.match(/grid-template-areas\s*:([^;}]*)/)?.[1].matchAll(/"([^"]*)"/g) ?? []).map(
+        ([, row]) => row.trim().split(/\s+/),
+      );
+
+    /** The last `grid-template-areas` `.hero-grid` is given among `candidates`. */
+    const heroAreas = (candidates: Rule[], where: string): string[][] => {
+      const declared = candidates
+        .filter(({ selectors }) => selectors.split(',').some((s) => s.trim() === '.hero-grid'))
+        .map(({ declarations }) => areaRows(declarations))
+        .filter((rows) => rows.length > 0);
+
+      expect(
+        declared.length,
+        `.hero-grid declares no grid-template-areas ${where}. Without it the three hero blocks fall back to ` +
+          'document order, and the copy split silently does nothing.',
+      ).toBeGreaterThan(0);
+      return declared[declared.length - 1];
+    };
+
+    // The stacking breakpoint: one column, the picture in the middle row.
+    const phone = heroAreas(
+      mediaRules(styles(), (maxWidth) => maxWidth === 1020),
+      'at the 1020px stacking breakpoint',
+    );
+    expect(
+      phone.map((row) => row.join(' ')),
+      'stacked, the hero must read copyTop / art / copyBottom -- the picture belongs after the headline and lede ' +
+        'and before the call-to-action row, not below the stats where it started',
+    ).toEqual(['copyTop', 'art', 'copyBottom']);
+
+    // Wide: both copy rows in column one, the art spanning them in column two.
+    const wide = heroAreas(topLevelRules(styles()), 'outside a media query (the desktop layout)');
+    expect(
+      wide.map((row) => row.join(' ')),
+      'side by side, the copy stacks in the first column and the art spans both rows of the second -- anything ' +
+        'else leaves a gap beside one of the two copy blocks',
+    ).toEqual(['copyTop art', 'copyBottom art']);
+
+    // The split must cost nothing where the copy is one column: a row gap
+    // between the two blocks would open a space that was never there before.
+    const gapless = topLevelRules(styles()).some(
+      ({ selectors, declarations }) =>
+        selectors.split(',').some((s) => s.trim() === '.hero-grid') && /(^|[;\s])row-gap\s*:\s*0/.test(declarations),
+    );
+    expect(
+      gapless,
+      '.hero-grid must set row-gap:0 in its base rule. The two copy blocks are one continuous column of text on a ' +
+        'desktop, and a grid gap between them is spacing the single block never had.',
+    ).toBe(true);
   });
 
   it('sizes elements against their container, not the viewport', () => {
