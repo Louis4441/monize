@@ -153,6 +153,41 @@ grew a column selects more than one row now; a query still written against the
 old key returns whichever the database offers first. Grep for reads of a
 unique key in the migration that widens it.
 
+## A read about somebody else needs somebody else's identity
+
+`users_self` exposes exactly two rows to a session: `app_current_user_id()` and
+`app_real_user_id()`. So **any query keyed on another person -- by their id, or
+worse, by their email -- returns zero rows from the caller's own scope**, and
+under `RLS_MODE=enforce` that empty result is what the caller gets back. It does
+not raise, it does not log, and "no rows" is the same shape as "no such user".
+`AuthService` finds a login by email only because it runs pre-identity, under a
+bypass; `DelegationService.delegateEmailExists` ran the identical `where` under
+`scoped()` and told owners that an account which demonstrably logs in did not
+exist. `listDelegates` had the same defect as a `relations: ["delegate"]` join,
+`revokeDelegate` decided whether to delete a login from three counts the
+database had refused to answer, and the delegate 2FA gate concluded that no
+owner requires 2FA.
+
+Before writing a query, ask whose row it is. There are three answers, not two:
+
+| Whose row | Use | Why |
+|---|---|---|
+| The caller's | `scoped()` / `withScopedDb` | The policy is the point. |
+| An owner's, read by their delegate | `withDelegateContext(owner, delegate)` | `current = owner, real = delegate` is the identity `users_self` and `user_preferences_isolation` were written for. **No bypass** -- the delegation is an identity the policies already understand, and `app.real_user_id` stays true about who is authenticated. |
+| A delegate's, read by their owner (or any genuine cross-user sweep) | `withSystemContext` | There is no policy arm for it. Decide authorization *first*, under `scoped()`, and let only the minimum out. |
+
+Reaching for `withSystemContext` when the middle row applies is the easy wrong
+answer: it works, so nothing complains, and the bypass fence widens by one.
+
+`src/delegation/rls-context-smoke.spec.ts` is the guard, and the shape is worth
+copying. Per-service specs mock `withScopedDb` away, which makes them
+structurally incapable of seeing this class of bug -- so that suite runs the
+**real** `withScopedDb` at `RLS_MODE=enforce`, records the ambient context at
+each repository call, and asserts the ordered sequence of identities plus the
+`set_config` statements actually emitted. Asserting the order is what proves the
+fence: the authorization read must appear under the caller's own identity
+*before* any bypass opens.
+
 ## A joint account is only shared where somebody remembered to share it
 
 `transaction.userId = :userId` is the wrong ownership predicate for any
