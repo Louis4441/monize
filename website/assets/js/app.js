@@ -84,23 +84,37 @@ function rnd(){
   var a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]/4294967296;
 }
 
+/* Replace an image with the "Screenshot pending" placeholder. `label` is what
+   the placeholder names -- always a name this file already owns, never the
+   attribute that was read, so the placeholder cannot echo back text the page
+   cannot vouch for. */
+function missShot(img,label){
+  if(img.dataset.miss||img.id) return; img.dataset.miss='1';
+  var ph=el('div','shotmiss', el('span',null,'Screenshot pending'), el('code',null,label));
+  if(img.parentNode) img.parentNode.replaceChild(ph,img);
+}
 function wireShot(img){
-  var n = img.getAttribute('data-shot'); if(!n) return img;
+  var raw = img.getAttribute('data-shot'); if(raw==null||raw==='') return img;
+  /* A name that is not in the vocabulary is a mistake in the page's own data,
+     not a URL: say so rather than fetching whatever the attribute asked for. */
+  var n = shotName(raw); if(!n){ missShot(img,'unknown screenshot'); return img; }
   img.loading='lazy'; img.decoding='async';
   delete img.dataset.fb; delete img.dataset.miss;
   img.onerror=function(){
-    if(!img.dataset.fb){ img.dataset.fb='1'; img.src=WIKI+n+'.png'; return; }
-    if(img.dataset.miss||img.id) return; img.dataset.miss='1';
-    var ph=el('div','shotmiss', el('span',null,'Screenshot pending'), el('code',null,n+'.png'));
-    if(img.parentNode) img.parentNode.replaceChild(ph,img);
+    if(!img.dataset.fb){ img.dataset.fb='1'; img.src=shotUrl(WIKI,n); return; }
+    missShot(img,n+'.png');
   };
-  img.src = LOCAL+n+'.png';
+  img.src = shotUrl(LOCAL,n);
   return img;
 }
 function shot(name,alt){
   var i=el('img'); i.alt=alt||''; i.setAttribute('data-shot',name); return wireShot(i);
 }
-function full(name){ var i=$('[data-shot="'+name+'"]'); return (i&&i.dataset.fb)? WIKI+name+'.png' : LOCAL+name+'.png'; }
+function full(name){
+  var n=shotName(name); if(!n) return null;
+  var i=$('[data-shot="'+n+'"]');
+  return (i&&i.dataset.fb) ? shotUrl(WIKI,n) : shotUrl(LOCAL,n);
+}
 
 /* ---------- content ---------- */
 var FCATS = [['all','Everything'],['accounts','Accounts'],['tx','Transactions'],['inv','Investments'],
@@ -306,6 +320,51 @@ var MARQUEE = ['Chequing','Savings','Credit cards','Lines of credit','Loans','Mo
  'Assets','Cash','Multi-currency','QIF import','OFX / QFX','Microsoft Money .mny','Split transactions','Tags',
  'Recurring bills','Cash-flow forecast','Budget wizard','Net worth history','Monte Carlo','MCP server','OIDC SSO','TOTP 2FA','Encrypted backups','PWA'];
 
+/* ---------- names that are allowed to become URLs ----------
+   A screenshot name reaches this file twice: once from the content model above,
+   and once back out of the DOM, because `data-shot` is where the name is parked
+   between a paint and the click that opens the lightbox. An attribute the page
+   reads is text the page cannot vouch for -- whoever wrote it, the read cannot
+   tell -- and the five places that used to concatenate one straight into an
+   `img.src` turned any attribute on the page into a request to a URL the site
+   never chose (CWE-79/CWE-601, "DOM text reinterpreted as HTML").
+
+   So a name is *looked up*, never trusted. What comes back is the literal from
+   the content model rather than the string that was read, which is the same
+   move TAGS makes for tag names: an entry that is not in the vocabulary
+   produces nothing at all instead of producing something unexpected. Adding a
+   screenshot means adding it to TOUR or GALLERY, which is where the site is
+   edited anyway.
+
+   Concatenation is what the resolvers are for. Nothing else in this file may
+   build a URL out of a name -- `frontend/src/test/website-dom-safety.test.ts`
+   fails on a `.src` assignment containing a `+`. */
+var SHOTS = (function(){
+  var names=Object.create(null), i, j, parts;
+  function put(n){ if(n) names[n]=n; }
+  for(i=0;i<TOUR.length;i++){
+    parts = TOUR[i].shots ? TOUR[i].shots.split('|') : [];
+    for(j=0;j<parts.length;j++) put(parts[j].split(':')[0]);
+  }
+  for(i=0;i<GALLERY.length;i++) put(GALLERY[i][1]);
+  return names;
+})();
+/* The header and footer logos fall back to the copy in the app repo. The key
+   is what `data-fallback` carries in the markup, not the path -- a path in an
+   attribute is a path the page would follow wherever it pointed. */
+var REPO_FILES = (function(){
+  var m=Object.create(null); m.logo='frontend/public/icons/monize-logo.svg'; return m;
+})();
+/* Each returns null for anything outside its vocabulary. Callers treat null as
+   "there is nothing to load" -- they never assign it to a src, because
+   `src = null` is a request for the URL "null". */
+function shotName(v){ return (typeof v==='string' && SHOTS[v]) || null; }
+function shotUrl(base,v){ var n=shotName(v); return n && base+n+'.png'; }
+function repoUrl(v){
+  var p = (typeof v==='string' && REPO_FILES[v]) || null;
+  return p && REPORAW+p;
+}
+
 $$('img[data-shot]').forEach(wireShot);
 
 var BUDGET=[
@@ -315,7 +374,7 @@ var BUDGET=[
   rows:[['Rent/Mortgage',2370,2370],['Groceries',744.02,700],['Restaurants',162.40,180],['Fuel',188.11,240],['Travel',669.57,600],['Streaming Services',48.97,60]]}
 ];
 
-window.__MZ = {LOCAL:LOCAL,WIKI:WIKI,REPORAW:REPORAW,DEMO:DEMO,GH:GH,$:$,$$:$$,el:el,clear:clear,fill:fill,rich:rich,rnd:rnd,wireShot:wireShot,shot:shot,full:full,
+window.__MZ = {LOCAL:LOCAL,WIKI:WIKI,REPORAW:REPORAW,DEMO:DEMO,GH:GH,$:$,$$:$$,el:el,clear:clear,fill:fill,rich:rich,rnd:rnd,wireShot:wireShot,shot:shot,full:full,shotName:shotName,shotUrl:shotUrl,repoUrl:repoUrl,
  FCATS:FCATS,FEATURES:FEATURES,TOUR:TOUR,REPORTS:REPORTS,RCOLOR:RCOLOR,QA:QA,CODE:CODE,
  STACK:STACK,STACK2:STACK2,SECURITY:SECURITY,FORMATS:FORMATS,FAQ:FAQ,GALCATS:GALCATS,GALLERY:GALLERY,MARQUEE:MARQUEE,BUDGET:BUDGET};
 })();
@@ -440,7 +499,7 @@ function paintF(){
 paintF();
 
 /* ---------- interactive tour ---------- */
-var rail=$('#rail'), thumbs=$('#thumbs'), stImg=$('#stImg'), ti=0, si=0, timer=null;
+var rail=$('#rail'), thumbs=$('#thumbs'), ti=0, si=0, timer=null;
 function shots(t){ return t.shots ? t.shots.split('|').map(function(p){ var k=p.split(':'); return {n:k[0],c:k[1]}; }) : []; }
 M.TOUR.forEach(function(t,i){
   var b=el('button',i===0?'on':'', el('span','em',t.em), t.name);
@@ -655,11 +714,22 @@ $$('figure.card img[data-shot], #reports figure img[data-shot]').forEach(functio
 
 /* ---------- lightbox ---------- */
 var lb=$('#lb'), lbImg=$('#lbImg'), lbCap=$('#lbCap'), set=[], idx=0;
-function openLB(list,i){ set=list; idx=i; lb.classList.add('on'); document.body.style.overflow='hidden'; paintLB(); }
+/* Names are resolved on the way in, so everything paintLB() reaches for is a
+   key from the content model and never the attribute a caller read it out of.
+   A name outside the vocabulary has no picture behind it, so it is dropped
+   rather than carried as far as an src; if that empties the set there is
+   nothing to show and the lightbox does not open. */
+function openLB(list,i){
+  set = list.map(function(x){ return {n:M.shotName(x.n), c:x.c}; })
+            .filter(function(x){ return x.n; });
+  if(!set.length) return;
+  idx = Math.min(Math.max(i,0), set.length-1);
+  lb.classList.add('on'); document.body.style.overflow='hidden'; paintLB();
+}
 function closeLB(){ lb.classList.remove('on'); document.body.style.overflow=''; }
 function paintLB(){
   var s=set[idx]; lbImg.src=M.full(s.n); lbImg.alt=s.c||'';
-  lbImg.onerror=function(){ lbImg.onerror=null; lbImg.src=M.WIKI+s.n+'.png'; };
+  lbImg.onerror=function(){ lbImg.onerror=null; lbImg.src=M.shotUrl(M.WIKI,s.n); };
   lbCap.textContent=(s.c||'')+'  ·  '+(idx+1)+' / '+set.length;
   var solo=set.length<2; $('#lbP').style.display=solo?'none':''; $('#lbN').style.display=solo?'none':'';
 }
@@ -676,8 +746,10 @@ addEventListener('keydown',function(e){
 /* ---------- logo fallback + easter egg ---------- */
 $$('img[data-fallback]').forEach(function(im){
   im.addEventListener('error',function(){
-    if(im.dataset.fb) return; im.dataset.fb='1';
-    im.src=M.REPORAW+im.getAttribute('data-fallback').replace('repo:','');
+    if(im.dataset.fb) return;
+    var url=M.repoUrl(im.getAttribute('data-fallback'));
+    if(!url) return;
+    im.dataset.fb='1'; im.src=url;
   });
 });
 var taps=0, tapT=0;

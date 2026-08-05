@@ -94,6 +94,23 @@ markup that used to live in the data:
   unescapes entities on the way in.
 - Randomness uses `rnd()`, which is `crypto.getRandomValues`, not `Math.random`.
 
+**A name that becomes a URL is looked up, never trusted.** A screenshot name
+is parked in `data-shot` between a paint and the click that opens the lightbox,
+so it arrives back as DOM text -- and five `img.src = BASE + name + '.png'`
+lines meant any attribute on the page was a request to a URL the site never
+chose (CodeQL: "DOM text reinterpreted as HTML"). Every name now goes through
+`shotName()` / `shotUrl()` / `full()`, which resolve it against a vocabulary
+built from `TOUR` and `GALLERY` and return the literal from that content model
+rather than the string that was read; the logo's `data-fallback` is likewise a
+key into `REPO_FILES`, not a path. Anything outside the vocabulary resolves to
+`null` and shows the "Screenshot pending" placeholder instead of loading.
+
+So **a new screenshot has to be in `TOUR` or `GALLERY` before an `<img
+data-shot>` anywhere can load it** -- including the ones written directly into
+`index.html`. Concatenating a name into a `src` is what the resolvers exist to
+replace, and `website-dom-safety.test.ts` fails on a `.src` assignment
+containing a `+`.
+
 Tag names live in the `TAGS` map, which constructs each one from a literal
 `document.createElement('div')`. Adding an element the page has not used before
 means adding a line there first - `el()` throws on an unknown tag rather than

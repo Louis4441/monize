@@ -55,6 +55,23 @@ const BANNED: Array<{ pattern: RegExp; why: string }> = [
     pattern: /\bdocument\.createElement\s*\(\s*(?!['"])/,
     why: 'createElement with a non-literal tag -- go through el(), whose TAGS map constructs each tag from a literal',
   },
+  {
+    // A screenshot name is parked in `data-shot` between a paint and the click
+    // that opens the lightbox, so it comes back as DOM text -- and five
+    // `img.src = BASE + name + '.png'` lines turned any attribute on the page
+    // into a request to a URL the site never chose. CodeQL flagged all five as
+    // "DOM text reinterpreted as HTML". The fix is that a name is resolved
+    // against the content model (`shotName`/`shotUrl`/`repoUrl` in app.js) and
+    // the *literal* from that model becomes the URL, never the string that was
+    // read. Concatenation on the right of a `src` assignment is exactly the
+    // shape that skips the resolver, so it is the shape this scans for.
+    pattern: /\.src\s*=[^=][^;]*\+/,
+    why: 'builds an image URL by concatenation -- resolve the name with shotUrl()/full()/repoUrl(), which return a URL built from the content model rather than from DOM text',
+  },
+  {
+    pattern: /\bsetAttribute\s*\(\s*['"](?:src|href)['"]\s*,[^;]*\+/,
+    why: 'builds a src/href by concatenation -- resolve the name with shotUrl()/full()/repoUrl() first',
+  },
 ];
 
 function jsFiles(): string[] {
