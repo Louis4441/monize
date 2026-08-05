@@ -54,7 +54,7 @@ There is nothing to compile, so builds finish instantly and stay inside the free
 ```
 index.html                     the whole page
 404.html                       friendly not-found page
-_headers                       security headers + long cache on /assets/*
+_headers                       security headers + revalidate-always caching
 _redirects                     /demo /github /docs /wiki /issues short links
 robots.txt, sitemap.xml        change the domain if it is not monize.net
 assets/css/styles.css          all styling, light + dark themes
@@ -77,7 +77,7 @@ instead of a broken image. Dropping the PNG into `assets/img/screenshots/` fixes
 ## Editing
 
 All copy and data live in plain arrays near the top of `assets/js/app.js`:
-`TIMELINE`, `FEATURES`, `TOUR`, `REPORTS`, `QA`, `CODE`, `STACK`, `SECURITY`, `FORMATS`, `FAQ`, `GALLERY`, `MARQUEE`, `BUDGET`.
+`FEATURES`, `TOUR`, `REPORTS`, `QA`, `CODE`, `STACK`, `SECURITY`, `FORMATS`, `FAQ`, `GALLERY`, `MARQUEE`, `BUDGET`.
 Add a feature card or a gallery image by adding one line - no rebuild, just refresh.
 
 The content arrays hold **text, never markup.** Nothing in `app.js` assigns a

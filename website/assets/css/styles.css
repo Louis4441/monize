@@ -127,18 +127,6 @@ main,header,footer{position:relative;z-index:1}
 .chip:hover{color:var(--txt);transform:translateY(-2px)}
 .chip.on{background:linear-gradient(135deg,var(--acc),#2563eb);border-color:transparent;color:#fff}
 
-/* timeline */
-.tl{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;margin:0 0 26px}
-.tl::before{content:"";position:absolute;left:6%;right:6%;top:19px;height:2px;background:var(--line)}
-.tl-i{text-align:center;cursor:pointer;position:relative;padding-top:0}
-.tl-i .dot{width:40px;height:40px;margin:0 auto 12px;border-radius:50%;background:var(--card);border:2px solid var(--line);display:grid;place-items:center;font-size:1rem;transition:.25s;position:relative;z-index:1}
-.tl-i.on .dot{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 25%,var(--card));transform:scale(1.12);box-shadow:0 0 0 8px color-mix(in srgb,var(--teal) 12%,transparent)}
-.tl-i .yr{font-weight:800;font-size:.95rem}
-.tl-i .lb{font-size:.8rem;color:var(--mut)}
-.tl-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:26px;min-height:120px}
-.tl-card h3{margin-bottom:6px}
-.tl-card p{color:var(--mut);margin:0}
-
 /* tour */
 .tour{display:grid;grid-template-columns:230px 1fr;gap:22px;align-items:start}
 .rail{display:flex;flex-direction:column;gap:6px;position:sticky;top:96px}
@@ -287,20 +275,50 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
 }
 @media (max-width:560px){
   .hdr-cta .btn.ghost{display:none}
+  /* Below this the header is four controls and a wordmark on a line that is not
+     wide enough for them, and nothing in it gives: .btn is white-space:nowrap
+     and .icobtn is a fixed square, so every pixel of the shortfall is taken out
+     of .brand -- which does not reflow, it just slides its own text under the
+     theme toggle. At 320px that read "Moniz", and the menu button, the only way
+     to reach the nav once #nav is display:none, hung 11px off the right-hand
+     edge. Not scrolled off: body sets overflow-x:hidden and, with html at
+     visible, that propagates to the viewport, so the button was clipped away.
+     Tightening the gutters and the gaps buys back roughly thirty of those
+     pixels, and .brand stops shrinking so the wordmark is whole or absent and
+     never half of itself. The icobtn size is scoped to the header because the
+     lightbox's close and arrow buttons carry the same class and are thumb
+     targets over a photo. */
+  #hdr{gap:10px;padding:12px 14px}
+  .hdr-cta .btn{padding:9px 13px}
+  .hdr-cta .icobtn{width:34px;height:34px}
+  .brand{flex:0 0 auto}
+}
+@media (max-width:360px){
+  /* Even tightened, the wordmark does not fit beside the demo button and the two
+     icons here, and of the five it is the one whose loss costs least: the logo
+     is still the link home and still carries the accessible name. */
+  .brand span{display:none}
 }
 @media (max-width:640px){
   .sec{padding:60px 0}
   .g4,.g3,.g2,.rep-grid{grid-template-columns:1fr}
-  /* Two lists here are long -- twenty-eight feature cards and forty-two gallery
-     screenshots -- and one column of either is a couple of screens of
-     thumb-scrolling to get past a section nobody has to read in full. Both
-     become a snapping horizontal strip on a phone, the shape the tour rail and
-     the filmstrip above already use.
+  /* Three lists here are long -- twenty-eight feature cards, forty-two gallery
+     screenshots and forty-six report rows -- and one column of any of them is a
+     couple of screens of thumb-scrolling to get past a section nobody has to
+     read in full. All three become a snapping horizontal strip on a phone, the
+     shape the tour rail and the filmstrip above already use.
+     Sideways rather than a capped box with its own vertical scrollbar, which is
+     the obvious alternative for the reports: a vertical scroller inside a
+     vertically scrolling page traps the gesture that was trying to get past it,
+     and on a touch screen there is no pointer position to tell the two apart.
+     Scrolling across is unambiguous -- a downward swipe anywhere still moves the
+     page.
      - the selector names its consumers instead of being a bare `.strip`: the
        collapse rule a line up sets grid-template-columns at the same
        specificity, and .gal sets columns further down, so a single class would
-       win on source order alone. Putting a third list in a strip means adding it
-       here as well as in the markup, which website-mobile-layout.test.ts checks.
+       win on source order alone. Putting a fourth list in a strip means adding
+       it here as well as in the markup, which website-mobile-layout.test.ts
+       checks.
      - display:grid is what turns the gallery's masonry off. A multi-column
        container is not a grid container, so nothing else here would reach it.
      - grid-template-columns has to be cleared, not just overridden: an explicit
@@ -312,12 +330,35 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
        scroller inside a 1fr track does (see the min-width:0 note above).
      - the reveal slides up 24px, which reads as a card entering from below a row
        it is not in, and overflow-y clips it besides. In a strip it is a fade. */
-  .grid.strip,.gal.strip{
+  .grid.strip,.gal.strip,.rep-grid.strip{
     display:grid;columns:auto;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;
     overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
     scroll-snap-type:x mandatory;scrollbar-width:thin;padding:4px 0 12px}
   .strip>*{scroll-snap-align:start;min-width:0}
   .strip>.rv{transform:none}
+  /* A report is one line of text and a category, not a card with a picture in
+     it, so a single row of them would leave most of the strip's height empty and
+     still take forty-six swipes to cross. Four to a column is roughly the height
+     of the feature cards beside it and turns the same list into twelve, and a
+     category chip or a search term usually cuts it to one or two. Rows have to
+     be given explicitly: with grid-auto-flow:column the implicit grid grows
+     sideways, so without this every item lands in row one. */
+  .rep-grid.strip{grid-template-rows:repeat(4,auto)}
+  /* The filter chips wrap to four or five centred rows on a phone -- eleven
+     report categories, ten feature ones -- so the control costs more height than
+     the strip it filters, and the reports section pushed its own list off the
+     screen before a thumb reached it. One scrolling row instead, the shape the
+     tour rail already takes at the tablet breakpoint.
+     - justify-content has to leave centre: a centred flex line that overflows
+       puts its first item at a negative offset, and a scroller cannot reach it
+       because scrollLeft has no values below zero.
+     - overflow-y is set because a box with overflow-x:auto and overflow-y
+       visible computes the second to auto as well, and the chips' 2px hover lift
+       is then enough to raise a vertical scrollbar over a one-line row. The
+       padding is what gives that lift somewhere to go. */
+  .tagrow{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;
+    overscroll-behavior-x:contain;scrollbar-width:thin;margin-bottom:18px;padding:2px 0 6px}
+  .tagrow .chip{flex:0 0 auto}
   /* The gallery's pictures are its content, so they crop to one height rather
      than making every figure as tall as the tallest screenshot -- the trade the
      filmstrip already makes, and the shot is a click away from full size. Both
@@ -331,7 +372,6 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
   .gal.strip figure .shotmiss{padding:14px}
   .stats{grid-template-columns:repeat(2,auto);gap:16px 22px}
   .gal{columns:1}
-  .tl{grid-template-columns:repeat(2,1fr);gap:18px 0}.tl::before{display:none}
   .fgrid{grid-template-columns:1fr}
   .float{display:none}
   /* Give the picture the width of the phone: 14px of gutter, the close button

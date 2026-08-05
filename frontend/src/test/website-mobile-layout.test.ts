@@ -31,6 +31,7 @@ const SITE = join(__dirname, '..', '..', '..', 'website');
 const STRIPS = [
   { id: 'fgrid', what: 'the feature list' },
   { id: 'gal', what: 'the screenshot gallery' },
+  { id: 'repGrid', what: 'the reports list' },
 ];
 
 /**
@@ -82,11 +83,11 @@ function rules(css: string): Rule[] {
 }
 
 /**
- * The rules that apply at the phone breakpoint. A regex cannot match a nested
- * brace pair, so the body of each `@media` is taken by counting braces out from
- * the one that opened it.
+ * The rules inside every `@media` whose `max-width` the caller accepts. A regex
+ * cannot match a nested brace pair, so the body of each `@media` is taken by
+ * counting braces out from the one that opened it.
  */
-function phoneRules(css: string): Rule[] {
+function mediaRules(css: string, accepts: (maxWidth: number) => boolean): Rule[] {
   const stripped = code(css);
   const opener = /@media([^{]*)\{/g;
   const found: Rule[] = [];
@@ -98,11 +99,28 @@ function phoneRules(css: string): Rule[] {
       if (stripped[end] === '{') depth++;
       else if (stripped[end] === '}') depth--;
     }
-    if (/max-width\s*:\s*640px/.test(at[1])) found.push(...rules(stripped.slice(start, end - 1)));
+    const max = at[1].match(/max-width\s*:\s*(\d+)px/);
+    if (max && accepts(Number(max[1]))) found.push(...rules(stripped.slice(start, end - 1)));
     opener.lastIndex = end;
   }
 
   return found;
+}
+
+/** The rules that apply at the phone breakpoint. */
+function phoneRules(css: string): Rule[] {
+  return mediaRules(css, (maxWidth) => maxWidth === 640);
+}
+
+function styles(): string {
+  return readFileSync(join(SITE, 'assets', 'css', 'styles.css'), 'utf8');
+}
+
+/** Track count for a `grid-template-rows` value, `repeat(n, ...)` included. */
+function trackCount(value: string): number {
+  const repeat = value.match(/repeat\(\s*(\d+)\s*,([^)]*)\)/);
+  const list = (repeat ? repeat[2] : value).trim().split(/\s+/).filter(Boolean).length;
+  return repeat ? Number(repeat[1]) * list : list;
 }
 
 function filesIn(dir: string, ext: string): string[] {
@@ -181,9 +199,10 @@ describe('website layout holds on a phone', () => {
   });
 
   /**
-   * Two lists here are long -- twenty-eight feature cards and forty-two gallery
-   * screenshots -- and one column of either is a couple of screens of
-   * thumb-scrolling to reach the next section, so on a phone both are horizontal
+   * Three lists here are long -- twenty-eight feature cards, forty-two gallery
+   * screenshots and forty-six report rows -- and one column of any of them is a
+   * couple of screens of thumb-scrolling to reach the next section, so on a
+   * phone all three are horizontal
    * strips. Three things have to line up, and any one of them alone leaves the
    * long column in place, which looks like nothing was changed rather than like
    * something is broken: the class in the markup, the rule in the phone
@@ -246,6 +265,97 @@ describe('website layout holds on a phone', () => {
     });
 
     expect(unstyled, unstyled.join('\n')).toEqual([]);
+  });
+
+  /**
+   * A report row is one line of text and a category, not a card with a picture
+   * in it, so the shared strip rule on its own -- a single row of 82%-wide
+   * columns -- leaves most of the strip's height empty and still costs one swipe
+   * per report. Stacking them four to a column is the difference between twelve
+   * swipes and forty-six, and it is the declaration a browser needs told
+   * explicitly: with `grid-auto-flow:column` the implicit grid grows sideways,
+   * so without a row track list every item lands in row one. That arrangement
+   * satisfies every assertion above, which is why it needs its own.
+   */
+  it('stacks the reports strip several rows deep', () => {
+    const declared = phoneRules(readFileSync(join(SITE, 'assets', 'css', 'styles.css'), 'utf8'))
+      .filter(({ selectors }) =>
+        selectors.split(',').some((s) => /\.rep-grid\b/.test(s) && /\bstrip\b/.test(s) && !/[\s>+~]/.test(s.trim())),
+      )
+      .flatMap(({ declarations }) =>
+        Array.from(declarations.matchAll(/grid-template-rows\s*:([^;}]*)/g)).map(([, value]) => value.trim()),
+      );
+
+    expect(
+      declared,
+      'the reports strip declares no grid-template-rows inside the phone breakpoint -- under grid-auto-flow:column ' +
+        'that puts all forty-six reports in a single row, one swipe each, with the rest of the strip blank',
+    ).not.toEqual([]);
+
+    const deepest = Math.max(...declared.map(trackCount));
+    expect(
+      deepest,
+      `the reports strip lays out ${deepest} row(s) of reports (${declared.join(', ')}) -- one row per column is the ` +
+        'shape this guard exists to catch',
+    ).toBeGreaterThan(1);
+  });
+
+  /**
+   * The header is a brand, a theme toggle, a demo button and a menu button on
+   * one flex line, and below about 380px that line is wider than the screen.
+   * Nothing in it gives -- `.btn` is `white-space:nowrap` and `.icobtn` is a
+   * fixed square -- so the whole shortfall came out of `.brand`, which does not
+   * reflow: it slid its own text under the theme toggle. At 320px the wordmark
+   * read "Moniz" and the menu button, the only way to reach the nav once `#nav`
+   * is `display:none`, hung 11px past the right edge. Not merely scrolled off:
+   * `body` sets `overflow-x:hidden` and, with `html` at visible, that propagates
+   * to the viewport, so the button was clipped away entirely. Measured in
+   * Chromium, the header held a hard 331px floor at every viewport below it.
+   *
+   * The layout result cannot be scanned, so these are the three declarations
+   * that keep it true. The third is the one that is easy to get wrong twice:
+   * the lightbox's close and arrow buttons carry `.icobtn` too, and they are
+   * thumb targets over a photo, so a header-sized override has to name the
+   * header.
+   */
+  it('keeps the whole header inside the narrowest phone', () => {
+    const css = styles();
+    const narrow = mediaRules(css, (maxWidth) => maxWidth <= 560);
+
+    const brandHolds = narrow.some(
+      ({ selectors, declarations }) =>
+        selectors.split(',').some((selector) => selector.trim() === '.brand') &&
+        (/(^|[;\s])flex\s*:\s*0\s+0\b/.test(declarations) || /(^|[;\s])flex-shrink\s*:\s*0/.test(declarations)),
+    );
+    expect(
+      brandHolds,
+      '.brand must stop shrinking at the phone breakpoint (flex:0 0 auto, or flex-shrink:0). It is the only ' +
+        'flexible item on the header line, so without this every pixel the header is over budget is taken out of ' +
+        'the wordmark -- which does not wrap, it slides under the control beside it and renders as "Moniz".',
+    ).toBe(true);
+
+    const wordmarkGoes = mediaRules(css, (maxWidth) => maxWidth <= 400).some(
+      ({ selectors, declarations }) =>
+        /\.brand\s+span\b/.test(selectors) && /(^|[;\s])display\s*:\s*none/.test(declarations),
+    );
+    expect(
+      wordmarkGoes,
+      'no breakpoint at or below 400px hides .brand span. Even with the gutters tightened the wordmark does not ' +
+        'fit beside the demo button and the two icon buttons on a 320-360px screen, and it is the element whose ' +
+        'loss costs least -- the logo is still the link home and still carries the accessible name.',
+    ).toBe(true);
+
+    const unscoped = narrow
+      .filter(({ declarations }) => /(^|[;\s])(width|height)\s*:/.test(declarations))
+      .flatMap(({ selectors }) => selectors.split(','))
+      .map((selector) => selector.trim())
+      .filter((selector) => /(^|[\s>+~])\.icobtn\b/.test(selector) && !/#hdr|\.hdr-cta/.test(selector));
+    expect(
+      unscoped,
+      `${unscoped.join(', ')} resizes an icon button at a phone breakpoint without naming the header. The lightbox's ` +
+        'close and previous/next buttons carry that class as well, and they are thumb targets sitting over a ' +
+        'photo -- shrink the header pair with .hdr-cta .icobtn instead.',
+    ).toEqual([]);
   });
 
   /**
