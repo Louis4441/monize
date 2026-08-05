@@ -35,8 +35,27 @@ const SITE = join(__dirname, '..', '..', '..', 'website');
 function code(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '');
 }
+/**
+ * Cutting HTML comments out by index rather than by `replace(/<!--.*?-->/g)`:
+ * one pass of that regex leaves a `<!--` behind on `<!--<!-- -->`, which is the
+ * incomplete-multi-character-sanitization shape CodeQL fails the build on. An
+ * unterminated comment swallows the rest of the file, which is what a browser
+ * does with one too.
+ */
 function markup(source: string): string {
-  return source.replace(/<!--[\s\S]*?-->/g, '');
+  const kept: string[] = [];
+  let from = 0;
+  for (;;) {
+    const open = source.indexOf('<!--', from);
+    if (open < 0) {
+      kept.push(source.slice(from));
+      return kept.join('');
+    }
+    kept.push(source.slice(from, open));
+    const close = source.indexOf('-->', open + 4);
+    if (close < 0) return kept.join('');
+    from = close + 3;
+  }
 }
 
 function filesIn(dir: string, ext: string): string[] {
