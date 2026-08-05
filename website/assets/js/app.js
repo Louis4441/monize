@@ -490,7 +490,19 @@ function paintTour(){
   var cur=ss[si];
   im.setAttribute('data-shot',cur.n); im.removeAttribute('data-fb'); im.alt=cur.c; M.wireShot(im);
   im.style.animation='none'; void im.offsetWidth; im.style.animation='';
-  var th=thumbs.children[si]; if(th&&th.scrollIntoView) th.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});
+  centreThumb(si);
+}
+/* Scroll the filmstrip, never the page. scrollIntoView() moves every scrollable
+   ancestor up to the document, so calling it from the first paint -- when the
+   tour is still far below the fold -- drags the whole page down to the tour
+   section, which is why the site used to open halfway down on a phone. Nudging
+   the strip's own scrollLeft cannot move anything but the strip. */
+function centreThumb(i){
+  var th=thumbs.children[i]; if(!th) return;
+  var t=th.getBoundingClientRect(), c=thumbs.getBoundingClientRect();
+  var delta=(t.left+t.width/2)-(c.left+c.width/2);
+  if(thumbs.scrollBy) thumbs.scrollBy({left:delta,behavior:'smooth'});
+  else thumbs.scrollLeft+=delta;
 }
 paintTour();
 $('#stBody').addEventListener('click',function(){ var ss=shots(M.TOUR[ti]); openLB(ss.map(function(s){return {n:s.n,c:M.TOUR[ti].name+' — '+s.c};}),si); });

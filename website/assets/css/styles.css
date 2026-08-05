@@ -104,6 +104,17 @@ main,header,footer{position:relative;z-index:1}
 .marq span::before{content:"◆";color:var(--teal);font-size:.6rem}
 @keyframes slide{to{transform:translateX(-50%)}}
 
+/* A `1fr` track still takes its automatic minimum from the item's min-content
+   width, and a horizontally scrolling child reports its whole unscrolled length
+   there -- the tour's filmstrip is six 132px thumbnails, the code block is a
+   `docker compose` line. That inflated the track to 846px on a 390px phone, and
+   a document wider than the screen is laid out against a containing block wider
+   than the screen: every position:fixed overlay sizes to that, so the lightbox
+   centred its picture at 434px, most of it past the right-hand edge. min-width:0
+   lets the track shrink and leaves the scrolling to the scroller. Any new
+   layout grid that can hold one needs to be on this list. */
+.grid>*,.hero-grid>*,.tour>*,.chat>*{min-width:0}
+
 /* generic cards */
 .grid{display:grid;gap:16px}
 .g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
@@ -200,6 +211,11 @@ html[data-theme=light] .code-wrap{background:#0d1424}
 .code-tabs .cp{margin-left:auto;border:1px solid var(--line);background:var(--card)}
 pre{margin:0;padding:20px;overflow-x:auto;font:.85rem/1.7 var(--mono);color:#cfe0ff}
 pre .c{color:#6b83ad}pre .k{color:#7fd6c1}pre .s{color:#f0b571}
+/* The self-hosting split. This lives in a class, not in a style attribute on the
+   element: an inline grid-template-columns outranks every media query below, so
+   the code block and the prerequisites stayed side by side in two ~160px columns
+   on a phone long after .g2 was told to collapse. */
+.selfhost-grid{grid-template-columns:1.15fr .85fr;align-items:start}
 .stack{display:flex;gap:8px;flex-wrap:wrap}
 .stack span{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 13px;font-size:.84rem;font-weight:700;color:var(--mut);transition:.18s}
 .stack span:hover{color:var(--txt);transform:translateY(-3px);border-color:var(--teal)}
@@ -229,11 +245,18 @@ footer ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}
 footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
 .fbot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:30px;padding-top:20px;border-top:1px solid var(--line);font-size:.82rem}
 
-/* lightbox */
-#lb{position:fixed;inset:0;z-index:100;background:rgba(4,8,16,.93);backdrop-filter:blur(6px);display:none;place-items:center;padding:34px}
+/* lightbox
+   The figure is sized against the overlay's own content box (width:100%,
+   max-width in px) and the image against the figure. A viewport-relative
+   max-width does not know about the overlay's padding: at 94vw inside 34px of
+   padding the image was 44px wider than the box holding it, so it hung off the
+   right-hand edge while the caption stayed centred -- which on a phone read as
+   the picture being shoved to the right. */
+#lb{position:fixed;inset:0;z-index:100;background:rgba(4,8,16,.93);backdrop-filter:blur(6px);display:none;place-items:center;padding:34px;overflow:auto}
 #lb.on{display:grid}
-#lb img{max-width:min(1180px,94vw);max-height:84vh;border-radius:12px;border:1px solid var(--line);box-shadow:var(--sh);object-fit:contain}
-#lb .lbcap{color:var(--mut);text-align:center;margin-top:14px;font-size:.9rem}
+#lb .lbfig{display:grid;justify-items:center;gap:14px;width:100%;max-width:1180px;min-width:0}
+#lb img{max-width:100%;max-height:78vh;border-radius:12px;border:1px solid var(--line);box-shadow:var(--sh);object-fit:contain}
+#lb .lbcap{color:var(--mut);text-align:center;font-size:.9rem}
 #lb .x{position:absolute;top:18px;right:22px}
 #lb .pv,#lb .nx{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;font-size:1.3rem}
 #lb .pv{left:18px}#lb .nx{right:18px}
@@ -255,6 +278,7 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
   .rail{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px}
   .rail button{flex:0 0 auto}
   .chat{grid-template-columns:1fr}
+  .selfhost-grid{grid-template-columns:1fr}
   .gal{columns:2}
   .fgrid{grid-template-columns:1fr 1fr}
   #nav{display:none}
@@ -272,6 +296,14 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
   .tl{grid-template-columns:repeat(2,1fr);gap:18px 0}.tl::before{display:none}
   .fgrid{grid-template-columns:1fr}
   .float{display:none}
+  /* Give the picture the width of the phone: 14px of gutter, the close button
+     cleared at the top, and the arrows moved down to the corners beside the
+     caption so they sit under a thumb instead of on top of the screenshot. */
+  #lb{padding:56px 14px 20px}
+  #lb img{max-height:68vh}
+  #lb .lbcap{padding:0 52px}
+  #lb .pv,#lb .nx{top:auto;bottom:14px;transform:none}
+  #lb .pv{left:14px}#lb .nx{right:14px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}}
 
