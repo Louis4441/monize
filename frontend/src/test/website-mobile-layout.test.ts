@@ -27,6 +27,12 @@ import { join } from 'node:path';
  */
 const SITE = join(__dirname, '..', '..', '..', 'website');
 
+/** The lists that are a horizontal strip on a phone rather than a long column. */
+const STRIPS = [
+  { id: 'fgrid', what: 'the feature list' },
+  { id: 'gal', what: 'the screenshot gallery' },
+];
+
 /**
  * Comments are stripped before scanning. Each rule below is written down in
  * prose next to the code it governs, and prose naming a banned pattern must not
@@ -175,42 +181,71 @@ describe('website layout holds on a phone', () => {
   });
 
   /**
-   * The features section is twenty-eight cards. Collapsed to a single column it
-   * is a screen and a half of thumb-scrolling to reach the next section, so on a
-   * phone it is a horizontal strip instead. Two files have to agree for that to
-   * happen -- the class in the markup and the rule in the phone breakpoint --
-   * and either one alone leaves the long column back in place, looking like
-   * nothing was changed rather than like something is broken.
+   * Two lists here are long -- twenty-eight feature cards and forty-two gallery
+   * screenshots -- and one column of either is a couple of screens of
+   * thumb-scrolling to reach the next section, so on a phone both are horizontal
+   * strips. Three things have to line up, and any one of them alone leaves the
+   * long column in place, which looks like nothing was changed rather than like
+   * something is broken: the class in the markup, the rule in the phone
+   * breakpoint, and that rule's selector actually reaching the element carrying
+   * the class. The third is the one only a scan catches -- the rule names its
+   * consumers (`.grid.strip,.gal.strip`) because a bare `.strip` would only beat
+   * the collapse rules on source order, so a third list added to the markup is
+   * styled by nothing until the selector grows to meet it.
    */
-  it('turns the feature list into a horizontal strip on a phone', () => {
-    const tag = markup(readFileSync(join(SITE, 'index.html'), 'utf8')).match(/<div[^>]*\bid="fgrid"[^>]*>/);
-    expect(tag, 'the feature list (#fgrid) is gone from index.html -- update this guard with it').not.toBeNull();
-    expect(
-      tag![0],
-      '#fgrid must carry the feat-strip class, which is what the phone breakpoint styles as a scroller',
-    ).toMatch(/class="[^"]*\bfeat-strip\b/);
-
-    const declared = phoneRules(readFileSync(join(SITE, 'assets', 'css', 'styles.css'), 'utf8'))
-      .filter(({ selectors }) => /\bfeat-strip\b/.test(selectors))
-      .map(({ declarations }) => declarations)
-      .join(';');
+  it('turns its long lists into horizontal strips on a phone', () => {
+    const html = markup(readFileSync(join(SITE, 'index.html'), 'utf8'));
+    const strips = phoneRules(readFileSync(join(SITE, 'assets', 'css', 'styles.css'), 'utf8')).filter(({ selectors }) =>
+      /(^|[\s,>+~])\.[A-Za-z0-9_.-]*\bstrip\b/.test(selectors),
+    );
+    const scrollers = strips.filter(({ declarations }) => /overflow-x\s*:\s*(auto|scroll)/.test(declarations));
 
     const required: Array<[RegExp, string]> = [
-      [/grid-auto-flow\s*:\s*column/, 'grid-auto-flow:column -- lays the cards along one row instead of one per row'],
+      [
+        /display\s*:\s*grid/,
+        'display:grid -- a multi-column container is not a grid container, so nothing else in the rule reaches the ' +
+          "gallery's masonry",
+      ],
+      [/grid-auto-flow\s*:\s*column/, 'grid-auto-flow:column -- lays the items along one row instead of one per row'],
       [
         /grid-template-columns\s*:\s*none/,
         'grid-template-columns:none -- an explicit track list sizes the leading items and grid-auto-columns only ' +
-          'picks up the implicit ones after it, so the collapsed 1fr would keep the first card full width',
+          'picks up the implicit ones after it, so the collapsed 1fr would keep the first item full width',
       ],
       [
         /overflow-x\s*:\s*(auto|scroll)/,
-        'overflow-x:auto -- without it the row is an overflow, not a scroller, and the cards are simply unreachable',
+        'overflow-x:auto -- without it the row is an overflow, not a scroller, and the items are simply unreachable',
       ],
-      [/scroll-snap-type\s*:\s*x/, 'scroll-snap-type:x -- a swipe lands on a card rather than between two'],
+      [/scroll-snap-type\s*:\s*x/, 'scroll-snap-type:x -- a swipe lands on an item rather than between two'],
     ];
-
+    const declared = strips.map(({ declarations }) => declarations).join(';');
     const missing = required.flatMap(([pattern, why]) => (pattern.test(declared) ? [] : [why]));
-    expect(missing, `the .feat-strip rule in the phone breakpoint is missing:\n  ${missing.join('\n  ')}`).toEqual([]);
+    expect(missing, `the strip rule in the phone breakpoint is missing:\n  ${missing.join('\n  ')}`).toEqual([]);
+
+    // Class-only selectors from the rule that makes a strip scroll, e.g.
+    // `.grid.strip` -> ['grid', 'strip']. Anything with a combinator or an
+    // element in it styles the items, not the container, and is skipped.
+    const reaches = scrollers
+      .flatMap(({ selectors }) => selectors.split(','))
+      .map((selector) => selector.trim())
+      .filter((selector) => /^(\.[A-Za-z0-9_-]+)+$/.test(selector))
+      .map((selector) => selector.slice(1).split('.'));
+
+    const unstyled = STRIPS.flatMap(({ id, what }) => {
+      const tag = html.match(new RegExp(`<[a-z]+[^>]*\\bid="${id}"[^>]*>`));
+      if (!tag) return [`${what} (#${id}) is gone from index.html -- update this guard with it`];
+
+      const classes = new Set((tag[0].match(/class="([^"]*)"/)?.[1] ?? '').split(/\s+/).filter(Boolean));
+      if (!classes.has('strip')) return [`${what} (#${id}) must carry the strip class`];
+      if (reaches.some((needed) => needed.every((name) => classes.has(name)))) return [];
+
+      return [
+        `${what} (#${id}) carries the strip class but no selector on the scrolling rule matches it -- it has ` +
+          `${[...classes].join(', ')}, and the rule reaches ${reaches.map((n) => n.join('.')).join(' / ')}`,
+      ];
+    });
+
+    expect(unstyled, unstyled.join('\n')).toEqual([]);
   });
 
   /**

@@ -375,6 +375,39 @@ var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function(
 function watch(n){ if(io) io.observe(n); else n.classList.add('in'); }
 $$('.rv').forEach(watch);
 
+/* ---------- lists that become a horizontal strip on a phone ----------
+   The layout is .strip in styles.css. Two things follow from it that CSS cannot
+   do, so every strip is registered here and repainted through rewind():
+
+   - a scroll offset survives its contents being replaced, clamped to whatever
+     the new content allows, so filtering twenty-eight cards down to two left the
+     strip parked at the end of the two. Moving the strip's own scrollLeft cannot
+     move anything but the strip, which is why this is not scrollIntoView.
+   - nothing inside a feature card or a gallery figure is focusable, so on the
+     browsers that do not make a scroller focusable by themselves the strip is
+     unreachable from a keyboard: it takes a tab stop and a name while there is
+     something to scroll to. Asking the element whether it can scroll, rather
+     than repeating `640px` here, keeps the two files from disagreeing after a
+     breakpoint moves. */
+var strips=[];
+function asStrip(node,label){ strips.push([node,label]); return node; }
+function syncStrips(){
+  strips.forEach(function(s){
+    var n=s[0];
+    if(n.scrollWidth-n.clientWidth>1){
+      n.setAttribute('tabindex','0');
+      n.setAttribute('role','group');
+      n.setAttribute('aria-label',s[1]);
+    }else{
+      n.removeAttribute('tabindex');
+      n.removeAttribute('role');
+      n.removeAttribute('aria-label');
+    }
+  });
+}
+function rewind(node){ node.scrollLeft=0; syncStrips(); }
+addEventListener('resize',syncStrips,{passive:true});
+
 /* count-up stats */
 var statsDone=false;
 function runStats(){
@@ -414,30 +447,12 @@ function paintTl(i){
 paintTl(0);
 
 /* ---------- features ---------- */
-var fchips=$('#fchips'), fgrid=$('#fgrid'), fcat='all';
+var fchips=$('#fchips'), fgrid=asStrip($('#fgrid'),'Features — scroll sideways for more'), fcat='all';
 M.FCATS.forEach(function(c){
   var b=el('button','chip'+(c[0]==='all'?' on':''),c[1]);
   b.addEventListener('click',function(){ fcat=c[0]; $$('.chip',fchips).forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); paintF(); });
   fchips.appendChild(b);
 });
-/* Below the phone breakpoint the grid is a horizontal strip (see .feat-strip in
-   styles.css). Nothing inside a feature card is focusable, so on the browsers
-   that do not make a scroller focusable by themselves the strip is unreachable
-   from a keyboard -- it takes a tab stop and a name. Asking the element whether
-   it can scroll, rather than repeating `640px` here, keeps the two files from
-   disagreeing after a breakpoint moves: the strip is focusable exactly while
-   there is something to scroll to. */
-function syncFStrip(){
-  if(fgrid.scrollWidth-fgrid.clientWidth>1){
-    fgrid.setAttribute('tabindex','0');
-    fgrid.setAttribute('role','group');
-    fgrid.setAttribute('aria-label','Features — scroll sideways for more');
-  }else{
-    fgrid.removeAttribute('tabindex');
-    fgrid.removeAttribute('role');
-    fgrid.removeAttribute('aria-label');
-  }
-}
 function paintF(){
   clear(fgrid);
   M.FEATURES.filter(function(f){ return fcat==='all'||f[0]===fcat; }).forEach(function(f,i){
@@ -445,16 +460,9 @@ function paintF(){
     c.style.transitionDelay=Math.min(i*35,420)+'ms';
     fgrid.appendChild(c); watch(c);
   });
-  /* A scroll offset survives its contents being replaced, clamped to whatever
-     the new content allows -- so filtering twenty-eight cards down to two left
-     the strip parked at the end of the two. Rewind it. Moving the strip's own
-     scrollLeft cannot move anything but the strip, which is why this is not
-     scrollIntoView. */
-  fgrid.scrollLeft=0;
-  syncFStrip();
+  rewind(fgrid);
 }
 paintF();
-addEventListener('resize',syncFStrip,{passive:true});
 
 /* ---------- interactive tour ---------- */
 var rail=$('#rail'), thumbs=$('#thumbs'), stImg=$('#stImg'), ti=0, si=0, timer=null;
@@ -644,20 +652,21 @@ M.FAQ.forEach(function(f){
 });
 
 /* ---------- gallery ---------- */
-var gcat='all';
+var gal=asStrip($('#gal'),'Screenshots — scroll sideways for more'), gcat='all';
 M.GALCATS.forEach(function(c){
   var b=el('button','chip'+(c[0]==='all'?' on':''),c[1]);
   b.addEventListener('click',function(){ gcat=c[0]; $$('.chip',$('#galChips')).forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); paintG(); });
   $('#galChips').appendChild(b);
 });
 function paintG(){
-  var g=clear($('#gal'));
+  var g=clear(gal);
   var list=M.GALLERY.filter(function(x){ return gcat==='all'||x[0]===gcat; });
   list.forEach(function(x,i){
     var f=el('figure'); f.appendChild(shot(x[1],x[2])); f.appendChild(el('figcaption',null,x[2]));
     f.addEventListener('click',function(){ openLB(list.map(function(y){return {n:y[1],c:y[2]};}),i); });
     g.appendChild(f);
   });
+  rewind(gal);
 }
 paintG();
 

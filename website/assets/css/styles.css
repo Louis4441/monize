@@ -291,25 +291,44 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
 @media (max-width:640px){
   .sec{padding:60px 0}
   .g4,.g3,.g2,.rep-grid{grid-template-columns:1fr}
-  /* The feature list is twenty-eight cards. Collapsed to one column that is a
-     screen and a half of thumb-scrolling to get past a section nobody has to
-     read in full, so on a phone it becomes a snapping horizontal strip -- the
-     shape the tour rail and the filmstrip above already use. Notes:
+  /* Two lists here are long -- twenty-eight feature cards and forty-two gallery
+     screenshots -- and one column of either is a couple of screens of
+     thumb-scrolling to get past a section nobody has to read in full. Both
+     become a snapping horizontal strip on a phone, the shape the tour rail and
+     the filmstrip above already use.
+     - the selector names its consumers instead of being a bare `.strip`: the
+       collapse rule a line up sets grid-template-columns at the same
+       specificity, and .gal sets columns further down, so a single class would
+       win on source order alone. Putting a third list in a strip means adding it
+       here as well as in the markup, which website-mobile-layout.test.ts checks.
+     - display:grid is what turns the gallery's masonry off. A multi-column
+       container is not a grid container, so nothing else here would reach it.
      - grid-template-columns has to be cleared, not just overridden: an explicit
        track list sizes the first items and grid-auto-columns only picks up the
-       implicit ones after it, so `1fr` two lines up would keep card one full
-       width and put the strip's own width behind it.
-     - the scroller is the grid itself, which is a block child of .wrap, so it is
-       exactly as wide as the gutter allows and cannot widen the document the way
-       a scroller inside a 1fr track does (see the min-width:0 note above).
+       implicit ones after it, so `1fr` would keep card one full width and put
+       the strip's own width behind it.
+     - the scroller is the list itself, a block child of .wrap, so it is exactly
+       as wide as the gutter allows and cannot widen the document the way a
+       scroller inside a 1fr track does (see the min-width:0 note above).
      - the reveal slides up 24px, which reads as a card entering from below a row
-       it is not in, and overflow-y clips it besides. In the strip it is a fade. */
-  .grid.feat-strip{
-    grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;
+       it is not in, and overflow-y clips it besides. In a strip it is a fade. */
+  .grid.strip,.gal.strip{
+    display:grid;columns:auto;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;
     overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
     scroll-snap-type:x mandatory;scrollbar-width:thin;padding:4px 0 12px}
-  .grid.feat-strip>.card{scroll-snap-align:start}
-  .grid.feat-strip>.rv{transform:none}
+  .strip>*{scroll-snap-align:start;min-width:0}
+  .strip>.rv{transform:none}
+  /* The gallery's pictures are its content, so they crop to one height rather
+     than making every figure as tall as the tallest screenshot -- the trade the
+     filmstrip already makes, and the shot is a click away from full size. Both
+     axes have to be given: object-fit crops the picture to the element's box,
+     but a height alone leaves the box itself at whatever the aspect ratio makes
+     it, so a portrait screenshot sat in a 106px-wide box with the rest of the
+     card blank beside it. The missing-shot placeholder takes the same height, or
+     a category with no local copies yet is a different shape from one with. */
+  .gal.strip figure{margin:0}
+  .gal.strip figure img,.gal.strip figure .shotmiss{width:100%;height:186px;object-fit:cover;object-position:top}
+  .gal.strip figure .shotmiss{padding:14px}
   .stats{grid-template-columns:repeat(2,auto);gap:16px 22px}
   .gal{columns:1}
   .tl{grid-template-columns:repeat(2,1fr);gap:18px 0}.tl::before{display:none}
