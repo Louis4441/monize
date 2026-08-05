@@ -1,7 +1,7 @@
-import { execSync } from "child_process";
-import { existsSync } from "fs";
 import { readFileSync } from "fs";
-import { basename, dirname, join } from "path";
+import { basename, join } from "path";
+
+import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
 
 /**
  * A doc that names a file is making a claim about the source tree.
@@ -282,30 +282,6 @@ describe("doc path grammar", () => {
 // The tree itself.
 // ---------------------------------------------------------------------------
 
-/**
- * The repo root is found by marker, not by counting `..` segments: inside the
- * dev container (docker-compose.dev.yml mounts `./backend:/app`) a fixed
- * traversal lands on `/` and a filesystem walk from there recurses the whole
- * container before failing. No root locally means the checkout genuinely lacks
- * the docs this suite checks -- skip, visibly. CI always has the full
- * checkout, so there a missing root is a broken guard and must fail, not skip.
- */
-function findRepoRoot(start: string): string | null {
-  let dir = start;
-  for (;;) {
-    if (
-      ["CLAUDE.md", "docs", "backend", "database"].every((marker) =>
-        existsSync(join(dir, marker)),
-      )
-    ) {
-      return dir;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-}
-
 const REPO_ROOT = findRepoRoot(__dirname);
 
 const describeTree = REPO_ROOT || process.env.CI ? describe : describe.skip;
@@ -319,25 +295,15 @@ describeTree("docs name files that exist", () => {
   let cached: TreeData | undefined;
 
   const load = (): TreeData => {
-    if (!REPO_ROOT) {
-      throw new Error(
-        "repository root not found: this suite needs the full checkout, and on CI that absence is a failure, not a skip",
-      );
-    }
     if (cached) return cached;
-    const git = (args: string): string[] =>
-      execSync(`git ls-files -z ${args}`, {
-        cwd: REPO_ROOT,
-        maxBuffer: 64 * 1024 * 1024,
-      })
-        .toString("utf8")
-        .split("\0")
-        .filter(Boolean);
+    const root = requireRepoRoot(REPO_ROOT);
     // Existence is generous (tracked plus untracked-but-not-ignored, so a file
     // committed in the same change as the doc that names it passes before
     // staging); the docs that gate are the tracked ones only.
-    const index = buildIndex(git("--cached --others --exclude-standard"));
-    const tracked = git("");
+    const index = buildIndex(
+      gitListFiles(root, "--cached --others --exclude-standard"),
+    );
+    const tracked = gitListFiles(root);
     const contractDocs = tracked.filter(
       (f) =>
         basename(f) === "CLAUDE.md" ||
