@@ -71,7 +71,25 @@ main,header,footer{position:relative;z-index:1}
 
 /* hero */
 .hero{padding:56px 0 40px}
-.hero-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:46px;align-items:center}
+/* The hero copy is split into two blocks either side of the screenshot so that
+   the one-column phone layout can put the picture between them -- straight
+   after the headline and lede, before the call-to-action row. As one block the
+   copy stacked whole and the screenshot landed under the stats, roughly a
+   screen and a half down, which reads on a phone as the hero having no picture
+   at all.
+
+   The document order is the phone order, and named areas move the picture into
+   the second column on desktop rather than the other way round: reordering with
+   grid changes only the visual sequence, so the order that stays true when the
+   areas do not apply is the one worth having in the markup. Two rows with a
+   zero row-gap reproduce the old single-column-of-copy spacing exactly on
+   desktop; the art spans both and stays centred against the pair. */
+.hero-grid{display:grid;grid-template-columns:1.02fr .98fr;
+  grid-template-areas:"copyTop art" "copyBottom art";
+  column-gap:46px;row-gap:0;align-items:center}
+.hero-copy-top{grid-area:copyTop}
+.hero-copy-bottom{grid-area:copyBottom}
+.hero-art{grid-area:art}
 .lede{font-size:1.12rem;color:var(--mut);max-width:56ch}
 .stats{list-style:none;display:grid;grid-template-columns:repeat(4,auto);gap:10px 26px;padding:0;margin:30px 0 0;justify-content:start}
 .stats li{min-width:84px}
@@ -258,7 +276,11 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
 @keyframes fall{to{transform:translateY(105vh) rotate(720deg);opacity:.1}}
 
 @media (max-width:1020px){
-  .hero-grid{grid-template-columns:1fr;gap:34px}
+  .hero-grid{grid-template-columns:1fr;grid-template-areas:"copyTop" "art" "copyBottom";gap:26px}
+  /* The lede's own bottom margin stacks on top of the row gap and would leave
+     the picture noticeably further from the text above it than from the
+     buttons below. */
+  .hero-copy-top>:last-child{margin-bottom:0}
   #heroArt .frame{transform:none}
   .g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}
   .rep-grid{grid-template-columns:repeat(2,1fr)}
