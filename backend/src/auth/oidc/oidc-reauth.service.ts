@@ -128,6 +128,40 @@ function flowHash(state: string): string {
   return crypto.createHash("sha256").update(state).digest("hex");
 }
 
+/**
+ * A present, non-empty string, as a type guard.
+ *
+ * The header arrives typed `string | undefined` but is really `unknown` -- a
+ * repeated header gives an array -- so the runtime check has to stay. Written as
+ * a guard on `value` rather than inline on the artifact so `consume` reads as one
+ * predicate, and so the narrowing removes the `token as string` cast that
+ * followed it.
+ */
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+/**
+ * Compare two `flowHash` digests without leaking where they diverge (CWE-208).
+ *
+ * `!==` on hex strings returns as soon as a character differs, so the time it
+ * takes reports the length of the shared prefix -- and the caller controls one
+ * side of the comparison via the marker cookie, so it can be probed. That is a
+ * narrow lever, since forging a match also needs a preimage of the `state` this
+ * hash was taken of, but constant time here costs nothing and the alternative is
+ * an argument rather than a property.
+ *
+ * Equal-length inputs are required by `timingSafeEqual`, so a length mismatch is
+ * answered first -- it is not a secret: both sides are SHA-256 hex, and anything
+ * else is malformed input rather than a near miss.
+ */
+function flowHashMatches(presented: string, expected: string): boolean {
+  const a = Buffer.from(presented, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 @Injectable()
 export class OidcReauthService {
   private readonly logger = new Logger(OidcReauthService.name);
@@ -196,7 +230,11 @@ export class OidcReauthService {
       );
       return null;
     }
-    if (!payload.sth || !state || payload.sth !== flowHash(state)) {
+    if (
+      !payload.sth ||
+      !state ||
+      !flowHashMatches(payload.sth, flowHash(state))
+    ) {
       // The marker outlived the redirect it was minted for. The reachable case is
       // a second authorization request overwriting `oidc_state` while the marker
       // cookie survives -- an ordinary `GET /auth/oidc` does exactly that, and it
@@ -242,13 +280,13 @@ export class OidcReauthService {
   ): void {
     this.pruneConsumed();
 
-    if (!token || typeof token !== "string") {
+    if (!isNonEmptyString(token)) {
       this.reject(userId, purpose, "no artifact presented");
     }
 
     let payload: OidcReauthPayload;
     try {
-      payload = jwt.verify(token as string, secret(), {
+      payload = jwt.verify(token, secret(), {
         algorithms: [ALGORITHM],
       }) as OidcReauthPayload;
     } catch (err) {
