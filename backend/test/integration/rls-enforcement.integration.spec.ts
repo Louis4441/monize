@@ -13,6 +13,7 @@ import {
   RlsRowSeeder,
   TableCatalog,
 } from "../helpers/rls-catalog";
+import { assertRuntimeRoleIsSafe } from "@/common/db/app-role";
 import { withScopedDb } from "@/common/db/scoped-db";
 import { withUserContext } from "@/common/db/with-context";
 
@@ -763,6 +764,456 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
         }
         await appDataSource.destroy();
       }
+    });
+  });
+
+  /**
+   * `currencies` is exempt reference data, but `user_currency_preferences` is
+   * not -- and its FK to `currencies(code)` is `ON DELETE CASCADE`. So a
+   * decision to delete a shared currency row, taken from inside one tenant's
+   * transaction, deletes rows that tenant cannot see.
+   *
+   * That is what happened: `CurrenciesService.remove` counted the remaining
+   * preference rows for the code with a tenant-scoped query, got zero because
+   * RLS had filtered away the other user's row, and deleted the currency --
+   * cascading that user's activation away. The restore's cleanup had the same
+   * blindness in a different shape.
+   *
+   * Only enforcement can demonstrate this, which is why it lives here: under
+   * `RLS_MODE=off` the app connects as the owner and every query sees
+   * everything, so the old code looked correct in every unit test.
+   */
+  describe("currency liveness is global, not tenant-scoped", () => {
+    const CODE = "PTS";
+
+    it("sees another user's activation that a tenant-scoped count cannot", async () => {
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Family Points', '*', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+      // Only user B activates it. A has no preference row for the code at all,
+      // which is exactly the state `remove` reaches after deleting its own.
+      await dataSource.query(
+        `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
+         VALUES ($1, $2, true)
+         ON CONFLICT (user_id, currency_code) DO NOTHING`,
+        [USER_B, CODE],
+      );
+
+      const appDataSource = new DataSource({
+        ...INTEGRATION_TYPEORM_OPTIONS,
+        username: TEST_APP_ROLE,
+        password: TEST_APP_ROLE_PASSWORD,
+        synchronize: false,
+        dropSchema: false,
+        extra: { max: 1 },
+      } as never);
+      await appDataSource.initialize();
+      const previousMode = process.env.RLS_MODE;
+      process.env.RLS_MODE = "enforce";
+      try {
+        const { tenantView, globalAnswer } = await withUserContext(USER_A, () =>
+          withScopedDb(appDataSource, async (m) => {
+            const [counted] = await m.query(
+              `SELECT count(*)::int AS n FROM user_currency_preferences
+                  WHERE currency_code = $1`,
+              [CODE],
+            );
+            const [answer] = await m.query(
+              `SELECT currency_code_in_use_globally($1) AS "inUse"`,
+              [CODE],
+            );
+            return { tenantView: counted.n, globalAnswer: answer.inUse };
+          }),
+        );
+
+        // The query the old code trusted: B's row is invisible, so it says the
+        // code is unused and the delete looks safe.
+        expect(tenantView).toBe(0);
+        // The SECURITY DEFINER function, in the same transaction as that query,
+        // gives the answer the delete actually needs.
+        expect(globalAnswer).toBe(true);
+      } finally {
+        if (previousMode === undefined) {
+          delete process.env.RLS_MODE;
+        } else {
+          process.env.RLS_MODE = previousMode;
+        }
+        await appDataSource.destroy();
+      }
+    });
+
+    it("reports an unreferenced code as free", async () => {
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ('ZZZ', 'Nothing Points', '?', 0, true, $1)
+         ON CONFLICT (code) DO NOTHING`,
+        [USER_A],
+      );
+      // "Unknown" is not the answer here: nothing references the code, which is
+      // a settled fact, and reporting it as live would strand the row forever.
+      const [{ inUse }] = await dataSource.query(
+        `SELECT currency_code_in_use_globally('ZZZ') AS "inUse"`,
+      );
+      expect(inUse).toBe(false);
+    });
+
+    /**
+     * The race the definer function alone does not close (F3R-005).
+     *
+     * Deleting a currency is: check whether anybody still references the code,
+     * then delete the row. `user_currency_preferences.currency_code` cascades on
+     * delete, so a preference another user inserts and commits between those two
+     * steps is removed by the cascade -- they get a success response and
+     * immediately lose the setting.
+     *
+     * `SELECT ... FOR UPDATE` on the parent is what serialises it, through the FK
+     * machinery rather than around it: an FK check takes `FOR KEY SHARE` on the
+     * parent row, which conflicts. So the concurrent insert waits, and once the
+     * deleting transaction commits, the insert fails with a plain FK violation.
+     *
+     * Two real connections, because one cannot demonstrate a lock.
+     */
+    it("makes a concurrent activation wait for the delete, then fail cleanly", async () => {
+      const CODE = "RCE";
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Race Points', 'R', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+
+      const other = new DataSource({
+        ...INTEGRATION_TYPEORM_OPTIONS,
+        synchronize: false,
+        dropSchema: false,
+        extra: { max: 1 },
+      } as never);
+      await other.initialize();
+
+      try {
+        let activationSettled = false;
+        let activationError: unknown;
+
+        // A: hold the lock the delete path takes, with nothing else in flight.
+        const deleter = dataSource.transaction(async (m) => {
+          await m.query("SELECT 1 FROM currencies WHERE code = $1 FOR UPDATE", [
+            CODE,
+          ]);
+
+          // B: activate the same code. Its FK check needs FOR KEY SHARE on the
+          // locked parent, so it must block rather than commit.
+          const activation = other
+            .transaction(async (n) =>
+              n.query(
+                `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
+                 VALUES ($1, $2, true)`,
+                [USER_B, CODE],
+              ),
+            )
+            .then(
+              () => {
+                activationSettled = true;
+              },
+              (error) => {
+                activationSettled = true;
+                activationError = error;
+              },
+            );
+
+          // Give it real time to prove it is waiting rather than merely slow.
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          expect(activationSettled).toBe(false);
+
+          await m.query("DELETE FROM currencies WHERE code = $1", [CODE]);
+          return activation;
+        });
+
+        await deleter;
+        // Whatever the deleter returned, wait for B to settle after the commit.
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // The forbidden outcome is a committed preference the cascade removed.
+        // Either B failed, or B holds a preference for a currency that still
+        // exists -- never a success that left nothing behind.
+        expect(activationSettled).toBe(true);
+        const surviving = await dataSource.query(
+          "SELECT 1 FROM user_currency_preferences WHERE user_id = $1 AND currency_code = $2",
+          [USER_B, CODE],
+        );
+        if (activationError === undefined) {
+          expect(surviving).toHaveLength(1);
+        } else {
+          expect(surviving).toHaveLength(0);
+        }
+        // And the code really is gone, so the delete was not what lost.
+        const currency = await dataSource.query(
+          "SELECT 1 FROM currencies WHERE code = $1",
+          [CODE],
+        );
+        expect(currency).toHaveLength(0);
+      } finally {
+        await other.destroy();
+        await dataSource.query(
+          "DELETE FROM user_currency_preferences WHERE currency_code = $1",
+          [CODE],
+        );
+        await dataSource.query("DELETE FROM currencies WHERE code = $1", [
+          CODE,
+        ]);
+      }
+    });
+
+    /**
+     * The per-user companion, which the delete gate asks before removing the
+     * caller's activation row. `CurrenciesService.isInUse` used to spell the
+     * referencing columns out itself and was missing `budgets.currency_code`, so
+     * a user with a budget denominated in a custom currency was told the code was
+     * not in use, lost their activation row, and was left with a budget in a
+     * currency that no longer appeared anywhere in their settings.
+     *
+     * A unit spec cannot show this -- it mocks `manager.query` and gets back
+     * whatever the fixture says. Only the real function over real rows can.
+     */
+    it("counts a budget as a reference to the currency it is denominated in", async () => {
+      const CODE = "BGT";
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Budget Points', 'B', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+      await dataSource.query(
+        `INSERT INTO budgets (user_id, name, period_start, currency_code)
+         VALUES ($1, 'Points budget', DATE '2026-01-01', $2)`,
+        [USER_A, CODE],
+      );
+
+      const referenced: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user_data($1) AS referenced(code)`,
+        [USER_A],
+      );
+      expect(referenced.map((r) => r.code)).toContain(CODE);
+
+      // And the other user's answer must not include it, or a shared code would
+      // become undeletable for everyone.
+      const otherUser: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user_data($1) AS referenced(code)`,
+        [USER_B],
+      );
+      expect(otherUser.map((r) => r.code)).not.toContain(CODE);
+    });
+
+    /**
+     * The two per-user functions differ by exactly one branch, and the difference
+     * is load-bearing in both directions: the backup export needs the activation
+     * row counted so an activated-but-unspent currency definition travels with
+     * the file, and the delete gate needs it *not* counted or no currency could
+     * ever be deleted.
+     */
+    it("counts an activation only in the composite, not in the data answer", async () => {
+      const CODE = "ACT";
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Activated Points', 'A', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+      // Activated and nothing else: no account, no budget, no transaction.
+      await dataSource.query(
+        `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
+         VALUES ($1, $2, true)
+         ON CONFLICT (user_id, currency_code) DO NOTHING`,
+        [USER_A, CODE],
+      );
+
+      const data: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user_data($1) AS referenced(code)`,
+        [USER_A],
+      );
+      const all: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user($1) AS referenced(code)`,
+        [USER_A],
+      );
+
+      expect(data.map((r) => r.code)).not.toContain(CODE);
+      expect(all.map((r) => r.code)).toContain(CODE);
+    });
+  });
+
+  /**
+   * The catalog query behind the enforce-mode startup check, against real
+   * catalogs. The unit specs cover the decision it makes from a row; this covers
+   * whether the row says what it should -- which is where a mistake would hide,
+   * because `pg_has_role` and the ownership joins are the parts you cannot reason
+   * about from the SQL text alone.
+   */
+  describe("runtime role safety check (enforce mode startup)", () => {
+    const databaseName = process.env.DATABASE_NAME || ("monize_test" as string);
+
+    it("accepts the unprivileged runtime role the harness provisions", async () => {
+      await expect(
+        assertRuntimeRoleIsSafe(dataSource, {
+          appUser: TEST_APP_ROLE,
+          databaseName,
+          logger: { log: () => {}, warn: () => {} },
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("refuses the owner, which bypasses RLS on its own tables", async () => {
+      const owner = (await dataSource.query("SELECT current_user AS name"))[0]
+        .name;
+
+      // The owner is what the runtime connects as at RLS_MODE=off, so pointing
+      // DATABASE_APP_USER at it is a plausible misconfiguration -- and it would
+      // have started, silently bypassing every policy.
+      await expect(
+        assertRuntimeRoleIsSafe(dataSource, {
+          appUser: owner,
+          databaseName,
+          logger: { log: () => {}, warn: () => {} },
+        }),
+      ).rejects.toThrow(/owns/i);
+    });
+
+    it("refuses a role that inherits membership in the owner", async () => {
+      const owner = (await dataSource.query("SELECT current_user AS name"))[0]
+        .name;
+      const inheritor = "monize_test_inheritor";
+      await dataSource.query(
+        `DO $$ BEGIN
+           IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${inheritor}') THEN
+             CREATE ROLE ${inheritor} LOGIN PASSWORD 'x' INHERIT;
+           END IF;
+         END $$;`,
+      );
+      await dataSource.query(`GRANT ${owner} TO ${inheritor}`);
+      try {
+        // Its own pg_roles row is clean; the membership is the whole problem, and
+        // a check that only read the row would have passed it.
+        await expect(
+          assertRuntimeRoleIsSafe(dataSource, {
+            appUser: inheritor,
+            databaseName,
+            logger: { log: () => {}, warn: () => {} },
+          }),
+        ).rejects.toThrow(/owns|inherits/i);
+      } finally {
+        await dataSource.query(`REVOKE ${owner} FROM ${inheritor}`);
+        await dataSource.query(`DROP ROLE IF EXISTS ${inheritor}`);
+      }
+    });
+
+    /**
+     * The membership form that `USAGE` misses.
+     *
+     * PostgreSQL role membership permits `SET ROLE` by default, and the two
+     * capabilities are separable: `WITH INHERIT FALSE` stops the privileges
+     * arriving automatically, `WITH SET TRUE` keeps the right to ask for them.
+     * `pg_has_role(..., 'USAGE')` only answers the first question, so this grant
+     * passed the safety check while `SET ROLE owner` in any session succeeded and
+     * every permission check afterwards ran as the database owner.
+     *
+     * Only a real catalog can show this: no unit double distinguishes `USAGE`
+     * from `MEMBER`, which is why the unit spec asserts the SQL text and this
+     * asserts the behaviour.
+     */
+    it("refuses a role that can SET ROLE to the owner without inheriting it", async () => {
+      const owner = (await dataSource.query("SELECT current_user AS name"))[0]
+        .name;
+      const switcher = "monize_test_switcher";
+      await dataSource.query(
+        `DO $$ BEGIN
+           IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${switcher}') THEN
+             CREATE ROLE ${switcher} LOGIN PASSWORD 'x' NOINHERIT;
+           END IF;
+         END $$;`,
+      );
+      // WITH INHERIT FALSE, SET TRUE is PostgreSQL 16 syntax; on an older server
+      // NOINHERIT on the role gives the same separation, so fall back to it
+      // rather than skipping the case.
+      try {
+        await dataSource.query(
+          `GRANT ${owner} TO ${switcher} WITH INHERIT FALSE, SET TRUE`,
+        );
+      } catch {
+        await dataSource.query(`GRANT ${owner} TO ${switcher}`);
+      }
+
+      try {
+        // First establish that the narrower predicate really does miss it --
+        // otherwise this test could pass for the wrong reason on a server whose
+        // semantics differ from the ones the fix was written against.
+        const [reach] = await dataSource.query(
+          `SELECT pg_has_role($1, $2, 'USAGE') AS usage,
+                  pg_has_role($1, $2, 'MEMBER') AS member`,
+          [switcher, owner],
+        );
+        expect(reach.member).toBe(true);
+        expect(reach.usage).toBe(false);
+
+        await expect(
+          assertRuntimeRoleIsSafe(dataSource, {
+            appUser: switcher,
+            databaseName,
+            logger: { log: () => {}, warn: () => {} },
+          }),
+        ).rejects.toThrow(/owns|member/i);
+      } finally {
+        await dataSource.query(`REVOKE ${owner} FROM ${switcher}`);
+        await dataSource.query(`DROP ROLE IF EXISTS ${switcher}`);
+      }
+    });
+
+    it("refuses a role that does not exist", async () => {
+      await expect(
+        assertRuntimeRoleIsSafe(dataSource, {
+          appUser: "monize_no_such_role",
+          databaseName,
+          logger: { log: () => {}, warn: () => {} },
+        }),
+      ).rejects.toThrow(/to exist/);
+    });
+  });
+
+  describe("runtime role privileges on migration bookkeeping", () => {
+    it("cannot write schema_migrations", async () => {
+      // The blanket table grant includes it. Inserting a filename makes the next
+      // deployment skip required DDL; deleting one makes a migration body re-run.
+      await expect(
+        asAppRole(identity(USER_A), (m) =>
+          m.query(
+            "INSERT INTO schema_migrations (filename) VALUES ('999_hostile.sql')",
+          ),
+        ),
+      ).rejects.toThrow(/permission denied/i);
+
+      await expect(
+        asAppRole(identity(USER_A), (m) =>
+          m.query("DELETE FROM schema_migrations"),
+        ),
+      ).rejects.toThrow(/permission denied/i);
+    });
+
+    it("cannot read schema_migrations either", async () => {
+      // Nothing in the application needs to, so ALL is revoked rather than
+      // carving out SELECT for a caller that does not exist.
+      await expect(
+        asAppRole(identity(USER_A), (m) =>
+          m.query("SELECT count(*) FROM schema_migrations"),
+        ),
+      ).rejects.toThrow(/permission denied/i);
+    });
+
+    it("still has DML on an ordinary user table", async () => {
+      // The revoke has to be surgical: revoking too much would break the app.
+      const rows = await asAppRole(identity(USER_A), (m) =>
+        m.query("SELECT count(*)::int AS n FROM accounts"),
+      );
+      expect(rows[0].n).toBeGreaterThanOrEqual(0);
     });
   });
 });

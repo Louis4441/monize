@@ -1,6 +1,12 @@
+import { BadRequestException, PayloadTooLargeException } from "@nestjs/common";
 import { gunzipSync } from "zlib";
 import { BackupService } from "../backup.service";
-import { SupportBackupService } from "./support-backup.service";
+import { decryptBackup } from "../backup-crypto.util";
+import {
+  allocatePseudonymCode,
+  SupportBackupService,
+} from "./support-backup.service";
+import { CURRENCY_METADATA } from "../../currencies/currency-metadata";
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const ACC1 = "aaaaaaaa-1111-4111-8111-111111111111";
@@ -299,24 +305,84 @@ function fixtureTables(): Record<string, Record<string, unknown>[]> {
   };
 }
 
-function makeService(tables = fixtureTables()): SupportBackupService {
-  const backup = {
+/**
+ * The double is typed as the exact subset of `BackupService` this service reads,
+ * not `as unknown as BackupService`.
+ *
+ * That cast hid a real hole: when `generate` started consulting
+ * `exportBufferLimitBytes`, the mock had no such member, so the value was
+ * `undefined` and `size > undefined` is `false` -- the new ceiling was silently
+ * disabled in every test in this file while they all passed. A `Pick` makes tsc
+ * demand the member, so the next dependency this service grows is a compile error
+ * here rather than a guard that quietly does nothing.
+ */
+type BackupServiceDouble = Pick<
+  BackupService,
+  "collectRawExport" | "exportBufferLimitBytes"
+>;
+
+/** Generous by default so the ceiling is out of the way unless a test wants it. */
+const DEFAULT_TEST_EXPORT_LIMIT = 64 * 1024 * 1024;
+
+function makeService(
+  tables = fixtureTables(),
+  exportBufferLimitBytes = DEFAULT_TEST_EXPORT_LIMIT,
+): SupportBackupService {
+  const backup: BackupServiceDouble = {
     collectRawExport: jest.fn().mockResolvedValue({
       version: 1,
       exportedAt: "2026-07-17T00:00:00.000Z",
       tables,
     }),
-  } as unknown as BackupService;
-  return new SupportBackupService(backup);
+    exportBufferLimitBytes,
+  };
+  return new SupportBackupService(backup as BackupService);
 }
+
+/** The double, so a test can inspect how the raw export was requested. */
+function makeServiceWithSpy(tables = fixtureTables()): {
+  service: SupportBackupService;
+  collectRawExport: jest.Mock;
+} {
+  const collectRawExport = jest.fn().mockResolvedValue({
+    version: 1,
+    exportedAt: "2026-07-17T00:00:00.000Z",
+    tables,
+  });
+  const backup: BackupServiceDouble = {
+    collectRawExport,
+    exportBufferLimitBytes: DEFAULT_TEST_EXPORT_LIMIT,
+  };
+  return {
+    service: new SupportBackupService(backup as BackupService),
+    collectRawExport,
+  };
+}
+
+/**
+ * The password every fixture here uses. It is not optional: `generate` refuses
+ * to produce an unencrypted support backup, so a helper that omitted it was
+ * exercising a branch no HTTP caller could reach -- and asserting the output was
+ * plain gzip, which is the opposite of the file's stated guarantee.
+ */
+const FIXTURE_PASSWORD = "fixture-password-not-a-secret";
 
 async function generateParsed(
   service: SupportBackupService,
-  opts: Parameters<SupportBackupService["generate"]>[1],
+  opts: Omit<Parameters<SupportBackupService["generate"]>[1], "password"> & {
+    password?: string;
+  },
 ): Promise<Record<string, any>> {
-  const { buffer, encrypted } = await service.generate(USER, opts);
-  expect(encrypted).toBe(false);
-  return JSON.parse(gunzipSync(buffer).toString("utf-8"));
+  const { buffer, encrypted } = await service.generate(USER, {
+    password: FIXTURE_PASSWORD,
+    ...opts,
+  });
+  expect(encrypted).toBe(true);
+  const gzipped = await decryptBackup(
+    buffer,
+    opts.password ?? FIXTURE_PASSWORD,
+  );
+  return JSON.parse(gunzipSync(gzipped).toString("utf-8"));
 }
 
 describe("SupportBackupService.generate", () => {
@@ -436,8 +502,21 @@ describe("SupportBackupService.generate", () => {
   });
 
   it("leaks no original name, free text, account number, secret or id", async () => {
-    const { buffer } = await makeService().generate(USER, { multiplier: 2.5 });
-    const json = gunzipSync(buffer).toString("utf-8");
+    // Decrypt and decompress first. Scanning the shipped bytes directly would
+    // pass for the wrong reason -- ciphertext contains nothing legible, so the
+    // assertion would hold even if every mask were removed. The claim is about
+    // the plaintext inside the file, so the plaintext is what gets scanned.
+    const { buffer } = await makeService().generate(USER, {
+      multiplier: 2.5,
+      password: FIXTURE_PASSWORD,
+    });
+    const json = gunzipSync(
+      await decryptBackup(buffer, FIXTURE_PASSWORD),
+    ).toString("utf-8");
+    // Guard against the scan becoming vacuous: the plaintext must at least look
+    // like the export it claims to be searching.
+    expect(json).toContain('"supportBackup":true');
+    expect(json.length).toBeGreaterThan(1000);
     for (const secret of [
       "Biedronka",
       "Everyday Chequing",
@@ -470,6 +549,106 @@ describe("SupportBackupService.generate", () => {
     expect(withPrices.security_prices).toHaveLength(1);
     // public price values are untouched even when included
     expect(withPrices.security_prices[0].close_price).toBe(250.12);
+  });
+
+  /**
+   * The DTO requires a password, so no HTTP caller reaches this. The branch that
+   * returned plain gzip when one was absent existed anyway, which put the "never
+   * ships in the clear" guarantee at the edge rather than in the thing that
+   * produces the file -- and 17 tests in this suite were exercising it, asserting
+   * `encrypted: false` on output the API cannot emit.
+   */
+  it.each([
+    ["omitted", undefined],
+    ["empty", ""],
+  ])(
+    "refuses to produce an unencrypted file when the password is %s",
+    async (_label, password) => {
+      await expect(
+        makeService().generate(USER, {
+          multiplier: 2.5,
+          password: password as string,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    },
+  );
+
+  /**
+   * The support path holds more copies of the dataset at once than any other
+   * export -- raw tables, scoped copy, obfuscated copy, currency-rewritten copy,
+   * remapped copy, a JSON string, a Buffer of it, then the gzip output -- and it
+   * had no ceiling at all while the buffered export had one. It cannot stream,
+   * because reconciling scaled balances needs every table together, so the
+   * ceiling is the only thing between a large dataset and an OOM-killed pod that
+   * leaves no artifact and no readable error.
+   */
+  /**
+   * A budget checked after the allocation is a budget checked too late.
+   *
+   * `collectRawExport` ran every table query, including `attachment_blobs`, which
+   * is base64: thirty 10 MiB receipts are roughly 400 MiB of text -- the whole of
+   * the chart's default backend limit -- fetched, held, and then discarded, because
+   * `ALWAYS_EXCLUDED_TABLES` drops the table afterwards. No ceiling could help,
+   * because the ceiling is consulted after the load.
+   */
+  it("never asks the database for tables it always excludes", async () => {
+    const { service, collectRawExport } = makeServiceWithSpy();
+
+    await service.generate(USER, {
+      multiplier: 2.5,
+      password: FIXTURE_PASSWORD,
+    });
+
+    expect(collectRawExport).toHaveBeenCalledTimes(1);
+    const [, options] = collectRawExport.mock.calls[0];
+    expect(options?.skipTables).toBeDefined();
+    for (const table of [
+      "attachment_blobs",
+      "transaction_attachments",
+      "ai_provider_configs",
+    ]) {
+      expect(options.skipTables.has(table)).toBe(true);
+    }
+  });
+
+  it("skips the same tables for a preview", async () => {
+    // The preview shares the cache, so a preview that loaded the blobs would
+    // hand the following generate a payload it had already paid for.
+    const { service, collectRawExport } = makeServiceWithSpy();
+
+    await service.preview(USER, { multiplier: 2.5 });
+
+    const [, options] = collectRawExport.mock.calls[0];
+    expect(options?.skipTables?.has("attachment_blobs")).toBe(true);
+  });
+
+  it("refuses a payload above the export ceiling", async () => {
+    const tiny = 200; // bytes -- below even the envelope
+    await expect(
+      makeService(fixtureTables(), tiny).generate(USER, {
+        multiplier: 2.5,
+        password: FIXTURE_PASSWORD,
+      }),
+    ).rejects.toThrow(PayloadTooLargeException);
+  });
+
+  it("says how large it was and how to narrow it", async () => {
+    // "Too large" with no number and no next step makes the user guess which of
+    // the three levers to pull.
+    await expect(
+      makeService(fixtureTables(), 200).generate(USER, {
+        multiplier: 2.5,
+        password: FIXTURE_PASSWORD,
+      }),
+    ).rejects.toThrow(/MiB.*limit|account selection|date range/);
+  });
+
+  it("produces the file when the payload fits", async () => {
+    const { encrypted } = await makeService(
+      fixtureTables(),
+      DEFAULT_TEST_EXPORT_LIMIT,
+    ).generate(USER, { multiplier: 2.5, password: FIXTURE_PASSWORD });
+    expect(encrypted).toBe(true);
   });
 
   it("encrypts the file when a password is given", async () => {
@@ -507,5 +686,223 @@ describe("SupportBackupService.preview", () => {
     const payees = samples.find((s) => s.table === "payees")!;
     expect(payees.before[0].name).toBe("Biedronka");
     expect(payees.after[0].name).toBe("Bi*****ka");
+  });
+});
+
+/**
+ * `currencies.code`, `name` and `symbol` were kept verbatim on the reasoning that
+ * the table holds public reference data. For a row a user created, all three are
+ * free text -- so a currency called `KEN / Kenneth Lasko Family Credits / KL`
+ * travelled unchanged inside an artifact documented as de-identified, beside the
+ * masked payee and account names it contradicted.
+ */
+describe("SupportBackupService custom currencies", () => {
+  const MARKER = "Kenneth Lasko";
+
+  function withCustomCurrency(): Record<string, Record<string, unknown>[]> {
+    const tables = fixtureTables();
+    tables.currencies = [
+      {
+        code: "KEN",
+        name: `${MARKER} Family Credits`,
+        symbol: "KL",
+        decimal_places: 0,
+        is_active: true,
+        created_by_user_id: USER,
+        created_at: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        code: "PLN",
+        name: "Polish Zloty",
+        symbol: "zl",
+        decimal_places: 2,
+        is_active: true,
+        created_by_user_id: null,
+        created_at: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    tables.user_currency_preferences = [
+      {
+        user_id: USER,
+        currency_code: "KEN",
+        is_active: true,
+        created_at: null,
+      },
+    ];
+    tables.accounts = tables.accounts.map((account, index) =>
+      index === 0 ? { ...account, currency_code: "KEN" } : account,
+    );
+    tables.transactions = tables.transactions.map((tx) =>
+      tx.account_id === ACC1 ? { ...tx, currency_code: "KEN" } : tx,
+    );
+    return tables;
+  }
+
+  it("removes the user's own words from the code, name and symbol", async () => {
+    const data = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+
+    const custom = data.currencies.find(
+      (c: Record<string, unknown>) => c.created_by_user_id !== null,
+    );
+    expect(custom.code).not.toBe("KEN");
+    expect(custom.code).toMatch(/^[A-Z]{3}$/);
+    expect(custom.name).not.toContain(MARKER);
+    expect(custom.symbol).not.toBe("KL");
+    // No marker anywhere in the artifact, not just in the row it came from.
+    expect(JSON.stringify(data)).not.toContain(MARKER);
+    expect(JSON.stringify(data)).not.toContain('"KEN"');
+  });
+
+  it("keeps decimal_places, which is the arithmetic", async () => {
+    const data = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+
+    const custom = data.currencies.find(
+      (c: Record<string, unknown>) => c.created_by_user_id !== null,
+    );
+    // Changing it would alter what every amount means in a file whose purpose
+    // is reproducing a calculation.
+    expect(custom.decimal_places).toBe(0);
+  });
+
+  it("leaves canonical currencies alone", async () => {
+    const data = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+
+    const canonical = data.currencies.find(
+      (c: Record<string, unknown>) => c.created_by_user_id === null,
+    );
+    // Genuinely public. Masking USD would make a reproduction harder to read for
+    // no gain.
+    expect(canonical).toMatchObject({
+      code: "PLN",
+      name: "Polish Zloty",
+      symbol: "zl",
+    });
+  });
+
+  it("rewrites every reference so the artifact still restores", async () => {
+    const data = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+
+    const custom = data.currencies.find(
+      (c: Record<string, unknown>) => c.created_by_user_id !== null,
+    );
+    const codes = new Set(
+      data.currencies.map((c: Record<string, unknown>) => c.code),
+    );
+
+    // A reference left pointing at the old code is a foreign-key violation on
+    // restore -- the artifact would be de-identified and useless.
+    expect(data.user_currency_preferences[0].currency_code).toBe(custom.code);
+    for (const account of data.accounts) {
+      expect(codes.has(account.currency_code)).toBe(true);
+    }
+    for (const tx of data.transactions) {
+      if (tx.currency_code) expect(codes.has(tx.currency_code)).toBe(true);
+    }
+  });
+
+  it("does not reuse a code across two exports of the same data", async () => {
+    const first = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+    const second = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+
+    const codeOf = (data: Record<string, any>) =>
+      data.currencies.find(
+        (c: Record<string, unknown>) => c.created_by_user_id !== null,
+      ).code;
+    // A derived code would let two artifacts from the same user be lined up by
+    // it, which is the correlation the identifier remapping exists to prevent.
+    expect(codeOf(first)).not.toBe(codeOf(second));
+  });
+
+  /**
+   * Currencies are shared, and the export deliberately includes every code the
+   * user's data references whoever defined it -- so a custom currency another
+   * user of the same instance created arrives with *that* user's real UUID in
+   * `created_by_user_id`. `currencies` has no `id` column, so the row-id sweep
+   * that remaps every other identifier never collects it, and the value would
+   * survive verbatim: two support files from two users of one instance could
+   * then be lined up by the creator id they share, which is precisely the
+   * correlation the remapping step exists to prevent.
+   */
+  it("carries no other user's id in a shared custom currency", async () => {
+    const OTHER_USER = "99999999-9999-4999-8999-999999999999";
+    const tables = withCustomCurrency();
+    tables.currencies = tables.currencies.map((row) =>
+      row.code === "KEN" ? { ...row, created_by_user_id: OTHER_USER } : row,
+    );
+
+    const data = await generateParsed(makeService(tables), {
+      multiplier: 2.5,
+    });
+
+    expect(JSON.stringify(data)).not.toContain(OTHER_USER);
+    const custom = data.currencies.find(
+      (c: Record<string, unknown>) => c.created_by_user_id !== null,
+    );
+    // Still marked as user-defined rather than canonical -- the distinction is
+    // what tells a reader the row is not public reference data, and the restore
+    // overwrites the id with the restoring user's anyway.
+    expect(custom.created_by_user_id).toBeTruthy();
+    expect(custom.created_by_user_id).not.toBe(OTHER_USER);
+  });
+
+  it("does not leak the exporting user's own id either", async () => {
+    const data = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+    // The fixture's currency is created by USER, and USER is remapped, so this
+    // holds for the same reason. Asserted so the fix above cannot be narrowed to
+    // "rewrite foreign ids only" and quietly reintroduce the simpler leak.
+    expect(JSON.stringify(data)).not.toContain(USER);
+  });
+
+  it("never invents a code a real currency claims", async () => {
+    // The wiring: one end-to-end export, proving the service reaches the
+    // allocator and stores what it returns. The allocation property itself is
+    // the next test's -- probing it through `generate` costs two scrypt
+    // derivations per sample (~200 ms), which bought twenty samples for four
+    // seconds of CPU and sat on the default timeout.
+    const data = await generateParsed(makeService(withCustomCurrency()), {
+      multiplier: 2.5,
+    });
+    const custom = data.currencies.find(
+      (c: Record<string, unknown>) => c.created_by_user_id !== null,
+    );
+    // A pseudonym that reads as USD or EUR would be actively misleading to
+    // whoever opens the artifact. The `not.toBe("KEN")` keeps this from
+    // passing vacuously when nothing is pseudonymised at all.
+    expect(custom.code).not.toBe("KEN");
+    expect(CURRENCY_METADATA[custom.code]).toBeUndefined();
+    expect(custom.code).not.toBe("PLN");
+  });
+
+  it("allocates a code no catalogued currency and no taken code claims", () => {
+    // 2000 samples rather than twenty, because the allocator is cheap on its
+    // own: a rejection bug that fires one time in fifty would survive a
+    // twenty-sample end-to-end loop and not this.
+    const taken = new Set<string>(["KEN", "PLN"]);
+    const issued = new Set<string>();
+    for (let run = 0; run < 2000; run += 1) {
+      const code = allocatePseudonymCode(taken);
+      expect(code).toMatch(/^[A-Z]{3}$/);
+      expect(CURRENCY_METADATA[code]).toBeUndefined();
+      // `taken` grows as codes are issued, so this also covers the collision
+      // path: the same code must never come back twice.
+      expect(issued.has(code)).toBe(false);
+      issued.add(code);
+    }
+    expect(issued.has("KEN")).toBe(false);
+    expect(issued.has("PLN")).toBe(false);
   });
 });

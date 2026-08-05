@@ -11,11 +11,23 @@ import {
 } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Cron } from "@nestjs/schedule";
-import { promises as fs, readdirSync, unlinkSync, copyFileSync } from "fs";
-import { resolve } from "path";
+import { promises as fs, readdirSync, unlinkSync } from "fs";
 import { randomUUID } from "crypto";
+import { resolve } from "path";
+import {
+  cleanStaleTempFiles,
+  copyFileAtomic,
+  isTempBackupName,
+  writeFileAtomic,
+} from "./atomic-file";
+import {
+  assertWithinAllowedRoots,
+  BackupPathNotAllowedError,
+  BackupPathUnusableError,
+  resolveAllowedRoots,
+} from "./backup-paths";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
-import { BackupService } from "./backup.service";
+import { BackupService, BackupCompletenessReport } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { User } from "../users/entities/user.entity";
 import { DemoModeService } from "../common/demo-mode.service";
@@ -54,6 +66,15 @@ const MONTHLY_FILE_PATTERN =
   /^monize-backup-monthly-(\d{2}-\d{2})\.(json\.gz|mzbe)$/;
 
 const WEEKLY_DAYS = [7, 14, 21, 28];
+
+/**
+ * A per-user backup directory name: the user's UUID. Used to keep those
+ * directories out of the folder picker -- listing them would turn it into user
+ * enumeration, and offering one as a destination would nest a second level
+ * inside it.
+ */
+const USER_DIRECTORY_NAME =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const FREQUENCY_HOURS: Record<AutoBackupFrequency, number> = {
   every6hours: 6,
@@ -108,6 +129,14 @@ export class AutoBackupService {
    *  chosen one of their own. */
   private readonly defaultFolderPath: string;
 
+  /**
+   * Roots a backup may be written under. Everything the user can influence is
+   * checked against these, canonically -- see backup-paths.ts for why lexical
+   * checks were not enough and why the destination is no longer the user's to
+   * choose freely.
+   */
+  private readonly allowedRoots: string[];
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly backupService: BackupService,
@@ -118,6 +147,51 @@ export class AutoBackupService {
     this.defaultFolderPath = this.resolveConfiguredFolderPath(
       config.get<string>("BACKUP_CONTAINER_DIR"),
     );
+    this.allowedRoots = resolveAllowedRoots(
+      config.get<string>("BACKUP_ALLOWED_ROOTS"),
+      this.defaultFolderPath,
+    );
+  }
+
+  /**
+   * The directory this user's backups go in: a server-computed subdirectory of
+   * the chosen (and permitted) root.
+   *
+   * Every user keeping the default used to share one folder with one set of
+   * date-based filenames, so a second user's job overwrote the first's artifact
+   * and then applied its own retention counts to whatever was left. Splitting by
+   * user is what makes naming, promotion, listing and retention a per-tenant
+   * question again.
+   */
+  private async resolveUserFolder(
+    userId: string,
+    folderPath: string | null | undefined,
+  ): Promise<string> {
+    const root = await this.assertAllowedRoot(
+      this.resolveFolderPath(folderPath),
+    );
+    // The root itself must exist and be writable (the deployment default is
+    // created on first use; anything else has to be mounted deliberately, so a
+    // typo surfaces as an error rather than as a new empty directory).
+    await this.assertFolderWritable(root);
+
+    // The per-user directory, by contrast, is server-computed and already
+    // inside a permitted root, so creating it needs no further decision. It is
+    // sharded the same way attachment bytes are (`<root>/<ab>/<cd>/<userId>`),
+    // per the repository-wide rule in the root CLAUDE.md.
+    //
+    // Canonicalise the FINAL path before creating anything, not only the root:
+    // the sharded segments are appended lexically after the root check, so a
+    // pre-existing symlink at `<root>/<ab>`, `<root>/<ab>/<cd>` or the user
+    // directory itself would otherwise redirect every write outside the approved
+    // roots while the base still looked clean (F3RB-002). Checking before the
+    // `mkdir` matters too: creating first and rejecting afterwards still left a
+    // directory inside the symlink's target.
+    const folder = await this.assertAllowedRoot(
+      this.userFolderPath(root, userId),
+    );
+    await this.assertFolderWritable(folder, { createIfMissing: true });
+    return folder;
   }
 
   /**
@@ -185,20 +259,37 @@ export class AutoBackupService {
   }
 
   /**
-   * Resolve, create and check the folder this user's backups go in, returning
-   * it. The base folder must already be usable (only the deployment default is
-   * created on demand, so a typo in an operator-chosen path still surfaces);
-   * the per-user folder underneath is created on first use, the way attachment
-   * shard directories are.
+   * Canonicalise a user-supplied folder and confirm it is inside a permitted
+   * root, translating the containment failure into the API's error shape.
    */
-  private async ensureUserFolder(
-    basePath: string,
-    userId: string,
-  ): Promise<string> {
-    await this.assertFolderWritable(basePath);
-    const userFolder = this.userFolderPath(basePath, userId);
-    await this.assertFolderWritable(userFolder, { createIfMissing: true });
-    return userFolder;
+  private async assertAllowedRoot(folderPath: string): Promise<string> {
+    try {
+      return await assertWithinAllowedRoots(
+        this.validateFolderPath(folderPath),
+        this.allowedRoots,
+      );
+    } catch (error) {
+      if (error instanceof BackupPathNotAllowedError) {
+        throw new BadRequestException(
+          tr("errors.backup.folderOutsideAllowedRoots", error.message, {
+            path: folderPath,
+            roots: this.allowedRoots.join(", "),
+          }),
+        );
+      }
+      // A path that cannot be a directory is a bad request, not a server fault.
+      // These used to escape as a 500 carrying the resolved filesystem path.
+      if (error instanceof BackupPathUnusableError) {
+        throw new BadRequestException(
+          tr(
+            "errors.backup.folderUnusable",
+            `Folder "${folderPath}" cannot be used as a directory (${error.code}).`,
+            { path: folderPath, reason: error.code },
+          ),
+        );
+      }
+      throw error;
+    }
   }
 
   /** Settings for a user with no persisted row yet (not saved by this method). */
@@ -253,6 +344,56 @@ export class AutoBackupService {
     return this.withResolvedFolder(existing ?? this.defaultSettingsFor(userId));
   }
 
+  /**
+   * Whether this deployment can write an automatic backup anywhere.
+   *
+   * Enabling a schedule already fails when it cannot -- `resolveUserFolder`
+   * creates the directory and `assertFolderWritable` probes it, so a read-only
+   * root filesystem with no mount is refused rather than stored. But it is
+   * refused only *after* the user has configured a frequency, a time and a
+   * retention policy and pressed save, and the answer does not depend on
+   * anything they chose. A surface that can say "this deployment has no backup
+   * storage" up front is telling them something true earlier.
+   *
+   * Cheap and side-effect-free: it probes the resolved root, creating nothing.
+   * The per-user subdirectory is server-computed inside that root, so a writable
+   * root is the whole of the question.
+   */
+  async describeCapability(userId: string): Promise<{
+    available: boolean;
+    folderPath: string;
+    reason?: string;
+  }> {
+    // Probe the root this admin's schedule would actually write under -- the
+    // stored folder when one is set, the deployment default otherwise. Probing
+    // only the default reported "no storage" while a configured secondary root
+    // from BACKUP_ALLOWED_ROOTS was mounted and writable, and the banner then
+    // blocked re-arming a schedule that would have worked (F3RB-003).
+    const settings = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.findOne({ where: { userId } }),
+    );
+    const configured = this.resolveFolderPath(settings?.folderPath);
+    try {
+      // Containment BEFORE the write probe, and through the same predicate the
+      // real write uses (F3RB-R1-001). `updateSettings` only validates a stored
+      // folder's syntax unless the same call enables the schedule, and a
+      // deployment upgraded from before confinement can already hold an
+      // arbitrary path -- so a stored root may be outside BACKUP_ALLOWED_ROOTS.
+      // Probing it first would create and delete a `.monize-write-test-*` file
+      // outside the approved volume and then report a configuration available
+      // that `resolveUserFolder` refuses.
+      const root = await this.assertAllowedRoot(configured);
+      await this.assertFolderWritable(root);
+      return { available: true, folderPath: root };
+    } catch (error) {
+      return {
+        available: false,
+        folderPath: configured,
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   async updateSettings(
     userId: string,
     dto: UpdateAutoBackupSettingsDto,
@@ -294,13 +435,15 @@ export class AutoBackupService {
     if (dto.enabled !== undefined) {
       settings.enabled = dto.enabled;
       if (dto.enabled) {
-        // Persist the resolved folder so the stored row always records where
-        // backups actually go, even when the user never picked one.
+        // Persist the resolved root so the stored row always records where
+        // backups actually go, even when the user never picked one. What gets
+        // checked for writability is the per-user subdirectory, which is where
+        // the file will land.
         settings.folderPath = this.resolveFolderPath(settings.folderPath);
         // Create and check the user's own folder now, so a base folder that is
         // readable but not writable is reported at save time rather than at
         // 02:00 as a failed backup.
-        await this.ensureUserFolder(settings.folderPath, userId);
+        await this.resolveUserFolder(userId, settings.folderPath);
         settings.nextBackupAt = this.calculateNextBackupAt(
           settings.frequency as AutoBackupFrequency,
           settings.backupTime,
@@ -322,7 +465,13 @@ export class AutoBackupService {
     folderPath: string,
   ): Promise<{ valid: boolean; error?: string }> {
     try {
-      const safePath = this.validateFolderPath(folderPath);
+      // Containment first: a path outside the permitted roots is not "valid but
+      // unwritable", it is not a destination at all, and reporting on its
+      // writability would confirm what lives there.
+      const safePath = await assertWithinAllowedRoots(
+        this.validateFolderPath(folderPath),
+        this.allowedRoots,
+      );
       await this.assertFolderWritable(safePath);
       return { valid: true };
     } catch (error) {
@@ -330,10 +479,19 @@ export class AutoBackupService {
     }
   }
 
+  /**
+   * List subdirectories of a permitted backup root.
+   *
+   * This endpoint requires authentication and no role, and it used to accept any
+   * absolute path -- so any user could walk `/`, `/tmp`, mounted secrets and
+   * other tenants' directories, then select what they found as a backup
+   * destination. It is now confined to the operator-approved roots, canonically,
+   * so a symlink inside a permitted directory cannot lead out of one either.
+   */
   async browseFolders(
     folderPath: string,
   ): Promise<{ current: string; directories: string[] }> {
-    const safePath = this.validateFolderPath(folderPath);
+    const safePath = await this.assertAllowedRoot(folderPath);
 
     let stat: Awaited<ReturnType<typeof fs.stat>>;
     try {
@@ -370,6 +528,16 @@ export class AutoBackupService {
     const entries = await fs.readdir(safePath, { withFileTypes: true });
     const directories = entries
       .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+      // The per-user directories are server-computed and named by user id.
+      // Listing them would turn a folder picker into user enumeration, and
+      // offering one as a destination would nest a second level inside it.
+      .filter(
+        (e) =>
+          !USER_DIRECTORY_NAME.test(e.name) &&
+          // ...and the two-hex-char shard levels above them, for the same
+          // reason: offering one as a destination nests a second layout level.
+          !/^[0-9a-f]{2}$/i.test(e.name),
+      )
       .map((e) => e.name)
       .sort((a, b) => a.localeCompare(b));
 
@@ -388,16 +556,34 @@ export class AutoBackupService {
       )) ?? this.defaultSettingsFor(userId);
     settings.folderPath = this.resolveFolderPath(settings.folderPath);
 
-    const userFolder = await this.ensureUserFolder(settings.folderPath, userId);
+    const userFolder = await this.resolveUserFolder(
+      userId,
+      settings.folderPath,
+    );
     const timezone = settings.timezone || "UTC";
-    const filename = await this.exportToFile(userId, userFolder, timezone);
-    this.copyToWeeklyIfNeeded(userFolder, filename, timezone);
-    this.copyToMonthlyIfNeeded(userFolder, filename, timezone);
-    this.enforceRetention(userFolder, settings.folderPath, settings);
+    const { filename, report } = await this.exportToFile(
+      userId,
+      userFolder,
+      timezone,
+    );
+    // A partial artifact skips promotion and retention *for this run*, because
+    // both of those delete.
+    //
+    // It does NOT yet get a distinct identity: the file is published under the
+    // ordinary date-only name, so a same-day partial replaces a complete
+    // artifact, and a later complete run's retention pass counts the partial as
+    // an ordinary daily backup (F3RB-001, tracked as issue #1069 -- fixing it
+    // changes on-disk naming, which is a compatibility decision). Do not read
+    // the skip below as "a partial cannot displace a complete copy".
+    await this.applyBackupOutcome(
+      settings,
+      userFolder,
+      filename,
+      report,
+      timezone,
+    );
 
     settings.lastBackupAt = new Date();
-    settings.lastBackupStatus = "success";
-    settings.lastBackupError = null;
     if (settings.enabled) {
       settings.nextBackupAt = this.calculateNextBackupAt(
         settings.frequency as AutoBackupFrequency,
@@ -408,7 +594,48 @@ export class AutoBackupService {
     }
     await this.scoped(AutoBackupSettings, (repo) => repo.save(settings));
 
-    return { message: "Backup completed successfully", filename };
+    return {
+      message: report.complete
+        ? "Backup completed successfully"
+        : "Backup written, but some attachments could not be included; it was not promoted or used for retention",
+      filename,
+    };
+  }
+
+  /**
+   * Records the backup's outcome and runs promotion + retention only when the
+   * artifact is complete.
+   *
+   * `success` promotes weekly/monthly copies and enforces retention. `partial`
+   * does neither: the daily artifact stays on disk so the ledger is backed up,
+   * but nothing that deletes a complete copy runs. A later complete backup
+   * resumes normal promotion and retention. This is the invariant that a backup
+   * shown as successful is a backup that can be restored in full (F3R7-001).
+   */
+  private async applyBackupOutcome(
+    settings: AutoBackupSettings,
+    folder: string,
+    filename: string,
+    report: BackupCompletenessReport,
+    timezone: string,
+  ): Promise<void> {
+    if (report.complete) {
+      await this.copyToWeeklyIfNeeded(folder, filename, timezone);
+      await this.copyToMonthlyIfNeeded(folder, filename, timezone);
+      this.enforceRetention(folder, settings.folderPath, settings);
+      settings.lastBackupStatus = "success";
+      settings.lastBackupError = null;
+      return;
+    }
+    settings.lastBackupStatus = "partial";
+    settings.lastBackupError =
+      `${report.missingAttachments} attachment(s) could not be included and ` +
+      `${report.inconsistentAttachments} did not match their metadata, of ` +
+      `${report.expectedAttachments} total. This artifact was written but not ` +
+      `promoted or used for retention, so complete backups are preserved.`;
+    this.logger.warn(
+      `Auto-backup for user ${settings.userId} is partial: ${settings.lastBackupError}`,
+    );
   }
 
   @Cron("0 * * * *")
@@ -434,23 +661,28 @@ export class AutoBackupService {
     for (const settings of dueSettings) {
       try {
         settings.folderPath = this.resolveFolderPath(settings.folderPath);
-        const userFolder = await this.ensureUserFolder(
-          settings.folderPath,
+        const userFolder = await this.resolveUserFolder(
           settings.userId,
+          settings.folderPath,
         );
         const timezone = settings.timezone || "UTC";
         // RLS (task C2): the export reads this user's entire dataset, and the
         // settings write below is that user's row -- both under a user context.
-        const filename = await withUserContext(settings.userId, () =>
-          this.exportToFile(settings.userId, userFolder, timezone),
+        const { filename, report } = await withUserContext(
+          settings.userId,
+          () => this.exportToFile(settings.userId, userFolder, timezone),
         );
-        this.copyToWeeklyIfNeeded(userFolder, filename, timezone);
-        this.copyToMonthlyIfNeeded(userFolder, filename, timezone);
-        this.enforceRetention(userFolder, settings.folderPath, settings);
+        // Promotion and retention run only for a complete artifact; a partial is
+        // written but never allowed to displace a complete copy (F3R7-001).
+        await this.applyBackupOutcome(
+          settings,
+          userFolder,
+          filename,
+          report,
+          timezone,
+        );
 
         settings.lastBackupAt = now;
-        settings.lastBackupStatus = "success";
-        settings.lastBackupError = null;
         settings.nextBackupAt = this.calculateNextBackupAt(
           settings.frequency as AutoBackupFrequency,
           settings.backupTime,
@@ -462,7 +694,7 @@ export class AutoBackupService {
         );
 
         this.logger.log(
-          `Auto-backup completed for user ${settings.userId}: ${filename}`,
+          `Auto-backup ${report.complete ? "completed" : "written (partial)"} for user ${settings.userId}: ${filename}`,
         );
       } catch (error) {
         this.logger.error(
@@ -603,7 +835,7 @@ export class AutoBackupService {
     userId: string,
     userFolder: string,
     timezone: string,
-  ): Promise<string> {
+  ): Promise<{ filename: string; report: BackupCompletenessReport }> {
     const user = await this.scoped(User, (repo) =>
       repo.findOne({ where: { id: userId } }),
     );
@@ -638,46 +870,36 @@ export class AutoBackupService {
     const filename = `${BACKUP_FILE_PREFIX}daily-${dateStr}.${ext}`;
     const filepath = this.safePath(userFolder, filename);
 
-    const payload = await this.backupService.exportToBuffer(
+    // Leftovers from an interrupted write, cleared before this one rather than
+    // by retention: a partial file is not a backup, so counting it towards
+    // "keep 7 daily" would quietly shorten the retention window.
+    const removed = await cleanStaleTempFiles(userFolder, Date.now());
+    if (removed > 0) {
+      this.logger.warn(
+        `Removed ${removed} stale partial backup file(s) in ${userFolder}`,
+      );
+    }
+
+    const { buffer, report } = await this.backupService.exportToBuffer(
       userId,
       encryptionPassword,
     );
-    // Write to a temporary name and rename into place. `rename` within a
-    // directory is atomic, so a reader (or a restore) never sees a half-written
-    // backup, and a crash mid-write leaves the previous good file rather than a
-    // truncated one that looks like a successful backup. Replacing our own
-    // same-day file is intended -- the collision that mattered was between
-    // different users, and the per-user directory removes it.
-    // FV-004: unique per write, not per process. `process.pid` looked unique and
-    // is not -- a manual backup and the scheduled one for the same user, day and
-    // extension collide inside a single process, and across replicas sharing a
-    // volume PIDs collide outright. The loser's `rename` then fails with ENOENT,
-    // or its own cleanup unlinks the temp file the winner is about to rename, so a
-    // legitimate backup run reports failure. Replacing our own *final* same-day
-    // file is still intended; it is the intermediate name that has to be private.
-    const tempPath = this.safePath(
-      userFolder,
-      `.${filename}.partial-${process.pid}-${randomUUID()}`,
-    );
-    try {
-      await fs.writeFile(tempPath, payload);
-      await fs.rename(tempPath, filepath);
-    } catch (error) {
-      await fs.unlink(tempPath).catch(() => {});
-      throw error;
-    }
+    // Temp file, fsync, rename: `fs.writeFile` truncated the final name first,
+    // so a kill or an ENOSPC mid-write left a partial artifact with a valid
+    // extension that sorted newest and that retention counted.
+    await writeFileAtomic(filepath, buffer);
 
     this.logger.log(
       `Backup written to ${filepath}${encryptionPassword ? " (encrypted)" : ""}`,
     );
-    return filename;
+    return { filename, report };
   }
 
-  private copyToWeeklyIfNeeded(
+  private async copyToWeeklyIfNeeded(
     folderPath: string,
     dailyFilename: string,
     timezone: string,
-  ): void {
+  ): Promise<void> {
     const dayOfMonth = this.getLocalDayOfMonth(new Date(), timezone);
     if (!WEEKLY_DAYS.includes(dayOfMonth)) return;
 
@@ -685,7 +907,11 @@ export class AutoBackupService {
     const dateStr = this.getLocalDateString(new Date(), timezone);
     const weeklyFilename = `${BACKUP_FILE_PREFIX}weekly-${dateStr}.${ext}`;
     try {
-      copyFileSync(
+      // Through a temp name for the same reason as the daily write: a copy
+      // straight onto the final name truncates last week's artifact first, so an
+      // interrupted promotion destroyed a good backup and left a partial one
+      // named as though it had replaced it.
+      await copyFileAtomic(
         this.safePath(folderPath, dailyFilename),
         this.safePath(folderPath, weeklyFilename),
       );
@@ -695,11 +921,11 @@ export class AutoBackupService {
     }
   }
 
-  private copyToMonthlyIfNeeded(
+  private async copyToMonthlyIfNeeded(
     folderPath: string,
     dailyFilename: string,
     timezone: string,
-  ): void {
+  ): Promise<void> {
     const dayOfMonth = this.getLocalDayOfMonth(new Date(), timezone);
     if (dayOfMonth !== 1) return;
 
@@ -716,7 +942,7 @@ export class AutoBackupService {
     const monthlyFilename = `${BACKUP_FILE_PREFIX}monthly-${year}-${month}.${ext}`;
 
     try {
-      copyFileSync(
+      await copyFileAtomic(
         this.safePath(folderPath, dailyFilename),
         this.safePath(folderPath, monthlyFilename),
       );
@@ -737,6 +963,11 @@ export class AutoBackupService {
 
     const files: BackupFile[] = [];
     for (const name of entries) {
+      // A partial write is not a backup. The temp names cannot match the
+      // patterns below anyway (they are dot-prefixed), but skipping them here
+      // states the rule where retention is decided rather than leaving it to a
+      // regex coincidence.
+      if (isTempBackupName(name)) continue;
       const dailyMatch = DAILY_FILE_PATTERN.exec(name);
       if (dailyMatch) {
         const date = parseDateString(dailyMatch[1]);
@@ -1041,11 +1272,23 @@ export class AutoBackupService {
       this.logger.error(
         `Failed to create backup folder ${safePath}: ${error.message}`,
       );
+      // The deployment default could not even be created, which is a different
+      // problem from a path the user mistyped: there is nowhere on this
+      // deployment for a backup to go, and no path they can type will change
+      // that. It used to report "Ensure the path is mapped as a Docker volume",
+      // which is one of the two mechanisms and the wrong one on Kubernetes -- an
+      // operator following it goes looking for a volume mount in a chart that
+      // expresses the same thing as a persistence value. The code cannot tell
+      // which platform it is on, so the message names both and says plainly that
+      // the destination is the deployment's to fix.
       throw new BadRequestException(
         tr(
-          "errors.backup.folderNotExistVolume",
-          `Folder does not exist: ${safePath}. Ensure the path is mapped as a Docker volume.`,
-          { safePath },
+          "errors.backup.noBackupStorage",
+          `This deployment has no writable backup storage: ${safePath} does not exist ` +
+            `and cannot be created (${error.code ?? error.message}). Mount a volume there ` +
+            `(Docker: a bind mount or named volume; Kubernetes: set ` +
+            `backend.persistence.backups in the Helm chart) and try again.`,
+          { safePath, reason: error.code ?? error.message },
         ),
       );
     }
@@ -1061,14 +1304,22 @@ export class AutoBackupService {
     const safePath = this.validateFolderPath(folderPath);
     await this.assertDirectoryExists(safePath, createIfMissing);
 
-    // Test write access by creating and removing a temporary file
+    // Test write access by creating and removing a temporary file.
+    //
+    // The name is a UUID, not a timestamp. `validateFolder` probes the *shared*
+    // root, so every user who validates the same folder writes here -- and the
+    // cron probes a per-user folder that every replica fires for. Two probes
+    // landing in the same millisecond used to pick the same name: both writes
+    // succeed, the first unlink removes the file, and the second gets ENOENT and
+    // reports "Folder is not writable ... Check container permissions" for a
+    // folder that is perfectly writable. On the settings screen that blocks
+    // enabling backups; in the cron it aborts that user's backup.
     const testFile = this.safePath(
       safePath,
-      `.monize-write-test-${Date.now()}`,
+      `.monize-write-test-${randomUUID()}`,
     );
     try {
       await fs.writeFile(testFile, "");
-      await fs.unlink(testFile);
     } catch {
       throw new BadRequestException(
         tr(
@@ -1076,6 +1327,16 @@ export class AutoBackupService {
           `Folder is not writable: ${safePath}. Check container permissions.`,
           { safePath },
         ),
+      );
+    }
+    // The write is the answer. Failing to remove the probe is litter -- one empty
+    // dot-file that no retention pattern matches -- and reporting it as "not
+    // writable" would contradict the write that just succeeded.
+    try {
+      await fs.unlink(testFile);
+    } catch (error) {
+      this.logger.warn(
+        `Could not remove write-test file ${testFile}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
