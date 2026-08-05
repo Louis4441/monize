@@ -105,12 +105,15 @@ GUCs through `withScopedDb` and the policies compare each row's owner against th
    rather than a convention.
 
    **`PUBLIC` is the exception, for the same reason and not in spite of it:** it is a keyword that
-   always resolves, so it cannot fail for a missing role. It has to be permitted, because
+   always resolves, so it cannot fail for a missing role. It stays permitted because
    `CREATE FUNCTION` grants `EXECUTE` to `PUBLIC` implicitly -- revoking that anywhere but the
    transaction that created the function leaves a window in which any role can execute a fresh
-   `SECURITY DEFINER` function. `133_currency_global_liveness.sql` is the case. This paragraph used
-   to read as an absolute ban while that `REVOKE` was already in the tree, which is a rule nothing
-   checked disagreeing with the code it governs.
+   `SECURITY DEFINER` function. No shipped migration uses this yet (the tree holds no
+   `SECURITY DEFINER` function, and every grant lives in `backend/src/common/db/app-role.ts`); the
+   allowance exists so the first migration that ships one can close that window in place.
+   `backend/scripts/migration-lint.test.mjs` pins both halves: that today's migrations contain no
+   role statement at all, and that a `REVOKE ... FROM PUBLIC` stays legal for the migration that
+   will eventually need it.
 
 ## Migration File Conventions
 - Numbered prefix for ordering: `NNN_description.sql` (e.g., `079_securities_is_favourite.sql`)

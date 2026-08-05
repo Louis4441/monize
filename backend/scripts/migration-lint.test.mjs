@@ -232,20 +232,83 @@ test("a migration naming a role is flagged; PUBLIC is allowed", () => {
   flags("REVOKE ALL ON TABLE t FROM monize_app;", "role-or-grant-statement");
   // A quoted role name is still a named role.
   flags('GRANT SELECT ON t TO "monize_app";', "role-or-grant-statement");
+  // Role membership is a GRANT naming two roles.
+  flags("GRANT monize_admin TO monize_app;", "role-or-grant-statement");
 
   clean("REVOKE ALL ON FUNCTION f(VARCHAR) FROM PUBLIC;");
   clean("REVOKE ALL ON FUNCTION f(VARCHAR) FROM public;");
   clean("GRANT SELECT ON TABLE t TO PUBLIC;");
+  // Tail options after the grantee list are options, not grantees.
+  clean("GRANT SELECT ON TABLE t TO PUBLIC WITH GRANT OPTION;");
+  clean("REVOKE ALL ON TABLE t FROM PUBLIC CASCADE;");
   // The word appearing in prose or an identifier is not a grant statement.
   clean("COMMENT ON FUNCTION f() IS 'EXECUTE is revoked from PUBLIC';");
 });
 
+test("every grantee in a list is checked, not just the first", () => {
+  // `FROM PUBLIC, monize_app` names a role exactly as much as `FROM monize_app`
+  // does; reading only the first entry let the rest of the list through.
+  flags(
+    "REVOKE ALL ON TABLE t FROM PUBLIC, monize_app;",
+    "role-or-grant-statement",
+  );
+  flags(
+    "GRANT SELECT ON TABLE t TO PUBLIC, monize_app;",
+    "role-or-grant-statement",
+  );
+  flags(
+    'REVOKE ALL ON TABLE t FROM monize_app, "PUBLIC";',
+    "role-or-grant-statement",
+  );
+  clean("REVOKE ALL ON TABLE t FROM PUBLIC, public;");
+});
+
+test("the other statements that bind a role are flagged too", () => {
+  // Each of these fails on an installation where the role does not exist, for
+  // the same reason a GRANT does.
+  flags("ALTER TABLE t OWNER TO monize_app;", "role-or-grant-statement");
+  flags(
+    "ALTER FUNCTION f(VARCHAR) OWNER TO monize_app;",
+    "role-or-grant-statement",
+  );
+  flags(
+    "REASSIGN OWNED BY old_owner TO new_owner;",
+    "role-or-grant-statement",
+  );
+  flags("SET ROLE monize_app;", "role-or-grant-statement");
+  flags("SET LOCAL ROLE monize_app;", "role-or-grant-statement");
+  flags("SET SESSION AUTHORIZATION monize_app;", "role-or-grant-statement");
+
+  // RESET names no role, and the words inside a string literal are data, not a
+  // statement.
+  clean("RESET ROLE;");
+  clean("INSERT INTO notes (body) VALUES ('never SET ROLE in a migration') ON CONFLICT DO NOTHING;");
+});
+
 test("the shipped migrations satisfy the role rule", () => {
-  // Migration 133 revokes EXECUTE from PUBLIC on a SECURITY DEFINER function, in
-  // the same transaction that creates it. Asserted here so a future tightening of
-  // the rule to an absolute ban fails loudly instead of silently making the
-  // directory unlintable.
-  clean("REVOKE ALL ON FUNCTION currency_code_in_use_globally(VARCHAR) FROM PUBLIC;");
+  // The real directory, not a fixture: the claim is about every migration that
+  // ships, so the test walks them all. No migration currently contains any
+  // role, grant, ownership or SET ROLE statement -- grants live in db-init
+  // (backend/src/common/db/app-role.ts).
+  const migrationsDir = fileURLToPath(
+    new URL("../../database/migrations", import.meta.url),
+  );
+  const { files, findings } = lintDirectory(migrationsDir);
+  assert.ok(files.length > 100, `expected the real migrations, got ${files.length} file(s)`);
+  assert.deepEqual(
+    findings.filter((f) => f.rule === "role-or-grant-statement"),
+    [],
+  );
+});
+
+test("a REVOKE FROM PUBLIC stays legal for the migration that will need it", () => {
+  // CREATE FUNCTION grants EXECUTE to PUBLIC implicitly; the only gap-free
+  // place to revoke that from a future SECURITY DEFINER function is the same
+  // transaction that creates it. No shipped migration uses this yet -- the
+  // test above pins that -- and this pins the allowance, so tightening the
+  // rule to an absolute ban fails loudly here instead of blocking that
+  // migration when it arrives.
+  clean("REVOKE ALL ON FUNCTION some_future_definer(VARCHAR) FROM PUBLIC;");
 });
 
 test("statements that are re-runnable by nature are not flagged", () => {

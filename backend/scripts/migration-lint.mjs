@@ -422,19 +422,24 @@ export const RULES = [
    * not exist (it is provisioned by db-init, or by the CNPG Cluster manifest, or
    * not at all at RLS_MODE=off). A statement naming that role fails, the
    * migration aborts, and the backend crash-loops before it serves a request.
-   * Roles and their grants therefore live in `backend/src/common/db/app-role.ts`.
+   * Roles and their grants therefore live in `backend/src/common/db/app-role.ts`,
+   * and no shipped migration contains any of these statements today -- the test
+   * suite pins that over the real directory.
    *
    * `PUBLIC` is the one exception, and it is not an exception to the reason:
    * PUBLIC is a keyword that always resolves, so `REVOKE ... FROM PUBLIC` cannot
-   * fail for a missing role. It has to be allowed, because `CREATE FUNCTION`
-   * grants EXECUTE to PUBLIC implicitly -- revoking it anywhere but in the same
+   * fail for a missing role. It stays allowed because `CREATE FUNCTION` grants
+   * EXECUTE to PUBLIC implicitly, and revoking that anywhere but in the same
    * transaction as the CREATE leaves a window in which any role can execute a
-   * fresh SECURITY DEFINER function. Migration 133 is the case.
+   * fresh SECURITY DEFINER function. Nothing in the tree needs it yet; the
+   * allowance exists so the first migration that ships such a function can close
+   * that window in place instead of fighting this rule.
    *
-   * `database/CLAUDE.md` stated this as an absolute ban while the source already
-   * held that one REVOKE, so the prose was a rule nothing checked and the code
-   * disagreed with. This is the checked version, and it says what is actually
-   * true.
+   * Every grantee is checked, not just the first: `REVOKE ... FROM PUBLIC,
+   * monize_app` names a role exactly as much as `FROM monize_app` does. The
+   * other statements that bind a specific role -- `OWNER TO`, `REASSIGN OWNED
+   * BY`, `SET ROLE` / `SET SESSION AUTHORIZATION` -- fail the same way a GRANT
+   * does, so they are covered by the same rule.
    */
   {
     id: "role-or-grant-statement",
@@ -445,11 +450,47 @@ export const RULES = [
           "CREATE/ALTER/DROP ROLE in a migration crash-loops startup where the role differs; roles live in db-init (common/db/app-role.ts)",
         );
       }
+      if (/\bOWNER\s+TO\b/i.test(text)) {
+        messages.push(
+          "ALTER ... OWNER TO names a role, and crash-loops startup where that role does not exist; ownership stays with the migration-running role",
+        );
+      }
+      if (/\bREASSIGN\s+OWNED\s+BY\b/i.test(text)) {
+        messages.push(
+          "REASSIGN OWNED BY names roles, and crash-loops startup where they do not exist",
+        );
+      }
+      // Anchored to the statement start: SET ROLE is a statement of its own,
+      // and the anchor keeps the words appearing inside a string literal (an
+      // INSERTed comment, say) from tripping the rule.
+      if (
+        /^\s*SET\s+(?:LOCAL\s+|SESSION\s+)?ROLE\b/i.test(text) ||
+        /^\s*SET\s+(?:LOCAL\s+)?SESSION\s+AUTHORIZATION\b/i.test(text)
+      ) {
+        messages.push(
+          "SET ROLE / SET SESSION AUTHORIZATION switches to a named role, and crash-loops startup where that role does not exist",
+        );
+      }
       const grant = /\b(GRANT|REVOKE)\b([\s\S]*)$/i.exec(text);
       if (grant) {
-        // The grantee follows TO (GRANT) or FROM (REVOKE).
-        const grantee = /\b(?:TO|FROM)\s+([A-Za-z_"][\w"$]*)/i.exec(grant[2]);
-        if (!grantee || grantee[1].toUpperCase() !== "PUBLIC") {
+        // The grantee list follows TO (GRANT) or FROM (REVOKE). Cut the tail
+        // options off first so `WITH GRANT OPTION` / `GRANTED BY` / `CASCADE`
+        // are not mistaken for grantees, then check every comma-separated
+        // entry -- `FROM PUBLIC, monize_app` names a role exactly as much as
+        // `FROM monize_app` does.
+        const list = /\b(?:TO|FROM)\s+([\s\S]+)$/i.exec(grant[2]);
+        const grantees = list
+          ? list[1]
+              .replace(/\b(?:WITH|GRANTED\s+BY|CASCADE|RESTRICT)\b[\s\S]*$/i, "")
+              .split(",")
+              .map((entry) => {
+                const token = /^(?:GROUP\s+)?([A-Za-z_"][\w"$]*)/i.exec(entry.trim());
+                // An entry the grammar cannot read is not provably PUBLIC, so
+                // it flags rather than passes.
+                return token ? normalizeIdentifier(token[1]) : "";
+              })
+          : [];
+        if (grantees.length === 0 || grantees.some((name) => name !== "public")) {
           messages.push(
             `${grant[1].toUpperCase()} to a named role in a migration crash-loops startup where the role does not exist; only PUBLIC is safe (it always resolves)`,
           );
