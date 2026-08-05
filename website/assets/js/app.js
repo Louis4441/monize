@@ -533,6 +533,7 @@ addEventListener('keydown',function(e){
 
 /* ---------- reports explorer ---------- */
 var reps=M.REPORTS.split(';').map(function(r){ var p=r.split('|'); return {n:p[0],c:p[1]}; });
+var repGrid=asStrip($('#repGrid'),'Reports — scroll sideways for more');
 var rcats=['All'].concat(Object.keys(M.RCOLOR)), rcat='All', rq='';
 $('#repCount').textContent=reps.length;
 rcats.forEach(function(c){
@@ -542,7 +543,7 @@ rcats.forEach(function(c){
 });
 $('#repSearch').addEventListener('input',function(){ rq=this.value.toLowerCase().trim(); paintR(); });
 function paintR(){
-  var g=clear($('#repGrid'));
+  var g=clear(repGrid);
   var list=reps.filter(function(r){
     return (rcat==='All'||r.c===rcat) && (!rq || r.n.toLowerCase().indexOf(rq)>-1 || r.c.toLowerCase().indexOf(rq)>-1);
   });
@@ -552,6 +553,7 @@ function paintR(){
     g.appendChild(n);
   });
   $('#repMsg').textContent = list.length ? 'Showing '+list.length+' of '+reps.length+' reports' : 'No report matches that — but the custom report builder will.';
+  rewind(repGrid);
 }
 paintR();
 

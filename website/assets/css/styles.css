@@ -279,16 +279,23 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
 @media (max-width:640px){
   .sec{padding:60px 0}
   .g4,.g3,.g2,.rep-grid{grid-template-columns:1fr}
-  /* Two lists here are long -- twenty-eight feature cards and forty-two gallery
-     screenshots -- and one column of either is a couple of screens of
-     thumb-scrolling to get past a section nobody has to read in full. Both
-     become a snapping horizontal strip on a phone, the shape the tour rail and
-     the filmstrip above already use.
+  /* Three lists here are long -- twenty-eight feature cards, forty-two gallery
+     screenshots and forty-six report rows -- and one column of any of them is a
+     couple of screens of thumb-scrolling to get past a section nobody has to
+     read in full. All three become a snapping horizontal strip on a phone, the
+     shape the tour rail and the filmstrip above already use.
+     Sideways rather than a capped box with its own vertical scrollbar, which is
+     the obvious alternative for the reports: a vertical scroller inside a
+     vertically scrolling page traps the gesture that was trying to get past it,
+     and on a touch screen there is no pointer position to tell the two apart.
+     Scrolling across is unambiguous -- a downward swipe anywhere still moves the
+     page.
      - the selector names its consumers instead of being a bare `.strip`: the
        collapse rule a line up sets grid-template-columns at the same
        specificity, and .gal sets columns further down, so a single class would
-       win on source order alone. Putting a third list in a strip means adding it
-       here as well as in the markup, which website-mobile-layout.test.ts checks.
+       win on source order alone. Putting a fourth list in a strip means adding
+       it here as well as in the markup, which website-mobile-layout.test.ts
+       checks.
      - display:grid is what turns the gallery's masonry off. A multi-column
        container is not a grid container, so nothing else here would reach it.
      - grid-template-columns has to be cleared, not just overridden: an explicit
@@ -300,12 +307,35 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
        scroller inside a 1fr track does (see the min-width:0 note above).
      - the reveal slides up 24px, which reads as a card entering from below a row
        it is not in, and overflow-y clips it besides. In a strip it is a fade. */
-  .grid.strip,.gal.strip{
+  .grid.strip,.gal.strip,.rep-grid.strip{
     display:grid;columns:auto;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;
     overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
     scroll-snap-type:x mandatory;scrollbar-width:thin;padding:4px 0 12px}
   .strip>*{scroll-snap-align:start;min-width:0}
   .strip>.rv{transform:none}
+  /* A report is one line of text and a category, not a card with a picture in
+     it, so a single row of them would leave most of the strip's height empty and
+     still take forty-six swipes to cross. Four to a column is roughly the height
+     of the feature cards beside it and turns the same list into twelve, and a
+     category chip or a search term usually cuts it to one or two. Rows have to
+     be given explicitly: with grid-auto-flow:column the implicit grid grows
+     sideways, so without this every item lands in row one. */
+  .rep-grid.strip{grid-template-rows:repeat(4,auto)}
+  /* The filter chips wrap to four or five centred rows on a phone -- eleven
+     report categories, ten feature ones -- so the control costs more height than
+     the strip it filters, and the reports section pushed its own list off the
+     screen before a thumb reached it. One scrolling row instead, the shape the
+     tour rail already takes at the tablet breakpoint.
+     - justify-content has to leave centre: a centred flex line that overflows
+       puts its first item at a negative offset, and a scroller cannot reach it
+       because scrollLeft has no values below zero.
+     - overflow-y is set because a box with overflow-x:auto and overflow-y
+       visible computes the second to auto as well, and the chips' 2px hover lift
+       is then enough to raise a vertical scrollbar over a one-line row. The
+       padding is what gives that lift somewhere to go. */
+  .tagrow{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;
+    overscroll-behavior-x:contain;scrollbar-width:thin;margin-bottom:18px;padding:2px 0 6px}
+  .tagrow .chip{flex:0 0 auto}
   /* The gallery's pictures are its content, so they crop to one height rather
      than making every figure as tall as the tallest screenshot -- the trade the
      filmstrip already makes, and the shot is a click away from full size. Both
