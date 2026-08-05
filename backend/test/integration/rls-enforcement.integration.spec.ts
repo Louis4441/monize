@@ -131,6 +131,18 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
     } as never);
     await dataSource.initialize();
 
+    // `synchronize` builds from entity metadata, and `schema_migrations` has no
+    // entity -- it is the migration runner's own ledger (same gap
+    // runtime-role.integration.spec.ts's MT-13 setup closes). Create it before
+    // the role is provisioned, so the revoke below the migration-bookkeeping
+    // tests exercise is not a silent no-op against a table that does not exist.
+    await dataSource.query(
+      `CREATE TABLE IF NOT EXISTS schema_migrations (
+         filename VARCHAR(255) PRIMARY KEY,
+         applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+       )`,
+    );
+
     // Real policies + the M3 enable, applied in filename order (T1's harness).
     await applyRlsPolicies(dataSource, { includeEnable: true });
 
@@ -896,6 +908,15 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
       try {
         let activationSettled = false;
         let activationError: unknown;
+        // Populated inside the transaction below; declared here so the
+        // deleter's callback does not have to return it. Returning a promise
+        // from a TypeORM transaction callback is implicitly awaited before
+        // the transaction commits -- and this promise cannot settle until
+        // that same commit releases the lock B is waiting on. Awaiting it
+        // from inside the transaction is therefore a guaranteed deadlock, not
+        // a race: A waits on B, B waits on A's commit, and nothing ever
+        // completes. It is awaited instead after `deleter` resolves, below.
+        let activation!: Promise<void>;
 
         // A: hold the lock the delete path takes, with nothing else in flight.
         const deleter = dataSource.transaction(async (m) => {
@@ -905,7 +926,7 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
 
           // B: activate the same code. Its FK check needs FOR KEY SHARE on the
           // locked parent, so it must block rather than commit.
-          const activation = other
+          activation = other
             .transaction(async (n) =>
               n.query(
                 `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
@@ -928,12 +949,13 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
           expect(activationSettled).toBe(false);
 
           await m.query("DELETE FROM currencies WHERE code = $1", [CODE]);
-          return activation;
         });
 
         await deleter;
-        // Whatever the deleter returned, wait for B to settle after the commit.
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        // The commit just released the lock; B's blocked insert can now settle
+        // one way or the other. `activation`'s own .then never rejects, so this
+        // cannot throw -- it only waits.
+        await activation;
 
         // The forbidden outcome is a committed preference the cascade removed.
         // Either B failed, or B holds a preference for a currency that still
@@ -1198,15 +1220,14 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
       ).rejects.toThrow(/permission denied/i);
     });
 
-    it("cannot read schema_migrations either", async () => {
-      // Nothing in the application needs to, so ALL is revoked rather than
-      // carving out SELECT for a caller that does not exist.
-      await expect(
-        asAppRole(identity(USER_A), (m) =>
-          m.query("SELECT count(*) FROM schema_migrations"),
-        ),
-      ).rejects.toThrow(/permission denied/i);
-    });
+    // Reading the ledger is intentionally left granted -- asserted against the
+    // running role in MT-13
+    // (runtime-role.integration.spec.ts: "may read the migration ledger but not
+    // write it"), which asserts SELECT succeeds. An earlier version of this
+    // test asserted the opposite (SELECT denied too) and contradicted that
+    // already-reviewed design; removed rather than fixed to keep the one
+    // authoritative assertion of this grant surface in MT-13's file instead of
+    // two specs quietly disagreeing about it.
 
     it("still has DML on an ordinary user table", async () => {
       // The revoke has to be surgical: revoking too much would break the app.

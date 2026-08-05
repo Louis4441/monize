@@ -12,6 +12,8 @@ import {
 import { User } from "@/users/entities/user.entity";
 import { OidcReauthService } from "@/auth/oidc/oidc-reauth.service";
 import { AiEncryptionService } from "@/ai/ai-encryption.service";
+import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
+import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
 import { createTestUserDirect } from "../helpers/integration-setup";
 import { applyRlsPolicies } from "../helpers/rls-setup";
 import { withUserContext } from "@/common/db/with-context";
@@ -86,6 +88,11 @@ describe("Backup export/restore round-trip (integration)", () => {
         // Only consulted for backups encrypted with a stored password; the
         // round-trip tests supply the password explicitly instead.
         { provide: AiEncryptionService, useValue: { decrypt: () => "" } },
+        // The real database-backed provider: no test here seeds an attachment,
+        // but BackupService's constructor requires the token to be resolvable
+        // regardless, and this needs no extra config (unlike local/S3).
+        DatabaseStorageProvider,
+        { provide: ATTACHMENT_STORAGE_PROVIDER, useExisting: DatabaseStorageProvider },
       ],
     }).compile();
 
