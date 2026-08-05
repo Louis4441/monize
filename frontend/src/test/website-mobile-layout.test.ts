@@ -83,11 +83,11 @@ function rules(css: string): Rule[] {
 }
 
 /**
- * The rules that apply at the phone breakpoint. A regex cannot match a nested
- * brace pair, so the body of each `@media` is taken by counting braces out from
- * the one that opened it.
+ * The rules inside every `@media` whose `max-width` the caller accepts. A regex
+ * cannot match a nested brace pair, so the body of each `@media` is taken by
+ * counting braces out from the one that opened it.
  */
-function phoneRules(css: string): Rule[] {
+function mediaRules(css: string, accepts: (maxWidth: number) => boolean): Rule[] {
   const stripped = code(css);
   const opener = /@media([^{]*)\{/g;
   const found: Rule[] = [];
@@ -99,11 +99,21 @@ function phoneRules(css: string): Rule[] {
       if (stripped[end] === '{') depth++;
       else if (stripped[end] === '}') depth--;
     }
-    if (/max-width\s*:\s*640px/.test(at[1])) found.push(...rules(stripped.slice(start, end - 1)));
+    const max = at[1].match(/max-width\s*:\s*(\d+)px/);
+    if (max && accepts(Number(max[1]))) found.push(...rules(stripped.slice(start, end - 1)));
     opener.lastIndex = end;
   }
 
   return found;
+}
+
+/** The rules that apply at the phone breakpoint. */
+function phoneRules(css: string): Rule[] {
+  return mediaRules(css, (maxWidth) => maxWidth === 640);
+}
+
+function styles(): string {
+  return readFileSync(join(SITE, 'assets', 'css', 'styles.css'), 'utf8');
 }
 
 /** Track count for a `grid-template-rows` value, `repeat(n, ...)` included. */
@@ -288,6 +298,64 @@ describe('website layout holds on a phone', () => {
       `the reports strip lays out ${deepest} row(s) of reports (${declared.join(', ')}) -- one row per column is the ` +
         'shape this guard exists to catch',
     ).toBeGreaterThan(1);
+  });
+
+  /**
+   * The header is a brand, a theme toggle, a demo button and a menu button on
+   * one flex line, and below about 380px that line is wider than the screen.
+   * Nothing in it gives -- `.btn` is `white-space:nowrap` and `.icobtn` is a
+   * fixed square -- so the whole shortfall came out of `.brand`, which does not
+   * reflow: it slid its own text under the theme toggle. At 320px the wordmark
+   * read "Moniz" and the menu button, the only way to reach the nav once `#nav`
+   * is `display:none`, hung 11px past the right edge. Not merely scrolled off:
+   * `body` sets `overflow-x:hidden` and, with `html` at visible, that propagates
+   * to the viewport, so the button was clipped away entirely. Measured in
+   * Chromium, the header held a hard 331px floor at every viewport below it.
+   *
+   * The layout result cannot be scanned, so these are the three declarations
+   * that keep it true. The third is the one that is easy to get wrong twice:
+   * the lightbox's close and arrow buttons carry `.icobtn` too, and they are
+   * thumb targets over a photo, so a header-sized override has to name the
+   * header.
+   */
+  it('keeps the whole header inside the narrowest phone', () => {
+    const css = styles();
+    const narrow = mediaRules(css, (maxWidth) => maxWidth <= 560);
+
+    const brandHolds = narrow.some(
+      ({ selectors, declarations }) =>
+        selectors.split(',').some((selector) => selector.trim() === '.brand') &&
+        (/(^|[;\s])flex\s*:\s*0\s+0\b/.test(declarations) || /(^|[;\s])flex-shrink\s*:\s*0/.test(declarations)),
+    );
+    expect(
+      brandHolds,
+      '.brand must stop shrinking at the phone breakpoint (flex:0 0 auto, or flex-shrink:0). It is the only ' +
+        'flexible item on the header line, so without this every pixel the header is over budget is taken out of ' +
+        'the wordmark -- which does not wrap, it slides under the control beside it and renders as "Moniz".',
+    ).toBe(true);
+
+    const wordmarkGoes = mediaRules(css, (maxWidth) => maxWidth <= 400).some(
+      ({ selectors, declarations }) =>
+        /\.brand\s+span\b/.test(selectors) && /(^|[;\s])display\s*:\s*none/.test(declarations),
+    );
+    expect(
+      wordmarkGoes,
+      'no breakpoint at or below 400px hides .brand span. Even with the gutters tightened the wordmark does not ' +
+        'fit beside the demo button and the two icon buttons on a 320-360px screen, and it is the element whose ' +
+        'loss costs least -- the logo is still the link home and still carries the accessible name.',
+    ).toBe(true);
+
+    const unscoped = narrow
+      .filter(({ declarations }) => /(^|[;\s])(width|height)\s*:/.test(declarations))
+      .flatMap(({ selectors }) => selectors.split(','))
+      .map((selector) => selector.trim())
+      .filter((selector) => /(^|[\s>+~])\.icobtn\b/.test(selector) && !/#hdr|\.hdr-cta/.test(selector));
+    expect(
+      unscoped,
+      `${unscoped.join(', ')} resizes an icon button at a phone breakpoint without naming the header. The lightbox's ` +
+        'close and previous/next buttons carry that class as well, and they are thumb targets sitting over a ' +
+        'photo -- shrink the header pair with .hdr-cta .icobtn instead.',
+    ).toEqual([]);
   });
 
   /**

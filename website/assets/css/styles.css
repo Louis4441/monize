@@ -275,6 +275,29 @@ footer a{color:var(--mut)}footer a:hover{color:var(--txt)}
 }
 @media (max-width:560px){
   .hdr-cta .btn.ghost{display:none}
+  /* Below this the header is four controls and a wordmark on a line that is not
+     wide enough for them, and nothing in it gives: .btn is white-space:nowrap
+     and .icobtn is a fixed square, so every pixel of the shortfall is taken out
+     of .brand -- which does not reflow, it just slides its own text under the
+     theme toggle. At 320px that read "Moniz", and the menu button, the only way
+     to reach the nav once #nav is display:none, hung 11px off the right-hand
+     edge. Not scrolled off: body sets overflow-x:hidden and, with html at
+     visible, that propagates to the viewport, so the button was clipped away.
+     Tightening the gutters and the gaps buys back roughly thirty of those
+     pixels, and .brand stops shrinking so the wordmark is whole or absent and
+     never half of itself. The icobtn size is scoped to the header because the
+     lightbox's close and arrow buttons carry the same class and are thumb
+     targets over a photo. */
+  #hdr{gap:10px;padding:12px 14px}
+  .hdr-cta .btn{padding:9px 13px}
+  .hdr-cta .icobtn{width:34px;height:34px}
+  .brand{flex:0 0 auto}
+}
+@media (max-width:360px){
+  /* Even tightened, the wordmark does not fit beside the demo button and the two
+     icons here, and of the five it is the one whose loss costs least: the logo
+     is still the link home and still carries the accessible name. */
+  .brand span{display:none}
 }
 @media (max-width:640px){
   .sec{padding:60px 0}
