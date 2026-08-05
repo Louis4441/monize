@@ -43,6 +43,28 @@ function sharedDataCount(d: DelegateSummary): number {
 const inputClass =
   'w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm';
 
+/** Addresses worth spending a lookup on. The server applies the real rule. */
+const LOOKUPABLE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The email lookup's result *and* the address that produced it. Without the
+ * address the component cannot tell an answer about what is in the field from
+ * an answer about what used to be, and every control below it is drawn from
+ * whichever of the two arrived last.
+ *
+ * `failed` is a fourth state on purpose. It used to collapse into "no such
+ * user", so a 500, a 403 or a timeout rendered as a confident invitation to set
+ * a password for someone who may already have one -- indistinguishable, on
+ * screen, from the answer this form exists to give.
+ */
+type EmailLookup =
+  | { state: 'known'; email: string; exists: boolean }
+  // `detail` is the server's or axios's own words, untranslated. Monize is
+  // self-hosted, so the person hitting this is usually the one who can fix it,
+  // and "403" or "Request failed with status code 500" is the difference
+  // between a diagnosis and a shrug.
+  | { state: 'failed'; email: string; detail?: string };
+
 export function SharedAccessSection() {
   const t = useTranslations('settings.sharedAccess');
   const tc = useTranslations('common');
@@ -57,8 +79,10 @@ export function SharedAccessSection() {
   const [password, setPassword] = useState('');
   const [sendInvite, setSendInvite] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  // null = unknown / not yet checked; true = email already has a login.
-  const [emailExists, setEmailExists] = useState<boolean | null>(null);
+  const [lookup, setLookup] = useState<EmailLookup | null>(null);
+  // Bumped by the retry button: the lookup for a failed address is otherwise
+  // keyed only on the address, so re-running it needs something to change.
+  const [lookupAttempt, setLookupAttempt] = useState(0);
 
   const [revokeTarget, setRevokeTarget] = useState<DelegateSummary | null>(
     null,
@@ -106,35 +130,62 @@ export function SharedAccessSection() {
     setLastName('');
     setPassword('');
     setSendInvite(false);
-    setEmailExists(null);
+    setLookup(null);
   };
+
+  const trimmedEmail = email.trim();
+  const emailIsLookupable = LOOKUPABLE_EMAIL.test(trimmedEmail);
+  // Adopt the lookup only while it still describes what is in the field. A
+  // response for a previous address is stale, not an answer, so it is dropped
+  // here during render rather than cleared from an effect.
+  const currentLookup =
+    lookup && lookup.email === trimmedEmail ? lookup : null;
+
+  const existingLogin =
+    currentLookup?.state === 'known' && currentLookup.exists;
+  const lookupFailed = currentLookup?.state === 'failed';
+  // No answer yet for the address on screen: the debounce is still running or
+  // the request is in flight. Absence of a result is the whole condition, so
+  // there is no separate loading state to set -- and setting one would make
+  // this effect re-run and cancel the request it is waiting for.
+  const lookupChecking = emailIsLookupable && currentLookup === null;
 
   // Debounced check: if the email already has a Monize login (existing
   // full account, or a delegate of another owner), the owner only links
   // the additional access -- no password / invite is set here.
   useEffect(() => {
-    if (!showCreate) return;
-    const value = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setEmailExists(null);
-      return;
-    }
+    if (!showCreate || !emailIsLookupable) return;
     let cancelled = false;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       delegationApi
-        .lookupEmail(value)
+        .lookupEmail(trimmedEmail)
         .then((r) => {
-          if (!cancelled) setEmailExists(r.exists);
+          if (!cancelled)
+            setLookup({
+              state: 'known',
+              email: trimmedEmail,
+              exists: r.exists,
+            });
         })
-        .catch(() => {
-          if (!cancelled) setEmailExists(null);
+        .catch((err) => {
+          if (cancelled) return;
+          logger.error(err);
+          setLookup({
+            state: 'failed',
+            email: trimmedEmail,
+            detail: getErrorMessage(err, '') || undefined,
+          });
         });
     }, 400);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
-  }, [email, showCreate]);
+    // `t` is deliberately absent: useTranslations returns a fresh identity each
+    // render, so depending on it re-runs this effect, and the cleanup then
+    // cancels the very request the component is waiting on. The failure copy is
+    // resolved at render instead.
+  }, [trimmedEmail, emailIsLookupable, showCreate, lookupAttempt]);
 
   const openCreate = () => {
     resetCreateForm();
@@ -144,8 +195,17 @@ export function SharedAccessSection() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Whether this address already has a login decides what the rest of the
+    // form even means, so an unanswered lookup is not a licence to guess: the
+    // "no" branch below would set a password for a person who may already have
+    // one. The server refuses to overwrite a real account's credentials, but
+    // submitting blind is how this stayed invisible in the first place.
+    if (lookupFailed) {
+      toast.error(t('errors.lookupFailed'));
+      return;
+    }
     // Existing login: just link the access, never touch their credentials.
-    if (!emailExists && !sendInvite) {
+    if (!existingLogin && !sendInvite) {
       if (!password) {
         toast.error(t('errors.setPasswordOrInvite'));
         return;
@@ -164,8 +224,8 @@ export function SharedAccessSection() {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         password:
-          emailExists || sendInvite ? undefined : password || undefined,
-        sendInvite: emailExists ? false : sendInvite,
+          existingLogin || sendInvite ? undefined : password || undefined,
+        sendInvite: existingLogin ? false : sendInvite,
       });
       if (res.temporaryPassword) {
         toast.success(
@@ -327,10 +387,36 @@ export function SharedAccessSection() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
+                aria-describedby="delegate-email-status"
               />
+              <p
+                id="delegate-email-status"
+                className="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                aria-live="polite"
+              >
+                {lookupChecking ? t('createModal.checkingEmail') : null}
+              </p>
             </div>
 
-            {!emailExists && (
+            {lookupFailed && (
+              <div className="rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-800 dark:text-red-200">
+                <p>{t('errors.lookupFailed')}</p>
+                {currentLookup.detail && (
+                  <p className="mt-1 text-xs opacity-80">
+                    {currentLookup.detail}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setLookupAttempt((n) => n + 1)}
+                  className="mt-2 font-medium underline"
+                >
+                  {t('createModal.retryEmailCheck')}
+                </button>
+              </div>
+            )}
+
+            {!existingLogin && !lookupFailed && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -359,11 +445,11 @@ export function SharedAccessSection() {
               </div>
             )}
 
-            {emailExists ? (
+            {existingLogin ? (
               <div className="rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 text-sm text-blue-800 dark:text-blue-200">
                 {t('createModal.existingAccountNotice')}
               </div>
-            ) : (
+            ) : lookupFailed ? null : (
               <>
                 <div className="flex items-center gap-3">
                   <ToggleSwitch
@@ -406,7 +492,11 @@ export function SharedAccessSection() {
             >
               {tc('cancel')}
             </Button>
-            <Button type="submit" isLoading={submitting}>
+            <Button
+              type="submit"
+              isLoading={submitting}
+              disabled={lookupFailed}
+            >
               {t('createModal.submitButton')}
             </Button>
           </div>
