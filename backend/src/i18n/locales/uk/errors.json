@@ -437,6 +437,7 @@
     "invalidTagKey": "Потрібен ключ тегу (1–100 символів)",
     "assetOptionNameRequired": "Потрібна назва класу активів.",
     "documentNotFound": "Документ не знайдено",
+    "embeddedSplitAmountMismatch": "Цей розподіл записує {{ amount }}, але {{ action }} {{ quantity }} @ {{ price }} за курсом {{ rate }} дає {{ expected }}. Використайте цю суму або вкажіть курс обміну, який ви мали на увазі.",
     "selectionNotFound": "Один або кілька вибраних паперів не знайдено",
     "comparisonSelectionEmpty": "Виберіть щонайменше один папір або ринковий індекс для порівняння",
     "exchangeRateNotPositive": "Курс обміну має бути більшим за нуль"

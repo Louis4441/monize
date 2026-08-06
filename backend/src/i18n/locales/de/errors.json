@@ -437,6 +437,7 @@
     "invalidTagKey": "Ein Tag-Schlüssel (1–100 Zeichen) ist erforderlich",
     "assetOptionNameRequired": "Ein Name für die Anlageklasse ist erforderlich.",
     "documentNotFound": "Dokument nicht gefunden",
+    "embeddedSplitAmountMismatch": "Dieser Buchungsteil verzeichnet {{ amount }}, aber {{ action }} {{ quantity }} @ {{ price }} ergibt umgerechnet {{ expected }} bei einem Kurs von {{ rate }}. Verwenden Sie diesen Betrag, oder geben Sie den gemeinten Wechselkurs an.",
     "selectionNotFound": "Eine oder mehrere der ausgewählten Wertpapiere wurden nicht gefunden",
     "comparisonSelectionEmpty": "Wählen Sie mindestens ein Wertpapier oder einen Marktindex zum Vergleich aus",
     "exchangeRateNotPositive": "Der Wechselkurs muss größer als null sein"

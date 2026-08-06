@@ -437,6 +437,7 @@
     "invalidTagKey": "É necessária uma chave de etiqueta (1-100 caracteres)",
     "assetOptionNameRequired": "É necessário um nome de classe de ativos.",
     "documentNotFound": "Documento não encontrado",
+    "embeddedSplitAmountMismatch": "Esta parcela regista {{ amount }}, mas {{ action }} {{ quantity }} @ {{ price }} converte-se em {{ expected }} à taxa de {{ rate }}. Use esse montante, ou indique a taxa de câmbio que pretendia.",
     "selectionNotFound": "Um ou mais dos títulos selecionados não foram encontrados",
     "comparisonSelectionEmpty": "Selecione pelo menos um título ou índice de mercado para comparar",
     "exchangeRateNotPositive": "A taxa de câmbio deve ser maior do que zero"

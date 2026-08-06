@@ -437,6 +437,7 @@
     "invalidTagKey": "Une clé d'étiquette (1 à 100 caractères) est requise",
     "assetOptionNameRequired": "Un nom de classe d'actifs est requis.",
     "documentNotFound": "Document introuvable",
+    "embeddedSplitAmountMismatch": "Cette répartition enregistre {{ amount }}, mais {{ action }} {{ quantity }} @ {{ price }} se convertit en {{ expected }} au taux de {{ rate }}. Utilisez ce montant, ou indiquez le taux de change voulu.",
     "selectionNotFound": "Un ou plusieurs des titres sélectionnés sont introuvables",
     "comparisonSelectionEmpty": "Sélectionnez au moins un titre ou un indice de marché à comparer",
     "exchangeRateNotPositive": "Le taux de change doit être supérieur à zéro"

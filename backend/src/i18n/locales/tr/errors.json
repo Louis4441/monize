@@ -437,6 +437,7 @@
     "invalidTagKey": "Bir etiket anahtarı (1-100 karakter) gereklidir",
     "assetOptionNameRequired": "Varlık sınıfı adı gerekli.",
     "documentNotFound": "Belge bulunamadı",
+    "embeddedSplitAmountMismatch": "Bu bölünme {{ amount }} kaydediyor, ancak {{ action }} {{ quantity }} @ {{ price }} işlemi {{ rate }} kuruyla {{ expected }} eder. Bu tutarı kullanın veya kastettiğiniz döviz kurunu belirtin.",
     "selectionNotFound": "Seçilen menkul kıymetlerden biri veya birkaçı bulunamadı",
     "comparisonSelectionEmpty": "Karşılaştırmak için en az bir menkul kıymet veya piyasa endeksi seçin",
     "exchangeRateNotPositive": "Döviz kuru sıfırdan büyük olmalıdır"

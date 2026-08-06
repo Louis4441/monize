@@ -437,6 +437,7 @@
     "invalidTagKey": "Se requiere una clave de etiqueta (1-100 caracteres)",
     "assetOptionNameRequired": "Se requiere un nombre de clase de activo.",
     "documentNotFound": "Documento no encontrado",
+    "embeddedSplitAmountMismatch": "Este desglose registra {{ amount }}, pero {{ action }} {{ quantity }} @ {{ price }} se convierte en {{ expected }} a un tipo de {{ rate }}. Usa ese importe, o indica el tipo de cambio que querías.",
     "selectionNotFound": "No se encontraron uno o varios de los valores seleccionados",
     "comparisonSelectionEmpty": "Seleccione al menos un valor o índice de mercado para comparar",
     "exchangeRateNotPositive": "El tipo de cambio debe ser mayor que cero"

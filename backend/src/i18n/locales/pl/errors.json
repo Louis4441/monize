@@ -437,6 +437,7 @@
     "invalidTagKey": "Wymagany jest klucz tagu (1–100 znaków)",
     "assetOptionNameRequired": "Nazwa klasy aktywów jest wymagana.",
     "documentNotFound": "Nie znaleziono dokumentu",
+    "embeddedSplitAmountMismatch": "Ten podział zapisuje {{ amount }}, ale {{ action }} {{ quantity }} @ {{ price }} po kursie {{ rate }} daje {{ expected }}. Użyj tej kwoty lub podaj właściwy kurs wymiany.",
     "selectionNotFound": "Nie znaleziono jednego lub więcej wybranych papierów wartościowych",
     "comparisonSelectionEmpty": "Wybierz co najmniej jeden papier wartościowy lub indeks giełdowy do porównania",
     "exchangeRateNotPositive": "Kurs wymiany musi być większy od zera"

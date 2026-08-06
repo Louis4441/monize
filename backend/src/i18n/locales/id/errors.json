@@ -437,6 +437,7 @@
     "invalidTagKey": "Kunci tag (1-100 karakter) diperlukan",
     "assetOptionNameRequired": "Nama kelas aset wajib diisi.",
     "documentNotFound": "Dokumen tidak ditemukan",
+    "embeddedSplitAmountMismatch": "Pembagian ini mencatat {{ amount }}, tetapi {{ action }} {{ quantity }} @ {{ price }} dikonversi menjadi {{ expected }} dengan kurs {{ rate }}. Gunakan jumlah itu, atau nyatakan nilai tukar yang Anda maksud.",
     "selectionNotFound": "Satu atau beberapa efek yang dipilih tidak ditemukan",
     "comparisonSelectionEmpty": "Pilih setidaknya satu efek atau indeks pasar untuk dibandingkan",
     "exchangeRateNotPositive": "Nilai tukar harus lebih besar dari nol"

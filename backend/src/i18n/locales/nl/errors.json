@@ -437,6 +437,7 @@
     "invalidTagKey": "Een tagsleutel (1-100 tekens) is vereist",
     "assetOptionNameRequired": "Een naam voor de beleggingscategorie is verplicht.",
     "documentNotFound": "Document niet gevonden",
+    "embeddedSplitAmountMismatch": "Deze splitsing registreert {{ amount }}, maar {{ action }} {{ quantity }} @ {{ price }} komt tegen een koers van {{ rate }} uit op {{ expected }}. Gebruik dat bedrag, of geef de bedoelde wisselkoers op.",
     "selectionNotFound": "Een of meer van de geselecteerde effecten zijn niet gevonden",
     "comparisonSelectionEmpty": "Selecteer minstens één effect of marktindex om te vergelijken",
     "exchangeRateNotPositive": "De wisselkoers moet groter zijn dan nul"
