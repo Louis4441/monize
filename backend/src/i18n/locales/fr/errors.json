@@ -421,7 +421,9 @@
     "allocationExceedsTotal": "Les pourcentages de répartition dépassent 100 %.",
     "invalidTagKey": "Une clé d'étiquette (1 à 100 caractères) est requise",
     "assetOptionNameRequired": "Un nom de classe d'actifs est requis.",
-    "documentNotFound": "Document introuvable"
+    "documentNotFound": "Document introuvable",
+    "selectionNotFound": "Un ou plusieurs des titres sélectionnés sont introuvables",
+    "comparisonSelectionEmpty": "Sélectionnez au moins un titre ou un indice de marché à comparer"
   },
   "tags": {
     "notFound": "Étiquette avec l'ID {{ id }} introuvable",

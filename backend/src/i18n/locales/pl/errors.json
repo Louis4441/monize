@@ -421,7 +421,9 @@
     "allocationExceedsTotal": "Suma procentów alokacji przekracza 100%.",
     "invalidTagKey": "Wymagany jest klucz tagu (1–100 znaków)",
     "assetOptionNameRequired": "Nazwa klasy aktywów jest wymagana.",
-    "documentNotFound": "Nie znaleziono dokumentu"
+    "documentNotFound": "Nie znaleziono dokumentu",
+    "selectionNotFound": "Nie znaleziono jednego lub więcej wybranych papierów wartościowych",
+    "comparisonSelectionEmpty": "Wybierz co najmniej jeden papier wartościowy lub indeks giełdowy do porównania"
   },
   "tags": {
     "notFound": "Nie znaleziono tagu o ID {{ id }}",

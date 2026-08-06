@@ -421,7 +421,9 @@
     "allocationExceedsTotal": "Tổng tỷ lệ phân bổ vượt quá 100%.",
     "invalidTagKey": "Cần có khóa thẻ (1-100 ký tự)",
     "assetOptionNameRequired": "Cần có tên loại tài sản.",
-    "documentNotFound": "Không tìm thấy tài liệu"
+    "documentNotFound": "Không tìm thấy tài liệu",
+    "selectionNotFound": "Không tìm thấy một hoặc nhiều chứng khoán đã chọn",
+    "comparisonSelectionEmpty": "Chọn ít nhất một chứng khoán hoặc chỉ số thị trường để so sánh"
   },
   "tags": {
     "notFound": "Không tìm thấy thẻ với ID {{ id }}",

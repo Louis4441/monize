@@ -421,7 +421,9 @@
     "allocationExceedsTotal": "配置百分比總和超過 100%。",
     "invalidTagKey": "需要標籤鍵（1-100 個字元）",
     "assetOptionNameRequired": "需要填寫資產類別名稱。",
-    "documentNotFound": "找不到該文件"
+    "documentNotFound": "找不到該文件",
+    "selectionNotFound": "找不到所選證券中的一檔或多檔",
+    "comparisonSelectionEmpty": "請至少選擇一檔證券或一個市場指數進行比較"
   },
   "tags": {
     "notFound": "找不到 ID 為 {{ id }} 的標籤",

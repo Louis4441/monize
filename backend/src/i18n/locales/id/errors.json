@@ -421,7 +421,9 @@
     "allocationExceedsTotal": "Persentase alokasi berjumlah lebih dari 100%.",
     "invalidTagKey": "Kunci tag (1-100 karakter) diperlukan",
     "assetOptionNameRequired": "Nama kelas aset wajib diisi.",
-    "documentNotFound": "Dokumen tidak ditemukan"
+    "documentNotFound": "Dokumen tidak ditemukan",
+    "selectionNotFound": "Satu atau beberapa efek yang dipilih tidak ditemukan",
+    "comparisonSelectionEmpty": "Pilih setidaknya satu efek atau indeks pasar untuk dibandingkan"
   },
   "tags": {
     "notFound": "Tag dengan ID {{ id }} tidak ditemukan",
