@@ -5,12 +5,14 @@ import { Logger } from "@nestjs/common";
 const mockQuery = jest.fn();
 const mockConnect = jest.fn();
 const mockEnd = jest.fn();
+const mockOn = jest.fn();
 
 jest.mock("pg", () => ({
   Client: jest.fn().mockImplementation(() => ({
     connect: mockConnect,
     query: mockQuery,
     end: mockEnd,
+    on: mockOn,
   })),
 }));
 
@@ -85,6 +87,11 @@ describe("db-migrate runMigrations()", () => {
     existsSyncSpy.mockReturnValue(true);
     readdirSyncSpy.mockReturnValue([]);
     mockQuery
+      // The database-lifecycle advisory lock (lock_timeout, acquire, reset),
+      // taken first so only one process initializes or migrates at a time.
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
       .mockResolvedValueOnce(undefined) // CREATE TABLE
       .mockResolvedValueOnce({ rows: [] }); // SELECT applied
 
@@ -102,6 +109,11 @@ describe("db-migrate runMigrations()", () => {
       "002_add_users.sql",
     ] as any);
     mockQuery
+      // The database-lifecycle advisory lock (lock_timeout, acquire, reset),
+      // taken first so only one process initializes or migrates at a time.
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
       .mockResolvedValueOnce(undefined) // CREATE TABLE
       .mockResolvedValueOnce({
         rows: [{ filename: "001_init.sql" }, { filename: "002_add_users.sql" }],
@@ -129,6 +141,11 @@ describe("db-migrate runMigrations()", () => {
     });
 
     mockQuery
+      // The database-lifecycle advisory lock (lock_timeout, acquire, reset),
+      // taken first so only one process initializes or migrates at a time.
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
       .mockResolvedValueOnce(undefined) // CREATE TABLE schema_migrations
       .mockResolvedValueOnce({ rows: [] }) // SELECT applied (none)
       .mockResolvedValue(undefined); // All subsequent queries succeed
@@ -165,6 +182,11 @@ describe("db-migrate runMigrations()", () => {
     readFileSyncSpy.mockReturnValue("SELECT 1;");
 
     mockQuery
+      // The database-lifecycle advisory lock (lock_timeout, acquire, reset),
+      // taken first so only one process initializes or migrates at a time.
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
       .mockResolvedValueOnce(undefined) // CREATE TABLE
       .mockResolvedValueOnce({
         rows: [{ filename: "001_init.sql" }, { filename: "002_add_users.sql" }],
@@ -192,6 +214,11 @@ describe("db-migrate runMigrations()", () => {
     readFileSyncSpy.mockReturnValue("INVALID SQL;");
 
     mockQuery
+      // The database-lifecycle advisory lock (lock_timeout, acquire, reset),
+      // taken first so only one process initializes or migrates at a time.
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
       .mockResolvedValueOnce(undefined) // CREATE TABLE
       .mockResolvedValueOnce({ rows: [] }) // SELECT applied
       .mockResolvedValueOnce(undefined) // BEGIN
@@ -220,6 +247,11 @@ describe("db-migrate runMigrations()", () => {
     readFileSyncSpy.mockReturnValue("SELECT 1;");
 
     mockQuery
+      // The database-lifecycle advisory lock (lock_timeout, acquire, reset),
+      // taken first so only one process initializes or migrates at a time.
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
       .mockResolvedValueOnce(undefined) // CREATE TABLE
       .mockResolvedValueOnce({ rows: [] }) // SELECT applied
       .mockResolvedValueOnce(undefined) // BEGIN (001)
@@ -263,6 +295,11 @@ describe("db-migrate runMigrations()", () => {
     readFileSyncSpy.mockReturnValue("SELECT 1;");
 
     mockQuery
+      // The database-lifecycle advisory lock (lock_timeout, acquire, reset),
+      // taken first so only one process initializes or migrates at a time.
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [{}] })
       .mockResolvedValueOnce(undefined) // CREATE TABLE
       .mockResolvedValueOnce({ rows: [] }) // SELECT applied
       .mockResolvedValue(undefined); // All subsequent queries succeed
@@ -275,6 +312,66 @@ describe("db-migrate runMigrations()", () => {
       ["001_init.sql"],
     );
     expect(logSpy).toHaveBeenCalledWith("Applied 1 migration(s) successfully");
+  });
+
+  it("forwards Postgres notices to the logger", async () => {
+    // APP_ROLE_GRANTS_SQL reports an insufficient-privilege failure as RAISE
+    // WARNING, which pg delivers as a notice event. Without this handler the
+    // one path meant to make grants converge failed with zero log output.
+    existsSyncSpy.mockReturnValue(false);
+    const warnSpy = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+
+    try {
+      await runMigrations();
+
+      expect(mockOn).toHaveBeenCalledWith("notice", expect.any(Function));
+      const handler = mockOn.mock.calls.find((c) => c[0] === "notice")![1];
+      handler({
+        message: "Insufficient privilege to grant DML to role monize_app",
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Postgres: Insufficient privilege to grant DML to role monize_app",
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("acquires the lifecycle lock before reading the applied set", async () => {
+    // The lock exists to serialise check-then-act: reading which migrations
+    // are applied before the current holder finishes would replay its work.
+    existsSyncSpy.mockReturnValue(true);
+    readdirSyncSpy.mockReturnValue([] as any);
+    mockQuery.mockResolvedValue({ rows: [] });
+
+    await runMigrations();
+
+    const calls = mockQuery.mock.calls.map((c) => c[0] as string);
+    const lockAt = calls.findIndex((t) => t.includes("pg_advisory_lock"));
+    const appliedAt = calls.findIndex((t) =>
+      t.includes("SELECT filename FROM schema_migrations"),
+    );
+    expect(lockAt).toBeGreaterThan(-1);
+    expect(appliedAt).toBeGreaterThan(lockAt);
+  });
+
+  it("re-applies the runtime role grants after this boot's DDL", async () => {
+    // On a first boot this pass is what revokes the runtime role's writes on
+    // schema_migrations -- db-init granted before the table existed.
+    existsSyncSpy.mockReturnValue(true);
+    readdirSyncSpy.mockReturnValue(["001_init.sql"] as any);
+    readFileSyncSpy.mockReturnValue("CREATE TABLE t1();");
+    mockQuery.mockResolvedValue({ rows: [] });
+
+    await runMigrations();
+
+    const calls = mockQuery.mock.calls.map((c) => c[0] as string);
+    const commitAt = calls.lastIndexOf("COMMIT");
+    const grantsAt = calls.findIndex((t) =>
+      t.includes("GRANT USAGE ON SCHEMA public"),
+    );
+    expect(commitAt).toBeGreaterThan(-1);
+    expect(grantsAt).toBeGreaterThan(commitAt);
   });
 
   it("always closes the client connection", async () => {

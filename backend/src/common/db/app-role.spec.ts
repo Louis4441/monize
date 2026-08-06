@@ -6,6 +6,7 @@ import {
   APP_ROLE_NAME_GUC,
   APP_ROLE_PASSWORD_GUC,
   APP_ROLE_UPSERT_SQL,
+  applyAppRoleGrants,
   provisionAppRole,
   SqlClient,
 } from "./app-role";
@@ -185,6 +186,51 @@ describe("app-role SQL", () => {
     );
     expect(APP_ROLE_GRANTS_SQL).not.toMatch(/FOR ROLE/i);
   });
+
+  it("creates the role without any RLS-exempting attribute", () => {
+    // Already PostgreSQL's defaults; named so that a future edit adding
+    // SUPERUSER or BYPASSRLS has to delete an explicit NO.
+    for (const attribute of [
+      "NOSUPERUSER",
+      "NOBYPASSRLS",
+      "NOCREATEDB",
+      "NOCREATEROLE",
+      "NOREPLICATION",
+    ]) {
+      expect(APP_ROLE_UPSERT_SQL).toContain(attribute);
+    }
+  });
+
+  it("revokes the runtime role's access to migration bookkeeping", () => {
+    // The blanket "ALL TABLES IN SCHEMA public" grant includes
+    // schema_migrations, so runtime credentials could insert a filename (the next
+    // deployment then skips required DDL) or delete one (a migration body
+    // re-runs). No application code touches the table.
+    //
+    // Write privileges only: #1063 landed the revoke keeping SELECT, and this
+    // test used to assert REVOKE ALL because that is what the audit-03 branch
+    // wrote. The difference is read access to a ledger of filenames, which is not
+    // the thing being protected -- forging or deleting a row is -- so the merged
+    // narrower revoke stands and the assertion follows it.
+    expect(APP_ROLE_GRANTS_SQL).toMatch(
+      /REVOKE INSERT, UPDATE, DELETE ON public\.%I FROM %I/,
+    );
+    // Guarded on the table's existence: the grants run on every startup,
+    // including before the table has been created.
+    expect(APP_ROLE_GRANTS_SQL).toContain("relname = infra_table");
+  });
+
+  it("orders the revoke after the blanket grant", () => {
+    // A revoke that ran first would be undone by the grant that followed it.
+    const grantAt = APP_ROLE_GRANTS_SQL.indexOf(
+      "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES",
+    );
+    const revokeAt = APP_ROLE_GRANTS_SQL.indexOf(
+      "REVOKE INSERT, UPDATE, DELETE ON public.%I",
+    );
+    expect(grantAt).toBeGreaterThan(-1);
+    expect(revokeAt).toBeGreaterThan(grantAt);
+  });
 });
 
 /**
@@ -220,5 +266,47 @@ describe("runtime grant surface", () => {
     expect(APP_ROLE_GRANTS_SQL.indexOf("GRANT SELECT, INSERT")).toBeLessThan(
       APP_ROLE_GRANTS_SQL.indexOf("REVOKE"),
     );
+  });
+});
+
+/**
+ * The grants-only entry point db-migrate calls after its DDL. Untested when it
+ * shipped (PR #1076 review): the one path meant to make grants converge had no
+ * assertion that it converges anything.
+ */
+describe("applyAppRoleGrants", () => {
+  it("sets the role-name GUC parameterized, then applies the grants", async () => {
+    const { client, calls } = makeClient();
+
+    await applyAppRoleGrants(client, { appUser: "monize_app" });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toEqual({
+      text: "SELECT set_config($1, $2, false)",
+      params: [APP_ROLE_NAME_GUC, "monize_app"],
+    });
+    expect(calls[1].text).toBe(APP_ROLE_GRANTS_SQL);
+  });
+
+  it("defaults the role name to monize_app when appUser is unset", async () => {
+    const { client, calls } = makeClient();
+
+    await applyAppRoleGrants(client, { appUser: undefined });
+
+    expect(calls[0].params).toEqual([APP_ROLE_NAME_GUC, DEFAULT_APP_USER]);
+  });
+
+  it("never touches the role or its password", async () => {
+    // Grants-only on purpose: db-migrate has no password to offer, and a
+    // convergence pass that re-ran the upsert would rotate credentials as a
+    // side effect of replaying migrations.
+    const { client, calls } = makeClient();
+
+    await applyAppRoleGrants(client, { appUser: "monize_app" });
+
+    for (const call of calls) {
+      expect(call.text).not.toBe(APP_ROLE_UPSERT_SQL);
+      expect(call.params ?? []).not.toContain(APP_ROLE_PASSWORD_GUC);
+    }
   });
 });

@@ -134,6 +134,9 @@ describe("McpRelayTools", () => {
         "user-1",
         "p1",
         "looking up category",
+        // The calling session, so an agent that reconnected mid-prompt re-binds
+        // its relay turn instead of losing it to the old session id.
+        "s",
       );
     });
 

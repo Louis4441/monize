@@ -44,12 +44,13 @@ export class OAuthInteractionController {
       // the consent was already submitted). Render a friendly page
       // instead of bubbling SessionNotFound up to a 500.
       this.logger.log(
-        `interaction.render no live interaction (${(err as Error).name}: ${(err as Error).message}) — rendering completed page`,
+        `interaction.render uid=${req.params?.uid} no live interaction (${(err as Error).name}: ${(err as Error).message}) — rendering closed-window page`,
       );
-      this.respondWithCompletedPage(res);
+      this.respondWithStaleInteractionPage(res);
       return;
     }
     const { prompt, params, uid } = interaction;
+    if (this.redirectStalePage(req, res, uid, "render")) return;
     this.logger.log(
       `interaction.render uid=${uid} prompt=${prompt.name} client=${params.client_id} scope="${params.scope}"`,
     );
@@ -114,8 +115,7 @@ export class OAuthInteractionController {
             ? params.resource
             : this.providerService.getMcpResourceUrl(),
       });
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
+      this.setInteractionPageHeaders(res);
       res.send(html);
       return;
     }
@@ -135,13 +135,14 @@ export class OAuthInteractionController {
       // Duplicate / stale form submission (back button, double-click,
       // or claude.ai re-prompting after the first submit had already
       // succeeded). The interaction has been consumed; render a
-      // friendly "completed" page instead of a 500.
+      // friendly closed-window page instead of a 500.
       this.logger.log(
-        `interaction.confirm no live interaction (${(err as Error).name}: ${(err as Error).message}) — rendering completed page`,
+        `interaction.confirm uid=${req.params?.uid} no live interaction (${(err as Error).name}: ${(err as Error).message}) — rendering closed-window page`,
       );
-      this.respondWithCompletedPage(res);
+      this.respondWithStaleInteractionPage(res);
       return;
     }
+    if (this.redirectStalePage(req, res, interaction.uid, "confirm")) return;
     const { prompt, params, session } = interaction;
 
     if (prompt.name !== "consent") {
@@ -246,22 +247,95 @@ export class OAuthInteractionController {
       // Stale uid (back button, retry after the original abort already
       // landed). Render a friendly closed-window page instead of 500.
       this.logger.log(
-        `interaction.abort no live interaction (${(err as Error).name}: ${(err as Error).message}) — rendering completed page`,
+        `interaction.abort uid=${req.params?.uid} no live interaction (${(err as Error).name}: ${(err as Error).message}) — rendering closed-window page`,
       );
-      this.respondWithCompletedPage(res);
+      this.respondWithStaleInteractionPage(res);
     }
   }
 
-  private respondWithCompletedPage(res: Response): void {
+  /**
+   * The provider resolves the live interaction from the single `_interaction`
+   * cookie (pinned to path '/'), never from the page URL -- so when an MCP
+   * client fires a second authorization attempt (Claude retries reconnects),
+   * the cookie moves to the new attempt while an older consent page may still
+   * be on screen. Acting on the cookie's interaction from that stale page
+   * would silently complete a DIFFERENT attempt than the one the user
+   * reviewed, and the client is usually waiting on the newest attempt anyway.
+   * Detect the mismatch and send the browser to the live interaction's own
+   * page so the user approves the attempt that can actually finish.
+   *
+   * Returns true when a redirect was issued (the caller must stop). The uid
+   * param is absent only outside the real Express route (unit tests calling
+   * the handler directly); the guard is a self-heal, not an auth boundary --
+   * the session/account checks below remain the security checks.
+   */
+  private redirectStalePage(
+    req: Request,
+    res: Response,
+    liveUid: string,
+    phase: "render" | "confirm",
+  ): boolean {
+    const pageUid = req.params?.uid;
+    if (!pageUid || pageUid === liveUid) return false;
+    this.logger.log(
+      `interaction.${phase} page uid=${pageUid} superseded by live interaction ${liveUid} — redirecting to the live consent page`,
+    );
+    // 303 turns the stale form POST into a GET of the live page (PRG).
+    res.redirect(phase === "confirm" ? 303 : 302, this.consentUrlFor(liveUid));
+    return true;
+  }
+
+  private consentUrlFor(uid: string): string {
+    // Absolute URL for the same reverse-proxy reasons as interactions.url in
+    // oauth-provider.service.ts (Envoy can rewrite/drop relative redirects).
+    const base =
+      this.configService.get<string>("PUBLIC_APP_URL")?.replace(/\/$/, "") ??
+      "";
+    return `${base}/api/v1/oauth-consent/${encodeURIComponent(uid)}`;
+  }
+
+  /**
+   * Headers for the HTML pages this controller serves. The Content-Security-
+   * Policy REPLACES the app-wide Helmet policy on these responses, and it must:
+   * Helmet's defaults (merged under the global config) include
+   * `form-action 'self'`, and Chrome enforces form-action against EVERY hop of
+   * the redirect chain that follows a form submission. The Allow/Deny POST is
+   * answered with a 303 to the provider's /oauth/auth resume endpoint (self),
+   * which 303s again to the OAuth client's redirect_uri (cross-origin, e.g.
+   * claude.ai) carrying the authorization code. Under `form-action 'self'`
+   * Chrome silently cancels that final hop: the server logs
+   * authorization.success, the browser stays parked on the consent form, and
+   * the client never receives its code -- the connection "never completes"
+   * with nothing visibly wrong. So this page's policy allows the chain to end
+   * at any https origin (the redirect_uri is per-client and dynamic, so it
+   * cannot be enumerated statically); everything else stays locked down.
+   */
+  private setInteractionPageHeaders(res: Response): void {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; " +
+        "style-src 'unsafe-inline'; form-action 'self' https:",
+    );
+  }
+
+  /**
+   * Rendered when the page's interaction no longer exists. That covers both a
+   * harmless duplicate submit after a success AND a superseded/expired attempt
+   * whose client is still waiting -- the copy must not claim success, or the
+   * waiting case reads as done and the user never retries (the connection then
+   * "never completes"). Say what is knowable and give the retry path.
+   */
+  private respondWithStaleInteractionPage(res: Response): void {
+    this.setInteractionPageHeaders(res);
     res.status(200).send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>Authorization complete — Monize</title>
+<title>Authorization window closed — Monize</title>
 <style>
   :root {
     --bg: #f8fafc; --card: #ffffff; --text: #0f172a;
@@ -287,8 +361,9 @@ export class OAuthInteractionController {
 <body>
   <main class="card">
     <div class="brand">Monize</div>
-    <h1>This authorization is already complete</h1>
-    <p>You can safely close this window and return to the application that requested access.</p>
+    <h1>This authorization window is no longer active</h1>
+    <p>The sign-in attempt this window belonged to has already finished or expired.</p>
+    <p style="margin-top:12px">If the application that requested access now shows Monize as connected, you are done — close this window. If it is still waiting, close this window and start the connection again from that application; a fresh approval prompt will appear.</p>
   </main>
 </body>
 </html>`);

@@ -1,3 +1,29 @@
+import type { AiRelayService } from "../ai/relay/ai-relay.service";
+import type { PendingAiAction } from "../ai/actions/ai-action.types";
+import { currentMcpSessionId } from "./mcp-session-context";
+
+/**
+ * The ONE way an MCP write tool offers its confirmation card to the web chat.
+ *
+ * Returns true when the relay took the card (it is shown in the browser and
+ * committed via `/ai/actions/confirm` on approval, so the tool must NOT write);
+ * false when this call is not part of a relay turn, so the tool falls back to
+ * `confirmWrite` in the calling MCP client.
+ *
+ * Tools must not call `relayService.emitPendingAction` directly: the decision
+ * depends on the *calling session*, which lives in the ambient MCP session
+ * context, and a call site that forgets to pass it sends a direct client's
+ * confirmation to a web chat nobody is watching. `mcp-relay-confirm.spec.ts`
+ * scans the tool sources and fails on a direct call.
+ */
+export function emitRelayCard(
+  relayService: AiRelayService,
+  userId: string,
+  action: PendingAiAction,
+): boolean {
+  return relayService.emitPendingAction(userId, action, currentMcpSessionId());
+}
+
 /**
  * LLM-facing result returned by an MCP write tool when it is serving a relayed
  * browser prompt and has handed the confirmation off to the web chat as a

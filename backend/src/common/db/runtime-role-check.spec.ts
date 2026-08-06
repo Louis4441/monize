@@ -1,9 +1,12 @@
 import {
   FORBIDDEN_ROLE_MEMBERSHIPS,
   KNOWN_SAFE_PREDEFINED_ROLES,
+  NAMED_ROLE_FACTS_SQL,
   RUNTIME_ROLE_FACTS_SQL,
   RuntimeRoleFacts,
   assertRuntimeRoleSafe,
+  assertRuntimeRoleSafeByName,
+  readNamedRoleFacts,
   readRuntimeRoleFacts,
   runtimeRoleViolations,
 } from "./runtime-role-check";
@@ -527,6 +530,127 @@ describe("assertRuntimeRoleSafe", () => {
         },
       ),
     ).rejects.toThrow(/owns this database/);
+  });
+});
+
+describe("the named-role facts query", () => {
+  it("is the connection query with only the subject swapped", () => {
+    // One template, two subjects. This is the guard against the defect the
+    // PR #1076 review found: a second, hand-written role-safety query beside
+    // this one warned on attributes this one refuses, so the pre-flight and
+    // the runtime check gave opposite answers about the same role. Deriving
+    // both from one template makes that state unrepresentable; this assertion
+    // fails if either query grows an edit of its own.
+    expect(NAMED_ROLE_FACTS_SQL).toBe(
+      RUNTIME_ROLE_FACTS_SQL.replace(
+        "r.rolname = current_user",
+        "r.rolname = $1",
+      ),
+    );
+  });
+
+  it("asks about the named role, not the connection", () => {
+    expect(NAMED_ROLE_FACTS_SQL).toContain("WHERE r.rolname = $1");
+    expect(NAMED_ROLE_FACTS_SQL).not.toContain("r.rolname = current_user");
+  });
+});
+
+describe("readNamedRoleFacts", () => {
+  it("passes the role name as a parameter and reads the same facts", async () => {
+    const querier = arrayQuerier(SAFE_ROW);
+
+    await expect(readNamedRoleFacts(querier, "monize_app")).resolves.toEqual(
+      SAFE,
+    );
+    expect(querier.query).toHaveBeenCalledWith(NAMED_ROLE_FACTS_SQL, [
+      "monize_app",
+    ]);
+  });
+
+  it("reads the { rows } result shape pg returns", async () => {
+    await expect(
+      readNamedRoleFacts(pgQuerier(SAFE_ROW), "monize_app"),
+    ).resolves.toEqual(SAFE);
+  });
+
+  it("returns null when no such role exists", async () => {
+    // For the named question a missing row is an answer ("no such role"), not
+    // a failed catalog read -- the caller owns the refusal message.
+    await expect(
+      readNamedRoleFacts({ query: jest.fn().mockResolvedValue([]) }, "ghost"),
+    ).resolves.toBeNull();
+  });
+});
+
+describe("assertRuntimeRoleSafeByName", () => {
+  it("accepts a safe role and defaults the name to monize_app", async () => {
+    const querier = arrayQuerier(SAFE_ROW);
+
+    await expect(
+      assertRuntimeRoleSafeByName(querier, { appUser: undefined }),
+    ).resolves.toBeUndefined();
+    expect(querier.query).toHaveBeenCalledWith(NAMED_ROLE_FACTS_SQL, [
+      "monize_app",
+    ]);
+  });
+
+  it("refuses to start when the configured role does not exist", async () => {
+    await expect(
+      assertRuntimeRoleSafeByName(
+        { query: jest.fn().mockResolvedValue([]) },
+        { appUser: "monize_app" },
+      ),
+    ).rejects.toThrow(/requires the runtime role 'monize_app' to exist/);
+  });
+
+  it.each([
+    ["a superuser", { rolsuper: true }],
+    ["a BYPASSRLS role", { rolbypassrls: true }],
+    ["a CREATEDB role", { rolcreatedb: true }],
+    ["a CREATEROLE role", { rolcreaterole: true }],
+    ["a REPLICATION role", { rolreplication: true }],
+    ["the database owner", { owns_database: true }],
+    ["an owner of policied tables", { owned_policied_tables: "2" }],
+    ["an inherited owner", { inherited_owner_roles: ["monize"] }],
+    [
+      "a forbidden predefined-role member",
+      { inherited_forbidden_roles: ["pg_execute_server_program"] },
+    ],
+    [
+      "a role with an exempt reachable context",
+      { exempt_reachable_contexts: ["monize"] },
+    ],
+  ])(
+    "gives the same verdict as the runtime check on %s",
+    async (_label, override) => {
+      // The regression the PR #1076 review names: the pre-flight this replaces
+      // classified CREATEDB/CREATEROLE/REPLICATION as warnings while the
+      // runtime check refuses them, so db-init blessed a role that main.ts then
+      // refused. Same facts, same violations function, same verdict -- both
+      // must reject every one of these, and both must accept the safe row.
+      const row = { ...SAFE_ROW, ...override };
+
+      await expect(
+        assertRuntimeRoleSafeByName(arrayQuerier(row), {
+          appUser: "monize_app",
+        }),
+      ).rejects.toThrow(/RLS_MODE=enforce requires an unprivileged/);
+      await expect(
+        assertRuntimeRoleSafe(arrayQuerier(row), {
+          mode: "enforce",
+          appUser: "monize_app",
+        }),
+      ).rejects.toThrow(/RLS_MODE=enforce requires an unprivileged/);
+    },
+  );
+
+  it("names every problem at once rather than one per restart", async () => {
+    await expect(
+      assertRuntimeRoleSafeByName(
+        arrayQuerier({ ...SAFE_ROW, rolsuper: true, owns_database: true }),
+        { appUser: "monize_app" },
+      ),
+    ).rejects.toThrow(/SUPERUSER[\s\S]*owns this database/);
   });
 });
 

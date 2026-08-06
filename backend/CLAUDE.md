@@ -153,6 +153,19 @@ grew a column selects more than one row now; a query still written against the
 old key returns whichever the database offers first. Grep for reads of a
 unique key in the migration that widens it.
 
+## One classifier decides whether a database role is safe
+
+`common/db/runtime-role-check.ts` owns the question "may this role serve
+enforced traffic": one facts query template, one violation list, one verdict.
+Every surface that asks goes through its exports -- `main.ts` about its own
+connection (`assertRuntimeRoleSafe`), `db-init` about the configured role by
+name (`assertRuntimeRoleSafeByName`). Do not write a second role-safety query:
+a hand-written copy in `app-role.ts` once warned on CREATEDB/CREATEROLE/
+REPLICATION where the original refuses them, so the pre-flight blessed a role
+the runtime check then rejected (PR #1076). `runtime-role-check.spec.ts` pins
+the two exported queries to one template ("only the subject swapped") and the
+two asserts to one verdict per input.
+
 ## A read about somebody else needs somebody else's identity
 
 `users_self` exposes exactly two rows to a session: `app_current_user_id()` and
@@ -287,6 +300,18 @@ for itself and the entrypoint just runs the steps.
 any pre-boot script.
 
 ## OAuth / OIDC provider
+
+**A page whose form submission must redirect off-origin needs its own CSP.**
+Helmet's app-wide policy merges in the default `form-action 'self'`, and Chrome
+enforces `form-action` against every redirect hop that follows a form submit --
+so the OAuth consent page's Allow/Deny POST (303 to `/oauth/auth` resume, 303 to
+the client's `redirect_uri` with the code) is silently cancelled on the final,
+cross-origin hop. The server logs `authorization.success`, the browser stays
+parked on the consent form, and the MCP client never receives its code. The
+interaction controller therefore sets a per-page policy with
+`form-action 'self' https:` (`setInteractionPageHeaders`); the redirect_uri is
+per-client and dynamic, so it cannot be enumerated. Do not "fix" this by
+loosening the global Helmet `form-action` -- only this page needs it.
 
 `node-oidc-provider` prints its own `oidc-provider NOTICE:`/`WARNING:` lines with bare `console.info`/`console.warn`, outside the Nest `Logger`. The library exposes no logger hook, so `oauth/oidc-provider-log-bridge.ts` -- installed at the top of `main.ts`, before anything can instantiate the provider -- re-routes exactly those lines to a `[OidcProvider]` logger and passes any other console output through untouched. That fixes the formatting only: every such notice still means a config option was left at its default, so fix the config rather than treating the bridge as the answer. In particular, `ttl` needs an explicit number for every artifact the provider can issue (`AccessToken`, `AuthorizationCode`, `IdToken`, `RefreshToken`, `Grant`, `Interaction`, `Session`); the guard test in `src/oauth/oauth-provider.service.spec.ts` fails when one is missing.
 

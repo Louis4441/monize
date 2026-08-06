@@ -108,8 +108,30 @@ Checklist for a new tool:
      `AiRelayService.emitPendingAction(userId, action)`. If it returns `true`,
      the approve/reject card is shown in the browser and committed via
      `/ai/actions/confirm` on approval -- return `RELAY_PREVIEW_SHOWN` and do
-     NOT write or `confirmWrite`. If it returns `false` (no in-flight relay
-     prompt), fall through to `confirmWrite` as above.
+     NOT write or `confirmWrite`. If it returns `false` (no relay turn for this
+     session), fall through to `confirmWrite` as above.
+
+## A relay turn belongs to one MCP session, for a bounded time
+
+The same user can have two MCP sessions at once -- the agent running the
+web-chat relay loop, and a direct client (Claude Desktop) they are typing at.
+Only one of them is serving a browser prompt, so **"does this write belong to
+the web chat" is a question about the calling session, not about the user**.
+
+- Emit a card with `emitRelayCard(this.relayService, userId, action)`
+  (`mcp-relay-confirm.ts`), never `relayService.emitPendingAction` directly:
+  the helper supplies the ambient MCP session id that the decision depends on.
+  `mcp-relay-confirm.spec.ts` scans the tool sources and fails on a direct call.
+- A relay turn is a prompt **claimed by this session** (`waitForPrompt` records
+  `claimedBy`), or one of its claims that timed out within the late-answer
+  retention window. It is not connection liveness, not user-wide, and not
+  unbounded in time. Each of those three was tried and each routed a direct
+  client's confirmation into a web chat nobody was watching -- the worst
+  version being user-wide + unbounded, where a single abandoned web-chat turn
+  captured every direct write the user made afterwards, permanently.
+- Liveness is session-scoped for the same reason: a direct client's tool calls
+  are not evidence that some other session's agent is still working, and
+  treating them as such kept dead relay prompts alive indefinitely.
 6. Update `mcp-server.service.ts` count and `mcp.module.ts` if it's a new
    provider class.
 7. Add/extend tests (below). `mcp-annotations.spec.ts` enforces that every tool
