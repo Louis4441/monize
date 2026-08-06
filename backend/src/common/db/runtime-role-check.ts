@@ -242,8 +242,18 @@ const FORBIDDEN_MEMBERSHIP_ARRAY = `ARRAY[${FORBIDDEN_ROLE_MEMBERSHIPS.map(
  * One round trip. `pg_roles` is world-readable, `pg_database.datdba` and
  * `pg_class.relowner` likewise, so an unprivileged role can answer all of this
  * about itself -- no elevated grant is needed to run the check.
+ *
+ * One template, two subjects. The same facts are asked about the connection's
+ * own role (`current_user` -- `main.ts`, on the connection that will serve
+ * requests) and about the configured role by name (`$1` -- db-init's
+ * pre-flight, asked as the owner before the runtime ever connects). Both
+ * instantiations come from this single template so the two checks cannot
+ * classify the same role differently: a second, hand-written safety query once
+ * warned on attributes this one refuses (PR #1076), and near-identical checks
+ * that give opposite answers are worse than either answer alone.
  */
-export const RUNTIME_ROLE_FACTS_SQL = `
+function roleFactsSql(subject: "current_user" | "$1"): string {
+  return `
 WITH protected_owners AS (
   -- The roles that own an RLS-enabled public table. Collected once: the
   -- reachable-context arm below asks a pg_has_role question per owner per
@@ -260,7 +270,7 @@ forbidden_roles AS (
   -- means a build where one is absent simply yields fewer rows, never an error.
   SELECT oid FROM pg_roles WHERE rolname = ANY(${FORBIDDEN_MEMBERSHIP_ARRAY})
 )
-SELECT current_user AS current_user_name,
+SELECT r.rolname::text AS current_user_name,
        ${FORBIDDEN_ATTR_DIRECT_COLUMNS},
        (d.datdba = r.oid) AS owns_database,
        (SELECT count(*)
@@ -331,8 +341,21 @@ SELECT current_user AS current_user_name,
          AS inherited_forbidden_roles
   FROM pg_roles r
   JOIN pg_database d ON d.datname = current_database()
- WHERE r.rolname = current_user
+ WHERE r.rolname = ${subject}
 `.trim();
+}
+
+/**
+ * The connection interrogating itself. Takes no parameters, which keeps it
+ * runnable through `psql` for the live checks.
+ */
+export const RUNTIME_ROLE_FACTS_SQL = roleFactsSql("current_user");
+
+/**
+ * The same facts about a role named by parameter -- db-init's pre-flight of the
+ * configured `DATABASE_APP_USER`, asked over the owner connection.
+ */
+export const NAMED_ROLE_FACTS_SQL = roleFactsSql("$1");
 
 interface RawFactRow {
   current_user_name?: string;
@@ -380,18 +403,9 @@ function firstRow(result: unknown): RawFactRow | undefined {
   return undefined;
 }
 
-export async function readRuntimeRoleFacts(
-  querier: RuntimeRoleQuerier,
-): Promise<RuntimeRoleFacts> {
-  const row = firstRow(await querier.query(RUNTIME_ROLE_FACTS_SQL));
-  if (!row?.current_user_name) {
-    throw new Error(
-      "RLS_MODE=enforce: could not read the runtime role's attributes from " +
-        "pg_roles. Refusing to start rather than assume the role is safe.",
-    );
-  }
+function factsFromRow(row: RawFactRow, currentUser: string): RuntimeRoleFacts {
   return {
-    currentUser: row.current_user_name,
+    currentUser,
     directForbiddenAttributes: FORBIDDEN_RUNTIME_ATTRIBUTES.filter(
       (a) => !!row[a.column],
     ).map((a) => a.label),
@@ -401,6 +415,37 @@ export async function readRuntimeRoleFacts(
     inheritedOwnerRoles: toRoleNames(row.inherited_owner_roles),
     inheritedForbiddenRoles: toRoleNames(row.inherited_forbidden_roles),
   };
+}
+
+export async function readRuntimeRoleFacts(
+  querier: RuntimeRoleQuerier,
+): Promise<RuntimeRoleFacts> {
+  const row = firstRow(await querier.query(RUNTIME_ROLE_FACTS_SQL));
+  if (!row?.current_user_name) {
+    // `current_user` always exists, so an empty answer is a failed catalog
+    // read, not a missing role.
+    throw new Error(
+      "RLS_MODE=enforce: could not read the runtime role's attributes from " +
+        "pg_roles. Refusing to start rather than assume the role is safe.",
+    );
+  }
+  return factsFromRow(row, row.current_user_name);
+}
+
+/**
+ * The same facts, asked about a role by name rather than about the connection.
+ * Returns null when no such role exists -- for the named question that is an
+ * answer rather than a read failure, and the caller owns the refusal message.
+ */
+export async function readNamedRoleFacts(
+  querier: RuntimeRoleQuerier,
+  roleName: string,
+): Promise<RuntimeRoleFacts | null> {
+  const row = firstRow(await querier.query(NAMED_ROLE_FACTS_SQL, [roleName]));
+  if (!row?.current_user_name) {
+    return null;
+  }
+  return factsFromRow(row, row.current_user_name);
 }
 
 /**
@@ -506,21 +551,53 @@ export async function assertRuntimeRoleSafe(
 
   const expectedRole = appUser || DEFAULT_APP_USER;
   const facts = await readRuntimeRoleFacts(querier);
-  const violations = runtimeRoleViolations(facts, expectedRole);
-  if (violations.length > 0) {
-    // Generated from the forbidden list so it cannot omit an attribute the check
-    // enforces -- RR6-003, where the hand-written sentence had dropped
-    // NOREPLICATION and an operator following it would rebuild an unsafe role.
-    const noAttributes = FORBIDDEN_RUNTIME_ATTRIBUTES.map(
-      (a) => `NO${a.label}`,
-    ).join(" ");
+  throwOnViolations(runtimeRoleViolations(facts, expectedRole));
+  return facts;
+}
+
+/** One refusal message for both asserts, so the wording cannot drift. */
+function throwOnViolations(violations: string[]): void {
+  if (violations.length === 0) return;
+  // Generated from the forbidden list so it cannot omit an attribute the check
+  // enforces -- RR6-003, where the hand-written sentence had dropped
+  // NOREPLICATION and an operator following it would rebuild an unsafe role.
+  const noAttributes = FORBIDDEN_RUNTIME_ATTRIBUTES.map(
+    (a) => `NO${a.label}`,
+  ).join(" ");
+  throw new Error(
+    "RLS_MODE=enforce requires an unprivileged, non-owner runtime role, " +
+      `but ${violations.join("; ")}. ` +
+      `Point DATABASE_APP_USER at a role created with ${noAttributes} that ` +
+      "owns no application object and is a member of no privileged role, " +
+      "or set RLS_MODE=shadow until it is provisioned.",
+  );
+}
+
+/**
+ * db-init's pre-flight of the same contract: the same facts template, the same
+ * violation list, the same verdict as `assertRuntimeRoleSafe` -- asked as the
+ * owner about the configured role by name, before the runtime ever connects as
+ * it. Call it only under `RLS_MODE=enforce`; at `off`/`shadow` the runtime is
+ * the owner by design and the configured role may be unused.
+ *
+ * The check on the serving connection (`main.ts`) stays authoritative -- it
+ * sees the session as it actually is. This one exists to stop the boot in
+ * db-init, where the operator reads the first error of a failed rollout,
+ * instead of three processes later.
+ */
+export async function assertRuntimeRoleSafeByName(
+  querier: RuntimeRoleQuerier,
+  { appUser }: { appUser: string | undefined },
+): Promise<void> {
+  const expectedRole = appUser || DEFAULT_APP_USER;
+  const facts = await readNamedRoleFacts(querier, expectedRole);
+  if (!facts) {
     throw new Error(
-      "RLS_MODE=enforce requires an unprivileged, non-owner runtime role, " +
-        `but ${violations.join("; ")}. ` +
-        `Point DATABASE_APP_USER at a role created with ${noAttributes} that ` +
-        "owns no application object and is a member of no privileged role, " +
-        "or set RLS_MODE=shadow until it is provisioned.",
+      `RLS_MODE=enforce requires the runtime role '${expectedRole}' to exist, ` +
+        "and it does not. Set DATABASE_APP_PASSWORD so it can be provisioned, " +
+        "create it declaratively (CNPG spec.managed.roles), or use " +
+        "RLS_MODE=shadow/off.",
     );
   }
-  return facts;
+  throwOnViolations(runtimeRoleViolations(facts, expectedRole));
 }

@@ -274,6 +274,16 @@ export async function runMigrations() {
     database: process.env.DATABASE_NAME,
   });
 
+  // Surface Postgres NOTICE/WARNING messages, exactly as db-init does. The
+  // grants convergence below reports its failures this way (the DO block
+  // degrades insufficient_privilege to RAISE WARNING), so without this handler
+  // the one path meant to make grants converge would fail with zero log output.
+  client.on("notice", (msg) => {
+    if (msg?.message) {
+      logger.warn(`Postgres: ${msg.message}`);
+    }
+  });
+
   try {
     await client.connect();
 
@@ -376,11 +386,13 @@ export async function runMigrations() {
       logger.log("Database is up to date; no pending migrations");
     }
 
-    // Converge the runtime role's grants now that the DDL has run. db-init
-    // granted before these migrations existed, so an object a migration creates
-    // in this very boot -- and whose EXECUTE it revokes from PUBLIC -- would be
-    // ungranted until the next restart. Unconditional: cheap, idempotent, and
-    // running it only when `count > 0` would miss a database repaired by hand.
+    // Converge the runtime role's grants now that this boot's DDL has run. On a
+    // first boot this is the pass that takes effect: db-init's grants ran
+    // before schema.sql created schema_migrations, so the write-revoke on the
+    // ledger was skipped and the default privileges handed the runtime role
+    // INSERT/UPDATE/DELETE on it -- this call takes those writes back (see
+    // applyAppRoleGrants). Unconditional: cheap, idempotent, and running it
+    // only when `count > 0` would miss a database repaired by hand.
     await applyAppRoleGrants(client, {
       appUser: process.env.DATABASE_APP_USER,
     });

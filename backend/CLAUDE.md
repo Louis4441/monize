@@ -153,6 +153,19 @@ grew a column selects more than one row now; a query still written against the
 old key returns whichever the database offers first. Grep for reads of a
 unique key in the migration that widens it.
 
+## One classifier decides whether a database role is safe
+
+`common/db/runtime-role-check.ts` owns the question "may this role serve
+enforced traffic": one facts query template, one violation list, one verdict.
+Every surface that asks goes through its exports -- `main.ts` about its own
+connection (`assertRuntimeRoleSafe`), `db-init` about the configured role by
+name (`assertRuntimeRoleSafeByName`). Do not write a second role-safety query:
+a hand-written copy in `app-role.ts` once warned on CREATEDB/CREATEROLE/
+REPLICATION where the original refuses them, so the pre-flight blessed a role
+the runtime check then rejected (PR #1076). `runtime-role-check.spec.ts` pins
+the two exported queries to one template ("only the subject swapped") and the
+two asserts to one verdict per input.
+
 ## A read about somebody else needs somebody else's identity
 
 `users_self` exposes exactly two rows to a session: `app_current_user_id()` and
