@@ -35,9 +35,24 @@ describe("GemPriceService", () => {
   describe("loadSeries", () => {
     it("groups daily closes per security, oldest first", async () => {
       manager.query.mockResolvedValue([
-        { security_id: "sec-a", price_date: "2025-01-02", close_price: "10.5" },
-        { security_id: "sec-a", price_date: "2025-01-03", close_price: "11" },
-        { security_id: "sec-b", price_date: "2025-01-03", close_price: "20" },
+        {
+          series_id: "sec-a",
+          price_date: "2025-01-02",
+          close_price: "10.5",
+          has_adjusted: false,
+        },
+        {
+          series_id: "sec-a",
+          price_date: "2025-01-03",
+          close_price: "11",
+          has_adjusted: false,
+        },
+        {
+          series_id: "sec-b",
+          price_date: "2025-01-03",
+          close_price: "20",
+          has_adjusted: false,
+        },
       ]);
 
       const series = await service.loadSeries(
@@ -99,8 +114,18 @@ describe("GemPriceService", () => {
 
     it("thins long ranges to one close per bucket and sorts ascending", async () => {
       manager.query.mockResolvedValue([
-        { security_id: "sec-a", price_date: "2025-02-28", close_price: "12" },
-        { security_id: "sec-a", price_date: "2025-01-31", close_price: "11" },
+        {
+          series_id: "sec-a",
+          price_date: "2025-02-28",
+          close_price: "12",
+          has_adjusted: true,
+        },
+        {
+          series_id: "sec-a",
+          price_date: "2025-01-31",
+          close_price: "11",
+          has_adjusted: true,
+        },
       ]);
 
       const series = await service.loadSeries(
