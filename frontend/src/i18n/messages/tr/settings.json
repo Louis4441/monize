@@ -589,6 +589,8 @@
       "description": "Başka bir kişiye hesaplarınıza kapsamlı erişim verin.",
       "emailLabel": "E-posta",
       "emailPlaceholder": "Temsilci e-postası",
+      "checkingEmail": "Bu e-posta mevcut Monize hesaplarıyla karşılaştırılıyor…",
+      "retryEmailCheck": "Yeniden denetle",
       "firstNameLabel": "Ad",
       "firstNamePlaceholder": "Ad (isteğe bağlı)",
       "lastNameLabel": "Soyad",
@@ -624,7 +626,8 @@
       "createFailed": "Temsilci oluşturulamadı",
       "revokeFailed": "Temsilci iptal edilemedi",
       "resetPasswordFailed": "Şifre sıfırlanamadı",
-      "copyFailed": "Panoya kopyalanamadı"
+      "copyFailed": "Panoya kopyalanamadı",
+      "lookupFailed": "Bu e-posta mevcut Monize hesaplarıyla karşılaştırılamadı. Mevcut bir parolanın yanlışlıkla üzerine yazılmaması için, bu denetim başarılı olana kadar temsilci ekleme duraklatıldı."
     },
     "jointLabel": "{count, plural, other {# ortak hesap}}"
   },

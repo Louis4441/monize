@@ -16,6 +16,10 @@ import {
   ObjectLiteral,
 } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import {
+  withDelegateContext,
+  withSystemContext,
+} from "../common/db/with-context";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 
@@ -137,6 +141,39 @@ export class DelegationService {
     );
   }
 
+  /**
+   * The `scoped()` sibling for work that is cross-user by construction: an
+   * owner managing a delegate touches *that person's* `users` row, and
+   * `users_self` only ever exposes `id = app_current_user_id()` or
+   * `id = app_real_user_id()`. From the owner's session the delegate's row is
+   * therefore invisible, and under enforcement the read returns zero rows --
+   * which is indistinguishable from "no such user". That is not hypothetical:
+   * the Add-delegate email lookup reported an existing Monize account as new,
+   * `listDelegates` rendered every delegate with a blank name and email, and
+   * `revokeDelegate` concluded a full account owned nothing.
+   *
+   * The bypass is fenced by convention, not by the type system, so each caller
+   * must hold to both halves:
+   *
+   *  1. **Authorization is decided before it opens.** The owner's own
+   *     `account_delegates` row -- read under `scoped()`, where the policy
+   *     still applies -- is what proves the relationship. Never open this over
+   *     a request value that has not been checked against one.
+   *  2. **Only the minimum leaves.** A boolean, a display label, or the
+   *     credential fields the owner is entitled to rotate. Never a `User`
+   *     entity straight out to a caller.
+   *
+   * Delegate-side reads of the *owner's* rows do NOT belong here: the delegate
+   * is a real identity the policies already understand, so those use
+   * `withDelegateContext` and take no bypass at all.
+   */
+  private systemScoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withSystemContext(() => this.scoped(entity, fn));
+  }
+
   // --- Context resolution (used by JwtStrategy and the guard) ---
 
   /**
@@ -200,29 +237,47 @@ export class DelegationService {
     ownerUserId: string,
     delegateUserId: string,
   ): Promise<boolean> {
-    const [owner, ownerPref] = await Promise.all([
-      this.scoped(User, (repo) => repo.findOne({ where: { id: ownerUserId } })),
-      this.scoped(UserPreference, (repo) =>
-        repo.findOne({ where: { userId: ownerUserId } }),
-      ),
-    ]);
-    const ownerRequires2FA = !!(
-      ownerPref?.twoFactorEnabled && owner?.twoFactorSecret
-    );
-    if (!ownerRequires2FA) return false;
+    // Spans two identities on purpose, so it must be read under both. Only
+    // `validateActingContext` already runs in a delegate context; the two
+    // own-session callers (`getAvailableContexts`, `resolveSwitchTarget`) are
+    // the delegate deciding whether they may switch, and there the owner's
+    // `users`/`user_preferences` rows are outside their own scope. Left
+    // scoped to the caller, `owner` and `ownerPref` came back null under
+    // enforcement, `ownerRequires2FA` was false, and the gate this method
+    // exists to impose waved every delegate straight through.
+    //
+    // `withDelegateContext` -- not a bypass: current = owner, real = delegate
+    // is exactly the identity `users_self` and `user_preferences_isolation`
+    // were written for, and it makes both sides visible without one. Callers
+    // have already established the active delegation that makes the pairing
+    // real, and only the boolean leaves.
+    return withDelegateContext(ownerUserId, delegateUserId, async () => {
+      const [owner, ownerPref] = await Promise.all([
+        this.scoped(User, (repo) =>
+          repo.findOne({ where: { id: ownerUserId } }),
+        ),
+        this.scoped(UserPreference, (repo) =>
+          repo.findOne({ where: { userId: ownerUserId } }),
+        ),
+      ]);
+      const ownerRequires2FA = !!(
+        ownerPref?.twoFactorEnabled && owner?.twoFactorSecret
+      );
+      if (!ownerRequires2FA) return false;
 
-    const [delegate, delegatePref] = await Promise.all([
-      this.scoped(User, (repo) =>
-        repo.findOne({ where: { id: delegateUserId } }),
-      ),
-      this.scoped(UserPreference, (repo) =>
-        repo.findOne({ where: { userId: delegateUserId } }),
-      ),
-    ]);
-    const delegateHas2FA = !!(
-      delegatePref?.twoFactorEnabled && delegate?.twoFactorSecret
-    );
-    return !delegateHas2FA;
+      const [delegate, delegatePref] = await Promise.all([
+        this.scoped(User, (repo) =>
+          repo.findOne({ where: { id: delegateUserId } }),
+        ),
+        this.scoped(UserPreference, (repo) =>
+          repo.findOne({ where: { userId: delegateUserId } }),
+        ),
+      ]);
+      const delegateHas2FA = !!(
+        delegatePref?.twoFactorEnabled && delegate?.twoFactorSecret
+      );
+      return !delegateHas2FA;
+    });
   }
 
   /** True if the user is a delegate for at least one owner. */
@@ -479,7 +534,6 @@ export class DelegationService {
     const allDelegations = await this.scoped(AccountDelegate, (repo) =>
       repo.find({
         where: { delegateUserId: user.id, status: "active" },
-        relations: ["owner"],
       }),
     );
 
@@ -531,7 +585,8 @@ export class DelegationService {
     for (const d of delegations) {
       contexts.push({
         userId: d.ownerUserId,
-        label: d.owner ? this.userLabel(d.owner) : d.ownerUserId,
+        label:
+          (await this.ownerLabelFor(d.ownerUserId, user.id)) ?? d.ownerUserId,
         isSelf: false,
         ownerHas2FA: await this.delegateMustEnrollOwn2FA(
           d.ownerUserId,
@@ -581,6 +636,32 @@ export class DelegationService {
     return name || user.email || user.id;
   }
 
+  /**
+   * The display label for an owner the delegate may act as. This used to ride
+   * along as `relations: ["owner"]`, which under enforcement joined to nothing
+   * -- the owner's `users` row is outside the delegate's own session -- and the
+   * context switcher fell back to printing a raw UUID at the delegate.
+   *
+   * Read under the delegation identity rather than a bypass, and only after
+   * the caller has established an active delegation between the two. Returns
+   * null when the row is genuinely unreadable, so the caller keeps its own
+   * fallback instead of receiving an empty label that looks deliberate.
+   */
+  private async ownerLabelFor(
+    ownerUserId: string,
+    delegateUserId: string,
+  ): Promise<string | null> {
+    const owner = await withDelegateContext(ownerUserId, delegateUserId, () =>
+      this.scoped(User, (repo) =>
+        repo.findOne({
+          where: { id: ownerUserId },
+          select: ["id", "firstName", "lastName", "email"],
+        }),
+      ),
+    );
+    return owner ? this.userLabel(owner) : null;
+  }
+
   // --- Owner-facing management ---
 
   /**
@@ -590,19 +671,29 @@ export class DelegationService {
    * that person's own login, not an owner-provisioned credential).
    */
   async isFullAccount(userId: string): Promise<boolean> {
-    const [ownsAccounts, ownsDelegations, user] = await Promise.all([
-      this.scoped(Account, (repo) => repo.count({ where: { userId } })),
-      this.scoped(AccountDelegate, (repo) =>
-        repo.count({ where: { ownerUserId: userId } }),
-      ),
-      this.scoped(User, (repo) =>
-        repo.findOne({
-          where: { id: userId },
-          select: ["id", "role"],
-        }),
-      ),
-    ]);
-    return ownsAccounts > 0 || ownsDelegations > 0 || user?.role === "admin";
+    // Every one of these three asks about somebody other than the caller: the
+    // owner calls it about a delegate, and registration calls it about the row
+    // it is deciding whether to claim. `accounts`, `account_delegates` (owner
+    // arm) and `users` are all scoped away from the asker, so left under
+    // `scoped()` this returned 0/0/null and answered "not a full account" for
+    // every user alive -- which is the permissive answer on all three call
+    // sites: it offers the Joint toggle for a credential identity, and hands
+    // the owner a password reset for a login that is not theirs.
+    return withSystemContext(async () => {
+      const [ownsAccounts, ownsDelegations, user] = await Promise.all([
+        this.scoped(Account, (repo) => repo.count({ where: { userId } })),
+        this.scoped(AccountDelegate, (repo) =>
+          repo.count({ where: { ownerUserId: userId } }),
+        ),
+        this.scoped(User, (repo) =>
+          repo.findOne({
+            where: { id: userId },
+            select: ["id", "role"],
+          }),
+        ),
+      ]);
+      return ownsAccounts > 0 || ownsDelegations > 0 || user?.role === "admin";
+    });
   }
 
   /**
@@ -620,20 +711,26 @@ export class DelegationService {
   async canOwnerResetDelegatePassword(
     delegateUserId: string,
   ): Promise<boolean> {
-    const user = await this.scoped(User, (repo) =>
-      repo.findOne({
-        where: { id: delegateUserId },
-        select: ["id", "isDelegateOnly"],
-      }),
-    );
-    if (!user || !user.isDelegateOnly) return false;
-    if (await this.isFullAccount(delegateUserId)) return false;
-    const delegationCount = await this.scoped(AccountDelegate, (repo) =>
-      repo.count({
-        where: { delegateUserId },
-      }),
-    );
-    return delegationCount <= 1;
+    // Cross-user throughout: `isDelegateOnly` lives on the delegate's own
+    // `users` row, invisible from the owner's session. The null it returned
+    // under enforcement short-circuited to `false`, so the owner was told they
+    // could never reset a password they had provisioned themselves.
+    return withSystemContext(async () => {
+      const user = await this.scoped(User, (repo) =>
+        repo.findOne({
+          where: { id: delegateUserId },
+          select: ["id", "isDelegateOnly"],
+        }),
+      );
+      if (!user || !user.isDelegateOnly) return false;
+      if (await this.isFullAccount(delegateUserId)) return false;
+      const delegationCount = await this.scoped(AccountDelegate, (repo) =>
+        repo.count({
+          where: { delegateUserId },
+        }),
+      );
+      return delegationCount <= 1;
+    });
   }
 
   async listDelegates(ownerUserId: string) {
@@ -643,10 +740,28 @@ export class DelegationService {
           ownerUserId,
           status: In(["active", "pending"] as DelegationStatus[]),
         },
-        relations: ["delegate", "grants"],
+        relations: ["grants"],
         order: { createdAt: "DESC" },
       }),
     );
+    if (delegations.length === 0) return [];
+
+    // Authorization-decision read: the delegations above are the owner's own
+    // rows and each names a delegate the owner provisioned, but that person's
+    // `users` row is outside the owner's session (users_self). As a
+    // `relations: ["delegate"]` join it silently resolved to null under
+    // enforcement, so Shared Access listed every delegate with no name, no
+    // email and no password state. Only the display fields leave, plus the
+    // password presence the owner already governs.
+    const delegateIds = [...new Set(delegations.map((d) => d.delegateUserId))];
+    const delegateUsers = await this.systemScoped(User, (repo) =>
+      repo.find({
+        where: { id: In(delegateIds) },
+        select: ["id", "email", "firstName", "lastName", "passwordHash"],
+      }),
+    );
+    const delegateById = new Map(delegateUsers.map((u) => [u.id, u]));
+
     return Promise.all(
       delegations.map(async (d) => ({
         id: d.id,
@@ -654,10 +769,10 @@ export class DelegationService {
         createdAt: d.createdAt,
         delegate: {
           id: d.delegateUserId,
-          email: d.delegate?.email ?? null,
-          firstName: d.delegate?.firstName ?? null,
-          lastName: d.delegate?.lastName ?? null,
-          hasPassword: !!d.delegate?.passwordHash,
+          email: delegateById.get(d.delegateUserId)?.email ?? null,
+          firstName: delegateById.get(d.delegateUserId)?.firstName ?? null,
+          lastName: delegateById.get(d.delegateUserId)?.lastName ?? null,
+          hasPassword: !!delegateById.get(d.delegateUserId)?.passwordHash,
           // False when the password is the delegate's own (full account or
           // a delegate elsewhere); the owner cannot reset it.
           canResetPassword: await this.canOwnerResetDelegatePassword(
@@ -873,15 +988,50 @@ export class DelegationService {
    */
   async delegateEmailExists(email: string): Promise<boolean> {
     const normalized = email.toLowerCase().trim();
-    const user = await this.scoped(User, (repo) =>
+    // Cross-user by construction -- the question *is* whether somebody else's
+    // login already uses this address, so `users_self` can never answer it
+    // from the caller's own scope. Under enforcement this matched nothing and
+    // the Add-delegate form offered to set a password for a user who already
+    // had one. The identical predicate works at login only because
+    // `AuthService` runs it pre-identity, under the same bypass.
+    //
+    // Only the boolean leaves. The endpoint is authenticated and already
+    // exists to disclose exactly this, and `AuthService.register` makes the
+    // same disclosure through its conflict response.
+    const user = await this.systemScoped(User, (repo) =>
       repo.findOne({
         where: { email: normalized },
+        select: ["id"],
       }),
     );
     return !!user;
   }
 
+  /**
+   * Provisioning or linking a delegate is cross-user work end to end: it looks
+   * a login up by address, may create one, and may set the password on it --
+   * none of which the owner's own scope can see or write (`users_self`). Under
+   * enforcement the lookup missed an existing account and the insert that
+   * followed hit the unique index on `users.email`, so granting access to
+   * anyone who already had a Monize login failed outright.
+   *
+   * Wrapped whole rather than per-statement, on the `AdminService.createUser`
+   * pattern, because the read and the write have to agree: deciding "no such
+   * user" outside the transaction that then creates one reintroduces the race
+   * the unique index exists to catch. `ownerUserId` comes from the JWT and is
+   * never taken from the request body, which is what makes bypassing the
+   * `account_delegates` WITH CHECK safe here.
+   */
   async createDelegate(ownerUserId: string, dto: CreateDelegateDto) {
+    return withSystemContext(() =>
+      this.createDelegateWithinContext(ownerUserId, dto),
+    );
+  }
+
+  private async createDelegateWithinContext(
+    ownerUserId: string,
+    dto: CreateDelegateDto,
+  ) {
     const email = dto.email.toLowerCase().trim();
 
     const owner = await this.scoped(User, (repo) =>
@@ -1108,41 +1258,53 @@ export class DelegationService {
     }
     const delegateUserId = delegation.delegateUserId;
 
-    await withScopedDb(this.dataSource, async (manager) => {
-      // Hard-delete the delegation. FK cascades remove its grants and any
-      // refresh tokens scoped to it, so live delegate sessions acting via
-      // this delegation are immediately invalidated.
-      await manager.delete(AccountDelegate, { id: delegationId });
+    // Authorization is settled above, under the owner's own scope: the
+    // delegation row is theirs or the lookup 404s. What follows reaches into
+    // the delegate's rows -- their accounts, their other delegations, their
+    // `users` row -- none of which the owner's session can see. Left scoped,
+    // all three counts came back 0 and `delegateUser` came back null, so every
+    // guard in the condition below passed and the branch that deletes a login
+    // ran for delegates that are full accounts in their own right. The DELETE
+    // itself was then filtered to zero rows by the same policy, so the damage
+    // was orphaned `users` rows rather than lost accounts -- but the decision
+    // was being made on answers the database had refused to give.
+    await withSystemContext(() =>
+      withScopedDb(this.dataSource, async (manager) => {
+        // Hard-delete the delegation. FK cascades remove its grants and any
+        // refresh tokens scoped to it, so live delegate sessions acting via
+        // this delegation are immediately invalidated.
+        await manager.delete(AccountDelegate, { id: delegationId });
 
-      // Entirely remove the delegate's login unless it has another reason to
-      // exist: a delegation elsewhere, its own data, it owns a delegation,
-      // it is an admin, or it has been claimed as a full account in its
-      // own right (isDelegateOnly=false). Without the isDelegateOnly
-      // check a self-registered user who hasn't created any accounts yet
-      // would be silently deleted on revoke.
-      const [otherDelegations, ownsAccounts, ownsDelegations] =
-        await Promise.all([
-          manager.count(AccountDelegate, { where: { delegateUserId } }),
-          manager.count(Account, { where: { userId: delegateUserId } }),
-          manager.count(AccountDelegate, {
-            where: { ownerUserId: delegateUserId },
-          }),
-        ]);
-      const delegateUser = await manager.findOne(User, {
-        where: { id: delegateUserId },
-      });
+        // Entirely remove the delegate's login unless it has another reason to
+        // exist: a delegation elsewhere, its own data, it owns a delegation,
+        // it is an admin, or it has been claimed as a full account in its
+        // own right (isDelegateOnly=false). Without the isDelegateOnly
+        // check a self-registered user who hasn't created any accounts yet
+        // would be silently deleted on revoke.
+        const [otherDelegations, ownsAccounts, ownsDelegations] =
+          await Promise.all([
+            manager.count(AccountDelegate, { where: { delegateUserId } }),
+            manager.count(Account, { where: { userId: delegateUserId } }),
+            manager.count(AccountDelegate, {
+              where: { ownerUserId: delegateUserId },
+            }),
+          ]);
+        const delegateUser = await manager.findOne(User, {
+          where: { id: delegateUserId },
+        });
 
-      if (
-        otherDelegations === 0 &&
-        ownsAccounts === 0 &&
-        ownsDelegations === 0 &&
-        delegateUser?.role !== "admin" &&
-        delegateUser?.isDelegateOnly !== false
-      ) {
-        // FK ON DELETE CASCADE cleans preferences, tokens, trusted devices.
-        await manager.delete(User, { id: delegateUserId });
-      }
-    });
+        if (
+          otherDelegations === 0 &&
+          ownsAccounts === 0 &&
+          ownsDelegations === 0 &&
+          delegateUser?.role !== "admin" &&
+          delegateUser?.isDelegateOnly !== false
+        ) {
+          // FK ON DELETE CASCADE cleans preferences, tokens, trusted devices.
+          await manager.delete(User, { id: delegateUserId });
+        }
+      }),
+    );
   }
 
   async setGrants(
@@ -1250,7 +1412,11 @@ export class DelegationService {
       );
     }
 
-    const delegate = await this.scoped(User, (repo) =>
+    // Past the ownership check, so the rest reads and rewrites the delegate's
+    // own login -- invisible and unwritable from the owner's session. Left
+    // scoped, the lookup returned null and the endpoint answered "Delegate not
+    // found" for a delegate sitting right there in the list.
+    const delegate = await this.systemScoped(User, (repo) =>
       repo.findOne({
         where: { id: delegation.delegateUserId },
       }),
@@ -1289,9 +1455,13 @@ export class DelegationService {
     // so a locked-out delegate can sign in with the new password.
     delegate.failedLoginAttempts = 0;
     delegate.lockedUntil = null;
-    await this.scoped(User, (repo) => repo.save(delegate));
+    await this.systemScoped(User, (repo) => repo.save(delegate));
 
-    await this.scoped(RefreshToken, (repo) =>
+    // Same reach: the sessions being cut are the delegate's, and
+    // `refresh_tokens` is keyed to them. A scoped UPDATE matched nothing, so
+    // the old password's sessions survived a reset that reported success --
+    // the one outcome a credential rotation must never have.
+    await this.systemScoped(RefreshToken, (repo) =>
       repo.update(
         { userId: delegate.id, isRevoked: false },
         { isRevoked: true },

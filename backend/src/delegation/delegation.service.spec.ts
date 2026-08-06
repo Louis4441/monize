@@ -22,6 +22,14 @@ jest.mock("../common/db/scoped-db", () =>
 );
 
 describe("DelegationService", () => {
+  // Real UUIDs, not "o1"/"d1": the delegation reads run under
+  // `withDelegateContext`, which rejects a non-UUID id at the wrap site rather
+  // than letting it reach a policied statement as a 22P02.
+  const OWNER_ID = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const DELEGATE_ID = "d1a2b3c4-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+  const SELF_ID = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
+  const OTHER_OWNER_ID = "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d";
+
   let service: DelegationService;
   let delegatesRepo: Record<string, jest.Mock>;
   let grantsRepo: Record<string, jest.Mock>;
@@ -44,7 +52,7 @@ describe("DelegationService", () => {
       count: jest.fn().mockResolvedValue(0),
     };
     grantsRepo = { findOne: jest.fn(), find: jest.fn(), count: jest.fn() };
-    usersRepo = { findOne: jest.fn(), save: jest.fn() };
+    usersRepo = { findOne: jest.fn(), find: jest.fn(), save: jest.fn() };
     prefsRepo = { findOne: jest.fn() };
     refreshRepo = { update: jest.fn() };
     accountsRepo = { find: jest.fn(), exists: jest.fn(), count: jest.fn() };
@@ -113,8 +121,8 @@ describe("DelegationService", () => {
 
   describe("validateActingContext", () => {
     const args = {
-      delegateUserId: "d1",
-      actingAsUserId: "o1",
+      delegateUserId: DELEGATE_ID,
+      actingAsUserId: OWNER_ID,
       delegationId: "g1",
     };
 
@@ -129,8 +137,8 @@ describe("DelegationService", () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
         status: "revoked",
-        delegateUserId: "d1",
-        ownerUserId: "o1",
+        delegateUserId: DELEGATE_ID,
+        ownerUserId: OWNER_ID,
       });
       await expect(service.validateActingContext(args)).rejects.toThrow(
         "Delegated access is no longer valid",
@@ -142,7 +150,7 @@ describe("DelegationService", () => {
         id: "g1",
         status: "active",
         delegateUserId: "someone-else",
-        ownerUserId: "o1",
+        ownerUserId: OWNER_ID,
       });
       await expect(service.validateActingContext(args)).rejects.toBeInstanceOf(
         UnauthorizedException,
@@ -153,10 +161,10 @@ describe("DelegationService", () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
         status: "active",
-        delegateUserId: "d1",
-        ownerUserId: "o1",
+        delegateUserId: DELEGATE_ID,
+        ownerUserId: OWNER_ID,
       });
-      usersRepo.findOne.mockResolvedValue({ id: "o1", isActive: false });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, isActive: false });
       await expect(service.validateActingContext(args)).rejects.toThrow(
         "Delegated access is no longer valid",
       );
@@ -166,19 +174,19 @@ describe("DelegationService", () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
         status: "active",
-        delegateUserId: "d1",
-        ownerUserId: "o1",
+        delegateUserId: DELEGATE_ID,
+        ownerUserId: OWNER_ID,
       });
       // owner active (validateActingContext call) then owner+pref for 2FA
       usersRepo.findOne.mockImplementation(({ where }: any) =>
-        where.id === "o1"
-          ? { id: "o1", isActive: true, twoFactorSecret: "secret" }
-          : { id: "d1", twoFactorSecret: null },
+        where.id === OWNER_ID
+          ? { id: OWNER_ID, isActive: true, twoFactorSecret: "secret" }
+          : { id: DELEGATE_ID, twoFactorSecret: null },
       );
       prefsRepo.findOne.mockImplementation(({ where }: any) =>
-        where.userId === "o1"
-          ? { userId: "o1", twoFactorEnabled: true }
-          : { userId: "d1", twoFactorEnabled: false },
+        where.userId === OWNER_ID
+          ? { userId: OWNER_ID, twoFactorEnabled: true }
+          : { userId: DELEGATE_ID, twoFactorEnabled: false },
       );
 
       await expect(service.validateActingContext(args)).rejects.toThrow(
@@ -190,12 +198,12 @@ describe("DelegationService", () => {
       const delegation = {
         id: "g1",
         status: "active",
-        delegateUserId: "d1",
-        ownerUserId: "o1",
+        delegateUserId: DELEGATE_ID,
+        ownerUserId: OWNER_ID,
       };
       delegatesRepo.findOne.mockResolvedValue(delegation);
       usersRepo.findOne.mockResolvedValue({
-        id: "o1",
+        id: OWNER_ID,
         isActive: true,
         twoFactorSecret: null,
       });
@@ -287,23 +295,28 @@ describe("DelegationService", () => {
 
   describe("resolveSwitchTarget", () => {
     it("returns null for the delegate's own id (self)", async () => {
-      await expect(service.resolveSwitchTarget("d1", "d1")).resolves.toBeNull();
+      await expect(
+        service.resolveSwitchTarget(DELEGATE_ID, DELEGATE_ID),
+      ).resolves.toBeNull();
     });
 
     it("throws when there is no active delegation for the target", async () => {
       delegatesRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.resolveSwitchTarget("d1", "o1"),
+        service.resolveSwitchTarget(DELEGATE_ID, OWNER_ID),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 
   describe("setGrants", () => {
     it("rejects accounts that do not belong to the owner", async () => {
-      delegatesRepo.findOne.mockResolvedValue({ id: "g1", ownerUserId: "o1" });
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        ownerUserId: OWNER_ID,
+      });
       accountsRepo.find.mockResolvedValue([{ id: "a1" }]); // only 1 of 2 owned
       await expect(
-        service.setGrants("o1", "g1", [
+        service.setGrants(OWNER_ID, "g1", [
           { accountId: "a1", canRead: true },
           { accountId: "a2", canRead: true },
         ]),
@@ -312,22 +325,28 @@ describe("DelegationService", () => {
 
     it("throws when the delegation is not owned by the caller", async () => {
       delegatesRepo.findOne.mockResolvedValue(null);
-      await expect(service.setGrants("o1", "g1", [])).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.setGrants(OWNER_ID, "g1", []),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("rejects CREATE/EDIT/DELETE without READ", async () => {
-      delegatesRepo.findOne.mockResolvedValue({ id: "g1", ownerUserId: "o1" });
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        ownerUserId: OWNER_ID,
+      });
       await expect(
-        service.setGrants("o1", "g1", [
+        service.setGrants(OWNER_ID, "g1", [
           { accountId: "a1", canRead: false, canCreate: true },
         ]),
       ).rejects.toThrow(/READ access is required/);
     });
 
     it("persists per-account CRUD flags for readable accounts", async () => {
-      delegatesRepo.findOne.mockResolvedValue({ id: "g1", ownerUserId: "o1" });
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        ownerUserId: OWNER_ID,
+      });
       accountsRepo.find.mockResolvedValue([{ id: "a1" }]);
       const saved: any[] = [];
       const manager = {
@@ -337,7 +356,7 @@ describe("DelegationService", () => {
       };
       installTransactionMock(manager);
 
-      await service.setGrants("o1", "g1", [
+      await service.setGrants(OWNER_ID, "g1", [
         {
           accountId: "a1",
           canRead: true,
@@ -363,9 +382,12 @@ describe("DelegationService", () => {
     });
 
     it("rejects a joint flag without READ", async () => {
-      delegatesRepo.findOne.mockResolvedValue({ id: "g1", ownerUserId: "o1" });
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        ownerUserId: OWNER_ID,
+      });
       await expect(
-        service.setGrants("o1", "g1", [
+        service.setGrants(OWNER_ID, "g1", [
           { accountId: "a1", canRead: false, isJoint: true },
         ]),
       ).rejects.toThrow(/READ access is required to mark an account as joint/);
@@ -374,16 +396,16 @@ describe("DelegationService", () => {
     it("rejects a joint flag for a delegate who is not a full account", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       // isFullAccount(d1): no accounts, no delegations of their own, not admin.
       accountsRepo.count = jest.fn().mockResolvedValue(0);
       delegatesRepo.count = jest.fn().mockResolvedValue(0);
-      usersRepo.findOne.mockResolvedValue({ id: "d1", role: "user" });
+      usersRepo.findOne.mockResolvedValue({ id: DELEGATE_ID, role: "user" });
 
       await expect(
-        service.setGrants("o1", "g1", [
+        service.setGrants(OWNER_ID, "g1", [
           { accountId: "a1", canRead: true, isJoint: true },
         ]),
       ).rejects.toThrow(/their own Monize account/);
@@ -392,12 +414,12 @@ describe("DelegationService", () => {
     it("persists isJoint for a full-account delegate", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       accountsRepo.count = jest.fn().mockResolvedValue(2); // owns accounts
       delegatesRepo.count = jest.fn().mockResolvedValue(0);
-      usersRepo.findOne.mockResolvedValue({ id: "d1", role: "user" });
+      usersRepo.findOne.mockResolvedValue({ id: DELEGATE_ID, role: "user" });
       accountsRepo.find.mockResolvedValue([{ id: "a1" }, { id: "a2" }]);
       const saved: any[] = [];
       const manager = {
@@ -407,7 +429,7 @@ describe("DelegationService", () => {
       };
       installTransactionMock(manager);
 
-      await service.setGrants("o1", "g1", [
+      await service.setGrants(OWNER_ID, "g1", [
         { accountId: "a1", canRead: true, canCreate: true, isJoint: true },
         { accountId: "a2", canRead: true },
       ]);
@@ -451,27 +473,30 @@ describe("DelegationService", () => {
 
   describe("delegateMustEnrollOwn2FA", () => {
     it("is false when the owner does not require 2FA", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", twoFactorSecret: null });
+      usersRepo.findOne.mockResolvedValue({
+        id: OWNER_ID,
+        twoFactorSecret: null,
+      });
       prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
-      await expect(service.delegateMustEnrollOwn2FA("o1", "d1")).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.delegateMustEnrollOwn2FA(OWNER_ID, DELEGATE_ID),
+      ).resolves.toBe(false);
     });
 
     it("is false when the delegate already has their own 2FA", async () => {
       usersRepo.findOne.mockImplementation(({ where }: any) =>
-        where.id === "o1"
-          ? { id: "o1", twoFactorSecret: "s" }
-          : { id: "d1", twoFactorSecret: "d" },
+        where.id === OWNER_ID
+          ? { id: OWNER_ID, twoFactorSecret: "s" }
+          : { id: DELEGATE_ID, twoFactorSecret: "d" },
       );
       prefsRepo.findOne.mockImplementation(({ where }: any) =>
-        where.userId === "o1"
+        where.userId === OWNER_ID
           ? { twoFactorEnabled: true }
           : { twoFactorEnabled: true },
       );
-      await expect(service.delegateMustEnrollOwn2FA("o1", "d1")).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.delegateMustEnrollOwn2FA(OWNER_ID, DELEGATE_ID),
+      ).resolves.toBe(false);
     });
   });
 
@@ -479,38 +504,41 @@ describe("DelegationService", () => {
     it("throws DELEGATE_2FA_REQUIRED when the target owner requires 2FA", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        delegateUserId: "d1",
-        ownerUserId: "o1",
+        delegateUserId: DELEGATE_ID,
+        ownerUserId: OWNER_ID,
         status: "active",
       });
       usersRepo.findOne.mockImplementation(({ where }: any) =>
-        where.id === "o1"
-          ? { id: "o1", twoFactorSecret: "s" }
-          : { id: "d1", twoFactorSecret: null },
+        where.id === OWNER_ID
+          ? { id: OWNER_ID, twoFactorSecret: "s" }
+          : { id: DELEGATE_ID, twoFactorSecret: null },
       );
       prefsRepo.findOne.mockImplementation(({ where }: any) =>
-        where.userId === "o1"
+        where.userId === OWNER_ID
           ? { twoFactorEnabled: true }
           : { twoFactorEnabled: false },
       );
-      await expect(service.resolveSwitchTarget("d1", "o1")).rejects.toThrow(
-        DELEGATE_2FA_REQUIRED,
-      );
+      await expect(
+        service.resolveSwitchTarget(DELEGATE_ID, OWNER_ID),
+      ).rejects.toThrow(DELEGATE_2FA_REQUIRED);
     });
 
     it("returns the delegation when the switch is allowed", async () => {
       const delegation = {
         id: "g1",
-        delegateUserId: "d1",
-        ownerUserId: "o1",
+        delegateUserId: DELEGATE_ID,
+        ownerUserId: OWNER_ID,
         status: "active",
       };
       delegatesRepo.findOne.mockResolvedValue(delegation);
-      usersRepo.findOne.mockResolvedValue({ id: "o1", twoFactorSecret: null });
+      usersRepo.findOne.mockResolvedValue({
+        id: OWNER_ID,
+        twoFactorSecret: null,
+      });
       prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
-      await expect(service.resolveSwitchTarget("d1", "o1")).resolves.toBe(
-        delegation,
-      );
+      await expect(
+        service.resolveSwitchTarget(DELEGATE_ID, OWNER_ID),
+      ).resolves.toBe(delegation);
     });
   });
 
@@ -523,26 +551,26 @@ describe("DelegationService", () => {
 
     it("returns [] when the user does not exist", async () => {
       usersRepo.findOne.mockResolvedValue(null);
-      await expect(service.getAvailableContexts("u1")).resolves.toEqual([]);
+      await expect(service.getAvailableContexts(SELF_ID)).resolves.toEqual([]);
     });
 
     it("returns [] for a user with no delegations", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "u1" });
+      usersRepo.findOne.mockResolvedValue({ id: SELF_ID });
       delegatesRepo.find.mockResolvedValue([]);
-      await expect(service.getAvailableContexts("u1")).resolves.toEqual([]);
+      await expect(service.getAvailableContexts(SELF_ID)).resolves.toEqual([]);
     });
 
     it("includes a self context when the user owns data", async () => {
       usersRepo.findOne.mockImplementation(({ where }: any) =>
-        where.id === "u1"
+        where.id === SELF_ID
           ? {
-              id: "u1",
+              id: SELF_ID,
               firstName: "Del",
               lastName: "Egate",
               isDelegateOnly: false,
             }
           : {
-              id: "o1",
+              id: OWNER_ID,
               firstName: "Own",
               lastName: "Er",
               twoFactorSecret: null,
@@ -550,20 +578,20 @@ describe("DelegationService", () => {
       );
       delegatesRepo.find.mockResolvedValue([
         {
-          ownerUserId: "o1",
-          owner: { id: "o1", firstName: "Own", lastName: "Er" },
+          ownerUserId: OWNER_ID,
+          owner: { id: OWNER_ID, firstName: "Own", lastName: "Er" },
         },
       ]);
       accountsRepo.exists.mockResolvedValue(true);
       prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
 
-      const res = await service.getAvailableContexts("u1");
+      const res = await service.getAvailableContexts(SELF_ID);
       expect(res).toHaveLength(2);
       expect(res[0]).toEqual(
-        expect.objectContaining({ userId: "u1", isSelf: true }),
+        expect.objectContaining({ userId: SELF_ID, isSelf: true }),
       );
       expect(res[1]).toEqual(
-        expect.objectContaining({ userId: "o1", isSelf: false }),
+        expect.objectContaining({ userId: OWNER_ID, isSelf: false }),
       );
     });
 
@@ -573,54 +601,54 @@ describe("DelegationService", () => {
       // see a "self" context so the banner appears and they don't get
       // auto-switched into the owner's account.
       usersRepo.findOne.mockImplementation(({ where }: any) =>
-        where.id === "u1"
-          ? { id: "u1", firstName: "Self", isDelegateOnly: false }
-          : { id: "o1", twoFactorSecret: null },
+        where.id === SELF_ID
+          ? { id: SELF_ID, firstName: "Self", isDelegateOnly: false }
+          : { id: OWNER_ID, twoFactorSecret: null },
       );
       delegatesRepo.find.mockResolvedValue([
-        { ownerUserId: "o1", owner: null },
+        { ownerUserId: OWNER_ID, owner: null },
       ]);
       accountsRepo.exists.mockResolvedValue(false);
       prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
 
-      const res = await service.getAvailableContexts("u1");
+      const res = await service.getAvailableContexts(SELF_ID);
       expect(res).toHaveLength(2);
       expect(res.find((c) => c.isSelf)).toEqual(
-        expect.objectContaining({ userId: "u1", isSelf: true }),
+        expect.objectContaining({ userId: SELF_ID, isSelf: true }),
       );
     });
 
     it("omits the self context for an owner-managed pure delegate with no data", async () => {
       usersRepo.findOne.mockImplementation(({ where }: any) =>
-        where.id === "u1"
-          ? { id: "u1", isDelegateOnly: true }
-          : { id: "o1", twoFactorSecret: null },
+        where.id === SELF_ID
+          ? { id: SELF_ID, isDelegateOnly: true }
+          : { id: OWNER_ID, twoFactorSecret: null },
       );
       delegatesRepo.find.mockResolvedValue([
-        { ownerUserId: "o1", owner: null },
+        { ownerUserId: OWNER_ID, owner: null },
       ]);
       accountsRepo.exists.mockResolvedValue(false);
       prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
 
-      const res = await service.getAvailableContexts("u1");
+      const res = await service.getAvailableContexts(SELF_ID);
       expect(res).toHaveLength(1);
       expect(res[0].isSelf).toBe(false);
-      expect(res[0].label).toBe("o1");
+      expect(res[0].label).toBe(OWNER_ID);
     });
 
     describe("joint-only delegations", () => {
-      /** A full-account grantee with one active delegation from "o1". */
+      /** A full-account grantee with one active delegation from OWNER_ID. */
       function arrangeGrantee(delegation: Record<string, unknown> = {}) {
         usersRepo.findOne.mockImplementation(({ where }: any) =>
-          where.id === "u1"
-            ? { id: "u1", firstName: "Del", isDelegateOnly: false }
-            : { id: "o1", firstName: "Own", twoFactorSecret: null },
+          where.id === SELF_ID
+            ? { id: SELF_ID, firstName: "Del", isDelegateOnly: false }
+            : { id: OWNER_ID, firstName: "Own", twoFactorSecret: null },
         );
         delegatesRepo.find.mockResolvedValue([
           {
             id: "g1",
-            ownerUserId: "o1",
-            owner: { id: "o1", firstName: "Own" },
+            ownerUserId: OWNER_ID,
+            owner: { id: OWNER_ID, firstName: "Own" },
             ...delegation,
           },
         ]);
@@ -636,7 +664,9 @@ describe("DelegationService", () => {
         ]);
 
         // Nothing to switch between: both accounts are already native.
-        await expect(service.getAvailableContexts("u1")).resolves.toEqual([]);
+        await expect(service.getAvailableContexts(SELF_ID)).resolves.toEqual(
+          [],
+        );
       });
 
       it("keeps the owner context when a readable grant is not joint", async () => {
@@ -651,8 +681,8 @@ describe("DelegationService", () => {
           },
         ]);
 
-        const res = await service.getAvailableContexts("u1");
-        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+        const res = await service.getAvailableContexts(SELF_ID);
+        expect(res.map((c) => c.userId)).toEqual([SELF_ID, OWNER_ID]);
       });
 
       it.each([
@@ -667,8 +697,8 @@ describe("DelegationService", () => {
           { delegationId: "g1", accountId: "a1", canRead: true, isJoint: true },
         ]);
 
-        const res = await service.getAvailableContexts("u1");
-        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+        const res = await service.getAvailableContexts(SELF_ID);
+        expect(res.map((c) => c.userId)).toEqual([SELF_ID, OWNER_ID]);
       });
 
       it.each([
@@ -694,8 +724,8 @@ describe("DelegationService", () => {
             },
           ]);
 
-          const res = await service.getAvailableContexts("u1");
-          expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+          const res = await service.getAvailableContexts(SELF_ID);
+          expect(res.map((c) => c.userId)).toEqual([SELF_ID, OWNER_ID]);
         },
       );
 
@@ -705,8 +735,8 @@ describe("DelegationService", () => {
         arrangeGrantee();
         grantsRepo.find.mockResolvedValue([]);
 
-        const res = await service.getAvailableContexts("u1");
-        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+        const res = await service.getAvailableContexts(SELF_ID);
+        expect(res.map((c) => c.userId)).toEqual([SELF_ID, OWNER_ID]);
       });
 
       it("keeps a joint-only owner the caller is currently acting as", async () => {
@@ -717,19 +747,27 @@ describe("DelegationService", () => {
           { delegationId: "g1", accountId: "a1", canRead: true, isJoint: true },
         ]);
 
-        const res = await service.getAvailableContexts("u1", "o1");
-        expect(res.map((c) => c.userId)).toEqual(["u1", "o1"]);
+        const res = await service.getAvailableContexts(SELF_ID, OWNER_ID);
+        expect(res.map((c) => c.userId)).toEqual([SELF_ID, OWNER_ID]);
       });
 
       it("drops only the joint-only owner, keeping the other owner's context", async () => {
         usersRepo.findOne.mockImplementation(({ where }: any) =>
-          where.id === "u1"
-            ? { id: "u1", firstName: "Del", isDelegateOnly: false }
+          where.id === SELF_ID
+            ? { id: SELF_ID, firstName: "Del", isDelegateOnly: false }
             : { id: where.id, firstName: where.id, twoFactorSecret: null },
         );
         delegatesRepo.find.mockResolvedValue([
-          { id: "g1", ownerUserId: "o1", owner: { id: "o1", firstName: "O1" } },
-          { id: "g2", ownerUserId: "o2", owner: { id: "o2", firstName: "O2" } },
+          {
+            id: "g1",
+            ownerUserId: OWNER_ID,
+            owner: { id: OWNER_ID, firstName: "O1" },
+          },
+          {
+            id: "g2",
+            ownerUserId: OTHER_OWNER_ID,
+            owner: { id: OTHER_OWNER_ID, firstName: "O2" },
+          },
         ]);
         accountsRepo.exists.mockResolvedValue(true);
         prefsRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
@@ -743,31 +781,38 @@ describe("DelegationService", () => {
           },
         ]);
 
-        const res = await service.getAvailableContexts("u1");
-        expect(res.map((c) => c.userId)).toEqual(["u1", "o2"]);
+        const res = await service.getAvailableContexts(SELF_ID);
+        expect(res.map((c) => c.userId)).toEqual([SELF_ID, OTHER_OWNER_ID]);
       });
     });
   });
 
   describe("listDelegates", () => {
+    // The delegate's users row is no longer a relation on the delegation: it
+    // is loaded by id under a system context, because users_self hides it from
+    // the owner's own session. A spec that still fed it through `delegate:`
+    // would assert against a join the service no longer performs.
+    const delegateUserRow = {
+      id: DELEGATE_ID,
+      email: "d@e.f",
+      firstName: "D",
+      lastName: null,
+      passwordHash: "h",
+    };
+
     it("maps delegations to a safe summary", async () => {
       usersRepo.findOne.mockResolvedValue({
-        id: "d1",
+        id: DELEGATE_ID,
         role: "user",
         isDelegateOnly: true,
       });
+      usersRepo.find.mockResolvedValue([delegateUserRow]);
       delegatesRepo.find.mockResolvedValue([
         {
           id: "g1",
           status: "active",
           createdAt: new Date("2026-01-01"),
-          delegateUserId: "d1",
-          delegate: {
-            email: "d@e.f",
-            firstName: "D",
-            lastName: null,
-            passwordHash: "h",
-          },
+          delegateUserId: DELEGATE_ID,
           payeesCanCreate: true,
           payeesCanEdit: true,
           payeesCanDelete: false,
@@ -789,13 +834,13 @@ describe("DelegationService", () => {
           ],
         },
       ]);
-      const res = await service.listDelegates("o1");
+      const res = await service.listDelegates(OWNER_ID);
       expect(res[0]).toEqual({
         id: "g1",
         status: "active",
         createdAt: new Date("2026-01-01"),
         delegate: {
-          id: "d1",
+          id: DELEGATE_ID,
           email: "d@e.f",
           firstName: "D",
           lastName: null,
@@ -828,19 +873,19 @@ describe("DelegationService", () => {
     });
 
     it("includes granted sections in the summary", async () => {
+      usersRepo.find.mockResolvedValue([delegateUserRow]);
       delegatesRepo.find.mockResolvedValue([
         {
           id: "g1",
           status: "active",
           createdAt: new Date("2026-01-01"),
-          delegateUserId: "d1",
-          delegate: { email: "d@e.f", passwordHash: "h" },
+          delegateUserId: DELEGATE_ID,
           billsCanRead: true,
           reportsCanRead: true,
           grants: [],
         },
       ]);
-      const res = await service.listDelegates("o1");
+      const res = await service.listDelegates(OWNER_ID);
       expect(res[0].sections).toEqual({
         bills: true,
         investments: false,
@@ -853,20 +898,20 @@ describe("DelegationService", () => {
     it("returns isJoint on every grant so a resave cannot silently clear it", async () => {
       // setGrants is delete-and-recreate: if this listing dropped isJoint,
       // the modal's next unchanged save would wipe every joint flag.
+      usersRepo.find.mockResolvedValue([delegateUserRow]);
       delegatesRepo.find.mockResolvedValue([
         {
           id: "g1",
           status: "active",
           createdAt: new Date("2026-01-01"),
-          delegateUserId: "d1",
-          delegate: { email: "d@e.f", passwordHash: "h" },
+          delegateUserId: DELEGATE_ID,
           grants: [
             { accountId: "a1", canRead: true, isJoint: true },
             { accountId: "a2", canRead: true, isJoint: false },
           ],
         },
       ]);
-      const res = await service.listDelegates("o1");
+      const res = await service.listDelegates(OWNER_ID);
       expect(res[0].grants.map((g) => g.isJoint)).toEqual([true, false]);
     });
   });
@@ -936,14 +981,14 @@ describe("DelegationService", () => {
     it("throws when the delegation is not owned by the caller", async () => {
       delegatesRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.setCapabilities("o1", "g1", { payeesCanCreate: true }),
+        service.setCapabilities(OWNER_ID, "g1", { payeesCanCreate: true }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("updates only the provided flags", async () => {
       const delegation = {
         id: "g1",
-        ownerUserId: "o1",
+        ownerUserId: OWNER_ID,
         payeesCanCreate: false,
         payeesCanEdit: false,
         categoriesCanEdit: true,
@@ -952,7 +997,7 @@ describe("DelegationService", () => {
       delegatesRepo.findOne.mockResolvedValue(delegation);
       delegatesRepo.save.mockResolvedValue(delegation);
 
-      await service.setCapabilities("o1", "g1", {
+      await service.setCapabilities(OWNER_ID, "g1", {
         payeesCanCreate: true,
         tagsCanDelete: true,
       });
@@ -1020,14 +1065,14 @@ describe("DelegationService", () => {
     it("throws when the delegation is not owned by the caller", async () => {
       delegatesRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.setSectionGrants("o1", "g1", { billsCanRead: true }),
+        service.setSectionGrants(OWNER_ID, "g1", { billsCanRead: true }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("updates only the provided sections", async () => {
       const delegation = {
         id: "g1",
-        ownerUserId: "o1",
+        ownerUserId: OWNER_ID,
         billsCanRead: false,
         investmentsCanRead: true,
         reportsCanRead: false,
@@ -1035,7 +1080,7 @@ describe("DelegationService", () => {
       delegatesRepo.findOne.mockResolvedValue(delegation);
       delegatesRepo.save.mockResolvedValue(delegation);
 
-      await service.setSectionGrants("o1", "g1", {
+      await service.setSectionGrants(OWNER_ID, "g1", {
         billsCanRead: true,
         reportsCanRead: true,
       });
@@ -1050,9 +1095,9 @@ describe("DelegationService", () => {
   describe("revokeDelegate", () => {
     it("throws when the delegation is not found", async () => {
       delegatesRepo.findOne.mockResolvedValue(null);
-      await expect(service.revokeDelegate("o1", "g1")).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.revokeDelegate(OWNER_ID, "g1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     function managerFor(counts: {
@@ -1070,7 +1115,7 @@ describe("DelegationService", () => {
           .mockResolvedValueOnce(counts.ownsAccounts)
           .mockResolvedValueOnce(counts.ownsDelegations),
         findOne: jest.fn().mockResolvedValue({
-          id: "d1",
+          id: DELEGATE_ID,
           role: counts.role ?? "user",
           isDelegateOnly: counts.isDelegateOnly ?? true,
         }),
@@ -1081,8 +1126,8 @@ describe("DelegationService", () => {
     it("fully deletes a pure delegate with no other ties", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       const manager = managerFor({
         otherDelegations: 0,
@@ -1092,13 +1137,13 @@ describe("DelegationService", () => {
       });
       installTransactionMock(manager);
 
-      await service.revokeDelegate("o1", "g1");
+      await service.revokeDelegate(OWNER_ID, "g1");
 
       expect(manager.delete).toHaveBeenCalledWith(expect.anything(), {
         id: "g1",
       });
       expect(manager.delete).toHaveBeenCalledWith(expect.anything(), {
-        id: "d1",
+        id: DELEGATE_ID,
       });
     });
 
@@ -1109,8 +1154,8 @@ describe("DelegationService", () => {
       // delegation must not delete their login.
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       const manager = managerFor({
         otherDelegations: 0,
@@ -1120,7 +1165,7 @@ describe("DelegationService", () => {
       });
       installTransactionMock(manager);
 
-      await service.revokeDelegate("o1", "g1");
+      await service.revokeDelegate(OWNER_ID, "g1");
 
       expect(manager.delete).toHaveBeenCalledTimes(1);
       expect(manager.delete).toHaveBeenCalledWith(expect.anything(), {
@@ -1131,8 +1176,8 @@ describe("DelegationService", () => {
     it("keeps the user when they delegate for someone else", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       const manager = managerFor({
         otherDelegations: 1,
@@ -1141,7 +1186,7 @@ describe("DelegationService", () => {
       });
       installTransactionMock(manager);
 
-      await service.revokeDelegate("o1", "g1");
+      await service.revokeDelegate(OWNER_ID, "g1");
 
       expect(manager.delete).toHaveBeenCalledTimes(1); // delegation only
       expect(manager.delete).toHaveBeenCalledWith(expect.anything(), {
@@ -1156,8 +1201,8 @@ describe("DelegationService", () => {
       // owner's Shared Access continues to work.
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       const manager = managerFor({
         otherDelegations: 1,
@@ -1167,7 +1212,7 @@ describe("DelegationService", () => {
       });
       installTransactionMock(manager);
 
-      await service.revokeDelegate("o1", "g1");
+      await service.revokeDelegate(OWNER_ID, "g1");
 
       expect(manager.delete).toHaveBeenCalledTimes(1); // delegation only
     });
@@ -1175,8 +1220,8 @@ describe("DelegationService", () => {
     it("keeps the user when they own data of their own", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       const manager = managerFor({
         otherDelegations: 0,
@@ -1185,7 +1230,7 @@ describe("DelegationService", () => {
       });
       installTransactionMock(manager);
 
-      await service.revokeDelegate("o1", "g1");
+      await service.revokeDelegate(OWNER_ID, "g1");
 
       expect(manager.delete).toHaveBeenCalledTimes(1);
     });
@@ -1193,8 +1238,8 @@ describe("DelegationService", () => {
     it("keeps an admin delegate", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        ownerUserId: "o1",
-        delegateUserId: "d1",
+        ownerUserId: OWNER_ID,
+        delegateUserId: DELEGATE_ID,
       });
       const manager = managerFor({
         otherDelegations: 0,
@@ -1204,7 +1249,7 @@ describe("DelegationService", () => {
       });
       installTransactionMock(manager);
 
-      await service.revokeDelegate("o1", "g1");
+      await service.revokeDelegate(OWNER_ID, "g1");
 
       expect(manager.delete).toHaveBeenCalledTimes(1);
     });
@@ -1213,12 +1258,12 @@ describe("DelegationService", () => {
   describe("isDelegateUser", () => {
     it("is true when the user has at least one delegation", async () => {
       delegatesRepo.count = jest.fn().mockResolvedValue(2);
-      await expect(service.isDelegateUser("d1")).resolves.toBe(true);
+      await expect(service.isDelegateUser(DELEGATE_ID)).resolves.toBe(true);
     });
 
     it("is false when the user has no delegations", async () => {
       delegatesRepo.count = jest.fn().mockResolvedValue(0);
-      await expect(service.isDelegateUser("d1")).resolves.toBe(false);
+      await expect(service.isDelegateUser(DELEGATE_ID)).resolves.toBe(false);
     });
   });
 
@@ -1226,28 +1271,31 @@ describe("DelegationService", () => {
     it("throws when the delegation is not found", async () => {
       delegatesRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.resetDelegatePassword("o1", "g1"),
+        service.resetDelegatePassword(OWNER_ID, "g1"),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("rejects an SSO delegate", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        delegateUserId: "d1",
+        delegateUserId: DELEGATE_ID,
       });
-      usersRepo.findOne.mockResolvedValue({ id: "d1", oidcSubject: "sso" });
-      await expect(service.resetDelegatePassword("o1", "g1")).rejects.toThrow(
-        /SSO/,
-      );
+      usersRepo.findOne.mockResolvedValue({
+        id: DELEGATE_ID,
+        oidcSubject: "sso",
+      });
+      await expect(
+        service.resetDelegatePassword(OWNER_ID, "g1"),
+      ).rejects.toThrow(/SSO/);
     });
 
     it("sets a temporary password and revokes sessions", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        delegateUserId: "d1",
+        delegateUserId: DELEGATE_ID,
       });
       const delegate = {
-        id: "d1",
+        id: DELEGATE_ID,
         oidcSubject: null,
         failedLoginAttempts: 5,
         lockedUntil: new Date(Date.now() + 60000),
@@ -1255,14 +1303,14 @@ describe("DelegationService", () => {
       };
       usersRepo.findOne.mockResolvedValue(delegate);
       usersRepo.save.mockResolvedValue(delegate);
-      const res = await service.resetDelegatePassword("o1", "g1");
+      const res = await service.resetDelegatePassword(OWNER_ID, "g1");
       expect(res.temporaryPassword).toBeTruthy();
       expect((delegate as any).mustChangePassword).toBe(true);
       // Owner reset must clear any lockout so the delegate can sign in.
       expect((delegate as any).failedLoginAttempts).toBe(0);
       expect((delegate as any).lockedUntil).toBeNull();
       expect(refreshRepo.update).toHaveBeenCalledWith(
-        { userId: "d1", isRevoked: false },
+        { userId: DELEGATE_ID, isRevoked: false },
         { isRevoked: true },
       );
     });
@@ -1270,31 +1318,37 @@ describe("DelegationService", () => {
     it("refuses when the delegate is a full account (owns accounts)", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        delegateUserId: "d1",
+        delegateUserId: DELEGATE_ID,
       });
-      usersRepo.findOne.mockResolvedValue({ id: "d1", oidcSubject: null });
+      usersRepo.findOne.mockResolvedValue({
+        id: DELEGATE_ID,
+        oidcSubject: null,
+      });
       accountsRepo.count.mockResolvedValue(2); // owns their own accounts
-      await expect(service.resetDelegatePassword("o1", "g1")).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.resetDelegatePassword(OWNER_ID, "g1"),
+      ).rejects.toThrow(ForbiddenException);
       expect(usersRepo.save).not.toHaveBeenCalled();
     });
 
     it("refuses when the delegate is a delegate for another owner too", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        delegateUserId: "d1",
+        delegateUserId: DELEGATE_ID,
       });
-      usersRepo.findOne.mockResolvedValue({ id: "d1", oidcSubject: null });
+      usersRepo.findOne.mockResolvedValue({
+        id: DELEGATE_ID,
+        oidcSubject: null,
+      });
       accountsRepo.count.mockResolvedValue(0);
       // isFullAccount's ownerUserId count = 0; delegateUserId count = 2.
       delegatesRepo.count = jest
         .fn()
         .mockResolvedValueOnce(0) // ownsDelegations (isFullAccount)
         .mockResolvedValueOnce(2); // delegations as delegate
-      await expect(service.resetDelegatePassword("o1", "g1")).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.resetDelegatePassword(OWNER_ID, "g1"),
+      ).rejects.toThrow(ForbiddenException);
       expect(usersRepo.save).not.toHaveBeenCalled();
     });
   });
@@ -1304,13 +1358,13 @@ describe("DelegationService", () => {
       accountsRepo.count.mockResolvedValue(0);
       delegatesRepo.count = jest.fn().mockResolvedValue(0);
       usersRepo.findOne.mockResolvedValue({
-        id: "d1",
+        id: DELEGATE_ID,
         role: "user",
         isDelegateOnly: true,
       });
-      await expect(service.canOwnerResetDelegatePassword("d1")).resolves.toBe(
-        true,
-      );
+      await expect(
+        service.canOwnerResetDelegatePassword(DELEGATE_ID),
+      ).resolves.toBe(true);
     });
 
     it("is false when the delegate is also a delegate elsewhere", async () => {
@@ -1320,13 +1374,13 @@ describe("DelegationService", () => {
         .mockResolvedValueOnce(0) // ownsDelegations (isFullAccount)
         .mockResolvedValueOnce(2); // delegations as delegate
       usersRepo.findOne.mockResolvedValue({
-        id: "d1",
+        id: DELEGATE_ID,
         role: "user",
         isDelegateOnly: true,
       });
-      await expect(service.canOwnerResetDelegatePassword("d1")).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.canOwnerResetDelegatePassword(DELEGATE_ID),
+      ).resolves.toBe(false);
     });
 
     it("is false for a claimed / self-registered user even with no own data yet", async () => {
@@ -1335,31 +1389,32 @@ describe("DelegationService", () => {
       // on; their login is theirs, so the owner can't rotate it even
       // before they have created any accounts of their own.
       usersRepo.findOne.mockResolvedValue({
-        id: "d1",
+        id: DELEGATE_ID,
         role: "user",
         isDelegateOnly: false,
       });
-      await expect(service.canOwnerResetDelegatePassword("d1")).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.canOwnerResetDelegatePassword(DELEGATE_ID),
+      ).resolves.toBe(false);
     });
 
     it("is false when the user record cannot be found", async () => {
       usersRepo.findOne.mockResolvedValue(null);
-      await expect(service.canOwnerResetDelegatePassword("d1")).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.canOwnerResetDelegatePassword(DELEGATE_ID),
+      ).resolves.toBe(false);
     });
   });
 
   describe("delegateEmailExists", () => {
     it("is true when a user with the (normalized) email exists", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "u1" });
+      usersRepo.findOne.mockResolvedValue({ id: SELF_ID });
       await expect(service.delegateEmailExists("  Foo@Bar.Com ")).resolves.toBe(
         true,
       );
       expect(usersRepo.findOne).toHaveBeenCalledWith({
         where: { email: "foo@bar.com" },
+        select: ["id"],
       });
     });
 
@@ -1383,23 +1438,23 @@ describe("DelegationService", () => {
     it("throws when the owner is not found", async () => {
       usersRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.createDelegate("o1", { email: "a@b.c" } as any),
+        service.createDelegate(OWNER_ID, { email: "a@b.c" } as any),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("rejects delegating to your own email", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "me@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "me@x.y" });
       await expect(
-        service.createDelegate("o1", { email: "ME@x.y" } as any),
+        service.createDelegate(OWNER_ID, { email: "ME@x.y" } as any),
       ).rejects.toThrow(/yourself/);
     });
 
     it("auto-generates a temporary password for a brand-new delegate", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null); // no existing user, no delegation
       installTransactionMock(manager);
-      const res = await service.createDelegate("o1", {
+      const res = await service.createDelegate(OWNER_ID, {
         email: "new@x.y",
       } as any);
       expect(res.temporaryPassword).toBeTruthy();
@@ -1407,9 +1462,9 @@ describe("DelegationService", () => {
     });
 
     it("clears lockout when the owner sets a password for a locked pure-delegate", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const lockedUser = {
-        id: "d1",
+        id: DELEGATE_ID,
         email: "new@x.y",
         oidcSubject: null,
         role: "user",
@@ -1425,11 +1480,12 @@ describe("DelegationService", () => {
       // owns no data) so credential management is allowed -- a fresh
       // self-registered user with no delegate role would not be.
       manager.count.mockImplementation((entity: any, opts: any) => {
-        if (opts?.where?.delegateUserId === "d1") return Promise.resolve(1);
+        if (opts?.where?.delegateUserId === DELEGATE_ID)
+          return Promise.resolve(1);
         return Promise.resolve(0);
       });
       installTransactionMock(manager);
-      await service.createDelegate("o1", {
+      await service.createDelegate(OWNER_ID, {
         email: "new@x.y",
         password: "StrongPass1!xyz",
       } as any);
@@ -1439,14 +1495,14 @@ describe("DelegationService", () => {
     });
 
     it("sends an invite when sendInvite is set and SMTP is configured", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       emailService.getStatus.mockReturnValue({ configured: true });
       emailService.sendMail.mockResolvedValue(undefined);
       configService.get.mockReturnValue("http://app");
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null);
       installTransactionMock(manager);
-      const res = await service.createDelegate("o1", {
+      const res = await service.createDelegate(OWNER_ID, {
         email: "new@x.y",
         sendInvite: true,
       } as any);
@@ -1455,7 +1511,7 @@ describe("DelegationService", () => {
     });
 
     it("resolves the invite email language from the delegate's stored preference", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       emailService.getStatus.mockReturnValue({ configured: true });
       emailService.sendMail.mockResolvedValue(undefined);
       configService.get.mockReturnValue("http://app");
@@ -1464,7 +1520,7 @@ describe("DelegationService", () => {
       manager.findOne.mockResolvedValue(null);
       installTransactionMock(manager);
 
-      await service.createDelegate("o1", {
+      await service.createDelegate(OWNER_ID, {
         email: "new@x.y",
         sendInvite: true,
       } as any);
@@ -1475,13 +1531,13 @@ describe("DelegationService", () => {
     });
 
     it("rejects an invite when SMTP is not configured", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       emailService.getStatus.mockReturnValue({ configured: false });
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null);
       installTransactionMock(manager);
       await expect(
-        service.createDelegate("o1", {
+        service.createDelegate(OWNER_ID, {
           email: "new@x.y",
           sendInvite: true,
         } as any),
@@ -1489,11 +1545,11 @@ describe("DelegationService", () => {
     });
 
     it("uses an owner-supplied password without forcing a change", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null);
       installTransactionMock(manager);
-      const res = await service.createDelegate("o1", {
+      const res = await service.createDelegate(OWNER_ID, {
         email: "new@x.y",
         password: "StrongPass1!xyz",
       } as any);
@@ -1502,42 +1558,42 @@ describe("DelegationService", () => {
     });
 
     it("reactivates a previously revoked delegation for an existing user", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const manager = makeManager();
       const existingDelegation = { id: "g1", status: "revoked" };
       manager.findOne
-        .mockResolvedValueOnce({ id: "d1" }) // existing user
+        .mockResolvedValueOnce({ id: DELEGATE_ID }) // existing user
         .mockResolvedValueOnce(existingDelegation); // existing delegation
       installTransactionMock(manager);
-      await service.createDelegate("o1", { email: "new@x.y" } as any);
+      await service.createDelegate(OWNER_ID, { email: "new@x.y" } as any);
       expect(existingDelegation.status).toBe("active");
     });
 
     it("conflicts when the user is already an active delegate", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const manager = makeManager();
       manager.findOne
-        .mockResolvedValueOnce({ id: "d1" })
+        .mockResolvedValueOnce({ id: DELEGATE_ID })
         .mockResolvedValueOnce({ id: "g1", status: "active" });
       installTransactionMock(manager);
       await expect(
-        service.createDelegate("o1", { email: "new@x.y" } as any),
+        service.createDelegate(OWNER_ID, { email: "new@x.y" } as any),
       ).rejects.toThrow(/already a delegate/);
     });
 
     it("rejects when the existing user is the owner themselves", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const manager = makeManager();
-      manager.findOne.mockResolvedValueOnce({ id: "o1" });
+      manager.findOne.mockResolvedValueOnce({ id: OWNER_ID });
       installTransactionMock(manager);
       await expect(
-        service.createDelegate("o1", { email: "new@x.y" } as any),
+        service.createDelegate(OWNER_ID, { email: "new@x.y" } as any),
       ).rejects.toThrow(/yourself/);
     });
 
     it("sets a password on an existing passwordless pure-delegate (re-link)", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
-      const existing = { id: "d1", passwordHash: null };
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
+      const existing = { id: DELEGATE_ID, passwordHash: null };
       const manager = makeManager();
       manager.findOne
         .mockResolvedValueOnce(existing) // existing user
@@ -1545,7 +1601,7 @@ describe("DelegationService", () => {
       // count(Account)=0, count(AccountDelegate owner)=0 -> pure delegate
       installTransactionMock(manager);
 
-      await service.createDelegate("o1", {
+      await service.createDelegate(OWNER_ID, {
         email: "shared@x.y",
         password: "StrongPass1!xyz",
       } as any);
@@ -1557,9 +1613,9 @@ describe("DelegationService", () => {
     });
 
     it("never touches credentials of an existing full user", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const existing = {
-        id: "d1",
+        id: DELEGATE_ID,
         passwordHash: "ORIGINAL",
         oidcSubject: null,
         role: "user",
@@ -1571,7 +1627,7 @@ describe("DelegationService", () => {
       manager.count.mockResolvedValue(2); // owns accounts -> full user
       installTransactionMock(manager);
 
-      const res = await service.createDelegate("o1", {
+      const res = await service.createDelegate(OWNER_ID, {
         email: "full@x.y",
         password: "StrongPass1!xyz",
       } as any);
@@ -1585,7 +1641,7 @@ describe("DelegationService", () => {
       // email-lookup debounce returns: dto.password is sent but the
       // target email belongs to a real user that just hasn't created
       // any accounts yet. mayManageCredentials must still be false.
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       const existing = {
         id: "d2",
         passwordHash: "USER-CHOSEN",
@@ -1601,7 +1657,7 @@ describe("DelegationService", () => {
       manager.count.mockResolvedValue(0);
       installTransactionMock(manager);
 
-      const res = await service.createDelegate("o1", {
+      const res = await service.createDelegate(OWNER_ID, {
         email: "fresh@x.y",
         password: "OwnerWouldOverwrite1!",
       } as any);
@@ -1611,7 +1667,7 @@ describe("DelegationService", () => {
     });
 
     it("logs (does not throw) when the invite email fails to send", async () => {
-      usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
+      usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
       emailService.getStatus.mockReturnValue({ configured: true });
       emailService.sendMail.mockRejectedValue(new Error("smtp down"));
       configService.get.mockReturnValue("http://app");
@@ -1621,7 +1677,7 @@ describe("DelegationService", () => {
         save: jest.fn((v: any) => ({ id: "g-new", ...v })),
       };
       installTransactionMock(manager);
-      const res = await service.createDelegate("o1", {
+      const res = await service.createDelegate(OWNER_ID, {
         email: "new@x.y",
         sendInvite: true,
       } as any);
@@ -1692,16 +1748,16 @@ describe("DelegationService", () => {
         { accountId: "a1", sortOrder: 0 },
         { accountId: "a2", sortOrder: 3 },
       ]);
-      const map = await service.getDelegateFavourites("d1");
+      const map = await service.getDelegateFavourites(DELEGATE_ID);
       expect(map.get("a1")).toBe(0);
       expect(map.get("a2")).toBe(3);
       expect(map.size).toBe(2);
     });
 
     it("setDelegateFavourite removes the row when unfavouriting", async () => {
-      await service.setDelegateFavourite("d1", "a1", false);
+      await service.setDelegateFavourite(DELEGATE_ID, "a1", false);
       expect(delegateFavouritesRepo.delete).toHaveBeenCalledWith({
-        delegateUserId: "d1",
+        delegateUserId: DELEGATE_ID,
         accountId: "a1",
       });
       expect(delegateFavouritesRepo.save).not.toHaveBeenCalled();
@@ -1709,15 +1765,15 @@ describe("DelegationService", () => {
 
     it("setDelegateFavourite is idempotent when already a favourite", async () => {
       delegateFavouritesRepo.findOne.mockResolvedValue({ id: "f1" });
-      await service.setDelegateFavourite("d1", "a1", true);
+      await service.setDelegateFavourite(DELEGATE_ID, "a1", true);
       expect(delegateFavouritesRepo.save).not.toHaveBeenCalled();
     });
 
     it("setDelegateFavourite inserts a new favourite", async () => {
       delegateFavouritesRepo.findOne.mockResolvedValue(null);
-      await service.setDelegateFavourite("d1", "a1", true);
+      await service.setDelegateFavourite(DELEGATE_ID, "a1", true);
       expect(delegateFavouritesRepo.save).toHaveBeenCalledWith({
-        delegateUserId: "d1",
+        delegateUserId: DELEGATE_ID,
         accountId: "a1",
         sortOrder: 0,
       });
@@ -1725,7 +1781,7 @@ describe("DelegationService", () => {
 
     it("reorderDelegateFavourites rejects a non-array (CWE-834)", async () => {
       await expect(
-        service.reorderDelegateFavourites("d1", {
+        service.reorderDelegateFavourites(DELEGATE_ID, {
           length: 1e9,
         } as unknown as string[]),
       ).rejects.toThrow(/must be an array/);
@@ -1733,20 +1789,20 @@ describe("DelegationService", () => {
 
     it("reorderDelegateFavourites sets sortOrder by position", async () => {
       const manager = installTransactionMock({ update: jest.fn() });
-      await service.reorderDelegateFavourites("d1", ["a2", "a1"]);
+      await service.reorderDelegateFavourites(DELEGATE_ID, ["a2", "a1"]);
       // The whole reorder is one transaction, so a partially applied order can
       // never be committed.
       expect(dataSource.transaction).toHaveBeenCalledTimes(1);
       expect(manager.update).toHaveBeenNthCalledWith(
         1,
         DelegateAccountFavourite,
-        { delegateUserId: "d1", accountId: "a2" },
+        { delegateUserId: DELEGATE_ID, accountId: "a2" },
         { sortOrder: 0 },
       );
       expect(manager.update).toHaveBeenNthCalledWith(
         2,
         DelegateAccountFavourite,
-        { delegateUserId: "d1", accountId: "a1" },
+        { delegateUserId: DELEGATE_ID, accountId: "a1" },
         { sortOrder: 1 },
       );
     });
@@ -1756,11 +1812,11 @@ describe("DelegationService", () => {
     it("throws when the delegate user no longer exists", async () => {
       delegatesRepo.findOne.mockResolvedValue({
         id: "g1",
-        delegateUserId: "d1",
+        delegateUserId: DELEGATE_ID,
       });
       usersRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.resetDelegatePassword("o1", "g1"),
+        service.resetDelegatePassword(OWNER_ID, "g1"),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });

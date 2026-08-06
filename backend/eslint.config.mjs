@@ -37,6 +37,14 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/database/demo-seed.service.ts",
   "src/database/seed.service.ts",
   "src/delegation/cross-owner-access.service.ts",
+  // Owner <-> delegate management. `users_self` exposes only the caller's own
+  // row, so an owner cannot see the login they provisioned and a delegate
+  // cannot see the owner they act for -- both halves of Shared Access are
+  // cross-user by construction. Delegate-side reads of the owner take
+  // withDelegateContext (no bypass); the owner-side management of another
+  // person's login takes withSystemContext, always after the delegation row
+  // has been read under the owner's own scope. See DelegationService.
+  "src/delegation/delegation.service.ts",
   "src/delegation/guards/account-delegate.guard.ts",
   // Joint accounts: one system-context read, the owner-label lookup (the
   // grantee's session cannot see the owner's users row under enforcement;

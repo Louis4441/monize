@@ -589,6 +589,8 @@
       "description": "Einer anderen Person begrenzten Zugriff auf Ihre Konten gewähren.",
       "emailLabel": "E-Mail",
       "emailPlaceholder": "E-Mail des Delegierten",
+      "checkingEmail": "Diese E-Mail wird mit vorhandenen Monize-Konten abgeglichen …",
+      "retryEmailCheck": "Erneut prüfen",
       "firstNameLabel": "Vorname",
       "firstNamePlaceholder": "Vorname (optional)",
       "lastNameLabel": "Nachname",
@@ -624,7 +626,8 @@
       "createFailed": "Delegierter konnte nicht erstellt werden",
       "revokeFailed": "Widerruf des Delegierten fehlgeschlagen",
       "resetPasswordFailed": "Passwort konnte nicht zurückgesetzt werden",
-      "copyFailed": "Kopieren in die Zwischenablage nicht möglich"
+      "copyFailed": "Kopieren in die Zwischenablage nicht möglich",
+      "lookupFailed": "Diese E-Mail konnte nicht mit vorhandenen Monize-Konten abgeglichen werden. Das Hinzufügen eines Delegierten pausiert, bis diese Prüfung gelingt, damit kein vorhandenes Passwort versehentlich überschrieben wird."
     },
     "jointLabel": "{count, plural, one {# Gemeinschaftskonto} other {# Gemeinschaftskonten}}"
   },

@@ -402,7 +402,12 @@ describe('SharedAccessSection', () => {
     );
   });
 
-  it('treats the email as new when the lookup request fails', async () => {
+  // This replaces a test that asserted the opposite -- "treats the email as
+  // new when the lookup request fails". That was the behaviour that hid a
+  // production bug for a week: with the lookup broken, the form drew the
+  // password field and read exactly like a confident "this person is new".
+  // A failed lookup is not an answer, and the states have to stay apart.
+  it('shows a failed lookup as a failure rather than as a new account', async () => {
     vi.mocked(delegationApi.lookupEmail).mockRejectedValue(
       new Error('lookup failed'),
     );
@@ -420,18 +425,104 @@ describe('SharedAccessSection', () => {
       });
     });
 
-    // After the 400ms debounce + failed lookup, emailExists stays null so the
-    // password field remains visible (existing-login notice never appears).
-    await waitFor(
-      () =>
-        expect(
-          screen.getByPlaceholderText('Set a password'),
-        ).toBeInTheDocument(),
-      { timeout: 2000 },
+    expect(
+      await screen.findByText(/Could not check this email/i, undefined, {
+        timeout: 2000,
+      }),
+    ).toBeInTheDocument();
+    // The credential controls depend on the answer, so they are not offered.
+    expect(
+      screen.queryByPlaceholderText('Set a password'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/already has a Monize login/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('will not submit over a failed lookup, and retrying re-runs it', async () => {
+    vi.mocked(delegationApi.lookupEmail).mockRejectedValueOnce(
+      new Error('lookup failed'),
     );
-    await waitFor(() =>
-      expect(delegationApi.lookupEmail).toHaveBeenCalledWith('maybe@x.y'),
+    await renderSection();
+    await screen.findByText('d@e.f');
+
+    await act(async () => {
+      openCreateModal();
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Delegate email'), {
+        target: { value: 'maybe@x.y' },
+      });
+    });
+    await screen.findByText(/Could not check this email/i, undefined, {
+      timeout: 2000,
+    });
+
+    // Submitting blind is what would set a password on someone else's login.
+    const submit = screen.getAllByRole('button', { name: 'Add delegate' });
+    expect(submit[submit.length - 1]).toBeDisabled();
+    await act(async () => {
+      submitCreate();
+    });
+    expect(delegationApi.createDelegate).not.toHaveBeenCalled();
+
+    // The retry must actually change something, or every attempt takes the
+    // identical path. Second call resolves, and the answer replaces the error.
+    vi.mocked(delegationApi.lookupEmail).mockResolvedValue({ exists: true });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    });
+
+    expect(
+      await screen.findByText(/already has a Monize login/i, undefined, {
+        timeout: 2000,
+      }),
+    ).toBeInTheDocument();
+    expect(vi.mocked(delegationApi.lookupEmail).mock.calls.length).toBe(2);
+  });
+
+  it('does not adopt a lookup answer that belongs to a previous address', async () => {
+    // The debounce does not make this impossible: a slow first response can
+    // land after the field has moved on, and "exists" for the old address
+    // would then hide the password field for the new one.
+    const answers: Record<string, { exists: boolean }> = {
+      'old@x.y': { exists: true },
+      'new@x.y': { exists: false },
+    };
+    vi.mocked(delegationApi.lookupEmail).mockImplementation(
+      async (addr: string) => answers[addr],
     );
+
+    await renderSection();
+    await screen.findByText('d@e.f');
+    await act(async () => {
+      openCreateModal();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Delegate email'), {
+        target: { value: 'old@x.y' },
+      });
+    });
+    await screen.findByText(/already has a Monize login/i, undefined, {
+      timeout: 2000,
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Delegate email'), {
+        target: { value: 'new@x.y' },
+      });
+    });
+
+    // The previous address's "exists" must not survive into the new one.
+    expect(
+      await screen.findByPlaceholderText('Set a password', undefined, {
+        timeout: 2000,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/already has a Monize login/i),
+    ).not.toBeInTheDocument();
   });
 
   it('surfaces an error toast when creating a delegate fails', async () => {

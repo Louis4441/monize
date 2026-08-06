@@ -589,6 +589,8 @@
       "description": "Grant another person scoped access to your accounts.",
       "emailLabel": "Email",
       "emailPlaceholder": "Delegate email",
+      "checkingEmail": "Checking this email against existing Monize accounts…",
+      "retryEmailCheck": "Check again",
       "firstNameLabel": "First name",
       "firstNamePlaceholder": "First name (optional)",
       "lastNameLabel": "Last name",
@@ -624,7 +626,8 @@
       "createFailed": "Failed to create delegate",
       "revokeFailed": "Failed to revoke delegate",
       "resetPasswordFailed": "Failed to reset password",
-      "copyFailed": "Could not copy to clipboard"
+      "copyFailed": "Could not copy to clipboard",
+      "lookupFailed": "Could not check this email against existing Monize accounts. Adding a delegate is paused until that check succeeds, so an existing password is never overwritten by mistake."
     },
     "jointLabel": "{count, plural, one {# joint account} other {# joint accounts}}"
   },
