@@ -561,7 +561,13 @@ export class AiRelayService {
     phase: "start" | "result",
     isError = false,
   ): void {
-    this.lastPollAt.set(userId, Date.now());
+    // Deliberately does NOT stamp lastPollAt: every MCP data tool call lands
+    // here, including calls from a direct MCP client (Claude Desktop) that has
+    // nothing to do with the relay. Stamping made the user look
+    // relay-connected the instant any tool ran, which routed the direct
+    // client's own write-confirmation card to the web chat. Only the relay
+    // control tools (get_next_prompt / post_response / report_progress) prove
+    // a relay agent is present.
     // Tool activity is liveness: keep the idle timer from firing mid-task.
     this.bumpInFlight(userId);
     const event: RelayServerEvent =
@@ -625,10 +631,17 @@ export class AiRelayService {
 
   /**
    * Whether the user has a relay agent currently or very recently handling a
-   * prompt: an in-flight prompt, a prompt that timed out after a claim (awaiting
-   * a late answer), or an agent that polled within the connection window. Used
-   * to decide whether a card with no live stream belongs to a relay turn (buffer
-   * it) or to a direct MCP client (let the caller elicit).
+   * prompt: an in-flight prompt, or a prompt that timed out after a claim
+   * (awaiting a late answer). Used to decide whether a card with no live stream
+   * belongs to a relay turn (buffer it) or to a direct MCP client (let the
+   * caller elicit).
+   *
+   * Deliberately keyed to a CLAIMED prompt only -- never to connection
+   * liveness. A relay agent that is merely parked on get_next_prompt has no
+   * prompt to be writing for, so a write arriving then is a direct MCP
+   * client's, and its confirmation must stay in that client. Treating a recent
+   * poll as a relay turn routed direct clients' confirmation cards to the web
+   * chat.
    */
   private hasRelayTurn(userId: string): boolean {
     for (const record of this.inFlight.values()) {
@@ -641,8 +654,7 @@ export class AiRelayService {
         return true;
       }
     }
-    const last = this.lastPollAt.get(userId) ?? 0;
-    return Date.now() - last < CONNECTED_WINDOW_MS;
+    return false;
   }
 
   /** Store a late confirmation card for pickup, enforcing TTL and the per-user cap. */

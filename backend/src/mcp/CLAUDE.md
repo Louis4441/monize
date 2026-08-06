@@ -109,7 +109,12 @@ Checklist for a new tool:
      the approve/reject card is shown in the browser and committed via
      `/ai/actions/confirm` on approval -- return `RELAY_PREVIEW_SHOWN` and do
      NOT write or `confirmWrite`. If it returns `false` (no in-flight relay
-     prompt), fall through to `confirmWrite` as above.
+     prompt), fall through to `confirmWrite` as above. The relay decision is
+     keyed to a **claimed relay prompt** (in-flight or awaiting a late
+     answer), never to connection liveness: every data tool call -- from a
+     direct MCP client too -- produces tool-activity signals, so "the user
+     looks connected" is not evidence the write serves the web chat, and
+     using it routed direct clients' confirmation cards there.
 6. Update `mcp-server.service.ts` count and `mcp.module.ts` if it's a new
    provider class.
 7. Add/extend tests (below). `mcp-annotations.spec.ts` enforces that every tool

@@ -173,6 +173,31 @@ describe("AiRelayService", () => {
       expect(service.emitPendingAction(USER, action)).toBe(false);
       expect(service.takeBufferedActions(USER)).toEqual([]);
     });
+
+    it("does not treat a direct MCP client's own tool activity as a relay turn", () => {
+      // Every MCP data tool call reports activity before its handler runs --
+      // including manage_transactions itself, called from Claude Desktop with
+      // no relay in sight. That activity must not make the write look like a
+      // relay turn, or the confirmation card lands in the web chat instead of
+      // the client that asked.
+      service.reportToolActivity(USER, "list_accounts", "start");
+      service.reportToolActivity(USER, "list_accounts", "result", false);
+      service.reportToolActivity(USER, "manage_transactions", "start");
+
+      expect(service.emitPendingAction(USER, action)).toBe(false);
+      expect(service.takeBufferedActions(USER)).toEqual([]);
+    });
+
+    it("does not route a card to the web chat while a relay agent is merely parked listening", () => {
+      // A relay agent polling get_next_prompt with nothing queued has no
+      // claimed prompt, so a write arriving now is a direct MCP client's and
+      // must confirm there -- not in the web chat.
+      void service.waitForPrompt(USER);
+      expect(service.getStatus(USER).state).toBe("listening");
+
+      expect(service.emitPendingAction(USER, action)).toBe(false);
+      expect(service.takeBufferedActions(USER)).toEqual([]);
+    });
   });
 
   describe("reportProgress", () => {
@@ -246,6 +271,12 @@ describe("AiRelayService", () => {
   describe("status", () => {
     it("is offline before any agent polls", () => {
       expect(service.getStatus(USER)).toEqual({ state: "offline", queued: 0 });
+    });
+
+    it("stays offline on tool activity alone (a direct MCP client is not a relay agent)", () => {
+      service.reportToolActivity(USER, "list_accounts", "start");
+      service.reportToolActivity(USER, "list_accounts", "result", false);
+      expect(service.getStatus(USER).state).toBe("offline");
     });
 
     it("is busy while a claimed prompt is in flight", async () => {
