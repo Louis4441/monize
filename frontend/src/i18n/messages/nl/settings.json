@@ -589,6 +589,8 @@
       "description": "Verleen een andere persoon beperkte toegang tot jouw rekeningen.",
       "emailLabel": "E-mail",
       "emailPlaceholder": "E-mail van gedelegeerde",
+      "checkingEmail": "Dit e-mailadres wordt vergeleken met bestaande Monize-accounts…",
+      "retryEmailCheck": "Opnieuw controleren",
       "firstNameLabel": "Voornaam",
       "firstNamePlaceholder": "Voornaam (optioneel)",
       "lastNameLabel": "Achternaam",
@@ -624,7 +626,8 @@
       "createFailed": "Aanmaken van gedelegeerde mislukt",
       "revokeFailed": "Intrekken van gedelegeerde mislukt",
       "resetPasswordFailed": "Opnieuw instellen van wachtwoord mislukt",
-      "copyFailed": "Kopiëren naar klembord mislukt"
+      "copyFailed": "Kopiëren naar klembord mislukt",
+      "lookupFailed": "Dit e-mailadres kon niet worden vergeleken met bestaande Monize-accounts. Het toevoegen van een gemachtigde is gepauzeerd totdat die controle slaagt, zodat een bestaand wachtwoord nooit per ongeluk wordt overschreven."
     },
     "jointLabel": "{count, plural, one {# gezamenlijke rekening} other {# gezamenlijke rekeningen}}"
   },

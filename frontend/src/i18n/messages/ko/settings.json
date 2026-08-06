@@ -589,6 +589,8 @@
       "description": "다른 사람에게 계정에 대한 범위별 접근 권한을 부여합니다.",
       "emailLabel": "이메일",
       "emailPlaceholder": "위임자 이메일",
+      "checkingEmail": "이 이메일을 기존 Monize 계정과 대조하는 중…",
+      "retryEmailCheck": "다시 확인",
       "firstNameLabel": "이름",
       "firstNamePlaceholder": "이름 (선택사항)",
       "lastNameLabel": "성",
@@ -624,7 +626,8 @@
       "createFailed": "위임자 생성에 실패했습니다",
       "revokeFailed": "위임자 취소에 실패했습니다",
       "resetPasswordFailed": "비밀번호 재설정에 실패했습니다",
-      "copyFailed": "클립보드에 복사할 수 없습니다"
+      "copyFailed": "클립보드에 복사할 수 없습니다",
+      "lookupFailed": "이 이메일을 기존 Monize 계정과 대조할 수 없습니다. 기존 비밀번호를 실수로 덮어쓰지 않도록, 대조가 성공할 때까지 위임자 추가를 중단합니다."
     },
     "jointLabel": "{count, plural, other {공동 계좌 #개}}"
   },

@@ -589,6 +589,8 @@
       "description": "Przyznaj innej osobie ograniczony dostęp do Twoich kont.",
       "emailLabel": "E-mail",
       "emailPlaceholder": "E-mail pełnomocnika",
+      "checkingEmail": "Sprawdzanie tego adresu e-mail względem istniejących kont Monize…",
+      "retryEmailCheck": "Sprawdź ponownie",
       "firstNameLabel": "Imię",
       "firstNamePlaceholder": "Imię (opcjonalnie)",
       "lastNameLabel": "Nazwisko",
@@ -624,7 +626,8 @@
       "createFailed": "Nie udało się utworzyć pełnomocnika",
       "revokeFailed": "Nie udało się odwołać pełnomocnika",
       "resetPasswordFailed": "Nie udało się zresetować hasła",
-      "copyFailed": "Nie udało się skopiować do schowka"
+      "copyFailed": "Nie udało się skopiować do schowka",
+      "lookupFailed": "Nie udało się sprawdzić tego adresu e-mail względem istniejących kont Monize. Dodawanie pełnomocnika jest wstrzymane do czasu powodzenia tego sprawdzenia, aby istniejące hasło nigdy nie zostało przypadkowo nadpisane."
     },
     "jointLabel": "{count, plural, one {# wspólne konto} few {# wspólne konta} many {# wspólnych kont} other {# wspólnego konta}}"
   },

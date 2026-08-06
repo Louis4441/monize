@@ -589,6 +589,8 @@
       "description": "Concedi a un'altra persona accesso limitato ai tuoi conti.",
       "emailLabel": "Email",
       "emailPlaceholder": "Email del delegato",
+      "checkingEmail": "Verifica di questa e-mail rispetto agli account Monize esistenti…",
+      "retryEmailCheck": "Verifica di nuovo",
       "firstNameLabel": "Nome",
       "firstNamePlaceholder": "Nome (facoltativo)",
       "lastNameLabel": "Cognome",
@@ -624,7 +626,8 @@
       "createFailed": "Impossibile creare il delegato",
       "revokeFailed": "Impossibile revocare il delegato",
       "resetPasswordFailed": "Impossibile reimpostare la password",
-      "copyFailed": "Impossibile copiare negli appunti"
+      "copyFailed": "Impossibile copiare negli appunti",
+      "lookupFailed": "Non è stato possibile verificare questa e-mail rispetto agli account Monize esistenti. L'aggiunta di un delegato resta sospesa finché la verifica non riesce, così che nessuna password esistente venga sovrascritta per errore."
     },
     "jointLabel": "{count, plural, one {# conto cointestato} other {# conti cointestati}}"
   },

@@ -589,6 +589,8 @@
       "description": "Accordez à une autre personne un accès limité à vos comptes.",
       "emailLabel": "E-mail",
       "emailPlaceholder": "E-mail du délégué",
+      "checkingEmail": "Vérification de cet e-mail auprès des comptes Monize existants…",
+      "retryEmailCheck": "Vérifier à nouveau",
       "firstNameLabel": "Prénom",
       "firstNamePlaceholder": "Prénom (facultatif)",
       "lastNameLabel": "Nom",
@@ -624,7 +626,8 @@
       "createFailed": "Échec de la création du délégué",
       "revokeFailed": "Échec de la révocation du délégué",
       "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
-      "copyFailed": "Impossible de copier dans le presse-papiers"
+      "copyFailed": "Impossible de copier dans le presse-papiers",
+      "lookupFailed": "Impossible de vérifier cet e-mail auprès des comptes Monize existants. L'ajout d'un délégué est suspendu jusqu'à ce que cette vérification aboutisse, afin qu'un mot de passe existant ne soit jamais écrasé par erreur."
     },
     "jointLabel": "{count, plural, one {# compte joint} other {# comptes joints}}"
   },

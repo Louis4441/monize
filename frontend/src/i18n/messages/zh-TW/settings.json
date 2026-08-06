@@ -589,6 +589,8 @@
       "description": "授予另一個人對您的科目的範圍存取。",
       "emailLabel": "電子郵件",
       "emailPlaceholder": "委派人電子郵件",
+      "checkingEmail": "正在將此電子郵件與現有 Monize 帳戶進行核對……",
+      "retryEmailCheck": "重新檢查",
       "firstNameLabel": "名字",
       "firstNamePlaceholder": "名字（選填）",
       "lastNameLabel": "姓氏",
@@ -624,7 +626,8 @@
       "createFailed": "建立委派人失敗",
       "revokeFailed": "撤銷委派人失敗",
       "resetPasswordFailed": "重置密碼失敗",
-      "copyFailed": "無法複製至剪貼簿"
+      "copyFailed": "無法複製至剪貼簿",
+      "lookupFailed": "無法將此電子郵件與現有 Monize 帳戶進行核對。在該核對成功之前，新增委派人已暫停，以免誤覆寫現有密碼。"
     },
     "jointLabel": "{count, plural, other {# 個聯名帳戶}}"
   },

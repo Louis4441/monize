@@ -589,6 +589,8 @@
       "description": "授予他人对您账户的范围访问权限。",
       "emailLabel": "电子邮件",
       "emailPlaceholder": "委托人电子邮件",
+      "checkingEmail": "正在将此电子邮件与现有 Monize 账户进行核对……",
+      "retryEmailCheck": "重新检查",
       "firstNameLabel": "名字",
       "firstNamePlaceholder": "名字（可选）",
       "lastNameLabel": "姓氏",
@@ -624,7 +626,8 @@
       "createFailed": "创建委托人失败",
       "revokeFailed": "撤销委托人失败",
       "resetPasswordFailed": "重置密码失败",
-      "copyFailed": "无法复制到剪贴板"
+      "copyFailed": "无法复制到剪贴板",
+      "lookupFailed": "无法将此电子邮件与现有 Monize 账户进行核对。在该核对成功之前，添加委托人已暂停，以免误覆盖现有密码。"
     },
     "jointLabel": "{count, plural, other {# 个联名账户}}"
   },

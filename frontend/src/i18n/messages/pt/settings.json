@@ -589,6 +589,8 @@
       "description": "Conceda a outra pessoa acesso limitado às suas contas.",
       "emailLabel": "E-mail",
       "emailPlaceholder": "E-mail do delegado",
+      "checkingEmail": "A verificar este e-mail em relação às contas Monize existentes…",
+      "retryEmailCheck": "Verificar novamente",
       "firstNameLabel": "Nome",
       "firstNamePlaceholder": "Nome (opcional)",
       "lastNameLabel": "Apelido",
@@ -624,7 +626,8 @@
       "createFailed": "Falha ao criar delegado",
       "revokeFailed": "Falha ao revogar delegado",
       "resetPasswordFailed": "Falha ao redefinir palavra-passe",
-      "copyFailed": "Não foi possível copiar para a área de transferência"
+      "copyFailed": "Não foi possível copiar para a área de transferência",
+      "lookupFailed": "Não foi possível verificar este e-mail em relação às contas Monize existentes. A adição de um delegado fica em pausa até que essa verificação tenha êxito, para que nenhuma palavra-passe existente seja substituída por engano."
     },
     "jointLabel": "{count, plural, one {# conta conjunta} other {# contas conjuntas}}"
   },

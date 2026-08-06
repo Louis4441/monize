@@ -589,6 +589,8 @@
       "description": "Berikan akses terbatas kepada orang lain ke akun Anda.",
       "emailLabel": "Surel",
       "emailPlaceholder": "Surel delegasi",
+      "checkingEmail": "Memeriksa email ini terhadap akun Monize yang sudah ada…",
+      "retryEmailCheck": "Periksa lagi",
       "firstNameLabel": "Nama depan",
       "firstNamePlaceholder": "Nama depan (opsional)",
       "lastNameLabel": "Nama belakang",
@@ -624,7 +626,8 @@
       "createFailed": "Gagal membuat delegasi",
       "revokeFailed": "Gagal mencabut delegasi",
       "resetPasswordFailed": "Gagal mengatur ulang kata sandi",
-      "copyFailed": "Tidak dapat menyalin ke papan klip"
+      "copyFailed": "Tidak dapat menyalin ke papan klip",
+      "lookupFailed": "Tidak dapat memeriksa email ini terhadap akun Monize yang sudah ada. Penambahan delegasi ditunda sampai pemeriksaan itu berhasil, sehingga kata sandi yang sudah ada tidak pernah tertimpa secara keliru."
     },
     "jointLabel": "{count, plural, other {# akun bersama}}"
   },

@@ -589,6 +589,8 @@
       "description": "Cấp cho người khác quyền truy cập có phạm vi vào tài khoản của bạn.",
       "emailLabel": "Email",
       "emailPlaceholder": "Email đại diện",
+      "checkingEmail": "Đang đối chiếu email này với các tài khoản Monize hiện có…",
+      "retryEmailCheck": "Kiểm tra lại",
       "firstNameLabel": "Tên",
       "firstNamePlaceholder": "Tên (tùy chọn)",
       "lastNameLabel": "Họ",
@@ -624,7 +626,8 @@
       "createFailed": "Không thể tạo đại diện",
       "revokeFailed": "Không thể thu hồi đại diện",
       "resetPasswordFailed": "Không thể đặt lại mật khẩu",
-      "copyFailed": "Không thể sao chép vào clipboard"
+      "copyFailed": "Không thể sao chép vào clipboard",
+      "lookupFailed": "Không thể đối chiếu email này với các tài khoản Monize hiện có. Việc thêm người được ủy quyền tạm dừng cho đến khi lần đối chiếu đó thành công, để không bao giờ ghi đè nhầm một mật khẩu hiện có."
     },
     "jointLabel": "{count, plural, other {# tài khoản chung}}"
   },

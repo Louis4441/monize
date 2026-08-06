@@ -589,6 +589,8 @@
       "description": "別のユーザーにアカウントへのスコープ付きアクセスを付与します。",
       "emailLabel": "メールアドレス",
       "emailPlaceholder": "デリゲートのメールアドレス",
+      "checkingEmail": "このメールアドレスを既存のMonizeアカウントと照合しています…",
+      "retryEmailCheck": "再確認する",
       "firstNameLabel": "名",
       "firstNamePlaceholder": "名（任意）",
       "lastNameLabel": "姓",
@@ -624,7 +626,8 @@
       "createFailed": "デリゲートの作成に失敗しました",
       "revokeFailed": "デリゲートの取り消しに失敗しました",
       "resetPasswordFailed": "パスワードのリセットに失敗しました",
-      "copyFailed": "クリップボードにコピーできませんでした"
+      "copyFailed": "クリップボードにコピーできませんでした",
+      "lookupFailed": "このメールアドレスを既存のMonizeアカウントと照合できませんでした。既存のパスワードを誤って上書きしないよう、照合が成功するまでデリゲートの追加を停止しています。"
     },
     "jointLabel": "{count, plural, other {# 件の共同口座}}"
   },
