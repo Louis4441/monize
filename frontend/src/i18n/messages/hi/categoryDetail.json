@@ -1,0 +1,109 @@
+{
+  "loading": "श्रेणी लोड हो रही है...",
+  "notFound": "श्रेणी नहीं मिली",
+  "loadFailed": "यह श्रेणी लोड नहीं हो सकी",
+  "backToCategories": "श्रेणियाँ",
+  "error": {
+    "retry": "फिर कोशिश करें"
+  },
+  "header": {
+    "incomePill": "आय",
+    "expensePill": "व्यय",
+    "systemBadge": "सिस्टम",
+    "edit": "संपादित करें",
+    "delete": "हटाएं",
+    "viewTransactions": "लेन-देन देखें",
+    "switchCategory": "किसी दूसरी श्रेणी पर जाएँ",
+    "switchPlaceholder": "श्रेणियाँ छाँटें...",
+    "switchNoMatches": "कोई श्रेणी मेल नहीं खाती",
+    "since": "{date} से श्रेणी"
+  },
+  "summary": {
+    "spentThisYear": "इस वर्ष खर्च",
+    "receivedThisYear": "इस वर्ष प्राप्त",
+    "vsLastYear": "पिछले वर्ष की समान अवधि से {percent}",
+    "vsLastYearNew": "पिछले वर्ष इस अवधि में कुछ नहीं",
+    "monthlyAverage": "मासिक औसत",
+    "averageTransaction": "औसत लेन-देन",
+    "transactions": "लेन-देन",
+    "sinceYear": "{year} से",
+    "lastTransaction": "अंतिम लेन-देन",
+    "convertedNote": "{currency} में परिवर्तित"
+  },
+  "topPayees": {
+    "title": "शीर्ष भुगतानकर्ता",
+    "subtitle": "पिछले 12 महीने",
+    "empty": "पिछले 12 महीनों में कोई गतिविधि नहीं",
+    "subtitleAllTime": "पूरा इतिहास",
+    "emptyAllTime": "इस श्रेणी के लिए कोई गतिविधि दर्ज नहीं",
+    "noPayee": "कोई भुगतानकर्ता नहीं",
+    "range12m": "12 महीने",
+    "rangeAll": "सभी"
+  },
+  "subcategoriesPanel": {
+    "title": "उपश्रेणियाँ",
+    "subtitle": "पूरा इतिहास, हर एक में उसकी अपनी उपश्रेणियाँ शामिल",
+    "empty": "इस श्रेणी की कोई उपश्रेणी नहीं है",
+    "thisCategory": "यह श्रेणी"
+  },
+  "accountsPanel": {
+    "title": "इन खातों से भुगतान",
+    "subtitle": "पूरा इतिहास",
+    "empty": "अभी कोई लेन-देन नहीं"
+  },
+  "scheduledPanel": {
+    "title": "आगामी नियोजित",
+    "subtitle": "इस श्रेणी के बिल और जमा",
+    "empty": "इस श्रेणी में कुछ भी नियोजित नहीं",
+    "noPayee": "कोई भुगतानकर्ता नहीं"
+  },
+  "tagPanel": {
+    "title": "टैग के अनुसार विश्लेषण",
+    "subtitle": "टैग मान के अनुसार इस श्रेणी का खर्च",
+    "keyLabel": "टैग कुंजी"
+  },
+  "keyInfo": {
+    "title": "मुख्य जानकारी",
+    "type": "प्रकार",
+    "income": "आय",
+    "expense": "व्यय",
+    "parent": "मूल श्रेणी",
+    "subcategories": "उपश्रेणियाँ",
+    "payees": "भुगतानकर्ता",
+    "created": "जोड़ा गया",
+    "firstTransaction": "पहला लेन-देन",
+    "largestTransaction": "सबसे बड़ा लेन-देन",
+    "largestValue": "{date} को {amount}",
+    "defaultFor": "इनकी डिफ़ॉल्ट श्रेणी",
+    "defaultForMore": "+{count} और",
+    "description": "विवरण"
+  },
+  "tabs": {
+    "ariaLabel": "श्रेणी के अनुभाग",
+    "overview": "अवलोकन",
+    "transactions": "लेन-देन",
+    "subcategories": "उपश्रेणियाँ"
+  },
+  "transactionsTab": {
+    "title": "लेन-देन",
+    "empty": "इस श्रेणी में अभी कोई लेन-देन नहीं है",
+    "loadFailed": "लेन-देन लोड नहीं हो सके",
+    "titleWithCount": "लेन-देन ({count})",
+    "openInRegister": "रजिस्टर में खोलें"
+  },
+  "subcategoriesTab": {
+    "empty": "इस श्रेणी की कोई उपश्रेणी नहीं है",
+    "name": "नाम",
+    "total": "कुल",
+    "transactions": "लेन-देन"
+  },
+  "seasonality": {
+    "title": "मौसमी रुझान",
+    "tooltip": "इस श्रेणी में एक सामान्य महीने का खर्च, पूरे इतिहास के वर्षों का औसत।",
+    "peak": "खर्च {month} में केंद्रित है।",
+    "even": "खर्च पूरे वर्ष समान रूप से फैला है।",
+    "needsMoreHistory": "मौसमी रुझान को संयोग से अलग करने के लिए कम से कम {years} वर्ष का इतिहास चाहिए।",
+    "empty": "महीने के अनुसार बाँटने के लिए अभी कोई खर्च नहीं",
+    "monthTooltip": "{month}: {years, plural, one {# वर्ष} other {# वर्षों}} में औसतन {amount}"
+  }
+}

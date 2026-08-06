@@ -1,0 +1,109 @@
+{
+  "loading": "Memuat kategori...",
+  "notFound": "Kategori tidak ditemukan",
+  "loadFailed": "Kategori ini tidak dapat dimuat",
+  "backToCategories": "Kategori",
+  "error": {
+    "retry": "Coba lagi"
+  },
+  "header": {
+    "incomePill": "Pendapatan",
+    "expensePill": "Pengeluaran",
+    "systemBadge": "Sistem",
+    "edit": "Ubah",
+    "delete": "Hapus",
+    "viewTransactions": "Lihat transaksi",
+    "switchCategory": "Pindah ke kategori lain",
+    "switchPlaceholder": "Saring kategori...",
+    "switchNoMatches": "Tidak ada kategori yang cocok",
+    "since": "Kategori sejak {date}"
+  },
+  "summary": {
+    "spentThisYear": "Pengeluaran Tahun Ini",
+    "receivedThisYear": "Diterima Tahun Ini",
+    "vsLastYear": "{percent} dibanding periode yang sama tahun lalu",
+    "vsLastYearNew": "Tidak ada apa pun pada periode ini tahun lalu",
+    "monthlyAverage": "Rata-rata Bulanan",
+    "averageTransaction": "Transaksi Rata-rata",
+    "transactions": "Transaksi",
+    "sinceYear": "Sejak {year}",
+    "lastTransaction": "Transaksi Terakhir",
+    "convertedNote": "Dikonversi ke {currency}"
+  },
+  "topPayees": {
+    "title": "Penerima Teratas",
+    "subtitle": "12 bulan terakhir",
+    "empty": "Tidak ada aktivitas dalam 12 bulan terakhir",
+    "subtitleAllTime": "Seluruh riwayat",
+    "emptyAllTime": "Tidak ada aktivitas tercatat untuk kategori ini",
+    "noPayee": "Tanpa penerima",
+    "range12m": "12 bulan",
+    "rangeAll": "Semua"
+  },
+  "subcategoriesPanel": {
+    "title": "Subkategori",
+    "subtitle": "Seluruh riwayat, masing-masing termasuk subkategorinya sendiri",
+    "empty": "Kategori ini tidak memiliki subkategori",
+    "thisCategory": "Kategori ini"
+  },
+  "accountsPanel": {
+    "title": "Dibayar dari Akun",
+    "subtitle": "Seluruh riwayat",
+    "empty": "Belum ada transaksi"
+  },
+  "scheduledPanel": {
+    "title": "Terjadwal Mendatang",
+    "subtitle": "Tagihan dan setoran dalam kategori ini",
+    "empty": "Tidak ada yang terjadwal dalam kategori ini",
+    "noPayee": "Tanpa penerima"
+  },
+  "tagPanel": {
+    "title": "Rincian Tag",
+    "subtitle": "Pengeluaran dalam kategori ini menurut nilai tag",
+    "keyLabel": "Kunci tag"
+  },
+  "keyInfo": {
+    "title": "Informasi utama",
+    "type": "Jenis",
+    "income": "Pendapatan",
+    "expense": "Pengeluaran",
+    "parent": "Kategori Induk",
+    "subcategories": "Subkategori",
+    "payees": "Penerima",
+    "created": "Ditambahkan",
+    "firstTransaction": "Transaksi Pertama",
+    "largestTransaction": "Transaksi Terbesar",
+    "largestValue": "{amount} pada {date}",
+    "defaultFor": "Kategori Default untuk",
+    "defaultForMore": "+{count} lagi",
+    "description": "Deskripsi"
+  },
+  "tabs": {
+    "ariaLabel": "Bagian kategori",
+    "overview": "Ringkasan",
+    "transactions": "Transaksi",
+    "subcategories": "Subkategori"
+  },
+  "transactionsTab": {
+    "title": "Transaksi",
+    "empty": "Belum ada transaksi dalam kategori ini",
+    "loadFailed": "Gagal memuat transaksi",
+    "titleWithCount": "Transaksi ({count})",
+    "openInRegister": "Buka di register"
+  },
+  "subcategoriesTab": {
+    "empty": "Kategori ini tidak memiliki subkategori",
+    "name": "Nama",
+    "total": "Total",
+    "transactions": "Transaksi"
+  },
+  "seasonality": {
+    "title": "Musiman",
+    "tooltip": "Biaya bulan tipikal untuk kategori ini, dirata-ratakan atas seluruh tahun riwayat.",
+    "peak": "Pengeluaran terpusat di {month}.",
+    "even": "Pengeluaran tersebar merata sepanjang tahun.",
+    "needsMoreHistory": "Diperlukan setidaknya {years} tahun riwayat untuk membedakan pola musiman dari kebetulan.",
+    "empty": "Belum ada pengeluaran untuk dirinci per bulan",
+    "monthTooltip": "{month}: rata-rata {amount} selama {years, plural, other {# tahun}}"
+  }
+}

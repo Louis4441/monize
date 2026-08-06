@@ -1,0 +1,138 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { ChevronLeftIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/Button';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { parseLocalDate } from '@/lib/utils';
+import type { Category } from '@/types/category';
+import { CategorySwitcher } from './CategorySwitcher';
+
+interface CategoryDetailHeaderProps {
+  category: Category;
+  /**
+   * The parent's name, resolved by the page from its category list (the
+   * detail payload does not load the parent relation). Null for a top-level
+   * category.
+   */
+  parentName: string | null;
+  /**
+   * Transactions can predate the category record (imports assign them to a
+   * category created afterwards), so "Category since" is the earlier of the
+   * first transaction and the record's creation.
+   */
+  firstTransactionDate: string | null;
+  onBack: () => void;
+  onViewTransactions: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  /** Categories the caret beside the name can jump to. */
+  categories: readonly Category[];
+  onSelectCategory: (id: string) => void;
+}
+
+/**
+ * The identity block: which category this is and the actions on it. Parent,
+ * description and dates live in the Key information card below, so the header
+ * stays one line -- the same division the payee detail header settled on.
+ *
+ * A system category gets no Edit or Delete: the backend refuses both, and a
+ * button whose action can only fail is worse than none.
+ */
+export function CategoryDetailHeader({
+  category,
+  parentName,
+  firstTransactionDate,
+  onBack,
+  onViewTransactions,
+  onEdit,
+  onDelete,
+  categories,
+  onSelectCategory,
+}: CategoryDetailHeaderProps) {
+  const t = useTranslations('categoryDetail');
+  const { formatDate } = useDateFormat();
+
+  // The user's own colour (or the parent's, inherited); never themed.
+  const swatchColor = category.effectiveColor ?? category.color;
+
+  // The title carries the same hierarchical label every category picker uses:
+  // "Parent: Child" for a subcategory, the bare name for a top-level one. A
+  // bare "Fees" as the page title would not say which Fees this is.
+  const title = parentName ? `${parentName}: ${category.name}` : category.name;
+
+  // Compare calendar days (parseLocalDate drops the time), matching what
+  // formatDate renders.
+  const sinceDate =
+    firstTransactionDate &&
+    parseLocalDate(firstTransactionDate) < parseLocalDate(category.createdAt)
+      ? firstTransactionDate
+      : category.createdAt;
+
+  return (
+    <div className="mb-6">
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-2 -ml-1 inline-flex items-center gap-1 rounded text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+      >
+        <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
+        {t('backToCategories')}
+      </button>
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {swatchColor && (
+              <span
+                className="h-4 w-4 shrink-0 rounded"
+                style={{ backgroundColor: swatchColor }}
+                aria-hidden
+              />
+            )}
+            <h1 className="truncate text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {category.icon ? `${category.icon} ` : ''}
+              {title}
+            </h1>
+            {/* Jump straight to another category instead of going back to the
+                list and clicking again. */}
+            <CategorySwitcher
+              currentId={category.id}
+              categories={categories}
+              onSelect={onSelectCategory}
+            />
+          </div>
+
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+            {category.isIncome ? t('header.incomePill') : t('header.expensePill')}
+          </span>
+          {category.isSystem && (
+            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+              {t('header.systemBadge')}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onViewTransactions}>
+            {t('header.viewTransactions')}
+          </Button>
+          {!category.isSystem && (
+            <>
+              <Button variant="outline" size="sm" onClick={onEdit}>
+                {t('header.edit')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={onDelete}>
+                {t('header.delete')}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        {t('header.since', { date: formatDate(sinceDate) })}
+      </p>
+    </div>
+  );
+}

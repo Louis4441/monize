@@ -1,0 +1,109 @@
+{
+  "loading": "Kategori yükleniyor...",
+  "notFound": "Kategori bulunamadı",
+  "loadFailed": "Bu kategori yüklenemedi",
+  "backToCategories": "Kategoriler",
+  "error": {
+    "retry": "Yeniden dene"
+  },
+  "header": {
+    "incomePill": "Gelir",
+    "expensePill": "Gider",
+    "systemBadge": "Sistem",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "viewTransactions": "İşlemleri görüntüle",
+    "switchCategory": "Başka bir kategoriye geç",
+    "switchPlaceholder": "Kategorileri filtrele...",
+    "switchNoMatches": "Eşleşen kategori yok",
+    "since": "{date} tarihinden beri kategori"
+  },
+  "summary": {
+    "spentThisYear": "Bu Yıl Harcanan",
+    "receivedThisYear": "Bu Yıl Alınan",
+    "vsLastYear": "Geçen yılın aynı dönemine göre {percent}",
+    "vsLastYearNew": "Geçen yıl bu dönemde kayıt yok",
+    "monthlyAverage": "Aylık Ortalama",
+    "averageTransaction": "Ortalama İşlem",
+    "transactions": "İşlemler",
+    "sinceYear": "{year} yılından beri",
+    "lastTransaction": "Son İşlem",
+    "convertedNote": "{currency} birimine çevrildi"
+  },
+  "topPayees": {
+    "title": "En Çok Kullanılan Alacaklılar",
+    "subtitle": "Son 12 ay",
+    "empty": "Son 12 ayda hareket yok",
+    "subtitleAllTime": "Tüm geçmiş",
+    "emptyAllTime": "Bu kategori için kayıtlı hareket yok",
+    "noPayee": "Alacaklı yok",
+    "range12m": "12 ay",
+    "rangeAll": "Tümü"
+  },
+  "subcategoriesPanel": {
+    "title": "Alt Kategoriler",
+    "subtitle": "Tüm geçmiş, her biri kendi alt kategorileri dahil",
+    "empty": "Bu kategorinin alt kategorisi yok",
+    "thisCategory": "Bu kategori"
+  },
+  "accountsPanel": {
+    "title": "Ödemenin Yapıldığı Hesaplar",
+    "subtitle": "Tüm geçmiş",
+    "empty": "Henüz işlem yok"
+  },
+  "scheduledPanel": {
+    "title": "Yaklaşan Planlananlar",
+    "subtitle": "Bu kategorideki faturalar ve mevduatlar",
+    "empty": "Bu kategoride planlanmış bir şey yok",
+    "noPayee": "Alacaklı yok"
+  },
+  "tagPanel": {
+    "title": "Etiket Dökümü",
+    "subtitle": "Etiket değerine göre bu kategorideki harcama",
+    "keyLabel": "Etiket anahtarı"
+  },
+  "keyInfo": {
+    "title": "Temel bilgiler",
+    "type": "Tür",
+    "income": "Gelir",
+    "expense": "Gider",
+    "parent": "Üst Kategori",
+    "subcategories": "Alt Kategoriler",
+    "payees": "Alacaklılar",
+    "created": "Eklendi",
+    "firstTransaction": "İlk İşlem",
+    "largestTransaction": "En Büyük İşlem",
+    "largestValue": "{date} tarihinde {amount}",
+    "defaultFor": "Şunların Varsayılan Kategorisi",
+    "defaultForMore": "+{count} daha",
+    "description": "Açıklama"
+  },
+  "tabs": {
+    "ariaLabel": "Kategori bölümleri",
+    "overview": "Genel bakış",
+    "transactions": "İşlemler",
+    "subcategories": "Alt Kategoriler"
+  },
+  "transactionsTab": {
+    "title": "İşlemler",
+    "empty": "Bu kategoride henüz işlem yok",
+    "loadFailed": "İşlemler yüklenemedi",
+    "titleWithCount": "İşlemler ({count})",
+    "openInRegister": "Kayıt defterinde aç"
+  },
+  "subcategoriesTab": {
+    "empty": "Bu kategorinin alt kategorisi yok",
+    "name": "Ad",
+    "total": "Toplam",
+    "transactions": "İşlemler"
+  },
+  "seasonality": {
+    "title": "Mevsimsellik",
+    "tooltip": "Bu kategoride tipik bir ayın maliyeti, tüm geçmiş yılların ortalaması.",
+    "peak": "Harcama {month} ayında yoğunlaşıyor.",
+    "even": "Harcama yıl boyunca eşit dağılmış.",
+    "needsMoreHistory": "Mevsimsel bir deseni rastlantıdan ayırmak için en az {years} yıllık geçmiş gerekir.",
+    "empty": "Aylara ayırmak için henüz harcama yok",
+    "monthTooltip": "{month}: {years, plural, one {# yılda} other {# yılda}} ortalama {amount}"
+  }
+}

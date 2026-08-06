@@ -227,9 +227,12 @@ export function CategoryList({
     setDeleteCategory(category);
   }, [t]);
 
+  // A row click opens the category's detail page, matching the payees,
+  // accounts and securities lists; Edit stays on the row actions and the
+  // long-press sheet.
   const { getRowHandlers } = useLongPress<Category>({
     onLongPress: (category) => setActionSheet({ open: true, category }),
-    onClick: onEdit,
+    onClick: (category) => router.push(`/categories/${category.id}`),
   });
 
   const handleConfirmDelete = async (reassignToCategoryId: string | null) => {

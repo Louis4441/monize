@@ -29,6 +29,7 @@
     "show": "Show payee info"
   },
   "categoryWidget": {
+    "detailsAria": "View category details",
     "totalSpent": "Total Spent",
     "totalEarned": "Total Earned",
     "income": "Income",

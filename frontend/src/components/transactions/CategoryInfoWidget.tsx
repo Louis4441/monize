@@ -1,8 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { PencilSquareIcon, ChevronDoubleLeftIcon } from '@heroicons/react/24/outline';
+import {
+  PencilSquareIcon,
+  ChevronDoubleLeftIcon,
+  EyeIcon,
+} from '@heroicons/react/24/outline';
 import { Category } from '@/types/category';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { GroupedTotal, MonthlyTotal, TransactionSummary } from '@/types/transaction';
@@ -12,6 +17,7 @@ import { budgetsApi } from '@/lib/budgets';
 import { countElapsedPeriods } from '@/lib/chart-buckets';
 import { sumMoney } from '@/lib/format';
 import { getNextScheduled } from '@/lib/scheduled-utils';
+import { buildDescendantIdSet, rollupToDirectChildren } from '@/lib/categoryUtils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -65,6 +71,7 @@ export function CategoryInfoWidget({
   onPayeeClick,
 }: CategoryInfoWidgetProps) {
   const t = useTranslations('transactions');
+  const router = useRouter();
   const { formatCurrency } = useNumberFormat();
   const { formatDate } = useDateFormat();
   const { convertToDefault, defaultCurrency } = useExchangeRates();
@@ -124,27 +131,12 @@ export function CategoryInfoWidget({
     [category.parentId, categories],
   );
 
-  const subcategories = useMemo(
-    () => categories.filter((c) => c.parentId === category.id),
-    [categories, category.id],
-  );
-
   // Every category id in this category's subtree, for the scheduled-item
   // predicate (the backend already expands descendants for the queries).
-  const descendantIds = useMemo(() => {
-    const ids = new Set<string>([category.id]);
-    let added = true;
-    while (added) {
-      added = false;
-      for (const c of categories) {
-        if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) {
-          ids.add(c.id);
-          added = true;
-        }
-      }
-    }
-    return ids;
-  }, [categories, category.id]);
+  const descendantIds = useMemo(
+    () => buildDescendantIdSet(categories, category.id),
+    [categories, category.id],
+  );
 
   const nextScheduled = useMemo(
     () =>
@@ -172,40 +164,15 @@ export function CategoryInfoWidget({
   // Roll grouped rows (which the backend returns per leaf category) up to
   // this category's direct children; rows for the category itself become a
   // "This category" bucket. Shares are of the summed absolute total.
-  const subcategoryShares = useMemo(() => {
-    if (subcategories.length === 0) return [];
-    const parentOf = new Map(categories.map((c) => [c.id, c.parentId]));
-    const rollupTarget = (id: string | null): string | null => {
-      if (!id) return null;
-      let current: string | null = id;
-      while (current) {
-        if (current === category.id) return category.id;
-        const parent: string | null = parentOf.get(current) ?? null;
-        if (parent === category.id) return current;
-        current = parent;
-      }
-      return null;
-    };
-
-    const buckets = new Map<string, number>();
-    for (const row of aggregateGroupedTotals(groupedCategories, currencyStrategy)) {
-      const target = rollupTarget(row.id);
-      if (!target) continue;
-      buckets.set(target, (buckets.get(target) ?? 0) + row.total);
-    }
-    const grandTotal = [...buckets.values()].reduce((sum, v) => sum + Math.abs(v), 0);
-    if (grandTotal === 0) return [];
-
-    const byId = new Map(categories.map((c) => [c.id, c]));
-    return [...buckets.entries()]
-      .map(([id, total]) => ({
-        id,
-        name: id === category.id ? null : (byId.get(id)?.name ?? ''),
-        total,
-        share: Math.abs(total) / grandTotal,
-      }))
-      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
-  }, [subcategories.length, categories, groupedCategories, currencyStrategy, category.id]);
+  const subcategoryShares = useMemo(
+    () =>
+      rollupToDirectChildren(
+        aggregateGroupedTotals(groupedCategories, currencyStrategy),
+        categories,
+        category.id,
+      ),
+    [categories, groupedCategories, currencyStrategy, category.id],
+  );
 
   const transactionCount = summary?.transactionCount ?? 0;
   const averageAmount =
@@ -262,6 +229,15 @@ export function CategoryInfoWidget({
           </div>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push(`/categories/${category.id}`)}
+            aria-label={t('categoryWidget.detailsAria')}
+            title={t('categoryWidget.detailsAria')}
+            className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
+          >
+            <EyeIcon className="h-5 w-5" />
+          </button>
           <button
             type="button"
             onClick={onEdit}

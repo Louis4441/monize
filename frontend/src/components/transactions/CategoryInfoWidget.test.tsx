@@ -30,6 +30,11 @@ vi.mock('@/hooks/useExchangeRates', () => ({
   }),
 }));
 
+const mockPush = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 import { transactionsApi } from '@/lib/transactions';
 import { budgetsApi } from '@/lib/budgets';
 
@@ -282,5 +287,12 @@ describe('CategoryInfoWidget', () => {
     expect(onEdit).toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText('Hide category info'));
     expect(onCollapse).toHaveBeenCalled();
+  });
+
+  it('opens the category detail page from the details button', async () => {
+    await renderWidget();
+
+    fireEvent.click(screen.getByLabelText('View category details'));
+    expect(mockPush).toHaveBeenCalledWith('/categories/c-1');
   });
 });

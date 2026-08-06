@@ -29,6 +29,7 @@
     "show": "Hiển thị thông tin người nhận"
   },
   "categoryWidget": {
+    "detailsAria": "Xem chi tiết danh mục",
     "totalSpent": "Tổng chi tiêu",
     "totalEarned": "Tổng thu nhập",
     "income": "Thu nhập",

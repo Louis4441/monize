@@ -1,0 +1,109 @@
+{
+  "loading": "Đang tải danh mục...",
+  "notFound": "Không tìm thấy danh mục",
+  "loadFailed": "Không thể tải danh mục này",
+  "backToCategories": "Danh mục",
+  "error": {
+    "retry": "Thử lại"
+  },
+  "header": {
+    "incomePill": "Thu nhập",
+    "expensePill": "Chi tiêu",
+    "systemBadge": "Hệ thống",
+    "edit": "Sửa",
+    "delete": "Xóa",
+    "viewTransactions": "Xem giao tác",
+    "switchCategory": "Chuyển sang danh mục khác",
+    "switchPlaceholder": "Lọc danh mục...",
+    "switchNoMatches": "Không có danh mục nào khớp",
+    "since": "Danh mục từ {date}"
+  },
+  "summary": {
+    "spentThisYear": "Chi tiêu năm nay",
+    "receivedThisYear": "Nhận được năm nay",
+    "vsLastYear": "{percent} so với cùng kỳ năm trước",
+    "vsLastYearNew": "Không có gì trong kỳ này năm trước",
+    "monthlyAverage": "Trung bình hàng tháng",
+    "averageTransaction": "Giao tác trung bình",
+    "transactions": "Giao tác",
+    "sinceYear": "Từ {year}",
+    "lastTransaction": "Giao tác gần nhất",
+    "convertedNote": "Đã chuyển sang {currency}"
+  },
+  "topPayees": {
+    "title": "Người nhận hàng đầu",
+    "subtitle": "12 tháng gần nhất",
+    "empty": "Không có hoạt động trong 12 tháng gần nhất",
+    "subtitleAllTime": "Toàn bộ lịch sử",
+    "emptyAllTime": "Chưa ghi nhận hoạt động nào cho danh mục này",
+    "noPayee": "Không có người nhận",
+    "range12m": "12 tháng",
+    "rangeAll": "Tất cả"
+  },
+  "subcategoriesPanel": {
+    "title": "Danh mục con",
+    "subtitle": "Toàn bộ lịch sử, mỗi mục bao gồm cả danh mục con của nó",
+    "empty": "Danh mục này không có danh mục con",
+    "thisCategory": "Danh mục này"
+  },
+  "accountsPanel": {
+    "title": "Thanh toán từ các tài khoản",
+    "subtitle": "Toàn bộ lịch sử",
+    "empty": "Chưa có giao tác"
+  },
+  "scheduledPanel": {
+    "title": "Lịch sắp tới",
+    "subtitle": "Hóa đơn và tiền gửi trong danh mục này",
+    "empty": "Không có gì được lên lịch trong danh mục này",
+    "noPayee": "Không có người nhận"
+  },
+  "tagPanel": {
+    "title": "Phân tích theo thẻ",
+    "subtitle": "Chi tiêu trong danh mục này theo giá trị thẻ",
+    "keyLabel": "Khóa thẻ"
+  },
+  "keyInfo": {
+    "title": "Thông tin chính",
+    "type": "Loại",
+    "income": "Thu nhập",
+    "expense": "Chi tiêu",
+    "parent": "Danh mục cha",
+    "subcategories": "Danh mục con",
+    "payees": "Người nhận",
+    "created": "Đã thêm",
+    "firstTransaction": "Giao tác đầu tiên",
+    "largestTransaction": "Giao tác lớn nhất",
+    "largestValue": "{amount} vào {date}",
+    "defaultFor": "Danh mục mặc định cho",
+    "defaultForMore": "+{count} nữa",
+    "description": "Mô tả"
+  },
+  "tabs": {
+    "ariaLabel": "Các phần của danh mục",
+    "overview": "Tổng quan",
+    "transactions": "Giao tác",
+    "subcategories": "Danh mục con"
+  },
+  "transactionsTab": {
+    "title": "Giao tác",
+    "empty": "Danh mục này chưa có giao tác nào",
+    "loadFailed": "Không thể tải giao tác",
+    "titleWithCount": "Giao tác ({count})",
+    "openInRegister": "Mở trong sổ ghi"
+  },
+  "subcategoriesTab": {
+    "empty": "Danh mục này không có danh mục con",
+    "name": "Tên",
+    "total": "Tổng",
+    "transactions": "Giao tác"
+  },
+  "seasonality": {
+    "title": "Tính mùa vụ",
+    "tooltip": "Chi phí của một tháng điển hình trong danh mục này, tính trung bình trên mọi năm lịch sử.",
+    "peak": "Chi tiêu tập trung vào {month}.",
+    "even": "Chi tiêu phân bố đều trong năm.",
+    "needsMoreHistory": "Cần ít nhất {years} năm lịch sử để phân biệt mẫu theo mùa với sự tình cờ.",
+    "empty": "Chưa có chi tiêu để phân tách theo tháng",
+    "monthTooltip": "{month}: trung bình {amount} qua {years, plural, other {# năm}}"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "loading": "Kategorie wird geladen...",
+  "notFound": "Kategorie nicht gefunden",
+  "loadFailed": "Diese Kategorie konnte nicht geladen werden",
+  "backToCategories": "Kategorien",
+  "error": {
+    "retry": "Erneut versuchen"
+  },
+  "header": {
+    "incomePill": "Einnahme",
+    "expensePill": "Ausgabe",
+    "systemBadge": "System",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "viewTransactions": "Buchungen anzeigen",
+    "switchCategory": "Zu einer anderen Kategorie wechseln",
+    "switchPlaceholder": "Kategorien filtern...",
+    "switchNoMatches": "Keine Kategorien gefunden",
+    "since": "Kategorie seit {date}"
+  },
+  "summary": {
+    "spentThisYear": "Ausgaben dieses Jahr",
+    "receivedThisYear": "Einnahmen dieses Jahr",
+    "vsLastYear": "{percent} gegenüber dem Vorjahreszeitraum",
+    "vsLastYearNew": "Im Vorjahreszeitraum nichts vorhanden",
+    "monthlyAverage": "Monatsdurchschnitt",
+    "averageTransaction": "Durchschnittliche Buchung",
+    "transactions": "Buchungen",
+    "sinceYear": "Seit {year}",
+    "lastTransaction": "Letzte Buchung",
+    "convertedNote": "Umgerechnet in {currency}"
+  },
+  "topPayees": {
+    "title": "Top-Zahlungsempfänger",
+    "subtitle": "Letzte 12 Monate",
+    "empty": "Keine Aktivität in den letzten 12 Monaten",
+    "subtitleAllTime": "Gesamter Zeitraum",
+    "emptyAllTime": "Für diese Kategorie ist keine Aktivität erfasst",
+    "noPayee": "Kein Zahlungsempfänger",
+    "range12m": "12 Monate",
+    "rangeAll": "Gesamt"
+  },
+  "subcategoriesPanel": {
+    "title": "Unterkategorien",
+    "subtitle": "Gesamter Zeitraum, jeweils einschließlich eigener Unterkategorien",
+    "empty": "Diese Kategorie hat keine Unterkategorien",
+    "thisCategory": "Diese Kategorie"
+  },
+  "accountsPanel": {
+    "title": "Bezahlt von Konten",
+    "subtitle": "Gesamter Zeitraum",
+    "empty": "Noch keine Buchungen"
+  },
+  "scheduledPanel": {
+    "title": "Anstehende geplante Buchungen",
+    "subtitle": "Rechnungen und Einzahlungen in dieser Kategorie",
+    "empty": "In dieser Kategorie ist nichts geplant",
+    "noPayee": "Kein Zahlungsempfänger"
+  },
+  "tagPanel": {
+    "title": "Aufschlüsselung nach Tags",
+    "subtitle": "Ausgaben in dieser Kategorie nach Tag-Wert",
+    "keyLabel": "Tag-Schlüssel"
+  },
+  "keyInfo": {
+    "title": "Kerndaten",
+    "type": "Typ",
+    "income": "Einnahme",
+    "expense": "Ausgabe",
+    "parent": "Übergeordnete Kategorie",
+    "subcategories": "Unterkategorien",
+    "payees": "Zahlungsempfänger",
+    "created": "Hinzugefügt",
+    "firstTransaction": "Erste Buchung",
+    "largestTransaction": "Größte Buchung",
+    "largestValue": "{amount} am {date}",
+    "defaultFor": "Standardkategorie für",
+    "defaultForMore": "+{count} weitere",
+    "description": "Beschreibung"
+  },
+  "tabs": {
+    "ariaLabel": "Kategorie-Abschnitte",
+    "overview": "Überblick",
+    "transactions": "Buchungen",
+    "subcategories": "Unterkategorien"
+  },
+  "transactionsTab": {
+    "title": "Buchungen",
+    "empty": "In dieser Kategorie gibt es noch keine Buchungen",
+    "loadFailed": "Buchungen konnten nicht geladen werden",
+    "titleWithCount": "Buchungen ({count})",
+    "openInRegister": "Im Kontobuch öffnen"
+  },
+  "subcategoriesTab": {
+    "empty": "Diese Kategorie hat keine Unterkategorien",
+    "name": "Name",
+    "total": "Gesamt",
+    "transactions": "Buchungen"
+  },
+  "seasonality": {
+    "title": "Saisonalität",
+    "tooltip": "Was ein typischer Monat in dieser Kategorie kostet, gemittelt über alle Jahre der Historie.",
+    "peak": "Die Ausgaben konzentrieren sich im {month}.",
+    "even": "Die Ausgaben sind gleichmäßig über das Jahr verteilt.",
+    "needsMoreHistory": "Es sind mindestens {years} Jahre Historie nötig, um ein saisonales Muster von Zufall zu unterscheiden.",
+    "empty": "Noch keine Ausgaben für eine Monatsaufteilung",
+    "monthTooltip": "{month}: durchschnittlich {amount} über {years, plural, one {# Jahr} other {# Jahre}}"
+  }
+}

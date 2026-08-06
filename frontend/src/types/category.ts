@@ -15,6 +15,56 @@ export interface Category {
   transactionCount?: number;
 }
 
+/**
+ * One account the category's transactions live in, in the account's own
+ * currency. Mirrors the backend's CategoryAccountBreakdownRow.
+ */
+export interface CategoryAccountBreakdownRow {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  currencyCode: string;
+  transactionCount: number;
+  total: number;
+  lastTransactionDate: string | null;
+}
+
+/**
+ * The category's single largest contribution by absolute amount. For a split
+ * transaction this is the matching split line's amount, not the parent's.
+ */
+export interface CategoryLargestTransaction {
+  id: string;
+  transactionDate: string;
+  amount: number;
+  currencyCode: string;
+  accountId: string;
+  accountName: string;
+  description: string | null;
+  payeeName: string | null;
+}
+
+/**
+ * Lifetime facts computed over real (non-void, non-split-child) transactions
+ * across the whole subtree -- this category plus all its descendants.
+ */
+export interface CategoryDetailStats {
+  transactionCount: number;
+  firstTransactionDate: string | null;
+  lastTransactionDate: string | null;
+  payeeCount: number;
+  subcategoryCount: number;
+}
+
+/** The detail-page aggregate from GET /categories/:id/detail. */
+export interface CategoryDetail {
+  category: Category;
+  stats: CategoryDetailStats;
+  accounts: CategoryAccountBreakdownRow[];
+  largestTransaction: CategoryLargestTransaction | null;
+  defaultCategoryForPayees: { payeeId: string; payeeName: string }[];
+}
+
 export interface CreateCategoryData {
   name: string;
   parentId?: string;

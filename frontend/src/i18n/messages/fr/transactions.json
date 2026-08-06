@@ -29,6 +29,7 @@
     "show": "Afficher les informations du bénéficiaire"
   },
   "categoryWidget": {
+    "detailsAria": "Voir les détails de la catégorie",
     "totalSpent": "Dépenses totales",
     "totalEarned": "Revenus totaux",
     "income": "Revenu",

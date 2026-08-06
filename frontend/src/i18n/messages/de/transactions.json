@@ -29,6 +29,7 @@
     "show": "Zahlungsempfänger-Informationen anzeigen"
   },
   "categoryWidget": {
+    "detailsAria": "Kategorie-Details anzeigen",
     "totalSpent": "Gesamtausgaben",
     "totalEarned": "Gesamteinnahmen",
     "income": "Einnahmen",

@@ -1,0 +1,109 @@
+{
+  "loading": "カテゴリを読み込んでいます...",
+  "notFound": "カテゴリが見つかりません",
+  "loadFailed": "このカテゴリを読み込めませんでした",
+  "backToCategories": "カテゴリ",
+  "error": {
+    "retry": "再試行"
+  },
+  "header": {
+    "incomePill": "収入",
+    "expensePill": "支出",
+    "systemBadge": "システム",
+    "edit": "編集",
+    "delete": "削除",
+    "viewTransactions": "取引を表示",
+    "switchCategory": "別のカテゴリに切り替える",
+    "switchPlaceholder": "カテゴリを絞り込む...",
+    "switchNoMatches": "一致するカテゴリはありません",
+    "since": "{date} からのカテゴリ"
+  },
+  "summary": {
+    "spentThisYear": "今年の支出",
+    "receivedThisYear": "今年の受取額",
+    "vsLastYear": "前年同期比 {percent}",
+    "vsLastYearNew": "前年の同期間には記録がありません",
+    "monthlyAverage": "月平均",
+    "averageTransaction": "平均取引額",
+    "transactions": "取引",
+    "sinceYear": "{year} 年から",
+    "lastTransaction": "最終取引",
+    "convertedNote": "{currency} に換算"
+  },
+  "topPayees": {
+    "title": "上位支払先",
+    "subtitle": "過去12か月",
+    "empty": "過去12か月の取引はありません",
+    "subtitleAllTime": "全期間",
+    "emptyAllTime": "このカテゴリの取引は記録されていません",
+    "noPayee": "支払先なし",
+    "range12m": "12か月",
+    "rangeAll": "全期間"
+  },
+  "subcategoriesPanel": {
+    "title": "サブカテゴリ",
+    "subtitle": "全期間、各項目は自身のサブカテゴリを含みます",
+    "empty": "このカテゴリにサブカテゴリはありません",
+    "thisCategory": "このカテゴリ"
+  },
+  "accountsPanel": {
+    "title": "支払元の口座",
+    "subtitle": "全期間",
+    "empty": "取引はまだありません"
+  },
+  "scheduledPanel": {
+    "title": "今後の予定",
+    "subtitle": "このカテゴリの請求と入金",
+    "empty": "このカテゴリに予定はありません",
+    "noPayee": "支払先なし"
+  },
+  "tagPanel": {
+    "title": "タグ別内訳",
+    "subtitle": "タグの値ごとのこのカテゴリの支出",
+    "keyLabel": "タグキー"
+  },
+  "keyInfo": {
+    "title": "基本情報",
+    "type": "種類",
+    "income": "収入",
+    "expense": "支出",
+    "parent": "親カテゴリ",
+    "subcategories": "サブカテゴリ",
+    "payees": "支払先",
+    "created": "追加日",
+    "firstTransaction": "最初の取引",
+    "largestTransaction": "最大の取引",
+    "largestValue": "{date} に {amount}",
+    "defaultFor": "デフォルトカテゴリとして設定されている支払先",
+    "defaultForMore": "他 {count} 件",
+    "description": "説明"
+  },
+  "tabs": {
+    "ariaLabel": "カテゴリのセクション",
+    "overview": "概要",
+    "transactions": "取引",
+    "subcategories": "サブカテゴリ"
+  },
+  "transactionsTab": {
+    "title": "取引",
+    "empty": "このカテゴリの取引はまだありません",
+    "loadFailed": "取引を読み込めませんでした",
+    "titleWithCount": "取引 ({count})",
+    "openInRegister": "取引一覧で開く"
+  },
+  "subcategoriesTab": {
+    "empty": "このカテゴリにサブカテゴリはありません",
+    "name": "名前",
+    "total": "合計",
+    "transactions": "取引"
+  },
+  "seasonality": {
+    "title": "季節性",
+    "tooltip": "このカテゴリの平均的な1か月の金額を、履歴のある全年で平均した値です。",
+    "peak": "支出は{month}に集中しています。",
+    "even": "支出は年間を通じて均等です。",
+    "needsMoreHistory": "季節的な傾向を偶然と区別するには、少なくとも{years}年分の履歴が必要です。",
+    "empty": "月別に分ける支出がまだありません",
+    "monthTooltip": "{month}: {years, plural, other {# 年}}平均で {amount}"
+  }
+}

@@ -1,5 +1,10 @@
 import apiClient from './api';
-import { Category, CreateCategoryData, UpdateCategoryData } from '@/types/category';
+import {
+  Category,
+  CategoryDetail,
+  CreateCategoryData,
+  UpdateCategoryData,
+} from '@/types/category';
 import { dedupe, invalidateCache } from './apiCache';
 
 export interface ImportDefaultsOptions {
@@ -27,6 +32,12 @@ export const categoriesApi = {
       },
       300_000, // 5 min - categories rarely change
     );
+  },
+
+  // Detail-page aggregate. Uncached: the page refetches on every mutation.
+  getDetail: async (id: string): Promise<CategoryDetail> => {
+    const response = await apiClient.get<CategoryDetail>(`/categories/${id}/detail`);
+    return response.data;
   },
 
   // Get category by ID

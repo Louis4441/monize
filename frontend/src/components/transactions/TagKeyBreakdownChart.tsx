@@ -15,6 +15,7 @@ const logger = createLogger('TagKeyBreakdownChart');
 
 export interface TagKeyBreakdownParams {
   accountIds?: string[];
+  categoryIds?: string[];
   startDate?: string;
   endDate?: string;
   tagIds?: string[];

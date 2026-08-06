@@ -28,6 +28,7 @@ const NAMESPACES = [
   "bills",
   "budgets",
   "categories",
+  "categoryDetail",
   "currencies",
   "dashboard",
   "emergencyAccess",

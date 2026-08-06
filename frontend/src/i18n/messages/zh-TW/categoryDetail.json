@@ -1,0 +1,109 @@
+{
+  "loading": "正在載入分類...",
+  "notFound": "找不到該分類",
+  "loadFailed": "無法載入該分類",
+  "backToCategories": "分類",
+  "error": {
+    "retry": "重試"
+  },
+  "header": {
+    "incomePill": "收入",
+    "expensePill": "支出",
+    "systemBadge": "系統",
+    "edit": "編輯",
+    "delete": "刪除",
+    "viewTransactions": "檢視交易",
+    "switchCategory": "切換到其他分類",
+    "switchPlaceholder": "篩選分類...",
+    "switchNoMatches": "沒有符合的分類",
+    "since": "自 {date} 起的分類"
+  },
+  "summary": {
+    "spentThisYear": "今年支出",
+    "receivedThisYear": "今年收入",
+    "vsLastYear": "較去年同期 {percent}",
+    "vsLastYearNew": "去年同期沒有記錄",
+    "monthlyAverage": "月平均",
+    "averageTransaction": "平均交易金額",
+    "transactions": "交易",
+    "sinceYear": "自 {year} 年起",
+    "lastTransaction": "最近交易",
+    "convertedNote": "已換算為 {currency}"
+  },
+  "topPayees": {
+    "title": "主要收款人",
+    "subtitle": "最近12個月",
+    "empty": "最近12個月沒有活動",
+    "subtitleAllTime": "全部歷史",
+    "emptyAllTime": "該分類沒有活動記錄",
+    "noPayee": "無收款人",
+    "range12m": "12個月",
+    "rangeAll": "全部"
+  },
+  "subcategoriesPanel": {
+    "title": "子分類",
+    "subtitle": "全部歷史，每項都包含其自身的子分類",
+    "empty": "該分類沒有子分類",
+    "thisCategory": "此分類"
+  },
+  "accountsPanel": {
+    "title": "付款帳戶",
+    "subtitle": "全部歷史",
+    "empty": "尚無交易"
+  },
+  "scheduledPanel": {
+    "title": "即將到來的排程交易",
+    "subtitle": "該分類中的帳單與存款",
+    "empty": "該分類中沒有排程交易",
+    "noPayee": "無收款人"
+  },
+  "tagPanel": {
+    "title": "標籤明細",
+    "subtitle": "按標籤值統計該分類的支出",
+    "keyLabel": "標籤鍵"
+  },
+  "keyInfo": {
+    "title": "關鍵資訊",
+    "type": "類型",
+    "income": "收入",
+    "expense": "支出",
+    "parent": "上層分類",
+    "subcategories": "子分類",
+    "payees": "收款人",
+    "created": "新增時間",
+    "firstTransaction": "首筆交易",
+    "largestTransaction": "最大交易",
+    "largestValue": "{date} 的 {amount}",
+    "defaultFor": "作為以下收款人的預設分類",
+    "defaultForMore": "還有 {count} 個",
+    "description": "說明"
+  },
+  "tabs": {
+    "ariaLabel": "分類各區塊",
+    "overview": "總覽",
+    "transactions": "交易",
+    "subcategories": "子分類"
+  },
+  "transactionsTab": {
+    "title": "交易",
+    "empty": "該分類尚無交易",
+    "loadFailed": "無法載入交易",
+    "titleWithCount": "交易 ({count})",
+    "openInRegister": "在交易列表中開啟"
+  },
+  "subcategoriesTab": {
+    "empty": "該分類沒有子分類",
+    "name": "名稱",
+    "total": "合計",
+    "transactions": "交易"
+  },
+  "seasonality": {
+    "title": "季節性",
+    "tooltip": "該分類一個典型月份的金額，按所有歷史年份取平均。",
+    "peak": "支出集中在{month}。",
+    "even": "支出全年分布均勻。",
+    "needsMoreHistory": "至少需要 {years} 年的歷史才能把季節性規律與偶然區分開。",
+    "empty": "尚無支出可按月分解",
+    "monthTooltip": "{month}：{years, plural, other {# 年}}平均 {amount}"
+  }
+}

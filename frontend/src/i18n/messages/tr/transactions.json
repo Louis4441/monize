@@ -29,6 +29,7 @@
     "show": "Alacaklı bilgisini göster"
   },
   "categoryWidget": {
+    "detailsAria": "Kategori ayrıntılarını görüntüle",
     "totalSpent": "Toplam Harcama",
     "totalEarned": "Toplam Kazanç",
     "income": "Gelir",

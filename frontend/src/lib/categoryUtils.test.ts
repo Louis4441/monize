@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCategoryTree, getCategorySelectOptions, buildCategoryColorMap, buildCategoryLabelMap } from './categoryUtils';
+import { buildCategoryTree, getCategorySelectOptions, buildCategoryColorMap, buildCategoryLabelMap, buildDescendantIdSet, rollupToDirectChildren } from './categoryUtils';
 import { Category } from '@/types/category';
 
 function makeCategory(overrides: Partial<Category> & { id: string; name: string }): Category {
@@ -178,5 +178,79 @@ describe('buildCategoryLabelMap', () => {
 
   it('returns an empty map for no categories', () => {
     expect(buildCategoryLabelMap([]).size).toBe(0);
+  });
+});
+
+describe('buildDescendantIdSet', () => {
+  it('includes the category itself and every level of descendants', () => {
+    const grandchild = makeCategory({ id: 'cat-6', name: 'Sushi', parentId: 'cat-5' });
+    const result = buildDescendantIdSet([food, fastFood, fineDining, grandchild], 'cat-3');
+    expect(result).toEqual(new Set(['cat-3', 'cat-4', 'cat-5', 'cat-6']));
+  });
+
+  it('returns only the category itself for a leaf', () => {
+    expect(buildDescendantIdSet([food, fastFood], 'cat-4')).toEqual(new Set(['cat-4']));
+  });
+
+  it('ignores unrelated branches', () => {
+    const result = buildDescendantIdSet([food, fastFood, groceries], 'cat-3');
+    expect(result.has('cat-1')).toBe(false);
+  });
+});
+
+describe('rollupToDirectChildren', () => {
+  const grandchild = makeCategory({ id: 'cat-6', name: 'Sushi', parentId: 'cat-5' });
+  const tree = [food, fastFood, fineDining, grandchild, groceries];
+
+  it('rolls leaf rows up to direct children and buckets the category itself as name null', () => {
+    const result = rollupToDirectChildren(
+      [
+        { id: 'cat-4', total: -100, count: 4 },
+        // A grandchild's rows land in its direct-child ancestor.
+        { id: 'cat-6', total: -60, count: 2 },
+        { id: 'cat-5', total: -40, count: 1 },
+        { id: 'cat-3', total: -50, count: 3 },
+      ],
+      tree,
+      'cat-3',
+    );
+    expect(result).toEqual([
+      { id: 'cat-4', name: 'Fast Food', total: -100, count: 4, share: 0.4 },
+      { id: 'cat-5', name: 'Fine Dining', total: -100, count: 3, share: 0.4 },
+      { id: 'cat-3', name: null, total: -50, count: 3, share: 0.2 },
+    ]);
+  });
+
+  it('drops rows outside the subtree', () => {
+    const result = rollupToDirectChildren(
+      [
+        { id: 'cat-4', total: -100, count: 4 },
+        { id: 'cat-1', total: -999, count: 9 },
+        { id: null, total: -50, count: 1 },
+      ],
+      tree,
+      'cat-3',
+    );
+    expect(result).toEqual([
+      { id: 'cat-4', name: 'Fast Food', total: -100, count: 4, share: 1 },
+    ]);
+  });
+
+  it('returns [] for a category with no children', () => {
+    expect(
+      rollupToDirectChildren([{ id: 'cat-1', total: -100, count: 1 }], tree, 'cat-1'),
+    ).toEqual([]);
+  });
+
+  it('returns [] when every bucket nets to zero', () => {
+    const result = rollupToDirectChildren(
+      [
+        { id: 'cat-4', total: 50, count: 1 },
+        { id: 'cat-4', total: -50, count: 1 },
+      ],
+      tree,
+      'cat-3',
+    );
+    expect(result).toEqual([]);
   });
 });
