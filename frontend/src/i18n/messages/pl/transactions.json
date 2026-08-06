@@ -29,6 +29,7 @@
     "show": "Pokaż informacje o odbiorcy"
   },
   "categoryWidget": {
+    "detailsAria": "Zobacz szczegóły kategorii",
     "totalSpent": "Łączne wydatki",
     "totalEarned": "Łączne przychody",
     "income": "Przychód",

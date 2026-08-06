@@ -1,0 +1,109 @@
+{
+  "loading": "Wczytywanie kategorii...",
+  "notFound": "Nie znaleziono kategorii",
+  "loadFailed": "Nie udało się wczytać tej kategorii",
+  "backToCategories": "Kategorie",
+  "error": {
+    "retry": "Ponów"
+  },
+  "header": {
+    "incomePill": "Przychody",
+    "expensePill": "Wydatek",
+    "systemBadge": "Systemowa",
+    "edit": "Edytuj",
+    "delete": "Usuń",
+    "viewTransactions": "Zobacz transakcje",
+    "switchCategory": "Przejdź do innej kategorii",
+    "switchPlaceholder": "Filtruj kategorie...",
+    "switchNoMatches": "Brak dopasowanych kategorii",
+    "since": "Kategoria od {date}"
+  },
+  "summary": {
+    "spentThisYear": "Wydatki w tym roku",
+    "receivedThisYear": "Wpływy w tym roku",
+    "vsLastYear": "{percent} wobec tego samego okresu w poprzednim roku",
+    "vsLastYearNew": "W tym okresie rok temu nic nie było",
+    "monthlyAverage": "Średnia miesięczna",
+    "averageTransaction": "Średnia transakcja",
+    "transactions": "Transakcje",
+    "sinceYear": "Od {year}",
+    "lastTransaction": "Ostatnia transakcja",
+    "convertedNote": "Przeliczono na {currency}"
+  },
+  "topPayees": {
+    "title": "Najczęstsi odbiorcy",
+    "subtitle": "Ostatnie 12 miesięcy",
+    "empty": "Brak aktywności w ostatnich 12 miesiącach",
+    "subtitleAllTime": "Cała historia",
+    "emptyAllTime": "Brak zarejestrowanej aktywności dla tej kategorii",
+    "noPayee": "Brak odbiorcy",
+    "range12m": "12 miesięcy",
+    "rangeAll": "Wszystko"
+  },
+  "subcategoriesPanel": {
+    "title": "Podkategorie",
+    "subtitle": "Cała historia, każda razem z własnymi podkategoriami",
+    "empty": "Ta kategoria nie ma podkategorii",
+    "thisCategory": "Ta kategoria"
+  },
+  "accountsPanel": {
+    "title": "Płacone z kont",
+    "subtitle": "Cała historia",
+    "empty": "Brak transakcji"
+  },
+  "scheduledPanel": {
+    "title": "Nadchodzące zaplanowane",
+    "subtitle": "Rachunki i wpłaty w tej kategorii",
+    "empty": "Nic nie zaplanowano w tej kategorii",
+    "noPayee": "Brak odbiorcy"
+  },
+  "tagPanel": {
+    "title": "Podział według tagów",
+    "subtitle": "Wydatki w tej kategorii według wartości tagu",
+    "keyLabel": "Klucz tagu"
+  },
+  "keyInfo": {
+    "title": "Kluczowe informacje",
+    "type": "Typ",
+    "income": "Przychody",
+    "expense": "Wydatek",
+    "parent": "Kategoria nadrzędna",
+    "subcategories": "Podkategorie",
+    "payees": "Odbiorcy",
+    "created": "Dodano",
+    "firstTransaction": "Pierwsza transakcja",
+    "largestTransaction": "Największa transakcja",
+    "largestValue": "{amount} dnia {date}",
+    "defaultFor": "Domyślna kategoria dla",
+    "defaultForMore": "+{count} więcej",
+    "description": "Opis"
+  },
+  "tabs": {
+    "ariaLabel": "Sekcje kategorii",
+    "overview": "Przegląd",
+    "transactions": "Transakcje",
+    "subcategories": "Podkategorie"
+  },
+  "transactionsTab": {
+    "title": "Transakcje",
+    "empty": "W tej kategorii nie ma jeszcze transakcji",
+    "loadFailed": "Nie udało się wczytać transakcji",
+    "titleWithCount": "Transakcje ({count})",
+    "openInRegister": "Otwórz w rejestrze"
+  },
+  "subcategoriesTab": {
+    "empty": "Ta kategoria nie ma podkategorii",
+    "name": "Nazwa",
+    "total": "Łącznie",
+    "transactions": "Transakcje"
+  },
+  "seasonality": {
+    "title": "Sezonowość",
+    "tooltip": "Ile kosztuje typowy miesiąc w tej kategorii, średnio z wszystkich lat historii.",
+    "peak": "Wydatki koncentrują się w {month}.",
+    "even": "Wydatki są równomiernie rozłożone w roku.",
+    "needsMoreHistory": "Potrzeba co najmniej {years} lat historii, aby odróżnić wzorzec sezonowy od przypadku.",
+    "empty": "Brak wydatków do podziału na miesiące",
+    "monthTooltip": "{month}: średnio {amount} z {years, plural, one {# roku} few {# lat} many {# lat} other {# lat}}"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "loading": "Caricamento della categoria...",
+  "notFound": "Categoria non trovata",
+  "loadFailed": "Impossibile caricare questa categoria",
+  "backToCategories": "Categorie",
+  "error": {
+    "retry": "Riprova"
+  },
+  "header": {
+    "incomePill": "Entrata",
+    "expensePill": "Uscita",
+    "systemBadge": "Sistema",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "viewTransactions": "Vedi transazioni",
+    "switchCategory": "Passa a un’altra categoria",
+    "switchPlaceholder": "Filtra le categorie...",
+    "switchNoMatches": "Nessuna categoria corrisponde",
+    "since": "Categoria dal {date}"
+  },
+  "summary": {
+    "spentThisYear": "Speso quest’anno",
+    "receivedThisYear": "Ricevuto quest’anno",
+    "vsLastYear": "{percent} rispetto allo stesso periodo dell’anno scorso",
+    "vsLastYearNew": "Nessun importo in questo periodo l’anno scorso",
+    "monthlyAverage": "Media mensile",
+    "averageTransaction": "Transazione media",
+    "transactions": "Transazioni",
+    "sinceYear": "Dal {year}",
+    "lastTransaction": "Ultima transazione",
+    "convertedNote": "Convertito in {currency}"
+  },
+  "topPayees": {
+    "title": "Beneficiari principali",
+    "subtitle": "Ultimi 12 mesi",
+    "empty": "Nessuna attività negli ultimi 12 mesi",
+    "subtitleAllTime": "Dall’inizio",
+    "emptyAllTime": "Nessuna attività registrata per questa categoria",
+    "noPayee": "Nessun beneficiario",
+    "range12m": "12 mesi",
+    "rangeAll": "Tutto"
+  },
+  "subcategoriesPanel": {
+    "title": "Sottocategorie",
+    "subtitle": "Dall’inizio, ciascuna incluse le proprie sottocategorie",
+    "empty": "Questa categoria non ha sottocategorie",
+    "thisCategory": "Questa categoria"
+  },
+  "accountsPanel": {
+    "title": "Pagato dai conti",
+    "subtitle": "Dall’inizio",
+    "empty": "Nessuna transazione per ora"
+  },
+  "scheduledPanel": {
+    "title": "Prossime pianificate",
+    "subtitle": "Fatture e versamenti in questa categoria",
+    "empty": "Nessuna pianificazione in questa categoria",
+    "noPayee": "Nessun beneficiario"
+  },
+  "tagPanel": {
+    "title": "Ripartizione per tag",
+    "subtitle": "Spesa in questa categoria per valore del tag",
+    "keyLabel": "Chiave tag"
+  },
+  "keyInfo": {
+    "title": "Informazioni principali",
+    "type": "Tipo",
+    "income": "Entrata",
+    "expense": "Uscita",
+    "parent": "Categoria genitore",
+    "subcategories": "Sottocategorie",
+    "payees": "Beneficiari",
+    "created": "Aggiunta",
+    "firstTransaction": "Prima transazione",
+    "largestTransaction": "Transazione più alta",
+    "largestValue": "{amount} il {date}",
+    "defaultFor": "Categoria predefinita per",
+    "defaultForMore": "+{count} altri",
+    "description": "Descrizione"
+  },
+  "tabs": {
+    "ariaLabel": "Sezioni della categoria",
+    "overview": "Panoramica",
+    "transactions": "Transazioni",
+    "subcategories": "Sottocategorie"
+  },
+  "transactionsTab": {
+    "title": "Transazioni",
+    "empty": "Questa categoria non ha ancora transazioni",
+    "loadFailed": "Impossibile caricare le transazioni",
+    "titleWithCount": "Transazioni ({count})",
+    "openInRegister": "Apri nel registro"
+  },
+  "subcategoriesTab": {
+    "empty": "Questa categoria non ha sottocategorie",
+    "name": "Nome",
+    "total": "Totale",
+    "transactions": "Transazioni"
+  },
+  "seasonality": {
+    "title": "Stagionalità",
+    "tooltip": "Quanto costa un mese tipico in questa categoria, come media su tutti gli anni di cronologia.",
+    "peak": "La spesa si concentra a {month}.",
+    "even": "La spesa è distribuita uniformemente nell’anno.",
+    "needsMoreHistory": "Servono almeno {years} anni di cronologia per distinguere uno schema stagionale dal caso.",
+    "empty": "Nessuna spesa da suddividere per mese",
+    "monthTooltip": "{month}: {amount} in media su {years, plural, one {# anno} other {# anni}}"
+  }
+}

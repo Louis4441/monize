@@ -1,0 +1,109 @@
+{
+  "loading": "Categorie wordt geladen...",
+  "notFound": "Categorie niet gevonden",
+  "loadFailed": "Deze categorie kon niet worden geladen",
+  "backToCategories": "Categorieën",
+  "error": {
+    "retry": "Opnieuw proberen"
+  },
+  "header": {
+    "incomePill": "Inkomsten",
+    "expensePill": "Uitgaven",
+    "systemBadge": "Systeem",
+    "edit": "Bewerken",
+    "delete": "Verwijderen",
+    "viewTransactions": "Transacties bekijken",
+    "switchCategory": "Naar een andere categorie gaan",
+    "switchPlaceholder": "Categorieën filteren...",
+    "switchNoMatches": "Geen categorieën gevonden",
+    "since": "Categorie sinds {date}"
+  },
+  "summary": {
+    "spentThisYear": "Dit jaar uitgegeven",
+    "receivedThisYear": "Dit jaar ontvangen",
+    "vsLastYear": "{percent} ten opzichte van dezelfde periode vorig jaar",
+    "vsLastYearNew": "Vorig jaar niets in deze periode",
+    "monthlyAverage": "Maandgemiddelde",
+    "averageTransaction": "Gemiddelde transactie",
+    "transactions": "Transacties",
+    "sinceYear": "Sinds {year}",
+    "lastTransaction": "Laatste transactie",
+    "convertedNote": "Omgerekend naar {currency}"
+  },
+  "topPayees": {
+    "title": "Topbegunstigden",
+    "subtitle": "Afgelopen 12 maanden",
+    "empty": "Geen activiteit in de afgelopen 12 maanden",
+    "subtitleAllTime": "Volledige historie",
+    "emptyAllTime": "Geen activiteit vastgelegd voor deze categorie",
+    "noPayee": "Geen begunstigde",
+    "range12m": "12 maanden",
+    "rangeAll": "Alles"
+  },
+  "subcategoriesPanel": {
+    "title": "Subcategorieën",
+    "subtitle": "Volledige historie, elk inclusief eigen subcategorieën",
+    "empty": "Deze categorie heeft geen subcategorieën",
+    "thisCategory": "Deze categorie"
+  },
+  "accountsPanel": {
+    "title": "Betaald vanaf rekeningen",
+    "subtitle": "Volledige historie",
+    "empty": "Nog geen transacties"
+  },
+  "scheduledPanel": {
+    "title": "Aankomend gepland",
+    "subtitle": "Rekeningen en stortingen in deze categorie",
+    "empty": "Niets gepland in deze categorie",
+    "noPayee": "Geen begunstigde"
+  },
+  "tagPanel": {
+    "title": "Verdeling per tag",
+    "subtitle": "Uitgaven in deze categorie per tagwaarde",
+    "keyLabel": "Tagsleutel"
+  },
+  "keyInfo": {
+    "title": "Kerngegevens",
+    "type": "Type",
+    "income": "Inkomsten",
+    "expense": "Uitgaven",
+    "parent": "Bovenliggende categorie",
+    "subcategories": "Subcategorieën",
+    "payees": "Begunstigden",
+    "created": "Toegevoegd",
+    "firstTransaction": "Eerste transactie",
+    "largestTransaction": "Grootste transactie",
+    "largestValue": "{amount} op {date}",
+    "defaultFor": "Standaardcategorie voor",
+    "defaultForMore": "+{count} meer",
+    "description": "Beschrijving"
+  },
+  "tabs": {
+    "ariaLabel": "Onderdelen van de categorie",
+    "overview": "Overzicht",
+    "transactions": "Transacties",
+    "subcategories": "Subcategorieën"
+  },
+  "transactionsTab": {
+    "title": "Transacties",
+    "empty": "Nog geen transacties in deze categorie",
+    "loadFailed": "Transacties konden niet worden geladen",
+    "titleWithCount": "Transacties ({count})",
+    "openInRegister": "Openen in het overzicht"
+  },
+  "subcategoriesTab": {
+    "empty": "Deze categorie heeft geen subcategorieën",
+    "name": "Naam",
+    "total": "Totaal",
+    "transactions": "Transacties"
+  },
+  "seasonality": {
+    "title": "Seizoenspatroon",
+    "tooltip": "Wat een typische maand in deze categorie kost, gemiddeld over alle jaren historie.",
+    "peak": "De uitgaven concentreren zich in {month}.",
+    "even": "De uitgaven zijn gelijkmatig over het jaar verdeeld.",
+    "needsMoreHistory": "Er is minstens {years} jaar historie nodig om een seizoenspatroon van ruis te onderscheiden.",
+    "empty": "Nog geen uitgaven om per maand uit te splitsen",
+    "monthTooltip": "{month}: gemiddeld {amount} over {years, plural, one {# jaar} other {# jaar}}"
+  }
+}

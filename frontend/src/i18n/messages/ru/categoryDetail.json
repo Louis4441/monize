@@ -1,0 +1,109 @@
+{
+  "loading": "Загрузка категории...",
+  "notFound": "Категория не найдена",
+  "loadFailed": "Не удалось загрузить эту категорию",
+  "backToCategories": "Категории",
+  "error": {
+    "retry": "Повторить"
+  },
+  "header": {
+    "incomePill": "Доход",
+    "expensePill": "Расход",
+    "systemBadge": "Система",
+    "edit": "Изменить",
+    "delete": "Удалить",
+    "viewTransactions": "Показать проводки",
+    "switchCategory": "Перейти к другой категории",
+    "switchPlaceholder": "Фильтр категорий...",
+    "switchNoMatches": "Нет подходящих категорий",
+    "since": "Категория с {date}"
+  },
+  "summary": {
+    "spentThisYear": "Потрачено в этом году",
+    "receivedThisYear": "Получено в этом году",
+    "vsLastYear": "{percent} к тому же периоду прошлого года",
+    "vsLastYearNew": "В этом периоде год назад ничего не было",
+    "monthlyAverage": "Среднее за месяц",
+    "averageTransaction": "Средняя проводка",
+    "transactions": "Проводки",
+    "sinceYear": "С {year}",
+    "lastTransaction": "Последняя проводка",
+    "convertedNote": "Пересчитано в {currency}"
+  },
+  "topPayees": {
+    "title": "Основные получатели",
+    "subtitle": "Последние 12 месяцев",
+    "empty": "Нет активности за последние 12 месяцев",
+    "subtitleAllTime": "За всё время",
+    "emptyAllTime": "По этой категории активность не зафиксирована",
+    "noPayee": "Без получателя",
+    "range12m": "12 месяцев",
+    "rangeAll": "Всё"
+  },
+  "subcategoriesPanel": {
+    "title": "Подкатегории",
+    "subtitle": "За всё время, каждая вместе со своими подкатегориями",
+    "empty": "У этой категории нет подкатегорий",
+    "thisCategory": "Эта категория"
+  },
+  "accountsPanel": {
+    "title": "Оплачивается со счетов",
+    "subtitle": "За всё время",
+    "empty": "Проводок пока нет"
+  },
+  "scheduledPanel": {
+    "title": "Ближайшие запланированные",
+    "subtitle": "Счета и депозиты в этой категории",
+    "empty": "В этой категории ничего не запланировано",
+    "noPayee": "Без получателя"
+  },
+  "tagPanel": {
+    "title": "Разбивка по тегам",
+    "subtitle": "Расходы в этой категории по значениям тега",
+    "keyLabel": "Ключ тега"
+  },
+  "keyInfo": {
+    "title": "Основные сведения",
+    "type": "Тип",
+    "income": "Доход",
+    "expense": "Расход",
+    "parent": "Родительская категория",
+    "subcategories": "Подкатегории",
+    "payees": "Получатели",
+    "created": "Добавлена",
+    "firstTransaction": "Первая проводка",
+    "largestTransaction": "Крупнейшая проводка",
+    "largestValue": "{amount} — {date}",
+    "defaultFor": "Категория по умолчанию для",
+    "defaultForMore": "и ещё {count}",
+    "description": "Описание"
+  },
+  "tabs": {
+    "ariaLabel": "Разделы категории",
+    "overview": "Обзор",
+    "transactions": "Проводки",
+    "subcategories": "Подкатегории"
+  },
+  "transactionsTab": {
+    "title": "Проводки",
+    "empty": "В этой категории пока нет проводок",
+    "loadFailed": "Не удалось загрузить проводки",
+    "titleWithCount": "Проводки ({count})",
+    "openInRegister": "Открыть в журнале"
+  },
+  "subcategoriesTab": {
+    "empty": "У этой категории нет подкатегорий",
+    "name": "Название",
+    "total": "Итого",
+    "transactions": "Проводки"
+  },
+  "seasonality": {
+    "title": "Сезонность",
+    "tooltip": "Сколько стоит типичный месяц в этой категории, в среднем за все годы истории.",
+    "peak": "Расходы сосредоточены в {month}.",
+    "even": "Расходы распределены по году равномерно.",
+    "needsMoreHistory": "Чтобы отличить сезонность от случайности, нужно не менее {years} лет истории.",
+    "empty": "Пока нет расходов для разбивки по месяцам",
+    "monthTooltip": "{month}: в среднем {amount} за {years, plural, one {# год} few {# года} many {# лет} other {# года}}"
+  }
+}

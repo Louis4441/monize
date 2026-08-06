@@ -29,6 +29,7 @@
     "show": "भुगतानकर्ता जानकारी दिखाएं"
   },
   "categoryWidget": {
+    "detailsAria": "श्रेणी का विवरण देखें",
     "totalSpent": "कुल खर्च",
     "totalEarned": "कुल आय",
     "income": "आय",

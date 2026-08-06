@@ -1,0 +1,109 @@
+{
+  "loading": "Завантаження категорії...",
+  "notFound": "Категорію не знайдено",
+  "loadFailed": "Не вдалося завантажити цю категорію",
+  "backToCategories": "Категорії",
+  "error": {
+    "retry": "Повторити"
+  },
+  "header": {
+    "incomePill": "Дохід",
+    "expensePill": "Витрата",
+    "systemBadge": "Системна",
+    "edit": "Редагувати",
+    "delete": "Видалити",
+    "viewTransactions": "Показати транзакції",
+    "switchCategory": "Перейти до іншої категорії",
+    "switchPlaceholder": "Фільтр категорій...",
+    "switchNoMatches": "Немає відповідних категорій",
+    "since": "Категорія з {date}"
+  },
+  "summary": {
+    "spentThisYear": "Витрачено цього року",
+    "receivedThisYear": "Отримано цього року",
+    "vsLastYear": "{percent} до того самого періоду минулого року",
+    "vsLastYearNew": "У цьому періоді рік тому нічого не було",
+    "monthlyAverage": "Середнє за місяць",
+    "averageTransaction": "Середня транзакція",
+    "transactions": "Транзакції",
+    "sinceYear": "З {year}",
+    "lastTransaction": "Остання транзакція",
+    "convertedNote": "Переведено в {currency}"
+  },
+  "topPayees": {
+    "title": "Основні одержувачі",
+    "subtitle": "Останні 12 місяців",
+    "empty": "Немає активності за останні 12 місяців",
+    "subtitleAllTime": "За весь час",
+    "emptyAllTime": "За цією категорією активності не зафіксовано",
+    "noPayee": "Без одержувача",
+    "range12m": "12 місяців",
+    "rangeAll": "Усе"
+  },
+  "subcategoriesPanel": {
+    "title": "Підкатегорії",
+    "subtitle": "За весь час, кожна разом із власними підкатегоріями",
+    "empty": "У цієї категорії немає підкатегорій",
+    "thisCategory": "Ця категорія"
+  },
+  "accountsPanel": {
+    "title": "Оплачується з рахунків",
+    "subtitle": "За весь час",
+    "empty": "Транзакцій ще немає"
+  },
+  "scheduledPanel": {
+    "title": "Найближчі заплановані",
+    "subtitle": "Рахунки та депозити в цій категорії",
+    "empty": "У цій категорії нічого не заплановано",
+    "noPayee": "Без одержувача"
+  },
+  "tagPanel": {
+    "title": "Розподіл за тегами",
+    "subtitle": "Витрати в цій категорії за значенням тега",
+    "keyLabel": "Ключ тега"
+  },
+  "keyInfo": {
+    "title": "Основні відомості",
+    "type": "Тип",
+    "income": "Дохід",
+    "expense": "Витрата",
+    "parent": "Батьківська категорія",
+    "subcategories": "Підкатегорії",
+    "payees": "Одержувачі",
+    "created": "Додано",
+    "firstTransaction": "Перша транзакція",
+    "largestTransaction": "Найбільша транзакція",
+    "largestValue": "{amount} — {date}",
+    "defaultFor": "Категорія за замовчуванням для",
+    "defaultForMore": "+ще {count}",
+    "description": "Опис"
+  },
+  "tabs": {
+    "ariaLabel": "Розділи категорії",
+    "overview": "Огляд",
+    "transactions": "Транзакції",
+    "subcategories": "Підкатегорії"
+  },
+  "transactionsTab": {
+    "title": "Транзакції",
+    "empty": "У цій категорії ще немає транзакцій",
+    "loadFailed": "Не вдалося завантажити транзакції",
+    "titleWithCount": "Транзакції ({count})",
+    "openInRegister": "Відкрити в журналі"
+  },
+  "subcategoriesTab": {
+    "empty": "У цієї категорії немає підкатегорій",
+    "name": "Назва",
+    "total": "Разом",
+    "transactions": "Транзакції"
+  },
+  "seasonality": {
+    "title": "Сезонність",
+    "tooltip": "Скільки коштує типовий місяць у цій категорії, у середньому за всі роки історії.",
+    "peak": "Витрати сконцентровані в {month}.",
+    "even": "Витрати розподілені по року рівномірно.",
+    "needsMoreHistory": "Щоб відрізнити сезонність від випадковості, потрібно щонайменше {years} років історії.",
+    "empty": "Поки немає витрат для розподілу за місяцями",
+    "monthTooltip": "{month}: у середньому {amount} за {years, plural, one {# рік} few {# роки} many {# років} other {# року}}"
+  }
+}

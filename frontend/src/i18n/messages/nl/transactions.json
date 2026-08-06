@@ -29,6 +29,7 @@
     "show": "Begunstigde-info tonen"
   },
   "categoryWidget": {
+    "detailsAria": "Categorie-details bekijken",
     "totalSpent": "Totaal uitgegeven",
     "totalEarned": "Totaal ontvangen",
     "income": "Inkomsten",

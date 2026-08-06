@@ -29,6 +29,7 @@
     "show": "Mostra info beneficiario"
   },
   "categoryWidget": {
+    "detailsAria": "Vedi dettagli della categoria",
     "totalSpent": "Spesa totale",
     "totalEarned": "Entrate totali",
     "income": "Entrata",

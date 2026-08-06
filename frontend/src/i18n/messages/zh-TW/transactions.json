@@ -29,6 +29,7 @@
     "show": "顯示收款人資訊"
   },
   "categoryWidget": {
+    "detailsAria": "檢視分類詳細資料",
     "totalSpent": "總支出",
     "totalEarned": "總收入",
     "income": "收入",

@@ -29,6 +29,7 @@
     "show": "Tampilkan info penerima"
   },
   "categoryWidget": {
+    "detailsAria": "Lihat detail kategori",
     "totalSpent": "Total Pengeluaran",
     "totalEarned": "Total Pemasukan",
     "income": "Pemasukan",

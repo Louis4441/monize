@@ -1,0 +1,109 @@
+{
+  "loading": "正在加载分类...",
+  "notFound": "未找到该分类",
+  "loadFailed": "无法加载该分类",
+  "backToCategories": "分类",
+  "error": {
+    "retry": "重试"
+  },
+  "header": {
+    "incomePill": "收入",
+    "expensePill": "支出",
+    "systemBadge": "系统",
+    "edit": "编辑",
+    "delete": "删除",
+    "viewTransactions": "查看交易",
+    "switchCategory": "切换到其他分类",
+    "switchPlaceholder": "筛选分类...",
+    "switchNoMatches": "没有匹配的分类",
+    "since": "自 {date} 起的分类"
+  },
+  "summary": {
+    "spentThisYear": "今年支出",
+    "receivedThisYear": "今年收入",
+    "vsLastYear": "较去年同期 {percent}",
+    "vsLastYearNew": "去年同期没有记录",
+    "monthlyAverage": "月平均",
+    "averageTransaction": "平均交易金额",
+    "transactions": "交易",
+    "sinceYear": "自 {year} 年起",
+    "lastTransaction": "最近交易",
+    "convertedNote": "已换算为 {currency}"
+  },
+  "topPayees": {
+    "title": "主要收款人",
+    "subtitle": "最近12个月",
+    "empty": "最近12个月没有活动",
+    "subtitleAllTime": "全部历史",
+    "emptyAllTime": "该分类没有活动记录",
+    "noPayee": "无收款人",
+    "range12m": "12个月",
+    "rangeAll": "全部"
+  },
+  "subcategoriesPanel": {
+    "title": "子分类",
+    "subtitle": "全部历史，每项都包含其自身的子分类",
+    "empty": "该分类没有子分类",
+    "thisCategory": "此分类"
+  },
+  "accountsPanel": {
+    "title": "付款账户",
+    "subtitle": "全部历史",
+    "empty": "暂无交易"
+  },
+  "scheduledPanel": {
+    "title": "即将到来的计划交易",
+    "subtitle": "该分类中的账单与存款",
+    "empty": "该分类中没有计划交易",
+    "noPayee": "无收款人"
+  },
+  "tagPanel": {
+    "title": "标签明细",
+    "subtitle": "按标签值统计该分类的支出",
+    "keyLabel": "标签键"
+  },
+  "keyInfo": {
+    "title": "关键信息",
+    "type": "类型",
+    "income": "收入",
+    "expense": "支出",
+    "parent": "父分类",
+    "subcategories": "子分类",
+    "payees": "收款人",
+    "created": "添加时间",
+    "firstTransaction": "首笔交易",
+    "largestTransaction": "最大交易",
+    "largestValue": "{date} 的 {amount}",
+    "defaultFor": "作为以下收款人的默认分类",
+    "defaultForMore": "还有 {count} 个",
+    "description": "描述"
+  },
+  "tabs": {
+    "ariaLabel": "分类各部分",
+    "overview": "概览",
+    "transactions": "交易",
+    "subcategories": "子分类"
+  },
+  "transactionsTab": {
+    "title": "交易",
+    "empty": "该分类暂无交易",
+    "loadFailed": "无法加载交易",
+    "titleWithCount": "交易 ({count})",
+    "openInRegister": "在交易列表中打开"
+  },
+  "subcategoriesTab": {
+    "empty": "该分类没有子分类",
+    "name": "名称",
+    "total": "合计",
+    "transactions": "交易"
+  },
+  "seasonality": {
+    "title": "季节性",
+    "tooltip": "该分类一个典型月份的金额，按所有历史年份取平均。",
+    "peak": "支出集中在{month}。",
+    "even": "支出全年分布均匀。",
+    "needsMoreHistory": "至少需要 {years} 年的历史才能把季节性规律与偶然区分开。",
+    "empty": "暂无支出可按月分解",
+    "monthTooltip": "{month}：{years, plural, other {# 年}}平均 {amount}"
+  }
+}

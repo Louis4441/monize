@@ -29,6 +29,7 @@
     "show": "Mostrar informações do beneficiário"
   },
   "categoryWidget": {
+    "detailsAria": "Ver detalhes da categoria",
     "totalSpent": "Total Gasto",
     "totalEarned": "Total Recebido",
     "income": "Receita",

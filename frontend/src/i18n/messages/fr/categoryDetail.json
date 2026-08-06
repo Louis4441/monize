@@ -1,0 +1,109 @@
+{
+  "loading": "Chargement de la catégorie...",
+  "notFound": "Catégorie introuvable",
+  "loadFailed": "Impossible de charger cette catégorie",
+  "backToCategories": "Catégories",
+  "error": {
+    "retry": "Réessayer"
+  },
+  "header": {
+    "incomePill": "Revenu",
+    "expensePill": "Dépense",
+    "systemBadge": "Système",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "viewTransactions": "Voir les transactions",
+    "switchCategory": "Passer à une autre catégorie",
+    "switchPlaceholder": "Filtrer les catégories...",
+    "switchNoMatches": "Aucune catégorie ne correspond",
+    "since": "Catégorie depuis {date}"
+  },
+  "summary": {
+    "spentThisYear": "Dépensé cette année",
+    "receivedThisYear": "Reçu cette année",
+    "vsLastYear": "{percent} par rapport à la même période l’an dernier",
+    "vsLastYearNew": "Rien sur cette période l’an dernier",
+    "monthlyAverage": "Moyenne mensuelle",
+    "averageTransaction": "Transaction moyenne",
+    "transactions": "Transactions",
+    "sinceYear": "Depuis {year}",
+    "lastTransaction": "Dernière transaction",
+    "convertedNote": "Converti en {currency}"
+  },
+  "topPayees": {
+    "title": "Principaux bénéficiaires",
+    "subtitle": "12 derniers mois",
+    "empty": "Aucune activité sur les 12 derniers mois",
+    "subtitleAllTime": "Depuis le début",
+    "emptyAllTime": "Aucune activité enregistrée pour cette catégorie",
+    "noPayee": "Aucun bénéficiaire",
+    "range12m": "12 mois",
+    "rangeAll": "Tout"
+  },
+  "subcategoriesPanel": {
+    "title": "Sous-catégories",
+    "subtitle": "Depuis le début, chacune incluant ses propres sous-catégories",
+    "empty": "Cette catégorie n’a pas de sous-catégories",
+    "thisCategory": "Cette catégorie"
+  },
+  "accountsPanel": {
+    "title": "Payé depuis les comptes",
+    "subtitle": "Depuis le début",
+    "empty": "Aucune transaction pour le moment"
+  },
+  "scheduledPanel": {
+    "title": "Prochaines transactions planifiées",
+    "subtitle": "Factures et dépôts dans cette catégorie",
+    "empty": "Rien de planifié dans cette catégorie",
+    "noPayee": "Aucun bénéficiaire"
+  },
+  "tagPanel": {
+    "title": "Répartition par étiquette",
+    "subtitle": "Dépenses dans cette catégorie par valeur d’étiquette",
+    "keyLabel": "Clé d’étiquette"
+  },
+  "keyInfo": {
+    "title": "Informations clés",
+    "type": "Type",
+    "income": "Revenu",
+    "expense": "Dépense",
+    "parent": "Catégorie parente",
+    "subcategories": "Sous-catégories",
+    "payees": "Bénéficiaires",
+    "created": "Ajouté",
+    "firstTransaction": "Première transaction",
+    "largestTransaction": "Transaction la plus élevée",
+    "largestValue": "{amount} le {date}",
+    "defaultFor": "Catégorie par défaut pour",
+    "defaultForMore": "+{count} autres",
+    "description": "Description"
+  },
+  "tabs": {
+    "ariaLabel": "Sections de la catégorie",
+    "overview": "Aperçu",
+    "transactions": "Transactions",
+    "subcategories": "Sous-catégories"
+  },
+  "transactionsTab": {
+    "title": "Transactions",
+    "empty": "Aucune transaction dans cette catégorie pour le moment",
+    "loadFailed": "Impossible de charger les transactions",
+    "titleWithCount": "Transactions ({count})",
+    "openInRegister": "Ouvrir dans le registre"
+  },
+  "subcategoriesTab": {
+    "empty": "Cette catégorie n’a pas de sous-catégories",
+    "name": "Nom",
+    "total": "Total",
+    "transactions": "Transactions"
+  },
+  "seasonality": {
+    "title": "Saisonnalité",
+    "tooltip": "Ce que coûte un mois typique dans cette catégorie, en moyenne sur toutes les années d’historique.",
+    "peak": "Les dépenses se concentrent en {month}.",
+    "even": "Les dépenses sont réparties uniformément sur l’année.",
+    "needsMoreHistory": "Il faut au moins {years} ans d’historique pour distinguer une saisonnalité du hasard.",
+    "empty": "Aucune dépense à répartir par mois pour le moment",
+    "monthTooltip": "{month} : {amount} en moyenne sur {years, plural, one {# an} other {# ans}}"
+  }
+}

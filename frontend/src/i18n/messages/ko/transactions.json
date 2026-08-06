@@ -29,6 +29,7 @@
     "show": "수취인 정보 표시"
   },
   "categoryWidget": {
+    "detailsAria": "카테고리 상세 보기",
     "totalSpent": "총 지출",
     "totalEarned": "총 수입",
     "income": "수입",

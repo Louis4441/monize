@@ -29,6 +29,7 @@
     "show": "支払先情報を表示"
   },
   "categoryWidget": {
+    "detailsAria": "カテゴリの詳細を表示",
     "totalSpent": "支出合計",
     "totalEarned": "収入合計",
     "income": "収入",
