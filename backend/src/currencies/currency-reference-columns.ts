@@ -1,13 +1,13 @@
 /**
  * Every column that holds a `currencies(code)` value.
  *
- * The two SQL functions (migrations 133 and 134) answer the *database's*
+ * The two SQL functions (migrations 136 and 137) answer the *database's*
  * questions about this list. This is the same list for the one caller that
  * cannot ask the database: the support backup rewrites currency codes inside an
  * in-memory export, after the rows have left Postgres.
  *
  * It is a hand-written list, which is exactly the thing that has gone wrong here
- * three times -- so `currency-reference-columns.spec.ts` parses
+ * three times -- so `currency-references.spec.ts` parses
  * `database/schema.sql` and fails when this and the schema disagree in either
  * direction. Add a currency reference in a migration and the test names it.
  */

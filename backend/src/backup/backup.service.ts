@@ -359,57 +359,119 @@ export class BackupService {
     // the compressed output and the number of tables held at once -- it does NOT
     // bound one table, or the carried attachment set (F3RB-006).
     const gzip = createGzip();
+    let responseAbort: Error | null = null;
+    const abortResponse = (error: Error): void => {
+      if (responseAbort === null) responseAbort = error;
+      // Rejecting the pending operation releases the snapshot transaction; the
+      // transform is destroyed separately so it cannot retain buffered output.
+      if (!gzip.destroyed) gzip.destroy();
+    };
+    const onResponseClose = (): void => {
+      if (!res.writableFinished) {
+        abortResponse(
+          new Error("Backup export response closed before completion"),
+        );
+      }
+    };
+    const onResponseError = (error: Error): void => abortResponse(error);
+    res.once("close", onResponseClose);
+    res.once("error", onResponseError);
 
-    const write = (chunk: string): Promise<void> =>
-      new Promise((resolve, _reject) => {
-        if (!gzip.write(chunk)) {
-          gzip.once("drain", resolve);
-        } else {
-          resolve();
+    /**
+     * One gzip operation that cannot wait forever after the response disappears.
+     * The write callback replaces a naked `drain` wait: `close` and `error` reject
+     * it, so `inExportSnapshot` unwinds and withScopedDb releases the transaction.
+     */
+    const gzipOperation = (
+      start: (done: (error?: Error | null) => void) => void,
+    ): Promise<void> =>
+      new Promise((resolve, reject) => {
+        if (responseAbort !== null) {
+          reject(responseAbort);
+          return;
+        }
+        let settled = false;
+        const cleanup = (): void => {
+          res.off("close", onClose);
+          res.off("error", onError);
+          gzip.off("error", onError);
+        };
+        const done = (error?: Error | null): void => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          if (error) reject(error);
+          else resolve();
+        };
+        const onClose = (): void =>
+          done(
+            responseAbort ??
+              new Error("Backup export response closed before completion"),
+          );
+        const onError = (error: Error): void => done(error);
+        res.once("close", onClose);
+        res.once("error", onError);
+        gzip.once("error", onError);
+        try {
+          start(done);
+        } catch (error) {
+          done(error instanceof Error ? error : new Error(String(error)));
         }
       });
 
-    const preRead = new Map<string, Record<string, unknown>[]>();
-    await this.inExportSnapshot(userId, async (read) => {
-      // Read the two attachment tables BEFORE the first byte goes out, so
-      // completeness can be signalled in the response headers rather than only
-      // in the log (F3RB-004). This costs no extra memory: both arrays were
-      // already retained for the end-of-stream assessment, so the only change
-      // is the order in which they are read inside the same snapshot.
-      for (const entry of tableQueries) {
-        if (
-          entry.key === "transaction_attachments" ||
-          entry.key === "attachment_blobs"
-        ) {
-          preRead.set(entry.key, await this.readTable(read, entry));
+    const write = (chunk: string): Promise<void> =>
+      gzipOperation((done) => {
+        gzip.write(chunk, done);
+      });
+
+    let completed = false;
+    try {
+      const preRead = new Map<string, Record<string, unknown>[]>();
+      await this.inExportSnapshot(userId, async (read) => {
+        // Read the two attachment tables BEFORE the first byte goes out, so
+        // completeness can be signalled in the response headers rather than only
+        // in the log (F3RB-004). This costs no extra memory: both arrays were
+        // already retained for the end-of-stream assessment, so the only change
+        // is the order in which they are read inside the same snapshot.
+        for (const entry of tableQueries) {
+          if (
+            entry.key === "transaction_attachments" ||
+            entry.key === "attachment_blobs"
+          ) {
+            preRead.set(entry.key, await this.readTable(read, entry));
+          }
         }
-      }
-      const attachments = preRead.get("transaction_attachments") ?? [];
-      const blobs = preRead.get("attachment_blobs") ?? [];
-      const report = this.assessAttachmentCompleteness(attachments, blobs);
-      this.warnIfIncompleteExport(userId, report);
-      this.markIncompleteExport(res, report);
+        const attachments = preRead.get("transaction_attachments") ?? [];
+        const blobs = preRead.get("attachment_blobs") ?? [];
+        const report = this.assessAttachmentCompleteness(attachments, blobs);
+        this.warnIfIncompleteExport(userId, report);
+        this.markIncompleteExport(res, report);
 
-      // Only now does anything reach the socket, so the headers above are still
-      // mutable.
-      gzip.pipe(res);
-      await write(
-        `{"version":${BACKUP_VERSION},"exportedAt":"${new Date().toISOString()}"`,
-      );
+        // Only now does anything reach the socket, so the headers above are still
+        // mutable.
+        gzip.pipe(res);
+        await write(
+          `{"version":${BACKUP_VERSION},"exportedAt":"${new Date().toISOString()}"`,
+        );
 
-      for (const entry of tableQueries) {
-        const rows =
-          preRead.get(entry.key) ?? (await this.readTable(read, entry));
-        await write(`,"${entry.key}":${JSON.stringify(rows)}`);
-      }
+        for (const entry of tableQueries) {
+          const rows =
+            preRead.get(entry.key) ?? (await this.readTable(read, entry));
+          await write(`,"${entry.key}":${JSON.stringify(rows)}`);
+        }
 
-      await write("}");
-    });
+        await write("}");
+      });
 
-    await new Promise<void>((resolve, reject) => {
-      gzip.once("error", reject);
-      gzip.end(resolve);
-    });
+      await gzipOperation((done) => {
+        gzip.end(() => done());
+      });
+      completed = true;
+    } finally {
+      res.off("close", onResponseClose);
+      res.off("error", onResponseError);
+      if (!completed && !gzip.destroyed) gzip.destroy();
+    }
 
     this.logger.log(`Backup export completed for user ${userId}`);
   }
@@ -1664,9 +1726,16 @@ export class BackupService {
     const rows = data.transaction_attachments;
     if (!rows?.length) return { stagedKeys: [], sourceKeys: [], skipped: 0 };
 
-    const oldIdOf = new Map(
-      [...idRemap].map(([oldId, newId]) => [newId, oldId] as const),
+    // `idRemap` contains every UUID-keyed row in the uploaded graph. Reversing
+    // the whole map allocated another graph-sized array just to authorize legacy
+    // attachment reads. Keep only the remapped attachment ids this method can use.
+    const attachmentIds = new Set(
+      rows.map((row) => String(row.id ?? "")).filter(Boolean),
     );
+    const oldIdOf = new Map<string, string>();
+    for (const [oldId, newId] of idRemap) {
+      if (attachmentIds.has(newId)) oldIdOf.set(newId, oldId);
+    }
     // Last row wins for a duplicated id -- and, critically, the row that is
     // *validated* below must be the row that is *inserted*. `attachment_blobs`
     // has `attachment_id` as its primary key, and Phase-2 inserts with
@@ -1687,14 +1756,25 @@ export class BackupService {
       canonicalEncoded.set(id, encoded);
     }
 
-    // What this user actually owns right now, by original id. Read once, before
-    // the destructive delete, because this is the only window in which the
-    // server's own record of ownership still exists -- and the server's record is
-    // the only thing that can authorize reading an object. Only the legacy path
-    // below needs it: an artifact that carries its own bytes needs no authority
-    // outside itself.
+    const runtimeProvider = this.attachmentStorage.name;
+
+    // Only legacy external rows need a database ownership proof. Current-format
+    // rows carry their bytes and never read a source object; database-provider or
+    // cross-provider legacy rows cannot use this runtime's object store either.
+    const legacySourceIds = new Set<string>();
+    for (const row of rows) {
+      const attachmentId = String(row.id ?? "");
+      if (carriedBytes.has(attachmentId)) continue;
+      const provider = String(row.storage_provider ?? "database");
+      if (provider === "database" || provider !== runtimeProvider) continue;
+      const oldId = oldIdOf.get(attachmentId);
+      if (oldId !== undefined) legacySourceIds.add(oldId);
+    }
+
+    // `loadOwnedAttachmentSources` returns before querying for an empty list, so
+    // a fully self-contained backup performs no legacy ownership read at all.
     const ownedSources = await this.loadOwnedAttachmentSources(userId, [
-      ...idRemap.keys(),
+      ...legacySourceIds,
     ]);
 
     const stagedKeys: string[] = [];
@@ -1702,7 +1782,6 @@ export class BackupService {
     const unrestorable = new Set<string>();
     /** Blob rows for attachments whose bytes are going to the object store. */
     const externallyPlaced = new Set<string>();
-    const runtimeProvider = this.attachmentStorage.name;
 
     for (const row of rows) {
       const attachmentId = String(row.id ?? "");

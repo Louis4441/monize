@@ -55,7 +55,10 @@ import {
 export class RestoreProcessingGate {
   private capacity: number;
   private active = 0;
-  private readonly waiters: Array<() => void> = [];
+  private readonly waiters: Array<{
+    resolve: () => void;
+    reject: (error: ServiceUnavailableException) => void;
+  }> = [];
 
   constructor(capacity = 1) {
     this.capacity = Math.max(1, Math.floor(capacity));
@@ -74,6 +77,14 @@ export class RestoreProcessingGate {
    */
   configure(capacity: number): void {
     this.capacity = Math.max(0, Math.floor(capacity));
+    if (this.capacity < 1) {
+      // Work that has not acquired a slot is governed by the new configuration
+      // too. Leaving old waiters queued would make zero honest only for callers
+      // that arrived later and strand the existing requests forever.
+      const error = this.noCapacityError();
+      for (const waiter of this.waiters.splice(0)) waiter.reject(error);
+      return;
+    }
     this.drain();
   }
 
@@ -97,25 +108,31 @@ export class RestoreProcessingGate {
     return this.waiters.length;
   }
 
+  private noCapacityError(): ServiceUnavailableException {
+    return new ServiceUnavailableException(
+      tr(
+        "errors.backup.restoreNoMemoryHeadroom",
+        "This deployment has no memory headroom for a restore: one restore's " +
+          "modeled peak does not fit the container. Raise the container memory " +
+          "limit or lower BACKUP_RESTORE_EXPANDED_LIMIT.",
+      ),
+    );
+  }
+
   private acquire(): Promise<void> {
     if (this.capacity < 1) {
       // Nothing will ever free a slot, so waiting would be a hang, not a queue.
       // 503 rather than 500: the deployment is misconfigured, a retry without
       // changing it cannot help, and the message says which knob to turn.
-      throw new ServiceUnavailableException(
-        tr(
-          "errors.backup.restoreNoMemoryHeadroom",
-          "This deployment has no memory headroom for a restore: one restore's " +
-            "modeled peak does not fit the container. Raise the container memory " +
-            "limit or lower BACKUP_RESTORE_EXPANDED_LIMIT.",
-        ),
-      );
+      throw this.noCapacityError();
     }
     if (this.active < this.capacity) {
       this.active += 1;
       return Promise.resolve();
     }
-    return new Promise<void>((resolve) => this.waiters.push(resolve));
+    return new Promise<void>((resolve, reject) =>
+      this.waiters.push({ resolve, reject }),
+    );
   }
 
   private release(): void {
@@ -128,8 +145,8 @@ export class RestoreProcessingGate {
       this.active += 1;
       // The waiter's `acquire` promise resolves; it did not increment `active`
       // when it queued, so this increment is its slot.
-      const next = this.waiters.shift() as () => void;
-      next();
+      const next = this.waiters.shift();
+      next?.resolve();
     }
   }
 }

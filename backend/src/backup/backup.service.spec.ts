@@ -1230,6 +1230,39 @@ describe("BackupService", () => {
       expect(written.subarray(0, 4).toString("ascii")).toBe("MZBE");
       expect(mockRes.end).toHaveBeenCalled();
     });
+
+    it("rejects instead of hanging when the response closes mid-export (PR1077-REV-004)", async () => {
+      // The plain export writes JSON through gzip inside the REPEATABLE READ
+      // snapshot. The old write helper waited on a `drain` that a cancelled
+      // client never emits, so the callback never returned and the snapshot
+      // transaction and its pooled connection were pinned for the process
+      // lifetime. Closing the response mid-export must settle the promise.
+      const { res } = responseDouble();
+
+      let releaseAttachments: (rows: unknown[]) => void = () => {};
+      const attachmentsRead = new Promise<unknown[]>((resolve) => {
+        releaseAttachments = resolve;
+      });
+      mockDataSource.query.mockImplementation((sql: string) => {
+        if (String(sql).includes("FROM transaction_attachments")) {
+          return attachmentsRead;
+        }
+        return Promise.resolve([]);
+      });
+
+      const exportPromise = service.streamExport(userId, res);
+      // Let the export park on the pending attachment read inside the snapshot.
+      await new Promise((r) => setImmediate(r));
+      // The client goes away; then the read the snapshot was blocked on returns.
+      res.emit("close");
+      releaseAttachments([]);
+
+      // The invariant is that this settles at all -- a hang fails the test by
+      // timing out rather than by assertion.
+      await expect(exportPromise).rejects.toThrow(
+        /response closed before completion/,
+      );
+    });
   });
 
   describe("exportToBuffer", () => {
@@ -2313,6 +2346,110 @@ describe("BackupService", () => {
           expect(attachmentStorage.load).not.toHaveBeenCalled();
           expect(attachmentStorage.save).not.toHaveBeenCalled();
           expect(result.skippedAttachments).toBe(1);
+        });
+      });
+
+      /**
+       * The legacy ownership preload is sized by legacy attachment rows, not by
+       * every UUID in the uploaded graph (PR1077-REV-005).
+       *
+       * The read used to receive `[...idRemap.keys()]` -- every remapped row in
+       * the artifact, transactions and splits and prices included -- to authorize
+       * a handful of legacy external attachments. A current-format artifact that
+       * carries its own bytes needs no authority outside itself, so it must issue
+       * no ownership query at all; a mixed artifact must query only the original
+       * ids of the legacy rows that actually read a source object.
+       */
+      describe("legacy ownership query scope", () => {
+        const ownershipQueryCalls = () =>
+          mockQueryRunner.query.mock.calls.filter(([sql]) =>
+            String(sql).includes("id = ANY($2::uuid[])"),
+          );
+
+        const attachmentRow = (id: string) => ({
+          id,
+          user_id: userId,
+          transaction_id: TX_ID,
+          filename: "receipt.pdf",
+          content_type: "application/pdf",
+          byte_size: BYTES.length,
+          sha256: SHA256,
+          storage_provider: "local",
+          storage_key: id,
+        });
+
+        it("issues no ownership query when every attachment carries its own bytes", async () => {
+          // Carried bytes, and a graph of unrelated rows the old code would have
+          // copied into the query parameter. The read must not happen.
+          ownedAttachments = [];
+          const data = {
+            ...validBackupData,
+            transactions: Array.from({ length: 40 }, () => ({
+              id: randomUUID(),
+            })),
+            transaction_attachments: [attachmentRow(OLD_ID)],
+            attachment_blobs: [
+              { attachment_id: OLD_ID, data: BYTES.toString("base64") },
+            ],
+          };
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data }),
+          );
+
+          expect(ownershipQueryCalls()).toHaveLength(0);
+          expect(attachmentStorage.load).not.toHaveBeenCalled();
+          expect(result.restored.transactionAttachments).toBe(1);
+        });
+
+        it("queries only the original ids of the legacy attachments, deduplicated", async () => {
+          const CARRIED = "aaaaaaaa-0000-4000-8000-000000000001";
+          const LEGACY_A = "bbbbbbbb-0000-4000-8000-000000000002";
+          const LEGACY_B = "cccccccc-0000-4000-8000-000000000003";
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          // The server holds the two legacy rows; the ownership read authorizes
+          // them and nothing else.
+          ownedAttachments = [
+            {
+              id: LEGACY_A,
+              storage_provider: "local",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+            },
+            {
+              id: LEGACY_B,
+              storage_provider: "local",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+            },
+          ];
+          const data = {
+            ...validBackupData,
+            transactions: Array.from({ length: 30 }, () => ({
+              id: randomUUID(),
+            })),
+            transaction_attachments: [
+              attachmentRow(CARRIED),
+              attachmentRow(LEGACY_A),
+              attachmentRow(LEGACY_B),
+            ],
+            attachment_blobs: [
+              { attachment_id: CARRIED, data: BYTES.toString("base64") },
+            ],
+          };
+
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data }),
+          );
+
+          const calls = ownershipQueryCalls();
+          expect(calls).toHaveLength(1);
+          const queriedIds = [
+            ...((calls[0][1] as unknown[])[1] as string[]),
+          ].sort();
+          expect(queriedIds).toEqual([LEGACY_A, LEGACY_B].sort());
         });
       });
 

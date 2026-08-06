@@ -40,7 +40,7 @@
 -- activation deleted, and was left with a budget in a currency they could no
 -- longer see or reactivate.
 --
--- Both are deliberately SECURITY INVOKER, unlike their sibling in 133. They must
+-- Both are deliberately SECURITY INVOKER, unlike their sibling in 136. They must
 -- answer for the calling tenant only, and under RLS the caller's own policies
 -- give exactly that -- so the ordinary rules apply and no privilege is granted.
 --

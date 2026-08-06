@@ -139,6 +139,24 @@ describe("RestoreProcessingGate", () => {
       ServiceUnavailableException,
     );
   });
+
+  it("rejects waiters that were queued before capacity becomes zero", async () => {
+    const gate = new RestoreProcessingGate(1);
+    const first = deferred();
+    const p1 = gate.run(async () => first.promise);
+    const p2 = gate.run(async () => "must not run");
+    const rejected = expect(p2).rejects.toThrow(ServiceUnavailableException);
+
+    await flush();
+    expect(gate.waitingCount).toBe(1);
+
+    gate.configure(0);
+    await rejected;
+    expect(gate.waitingCount).toBe(0);
+
+    first.resolve();
+    await p1;
+  });
 });
 
 describe("computeRestoreProcessingSlots", () => {

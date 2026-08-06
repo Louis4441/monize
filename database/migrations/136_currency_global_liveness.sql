@@ -67,6 +67,6 @@ COMMENT ON FUNCTION currency_code_in_use_globally(VARCHAR) IS
 -- Not a general-purpose helper: only the owner and the runtime role call it.
 -- This migration must not name the runtime role (it may not exist yet on a
 -- given deployment, and a failing GRANT would crash-loop startup), so the
--- runtime grant lives in backend/src/db-init.ts alongside the other role
--- grants. Revoking PUBLIC here is safe because PUBLIC always exists.
+-- runtime grant lives in backend/src/common/db/app-role.ts alongside the other
+-- role grants. Revoking PUBLIC here is safe because PUBLIC always exists.
 REVOKE ALL ON FUNCTION currency_code_in_use_globally(VARCHAR) FROM PUBLIC;
