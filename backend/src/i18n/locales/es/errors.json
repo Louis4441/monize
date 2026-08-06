@@ -317,7 +317,9 @@
   "monteCarlo": {
     "scenarioNotFound": "Escenario {{ id }} no encontrado",
     "scenarioIdsMustBeArray": "scenarioIds debe ser un array",
-    "atLeastOneAccountRequired": "Se requiere al menos un accountId"
+    "atLeastOneAccountRequired": "Se requiere al menos un accountId",
+    "currentValueUnavailable": "No se pudo determinar el valor actual de las cuentas seleccionadas, por lo que una simulación no puede partir de él. Introduzca un valor inicial explícitamente o vuelva a intentarlo cuando haya precios y tipos de cambio disponibles.",
+    "historicalReturnsUnavailable": "No se pudieron calcular los rendimientos históricos de las cuentas seleccionadas, por lo que una simulación no puede usarlos. Introduzca manualmente un rendimiento esperado y una volatilidad, o reinténtelo cuando los precios y los tipos de cambio estén disponibles."
   },
   "netWorth": {
     "invalidStartDate": "startDate debe estar en formato YYYY-MM-DD",
