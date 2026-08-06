@@ -1831,4 +1831,121 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctx.importResult.skipped).toBe(0);
     });
   });
+
+  describe("CSV-emitted action codes", () => {
+    it("maps addshares to ADD_SHARES with no cost and no cash leg", async () => {
+      const securityMap = new Map<string, string | null>();
+      securityMap.set("AAPL", "sec-1");
+      const ctx = makeContext({ securityMap });
+
+      await service.processTransaction(ctx, {
+        action: "addshares",
+        security: "AAPL",
+        quantity: 25,
+        price: 0,
+        commission: 0,
+        amount: 0,
+        date: "2026-01-15",
+      });
+
+      const saved = managerOf(ctx).save.mock.calls[0][0];
+      expect(saved).toBeInstanceOf(InvestmentTransaction);
+      expect(saved.action).toBe(InvestmentAction.ADD_SHARES);
+      expect(saved.quantity).toBe(25);
+      // An unknown cost is persisted as NULL, never as a zero price
+      expect(saved.price).toBeNull();
+      expect(saved.totalAmount).toBe(0);
+      // No cash transaction: only the investment row is saved
+      expect(managerOf(ctx).save).toHaveBeenCalledTimes(1);
+      expect(ctx.importResult.imported).toBe(1);
+    });
+
+    it("maps removeshares to REMOVE_SHARES", async () => {
+      const securityMap = new Map<string, string | null>();
+      securityMap.set("AAPL", "sec-1");
+      const holding = { quantity: 100, averageCost: 50 } as unknown as Holding;
+      const ctx = makeContext({ securityMap });
+      managerOf(ctx).findOne.mockImplementation((cls: any) =>
+        Promise.resolve(cls === Holding ? holding : null),
+      );
+
+      await service.processTransaction(ctx, {
+        action: "removeshares",
+        security: "AAPL",
+        quantity: 10,
+        price: 0,
+        commission: 0,
+        amount: 0,
+        date: "2026-01-16",
+      });
+
+      const saved = managerOf(ctx).save.mock.calls[0][0];
+      expect(saved.action).toBe(InvestmentAction.REMOVE_SHARES);
+      expect(saved.totalAmount).toBe(0);
+      expect(ctx.importResult.imported).toBe(1);
+    });
+
+    it("books xin with no transfer account as a plain cash deposit on the linked cash account", async () => {
+      const ctx = makeContext({
+        account: {
+          id: accountId,
+          currencyCode: "USD",
+          accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+          linkedAccountId: "cash-1",
+          name: "Brokerage",
+        } as any,
+      });
+
+      await service.processTransaction(ctx, {
+        action: "xin",
+        security: "",
+        quantity: 0,
+        price: 0,
+        commission: 0,
+        amount: 500,
+        date: "2026-02-05",
+        payee: "Contribution",
+      });
+
+      // A single cash Transaction is created; no InvestmentTransaction row
+      expect(managerOf(ctx).save).toHaveBeenCalledTimes(1);
+      const created = managerOf(ctx).create.mock.calls[0][1];
+      expect(created.accountId).toBe("cash-1");
+      expect(created.amount).toBe(500);
+      expect(created.isTransfer).toBe(false);
+      expect(
+        managerOf(ctx).save.mock.calls[0][0],
+      ).not.toBeInstanceOf(InvestmentTransaction);
+      expect(ctx.affectedAccountIds.has("cash-1")).toBe(true);
+      expect(ctx.importResult.imported).toBe(1);
+    });
+
+    it("books xout with a positive file amount as a negative cash movement", async () => {
+      const ctx = makeContext({
+        account: {
+          id: accountId,
+          currencyCode: "USD",
+          accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+          linkedAccountId: "cash-1",
+          name: "Brokerage",
+        } as any,
+      });
+
+      await service.processTransaction(ctx, {
+        action: "xout",
+        security: "",
+        quantity: 0,
+        price: 0,
+        commission: 0,
+        amount: 25,
+        date: "2026-02-06",
+        payee: "Management Fee",
+      });
+
+      const created = managerOf(ctx).create.mock.calls[0][1];
+      expect(created.accountId).toBe("cash-1");
+      expect(created.amount).toBe(-25);
+      expect(ctx.importResult.imported).toBe(1);
+    });
+  });
 });

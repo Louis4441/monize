@@ -2985,6 +2985,39 @@ describe("ImportService", () => {
         service.parseCsvFile(userId, "", columnMapping),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it("passes the parser's investmentSummary through to the response", async () => {
+      mockedValidateCsvContent.mockReturnValue({ valid: true });
+      const investmentSummary = {
+        actionCounts: { buy: 2, cashIn: 1 },
+        cashFallbackValues: ["Journal"],
+        uncostedShareRows: 1,
+        rejectedRows: [{ reason: "missingProceeds", count: 1 }],
+      };
+      mockedParseCsv.mockReturnValue({
+        accountType: "INVESTMENT",
+        accountName: "",
+        transactions: [],
+        categories: [],
+        transferAccounts: [],
+        securities: ["AAPL"],
+        detectedDateFormat: "YYYY-MM-DD",
+        sampleDates: [],
+        openingBalance: null,
+        openingBalanceDate: null,
+        investmentSummary,
+      });
+
+      const result = await service.parseCsvFile(
+        userId,
+        "content",
+        columnMapping,
+      );
+
+      expect(result.investmentSummary).toEqual(investmentSummary);
+      expect(result.accountType).toBe("INVESTMENT");
+      expect(result.securities).toEqual(["AAPL"]);
+    });
   });
 
   describe("importCsvFile", () => {
@@ -3069,6 +3102,112 @@ describe("ImportService", () => {
       expect(mockedParseCsv).toHaveBeenCalled();
       expect(result).toBeDefined();
       expect(result.imported).toBeDefined();
+    });
+
+    const emptyParseResult = (accountType: string) => ({
+      accountType,
+      accountName: "",
+      transactions: [],
+      categories: [],
+      transferAccounts: [],
+      securities: [],
+      detectedDateFormat: "YYYY-MM-DD",
+      sampleDates: [],
+      openingBalance: null,
+      openingBalanceDate: null,
+    });
+
+    const investmentCsvDto = () =>
+      ({
+        content: "Date,Action,Symbol,Quantity,Price,Amount\n",
+        accountId: "acct-1",
+        columnMapping: {
+          date: 0,
+          amount: 5,
+          dateFormat: "YYYY-MM-DD",
+          hasHeader: true,
+          delimiter: ",",
+          investmentMode: true,
+          actionColumn: 1,
+          securityColumn: 2,
+          quantityColumn: 3,
+          priceColumn: 4,
+          commissionColumn: 6,
+          actionKeywords: { buy: ["acquisto"] },
+        },
+        categoryMappings: [],
+        accountMappings: [],
+        securityMappings: [{ originalName: "AAPL", securityId: "sec-1" }],
+      }) as any;
+
+    it("forwards securityMappings to the shared import path instead of []", async () => {
+      mockedValidateCsvContent.mockReturnValue({ valid: true });
+      mockedParseCsv.mockReturnValue(emptyParseResult("INVESTMENT"));
+      const importSpy = jest
+        .spyOn(service as any, "importParsedTransactions")
+        .mockResolvedValue({ imported: 0 });
+
+      const dto = investmentCsvDto();
+      await service.importCsvFile(userId, dto);
+
+      expect(importSpy).toHaveBeenCalledWith(
+        userId,
+        expect.anything(),
+        "acct-1",
+        dto.categoryMappings,
+        dto.accountMappings,
+        dto.securityMappings,
+        undefined,
+      );
+      importSpy.mockRestore();
+    });
+
+    it("copies the investment column config into the parser config", async () => {
+      mockedValidateCsvContent.mockReturnValue({ valid: true });
+      mockedParseCsv.mockReturnValue(emptyParseResult("INVESTMENT"));
+      const importSpy = jest
+        .spyOn(service as any, "importParsedTransactions")
+        .mockResolvedValue({ imported: 0 });
+
+      await service.importCsvFile(userId, investmentCsvDto());
+
+      expect(mockedParseCsv).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          investmentMode: true,
+          actionColumn: 1,
+          securityColumn: 2,
+          quantityColumn: 3,
+          priceColumn: 4,
+          commissionColumn: 6,
+          actionKeywords: { buy: ["acquisto"] },
+        }),
+        undefined,
+      );
+      importSpy.mockRestore();
+    });
+
+    it("rejects an investment-mode CSV targeting a non-brokerage account", async () => {
+      mockedValidateCsvContent.mockReturnValue({ valid: true });
+      mockedParseCsv.mockReturnValue(emptyParseResult("INVESTMENT"));
+      accountsRepository.findOne.mockResolvedValue(mockChequingAccount);
+
+      await expect(
+        service.importCsvFile(userId, investmentCsvDto()),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("still rejects a regular CSV targeting a brokerage account", async () => {
+      mockedValidateCsvContent.mockReturnValue({ valid: true });
+      mockedParseCsv.mockReturnValue(emptyParseResult("CHEQUING"));
+      accountsRepository.findOne.mockResolvedValue(mockBrokerageAccount);
+
+      const dto = investmentCsvDto();
+      dto.columnMapping.investmentMode = false;
+
+      await expect(service.importCsvFile(userId, dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
