@@ -235,6 +235,20 @@ describe('CategoryList', () => {
     expect(mockPush).toHaveBeenCalledWith('/transactions?categoryId=c1');
   });
 
+  // Row click -> detail page
+  it('navigates to the category detail page when the row is clicked', () => {
+    const categories = [
+      makeCategory({ id: 'c1', name: 'Food' }),
+    ];
+
+    render(<CategoryList categories={categories} onEdit={onEdit} onRefresh={onRefresh} />);
+    // Click the row itself (via a cell without its own handler), matching the
+    // payees/accounts/securities lists. Edit stays on the row actions.
+    fireEvent.click(screen.getByText('Food').closest('tr')!);
+    expect(mockPush).toHaveBeenCalledWith('/categories/c1');
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
   // Delete flow
   it('opens delete dialog when delete button is clicked', async () => {
     mockCategoriesApi.getTransactionCount.mockResolvedValueOnce(0);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNextScheduled } from './scheduled-utils';
+import { getNextScheduled, getUpcomingScheduled } from './scheduled-utils';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 
 const makeScheduled = (
@@ -76,5 +76,53 @@ describe('getNextScheduled', () => {
       () => true,
     );
     expect(result?.payeeName).toBe('Hydro One Networks');
+  });
+});
+
+describe('getUpcomingScheduled', () => {
+  it('lists matching active items soonest first, bounded by the limit', () => {
+    const result = getUpcomingScheduled(
+      [
+        makeScheduled({ id: 'st-1', nextDueDate: '2026-08-15T00:00:00.000Z' }),
+        makeScheduled({ id: 'st-2', nextDueDate: '2026-08-01T00:00:00.000Z' }),
+        makeScheduled({ id: 'st-3', nextDueDate: '2026-08-08T00:00:00.000Z' }),
+      ],
+      () => true,
+      2,
+    );
+    expect(result.map((item) => item.date)).toEqual(['2026-08-01', '2026-08-08']);
+  });
+
+  it('excludes inactive and non-matching items', () => {
+    const result = getUpcomingScheduled(
+      [
+        makeScheduled({ id: 'st-1', isActive: false }),
+        makeScheduled({ id: 'st-2', categoryId: 'c-other' }),
+        makeScheduled({ id: 'st-3', categoryId: 'c-1' }),
+      ],
+      (st) => st.categoryId === 'c-1',
+      5,
+    );
+    expect(result).toHaveLength(1);
+  });
+
+  it('honours per-occurrence overrides for date and amount', () => {
+    const result = getUpcomingScheduled(
+      [
+        makeScheduled({
+          nextOverride: {
+            overrideDate: '2026-08-20T00:00:00.000Z',
+            amount: -99,
+          } as ScheduledTransaction['nextOverride'],
+        }),
+      ],
+      () => true,
+      5,
+    );
+    expect(result[0]).toMatchObject({ date: '2026-08-20', amount: -99 });
+  });
+
+  it('returns an empty list when nothing matches', () => {
+    expect(getUpcomingScheduled([makeScheduled()], () => false, 5)).toEqual([]);
   });
 });
