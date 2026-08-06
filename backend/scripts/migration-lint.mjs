@@ -264,6 +264,28 @@ export function collectDrops(statements, upToIndex) {
  * `ENABLE ROW LEVEL SECURITY`, and data `UPDATE`/`DELETE` (their WHERE clauses
  * select the pre-migration state and match nothing on a second pass).
  */
+/**
+ * Normalized role names out of a `TO`/`FROM` grantee list ("PUBLIC,
+ * monize_app WITH GRANT OPTION" -> ["public", "monize_app"]). Tail options are
+ * cut first so `WITH GRANT OPTION` / `GRANTED BY` / `CASCADE` are not mistaken
+ * for grantees. An entry the grammar cannot read comes back as "" -- not
+ * provably PUBLIC, so the caller flags it rather than passing it.
+ */
+function granteesOf(listText) {
+  return listText
+    .replace(/\b(?:WITH|GRANTED\s+BY|CASCADE|RESTRICT)\b[\s\S]*$/i, "")
+    .split(",")
+    .map((entry) => {
+      const token = /^(?:GROUP\s+)?([A-Za-z_"][\w"$]*)/i.exec(entry.trim());
+      return token ? normalizeIdentifier(token[1]) : "";
+    });
+}
+
+/** True when a grantee list is anything other than exactly PUBLIC entries. */
+function namesARole(grantees) {
+  return grantees.length === 0 || grantees.some((name) => name !== "public");
+}
+
 export const RULES = [
   {
     id: "create-table-without-if-not-exists",
@@ -474,8 +496,8 @@ export const RULES = [
    * Every grantee is checked, not just the first: `REVOKE ... FROM PUBLIC,
    * monize_app` names a role exactly as much as `FROM monize_app` does. The
    * other statements that bind a specific role -- `OWNER TO`, `REASSIGN OWNED
-   * BY`, `SET ROLE` / `SET SESSION AUTHORIZATION` -- fail the same way a GRANT
-   * does, so they are covered by the same rule.
+   * BY`, `SET ROLE` / `SET SESSION AUTHORIZATION`, and a policy's `TO` clause
+   * -- fail the same way a GRANT does, so they are covered by the same rule.
    */
   {
     id: "role-or-grant-statement",
@@ -507,34 +529,29 @@ export const RULES = [
           "SET ROLE / SET SESSION AUTHORIZATION switches to a named role, and crash-loops startup where that role does not exist",
         );
       }
+      // A policy's TO clause binds it to roles at CREATE/ALTER time and fails
+      // for a missing role exactly like a GRANT. The clause sits before
+      // USING / WITH CHECK, so only that head is searched -- a column named
+      // granted_to inside the predicate is not a TO clause -- and RENAME TO
+      // renames the policy, not a role.
+      if (/\b(?:CREATE|ALTER)\s+POLICY\b/i.test(text)) {
+        const head = text
+          .split(/\bUSING\b|\bWITH\s+CHECK\b/i)[0]
+          .replace(/\bRENAME\s+TO\s+[A-Za-z_"][\w"$]*/i, " ");
+        const toClause = /\bTO\s+([\s\S]+)$/i.exec(head);
+        if (toClause && namesARole(granteesOf(toClause[1]))) {
+          messages.push(
+            "CREATE/ALTER POLICY ... TO names a role, and crash-loops startup where that role does not exist; leave the policy on its default (PUBLIC)",
+          );
+        }
+      }
       const grant = /\b(GRANT|REVOKE)\b([\s\S]*)$/i.exec(text);
       if (grant) {
-        // The grantee list follows TO (GRANT) or FROM (REVOKE). Cut the tail
-        // options off first so `WITH GRANT OPTION` / `GRANTED BY` / `CASCADE`
-        // are not mistaken for grantees, then check every comma-separated
-        // entry -- `FROM PUBLIC, monize_app` names a role exactly as much as
-        // `FROM monize_app` does.
+        // The grantee list follows TO (GRANT) or FROM (REVOKE); every
+        // comma-separated entry is checked -- `FROM PUBLIC, monize_app` names
+        // a role exactly as much as `FROM monize_app` does.
         const list = /\b(?:TO|FROM)\s+([\s\S]+)$/i.exec(grant[2]);
-        const grantees = list
-          ? list[1]
-              .replace(
-                /\b(?:WITH|GRANTED\s+BY|CASCADE|RESTRICT)\b[\s\S]*$/i,
-                "",
-              )
-              .split(",")
-              .map((entry) => {
-                const token = /^(?:GROUP\s+)?([A-Za-z_"][\w"$]*)/i.exec(
-                  entry.trim(),
-                );
-                // An entry the grammar cannot read is not provably PUBLIC, so
-                // it flags rather than passes.
-                return token ? normalizeIdentifier(token[1]) : "";
-              })
-          : [];
-        if (
-          grantees.length === 0 ||
-          grantees.some((name) => name !== "public")
-        ) {
+        if (!list || namesARole(granteesOf(list[1]))) {
           messages.push(
             `${grant[1].toUpperCase()} to a named role in a migration crash-loops startup where the role does not exist; only PUBLIC is safe (it always resolves)`,
           );

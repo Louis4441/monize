@@ -309,6 +309,28 @@ test("the other statements that bind a role are flagged too", () => {
   flags("SET LOCAL ROLE monize_app;", "role-or-grant-statement");
   flags("SET SESSION AUTHORIZATION monize_app;", "role-or-grant-statement");
 
+  // A policy's TO clause binds it to roles the same way a GRANT does.
+  flags(
+    "CREATE POLICY p ON t TO monize_app USING (true);",
+    "role-or-grant-statement",
+  );
+  flags(
+    "CREATE POLICY p ON t FOR SELECT TO PUBLIC, monize_app USING (true);",
+    "role-or-grant-statement",
+  );
+  flags("ALTER POLICY p ON t TO monize_app;", "role-or-grant-statement");
+  // TO PUBLIC is the default made explicit; RENAME TO renames the policy, not
+  // a role; and a column named granted_to inside the predicate is not a TO
+  // clause.
+  clean(
+    "DROP POLICY IF EXISTS p ON t;\nCREATE POLICY p ON t TO PUBLIC USING (granted_to IS NOT NULL);",
+  );
+  assert.ok(
+    !rulesOf("ALTER POLICY p ON t RENAME TO p2;").includes(
+      "role-or-grant-statement",
+    ),
+  );
+
   // RESET names no role, and the words inside a string literal are data, not a
   // statement.
   clean("RESET ROLE;");
