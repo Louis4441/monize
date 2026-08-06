@@ -424,9 +424,18 @@ export interface SecurityPrice {
    * the backend from provider data and returned by the prices endpoint; null for
    * a security whose provider does not supply it (MSN today).
    *
-   * Use it, falling back to `closePrice`, wherever a *return* is computed --
-   * `COALESCE(adjusted_close, close_price)` is what the backend's own
-   * calculations do. Keep `closePrice` for anything that shows the quote itself.
+   * Keep `closePrice` for anything that shows the quote itself.
+   *
+   * **A return is not computed from a per-row fallback.** `adjustedClose` is
+   * nullable per row and only the provider backfill writes it, so a
+   * transaction-derived price, an import or a seed lands raw beside it: reading
+   * `adjustedClose ?? closePrice` row by row splices raw rows into an adjusted
+   * series, which around a split is a several-hundred-percent return that never
+   * happened. The basis is chosen once per series over the window being read --
+   * `backend/src/common/time-series/price-series.util.ts` is the one place that
+   * decides it, and `GET /investments/performance/comparison` is how a
+   * percentage series reaches this app. See `docs/time-series-contract.md`
+   * rule 1.
    */
   adjustedClose: number | null;
   volume: number | null;
@@ -537,4 +546,91 @@ export interface CapitalGainEntry {
   realizedGain: number;
   unrealizedGain: number;
   totalCapitalGain: number;
+}
+
+// --- Performance comparison (Security Performance report) -------------------
+//
+// The wire shape of `GET /investments/performance/comparison`. Several of these
+// fields exist only to make a refusal visible, so dropping one turns a stated
+// gap into a silent zero -- `docs/security-benchmark-comparison.md` is the
+// contract, and `backend/src/securities/performance-comparison.types.ts` is the
+// half of it these mirror.
+
+/** Whether a plotted line is one of the user's instruments or a benchmark. */
+export type PerformanceSeriesKind = 'SECURITY' | 'INDEX';
+
+/** Which price series answered, decided once per instrument. */
+export type PerformanceBasis = 'ADJUSTED' | 'RAW';
+
+/** Why an instrument the user selected is not drawn. */
+export type PerformanceExclusionReason =
+  | 'NO_PRICE_HISTORY'
+  | 'NO_PRICE_AT_WINDOW_START'
+  | 'NON_POSITIVE_BASE'
+  | 'SINGLE_OBSERVATION';
+
+export interface PerformanceSeriesRef {
+  /** `sec:<uuid>` or `idx:<code>`; also the key inside `values` and `totals`. */
+  key: string;
+  kind: PerformanceSeriesKind;
+  id: string;
+  label: string;
+  name: string;
+  /**
+   * The currency the underlying closes are quoted in. Nothing is converted, so
+   * this is not the currency of the percentage -- it is what tells the reader
+   * which market's money the line was measured in.
+   */
+  currencyCode: string;
+  basis: PerformanceBasis;
+}
+
+export interface PerformanceExclusion {
+  key: string;
+  kind: PerformanceSeriesKind;
+  id: string;
+  label: string;
+  reason: PerformanceExclusionReason;
+}
+
+export interface PerformanceGap {
+  key: string;
+  from: string;
+  to: string;
+}
+
+export interface PerformancePoint {
+  date: string;
+  /** Percent return since the window start; null where it is not known. */
+  values: Record<string, number | null>;
+}
+
+export interface PerformanceComparison {
+  window: { start: string; end: string };
+  sampling: 'day' | 'week' | 'month';
+  series: PerformanceSeriesRef[];
+  points: PerformancePoint[];
+  /** Return over the whole window; null where the series does not reach its end. */
+  totals: Record<string, number | null>;
+  gaps: PerformanceGap[];
+  excluded: PerformanceExclusion[];
+  status: 'complete' | 'incomplete';
+}
+
+/** Where an index's stored history begins and ends. */
+export interface MarketIndexCoverage {
+  earliestDate: string | null;
+  latestDate: string | null;
+}
+
+/** A benchmark the report can overlay, with what we actually hold for it. */
+export interface MarketIndex {
+  code: string;
+  yahooSymbol: string;
+  defaultName: string;
+  currencyCode: string;
+  region: 'NORTH_AMERICA' | 'EUROPE' | 'ASIA_PACIFIC';
+  /** Exchanges this index is the natural benchmark for. */
+  exchanges: string[];
+  coverage: MarketIndexCoverage;
 }

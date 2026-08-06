@@ -106,7 +106,7 @@
       "security-type-allocation": "Visualizza l'allocazione del portafoglio per tipo di asset (azioni, ETF, fondi comuni, obbligazioni) con dettaglio sulle posizioni.",
       "geographic-allocation": "Analizza l'esposizione geografica del portafoglio per borsa e regione per valutare la diversificazione.",
       "dividend-yield-growth": "Monitora il rendimento dei dividendi, i rendimenti per titolo, la crescita anno su anno e la frequenza dei pagamenti.",
-      "security-performance": "Analizza in dettaglio lo storico prezzi, le transazioni e i rendimenti di un titolo, oppure confronta il rendimento di più titoli in un unico grafico.",
+      "security-performance": "Analisi approfondita dello storico prezzi, delle transazioni e dei rendimenti di un titolo, oppure confronto di più titoli e indici di mercato in un unico grafico.",
       "currency-exposure": "Comprendi il rischio valutario con l'allocazione del portafoglio per valuta e i dettagli sui tassi di cambio.",
       "monte-carlo-simulation": "Proietta i risultati futuri del portafoglio con migliaia di percorsi di rendimento casuali e una libreria di scenari salvati.",
       "gem-strategy": "Segui il segnale Global Equities Momentum, perché è cambiato e se il tuo portafoglio gli corrisponde.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% del portafoglio"
   },
   "securityPerformance": {
-    "selectPrompt": "Seleziona uno o più titoli sopra per visualizzarne il rendimento. Scegline due o più per confrontarli in un unico grafico.",
+    "selectPrompt": "Seleziona uno o più titoli qui sopra per vederne la performance e aggiungi un indice di mercato con cui confrontarli.",
     "selectSecuritiesPlaceholder": "Seleziona titoli...",
     "comparisonTitle": "Confronto dei rendimenti",
-    "comparisonSubtitle": "Rendimento cumulato di ogni titolo selezionato, riportato a 0% al primo prezzo disponibile in modo da confrontarli su un'unica scala indipendentemente da prezzo o valuta.",
-    "comparisonNoData": "Nessuno storico prezzi disponibile per i titoli selezionati.",
+    "comparisonSubtitle": "Rendimento cumulato di ogni strumento selezionato, riportato a 0 % all’inizio della finestra scelta così da confrontarli su un’unica scala indipendentemente da prezzo e valuta. Gli indici di mercato sono tracciati tratteggiati.",
+    "comparisonNoData": "Nessuno degli strumenti selezionati ha potuto essere valorizzato su questa finestra.",
     "comparisonError": "Impossibile caricare lo storico prezzi. Riprova.",
     "viewPriceChart": "Grafico prezzi",
     "viewTransactions": "Transazioni",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Azioni",
     "pdfColPrice": "Prezzo",
     "pdfColTotal": "Totale",
-    "pdfTotalDividends": "Dividendi totali"
+    "pdfTotalDividends": "Dividendi totali",
+    "selectIndexesPlaceholder": "Aggiungi un indice di mercato…",
+    "timeframeChartOnlyNote": "Il periodo vale per il grafico. I valori sopra e le tabelle sotto riguardano l’intera posizione.",
+    "comparisonExcludedTitle": "Non mostrato in questo grafico",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "non è memorizzato alcuno storico prezzi",
+      "NO_PRICE_AT_WINDOW_START": "nessun prezzo abbastanza vicino all’inizio di questa finestra, quindi il rendimento sul periodo è sconosciuto",
+      "NON_POSITIVE_BASE": "il prezzo all’inizio di questa finestra non è un valore utilizzabile",
+      "SINGLE_OBSERVATION": "un solo prezzo in questa finestra, che non misura alcuna variazione"
+    },
+    "comparisonIncomplete": "Parte di questo grafico non è stata misurabile: una linea interrotta segnala un tratto senza prezzi, e una linea che finisce prima non ha dati oltre quel punto.",
+    "comparisonIndexLegend": "{name} (indice)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Nord America",
+      "EUROPE": "Europa",
+      "ASIA_PACIFIC": "Asia-Pacifico"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Nessuna posizione in investimenti trovata. Aggiungi titoli per vedere la ripartizione per tipo di asset.",

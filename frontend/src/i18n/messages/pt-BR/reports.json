@@ -106,7 +106,7 @@
       "security-type-allocation": "Veja a alocação do portfólio por tipo de ativo (ações, ETFs, fundos de investimento, obrigações) com detalhe das posições.",
       "geographic-allocation": "Analise a exposição geográfica do portfólio por bolsa e região para obter informações sobre diversificação.",
       "dividend-yield-growth": "Acompanhe o rendimento de dividendos, rendimentos por título, crescimento anual e análise da frequência de pagamentos.",
-      "security-performance": "Análise aprofundada do histórico de preços, das transações e dos retornos de um ativo, ou compare o desempenho de vários ativos em um único gráfico.",
+      "security-performance": "Análise detalhada do histórico de preços, transações e retornos de um ativo, ou comparação de vários ativos e índices de mercado em um só gráfico.",
       "currency-exposure": "Compreenda o risco cambial com a alocação do portfólio por moeda e detalhes das taxas de câmbio.",
       "monte-carlo-simulation": "Projete resultados futuros do portfólio com milhares de trajetórias de rentabilidade aleatórias e uma biblioteca de cenários salvos.",
       "gem-strategy": "Acompanhe o sinal Global Equities Momentum, por que ele mudou e se sua carteira corresponde a ele.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% do Portfólio"
   },
   "securityPerformance": {
-    "selectPrompt": "Selecione um ou mais ativos acima para ver o desempenho deles. Escolha dois ou mais para compará-los em um único gráfico.",
+    "selectPrompt": "Selecione um ou mais ativos acima para ver o desempenho deles e adicione um índice de mercado para servir de comparação.",
     "selectSecuritiesPlaceholder": "Selecionar ativos...",
     "comparisonTitle": "Comparação de desempenho",
-    "comparisonSubtitle": "Retorno acumulado de cada ativo selecionado, rebaseado para 0% no seu primeiro preço disponível, para serem comparados em uma única escala, independentemente do preço ou da moeda.",
-    "comparisonNoData": "Não há histórico de preços disponível para os ativos selecionados.",
+    "comparisonSubtitle": "Retorno acumulado de cada instrumento selecionado, rebaseado em 0 % no início da janela escolhida para que possam ser comparados em uma única escala, independentemente de preço ou moeda. Índices de mercado são desenhados tracejados.",
+    "comparisonNoData": "Nenhum dos instrumentos selecionados pôde ser precificado nesta janela.",
     "comparisonError": "Não foi possível carregar o histórico de preços. Tente novamente.",
     "viewPriceChart": "Gráfico de Preços",
     "viewTransactions": "Transações",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Ações",
     "pdfColPrice": "Preço",
     "pdfColTotal": "Total",
-    "pdfTotalDividends": "Total de Dividendos"
+    "pdfTotalDividends": "Total de Dividendos",
+    "selectIndexesPlaceholder": "Adicionar um índice de mercado…",
+    "timeframeChartOnlyNote": "O período se aplica ao gráfico. Os números acima e as tabelas abaixo cobrem a posição inteira.",
+    "comparisonExcludedTitle": "Não exibido neste gráfico",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "não há histórico de preços armazenado",
+      "NO_PRICE_AT_WINDOW_START": "nenhum preço próximo o bastante do início desta janela, então o retorno no período é desconhecido",
+      "NON_POSITIVE_BASE": "o preço no início desta janela não é um valor utilizável",
+      "SINGLE_OBSERVATION": "apenas um preço nesta janela, o que não mede variação alguma"
+    },
+    "comparisonIncomplete": "Parte deste gráfico não pôde ser medida: uma linha interrompida marca um trecho sem preços, e uma linha que termina antes não tem dados depois desse ponto.",
+    "comparisonIndexLegend": "{name} (índice)",
+    "indexRegions": {
+      "NORTH_AMERICA": "América do Norte",
+      "EUROPE": "Europa",
+      "ASIA_PACIFIC": "Ásia-Pacífico"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Nenhuma posição de investimento encontrada. Adicione títulos para ver a análise por tipo de ativo.",

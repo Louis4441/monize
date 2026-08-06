@@ -106,7 +106,7 @@
       "security-type-allocation": "Zeigen Sie die Portfolio-Allokation nach Anlageklasse (Aktien, ETFs, Investmentfonds, Anleihen) mit Drill-down in Positionen an.",
       "geographic-allocation": "Analysieren Sie die geografische Gewichtung Ihres Portfolios nach Börse und Region.",
       "dividend-yield-growth": "Verfolgen Sie Dividendenrendite, Renditen je Wertpapier, jährliches Wachstum und Häufigkeitsanalyse.",
-      "security-performance": "Detaillierte Analyse von Kursverlauf, Buchungen und Renditen eines Wertpapiers – oder Vergleich der Wertentwicklung mehrerer Wertpapiere in einem Diagramm.",
+      "security-performance": "Detaillierte Analyse des Kursverlaufs, der Transaktionen und der Renditen eines Wertpapiers oder Vergleich mehrerer Wertpapiere und Marktindizes in einem Diagramm.",
       "currency-exposure": "Verstehen Sie das Währungsrisiko mit Portfolio-Allokation nach Währung und Wechselkursdetails.",
       "monte-carlo-simulation": "Projizieren Sie künftige Portfolio-Ergebnisse mit tausenden zufälliger Renditepfade und einer gespeicherten Szenariobibliothek.",
       "gem-strategy": "Verfolgen Sie das Global-Equities-Momentum-Signal, warum es sich geändert hat und ob Ihr Portfolio dazu passt.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% des Portfolios"
   },
   "securityPerformance": {
-    "selectPrompt": "Wählen Sie oben ein oder mehrere Wertpapiere aus, um ihre Wertentwicklung anzuzeigen. Wählen Sie zwei oder mehr, um sie in einem Diagramm zu vergleichen.",
+    "selectPrompt": "Wählen Sie oben eine oder mehrere Wertpapiere aus, um deren Wertentwicklung zu sehen, und fügen Sie einen Marktindex hinzu, an dem Sie sie messen.",
     "selectSecuritiesPlaceholder": "Wertpapiere auswählen...",
     "comparisonTitle": "Wertentwicklungsvergleich",
-    "comparisonSubtitle": "Kumulierte Rendite jedes ausgewählten Wertpapiers, auf 0 % zum ersten verfügbaren Kurs normiert, sodass sie unabhängig von Kurs oder Währung auf einer Skala vergleichbar sind.",
-    "comparisonNoData": "Für die ausgewählten Wertpapiere ist kein Kursverlauf verfügbar.",
+    "comparisonSubtitle": "Kumulierte Rendite jedes ausgewählten Instruments, zu Beginn des gewählten Zeitraums auf 0 % normiert, sodass sie unabhängig von Kurs und Währung auf einer Skala vergleichbar sind. Marktindizes werden gestrichelt dargestellt.",
+    "comparisonNoData": "Keines der ausgewählten Instrumente konnte über diesen Zeitraum bewertet werden.",
     "comparisonError": "Kursverlauf konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
     "viewPriceChart": "Kursdiagramm",
     "viewTransactions": "Buchungen",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Anteile",
     "pdfColPrice": "Kurs",
     "pdfColTotal": "Gesamt",
-    "pdfTotalDividends": "Dividenden gesamt"
+    "pdfTotalDividends": "Dividenden gesamt",
+    "selectIndexesPlaceholder": "Marktindex hinzufügen…",
+    "timeframeChartOnlyNote": "Der Zeitraum gilt für das Diagramm. Die Kennzahlen oben und die Tabellen unten umfassen den gesamten Bestand.",
+    "comparisonExcludedTitle": "Nicht in diesem Diagramm enthalten",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "es ist kein Kursverlauf gespeichert",
+      "NO_PRICE_AT_WINDOW_START": "kein Kurs nahe genug am Beginn dieses Zeitraums, sodass die Rendite über den Zeitraum unbekannt ist",
+      "NON_POSITIVE_BASE": "der Kurs zu Beginn dieses Zeitraums ist kein brauchbarer Wert",
+      "SINGLE_OBSERVATION": "nur ein Kurs in diesem Zeitraum, was keine Veränderung misst"
+    },
+    "comparisonIncomplete": "Ein Teil dieses Diagramms konnte nicht gemessen werden: eine unterbrochene Linie markiert einen Abschnitt ohne Kurse, und eine früh endende Linie hat danach keine Daten.",
+    "comparisonIndexLegend": "{name} (Index)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Nordamerika",
+      "EUROPE": "Europa",
+      "ASIA_PACIFIC": "Asien-Pazifik"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Keine Anlagebestände gefunden. Fügen Sie Wertpapiere hinzu, um die Anlageklassenaufschlüsselung zu sehen.",

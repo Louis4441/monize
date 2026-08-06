@@ -106,7 +106,7 @@
       "security-type-allocation": "Zobacz alokację portfela według typu aktywów (akcje, ETF-y, fundusze inwestycyjne, obligacje) ze szczegółowym wglądem w pozycje.",
       "geographic-allocation": "Analizuj geograficzną ekspozycję portfela według giełdy i regionu dla lepszej dywersyfikacji.",
       "dividend-yield-growth": "Śledź stopę dywidendy, stopy dla poszczególnych papierów wartościowych, wzrost rok do roku i analizę częstotliwości wypłat.",
-      "security-performance": "Szczegółowa analiza historii cen, transakcji i zwrotów papieru wartościowego lub porównanie wyników kilku papierów na jednym wykresie.",
+      "security-performance": "Szczegółowa analiza historii cen, transakcji i stóp zwrotu papieru wartościowego albo porównanie kilku papierów i indeksów giełdowych na jednym wykresie.",
       "currency-exposure": "Zrozum ryzyko walutowe dzięki alokacji portfela według waluty i szczegółom kursów wymiany.",
       "monte-carlo-simulation": "Prognozuj przyszłe wyniki portfela na podstawie tysięcy losowych ścieżek zwrotu z biblioteką zapisanych scenariuszy.",
       "gem-strategy": "Śledź sygnał Global Equities Momentum, powód jego zmiany i to, czy Twój portfel jest z nim zgodny.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% portfela"
   },
   "securityPerformance": {
-    "selectPrompt": "Wybierz powyżej jeden lub więcej papierów wartościowych, aby zobaczyć ich wyniki. Wybierz co najmniej dwa, aby porównać je na jednym wykresie.",
+    "selectPrompt": "Wybierz powyżej jeden lub więcej papierów wartościowych, aby zobaczyć ich wyniki, i dodaj indeks giełdowy, do którego chcesz je porównać.",
     "selectSecuritiesPlaceholder": "Wybierz papiery wartościowe...",
     "comparisonTitle": "Porównanie wyników",
-    "comparisonSubtitle": "Skumulowany zwrot każdego wybranego papieru wartościowego, sprowadzony do 0% w dniu pierwszej dostępnej ceny, aby można je było porównać na jednej skali niezależnie od ceny i waluty.",
-    "comparisonNoData": "Dla wybranych papierów wartościowych nie ma dostępnej historii cen.",
+    "comparisonSubtitle": "Skumulowana stopa zwrotu każdego wybranego instrumentu, sprowadzona do 0 % na początku wybranego okresu, aby porównywać je w jednej skali niezależnie od ceny i waluty. Indeksy giełdowe rysowane są linią przerywaną.",
+    "comparisonNoData": "Żadnego z wybranych instrumentów nie udało się wycenić w tym okresie.",
     "comparisonError": "Nie udało się wczytać historii cen. Spróbuj ponownie.",
     "viewPriceChart": "Wykres ceny",
     "viewTransactions": "Transakcje",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Udziały",
     "pdfColPrice": "Cena",
     "pdfColTotal": "Suma",
-    "pdfTotalDividends": "Dywidendy łącznie"
+    "pdfTotalDividends": "Dywidendy łącznie",
+    "selectIndexesPlaceholder": "Dodaj indeks giełdowy…",
+    "timeframeChartOnlyNote": "Zakres czasu dotyczy wykresu. Wartości powyżej i tabele poniżej obejmują całą pozycję.",
+    "comparisonExcludedTitle": "Nieuwzględnione na tym wykresie",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "nie zapisano dla niego historii cen",
+      "NO_PRICE_AT_WINDOW_START": "brak ceny dostatecznie blisko początku tego okresu, więc stopa zwrotu za okres jest nieznana",
+      "NON_POSITIVE_BASE": "jego cena na początku tego okresu nie jest wartością użyteczną",
+      "SINGLE_OBSERVATION": "tylko jedna cena w tym okresie, co nie mierzy żadnej zmiany"
+    },
+    "comparisonIncomplete": "Części tego wykresu nie dało się zmierzyć: przerwana linia oznacza odcinek bez cen, a linia kończąca się wcześniej nie ma danych po tym punkcie.",
+    "comparisonIndexLegend": "{name} (indeks)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Ameryka Północna",
+      "EUROPE": "Europa",
+      "ASIA_PACIFIC": "Azja i Pacyfik"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Nie znaleziono pozycji inwestycyjnych. Dodaj papiery wartościowe, aby zobaczyć rozbicie według typu aktywów.",

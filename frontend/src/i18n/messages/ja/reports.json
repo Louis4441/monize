@@ -106,7 +106,7 @@
       "security-type-allocation": "保有銘柄へのドリルダウンを含む資産タイプ（株式、ETF、投資信託、債券）別のポートフォリオ配分を確認します。",
       "geographic-allocation": "分散投資のインサイトのために取引所と地域別のポートフォリオの地理的エクスポージャーを分析します。",
       "dividend-yield-growth": "配当利回り、有価証券ごとの利回り、前年比成長、支払い頻度分析を追跡します。",
-      "security-performance": "有価証券の価格履歴、取引、リターンを詳しく分析したり、複数の有価証券のパフォーマンスを1つのチャートで比較したりできます。",
+      "security-performance": "銘柄の価格履歴・取引・リターンを詳しく確認したり、複数の銘柄と市場指数を1つのチャートで比較したりします。",
       "currency-exposure": "通貨別ポートフォリオ配分と為替レートの詳細で通貨リスクを把握します。",
       "monte-carlo-simulation": "数千のランダム化されたリターンパスで将来のポートフォリオ結果を予測し、シナリオライブラリを保存します。",
       "gem-strategy": "Global Equities Momentumのシグナル、変化した理由、そして自分のポートフォリオが一致しているかを確認します。",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% ポートフォリオ"
   },
   "securityPerformance": {
-    "selectPrompt": "上で1つ以上の有価証券を選択すると、そのパフォーマンスを表示します。2つ以上を選択すると、1つのチャートで比較できます。",
+    "selectPrompt": "上で銘柄を1つ以上選ぶとパフォーマンスを表示します。比較の基準にする市場指数も追加できます。",
     "selectSecuritiesPlaceholder": "有価証券を選択...",
     "comparisonTitle": "パフォーマンス比較",
-    "comparisonSubtitle": "選択した各有価証券の累積リターンを、最初に取得できた価格を0%として再基準化し、価格や通貨に関係なく同じ尺度で比較できるようにしたものです。",
-    "comparisonNoData": "選択した有価証券の価格履歴がありません。",
+    "comparisonSubtitle": "選択した各銘柄の累積リターンです。選んだ期間の開始時点で0%に基準化しているため、価格や通貨にかかわらず同じ尺度で比較できます。市場指数は破線で描画します。",
+    "comparisonNoData": "選択した銘柄はいずれもこの期間の価格を求められませんでした。",
     "comparisonError": "価格履歴を読み込めませんでした。もう一度お試しください。",
     "viewPriceChart": "価格グラフ",
     "viewTransactions": "取引",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "株数",
     "pdfColPrice": "価格",
     "pdfColTotal": "合計",
-    "pdfTotalDividends": "総配当"
+    "pdfTotalDividends": "総配当",
+    "selectIndexesPlaceholder": "市場指数を追加…",
+    "timeframeChartOnlyNote": "期間はチャートにのみ適用されます。上の数値と下の表は保有全体を対象としています。",
+    "comparisonExcludedTitle": "このチャートに表示していないもの",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "価格履歴が保存されていません",
+      "NO_PRICE_AT_WINDOW_START": "この期間の開始に十分近い価格がないため、期間のリターンは不明です",
+      "NON_POSITIVE_BASE": "この期間の開始時点の価格が使用できる値ではありません",
+      "SINGLE_OBSERVATION": "この期間の価格が1件のみで、変化を測れません"
+    },
+    "comparisonIncomplete": "このチャートの一部は測定できませんでした。線の途切れは価格のない区間を示し、早く終わる線はそれ以降のデータがありません。",
+    "comparisonIndexLegend": "{name}（指数）",
+    "indexRegions": {
+      "NORTH_AMERICA": "北米",
+      "EUROPE": "欧州",
+      "ASIA_PACIFIC": "アジア太平洋"
+    }
   },
   "securityTypeAllocation": {
     "noData": "投資保有銘柄が見つかりません。資産タイプ内訳を確認するには有価証券を追加してください。",

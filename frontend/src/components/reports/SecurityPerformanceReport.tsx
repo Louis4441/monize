@@ -35,8 +35,22 @@ import { renderChartFlagDot, ChartFlagShadowFilter } from '@/components/investme
 import { buildTimeAxisTicks } from '@/lib/chart-time-axis';
 import { SecurityComparisonChart, SecurityComparisonChartHandle } from '@/components/reports/SecurityComparisonChart';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
+import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
+import { useDateRange } from '@/hooks/useDateRange';
+import { CHART_RANGES } from '@/lib/security-detail';
+import { MarketIndex } from '@/types/investment';
 
 const MAX_PAGES = 50;
+
+/** Regions in the order the index picker groups them. */
+const INDEX_REGIONS = ['NORTH_AMERICA', 'EUROPE', 'ASIA_PACIFIC'] as const;
+
+/**
+ * Marks a picker row as a region heading rather than an index. `MultiSelect`
+ * puts a group's own value into the selection once every child is chosen, so
+ * the two have to be told apart before the selection reaches the API.
+ */
+const INDEX_GROUP_PREFIX = 'region:';
 
 type TradeSortField = 'date' | 'account' | 'action' | 'shares' | 'price' | 'total';
 type DividendSortField = 'date' | 'account' | 'type' | 'amount';
@@ -53,6 +67,7 @@ interface PriceChartPoint {
 export function SecurityPerformanceReport() {
   const t = useTranslations('reports');
   const tc = useTranslations('common');
+  const ti = useTranslations('marketIndexes');
   const formatChartDate = useChartDateFormat();
   const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatSignedPercent } = useNumberFormat();
@@ -64,12 +79,35 @@ export function SecurityPerformanceReport() {
   // the single-security deep dive (stats, tabs, PDF); two or more switch to the
   // performance-comparison chart. Empty shows the initial prompt.
   const [selectedSecurityIds, setSelectedSecurityIds] = useState<string[]>([]);
+  // Benchmarks overlaid on the chart. Selecting one switches to the
+  // percent-return comparison: an index level and a share price cannot share a
+  // currency axis, and giving each its own invites the reader to compare two
+  // independently-scaled lines.
+  const [selectedIndexCodes, setSelectedIndexCodes] = useState<string[]>([]);
   const [viewType, setViewType] = useState<'chart' | 'transactions' | 'dividends'>('chart');
+  // The chart's window. Persisted per user, like the security detail page's.
+  const { dateRange, setDateRange, startDate, setStartDate, endDate, setEndDate, resolvedRange } =
+    useDateRange({
+      defaultRange: '1y',
+      storageKey: 'reports.security-performance.range',
+    });
   // Bumped on a manual price refresh so the comparison chart re-fetches its
   // (separately loaded) per-security price history.
   const [allRefreshKey, setAllRefreshKey] = useState(0);
-  const isComparison = selectedSecurityIds.length > 1;
-  const isSingle = selectedSecurityIds.length === 1;
+  // The region rows in the index picker are grouping, not instruments:
+  // `MultiSelect` adds a group's own value to the selection once all its
+  // children are chosen, and sending `region:EUROPE` to the API would be
+  // rejected as an unknown index code. The prefix is this component's own
+  // construction (see `indexOptions`), so stripping it here needs no catalog.
+  const activeIndexCodes = useMemo(
+    () => selectedIndexCodes.filter((code) => !code.startsWith(INDEX_GROUP_PREFIX)),
+    [selectedIndexCodes],
+  );
+  const hasIndexOverlay = activeIndexCodes.length > 0;
+  // Two or more instruments on one chart, or one measured against a benchmark:
+  // either way the honest axis is percent return rebased to the window start.
+  const isComparison = selectedSecurityIds.length + activeIndexCodes.length > 1;
+  const isSingle = selectedSecurityIds.length === 1 && !hasIndexOverlay;
   // The single selected security's id (empty in the prompt/comparison modes),
   // which drives the per-security detail fetch and panels below.
   const selectedSecurityId = isSingle ? selectedSecurityIds[0] : '';
@@ -91,15 +129,17 @@ export function SecurityPerformanceReport() {
   // re-fetches the base data (alongside the per-security detail below).
   const { data: baseData, isLoading, error, reload: reloadBase } = useReportData(
     async () => {
-      const [secs, summary, accts] = await Promise.all([
+      const [secs, summary, accts, indexes] = await Promise.all([
         investmentsApi.getSecurities(),
         investmentsApi.getPortfolioSummary(),
         investmentsApi.getInvestmentAccounts(),
+        investmentsApi.getMarketIndexes(),
       ]);
       return {
         securities: secs.filter((s) => s.isActive),
         holdings: summary.holdings,
         accounts: accts,
+        marketIndexes: indexes,
       };
     },
     [],
@@ -108,6 +148,10 @@ export function SecurityPerformanceReport() {
   const securities = useMemo<Security[]>(() => baseData?.securities ?? [], [baseData]);
   const holdings = useMemo<HoldingWithMarketValue[]>(() => baseData?.holdings ?? [], [baseData]);
   const accounts = useMemo<Account[]>(() => baseData?.accounts ?? [], [baseData]);
+  const marketIndexes = useMemo<MarketIndex[]>(
+    () => baseData?.marketIndexes ?? [],
+    [baseData],
+  );
 
   const selectedSecurity = securities.find((s) => s.id === selectedSecurityId);
 
@@ -122,10 +166,41 @@ export function SecurityPerformanceReport() {
     [securities],
   );
 
-  // The chosen securities, used to drive the comparison chart's fetches.
-  const selectedSecurities = useMemo(
-    () => securities.filter((s) => selectedSecurityIds.includes(s.id)),
-    [securities, selectedSecurityIds],
+  /** An index's localized name, falling back to what the catalog called it. */
+  const indexLabel = (index: MarketIndex) => {
+    const key = `names.${index.code}` as Parameters<typeof ti>[0];
+    const localized = ti(key);
+    return localized === key ? index.defaultName : localized;
+  };
+
+  /**
+   * Benchmarks, grouped by region.
+   *
+   * An index we hold no history for is left out rather than offered: selecting
+   * it could only produce an excluded row, and an option that cannot work is
+   * worse than one that is not there. The catalog carries the coverage so this
+   * is a fact rather than a guess.
+   */
+  const indexOptions = useMemo<MultiSelectOption[]>(
+    () =>
+      INDEX_REGIONS.flatMap((region) => {
+        const inRegion = marketIndexes
+          .filter((index) => index.region === region && index.coverage.latestDate)
+          .sort((a, b) => a.defaultName.localeCompare(b.defaultName));
+        if (inRegion.length === 0) return [];
+        return [
+          {
+            value: `${INDEX_GROUP_PREFIX}${region}`,
+            label: t(`securityPerformance.indexRegions.${region}` as Parameters<typeof t>[0]),
+            children: inRegion.map((index) => ({
+              value: index.code,
+              label: indexLabel(index),
+            })),
+          },
+        ];
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [marketIndexes, t, ti],
   );
 
   const accountNameById = useMemo(() => {
@@ -152,7 +227,13 @@ export function SecurityPerformanceReport() {
       const allTx: InvestmentTransaction[] = [];
 
       const [priceData, firstPage] = await Promise.all([
-        investmentsApi.getSecurityPrices(selectedSecurityId, 1095),
+        // The window, not a row cap: a limit shorter than the history drops its
+        // oldest end, which is exactly the wrong half for a chart asking for
+        // five years. An empty start is "all history", and the server bounds it.
+        investmentsApi.getSecurityPrices(selectedSecurityId, {
+          startDate: resolvedRange.start || undefined,
+          endDate: resolvedRange.end || undefined,
+        }),
         investmentsApi.getTransactions({ symbol, limit: 200 }),
       ]);
 
@@ -172,7 +253,10 @@ export function SecurityPerformanceReport() {
 
       return { prices: priceData, transactions: allTx };
     },
-    [selectedSecurityId, securities],
+    // The window is part of what the price fetch answers, so changing it has to
+    // refetch. The transactions are deliberately not windowed -- see the note
+    // beside the selector.
+    [selectedSecurityId, securities, resolvedRange.start, resolvedRange.end],
   );
 
   const prices = useMemo<SecurityPrice[]>(() => detailData?.prices ?? [], [detailData]);
@@ -436,17 +520,28 @@ export function SecurityPerformanceReport() {
 
   return (
     <div className="space-y-6">
-      {/* Security Selector */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
+      {/* Security and benchmark selectors, and the chart's window */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 space-y-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex gap-2 items-center min-w-[250px]">
-            <MultiSelect
-              ariaLabel={t('securityPerformance.selectSecuritiesPlaceholder')}
-              options={securityOptions}
-              value={selectedSecurityIds}
-              onChange={setSelectedSecurityIds}
-              placeholder={t('securityPerformance.selectSecuritiesPlaceholder')}
-            />
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="min-w-[250px]">
+              <MultiSelect
+                ariaLabel={t('securityPerformance.selectSecuritiesPlaceholder')}
+                options={securityOptions}
+                value={selectedSecurityIds}
+                onChange={setSelectedSecurityIds}
+                placeholder={t('securityPerformance.selectSecuritiesPlaceholder')}
+              />
+            </div>
+            <div className="min-w-[250px]">
+              <MultiSelect
+                ariaLabel={t('securityPerformance.selectIndexesPlaceholder')}
+                options={indexOptions}
+                value={selectedIndexCodes}
+                onChange={setSelectedIndexCodes}
+                placeholder={t('securityPerformance.selectIndexesPlaceholder')}
+              />
+            </div>
           </div>
           <div className="flex gap-2 items-center">
             {isSingle && (
@@ -481,9 +576,33 @@ export function SecurityPerformanceReport() {
             {(isSingle || isComparison) && <ExportDropdown onExportPdf={handleExportPdf} />}
           </div>
         </div>
+
+        {/*
+          The window governs the chart alone. The stats cards report the
+          position as it stands now and the tables are history records; scoping
+          either to a window would answer a question nobody asked -- a "cost
+          basis over the last month" is not a cost basis. The note says so
+          rather than leaving the reader to work it out.
+        */}
+        <div className="flex flex-wrap gap-3 items-center justify-between">
+          <DateRangeSelector
+            ranges={CHART_RANGES}
+            value={dateRange}
+            onChange={setDateRange}
+            showCustom
+            customStartDate={startDate}
+            onCustomStartDateChange={setStartDate}
+            customEndDate={endDate}
+            onCustomEndDateChange={setEndDate}
+            size="sm"
+          />
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {t('securityPerformance.timeframeChartOnlyNote')}
+          </p>
+        </div>
       </div>
 
-      {selectedSecurityIds.length === 0 ? (
+      {selectedSecurityIds.length + activeIndexCodes.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-8 text-center">
           <p className="text-gray-500 dark:text-gray-400">
             {t('securityPerformance.selectPrompt')}
@@ -491,7 +610,10 @@ export function SecurityPerformanceReport() {
         </div>
       ) : isComparison ? (
         <SecurityComparisonChart
-          securities={selectedSecurities}
+          securityIds={selectedSecurityIds}
+          indexCodes={activeIndexCodes}
+          startDate={resolvedRange.start}
+          endDate={resolvedRange.end}
           reloadKey={allRefreshKey}
           exportRef={comparisonExportRef}
         />

@@ -106,7 +106,7 @@
       "security-type-allocation": "依資產類型（股票、ETF、共同基金、債券）查看投資組合配置，並可深入了解各持倉。",
       "geographic-allocation": "依交易所及地區分析投資組合的地理曝險，取得分散投資洞察。",
       "dividend-yield-growth": "追蹤股利殖利率、個別證券殖利率、年度成長及配息頻率分析。",
-      "security-performance": "深入分析某檔證券的價格歷史、交易與報酬，或在同一圖表中比較多檔證券的績效。",
+      "security-performance": "深入檢視證券的價格歷史、交易與報酬，或在同一張圖中比較多檔證券與市場指數。",
       "currency-exposure": "了解貨幣風險，包含依貨幣分析的投資組合配置及匯率詳情。",
       "monte-carlo-simulation": "以數千條隨機報酬路徑預測未來投資組合結果，並儲存情境。",
       "gem-strategy": "追蹤 Global Equities Momentum 訊號、其變動原因，以及你的投資組合是否與之相符。",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "佔投資組合 %"
   },
   "securityPerformance": {
-    "selectPrompt": "請在上方選擇一檔或多檔證券以查看其績效。選擇兩檔或以上即可在同一圖表中進行比較。",
+    "selectPrompt": "在上方選擇一檔或多檔證券以查看其表現，並加入一個市場指數作為對照。",
     "selectSecuritiesPlaceholder": "選擇證券...",
     "comparisonTitle": "績效比較",
-    "comparisonSubtitle": "每檔所選證券的累計報酬，以其首個可用價格為基準歸零（0%），以便不論價格或幣別都能在同一刻度上比較。",
-    "comparisonNoData": "所選證券沒有可用的價格歷史。",
+    "comparisonSubtitle": "每檔所選標的的累計報酬率，在所選期間的起點重設為 0%，因此無論價格或幣別皆可在同一刻度上比較。市場指數以虛線繪製。",
+    "comparisonNoData": "所選標的在此期間皆無法定價。",
     "comparisonError": "無法載入價格歷史，請重試。",
     "viewPriceChart": "價格圖表",
     "viewTransactions": "交易記錄",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "股數",
     "pdfColPrice": "價格",
     "pdfColTotal": "總計",
-    "pdfTotalDividends": "股利總計"
+    "pdfTotalDividends": "股利總計",
+    "selectIndexesPlaceholder": "加入市場指數…",
+    "timeframeChartOnlyNote": "時間範圍僅套用於圖表。上方數字與下方表格涵蓋整體持有部位。",
+    "comparisonExcludedTitle": "未於此圖中顯示",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "未儲存其價格歷史",
+      "NO_PRICE_AT_WINDOW_START": "沒有足夠接近此期間起點的價格，因此該期間的報酬率未知",
+      "NON_POSITIVE_BASE": "其在此期間起點的價格不是可用數值",
+      "SINGLE_OBSERVATION": "此期間內僅有一個價格，無法衡量任何變化"
+    },
+    "comparisonIncomplete": "此圖的一部分無法測量：中斷的線段標示沒有價格的區間，提前結束的線在該點之後沒有資料。",
+    "comparisonIndexLegend": "{name}（指數）",
+    "indexRegions": {
+      "NORTH_AMERICA": "北美",
+      "EUROPE": "歐洲",
+      "ASIA_PACIFIC": "亞太"
+    }
   },
   "securityTypeAllocation": {
     "noData": "找不到投資持倉。請新增證券以查看資產類型明細。",

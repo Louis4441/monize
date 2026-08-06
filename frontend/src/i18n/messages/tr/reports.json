@@ -106,7 +106,7 @@
       "security-type-allocation": "Varlık türüne göre portföy dağılımını görüntüleyin (hisseler, ETF'ler, yatırım fonları, tahviller) ve holdings'e ayrıntılı bakın.",
       "geographic-allocation": "Çeşitlendirme bilgileri için borsa ve bölgeye göre portföy coğrafi riskini analiz edin.",
       "dividend-yield-growth": "Temettü verimini, menkul kıymet bazında verimleri, yıldan yıla büyümeyi ve ödeme sıklığı analizini takip edin.",
-      "security-performance": "Bir menkul kıymetin fiyat geçmişini, işlemlerini ve getirilerini ayrıntılı inceleyin ya da birden fazla menkul kıymetin performansını tek bir grafikte karşılaştırın.",
+      "security-performance": "Bir menkul kıymetin fiyat geçmişi, işlemleri ve getirilerine derinlemesine bakın veya birden fazla menkul kıymeti ve piyasa endeksini tek bir grafikte karşılaştırın.",
       "currency-exposure": "Portföyün para birimine göre dağılımı ve döviz kuru ayrıntılarıyla kur riskini anlayın.",
       "monte-carlo-simulation": "Binlerce rastgeleleştirilmiş getiri yolu ve kaydedilmiş senaryo kütüphanesiyle gelecekteki portföy sonuçlarını tahmin edin.",
       "gem-strategy": "Global Equities Momentum sinyalini, neden değiştiğini ve portföyünüzün buna uyup uymadığını izleyin.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "Portföy %"
   },
   "securityPerformance": {
-    "selectPrompt": "Performansını görüntülemek için yukarıdan bir veya daha fazla menkul kıymet seçin. Tek bir grafikte karşılaştırmak için iki veya daha fazlasını seçin.",
+    "selectPrompt": "Performansını görmek için yukarıdan bir veya daha fazla menkul kıymet seçin ve karşılaştırmak için bir piyasa endeksi ekleyin.",
     "selectSecuritiesPlaceholder": "Menkul kıymetler seçin...",
     "comparisonTitle": "Performans karşılaştırması",
-    "comparisonSubtitle": "Seçilen her menkul kıymetin kümülatif getirisi, ilk mevcut fiyatında %0'a sabitlenir; böylece fiyat veya para biriminden bağımsız olarak tek bir ölçekte karşılaştırılır.",
-    "comparisonNoData": "Seçilen menkul kıymetler için fiyat geçmişi yok.",
+    "comparisonSubtitle": "Seçilen her enstrümanın kümülatif getirisi, seçilen dönemin başında %0’a sabitlenmiştir; böylece fiyat ve para biriminden bağımsız olarak tek bir ölçekte karşılaştırılır. Piyasa endeksleri kesik çizgiyle çizilir.",
+    "comparisonNoData": "Seçilen enstrümanların hiçbiri bu dönemde fiyatlandırılamadı.",
     "comparisonError": "Fiyat geçmişi yüklenemedi. Lütfen tekrar deneyin.",
     "viewPriceChart": "Fiyat Grafiği",
     "viewTransactions": "İşlemler",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Hisse",
     "pdfColPrice": "Fiyat",
     "pdfColTotal": "Toplam",
-    "pdfTotalDividends": "Toplam Temettü"
+    "pdfTotalDividends": "Toplam Temettü",
+    "selectIndexesPlaceholder": "Piyasa endeksi ekle…",
+    "timeframeChartOnlyNote": "Zaman aralığı grafiğe uygulanır. Yukarıdaki rakamlar ve aşağıdaki tablolar pozisyonun tamamını kapsar.",
+    "comparisonExcludedTitle": "Bu grafikte gösterilmiyor",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "kayıtlı fiyat geçmişi yok",
+      "NO_PRICE_AT_WINDOW_START": "bu dönemin başlangıcına yeterince yakın bir fiyat yok, bu nedenle dönem getirisi bilinmiyor",
+      "NON_POSITIVE_BASE": "bu dönemin başındaki fiyatı kullanılabilir bir değer değil",
+      "SINGLE_OBSERVATION": "bu dönemde yalnızca bir fiyat var, bu da hiçbir değişimi ölçmez"
+    },
+    "comparisonIncomplete": "Bu grafiğin bir kısmı ölçülemedi: kesik bir çizgi fiyat bulunmayan bir aralığı gösterir, erken biten bir çizginin ise o noktadan sonrası için verisi yoktur.",
+    "comparisonIndexLegend": "{name} (endeks)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Kuzey Amerika",
+      "EUROPE": "Avrupa",
+      "ASIA_PACIFIC": "Asya-Pasifik"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Yatırım varlığı bulunamadı. Varlık türü dökümünü görmek için menkul kıymet ekleyin.",

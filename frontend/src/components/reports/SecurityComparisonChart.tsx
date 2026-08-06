@@ -14,7 +14,11 @@ import {
 } from 'recharts';
 import { useReportData } from '@/hooks/useReportData';
 import { investmentsApi } from '@/lib/investments';
-import { Security, SecurityPrice } from '@/types/investment';
+import {
+  PerformanceComparison,
+  PerformanceExclusionReason,
+  PerformanceSeriesRef,
+} from '@/types/investment';
 import { chartColors, chartSeriesColor } from '@/lib/chart-colors';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { parseLocalDate, type ChartDatePattern } from '@/lib/utils';
@@ -23,57 +27,68 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { buildTimeAxisTicks } from '@/lib/chart-time-axis';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 
-// Match the single-security price chart's window (~3 years of history).
-const PRICE_LIMIT = 1095;
-
 /** A security plotted as one line, with its assigned palette colour. */
 export interface PerformanceSeries {
-  id: string;
-  symbol: string;
+  key: string;
+  kind: 'SECURITY' | 'INDEX';
+  label: string;
   name: string;
   color: string;
+  /** Benchmarks are dashed; they are not one of the user's instruments. */
+  dashed: boolean;
 }
 
-/** One merged row: a timestamp plus each security's % return (by id). */
+/** One merged row: a timestamp plus each series' percent return (by key). */
 export interface PerformanceRow {
   ts: number;
-  [securityId: string]: number;
+  [seriesKey: string]: number | null;
 }
 
 /**
- * Normalise each security's price history to its own cumulative percent return
- * (rebased to 0% at that security's first available price in the window) and
- * merge into one date-keyed dataset. Rebasing per security -- rather than
- * plotting raw prices -- is what lets securities with different price levels and
- * currencies be compared on a single axis. A security with no usable price (none
- * in the window, or a non-positive base) is dropped from the legend rather than
- * drawn as a flat zero line.
+ * Turn the server's payload into the rows and series Recharts consumes.
+ *
+ * Everything financial already happened server-side -- the basis per series, the
+ * bounded lookup at the window start, the exclusions -- so this is presentation
+ * only. Exported and pure so the mapping is testable without React, and so it
+ * stays obvious that no arithmetic sneaks back in here: a `null` the server took
+ * care to produce is carried through as `null`, never coerced.
  */
-export function buildPerformanceData(
-  input: { security: Security; prices: SecurityPrice[] }[],
-): { rows: PerformanceRow[]; series: Omit<PerformanceSeries, 'color'>[] } {
-  const byTs = new Map<number, PerformanceRow>();
-  const series: Omit<PerformanceSeries, 'color'>[] = [];
+export function buildPerformanceView(comparison: PerformanceComparison): {
+  rows: PerformanceRow[];
+  series: PerformanceSeries[];
+} {
+  const securityIndex = new Map<string, number>();
+  comparison.series
+    .filter((entry) => entry.kind === 'SECURITY')
+    .forEach((entry, i) => securityIndex.set(entry.key, i));
 
-  for (const { security, prices } of input) {
-    const sorted = [...prices].sort((a, b) =>
-      a.priceDate.localeCompare(b.priceDate),
-    );
-    const base = sorted.length > 0 ? Number(sorted[0].closePrice) : 0;
-    if (!(base > 0)) continue;
+  const series: PerformanceSeries[] = comparison.series.map(
+    (entry: PerformanceSeriesRef, i) => ({
+      key: entry.key,
+      kind: entry.kind,
+      label: entry.label,
+      name: entry.name,
+      // A benchmark takes the neutral token and a dash, the way the GEM
+      // report's simulated line does: it is a yardstick, not one of the
+      // holdings, and it must not read as one. Securities keep the categorical
+      // palette, indexed among themselves so a holding's colour does not move
+      // when an index is added or removed.
+      color:
+        entry.kind === 'INDEX'
+          ? chartColors.neutral
+          : chartSeriesColor(securityIndex.get(entry.key) ?? i),
+      dashed: entry.kind === 'INDEX',
+    }),
+  );
 
-    series.push({ id: security.id, symbol: security.symbol, name: security.name });
-
-    for (const p of sorted) {
-      const ts = parseLocalDate(p.priceDate).getTime();
-      const pct = (Number(p.closePrice) / base - 1) * 100;
-      const row = byTs.get(ts) ?? { ts };
-      row[security.id] = pct;
-      byTs.set(ts, row);
+  const rows: PerformanceRow[] = comparison.points.map((point) => {
+    const row: PerformanceRow = { ts: parseLocalDate(point.date).getTime() };
+    for (const entry of comparison.series) {
+      row[entry.key] = point.values[entry.key] ?? null;
     }
-  }
+    return row;
+  });
 
-  const rows = [...byTs.values()].sort((a, b) => a.ts - b.ts);
   return { rows, series };
 }
 
@@ -83,8 +98,13 @@ export interface SecurityComparisonChartHandle {
 }
 
 interface SecurityComparisonChartProps {
-  /** The securities the user chose to compare (from the multi-select). */
-  securities: Security[];
+  /** Ids of the securities the user chose to compare. */
+  securityIds: string[];
+  /** Codes of the market indexes overlaid as benchmarks. */
+  indexCodes: string[];
+  /** Window start (`''` means all history, resolved server-side from the data). */
+  startDate: string;
+  endDate: string;
   /** Bumped by the RefreshPricesButton so a manual price refresh re-fetches. */
   reloadKey?: number;
   /**
@@ -97,46 +117,71 @@ interface SecurityComparisonChartProps {
 }
 
 /**
- * Performance-comparison view for the Security Performance report: each of the
- * user-selected securities drawn on one chart as its cumulative percent return
- * over time, so they can see at a glance which holdings have out- or
- * under-performed. Mounted only when two or more securities are selected, so its
- * per-security price fetches do not run for the single-security detail flow.
+ * Performance-comparison view for the Security Performance report: each selected
+ * security, and each overlaid market index, drawn on one chart as its cumulative
+ * percent return over the chosen window.
+ *
+ * The arithmetic is the server's (`docs/security-benchmark-comparison.md`).
+ * What this component owes the payload is honesty about what it could not work
+ * out: a `null` is a break in the line rather than a bridge, and a series the
+ * server refused is named with its reason rather than quietly absent.
  */
 export function SecurityComparisonChart({
-  securities,
+  securityIds,
+  indexCodes,
+  startDate,
+  endDate,
   reloadKey = 0,
   exportRef,
 }: SecurityComparisonChartProps) {
   const t = useTranslations('reports');
+  const ti = useTranslations('marketIndexes');
   const formatChartDate = useChartDateFormat();
   const { formatSignedPercent } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, error } = useReportData(async () => {
-    const results = await Promise.all(
-      securities.map(async (security) => ({
-        security,
-        prices: await investmentsApi.getSecurityPrices(security.id, PRICE_LIMIT),
-      })),
-    );
-    return buildPerformanceData(results);
-  }, [securities, reloadKey]);
+  // Everything that changes the *meaning* of the response is in the key, so a
+  // payload can never be mistaken for the answer to a different selection
+  // (`frontend/CLAUDE.md`, asynchronous data).
+  const requestKey = [
+    [...securityIds].sort().join(','),
+    [...indexCodes].sort().join(','),
+    startDate,
+    endDate,
+  ].join('|');
 
-  const rows = useMemo(() => data?.rows ?? [], [data]);
-  const series = useMemo<PerformanceSeries[]>(
+  const { data, isLoading, error } = useReportData(
     () =>
-      (data?.series ?? [])
-        .slice()
-        .sort((a, b) => a.symbol.localeCompare(b.symbol))
-        .map((s, i) => ({ ...s, color: chartSeriesColor(i) })),
+      investmentsApi.getPerformanceComparison({
+        securityIds,
+        indexCodes,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      }),
+    [requestKey, reloadKey],
+    { requestKey },
+  );
+
+  const { rows, series } = useMemo(
+    () => (data ? buildPerformanceView(data) : { rows: [], series: [] }),
     [data],
   );
-  const symbolById = useMemo(() => {
+
+  const labelByKey = useMemo(() => {
     const map = new Map<string, string>();
-    series.forEach((s) => map.set(s.id, s.symbol));
+    series.forEach((s) => map.set(s.key, s.label));
     return map;
   }, [series]);
+
+  /** An index's localized name, falling back to what the server called it. */
+  const indexName = (code: string, fallback: string) => {
+    const key = `names.${code}` as Parameters<typeof ti>[0];
+    const localized = ti(key);
+    return localized === key ? fallback : localized;
+  };
+
+  const seriesName = (entry: PerformanceSeries) =>
+    entry.kind === 'INDEX' ? indexName(entry.key.slice(4), entry.name) : entry.label;
 
   const xAxis = useMemo(() => {
     if (rows.length === 0) {
@@ -166,18 +211,24 @@ export function SecurityComparisonChart({
         const { exportToPdf } = await import('@/lib/pdf-export');
         await exportToPdf({
           title: t('securityPerformance.comparisonTitle'),
-          subtitle: series.map((s) => s.symbol).join(', ') || undefined,
+          subtitle: series.map((s) => seriesName(s)).join(', ') || undefined,
           description: t('securityPerformance.comparisonSubtitle'),
           chartContainer: chartRef.current,
           chartLegend: series.map((s) => ({
             color: resolvePdfColor(s.color),
-            label: `${s.symbol} - ${s.name}`,
+            label:
+              s.kind === 'INDEX'
+                ? t('securityPerformance.comparisonIndexLegend', {
+                    name: seriesName(s),
+                  })
+                : `${s.label} - ${s.name}`,
           })),
           filename: 'security-performance-comparison',
         });
       },
     }),
-    [series, t],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [series, t, ti],
   );
 
   if (error) {
@@ -190,8 +241,13 @@ export function SecurityComparisonChart({
     );
   }
 
+  const excluded = data?.excluded ?? [];
+
   return (
-    <div ref={chartRef} className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6">
+    <div
+      ref={chartRef}
+      className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6"
+    >
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
         {t('securityPerformance.comparisonTitle')}
       </h3>
@@ -234,7 +290,7 @@ export function SecurityComparisonChart({
                     .filter((p) => typeof p.value === 'number')
                     .map((p) => ({
                       id: String(p.dataKey),
-                      symbol: symbolById.get(String(p.dataKey)) ?? '',
+                      label: labelByKey.get(String(p.dataKey)) ?? '',
                       value: p.value as number,
                       color: p.color as string,
                     }))
@@ -246,7 +302,7 @@ export function SecurityComparisonChart({
                       </p>
                       {items.map((item) => (
                         <p key={item.id} className="text-sm flex justify-between gap-3">
-                          <span style={{ color: item.color }}>{item.symbol}</span>
+                          <span style={{ color: item.color }}>{item.label}</span>
                           <span className="text-gray-700 dark:text-gray-300">
                             {formatSignedPercent(item.value)}
                           </span>
@@ -259,20 +315,67 @@ export function SecurityComparisonChart({
               <Legend />
               {series.map((s) => (
                 <Line
-                  key={s.id}
+                  key={s.key}
                   type="monotone"
-                  dataKey={s.id}
-                  name={s.symbol}
+                  dataKey={s.key}
+                  name={seriesName(s)}
                   stroke={s.color}
                   strokeWidth={2}
+                  strokeDasharray={s.dashed ? '5 3' : undefined}
                   dot={false}
-                  connectNulls
+                  // A gap in the prices stays a gap in the line. Bridging it
+                  // draws a straight segment through a stretch nobody observed,
+                  // indistinguishable from measured data -- and it throws away
+                  // the null the server went to real trouble to send.
+                  connectNulls={false}
+                  isAnimationActive={false}
                 />
               ))}
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
+
+      {/*
+        A refused series must be named. Dropping it silently makes a chart of
+        two instruments out of a request for three, and it reads as complete.
+      */}
+      {excluded.length > 0 && (
+        <div className="mt-4 rounded-md bg-gray-50 dark:bg-gray-900/40 p-3">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('securityPerformance.comparisonExcludedTitle')}
+          </p>
+          <ul className="mt-1 space-y-1">
+            {excluded.map((entry) => (
+              <li
+                key={entry.key}
+                className="text-sm text-gray-500 dark:text-gray-400"
+              >
+                {t('securityPerformance.comparisonExcludedRow', {
+                  label:
+                    entry.kind === 'INDEX'
+                      ? indexName(entry.id, entry.label)
+                      : entry.label,
+                  reason: t(
+                    `securityPerformance.comparisonExcluded.${entry.reason}` as Parameters<
+                      typeof t
+                    >[0],
+                  ),
+                })}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {data?.status === 'incomplete' && series.length > 0 && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {t('securityPerformance.comparisonIncomplete')}
+        </p>
+      )}
     </div>
   );
 }
+
+/** Exported for the report's excluded-reason copy; keeps the union in one place. */
+export type { PerformanceExclusionReason };

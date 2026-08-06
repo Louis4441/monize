@@ -2,17 +2,36 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@/test/render';
 import {
   SecurityComparisonChart,
-  buildPerformanceData,
+  buildPerformanceView,
   type SecurityComparisonChartHandle,
 } from './SecurityComparisonChart';
-import type { Security, SecurityPrice } from '@/types/investment';
+import type {
+  PerformanceComparison,
+  PerformanceExclusionReason,
+  PerformanceSeriesRef,
+} from '@/types/investment';
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   LineChart: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="line-chart">{children}</div>
   ),
-  Line: ({ name }: { name?: string }) => <div data-testid="line" data-name={name} />,
+  Line: ({
+    name,
+    strokeDasharray,
+    connectNulls,
+  }: {
+    name?: string;
+    strokeDasharray?: string;
+    connectNulls?: boolean;
+  }) => (
+    <div
+      data-testid="line"
+      data-name={name}
+      data-dash={strokeDasharray ?? ''}
+      data-connect-nulls={String(connectNulls)}
+    />
+  ),
   XAxis: () => null,
   YAxis: () => null,
   CartesianGrid: () => null,
@@ -20,10 +39,11 @@ vi.mock('recharts', () => ({
   Legend: () => null,
 }));
 
-const mockGetSecurityPrices = vi.fn();
+const mockGetPerformanceComparison = vi.fn();
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
-    getSecurityPrices: (...args: unknown[]) => mockGetSecurityPrices(...args),
+    getPerformanceComparison: (...args: unknown[]) =>
+      mockGetPerformanceComparison(...args),
   },
 }));
 
@@ -45,99 +65,347 @@ vi.mock('@/lib/utils', async (importActual) => ({
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
 }));
 
-function sec(id: string, symbol: string): Security {
+function securityRef(id: string, label: string): PerformanceSeriesRef {
   return {
+    key: `sec:${id}`,
+    kind: 'SECURITY',
     id,
-    symbol,
-    name: `${symbol} Inc`,
+    label,
+    name: `${label} Inc`,
     currencyCode: 'USD',
-    isActive: true,
-  } as Security;
-}
-function price(priceDate: string, closePrice: number): SecurityPrice {
-  return { priceDate, closePrice } as SecurityPrice;
+    basis: 'ADJUSTED',
+  };
 }
 
-describe('buildPerformanceData', () => {
-  it('rebases each security to 0% at its first price and merges by date', () => {
-    const { rows, series } = buildPerformanceData([
-      { security: sec('s1', 'AAA'), prices: [price('2024-01-01', 10), price('2024-02-01', 15)] },
-      { security: sec('s2', 'BBB'), prices: [price('2024-02-01', 100)] },
-    ]);
-    expect(series.map((s) => s.symbol)).toEqual(['AAA', 'BBB']);
+function indexRef(code: string, name: string): PerformanceSeriesRef {
+  return {
+    key: `idx:${code}`,
+    kind: 'INDEX',
+    id: code,
+    label: code,
+    name,
+    currencyCode: 'USD',
+    basis: 'RAW',
+  };
+}
+
+function comparison(
+  overrides: Partial<PerformanceComparison> = {},
+): PerformanceComparison {
+  return {
+    window: { start: '2024-01-01', end: '2024-12-31' },
+    sampling: 'day',
+    series: [],
+    points: [],
+    totals: {},
+    gaps: [],
+    excluded: [],
+    status: 'complete',
+    ...overrides,
+  };
+}
+
+describe('buildPerformanceView', () => {
+  it('maps the payload to rows keyed by series', () => {
+    const { rows, series } = buildPerformanceView(
+      comparison({
+        series: [securityRef('s1', 'AAA'), securityRef('s2', 'BBB')],
+        points: [
+          { date: '2024-01-01', values: { 'sec:s1': 0, 'sec:s2': 0 } },
+          { date: '2024-02-01', values: { 'sec:s1': 50, 'sec:s2': -10 } },
+        ],
+      }),
+    );
+    expect(series.map((s) => s.label)).toEqual(['AAA', 'BBB']);
     expect(rows).toHaveLength(2);
-    // Earliest date: only AAA present, rebased to 0%.
-    expect(rows[0].s1).toBe(0);
-    expect(rows[0].s2).toBeUndefined();
-    // Second date: AAA +50% (15/10), BBB rebased to 0% at its own first price.
-    expect(rows[1].s1).toBe(50);
-    expect(rows[1].s2).toBe(0);
+    expect(rows[1]['sec:s1']).toBe(50);
+    expect(rows[1]['sec:s2']).toBe(-10);
   });
 
-  it('drops a security with no prices or a non-positive base price', () => {
-    const { series } = buildPerformanceData([
-      { security: sec('s1', 'AAA'), prices: [] },
-      { security: sec('s2', 'BBB'), prices: [price('2024-01-01', 0)] },
-    ]);
-    expect(series).toHaveLength(0);
+  /**
+   * The server goes to real trouble to send `null` rather than `0` for anything
+   * it could not work out, and the last hundred pixels are where that gets
+   * thrown away. A `?? 0` here would turn every gap into a measured zero.
+   */
+  it('carries an unknown value through as null, never as zero', () => {
+    const { rows } = buildPerformanceView(
+      comparison({
+        series: [securityRef('s1', 'AAA')],
+        points: [
+          { date: '2024-01-01', values: { 'sec:s1': 0 } },
+          { date: '2024-02-01', values: { 'sec:s1': null } },
+        ],
+      }),
+    );
+    expect(rows[1]['sec:s1']).toBeNull();
+    expect(rows[1]['sec:s1']).not.toBe(0);
+  });
+
+  it('marks an index as dashed and a security as not', () => {
+    const { series } = buildPerformanceView(
+      comparison({
+        series: [securityRef('s1', 'AAA'), indexRef('SP500', 'S&P 500')],
+      }),
+    );
+    expect(series[0].dashed).toBe(false);
+    expect(series[1].dashed).toBe(true);
+  });
+
+  /**
+   * A holding's colour must not move when a benchmark is added beside it: the
+   * reader has already learned which line is theirs.
+   */
+  it('colours securities from the palette independently of any indexes', () => {
+    const withoutIndex = buildPerformanceView(
+      comparison({ series: [securityRef('s1', 'AAA'), securityRef('s2', 'BBB')] }),
+    );
+    const withIndex = buildPerformanceView(
+      comparison({
+        series: [
+          securityRef('s1', 'AAA'),
+          securityRef('s2', 'BBB'),
+          indexRef('SP500', 'S&P 500'),
+        ],
+      }),
+    );
+    expect(withIndex.series[0].color).toBe(withoutIndex.series[0].color);
+    expect(withIndex.series[1].color).toBe(withoutIndex.series[1].color);
   });
 });
 
 describe('SecurityComparisonChart', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetPerformanceComparison.mockResolvedValue(comparison());
   });
 
-  async function renderChart(securities: Security[]) {
+  async function renderChart(props: Partial<{
+    securityIds: string[];
+    indexCodes: string[];
+    startDate: string;
+    endDate: string;
+    exportRef: { current: SecurityComparisonChartHandle | null };
+  }> = {}) {
     await act(async () => {
-      render(<SecurityComparisonChart securities={securities} />);
+      render(
+        <SecurityComparisonChart
+          securityIds={props.securityIds ?? ['s1', 's2']}
+          indexCodes={props.indexCodes ?? []}
+          startDate={props.startDate ?? '2024-01-01'}
+          endDate={props.endDate ?? '2024-12-31'}
+          exportRef={props.exportRef}
+        />,
+      );
     });
   }
 
-  it('renders one line per security that has usable prices', async () => {
-    mockGetSecurityPrices.mockImplementation((id: string) =>
-      Promise.resolve(
-        id === 's1'
-          ? [price('2024-01-01', 10), price('2024-02-01', 12)]
-          : [price('2024-01-01', 100), price('2024-02-01', 90)],
-      ),
+  it('renders one line per returned series', async () => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [securityRef('s1', 'AAA'), securityRef('s2', 'BBB')],
+        points: [{ date: '2024-01-01', values: { 'sec:s1': 0, 'sec:s2': 0 } }],
+      }),
     );
-    await renderChart([sec('s1', 'AAA'), sec('s2', 'BBB')]);
+    await renderChart();
 
     await waitFor(() => expect(screen.getAllByTestId('line')).toHaveLength(2));
-    const names = screen.getAllByTestId('line').map((l) => l.getAttribute('data-name'));
+    const names = screen
+      .getAllByTestId('line')
+      .map((l) => l.getAttribute('data-name'));
     expect(names).toEqual(expect.arrayContaining(['AAA', 'BBB']));
   });
 
-  it('shows the no-data message when no security has price history', async () => {
-    mockGetSecurityPrices.mockResolvedValue([]);
-    await renderChart([sec('s1', 'AAA')]);
+  it('sends the window and the selection to the server', async () => {
+    await renderChart({
+      securityIds: ['s1'],
+      indexCodes: ['SP500'],
+      startDate: '2020-01-01',
+      endDate: '2025-12-31',
+    });
+    await waitFor(() =>
+      expect(mockGetPerformanceComparison).toHaveBeenCalledWith({
+        securityIds: ['s1'],
+        indexCodes: ['SP500'],
+        startDate: '2020-01-01',
+        endDate: '2025-12-31',
+      }),
+    );
+  });
+
+  it('treats an empty start as all history rather than as a filter', async () => {
+    await renderChart({ startDate: '' });
+    await waitFor(() =>
+      expect(mockGetPerformanceComparison).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: undefined }),
+      ),
+    );
+  });
+
+  /**
+   * `connectNulls` draws a straight segment through the gap, indistinguishable
+   * from measured data -- and a tooltip saying "unknown" under the cursor does
+   * not undo it (`frontend/CLAUDE.md`, `docs/time-series-contract.md` rule 3).
+   */
+  it('never bridges a gap in a line', async () => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [securityRef('s1', 'AAA')],
+        points: [
+          { date: '2024-01-01', values: { 'sec:s1': 0 } },
+          { date: '2024-06-01', values: { 'sec:s1': null } },
+        ],
+        gaps: [{ key: 'sec:s1', from: '2024-06-01', to: '2024-06-01' }],
+        status: 'incomplete',
+      }),
+    );
+    await renderChart();
+
+    await waitFor(() => expect(screen.getAllByTestId('line')).toHaveLength(1));
+    expect(screen.getByTestId('line').getAttribute('data-connect-nulls')).toBe(
+      'false',
+    );
+  });
+
+  it('draws a benchmark dashed and a holding solid', async () => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [securityRef('s1', 'AAA'), indexRef('SP500', 'S&P 500')],
+        points: [{ date: '2024-01-01', values: { 'sec:s1': 0, 'idx:SP500': 0 } }],
+      }),
+    );
+    await renderChart({ indexCodes: ['SP500'] });
+
+    await waitFor(() => expect(screen.getAllByTestId('line')).toHaveLength(2));
+    const dashes = screen
+      .getAllByTestId('line')
+      .map((l) => l.getAttribute('data-dash'));
+    expect(dashes).toEqual(['', '5 3']);
+  });
+
+  it('labels an index line with its localized name', async () => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [indexRef('SP500', 'S&P 500')],
+        points: [{ date: '2024-01-01', values: { 'idx:SP500': 0 } }],
+      }),
+    );
+    await renderChart({ securityIds: [], indexCodes: ['SP500'] });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('line').getAttribute('data-name')).toBe(
+        'S&P 500',
+      ),
+    );
+  });
+
+  /**
+   * A refused series that simply vanishes turns a request for three instruments
+   * into a chart of two, and the chart reads as complete.
+   */
+  it.each<[PerformanceExclusionReason, RegExp]>([
+    ['NO_PRICE_HISTORY', /no price history is stored/i],
+    ['NO_PRICE_AT_WINDOW_START', /no price close enough to the start/i],
+    ['NON_POSITIVE_BASE', /not a usable figure/i],
+    ['SINGLE_OBSERVATION', /only one price in this window/i],
+  ])('names an excluded series and why (%s)', async (reason, copy) => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [securityRef('s1', 'AAA')],
+        points: [{ date: '2024-01-01', values: { 'sec:s1': 0 } }],
+        excluded: [
+          {
+            key: 'sec:s2',
+            kind: 'SECURITY',
+            id: 's2',
+            label: 'BBB',
+            reason,
+          },
+        ],
+        status: 'incomplete',
+      }),
+    );
+    await renderChart();
+
+    await waitFor(() =>
+      expect(screen.getByText(/Not shown on this chart/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(copy)).toBeInTheDocument();
+    expect(screen.getByText(/BBB/)).toBeInTheDocument();
+  });
+
+  it('discloses an incomplete chart', async () => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [securityRef('s1', 'AAA')],
+        points: [{ date: '2024-01-01', values: { 'sec:s1': 0 } }],
+        status: 'incomplete',
+      }),
+    );
+    await renderChart();
 
     await waitFor(() =>
       expect(
-        screen.getByText(/No price history is available/i),
+        screen.getByText(/Part of this chart could not be measured/i),
       ).toBeInTheDocument(),
     );
   });
 
+  it('says nothing about completeness when the chart is complete', async () => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [securityRef('s1', 'AAA')],
+        points: [{ date: '2024-01-01', values: { 'sec:s1': 0 } }],
+      }),
+    );
+    await renderChart();
+
+    await waitFor(() => expect(screen.getAllByTestId('line')).toHaveLength(1));
+    expect(
+      screen.queryByText(/Part of this chart could not be measured/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not shown on this chart/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the no-data message when nothing could be priced', async () => {
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({ status: 'incomplete' }),
+    );
+    await renderChart();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/None of the selected instruments could be priced/i),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  /**
+   * A failed request is not an empty dataset: rendering the failure as
+   * emptiness turns an outage into a plausible answer.
+   */
+  it('shows the error state rather than an empty chart when the request fails', async () => {
+    mockGetPerformanceComparison.mockRejectedValue(new Error('boom'));
+    await renderChart();
+    await act(async () => {});
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Could not load price history/i),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('line')).not.toBeInTheDocument();
+  });
+
   it('exports the comparison chart to PDF through the export handle', async () => {
     mockExportToPdf.mockResolvedValue(undefined);
-    mockGetSecurityPrices.mockImplementation((id: string) =>
-      Promise.resolve(
-        id === 's1'
-          ? [price('2024-01-01', 10), price('2024-02-01', 12)]
-          : [price('2024-01-01', 100), price('2024-02-01', 90)],
-      ),
+    mockGetPerformanceComparison.mockResolvedValue(
+      comparison({
+        series: [securityRef('s1', 'AAA'), indexRef('SP500', 'S&P 500')],
+        points: [{ date: '2024-01-01', values: { 'sec:s1': 0, 'idx:SP500': 0 } }],
+      }),
     );
     const ref: { current: SecurityComparisonChartHandle | null } = { current: null };
-    await act(async () => {
-      render(
-        <SecurityComparisonChart
-          securities={[sec('s1', 'AAA'), sec('s2', 'BBB')]}
-          exportRef={ref}
-        />,
-      );
-    });
+    await renderChart({ indexCodes: ['SP500'], exportRef: ref });
     await waitFor(() => expect(screen.getAllByTestId('line')).toHaveLength(2));
 
     await act(async () => {
@@ -147,13 +415,14 @@ describe('SecurityComparisonChart', () => {
     expect(mockExportToPdf).toHaveBeenCalledTimes(1);
     const call = mockExportToPdf.mock.calls[0][0];
     expect(call.title).toBe('Performance Comparison');
-    expect(call.subtitle).toBe('AAA, BBB');
+    expect(call.subtitle).toBe('AAA, S&P 500');
     expect(call.filename).toBe('security-performance-comparison');
     expect(call.chartContainer).toBeInstanceOf(HTMLElement);
-    // One legend entry per plotted security, resolved to concrete colours.
+    // The Recharts legend is HTML, not part of the captured SVG, so the PDF
+    // redraws it -- and the benchmark has to stay identifiable as one there.
     expect(call.chartLegend).toEqual([
       { color: expect.stringMatching(/^#/), label: 'AAA - AAA Inc' },
-      { color: expect.stringMatching(/^#/), label: 'BBB - BBB Inc' },
+      { color: expect.stringMatching(/^#/), label: 'S&P 500 (index)' },
     ]);
   });
 });

@@ -106,7 +106,7 @@
       "security-type-allocation": "Bekijk portefeuillealllocatie per activatype (aandelen, ETFs, beleggingsfondsen, obligaties) met inzoom op posities.",
       "geographic-allocation": "Analyseer de geografische blootstelling van jouw portefeuille per beurs en regio voor diversificatie-inzichten.",
       "dividend-yield-growth": "Volg dividendrendement, rendement per waardepapier, jaar-op-jaargroei en frequentieanalyse van betalingen.",
-      "security-performance": "Analyseer diepgaand de koershistorie, transacties en rendementen van een waardepapier, of vergelijk de prestaties van meerdere waardepapieren in één grafiek.",
+      "security-performance": "Diepgaand inzicht in de koershistorie, transacties en rendementen van een effect, of vergelijk meerdere effecten en marktindices in één grafiek.",
       "currency-exposure": "Begrijp valutarisico met portefeuillealllocatie per valuta en wisselkoersdetails.",
       "monte-carlo-simulation": "Projecteer toekomstige portefeuilleresultaten met duizenden gerandomiseerde rendementspaden en een opgeslagen scenariobibliotheek.",
       "gem-strategy": "Volg het Global Equities Momentum-signaal, waarom het veranderde en of je portefeuille ermee overeenkomt.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% van portefeuille"
   },
   "securityPerformance": {
-    "selectPrompt": "Selecteer hierboven een of meer waardepapieren om hun prestaties te bekijken. Kies er twee of meer om ze in één grafiek te vergelijken.",
+    "selectPrompt": "Selecteer hierboven een of meer effecten om hun rendement te zien, en voeg een marktindex toe om ze aan af te meten.",
     "selectSecuritiesPlaceholder": "Waardepapieren selecteren...",
     "comparisonTitle": "Prestatievergelijking",
-    "comparisonSubtitle": "Cumulatief rendement van elk geselecteerd waardepapier, herijkt naar 0% bij de eerste beschikbare koers, zodat ze op één schaal vergelijkbaar zijn ongeacht koers of valuta.",
-    "comparisonNoData": "Voor de geselecteerde waardepapieren is geen koershistorie beschikbaar.",
+    "comparisonSubtitle": "Cumulatief rendement van elk geselecteerd instrument, herijkt op 0 % aan het begin van de gekozen periode zodat ze op één schaal vergelijkbaar zijn, ongeacht koers of valuta. Marktindices worden gestippeld getekend.",
+    "comparisonNoData": "Geen van de geselecteerde instrumenten kon over deze periode worden gewaardeerd.",
     "comparisonError": "Kon de koershistorie niet laden. Probeer het opnieuw.",
     "viewPriceChart": "Koersgrafiek",
     "viewTransactions": "Transacties",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Aandelen",
     "pdfColPrice": "Koers",
     "pdfColTotal": "Totaal",
-    "pdfTotalDividends": "Totale dividenden"
+    "pdfTotalDividends": "Totale dividenden",
+    "selectIndexesPlaceholder": "Marktindex toevoegen…",
+    "timeframeChartOnlyNote": "De periode geldt voor de grafiek. De cijfers hierboven en de tabellen hieronder beslaan de volledige positie.",
+    "comparisonExcludedTitle": "Niet in deze grafiek opgenomen",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "er is geen koershistorie opgeslagen",
+      "NO_PRICE_AT_WINDOW_START": "geen koers dicht genoeg bij het begin van deze periode, dus het rendement over de periode is onbekend",
+      "NON_POSITIVE_BASE": "de koers aan het begin van deze periode is geen bruikbaar getal",
+      "SINGLE_OBSERVATION": "slechts één koers in deze periode, wat geen verandering meet"
+    },
+    "comparisonIncomplete": "Een deel van deze grafiek kon niet worden gemeten: een onderbroken lijn markeert een stuk zonder koersen, en een lijn die vroeg eindigt heeft daarna geen gegevens.",
+    "comparisonIndexLegend": "{name} (index)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Noord-Amerika",
+      "EUROPE": "Europa",
+      "ASIA_PACIFIC": "Azië-Pacific"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Geen beleggingsposities gevonden. Voeg waardepapieren toe om de activatypeuitsplitsing te zien.",

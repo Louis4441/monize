@@ -106,7 +106,7 @@
       "security-type-allocation": "按资产类型（股票、ETF、共同基金、债券）查看投资组合配置，并可深入查看持仓。",
       "geographic-allocation": "按交易所和地区分析投资组合的地理敞口，获取多元化洞察。",
       "dividend-yield-growth": "追踪股息收益率、各证券收益率、同比增长和付款频率分析。",
-      "security-performance": "深入分析某只证券的价格历史、交易和回报，或在同一图表中比较多只证券的表现。",
+      "security-performance": "深入查看证券的价格历史、交易与收益，或在同一张图中比较多只证券与市场指数。",
       "currency-exposure": "了解货币风险，查看按货币划分的投资组合配置和汇率详情。",
       "monte-carlo-simulation": "通过数千条随机回报路径预测未来投资组合结果，并附有已保存情景库。",
       "gem-strategy": "跟踪 Global Equities Momentum 信号、它变化的原因，以及你的组合是否与之一致。",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "占组合 %"
   },
   "securityPerformance": {
-    "selectPrompt": "在上方选择一只或多只证券以查看其表现。选择两只或更多可在同一图表中进行比较。",
+    "selectPrompt": "在上方选择一只或多只证券以查看其表现，并添加一个市场指数作为对照。",
     "selectSecuritiesPlaceholder": "选择证券...",
     "comparisonTitle": "表现对比",
-    "comparisonSubtitle": "每只所选证券的累计回报，以其首个可用价格为基准归零（0%），以便不论价格或币种都能在同一刻度上比较。",
-    "comparisonNoData": "所选证券没有可用的价格历史。",
+    "comparisonSubtitle": "每只所选标的的累计收益率，在所选时间段的起点重设为 0%，因此无论价格或币种如何都可在同一刻度上比较。市场指数以虚线绘制。",
+    "comparisonNoData": "所选标的在该时间段内均无法定价。",
     "comparisonError": "无法加载价格历史，请重试。",
     "viewPriceChart": "价格图表",
     "viewTransactions": "交易",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "股数",
     "pdfColPrice": "价格",
     "pdfColTotal": "合计",
-    "pdfTotalDividends": "总股息"
+    "pdfTotalDividends": "总股息",
+    "selectIndexesPlaceholder": "添加市场指数…",
+    "timeframeChartOnlyNote": "时间范围仅作用于图表。上方数字与下方表格涵盖整个持仓。",
+    "comparisonExcludedTitle": "未在此图中显示",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "未存储其价格历史",
+      "NO_PRICE_AT_WINDOW_START": "没有足够接近该时间段起点的价格，因此该期间的收益率未知",
+      "NON_POSITIVE_BASE": "其在该时间段起点的价格不是可用数值",
+      "SINGLE_OBSERVATION": "该时间段内只有一个价格，无法衡量任何变化"
+    },
+    "comparisonIncomplete": "此图的一部分无法测量：断开的线段标示没有价格的区间，提前结束的线在该点之后没有数据。",
+    "comparisonIndexLegend": "{name}（指数）",
+    "indexRegions": {
+      "NORTH_AMERICA": "北美",
+      "EUROPE": "欧洲",
+      "ASIA_PACIFIC": "亚太"
+    }
   },
   "securityTypeAllocation": {
     "noData": "未找到投资持仓。添加证券以查看资产类型明细。",

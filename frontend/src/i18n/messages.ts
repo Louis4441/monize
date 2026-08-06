@@ -37,6 +37,7 @@ const NAMESPACES = [
   "institutions",
   "investments",
   "layout",
+  "marketIndexes",
   "payeeDetail",
   "payees",
   "reconcile",

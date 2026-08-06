@@ -1,0 +1,26 @@
+{
+  "names": {
+    "SP500": "S&P 500",
+    "NASDAQ_COMPOSITE": "NASDAQ कंपोजिट",
+    "DOW_JONES": "डाउ जोन्स इंडस्ट्रियल एवरेज",
+    "RUSSELL_2000": "Russell 2000",
+    "SP_TSX_COMPOSITE": "S&P/TSX कंपोजिट",
+    "FTSE_100": "FTSE 100",
+    "DAX": "DAX",
+    "CAC_40": "CAC 40",
+    "AEX": "AEX",
+    "FTSE_MIB": "FTSE MIB",
+    "OMXS30": "OMX स्टॉकहोम 30",
+    "EURO_STOXX_50": "EURO STOXX 50",
+    "NIKKEI_225": "निक्केई 225",
+    "HANG_SENG": "हैंग सेंग",
+    "SSE_COMPOSITE": "SSE कंपोजिट",
+    "SZSE_COMPONENT": "SZSE कंपोनेंट",
+    "ASX_200": "S&P/ASX 200",
+    "KOSPI": "कोस्पी",
+    "TAIEX": "TAIEX",
+    "STI": "स्ट्रेट्स टाइम्स इंडेक्स",
+    "SENSEX": "BSE सेंसेक्स",
+    "NIFTY_50": "निफ्टी 50"
+  }
+}
