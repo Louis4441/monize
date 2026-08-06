@@ -613,6 +613,34 @@ CREATE TABLE security_prices (
 CREATE INDEX idx_security_prices_security ON security_prices(security_id);
 CREATE INDEX idx_security_prices_date ON security_prices(price_date DESC);
 
+-- Market Index Prices (global reference data, like exchange_rates)
+--
+-- An index has no owner and nobody holds units of it, so it is not a security:
+-- one S&P 500 close serves the whole deployment. index_code is the app's own
+-- stable key (backend/src/securities/market-indexes.ts), not the provider's
+-- spelling, so changing provider is not a data migration.
+CREATE TABLE market_index_prices (
+    id BIGSERIAL PRIMARY KEY,
+    index_code VARCHAR(32) NOT NULL,
+    price_date DATE NOT NULL,
+    close_price NUMERIC(24, 10) NOT NULL,
+    adjusted_close NUMERIC(24, 10),
+    source VARCHAR(50) NOT NULL, -- yahoo_finance
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(index_code, price_date)
+);
+
+CREATE INDEX idx_market_index_prices_code_date ON market_index_prices(index_code, price_date DESC);
+
+-- Per-index fetch bookkeeping, so a provider that cannot serve an index is not
+-- re-asked on every request.
+CREATE TABLE market_index_sync (
+    index_code VARCHAR(32) PRIMARY KEY,
+    last_attempt_at TIMESTAMPTZ,
+    last_success_at TIMESTAMPTZ,
+    last_error TEXT
+);
+
 -- Investment Holdings
 CREATE TABLE holdings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2177,6 +2205,17 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 --
 --   exchange_rates   Global reference data with no owner column at all;
 --                    written by the scheduled refresh under system context.
+--
+--   market_index_prices, market_index_sync
+--                    The same shape as exchange_rates, and for the same reason:
+--                    a market index has no owner and nobody holds units of it,
+--                    so one S&P 500 close serves every user. No owner column
+--                    exists to policy on, the rows are written only by the
+--                    scheduled refresh and the on-demand backfill under system
+--                    context, and the reads expose nothing about any user. The
+--                    alternative -- a per-user securities row per index --
+--                    would put a fake instrument in every holdings list and
+--                    multiply provider traffic by the number of accounts.
 --
 --   oauth_payloads   No owner column exists -- rows are keyed by opaque
 --                    id/model/grant_id/uid. Every access happens in the
