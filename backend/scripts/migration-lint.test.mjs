@@ -24,7 +24,10 @@ const rulesOf = (sql) => lintSql(sql).findings.map((f) => f.rule);
 const clean = (sql) => assert.deepEqual(lintSql(sql).findings, []);
 const flags = (sql, rule) => {
   const found = rulesOf(sql);
-  assert.ok(found.includes(rule), `expected rule "${rule}", got ${JSON.stringify(found)}`);
+  assert.ok(
+    found.includes(rule),
+    `expected rule "${rule}", got ${JSON.stringify(found)}`,
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -66,7 +69,9 @@ test("splitStatements keeps a semicolon inside a dollar-quoted body out of the t
   assert.equal(topLevel.length, 2);
   assert.ok(topLevel[0].text.includes("DO $$"));
   // The body's statements are present too, tagged with their enclosing block.
-  assert.ok(statements.some((s) => s.blockText && s.text.includes("PERFORM 2")));
+  assert.ok(
+    statements.some((s) => s.blockText && s.text.includes("PERFORM 2")),
+  );
 });
 
 test("splitStatements blanks the body out of the wrapper statement text", () => {
@@ -84,8 +89,14 @@ test("normalizeIdentifier strips quotes and schema qualification", () => {
 test("isBlockGuarded recognizes catalog probes and IF EXISTS tests only", () => {
   assert.equal(isBlockGuarded(null), false);
   assert.equal(isBlockGuarded("BEGIN PERFORM 1; END"), false);
-  assert.equal(isBlockGuarded("IF NOT EXISTS (SELECT 1 FROM pg_trigger) THEN"), true);
-  assert.equal(isBlockGuarded("IF EXISTS (SELECT 1 FROM information_schema.columns)"), true);
+  assert.equal(
+    isBlockGuarded("IF NOT EXISTS (SELECT 1 FROM pg_trigger) THEN"),
+    true,
+  );
+  assert.equal(
+    isBlockGuarded("IF EXISTS (SELECT 1 FROM information_schema.columns)"),
+    true,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -93,14 +104,23 @@ test("isBlockGuarded recognizes catalog probes and IF EXISTS tests only", () => 
 // ---------------------------------------------------------------------------
 
 test("CREATE TABLE without IF NOT EXISTS is flagged", () => {
-  flags("CREATE TABLE widgets (id UUID PRIMARY KEY);", "create-table-without-if-not-exists");
+  flags(
+    "CREATE TABLE widgets (id UUID PRIMARY KEY);",
+    "create-table-without-if-not-exists",
+  );
   clean("CREATE TABLE IF NOT EXISTS widgets (id UUID PRIMARY KEY);");
 });
 
 test("CREATE INDEX without IF NOT EXISTS is flagged, unique and concurrent included", () => {
   flags("CREATE INDEX idx_a ON t(a);", "create-index-without-if-not-exists");
-  flags("CREATE UNIQUE INDEX idx_a ON t(a);", "create-index-without-if-not-exists");
-  flags("CREATE INDEX CONCURRENTLY idx_a ON t(a);", "create-index-without-if-not-exists");
+  flags(
+    "CREATE UNIQUE INDEX idx_a ON t(a);",
+    "create-index-without-if-not-exists",
+  );
+  flags(
+    "CREATE INDEX CONCURRENTLY idx_a ON t(a);",
+    "create-index-without-if-not-exists",
+  );
   clean("CREATE INDEX IF NOT EXISTS idx_a ON t(a);");
   clean("CREATE UNIQUE INDEX IF NOT EXISTS idx_a ON t(a);");
 });
@@ -110,7 +130,9 @@ test("ADD COLUMN without IF NOT EXISTS is flagged once per column", () => {
     "ALTER TABLE t ADD COLUMN a INT, ADD COLUMN IF NOT EXISTS b INT, ADD COLUMN c INT;",
   ).findings;
   assert.equal(findings.length, 2);
-  assert.ok(findings.every((f) => f.rule === "add-column-without-if-not-exists"));
+  assert.ok(
+    findings.every((f) => f.rule === "add-column-without-if-not-exists"),
+  );
   clean("ALTER TABLE t ADD COLUMN IF NOT EXISTS a INT;");
 });
 
@@ -184,14 +206,25 @@ END $$;`);
 });
 
 test("enum value, type, function, view, sequence, extension and schema DDL are covered", () => {
-  flags("ALTER TYPE mood ADD VALUE 'sad';", "enum-add-value-without-if-not-exists");
+  flags(
+    "ALTER TYPE mood ADD VALUE 'sad';",
+    "enum-add-value-without-if-not-exists",
+  );
   clean("ALTER TYPE mood ADD VALUE IF NOT EXISTS 'sad';");
   flags("CREATE TYPE mood AS ENUM ('ok');", "create-type-without-guard");
-  flags("CREATE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;", "create-function-without-or-replace");
-  clean("CREATE OR REPLACE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;");
+  flags(
+    "CREATE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;",
+    "create-function-without-or-replace",
+  );
+  clean(
+    "CREATE OR REPLACE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;",
+  );
   flags("CREATE VIEW v AS SELECT 1;", "create-view-without-or-replace");
   clean("CREATE OR REPLACE VIEW v AS SELECT 1;");
-  flags("CREATE MATERIALIZED VIEW mv AS SELECT 1;", "create-view-without-or-replace");
+  flags(
+    "CREATE MATERIALIZED VIEW mv AS SELECT 1;",
+    "create-view-without-or-replace",
+  );
   flags("CREATE SEQUENCE s;", "create-object-without-if-not-exists");
   flags("CREATE EXTENSION pg_trgm;", "create-object-without-if-not-exists");
   clean("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
@@ -201,6 +234,138 @@ test("INSERT without ON CONFLICT is flagged; ON CONFLICT and WHERE NOT EXISTS pa
   flags("INSERT INTO t (a) VALUES (1);", "insert-without-on-conflict");
   clean("INSERT INTO t (a) VALUES (1) ON CONFLICT DO NOTHING;");
   clean("INSERT INTO t (a) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM t);");
+});
+
+/**
+ * Not idempotency but deployability, and the reason it is here rather than in a
+ * jest spec: it has to hold for every migration in the directory, and this is
+ * the CI gate that walks all of them.
+ *
+ * A migration naming the runtime role fails on any installation where that role
+ * does not exist -- it is provisioned by db-init, or by the CNPG Cluster
+ * manifest, or not at all at RLS_MODE=off -- and the migration aborting means the
+ * backend crash-loops before serving a request.
+ *
+ * PUBLIC is allowed, and for the same reason rather than in spite of it: it is a
+ * keyword that always resolves. It must be allowed, because CREATE FUNCTION
+ * grants EXECUTE to PUBLIC implicitly, so revoking that anywhere but the
+ * transaction that created the function leaves a window in which any role can
+ * execute a fresh SECURITY DEFINER function.
+ */
+test("a migration naming a role is flagged; PUBLIC is allowed", () => {
+  flags("CREATE ROLE monize_app LOGIN;", "role-or-grant-statement");
+  flags("ALTER ROLE monize_app NOSUPERUSER;", "role-or-grant-statement");
+  flags("DROP ROLE monize_app;", "role-or-grant-statement");
+  flags("CREATE USER monize_app PASSWORD 'x';", "role-or-grant-statement");
+  flags(
+    "GRANT EXECUTE ON FUNCTION f(VARCHAR) TO monize_app;",
+    "role-or-grant-statement",
+  );
+  flags("GRANT SELECT ON TABLE t TO monize_app;", "role-or-grant-statement");
+  flags("REVOKE ALL ON TABLE t FROM monize_app;", "role-or-grant-statement");
+  // A quoted role name is still a named role.
+  flags('GRANT SELECT ON t TO "monize_app";', "role-or-grant-statement");
+  // Role membership is a GRANT naming two roles.
+  flags("GRANT monize_admin TO monize_app;", "role-or-grant-statement");
+
+  clean("REVOKE ALL ON FUNCTION f(VARCHAR) FROM PUBLIC;");
+  clean("REVOKE ALL ON FUNCTION f(VARCHAR) FROM public;");
+  clean("GRANT SELECT ON TABLE t TO PUBLIC;");
+  // Tail options after the grantee list are options, not grantees.
+  clean("GRANT SELECT ON TABLE t TO PUBLIC WITH GRANT OPTION;");
+  clean("REVOKE ALL ON TABLE t FROM PUBLIC CASCADE;");
+  // The word appearing in prose or an identifier is not a grant statement.
+  clean("COMMENT ON FUNCTION f() IS 'EXECUTE is revoked from PUBLIC';");
+});
+
+test("every grantee in a list is checked, not just the first", () => {
+  // `FROM PUBLIC, monize_app` names a role exactly as much as `FROM monize_app`
+  // does; reading only the first entry let the rest of the list through.
+  flags(
+    "REVOKE ALL ON TABLE t FROM PUBLIC, monize_app;",
+    "role-or-grant-statement",
+  );
+  flags(
+    "GRANT SELECT ON TABLE t TO PUBLIC, monize_app;",
+    "role-or-grant-statement",
+  );
+  flags(
+    'REVOKE ALL ON TABLE t FROM monize_app, "PUBLIC";',
+    "role-or-grant-statement",
+  );
+  clean("REVOKE ALL ON TABLE t FROM PUBLIC, public;");
+});
+
+test("the other statements that bind a role are flagged too", () => {
+  // Each of these fails on an installation where the role does not exist, for
+  // the same reason a GRANT does.
+  flags("ALTER TABLE t OWNER TO monize_app;", "role-or-grant-statement");
+  flags(
+    "ALTER FUNCTION f(VARCHAR) OWNER TO monize_app;",
+    "role-or-grant-statement",
+  );
+  flags("REASSIGN OWNED BY old_owner TO new_owner;", "role-or-grant-statement");
+  flags("SET ROLE monize_app;", "role-or-grant-statement");
+  flags("SET LOCAL ROLE monize_app;", "role-or-grant-statement");
+  flags("SET SESSION AUTHORIZATION monize_app;", "role-or-grant-statement");
+
+  // A policy's TO clause binds it to roles the same way a GRANT does.
+  flags(
+    "CREATE POLICY p ON t TO monize_app USING (true);",
+    "role-or-grant-statement",
+  );
+  flags(
+    "CREATE POLICY p ON t FOR SELECT TO PUBLIC, monize_app USING (true);",
+    "role-or-grant-statement",
+  );
+  flags("ALTER POLICY p ON t TO monize_app;", "role-or-grant-statement");
+  // TO PUBLIC is the default made explicit; RENAME TO renames the policy, not
+  // a role; and a column named granted_to inside the predicate is not a TO
+  // clause.
+  clean(
+    "DROP POLICY IF EXISTS p ON t;\nCREATE POLICY p ON t TO PUBLIC USING (granted_to IS NOT NULL);",
+  );
+  assert.ok(
+    !rulesOf("ALTER POLICY p ON t RENAME TO p2;").includes(
+      "role-or-grant-statement",
+    ),
+  );
+
+  // RESET names no role, and the words inside a string literal are data, not a
+  // statement.
+  clean("RESET ROLE;");
+  clean(
+    "INSERT INTO notes (body) VALUES ('never SET ROLE in a migration') ON CONFLICT DO NOTHING;",
+  );
+});
+
+test("the shipped migrations satisfy the role rule", () => {
+  // The real directory, not a fixture: the claim is about every migration that
+  // ships, so the test walks them all. No migration currently contains any
+  // role, grant, ownership or SET ROLE statement -- grants live in db-init
+  // (backend/src/common/db/app-role.ts).
+  const migrationsDir = fileURLToPath(
+    new URL("../../database/migrations", import.meta.url),
+  );
+  const { files, findings } = lintDirectory(migrationsDir);
+  assert.ok(
+    files.length > 100,
+    `expected the real migrations, got ${files.length} file(s)`,
+  );
+  assert.deepEqual(
+    findings.filter((f) => f.rule === "role-or-grant-statement"),
+    [],
+  );
+});
+
+test("a REVOKE FROM PUBLIC stays legal for the migration that will need it", () => {
+  // CREATE FUNCTION grants EXECUTE to PUBLIC implicitly; the only gap-free
+  // place to revoke that from a future SECURITY DEFINER function is the same
+  // transaction that creates it. No shipped migration uses this yet -- the
+  // test above pins that -- and this pins the allowance, so tightening the
+  // rule to an absolute ban fails loudly here instead of blocking that
+  // migration when it arrives.
+  clean("REVOKE ALL ON FUNCTION some_future_definer(VARCHAR) FROM PUBLIC;");
 });
 
 test("statements that are re-runnable by nature are not flagged", () => {
@@ -240,9 +405,15 @@ test("a disable pragma without a reason, or naming an unknown rule, is itself a 
   const noReason = lintSql(
     "-- migration-lint-disable-next-line insert-without-on-conflict\nINSERT INTO t (a) VALUES (1);",
   ).findings;
-  assert.ok(noReason.some((f) => f.rule === "pragma" && /needs a reason/.test(f.message)));
+  assert.ok(
+    noReason.some(
+      (f) => f.rule === "pragma" && /needs a reason/.test(f.message),
+    ),
+  );
 
-  const unknown = collectPragmas("-- migration-lint-disable-next-line no-such-rule: why\n");
+  const unknown = collectPragmas(
+    "-- migration-lint-disable-next-line no-such-rule: why\n",
+  );
   assert.ok(unknown.problems.some((p) => /unknown lint rule/.test(p.message)));
 });
 

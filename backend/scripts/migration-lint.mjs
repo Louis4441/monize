@@ -125,7 +125,11 @@ export function splitStatements(sql, offset = 0, blockText = null) {
     const raw = sql.slice(from, to);
     if (!raw.trim()) return;
     const lead = /^\s*/.exec(raw)[0].length;
-    statements.push({ text: raw.slice(lead), start: offset + from + lead, blockText });
+    statements.push({
+      text: raw.slice(lead),
+      start: offset + from + lead,
+      blockText,
+    });
   };
   while (i < sql.length) {
     if (sql[i] === "'") {
@@ -147,11 +151,17 @@ export function splitStatements(sql, offset = 0, blockText = null) {
       // out of the wrapper's text -- otherwise every statement inside a
       // conditional block would also be judged as unguarded wrapper text.
       const outerRaw =
-        sql.slice(start, bodyStart) + " ".repeat(bodyEnd - bodyStart) + sql.slice(bodyEnd, stop);
+        sql.slice(start, bodyStart) +
+        " ".repeat(bodyEnd - bodyStart) +
+        sql.slice(bodyEnd, stop);
       const outerLead = /^\s*/.exec(outerRaw)[0].length;
       const outerText = outerRaw.slice(outerLead);
       if (outerText.trim()) {
-        statements.push({ text: outerText, start: offset + start + outerLead, blockText });
+        statements.push({
+          text: outerText,
+          start: offset + start + outerLead,
+          blockText,
+        });
       }
       statements.push(...splitStatements(body, bodyOffset, outerText + body));
       i = stop + 1;
@@ -217,9 +227,18 @@ export function normalizeIdentifier(raw) {
 export function collectDrops(statements, upToIndex) {
   const drops = new Set();
   const patterns = [
-    { kind: "trigger", regex: /\bDROP\s+TRIGGER\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi },
-    { kind: "policy", regex: /\bDROP\s+POLICY\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi },
-    { kind: "constraint", regex: /\bDROP\s+CONSTRAINT\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi },
+    {
+      kind: "trigger",
+      regex: /\bDROP\s+TRIGGER\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi,
+    },
+    {
+      kind: "policy",
+      regex: /\bDROP\s+POLICY\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi,
+    },
+    {
+      kind: "constraint",
+      regex: /\bDROP\s+CONSTRAINT\s+IF\s+EXISTS\s+(%I|[A-Za-z0-9_"]+)/gi,
+    },
   ];
   for (let i = 0; i < upToIndex; i++) {
     const { text } = statements[i];
@@ -245,6 +264,28 @@ export function collectDrops(statements, upToIndex) {
  * `ENABLE ROW LEVEL SECURITY`, and data `UPDATE`/`DELETE` (their WHERE clauses
  * select the pre-migration state and match nothing on a second pass).
  */
+/**
+ * Normalized role names out of a `TO`/`FROM` grantee list ("PUBLIC,
+ * monize_app WITH GRANT OPTION" -> ["public", "monize_app"]). Tail options are
+ * cut first so `WITH GRANT OPTION` / `GRANTED BY` / `CASCADE` are not mistaken
+ * for grantees. An entry the grammar cannot read comes back as "" -- not
+ * provably PUBLIC, so the caller flags it rather than passing it.
+ */
+function granteesOf(listText) {
+  return listText
+    .replace(/\b(?:WITH|GRANTED\s+BY|CASCADE|RESTRICT)\b[\s\S]*$/i, "")
+    .split(",")
+    .map((entry) => {
+      const token = /^(?:GROUP\s+)?([A-Za-z_"][\w"$]*)/i.exec(entry.trim());
+      return token ? normalizeIdentifier(token[1]) : "";
+    });
+}
+
+/** True when a grantee list is anything other than exactly PUBLIC entries. */
+function namesARole(grantees) {
+  return grantees.length === 0 || grantees.some((name) => name !== "public");
+}
+
 export const RULES = [
   {
     id: "create-table-without-if-not-exists",
@@ -292,7 +333,10 @@ export const RULES = [
       if (ctx.blockGuarded) return [];
       const kinds =
         "TABLE|INDEX|TRIGGER|POLICY|VIEW|TYPE|SEQUENCE|CONSTRAINT|COLUMN|FUNCTION|EXTENSION|SCHEMA|MATERIALIZED\\s+VIEW";
-      const regex = new RegExp(`\\bDROP\\s+(${kinds})\\s+(?!IF\\s+EXISTS)`, "gi");
+      const regex = new RegExp(
+        `\\bDROP\\s+(${kinds})\\s+(?!IF\\s+EXISTS)`,
+        "gi",
+      );
       const messages = [];
       for (const match of text.matchAll(regex)) {
         messages.push(`DROP ${match[1].toUpperCase()} without IF EXISTS`);
@@ -305,9 +349,15 @@ export const RULES = [
     check(text, ctx) {
       if (ctx.blockGuarded) return [];
       const messages = [];
-      for (const match of text.matchAll(/\bADD\s+CONSTRAINT\s+([A-Za-z0-9_"]+)/gi)) {
+      for (const match of text.matchAll(
+        /\bADD\s+CONSTRAINT\s+([A-Za-z0-9_"]+)/gi,
+      )) {
         const name = normalizeIdentifier(match[1]);
-        if (ctx.drops.has(`constraint:${name}`) || ctx.drops.has("constraint:%i")) continue;
+        if (
+          ctx.drops.has(`constraint:${name}`) ||
+          ctx.drops.has("constraint:%i")
+        )
+          continue;
         messages.push(
           `ADD CONSTRAINT ${match[1]} is not preceded by DROP CONSTRAINT IF EXISTS ${match[1]}`,
         );
@@ -325,7 +375,8 @@ export const RULES = [
       )) {
         if (/\bCREATE\s+OR\s+REPLACE\s+TRIGGER\b/i.test(text)) continue;
         const name = normalizeIdentifier(match[1]);
-        if (ctx.drops.has(`trigger:${name}`) || ctx.drops.has("trigger:%i")) continue;
+        if (ctx.drops.has(`trigger:${name}`) || ctx.drops.has("trigger:%i"))
+          continue;
         messages.push(
           `CREATE TRIGGER ${match[1]} is neither preceded by DROP TRIGGER IF EXISTS ${match[1]} nor inside a pg_trigger existence check`,
         );
@@ -338,9 +389,12 @@ export const RULES = [
     check(text, ctx) {
       if (ctx.blockGuarded) return [];
       const messages = [];
-      for (const match of text.matchAll(/\bCREATE\s+POLICY\s+(%I|[A-Za-z0-9_"]+)/gi)) {
+      for (const match of text.matchAll(
+        /\bCREATE\s+POLICY\s+(%I|[A-Za-z0-9_"]+)/gi,
+      )) {
         const name = normalizeIdentifier(match[1]);
-        if (ctx.drops.has(`policy:${name}`) || ctx.drops.has("policy:%i")) continue;
+        if (ctx.drops.has(`policy:${name}`) || ctx.drops.has("policy:%i"))
+          continue;
         messages.push(
           `CREATE POLICY ${match[1]} is not preceded by DROP POLICY IF EXISTS ${match[1]}`,
         );
@@ -398,8 +452,12 @@ export const RULES = [
       if (ctx.blockGuarded) return [];
       const messages = [];
       for (const kind of ["SEQUENCE", "EXTENSION", "SCHEMA"]) {
-        const regex = new RegExp(`\\bCREATE\\s+${kind}\\s+(?!IF\\s+NOT\\s+EXISTS)`, "i");
-        if (regex.test(text)) messages.push(`CREATE ${kind} without IF NOT EXISTS`);
+        const regex = new RegExp(
+          `\\bCREATE\\s+${kind}\\s+(?!IF\\s+NOT\\s+EXISTS)`,
+          "i",
+        );
+        if (regex.test(text))
+          messages.push(`CREATE ${kind} without IF NOT EXISTS`);
       }
       return messages;
     },
@@ -414,6 +472,92 @@ export const RULES = [
       return [
         "INSERT INTO without ON CONFLICT (or a WHERE NOT EXISTS guard) duplicates rows on a re-run",
       ];
+    },
+  },
+  /**
+   * Not idempotency -- deployability. A migration runs unconditionally at
+   * startup on every installation, including ones where the runtime role does
+   * not exist (it is provisioned by db-init, or by the CNPG Cluster manifest, or
+   * not at all at RLS_MODE=off). A statement naming that role fails, the
+   * migration aborts, and the backend crash-loops before it serves a request.
+   * Roles and their grants therefore live in `backend/src/common/db/app-role.ts`,
+   * and no shipped migration contains any of these statements today -- the test
+   * suite pins that over the real directory.
+   *
+   * `PUBLIC` is the one exception, and it is not an exception to the reason:
+   * PUBLIC is a keyword that always resolves, so `REVOKE ... FROM PUBLIC` cannot
+   * fail for a missing role. It stays allowed because `CREATE FUNCTION` grants
+   * EXECUTE to PUBLIC implicitly, and revoking that anywhere but in the same
+   * transaction as the CREATE leaves a window in which any role can execute a
+   * fresh SECURITY DEFINER function. Nothing in the tree needs it yet; the
+   * allowance exists so the first migration that ships such a function can close
+   * that window in place instead of fighting this rule.
+   *
+   * Every grantee is checked, not just the first: `REVOKE ... FROM PUBLIC,
+   * monize_app` names a role exactly as much as `FROM monize_app` does. The
+   * other statements that bind a specific role -- `OWNER TO`, `REASSIGN OWNED
+   * BY`, `SET ROLE` / `SET SESSION AUTHORIZATION`, and a policy's `TO` clause
+   * -- fail the same way a GRANT does, so they are covered by the same rule.
+   */
+  {
+    id: "role-or-grant-statement",
+    check(text) {
+      const messages = [];
+      if (/\b(?:CREATE|ALTER|DROP)\s+(?:ROLE|USER|GROUP)\b/i.test(text)) {
+        messages.push(
+          "CREATE/ALTER/DROP ROLE in a migration crash-loops startup where the role differs; roles live in db-init (common/db/app-role.ts)",
+        );
+      }
+      if (/\bOWNER\s+TO\b/i.test(text)) {
+        messages.push(
+          "ALTER ... OWNER TO names a role, and crash-loops startup where that role does not exist; ownership stays with the migration-running role",
+        );
+      }
+      if (/\bREASSIGN\s+OWNED\s+BY\b/i.test(text)) {
+        messages.push(
+          "REASSIGN OWNED BY names roles, and crash-loops startup where they do not exist",
+        );
+      }
+      // Anchored to the statement start: SET ROLE is a statement of its own,
+      // and the anchor keeps the words appearing inside a string literal (an
+      // INSERTed comment, say) from tripping the rule.
+      if (
+        /^\s*SET\s+(?:LOCAL\s+|SESSION\s+)?ROLE\b/i.test(text) ||
+        /^\s*SET\s+(?:LOCAL\s+)?SESSION\s+AUTHORIZATION\b/i.test(text)
+      ) {
+        messages.push(
+          "SET ROLE / SET SESSION AUTHORIZATION switches to a named role, and crash-loops startup where that role does not exist",
+        );
+      }
+      // A policy's TO clause binds it to roles at CREATE/ALTER time and fails
+      // for a missing role exactly like a GRANT. The clause sits before
+      // USING / WITH CHECK, so only that head is searched -- a column named
+      // granted_to inside the predicate is not a TO clause -- and RENAME TO
+      // renames the policy, not a role.
+      if (/\b(?:CREATE|ALTER)\s+POLICY\b/i.test(text)) {
+        const head = text
+          .split(/\bUSING\b|\bWITH\s+CHECK\b/i)[0]
+          .replace(/\bRENAME\s+TO\s+[A-Za-z_"][\w"$]*/i, " ");
+        const toClause = /\bTO\s+([\s\S]+)$/i.exec(head);
+        if (toClause && namesARole(granteesOf(toClause[1]))) {
+          messages.push(
+            "CREATE/ALTER POLICY ... TO names a role, and crash-loops startup where that role does not exist; leave the policy on its default (PUBLIC)",
+          );
+        }
+      }
+      const grant = /\b(GRANT|REVOKE)\b([\s\S]*)$/i.exec(text);
+      if (grant) {
+        // The grantee list follows TO (GRANT) or FROM (REVOKE); every
+        // comma-separated entry is checked -- `FROM PUBLIC, monize_app` names
+        // a role exactly as much as `FROM monize_app` does.
+        const list = /\b(?:TO|FROM)\s+([\s\S]+)$/i.exec(grant[2]);
+        if (!list || namesARole(granteesOf(list[1]))) {
+          messages.push(
+            `${grant[1].toUpperCase()} to a named role in a migration crash-loops startup where the role does not exist; only PUBLIC is safe (it always resolves)`,
+          );
+        }
+      }
+      return messages;
     },
   },
 ];
@@ -433,14 +577,18 @@ export function collectPragmas(sql) {
   const problems = [];
   const lines = sql.split("\n");
   lines.forEach((line, index) => {
-    const match = new RegExp(`--\\s*${DISABLE_PRAGMA}\\s+([a-z0-9-]+)\\s*(:\\s*(.*))?$`, "i").exec(
-      line,
-    );
+    const match = new RegExp(
+      `--\\s*${DISABLE_PRAGMA}\\s+([a-z0-9-]+)\\s*(:\\s*(.*))?$`,
+      "i",
+    ).exec(line);
     if (!match) return;
     const ruleId = match[1];
     const reason = (match[3] || "").trim();
     if (!RULES.some((r) => r.id === ruleId)) {
-      problems.push({ line: index + 1, message: `unknown lint rule "${ruleId}" in disable pragma` });
+      problems.push({
+        line: index + 1,
+        message: `unknown lint rule "${ruleId}" in disable pragma`,
+      });
       return;
     }
     if (!reason) {
@@ -518,24 +666,53 @@ function main() {
   console.log(`Migration idempotency lint: ${files.length} file(s) in ${dir}`);
 
   if (findings.length === 0) {
-    console.log("OK -- every migration body is re-runnable against an up-to-date database.");
+    console.log(
+      "OK -- every migration body is re-runnable against an up-to-date database.",
+    );
     return;
   }
 
   console.error("");
   for (const finding of findings) {
-    console.error(`FAIL: ${finding.file}:${finding.line} [${finding.rule}] ${finding.message}`);
+    console.error(
+      `FAIL: ${finding.file}:${finding.line} [${finding.rule}] ${finding.message}`,
+    );
+  }
+  // Two failure families, two remedies. Naming only the idempotency one sent a
+  // reader of a role/grant finding looking for an IF NOT EXISTS clause to add.
+  const hasRoleFinding = findings.some(
+    (f) => f.rule === "role-or-grant-statement",
+  );
+  const hasIdempotencyFinding = findings.some(
+    (f) => f.rule !== "role-or-grant-statement",
+  );
+  const remedies = [];
+  if (hasIdempotencyFinding) {
+    remedies.push(
+      "Migrations must be no-ops when re-run: a half-applied migration otherwise\n" +
+        "crash-loops the backend at startup. Add the IF [NOT] EXISTS clause, a preceding\n" +
+        "DROP ... IF EXISTS, or wrap the statement in a catalog-checking DO block.",
+    );
+  }
+  if (hasRoleFinding) {
+    remedies.push(
+      "Migrations must not name a role: they run unconditionally at startup, including\n" +
+        "where that role does not exist. Move it to backend/src/common/db/app-role.ts,\n" +
+        "which db-init applies idempotently. Only PUBLIC is safe in a migration.",
+    );
   }
   console.error(
-    `\n${findings.length} finding(s). Migrations must be no-ops when re-run: a half-applied\n` +
-      "migration otherwise crash-loops the backend at startup. Add the IF [NOT] EXISTS clause,\n" +
-      "a preceding DROP ... IF EXISTS, or wrap the statement in a catalog-checking DO block.\n" +
-      "See docs/database-migrations.md.",
+    `\n${findings.length} finding(s).\n\n` +
+      remedies.join("\n\n") +
+      "\n\nSee docs/database-migrations.md.",
   );
   process.exit(1);
 }
 
-if (process.argv[1] && statSync(process.argv[1], { throwIfNoEntry: false })?.isFile()) {
+if (
+  process.argv[1] &&
+  statSync(process.argv[1], { throwIfNoEntry: false })?.isFile()
+) {
   const invoked = fileURLToPath(import.meta.url);
   if (process.argv[1] === invoked) main();
 }
