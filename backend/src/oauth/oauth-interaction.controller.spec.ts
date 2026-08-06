@@ -181,6 +181,32 @@ describe("OAuthInteractionController", () => {
       expect(ctx?.system).toBeUndefined();
     });
 
+    it("sets a page CSP whose form-action lets the submit's redirect chain reach the client's https callback", async () => {
+      // Helmet's app-wide policy carries the default `form-action 'self'`, and
+      // Chrome enforces form-action on every redirect hop after a form submit.
+      // The Allow POST resolves 'self' -> /oauth/auth resume -> the client's
+      // https redirect_uri (cross-origin); without 'self' https: here Chrome
+      // silently cancels the last hop -- the server logs authorization.success
+      // while the browser never delivers the code and the consent page just
+      // sits there. The consent page must therefore ship its own CSP.
+      const { controller } = makeController({
+        interactionDetails: jest.fn().mockResolvedValue({
+          uid: "u",
+          prompt: { name: "consent" },
+          params: { client_id: "claude-desktop", scope: "monize:read" },
+        }),
+      });
+      const req = { cookies: { auth_token: "valid" } } as any;
+      const res = makeRes();
+
+      await controller.render(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith(
+        "Content-Security-Policy",
+        expect.stringContaining("form-action 'self' https:"),
+      );
+    });
+
     it("renders consent HTML for authenticated user with valid prompt", async () => {
       const { controller } = makeController({
         interactionDetails: jest.fn().mockResolvedValue({
@@ -211,7 +237,7 @@ describe("OAuthInteractionController", () => {
       );
     });
 
-    it("renders a friendly completed page when the interaction is stale (consumed/expired)", async () => {
+    it("renders an honest closed-window page when the interaction is stale (consumed/expired)", async () => {
       const { controller } = makeController({
         interactionDetails: jest.fn().mockRejectedValue(
           Object.assign(new Error("invalid_request"), {
@@ -225,8 +251,66 @@ describe("OAuthInteractionController", () => {
       await controller.render(req, res);
 
       expect(res.status).toHaveBeenCalledWith(200);
+      // The page must NOT claim the authorization completed: a superseded
+      // reconnect attempt lands here while the client is still waiting, and
+      // "already complete" told the user to stop when they needed to retry.
       expect(res.send).toHaveBeenCalledWith(
-        expect.stringContaining("authorization is already complete"),
+        expect.stringContaining("no longer active"),
+      );
+      expect(res.send).toHaveBeenCalledWith(
+        expect.stringContaining("start the connection again"),
+      );
+      expect(res.send).not.toHaveBeenCalledWith(
+        expect.stringContaining("already complete"),
+      );
+    });
+
+    it("redirects a stale page to the live interaction's own consent page (uid mismatch)", async () => {
+      // A second authorization attempt moved the single path-'/' interaction
+      // cookie to a new uid while this older page was still open. The page
+      // must not act under its stale uid: send the browser to the live
+      // interaction so the user reviews the attempt the client is waiting on.
+      const { controller } = makeController({
+        interactionDetails: jest.fn().mockResolvedValue({
+          uid: "live-uid",
+          prompt: { name: "consent" },
+          params: { client_id: "claude-desktop", scope: "monize:read" },
+        }),
+      });
+      const req = {
+        cookies: { auth_token: "valid" },
+        params: { uid: "stale-uid" },
+      } as any;
+      const res = makeRes();
+
+      await controller.render(req, res);
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        302,
+        "https://app.monize.test/api/v1/oauth-consent/live-uid",
+      );
+      expect(res.send).not.toHaveBeenCalled();
+    });
+
+    it("renders normally when the page uid matches the live interaction", async () => {
+      const { controller } = makeController({
+        interactionDetails: jest.fn().mockResolvedValue({
+          uid: "u1",
+          prompt: { name: "consent" },
+          params: { client_id: "claude-desktop", scope: "monize:read" },
+        }),
+      });
+      const req = {
+        cookies: { auth_token: "valid" },
+        params: { uid: "u1" },
+      } as any;
+      const res = makeRes();
+
+      await controller.render(req, res);
+
+      expect(res.redirect).not.toHaveBeenCalled();
+      expect(res.send).toHaveBeenCalledWith(
+        expect.stringContaining("Claude Desktop"),
       );
     });
 
@@ -255,7 +339,7 @@ describe("OAuthInteractionController", () => {
       },
     };
 
-    it("renders a friendly completed page when the interaction is already consumed", async () => {
+    it("renders an honest closed-window page when the interaction is already consumed", async () => {
       const { controller } = makeController({
         interactionDetails: jest.fn().mockRejectedValue(
           Object.assign(new Error("invalid_request"), {
@@ -270,8 +354,88 @@ describe("OAuthInteractionController", () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.send).toHaveBeenCalledWith(
-        expect.stringContaining("authorization is already complete"),
+        expect.stringContaining("no longer active"),
       );
+      expect(res.send).not.toHaveBeenCalledWith(
+        expect.stringContaining("already complete"),
+      );
+    });
+
+    it("redirects a stale Allow submit to the live interaction instead of completing the wrong attempt", async () => {
+      // Clicking Allow on a superseded page must not grant/finish the
+      // cookie-resolved interaction: the user reviewed a different page's
+      // client and scopes. Re-render the live attempt for a fresh approval.
+      const grant = {
+        addOIDCScope: jest.fn(),
+        addOIDCClaims: jest.fn(),
+        addResourceScope: jest.fn(),
+        save: jest.fn().mockResolvedValue("grant-id-1"),
+      };
+      class GrantMock {
+        constructor() {
+          return grant;
+        }
+        static find = jest.fn().mockResolvedValue(null);
+      }
+      const { controller, interactionFinished } = makeController({
+        interactionDetails: jest.fn().mockResolvedValue({
+          uid: "live-uid",
+          prompt: { name: "consent", details: consentDetails },
+          params: { client_id: "claude-desktop" },
+          session: { accountId: USER_ID },
+        }),
+        Grant: GrantMock as any,
+      });
+      const req = {
+        cookies: { auth_token: "v" },
+        params: { uid: "stale-uid" },
+        body: {},
+      } as any;
+      const res = makeRes();
+
+      await controller.confirm(req, res);
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        303,
+        "https://app.monize.test/api/v1/oauth-consent/live-uid",
+      );
+      expect(grant.save).not.toHaveBeenCalled();
+      expect(interactionFinished).not.toHaveBeenCalled();
+    });
+
+    it("confirms normally when the page uid matches the live interaction", async () => {
+      const grant = {
+        addOIDCScope: jest.fn(),
+        addOIDCClaims: jest.fn(),
+        addResourceScope: jest.fn(),
+        save: jest.fn().mockResolvedValue("grant-id-1"),
+      };
+      class GrantMock {
+        constructor() {
+          return grant;
+        }
+        static find = jest.fn().mockResolvedValue(null);
+      }
+      const { controller, interactionFinished } = makeController({
+        interactionDetails: jest.fn().mockResolvedValue({
+          uid: "u1",
+          prompt: { name: "consent", details: consentDetails },
+          params: { client_id: "claude-desktop" },
+          session: { accountId: USER_ID },
+        }),
+        Grant: GrantMock as any,
+      });
+      const req = {
+        cookies: { auth_token: "v" },
+        params: { uid: "u1" },
+        body: {},
+      } as any;
+      const res = makeRes();
+
+      await controller.confirm(req, res);
+
+      expect(res.redirect).not.toHaveBeenCalled();
+      expect(interactionFinished).toHaveBeenCalled();
     });
 
     it("returns 401 when user not authenticated", async () => {

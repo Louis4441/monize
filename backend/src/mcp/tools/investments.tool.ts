@@ -30,7 +30,7 @@ import {
   MAX_BULK_ACTION_ROWS,
   resolveApprovalMode,
 } from "../../ai/actions/ai-action.types";
-import { RELAY_PREVIEW_SHOWN } from "../mcp-relay-confirm";
+import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
 import {
   UserContextResolver,
   requireScope,
@@ -724,7 +724,7 @@ export class McpInvestmentsTools {
         userId,
         preview,
       );
-      if (this.relayService.emitPendingAction(userId, action)) {
+      if (emitRelayCard(this.relayService, userId, action)) {
         return toolResult(RELAY_PREVIEW_SHOWN);
       }
       const confirmation = await confirmWrite(
@@ -785,7 +785,7 @@ export class McpInvestmentsTools {
       bulk.okPreviews,
       bulk.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -849,7 +849,7 @@ export class McpInvestmentsTools {
         userId,
         preview,
       );
-      if (this.relayService.emitPendingAction(userId, action)) {
+      if (emitRelayCard(this.relayService, userId, action)) {
         return toolResult(RELAY_PREVIEW_SHOWN);
       }
       const confirmation = await confirmWrite(
@@ -930,7 +930,7 @@ export class McpInvestmentsTools {
       bulk.okRows,
       bulk.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -986,7 +986,7 @@ export class McpInvestmentsTools {
         userId,
         preview,
       );
-      if (this.relayService.emitPendingAction(userId, action)) {
+      if (emitRelayCard(this.relayService, userId, action)) {
         return toolResult(RELAY_PREVIEW_SHOWN);
       }
       const confirmation = await confirmWrite(
@@ -1057,7 +1057,7 @@ export class McpInvestmentsTools {
       bulk.okRows,
       bulk.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -1092,9 +1092,9 @@ export class McpInvestmentsTools {
     requestId: unknown,
     skipped: { index: number; reason: string }[],
   ) {
-    if (this.relayService.emitPendingAction(userId, cards[0])) {
+    if (emitRelayCard(this.relayService, userId, cards[0])) {
       for (let i = 1; i < cards.length; i++) {
-        this.relayService.emitPendingAction(userId, cards[i]);
+        emitRelayCard(this.relayService, userId, cards[i]);
       }
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
@@ -1310,7 +1310,7 @@ export class McpInvestmentsTools {
     confirmMessage: string,
     requestId: unknown,
   ): Promise<"relay" | "accepted" | "declined"> {
-    if (this.relayService.emitPendingAction(userId, pendingAction)) {
+    if (emitRelayCard(this.relayService, userId, pendingAction)) {
       return "relay";
     }
     const confirmation = await confirmWrite(
@@ -1389,7 +1389,7 @@ export class McpInvestmentsTools {
       prep.okRows,
       prep.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -1475,7 +1475,7 @@ export class McpInvestmentsTools {
       prep.okRows,
       prep.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -1557,7 +1557,7 @@ export class McpInvestmentsTools {
       prep.okRows,
       prep.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -1644,9 +1644,9 @@ export class McpInvestmentsTools {
     requestId: unknown,
     skipped: { index: number; reason: string }[],
   ) {
-    if (this.relayService.emitPendingAction(userId, cards[0])) {
+    if (emitRelayCard(this.relayService, userId, cards[0])) {
       for (let i = 1; i < cards.length; i++) {
-        this.relayService.emitPendingAction(userId, cards[i]);
+        emitRelayCard(this.relayService, userId, cards[i]);
       }
       return toolResult(RELAY_PREVIEW_SHOWN);
     }

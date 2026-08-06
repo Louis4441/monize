@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { UserContextResolver } from "./mcp-context";
 import type { AiRelayService } from "../ai/relay/ai-relay.service";
+import { withMcpSession } from "./mcp-session-context";
 
 // Relay control tools are infrastructure (the long-poll and answer channel),
 // not work the user should see as progress.
@@ -31,23 +32,43 @@ export function wrapToolHandlerForRelay(
   relayService: AiRelayService,
 ): ToolHandler {
   return async (args, extra) => {
-    const userId = resolve(extra?.sessionId)?.userId;
-    if (userId) {
-      relayService.reportToolActivity(userId, name, "start");
-    }
-    let isError = false;
-    try {
-      const result = await handler(args, extra);
-      isError = Boolean((result as { isError?: boolean } | undefined)?.isError);
-      return result;
-    } catch (err) {
-      isError = true;
-      throw err;
-    } finally {
+    const sessionId = extra?.sessionId;
+    const userId = resolve(sessionId)?.userId;
+    // Every tool handler runs inside its session's ambient context, so a write
+    // deep inside one can tell whether it is serving this session's relay turn
+    // or is a direct MCP client's own call (see mcp-session-context.ts).
+    return withMcpSession(sessionId, async () => {
       if (userId) {
-        relayService.reportToolActivity(userId, name, "result", isError);
+        relayService.reportToolActivity(
+          userId,
+          name,
+          "start",
+          false,
+          sessionId,
+        );
       }
-    }
+      let isError = false;
+      try {
+        const result = await handler(args, extra);
+        isError = Boolean(
+          (result as { isError?: boolean } | undefined)?.isError,
+        );
+        return result;
+      } catch (err) {
+        isError = true;
+        throw err;
+      } finally {
+        if (userId) {
+          relayService.reportToolActivity(
+            userId,
+            name,
+            "result",
+            isError,
+            sessionId,
+          );
+        }
+      }
+    });
   };
 }
 

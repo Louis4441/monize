@@ -50,7 +50,13 @@ export class McpRelayTools {
         if (check.error) return check.result;
 
         try {
-          const claimed = await this.relayService.waitForPrompt(ctx.userId);
+          // The claim is bound to THIS session: it is what makes a later write
+          // from this agent part of the relay turn, and a write from any other
+          // session of the same user a direct client's.
+          const claimed = await this.relayService.waitForPrompt(
+            ctx.userId,
+            extra.sessionId,
+          );
           if (!claimed) {
             // No prompt this window. If the user has gone quiet long enough,
             // tell the agent to stop looping instead of polling forever.
@@ -142,6 +148,9 @@ export class McpRelayTools {
             ctx.userId,
             args.promptId,
             args.text,
+            // Re-binds the turn when an agent reconnects mid-prompt with a
+            // fresh session id; knowing the promptId is what proves ownership.
+            extra.sessionId,
           );
           return toolResult({ delivered });
         } catch (err: unknown) {

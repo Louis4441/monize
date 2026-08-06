@@ -32,7 +32,7 @@ import { AttachmentToolPrepService } from "../../attachments/attachment-tool-pre
 import { AttachmentsService } from "../../attachments/attachments.service";
 import { sniffAttachmentMime } from "../../attachments/attachment-mime.util";
 import { withUserContext } from "../../common/db/with-context";
-import { RELAY_PREVIEW_SHOWN } from "../mcp-relay-confirm";
+import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
 import {
   UserContextResolver,
   requireScope,
@@ -942,7 +942,7 @@ export class McpTransactionsTools {
     confirmMessage: string,
     requestId: unknown,
   ): Promise<"relay" | "accepted" | "declined"> {
-    if (this.relayService.emitPendingAction(userId, pendingAction)) {
+    if (emitRelayCard(this.relayService, userId, pendingAction)) {
       return "relay";
     }
     const confirmation = await confirmWrite(
@@ -1347,9 +1347,9 @@ export class McpTransactionsTools {
       );
     }
     // Relay: emit each card to the web chat.
-    if (this.relayService.emitPendingAction(userId, cards[0])) {
+    if (emitRelayCard(this.relayService, userId, cards[0])) {
       for (let i = 1; i < cards.length; i++) {
-        this.relayService.emitPendingAction(userId, cards[i]);
+        emitRelayCard(this.relayService, userId, cards[i]);
       }
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
@@ -1583,7 +1583,7 @@ export class McpTransactionsTools {
       bulk.okRows,
       bulk.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -1688,7 +1688,7 @@ export class McpTransactionsTools {
       bulk.okRows,
       bulk.previewRows,
     );
-    if (this.relayService.emitPendingAction(userId, action)) {
+    if (emitRelayCard(this.relayService, userId, action)) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
@@ -1721,9 +1721,9 @@ export class McpTransactionsTools {
     skipped: { index: number; reason: string }[],
   ) {
     // Relay path: emit each card; the browser confirms+commits each.
-    if (this.relayService.emitPendingAction(userId, cards[0])) {
+    if (emitRelayCard(this.relayService, userId, cards[0])) {
       for (let i = 1; i < cards.length; i++) {
-        this.relayService.emitPendingAction(userId, cards[i]);
+        emitRelayCard(this.relayService, userId, cards[i]);
       }
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
