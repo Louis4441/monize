@@ -31,6 +31,7 @@ function renderStep(overrides: Record<string, unknown> = {}) {
     ],
     columnMapping: defaultMapping(),
     onColumnMappingChange: vi.fn(),
+    onInvestmentModeChange: vi.fn(),
     transferRules: [],
     onTransferRulesChange: vi.fn(),
     accounts: [],

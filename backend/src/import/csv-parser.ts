@@ -9,12 +9,38 @@
  */
 
 import type { QifTransaction, QifParseResult } from "./qif-parser";
+import { roundToDecimals } from "../common/round.util";
 
 export interface CsvHeadersResult {
   headers: string[];
   sampleRows: string[][];
   rowCount: number;
 }
+
+/**
+ * Canonical investment actions the CSV importer can classify a row into.
+ * The parser emits the QIF action code for each (CANONICAL_TO_QIF_ACTION) so
+ * ImportInvestmentProcessorService handles CSV rows exactly like QIF rows.
+ * cashIn/cashOut are pure cash movements booked on the linked cash account.
+ */
+export type CanonicalInvestmentAction =
+  | "buy"
+  | "sell"
+  | "dividend"
+  | "interest"
+  | "capitalGain"
+  | "reinvest"
+  | "split"
+  | "transferIn"
+  | "transferOut"
+  | "addShares"
+  | "removeShares"
+  | "cashIn"
+  | "cashOut";
+
+export type CsvActionKeywords = Partial<
+  Record<CanonicalInvestmentAction, string[]>
+>;
 
 export interface CsvColumnMappingConfig {
   date: number;
@@ -38,12 +64,185 @@ export interface CsvColumnMappingConfig {
   transferOutValues?: string[];
   transferInValues?: string[];
   transferAccountColumn?: number;
+  investmentMode?: boolean;
+  actionColumn?: number;
+  securityColumn?: number;
+  quantityColumn?: number;
+  priceColumn?: number;
+  commissionColumn?: number;
+  actionKeywords?: CsvActionKeywords;
 }
 
 export interface CsvTransferRule {
   type: "payee" | "category";
   pattern: string;
   accountName: string;
+}
+
+/** Per-canonical-action row counts and skip reporting for the preview step. */
+export interface CsvInvestmentSummary {
+  actionCounts: Partial<Record<CanonicalInvestmentAction, number>>;
+  /** Distinct unmatched action values imported as cash transactions */
+  cashFallbackValues: string[];
+  /** Buy/reinvest rows downgraded to addshares because no cost was derivable */
+  uncostedShareRows: number;
+  rejectedRows: { reason: string; count: number }[];
+}
+
+// Iteration order doubles as match priority when a keyword appears in more
+// than one action's list.
+const CANONICAL_INVESTMENT_ACTIONS: CanonicalInvestmentAction[] = [
+  "buy",
+  "sell",
+  "dividend",
+  "interest",
+  "capitalGain",
+  "reinvest",
+  "split",
+  "transferIn",
+  "transferOut",
+  "addShares",
+  "removeShares",
+  "cashIn",
+  "cashOut",
+];
+
+/**
+ * Built-in action keyword lists, compared with exact match after trim +
+ * lowercase. Exact only -- substring matching over financial verbs is how
+ * "sell" would claim "sell to cover taxes withheld" and misfile the row.
+ * A user-supplied list in `actionKeywords` replaces the default list for
+ * that action (same semantics as incomeValues/expenseValues).
+ */
+export const DEFAULT_INVESTMENT_ACTION_KEYWORDS: Record<
+  CanonicalInvestmentAction,
+  string[]
+> = {
+  buy: ["buy", "bought", "purchase", "buy to open", "you bought"],
+  sell: ["sell", "sold", "sale", "sell to close", "you sold"],
+  dividend: [
+    "div",
+    "dividend",
+    "cash dividend",
+    "qualified dividend",
+    "ordinary dividend",
+  ],
+  interest: ["int", "interest", "interest income", "credit interest"],
+  capitalGain: [
+    "capital gain",
+    "cap gain",
+    "lt cap gain",
+    "st cap gain",
+    "capital gains distribution",
+  ],
+  reinvest: [
+    "reinvest",
+    "reinvestment",
+    "drip",
+    "reinvest dividend",
+    "dividend reinvestment",
+    "reinvest shares",
+  ],
+  split: ["split", "stock split"],
+  transferIn: ["transfer in", "shares in", "securities in", "receive"],
+  transferOut: ["transfer out", "shares out", "securities out", "deliver"],
+  addShares: ["add", "add shares", "adjust up"],
+  removeShares: ["remove", "remove shares", "adjust down"],
+  cashIn: ["deposit", "contribution", "cash in", "credit", "funds received"],
+  cashOut: [
+    "withdrawal",
+    "withdraw",
+    "cash out",
+    "fee",
+    "management fee",
+    "debit",
+    "tax withheld",
+  ],
+};
+
+/**
+ * QIF action-code vocabulary accepted as a final fallback so Quicken-style
+ * CSV exports classify with no keyword configuration. Only codes with an
+ * unambiguous canonical meaning are listed; the rest stay unknown rather
+ * than guessing.
+ */
+const QIF_ACTION_CODE_TO_CANONICAL: Record<string, CanonicalInvestmentAction> =
+  {
+    buy: "buy",
+    sell: "sell",
+    div: "dividend",
+    intinc: "interest",
+    cglong: "capitalGain",
+    cgshort: "capitalGain",
+    cgmid: "capitalGain",
+    stksplit: "split",
+    shrsin: "transferIn",
+    shrsout: "transferOut",
+    reinvdiv: "reinvest",
+    reinvint: "reinvest",
+    reinvlg: "reinvest",
+    reinvsh: "reinvest",
+    reinvmd: "reinvest",
+    xin: "cashIn",
+    xout: "cashOut",
+  };
+
+/**
+ * QIF action code the parser emits per canonical action. The investment
+ * processor's actionMap is the other half of this contract -- the parser
+ * must never emit a code that map does not resolve, because its fallback
+ * for unknown codes is BUY.
+ */
+export const CANONICAL_TO_QIF_ACTION: Record<
+  CanonicalInvestmentAction,
+  string
+> = {
+  buy: "buy",
+  sell: "sell",
+  dividend: "div",
+  interest: "intinc",
+  capitalGain: "cglong",
+  reinvest: "reinvdiv",
+  split: "stksplit",
+  transferIn: "shrsin",
+  transferOut: "shrsout",
+  addShares: "addshares",
+  removeShares: "removeshares",
+  cashIn: "xin",
+  cashOut: "xout",
+};
+
+/**
+ * Classify a raw action-column value into a canonical investment action.
+ * Priority: user keyword lists, then built-in defaults (skipped for actions
+ * the user overrode), then the QIF action-code vocabulary. Returns null for
+ * an unmatched value -- the caller decides the cash fallback, never BUY.
+ */
+export function normalizeCsvAction(
+  raw: string | undefined | null,
+  config: CsvColumnMappingConfig,
+): CanonicalInvestmentAction | null {
+  const key = (raw ?? "").trim().toLowerCase();
+  if (!key) {
+    return null;
+  }
+  const overrides = config.actionKeywords || {};
+  const matches = (list: string[] | undefined): boolean =>
+    (list || []).some((k) => k.trim().toLowerCase() === key);
+
+  for (const action of CANONICAL_INVESTMENT_ACTIONS) {
+    if (matches(overrides[action])) {
+      return action;
+    }
+  }
+  for (const action of CANONICAL_INVESTMENT_ACTIONS) {
+    if (overrides[action] === undefined) {
+      if (matches(DEFAULT_INVESTMENT_ACTION_KEYWORDS[action])) {
+        return action;
+      }
+    }
+  }
+  return QIF_ACTION_CODE_TO_CANONICAL[key] ?? null;
 }
 
 // Field length limits matching database column constraints (same as qif-parser)
@@ -53,6 +252,7 @@ const FIELD_LIMITS = {
   REFERENCE_NUMBER: 100,
   CATEGORY: 255,
   TAG: 100,
+  SECURITY: 255,
 } as const;
 
 /**
@@ -629,6 +829,245 @@ function getField(row: string[], index: number | undefined): string {
   return index < row.length ? row[index] : "";
 }
 
+// Stable rejection-reason keys surfaced through investmentSummary.rejectedRows;
+// the frontend translates them for the Review step.
+type InvestmentRejectReason =
+  | "missingSecurity"
+  | "missingQuantity"
+  | "missingAmount"
+  | "missingProceeds"
+  | "missingSplitRatio";
+
+const SECURITY_REQUIRED_ACTIONS: ReadonlySet<CanonicalInvestmentAction> =
+  new Set([
+    "buy",
+    "sell",
+    "reinvest",
+    "split",
+    "transferIn",
+    "transferOut",
+    "addShares",
+    "removeShares",
+  ]);
+
+interface InvestmentRowOutcome {
+  transaction?: QifTransaction;
+  /** Canonical action actually emitted (post-fallback/downgrade) */
+  emittedAction?: CanonicalInvestmentAction;
+  rejectReason?: InvestmentRejectReason;
+  /** Raw action value of a row imported via the unknown-action cash fallback */
+  cashFallbackValue?: string;
+  /** True when a buy/reinvest was downgraded to addshares (no derivable cost) */
+  uncosted?: boolean;
+}
+
+/**
+ * Classify one CSV row in investment mode per the truth table in
+ * docs/import-csv-investment-spec.md. Quantity, price and commission carry no
+ * direction (abs); the action does. Missing money data is never defaulted --
+ * a row whose cost or proceeds cannot be established is rejected, and a
+ * missing price is left at 0 so the processor persists NULL, not 0.
+ */
+function buildInvestmentRow(params: {
+  row: string[];
+  config: CsvColumnMappingConfig;
+  parsedDate: string;
+  payee: string;
+  memo: string;
+  referenceNumber: string;
+  tagNames: string[];
+  normalizedStatus: NormalizedReconciliationStatus | null;
+}): InvestmentRowOutcome {
+  const { row, config, parsedDate, normalizedStatus } = params;
+
+  // Row total from the amount column or debit/credit pair. Zero is treated as
+  // unknown: a $0.00 cell carries no information a money movement can use.
+  let parsedAmount: number | null = null;
+  if (config.amount !== undefined) {
+    parsedAmount = parseCsvAmount(getField(row, config.amount));
+  } else if (config.debit !== undefined || config.credit !== undefined) {
+    const creditVal =
+      config.credit !== undefined
+        ? parseCsvAmount(getField(row, config.credit))
+        : null;
+    const debitVal =
+      config.debit !== undefined
+        ? parseCsvAmount(getField(row, config.debit))
+        : null;
+    if (creditVal !== null && creditVal !== 0) {
+      parsedAmount = Math.abs(creditVal);
+    } else if (debitVal !== null && debitVal !== 0) {
+      parsedAmount = -Math.abs(debitVal);
+    }
+  }
+  const amountKnown = parsedAmount !== null && parsedAmount !== 0;
+  const absAmount = amountKnown ? Math.abs(parsedAmount!) : 0;
+
+  const rawAction = getField(row, config.actionColumn).trim();
+  let canonical = normalizeCsvAction(rawAction, config);
+  let cashFallbackValue: string | undefined;
+  if (canonical === null) {
+    // Unknown action: import as a cash movement by amount sign (user
+    // decision). With no amount there is nothing truthful to book.
+    if (!amountKnown) {
+      return { rejectReason: "missingAmount" };
+    }
+    cashFallbackValue = rawAction;
+    canonical = parsedAmount! > 0 ? "cashIn" : "cashOut";
+  }
+
+  const quantityRaw =
+    config.quantityColumn !== undefined
+      ? parseCsvAmount(getField(row, config.quantityColumn))
+      : null;
+  const quantity = quantityRaw !== null ? Math.abs(quantityRaw) : 0;
+  const quantityKnown = quantity > 0;
+  const priceRaw =
+    config.priceColumn !== undefined
+      ? parseCsvAmount(getField(row, config.priceColumn))
+      : null;
+  const priceFromColumn =
+    priceRaw !== null && Math.abs(priceRaw) > 0 ? Math.abs(priceRaw) : null;
+  const commissionRaw =
+    config.commissionColumn !== undefined
+      ? parseCsvAmount(getField(row, config.commissionColumn))
+      : null;
+  const commission = commissionRaw !== null ? Math.abs(commissionRaw) : 0;
+  const security = truncate(
+    getField(row, config.securityColumn),
+    FIELD_LIMITS.SECURITY,
+  );
+
+  if (SECURITY_REQUIRED_ACTIONS.has(canonical) && !security) {
+    return { rejectReason: "missingSecurity" };
+  }
+
+  const emit = (
+    fields: Partial<QifTransaction> & { amount: number },
+    emittedAction: CanonicalInvestmentAction,
+    extra: Pick<InvestmentRowOutcome, "cashFallbackValue" | "uncosted"> = {},
+  ): InvestmentRowOutcome => ({
+    transaction: {
+      date: parsedDate,
+      payee: params.payee,
+      memo: params.memo,
+      number: params.referenceNumber,
+      cleared: normalizedStatus === "CLEARED",
+      reconciled: normalizedStatus === "RECONCILED",
+      void: normalizedStatus === "VOID",
+      category: "",
+      isTransfer: false,
+      transferAccount: "",
+      splits: [],
+      security: "",
+      action: CANONICAL_TO_QIF_ACTION[emittedAction],
+      price: 0,
+      quantity: 0,
+      commission: 0,
+      tagNames: params.tagNames,
+      ...fields,
+    },
+    emittedAction,
+    ...extra,
+  });
+
+  switch (canonical) {
+    case "buy":
+    case "reinvest": {
+      if (!quantityKnown) {
+        return { rejectReason: "missingQuantity" };
+      }
+      let price = priceFromColumn;
+      if (price === null && amountKnown) {
+        const derived = roundToDecimals(
+          (absAmount - commission) / quantity,
+          10,
+        );
+        if (derived > 0) {
+          price = derived;
+        }
+      }
+      if (price === null) {
+        // No cost is derivable: uncosted shares enter as addshares with the
+        // price left unknown rather than invented as 0.
+        return emit({ amount: 0, security, quantity }, "addShares", {
+          uncosted: true,
+        });
+      }
+      return emit(
+        { amount: absAmount, security, quantity, price, commission },
+        canonical,
+      );
+    }
+    case "sell": {
+      if (!quantityKnown) {
+        return { rejectReason: "missingQuantity" };
+      }
+      let price = priceFromColumn;
+      if (price === null && amountKnown) {
+        price = roundToDecimals((absAmount + commission) / quantity, 10);
+      }
+      if (price === null || price <= 0) {
+        // Downgrading to removeshares would silently drop the cash proceeds.
+        return { rejectReason: "missingProceeds" };
+      }
+      return emit(
+        { amount: absAmount, security, quantity, price, commission },
+        canonical,
+      );
+    }
+    case "dividend":
+    case "interest":
+    case "capitalGain": {
+      if (!amountKnown) {
+        return { rejectReason: "missingAmount" };
+      }
+      return emit(
+        {
+          amount: absAmount,
+          security,
+          quantity: quantityKnown ? quantity : 0,
+          price: priceFromColumn ?? 0,
+        },
+        canonical,
+      );
+    }
+    case "split": {
+      if (!quantityKnown) {
+        return { rejectReason: "missingSplitRatio" };
+      }
+      return emit({ amount: 0, security, quantity }, canonical);
+    }
+    case "transferIn":
+    case "transferOut":
+    case "addShares":
+    case "removeShares": {
+      if (!quantityKnown) {
+        return { rejectReason: "missingQuantity" };
+      }
+      return emit(
+        {
+          amount: absAmount,
+          security,
+          quantity,
+          price: priceFromColumn ?? 0,
+        },
+        canonical,
+      );
+    }
+    case "cashIn":
+    case "cashOut": {
+      if (!amountKnown) {
+        return { rejectReason: "missingAmount" };
+      }
+      // Explicit keyword rows force the direction; fallback rows already
+      // chose the action from the sign, so both land signed correctly.
+      const amount = canonical === "cashIn" ? absAmount : -absAmount;
+      return emit({ amount }, canonical, { cashFallbackValue });
+    }
+  }
+}
+
 /**
  * Validate that CSV content is non-empty and has at least 2 lines
  * (either header + data, or 2 data rows).
@@ -690,10 +1129,11 @@ export function parseCsv(
   transferRules?: CsvTransferRule[],
 ): QifParseResult {
   const rows = parseCsvRows(content, config.delimiter);
+  const investmentMode = config.investmentMode === true;
 
   if (rows.length === 0) {
     return {
-      accountType: "CHEQUING",
+      accountType: investmentMode ? "INVESTMENT" : "CHEQUING",
       accountName: "",
       transactions: [],
       categories: [],
@@ -703,6 +1143,16 @@ export function parseCsv(
       sampleDates: [],
       openingBalance: null,
       openingBalanceDate: null,
+      ...(investmentMode
+        ? {
+            investmentSummary: {
+              actionCounts: {},
+              cashFallbackValues: [],
+              uncostedShareRows: 0,
+              rejectedRows: [],
+            },
+          }
+        : {}),
     };
   }
 
@@ -712,6 +1162,11 @@ export function parseCsv(
   const transactions: QifTransaction[] = [];
   const categoriesSet = new Set<string>();
   const transferAccountsSet = new Set<string>();
+  const securitiesSet = new Set<string>();
+  const actionCounts: Partial<Record<CanonicalInvestmentAction, number>> = {};
+  const cashFallbackValues = new Set<string>();
+  const rejectedRowCounts = new Map<InvestmentRejectReason, number>();
+  let uncostedShareRows = 0;
   const rawDates: string[] = [];
   const rules = transferRules || [];
 
@@ -800,6 +1255,42 @@ export function parseCsv(
             getField(row, config.reconciliationStatus),
           )
         : null;
+
+    if (investmentMode) {
+      // Investment rows classify by action; the sign/type-column machinery
+      // and transfer rules below do not apply (the UI hides them).
+      const outcome = buildInvestmentRow({
+        row,
+        config,
+        parsedDate,
+        payee,
+        memo,
+        referenceNumber,
+        tagNames,
+        normalizedStatus,
+      });
+      if (outcome.rejectReason) {
+        rejectedRowCounts.set(
+          outcome.rejectReason,
+          (rejectedRowCounts.get(outcome.rejectReason) || 0) + 1,
+        );
+        continue;
+      }
+      const emitted = outcome.emittedAction!;
+      actionCounts[emitted] = (actionCounts[emitted] || 0) + 1;
+      if (outcome.uncosted) {
+        uncostedShareRows++;
+      }
+      if (outcome.cashFallbackValue !== undefined) {
+        cashFallbackValues.add(outcome.cashFallbackValue);
+      }
+      const investmentTx = outcome.transaction!;
+      if (investmentTx.security) {
+        securitiesSet.add(investmentTx.security);
+      }
+      transactions.push(investmentTx);
+      continue;
+    }
 
     // Transfer detection
     let isTransfer = false;
@@ -913,15 +1404,27 @@ export function parseCsv(
   const sampleDates = [...new Set(rawDates)].slice(0, 3);
 
   return {
-    accountType: "CHEQUING",
+    accountType: investmentMode ? "INVESTMENT" : "CHEQUING",
     accountName: "",
     transactions,
     categories: Array.from(categoriesSet).sort(),
     transferAccounts: Array.from(transferAccountsSet).sort(),
-    securities: [],
+    securities: Array.from(securitiesSet).sort(),
     detectedDateFormat: config.dateFormat,
     sampleDates,
     openingBalance: null,
     openingBalanceDate: null,
+    ...(investmentMode
+      ? {
+          investmentSummary: {
+            actionCounts,
+            cashFallbackValues: Array.from(cashFallbackValues).sort(),
+            uncostedShareRows,
+            rejectedRows: Array.from(rejectedRowCounts.entries()).map(
+              ([reason, count]) => ({ reason, count }),
+            ),
+          },
+        }
+      : {}),
   };
 }

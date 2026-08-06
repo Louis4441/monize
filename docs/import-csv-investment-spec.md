@@ -173,6 +173,7 @@ CSV):
 investmentSummary?: {
   actionCounts: Record<string, number>;   // canonical action -> row count
   cashFallbackValues: string[];           // distinct unknown action values imported as cash
+  uncostedShareRows: number;              // buy/reinvest rows downgraded to addshares
   rejectedRows: { reason: string; count: number }[];
 };
 ```

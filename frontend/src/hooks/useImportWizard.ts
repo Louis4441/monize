@@ -16,6 +16,8 @@ import {
   SavedColumnMapping,
   ParsedQifMultiAccountResponse,
   autoMatchCsvColumns,
+  autoMatchInvestmentColumns,
+  looksLikeInvestmentCsv,
 } from '@/lib/import';
 import { accountsApi } from '@/lib/accounts';
 import { categoriesApi } from '@/lib/categories';
@@ -417,7 +419,16 @@ export function useImportWizard() {
         }
         setImportFiles(fileDataArray);
         const autoMatched = autoMatchCsvColumns(headersResponse.headers);
-        setCsvColumnMapping({ ...DEFAULT_CSV_COLUMN_MAPPING, ...autoMatched });
+        // Pre-enable investment mode when the headers look like a brokerage
+        // export; the toggle in the mapping step keeps the final say.
+        const investmentDetected = looksLikeInvestmentCsv(headersResponse.headers);
+        setCsvColumnMapping({
+          ...DEFAULT_CSV_COLUMN_MAPPING,
+          ...autoMatched,
+          ...(investmentDetected
+            ? { investmentMode: true, ...autoMatchInvestmentColumns(headersResponse.headers) }
+            : {}),
+        });
         setCsvTransferRules([]);
         setStep('csvColumnMapping');
 
@@ -532,6 +543,40 @@ export function useImportWizard() {
     setCsvColumnMapping(mapping);
   }, []);
 
+  const handleCsvInvestmentModeChange = useCallback((enabled: boolean) => {
+    setCsvColumnMapping(prev => {
+      if (enabled) {
+        // The sign/type-column machinery and transfer rules are inert in
+        // investment mode; clear them so a saved preset round-trips cleanly.
+        return {
+          ...prev,
+          ...autoMatchInvestmentColumns(csvHeaders),
+          investmentMode: true,
+          amountTypeColumn: undefined,
+          incomeValues: undefined,
+          expenseValues: undefined,
+          transferOutValues: undefined,
+          transferInValues: undefined,
+          transferAccountColumn: undefined,
+          reverseSign: undefined,
+        };
+      }
+      return {
+        ...prev,
+        investmentMode: false,
+        actionColumn: undefined,
+        securityColumn: undefined,
+        quantityColumn: undefined,
+        priceColumn: undefined,
+        commissionColumn: undefined,
+        actionKeywords: undefined,
+      };
+    });
+    if (enabled) {
+      setCsvTransferRules([]);
+    }
+  }, [csvHeaders]);
+
   const handleCsvTransferRulesChange = useCallback((rules: CsvTransferRule[]) => {
     setCsvTransferRules(rules);
   }, []);
@@ -576,6 +621,7 @@ export function useImportWizard() {
       const fileDataArray: ImportFileData[] = [];
       const allCats: Set<string> = new Set();
       const allTransferAccounts: Set<string> = new Set();
+      const allSecs: Set<string> = new Set();
       let detectedFormat: DateFormat | null = null;
 
       // For bulk CSV, check if subsequent files have matching headers
@@ -606,8 +652,10 @@ export function useImportWizard() {
 
         parsed.categories.forEach((cat) => allCats.add(cat));
         parsed.transferAccounts.forEach((acc) => allTransferAccounts.add(acc));
+        (parsed.securities || []).forEach((sec) => allSecs.add(sec));
 
-        const match = matchFilenameToAccount(fileData.fileName, false, accounts, parsed.accountType);
+        const isFileInvestment = parsed.accountType === 'INVESTMENT';
+        const match = matchFilenameToAccount(fileData.fileName, isFileInvestment, accounts, parsed.accountType);
 
         fileDataArray.push({
           fileName: fileData.fileName,
@@ -619,17 +667,29 @@ export function useImportWizard() {
         });
       }
 
+      const isInvestment = fileDataArray.some((f) => f.parsedData?.accountType === 'INVESTMENT');
+
       if (detectedFormat) setDateFormat(detectedFormat);
       const newCatMappings = buildCategoryMappings(allCats, categories, accounts);
       const newAccMappings = buildAccountMappings(allTransferAccounts, accounts, defaultCurrency);
+      const newSecMappings = isInvestment
+        ? buildSecurityMappings(allSecs, securities, defaultCurrency)
+        : [];
       setImportFiles(fileDataArray);
       setCategoryMappings(newCatMappings);
       setAccountMappings(newAccMappings);
-      setSecurityMappings([]);
+      setSecurityMappings(newSecMappings);
 
-      // Skip account selection when a single file is imported with a preselected account
-      if (preselectedAccountId && fileDataArray.length === 1) {
-        setStep(getStepAfterAccountSelection(newCatMappings, [], newAccMappings, false));
+      // Skip account selection when a single file is imported with a
+      // preselected account of a compatible type: an investment file needs a
+      // brokerage account and a regular file must not target one, or the
+      // backend rejects the import after every mapping step is done.
+      const preselected = accounts.find((a) => a.id === preselectedAccountId);
+      const preselectionMatchesMode =
+        !!preselected && isInvestmentBrokerageAccount(preselected) === isInvestment;
+      if (preselectedAccountId && fileDataArray.length === 1 && preselectionMatchesMode) {
+        setFileAccountId(0, preselectedAccountId);
+        setStep(getStepAfterAccountSelection(newCatMappings, newSecMappings, newAccMappings, isInvestment));
       } else {
         setStep('selectAccount');
       }
@@ -638,7 +698,7 @@ export function useImportWizard() {
     } finally {
       setIsLoading(false);
     }
-  }, [importFiles, csvColumnMapping, csvTransferRules, csvHeaders, accounts, categories, defaultCurrency, preselectedAccountId, t]);
+  }, [importFiles, csvColumnMapping, csvTransferRules, csvHeaders, accounts, categories, securities, defaultCurrency, preselectedAccountId, setFileAccountId, t]);
 
   const handleSaveColumnMapping = useCallback(async (name: string) => {
     try {
@@ -854,6 +914,7 @@ export function useImportWizard() {
             transferRules: csvTransferRules,
             categoryMappings: catMappings,
             accountMappings: accMappings,
+            securityMappings: secMappings.length > 0 ? secMappings : undefined,
             dateFormat,
           });
         } else if (fileType === 'ofx') {
@@ -1163,6 +1224,7 @@ export function useImportWizard() {
     fileType,
     csvHeaders, csvSampleRows,
     csvColumnMapping, handleCsvColumnMappingChange,
+    handleCsvInvestmentModeChange,
     csvTransferRules, handleCsvTransferRulesChange,
     savedColumnMappings,
     handleCsvMappingComplete,
