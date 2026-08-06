@@ -247,6 +247,21 @@ describe('CategoryDetailPage', () => {
     expect(screen.getByTestId('chart')).toBeInTheDocument();
   });
 
+  it('titles a subcategory page "Parent: Child"', async () => {
+    routeParams.current = { id: 'cat-1a' };
+    mockGetDetail.mockResolvedValue(
+      detailFixture({
+        category: categoryFixture({ id: 'cat-1a', parentId: 'cat-1', name: 'Produce' }),
+      }),
+    );
+
+    await renderPage();
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Groceries: Produce' }),
+    ).toBeInTheDocument();
+  });
+
   it('frames an income category as received, not spent', async () => {
     mockGetDetail.mockResolvedValue(
       detailFixture({ category: categoryFixture({ isIncome: true }) }),

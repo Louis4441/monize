@@ -551,6 +551,7 @@ function CategoryDetailContent() {
       <main className="px-4 sm:px-6 lg:px-12 pt-6 pb-8">
         <CategoryDetailHeader
           category={category}
+          parentName={parentName}
           firstTransactionDate={detail.stats.firstTransactionDate}
           onBack={() => router.push('/categories')}
           onViewTransactions={() => goToRegister()}

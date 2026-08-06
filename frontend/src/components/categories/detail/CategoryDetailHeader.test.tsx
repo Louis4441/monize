@@ -27,6 +27,7 @@ function renderHeader(
   overrides: Partial<Category> = {},
   firstTransactionDate: string | null = null,
   categories: Category[] = [],
+  parentName: string | null = null,
 ) {
   const handlers = {
     onBack: vi.fn(),
@@ -38,6 +39,7 @@ function renderHeader(
   const { container } = render(
     <CategoryDetailHeader
       category={category(overrides)}
+      parentName={parentName}
       firstTransactionDate={firstTransactionDate}
       categories={categories}
       {...handlers}
@@ -47,9 +49,16 @@ function renderHeader(
 }
 
 describe('CategoryDetailHeader', () => {
-  it('shows the category name', () => {
+  it('titles a top-level category by its bare name', () => {
     renderHeader();
     expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument();
+  });
+
+  it('titles a subcategory "Parent: Child", like every category picker', () => {
+    renderHeader({ name: 'Produce', parentId: 'cat-parent' }, null, [], 'Groceries');
+    expect(
+      screen.getByRole('heading', { name: 'Groceries: Produce' }),
+    ).toBeInTheDocument();
   });
 
   it('draws the swatch in the category own colour', () => {

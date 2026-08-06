@@ -11,6 +11,12 @@ import { CategorySwitcher } from './CategorySwitcher';
 interface CategoryDetailHeaderProps {
   category: Category;
   /**
+   * The parent's name, resolved by the page from its category list (the
+   * detail payload does not load the parent relation). Null for a top-level
+   * category.
+   */
+  parentName: string | null;
+  /**
    * Transactions can predate the category record (imports assign them to a
    * category created afterwards), so "Category since" is the earlier of the
    * first transaction and the record's creation.
@@ -35,6 +41,7 @@ interface CategoryDetailHeaderProps {
  */
 export function CategoryDetailHeader({
   category,
+  parentName,
   firstTransactionDate,
   onBack,
   onViewTransactions,
@@ -48,6 +55,11 @@ export function CategoryDetailHeader({
 
   // The user's own colour (or the parent's, inherited); never themed.
   const swatchColor = category.effectiveColor ?? category.color;
+
+  // The title carries the same hierarchical label every category picker uses:
+  // "Parent: Child" for a subcategory, the bare name for a top-level one. A
+  // bare "Fees" as the page title would not say which Fees this is.
+  const title = parentName ? `${parentName}: ${category.name}` : category.name;
 
   // Compare calendar days (parseLocalDate drops the time), matching what
   // formatDate renders.
@@ -80,7 +92,7 @@ export function CategoryDetailHeader({
             )}
             <h1 className="truncate text-2xl font-bold text-gray-900 dark:text-gray-100">
               {category.icon ? `${category.icon} ` : ''}
-              {category.name}
+              {title}
             </h1>
             {/* Jump straight to another category instead of going back to the
                 list and clicking again. */}
