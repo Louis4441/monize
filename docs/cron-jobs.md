@@ -24,6 +24,7 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 | `budget-alert.service` | `0 7 * * 1` | Mondays 7 AM | Weekly budget digest |
 | `budget-alert.service` | `0 3 * * *` | Daily 3 AM | Purge sent alerts older than 30 days |
 | `security-price.service` | `0 17 * * 1-5` (America/New_York) | 5 PM ET weekdays | Fetch security prices |
+| `market-index.service` | `10 17 * * 1-5` (America/New_York) | 5:10 PM ET weekdays | Fetch market index closes for the benchmark overlay (staggered after the price and FX refreshes) |
 | `mny-staging.service` | `0 0-23/1 * * *` | Hourly | Delete expired staged import files (24 h TTL) |
 | `mny-import-job.service` | `0 */5 * * * *` | Every 5 min | Fail import jobs whose worker stopped heartbeating |
 | `auto-backup.service` | `0 * * * *` | Hourly | Enrol every non-admin user on the default backup policy, then write each user's due automatic backup, promote weekly/monthly copies, enforce retention |
