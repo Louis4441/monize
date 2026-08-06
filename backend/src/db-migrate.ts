@@ -2,6 +2,8 @@ import { Logger } from "@nestjs/common";
 import { Client } from "pg";
 import * as fs from "fs";
 import * as path from "path";
+import { applyAppRoleGrants } from "./common/db/app-role";
+import { acquireDbLifecycleLock } from "./common/db/advisory-locks";
 
 const MIGRATIONS_DIRNAME = "migrations";
 
@@ -272,8 +274,25 @@ export async function runMigrations() {
     database: process.env.DATABASE_NAME,
   });
 
+  // Surface Postgres NOTICE/WARNING messages, exactly as db-init does. The
+  // grants convergence below reports its failures this way (the DO block
+  // degrades insufficient_privilege to RAISE WARNING), so without this handler
+  // the one path meant to make grants converge would fail with zero log output.
+  client.on("notice", (msg) => {
+    if (msg?.message) {
+      logger.warn(`Postgres: ${msg.message}`);
+    }
+  });
+
   try {
     await client.connect();
+
+    // The same lock db-init takes, for the same reason and against the same
+    // races: two migrators both reading the pending set before either commits,
+    // and an initializer applying schema.sql while a migrator replays migrations
+    // on top of it. The applied-filename read below therefore happens after any
+    // other process has finished, so a follower simply finds nothing pending.
+    await acquireDbLifecycleLock(client);
 
     // Find migrations directory
     // All base directories are trusted (derived from __dirname or cwd)
@@ -366,6 +385,17 @@ export async function runMigrations() {
     } else {
       logger.log("Database is up to date; no pending migrations");
     }
+
+    // Converge the runtime role's grants now that this boot's DDL has run. On a
+    // first boot this is the pass that takes effect: db-init's grants ran
+    // before schema.sql created schema_migrations, so the write-revoke on the
+    // ledger was skipped and the default privileges handed the runtime role
+    // INSERT/UPDATE/DELETE on it -- this call takes those writes back (see
+    // applyAppRoleGrants). Unconditional: cheap, idempotent, and running it
+    // only when `count > 0` would miss a database repaired by hand.
+    await applyAppRoleGrants(client, {
+      appUser: process.env.DATABASE_APP_USER,
+    });
   } catch (error) {
     logger.error(formatRunnerFailure(error));
     process.exit(1);

@@ -182,6 +182,36 @@ export interface ProvisionAppRoleOptions {
 }
 
 /**
+ * Apply the grants alone, without touching the role or its password.
+ *
+ * Called twice per startup: by `db-init` (inside `provisionAppRole`) and again
+ * by `db-migrate` after its DDL. On a first boot the second call is the one
+ * that takes effect: db-init's grants run before `schema.sql` has created
+ * anything, so the write-revoke on `schema_migrations` finds no table and is
+ * skipped -- and the default privileges db-init sets then hand the runtime role
+ * INSERT/UPDATE/DELETE on the ledger the moment it is created. Re-running after
+ * migrations is what takes those writes back. The same pass is what would cover
+ * an object a migration creates in the boot that first ships it, once this SQL
+ * carries a grant for it -- today it carries none beyond the blanket
+ * table/sequence grants, which `ALTER DEFAULT PRIVILEGES` already extends to
+ * new objects.
+ *
+ * Idempotent and never fatal: a privilege shortfall degrades to a warning, as
+ * everywhere else in this file.
+ */
+export async function applyAppRoleGrants(
+  client: SqlClient,
+  { appUser }: { appUser: string | undefined },
+): Promise<void> {
+  const roleName = appUser || DEFAULT_APP_USER;
+  await client.query("SELECT set_config($1, $2, false)", [
+    APP_ROLE_NAME_GUC,
+    roleName,
+  ]);
+  await client.query(APP_ROLE_GRANTS_SQL);
+}
+
+/**
  * Provision (or converge) the runtime role and its grants. Safe to call on
  * every startup and before the "tables already exist" early return in db-init,
  * so both initial creation and password rotation run on an already-initialized
@@ -222,5 +252,6 @@ export async function provisionAppRole(
   }
 
   // Grants run whenever the role exists, regardless of how it was provisioned.
+  // db-migrate re-applies them after its DDL -- see applyAppRoleGrants.
   await client.query(APP_ROLE_GRANTS_SQL);
 }

@@ -26,7 +26,7 @@ The split is **by process**: startup scripts connect as the owner; the API runti
 
 ### Pooler compatibility
 
-The GUC is transaction-local and the transaction is the unit every pooler preserves, so the design is **safe under transaction-mode poolers** (e.g. pgBouncer in `transaction` mode) as well as session-mode pooling and the app's own pg pool. The standing constraint this buys: **no cross-transaction session state** anywhere in the backend -- no session-scoped advisory locks (`pg_advisory_lock`; use `pg_advisory_xact_lock`), no LISTEN/NOTIFY, no temp tables, no named prepared statements. None are used today (verified); adding one later is a deliberate, reviewed decision that re-imposes session-mode-only pooling.
+The GUC is transaction-local and the transaction is the unit every pooler preserves, so the design is **safe under transaction-mode poolers** (e.g. pgBouncer in `transaction` mode) as well as session-mode pooling and the app's own pg pool. The standing constraint this buys: **no cross-transaction session state** on the backend's pooled runtime connections -- no session-scoped advisory locks (`pg_advisory_lock`; use `pg_advisory_xact_lock`), no LISTEN/NOTIFY, no temp tables, no named prepared statements. The pooled runtime uses none today; adding one later is a deliberate, reviewed decision that re-imposes session-mode-only pooling. The one deliberate exception lives outside the pool: `db-init`/`db-migrate` serialise startup with a session advisory lock (`backend/src/common/db/advisory-locks.ts`) on a dedicated `pg.Client` connection each holds for its whole run -- which is why the startup scripts must reach Postgres directly, not through a transaction-mode pooler.
 
 ## Configuration
 
