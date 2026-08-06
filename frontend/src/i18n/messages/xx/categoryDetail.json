@@ -1,0 +1,109 @@
+{
+  "loading": "[XX-Loading category details...-XX]",
+  "notFound": "[XX-Category not found-XX]",
+  "loadFailed": "[XX-Failed to load category details-XX]",
+  "backToCategories": "[XX-Back to Categories-XX]",
+  "error": {
+    "retry": "[XX-Retry-XX]"
+  },
+  "header": {
+    "incomePill": "[XX-Income-XX]",
+    "expensePill": "[XX-Expense-XX]",
+    "systemBadge": "[XX-System-XX]",
+    "edit": "[XX-Edit-XX]",
+    "delete": "[XX-Delete-XX]",
+    "viewTransactions": "[XX-View Transactions-XX]",
+    "switchCategory": "[XX-Switch category-XX]",
+    "switchPlaceholder": "[XX-Filter categories...-XX]",
+    "switchNoMatches": "[XX-No categories match-XX]",
+    "since": "[XX-Category since {date}-XX]"
+  },
+  "summary": {
+    "spentThisYear": "[XX-Spent This Year-XX]",
+    "receivedThisYear": "[XX-Received This Year-XX]",
+    "vsLastYear": "[XX-{percent} vs same period last year-XX]",
+    "vsLastYearNew": "[XX-Nothing in this period last year-XX]",
+    "monthlyAverage": "[XX-Monthly Average-XX]",
+    "averageTransaction": "[XX-Average Transaction-XX]",
+    "transactions": "[XX-Transactions-XX]",
+    "sinceYear": "[XX-Since {year}-XX]",
+    "lastTransaction": "[XX-Last Transaction-XX]",
+    "convertedNote": "[XX-Converted to {currency}-XX]"
+  },
+  "topPayees": {
+    "title": "[XX-Top Payees-XX]",
+    "subtitle": "[XX-Trailing 12 months-XX]",
+    "empty": "[XX-No activity in the last 12 months-XX]",
+    "subtitleAllTime": "[XX-All time-XX]",
+    "emptyAllTime": "[XX-No activity recorded for this category-XX]",
+    "noPayee": "[XX-No payee-XX]",
+    "range12m": "[XX-12 months-XX]",
+    "rangeAll": "[XX-All time-XX]"
+  },
+  "subcategoriesPanel": {
+    "title": "[XX-Subcategories-XX]",
+    "subtitle": "[XX-All time, each including its own subcategories-XX]",
+    "empty": "[XX-This category has no subcategories-XX]",
+    "thisCategory": "[XX-This category-XX]"
+  },
+  "accountsPanel": {
+    "title": "[XX-Paid From Accounts-XX]",
+    "subtitle": "[XX-All time-XX]",
+    "empty": "[XX-No transactions yet-XX]"
+  },
+  "scheduledPanel": {
+    "title": "[XX-Upcoming Scheduled-XX]",
+    "subtitle": "[XX-Bills and deposits in this category-XX]",
+    "empty": "[XX-Nothing scheduled in this category-XX]",
+    "noPayee": "[XX-No payee-XX]"
+  },
+  "tagPanel": {
+    "title": "[XX-Tag Breakdown-XX]",
+    "subtitle": "[XX-Spending in this category by tag value-XX]",
+    "keyLabel": "[XX-Tag key-XX]"
+  },
+  "keyInfo": {
+    "title": "[XX-Key Information-XX]",
+    "type": "[XX-Type-XX]",
+    "income": "[XX-Income-XX]",
+    "expense": "[XX-Expense-XX]",
+    "parent": "[XX-Parent Category-XX]",
+    "subcategories": "[XX-Subcategories-XX]",
+    "payees": "[XX-Payees-XX]",
+    "created": "[XX-Added-XX]",
+    "firstTransaction": "[XX-First Transaction-XX]",
+    "largestTransaction": "[XX-Largest Transaction-XX]",
+    "largestValue": "[XX-{amount} on {date}-XX]",
+    "defaultFor": "[XX-Default Category For-XX]",
+    "defaultForMore": "[XX-+{count} more-XX]",
+    "description": "[XX-Description-XX]"
+  },
+  "tabs": {
+    "ariaLabel": "[XX-Category detail sections-XX]",
+    "overview": "[XX-Overview-XX]",
+    "transactions": "[XX-Transactions-XX]",
+    "subcategories": "[XX-Subcategories-XX]"
+  },
+  "transactionsTab": {
+    "title": "[XX-Transactions-XX]",
+    "empty": "[XX-No transactions in this category yet-XX]",
+    "loadFailed": "[XX-Failed to load transactions-XX]",
+    "titleWithCount": "[XX-Transactions ({count})-XX]",
+    "openInRegister": "[XX-Open in the register-XX]"
+  },
+  "subcategoriesTab": {
+    "empty": "[XX-This category has no subcategories-XX]",
+    "name": "[XX-Name-XX]",
+    "total": "[XX-Total-XX]",
+    "transactions": "[XX-Transactions-XX]"
+  },
+  "seasonality": {
+    "title": "[XX-Seasonality-XX]",
+    "tooltip": "[XX-What a typical month in this category costs, averaged over every year of history.-XX]",
+    "peak": "[XX-Spending concentrates in {month}.-XX]",
+    "even": "[XX-Spending is spread evenly across the year.-XX]",
+    "needsMoreHistory": "[XX-At least {years} years of history are needed before a seasonal pattern can be told from noise.-XX]",
+    "empty": "[XX-No spending to break down by month yet-XX]",
+    "monthTooltip": "[XX-{month}: {amount} on average across {years, plural, one {# year} other {# years}}-XX]"
+  }
+}

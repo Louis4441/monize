@@ -1,0 +1,109 @@
+{
+  "loading": "Loading category details...",
+  "notFound": "Category not found",
+  "loadFailed": "Failed to load category details",
+  "backToCategories": "Back to Categories",
+  "error": {
+    "retry": "Retry"
+  },
+  "header": {
+    "incomePill": "Income",
+    "expensePill": "Expense",
+    "systemBadge": "System",
+    "edit": "Edit",
+    "delete": "Delete",
+    "viewTransactions": "View Transactions",
+    "switchCategory": "Switch category",
+    "switchPlaceholder": "Filter categories...",
+    "switchNoMatches": "No categories match",
+    "since": "Category since {date}"
+  },
+  "summary": {
+    "spentThisYear": "Spent This Year",
+    "receivedThisYear": "Received This Year",
+    "vsLastYear": "{percent} vs same period last year",
+    "vsLastYearNew": "Nothing in this period last year",
+    "monthlyAverage": "Monthly Average",
+    "averageTransaction": "Average Transaction",
+    "transactions": "Transactions",
+    "sinceYear": "Since {year}",
+    "lastTransaction": "Last Transaction",
+    "convertedNote": "Converted to {currency}"
+  },
+  "topPayees": {
+    "title": "Top Payees",
+    "subtitle": "Trailing 12 months",
+    "empty": "No activity in the last 12 months",
+    "subtitleAllTime": "All time",
+    "emptyAllTime": "No activity recorded for this category",
+    "noPayee": "No payee",
+    "range12m": "12 months",
+    "rangeAll": "All time"
+  },
+  "subcategoriesPanel": {
+    "title": "Subcategories",
+    "subtitle": "All time, each including its own subcategories",
+    "empty": "This category has no subcategories",
+    "thisCategory": "This category"
+  },
+  "accountsPanel": {
+    "title": "Paid From Accounts",
+    "subtitle": "All time",
+    "empty": "No transactions yet"
+  },
+  "scheduledPanel": {
+    "title": "Upcoming Scheduled",
+    "subtitle": "Bills and deposits in this category",
+    "empty": "Nothing scheduled in this category",
+    "noPayee": "No payee"
+  },
+  "tagPanel": {
+    "title": "Tag Breakdown",
+    "subtitle": "Spending in this category by tag value",
+    "keyLabel": "Tag key"
+  },
+  "keyInfo": {
+    "title": "Key Information",
+    "type": "Type",
+    "income": "Income",
+    "expense": "Expense",
+    "parent": "Parent Category",
+    "subcategories": "Subcategories",
+    "payees": "Payees",
+    "created": "Added",
+    "firstTransaction": "First Transaction",
+    "largestTransaction": "Largest Transaction",
+    "largestValue": "{amount} on {date}",
+    "defaultFor": "Default Category For",
+    "defaultForMore": "+{count} more",
+    "description": "Description"
+  },
+  "tabs": {
+    "ariaLabel": "Category detail sections",
+    "overview": "Overview",
+    "transactions": "Transactions",
+    "subcategories": "Subcategories"
+  },
+  "transactionsTab": {
+    "title": "Transactions",
+    "empty": "No transactions in this category yet",
+    "loadFailed": "Failed to load transactions",
+    "titleWithCount": "Transactions ({count})",
+    "openInRegister": "Open in the register"
+  },
+  "subcategoriesTab": {
+    "empty": "This category has no subcategories",
+    "name": "Name",
+    "total": "Total",
+    "transactions": "Transactions"
+  },
+  "seasonality": {
+    "title": "Seasonality",
+    "tooltip": "What a typical month in this category costs, averaged over every year of history.",
+    "peak": "Spending concentrates in {month}.",
+    "even": "Spending is spread evenly across the year.",
+    "needsMoreHistory": "At least {years} years of history are needed before a seasonal pattern can be told from noise.",
+    "empty": "No spending to break down by month yet",
+    "monthTooltip": "{month}: {amount} on average across {years, plural, one {# year} other {# years}}"
+  }
+}

@@ -123,6 +123,95 @@ export function buildCategoryLabelMap(
 }
 
 /**
+ * Every category id in a category's subtree, itself included. The backend
+ * expands descendants for its own queries; this is the client-side twin for
+ * predicates that run over locally-held rows (scheduled transactions, say).
+ */
+export function buildDescendantIdSet(
+  categories: Category[],
+  categoryId: string,
+): Set<string> {
+  const ids = new Set<string>([categoryId]);
+  let added = true;
+  while (added) {
+    added = false;
+    for (const c of categories) {
+      if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) {
+        ids.add(c.id);
+        added = true;
+      }
+    }
+  }
+  return ids;
+}
+
+/** One direct-child bucket of a category rollup. `name` is null for the category itself. */
+export interface SubcategoryShare {
+  id: string;
+  name: string | null;
+  total: number;
+  count: number;
+  /** This bucket's share of the summed absolute totals, 0..1. */
+  share: number;
+}
+
+/**
+ * Roll per-leaf grouped totals up to a category's direct children; rows for
+ * the category itself become a bucket with `name: null` ("This category").
+ * Rows outside the subtree are dropped. Shares are of the summed absolute
+ * total, so mixed-sign buckets still read as parts of a whole. Returns []
+ * when the category has no children -- a rollup of one bucket says nothing.
+ */
+export function rollupToDirectChildren(
+  rows: ReadonlyArray<{ id: string | null; total: number; count?: number }>,
+  categories: Category[],
+  categoryId: string,
+): SubcategoryShare[] {
+  const hasChildren = categories.some((c) => c.parentId === categoryId);
+  if (!hasChildren) return [];
+
+  const parentOf = new Map(categories.map((c) => [c.id, c.parentId]));
+  const rollupTarget = (id: string | null): string | null => {
+    if (!id) return null;
+    let current: string | null = id;
+    while (current) {
+      if (current === categoryId) return categoryId;
+      const parent: string | null = parentOf.get(current) ?? null;
+      if (parent === categoryId) return current;
+      current = parent;
+    }
+    return null;
+  };
+
+  const buckets = new Map<string, { total: number; count: number }>();
+  for (const row of rows) {
+    const target = rollupTarget(row.id);
+    if (!target) continue;
+    const bucket = buckets.get(target) ?? { total: 0, count: 0 };
+    buckets.set(target, {
+      total: bucket.total + row.total,
+      count: bucket.count + (row.count ?? 0),
+    });
+  }
+  const grandTotal = [...buckets.values()].reduce(
+    (sum, bucket) => sum + Math.abs(bucket.total),
+    0,
+  );
+  if (grandTotal === 0) return [];
+
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  return [...buckets.entries()]
+    .map(([id, bucket]) => ({
+      id,
+      name: id === categoryId ? null : (byId.get(id)?.name ?? ''),
+      total: bucket.total,
+      count: bucket.count,
+      share: Math.abs(bucket.total) / grandTotal,
+    }))
+    .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+}
+
+/**
  * The special pseudo-category filter options. Selecting "Uncategorized"
  * matches records with no category (and that are neither transfers nor
  * splits); "Transfers" matches transfer records. Shared by the Transactions

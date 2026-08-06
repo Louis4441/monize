@@ -29,6 +29,7 @@
     "show": "[XX-Show payee info-XX]"
   },
   "categoryWidget": {
+    "detailsAria": "[XX-View category details-XX]",
     "totalSpent": "[XX-Total Spent-XX]",
     "totalEarned": "[XX-Total Earned-XX]",
     "income": "[XX-Income-XX]",
