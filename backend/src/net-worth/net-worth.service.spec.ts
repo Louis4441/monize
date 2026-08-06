@@ -3224,6 +3224,39 @@ describe("NetWorthService", () => {
         ]);
       });
 
+      // The inception lookup can come back with nothing to say -- a row whose
+      // aggregate is NULL, or no row at all. Neither is licence to reach for a
+      // made-up start: fall back to the window end, which yields the single
+      // point "today" rather than an invented history.
+      it.each([
+        ["a NULL aggregate", [{ earliest: null }]],
+        ["no rows at all", []],
+      ])(
+        "falls back to the window end on %s",
+        async (_label, inceptionRows) => {
+          prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+          reportQuery.mockResolvedValueOnce([
+            {
+              id: "cash-1",
+              account_type: "INVESTMENT",
+              account_sub_type: "INVESTMENT_CASH",
+              currency_code: "USD",
+              opening_balance: 0,
+            },
+          ]);
+          reportQuery.mockResolvedValueOnce(inceptionRows);
+          reportQuery.mockResolvedValueOnce([]);
+
+          const result = await service.getInvestmentBreakdown("user-1", {
+            granularity: "monthly",
+            endDate: "2025-03-31",
+          });
+
+          expect(result.points.map((p) => p.date)).toEqual(["2025-03-01"]);
+        },
+      );
+
       it("clamps an inception later than the window end to a single point", async () => {
         prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
