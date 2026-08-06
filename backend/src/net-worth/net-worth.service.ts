@@ -766,7 +766,6 @@ export class NetWorthService {
     const defaultCurrency = displayCurrency || pref?.defaultCurrency || "USD";
 
     const end = endDate || new Date().toISOString().slice(0, 10);
-    const start = startDate || "1990-01-01";
 
     let accountFilter = "";
     const acctParams: any[] = [userId];
@@ -805,6 +804,14 @@ export class NetWorthService {
     );
 
     if (investAccounts.length === 0) return [];
+
+    // "All time" (no startDate) begins where the scope's own history begins.
+    const start =
+      startDate ||
+      (await this.resolveInvestmentInception(
+        investAccounts.map((a) => a.id),
+        end,
+      ));
 
     const brokerageIds = investAccounts
       .filter(
@@ -1142,7 +1149,6 @@ export class NetWorthService {
       opts.displayCurrency || pref?.defaultCurrency || "USD";
 
     const end = opts.endDate || new Date().toISOString().slice(0, 10);
-    const start = opts.startDate || "1990-01-01";
 
     const empty: InvestmentBreakdown = {
       granularity,
@@ -1156,6 +1162,14 @@ export class NetWorthService {
       opts.accountIds,
     );
     if (investAccounts.length === 0) return empty;
+
+    // "All time" (no startDate) begins where the scope's own history begins.
+    const start =
+      opts.startDate ||
+      (await this.resolveInvestmentInception(
+        investAccounts.map((a) => a.id),
+        end,
+      ));
 
     const brokerageIds = investAccounts
       .filter(
@@ -1473,6 +1487,60 @@ export class NetWorthService {
        WHERE a.user_id = $1 ${accountFilter}`,
       acctParams,
     );
+  }
+
+  /**
+   * Window start for a request that asked for "all time" (no startDate): the
+   * earliest date the scoped accounts have anything to show. Per account that
+   * is its first non-void transaction or investment transaction, falling back
+   * to the date the account was created when it has neither -- the same rule
+   * `resolveStartDate` / `recalculateBrokerageAccount` use to decide where an
+   * account's monthly snapshots begin, so the by-security chart and the total
+   * chart start on the same point rather than years apart.
+   *
+   * A fixed epoch here is what issue #1081 reported: the per-security series
+   * enumerates every sample between start and end, so "all time" prepended
+   * three decades of empty months and flattened the real data against the
+   * x-axis. Callers resolve their account scope first and return early when it
+   * is empty, so this never has to invent a date for an empty scope; the result
+   * is clamped to `end` so a reversed window still yields a single point.
+   */
+  private async resolveInvestmentInception(
+    accountIds: string[],
+    end: string,
+  ): Promise<string> {
+    const rows: Array<{ earliest: string | Date | null }> =
+      await this.scopedQuery(
+        `WITH scoped AS (
+            SELECT a.id, a.created_at FROM accounts a WHERE a.id = ANY($1::UUID[])
+          ),
+          first_tx AS (
+            SELECT t.account_id, MIN(t.transaction_date) AS d
+              FROM transactions t
+             WHERE t.account_id = ANY($1::UUID[])
+               AND (t.status IS NULL OR t.status != 'VOID')
+               AND t.parent_transaction_id IS NULL
+             GROUP BY t.account_id
+          ),
+          first_inv AS (
+            SELECT it.account_id, MIN(it.transaction_date) AS d
+              FROM investment_transactions it
+             WHERE it.account_id = ANY($1::UUID[])
+             GROUP BY it.account_id
+          )
+          SELECT MIN(
+                   COALESCE(LEAST(ft.d, fi.d), s.created_at::DATE)
+                 )::TEXT AS earliest
+            FROM scoped s
+            LEFT JOIN first_tx ft ON ft.account_id = s.id
+            LEFT JOIN first_inv fi ON fi.account_id = s.id`,
+        [accountIds],
+      );
+
+    const earliest = rows?.[0]?.earliest;
+    if (!earliest) return end;
+    const inception = this.toDateString(earliest);
+    return inception > end ? end : inception;
   }
 
   /** Latest close valuing a security at one sample point (see granularity notes). */
