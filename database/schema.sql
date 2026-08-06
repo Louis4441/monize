@@ -132,6 +132,7 @@ CREATE TABLE accounts (
     exclude_from_net_worth BOOLEAN DEFAULT false,
     -- Loan-specific fields
     payment_amount NUMERIC(20, 4), -- payment amount per period for loans
+    extra_payment_amount NUMERIC(20, 4), -- standing extra-principal instruction inside that payment
     payment_frequency VARCHAR(20), -- 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'
     payment_start_date DATE, -- when loan payments start
     source_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL, -- account payments come from

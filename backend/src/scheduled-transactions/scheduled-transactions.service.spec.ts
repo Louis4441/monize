@@ -146,6 +146,7 @@ describe("ScheduledTransactionsService", () => {
 
     accountsRepo = {
       findOne: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     tagRepo = {
@@ -867,6 +868,63 @@ describe("ScheduledTransactionsService", () => {
           description: expect.stringContaining("Updated"),
         }),
       );
+    });
+
+    it("syncs the durable loan configuration when the user edits a loan payment schedule", async () => {
+      // The per-posting recalculation reads the configured payment and extra
+      // from the account, because the template also carries transient clamps.
+      // A user edit of the template is a reconfiguration, so it must land on
+      // the account too -- otherwise the recalculation would grow the edit
+      // back to the stale configured value (review #1131).
+      const scheduled = makeScheduled({ amount: -1000 });
+      stubFindOne(scheduled);
+      accountsRepo.findOne.mockResolvedValueOnce({
+        id: "acc-loan",
+        scheduledTransactionId: stId,
+      });
+
+      await service.update(userId, stId, {
+        amount: -800,
+        splits: [
+          { transferAccountId: "acc-loan", amount: -500, memo: "Principal" },
+          { categoryId: "cat-interest", amount: -100, memo: "Interest" },
+          {
+            transferAccountId: "acc-loan",
+            amount: -200,
+            memo: "Extra Principal",
+          },
+        ],
+      });
+
+      expect(accountsRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { scheduledTransactionId: stId, userId },
+        }),
+      );
+      expect(accountsRepo.update).toHaveBeenCalledWith("acc-loan", {
+        paymentAmount: 800,
+        extraPaymentAmount: 200,
+      });
+    });
+
+    it("does not touch any account when the schedule is not a loan payment", async () => {
+      const scheduled = makeScheduled();
+      stubFindOne(scheduled);
+      accountsRepo.findOne.mockResolvedValueOnce(null);
+
+      await service.update(userId, stId, { amount: -1200 });
+
+      expect(accountsRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("does not look up a loan account for a presentation-only edit", async () => {
+      const scheduled = makeScheduled();
+      stubFindOne(scheduled);
+
+      await service.update(userId, stId, { name: "Renamed" });
+
+      expect(accountsRepo.findOne).not.toHaveBeenCalled();
+      expect(accountsRepo.update).not.toHaveBeenCalled();
     });
   });
 

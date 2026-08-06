@@ -98,6 +98,7 @@ describe("NetWorthService", () => {
     statementDueDay: null,
     statementSettlementDay: null,
     paymentAmount: null,
+    extraPaymentAmount: null,
     paymentFrequency: null,
     paymentStartDate: null,
     sourceAccountId: null,
