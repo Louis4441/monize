@@ -150,6 +150,19 @@ interface PendingPrompt {
   /** True once an agent has claimed this prompt via get_next_prompt. */
   claimed: boolean;
   /**
+   * MCP session id of the agent that claimed this prompt. A relay turn belongs
+   * to ONE session: writes, tool activity and liveness from any other session
+   * (a direct MCP client the same user has open) are not part of this turn and
+   * must not steer it. Undefined only for a claim made without a session id,
+   * which the MCP tool layer cannot produce (`resolve(extra.sessionId)` is what
+   * yields the user in the first place) -- it occurs in tests, where strict
+   * equality against another `undefined` keeps the unbound behaviour.
+   *
+   * Adopted on a later liveness signal that carries a different session (see
+   * `adoptSession`), so an agent that reconnects mid-prompt keeps its turn.
+   */
+  claimedBy?: string;
+  /**
    * Refs to attachments the user uploaded with this prompt (bytes live in the
    * RelayAttachmentStore). Passed to the agent on claim and released once the
    * prompt definitively settles; the store's TTL is the backstop.
@@ -173,6 +186,8 @@ interface PendingPrompt {
 interface Waiter {
   resolve: (prompt: RelayClaimedPrompt | null) => void;
   timer: ReturnType<typeof setTimeout>;
+  /** MCP session of the parked agent; becomes the claim's owning session. */
+  sessionId?: string;
 }
 
 /** A late agent answer held for pickup after the browser stream gave up. */
@@ -180,6 +195,19 @@ interface BufferedResponse {
   text: string;
   /** Epoch ms the answer was posted; used for TTL pruning and LRU eviction. */
   at: number;
+}
+
+/**
+ * A prompt that was claimed and then timed out before `post_response` arrived.
+ * Carries the claiming session so a late confirmation card is recognised as
+ * belonging to THAT agent's turn and not to some other session's write, and the
+ * timestamp so the marker stops counting as a live turn once it is older than
+ * the buffer would have retained the answer.
+ */
+interface LateMarker {
+  userId: string;
+  at: number;
+  sessionId?: string;
 }
 
 /**
@@ -244,10 +272,7 @@ export class AiRelayService {
    * Entries are evicted when the answer arrives, or after BUFFER_TTL_MS since
    * there is no point waiting longer than the buffer would retain the answer.
    */
-  private readonly awaitingLate = new Map<
-    string,
-    { userId: string; at: number }
-  >();
+  private readonly awaitingLate = new Map<string, LateMarker>();
   /**
    * Write-confirmation cards emitted after the browser stream gave up, keyed by
    * userId then actionId. The browser drains them via the pickup endpoint so a
@@ -326,14 +351,18 @@ export class AiRelayService {
    * for the user, or parks until one arrives or the poll window elapses (then
    * returns null so the agent polls again).
    */
-  waitForPrompt(userId: string): Promise<RelayClaimedPrompt | null> {
+  waitForPrompt(
+    userId: string,
+    sessionId?: string,
+  ): Promise<RelayClaimedPrompt | null> {
     this.lastPollAt.set(userId, Date.now());
     // The agent is polling, so it is connected: clear any stale idle-disconnect
     // notice (e.g. it just reconnected after a quiet spell).
     this.idleDisconnectedAt.delete(userId);
-    // A poll proves the agent is alive: keep any prompt it is mid-task on from
-    // tripping the idle timer.
-    this.bumpInFlight(userId);
+    // A poll proves THIS agent is alive: keep the prompt it is mid-task on from
+    // tripping the idle timer. Scoped to its own session -- another session's
+    // traffic says nothing about whether this agent is still working.
+    this.bumpInFlight(userId, sessionId);
 
     const queue = this.pending.get(userId) ?? [];
     const [next, ...rest] = queue;
@@ -341,12 +370,13 @@ export class AiRelayService {
       this.pending.set(userId, rest);
       // Claiming a prompt is activity: restart the inactivity clock.
       this.idleSince.delete(userId);
-      return Promise.resolve(this.claim(userId, next));
+      return Promise.resolve(this.claim(userId, next, sessionId));
     }
 
     return new Promise<RelayClaimedPrompt | null>((resolve) => {
       const waiter: Waiter = {
         resolve,
+        sessionId,
         timer: setTimeout(() => {
           this.removeWaiter(userId, waiter);
           resolve(null);
@@ -508,15 +538,23 @@ export class AiRelayService {
    * "sending the confirmation card...") instead of a static spinner. Returns
    * false if the prompt is unknown, already settled, or has no stream.
    */
-  reportProgress(userId: string, promptId: string, text: string): boolean {
+  reportProgress(
+    userId: string,
+    promptId: string,
+    text: string,
+    sessionId?: string,
+  ): boolean {
     this.lastPollAt.set(userId, Date.now());
-    // Progress is liveness: keep the idle timer from firing mid-task.
-    this.bumpInFlight(userId);
     const record = this.inFlight.get(promptId);
     if (!record || record.userId !== userId) {
       return false;
     }
     const { prompt } = record;
+    // Knowing the promptId is what proves this caller owns the turn, so a
+    // reconnected agent's new session is adopted here rather than locked out.
+    this.adoptSession(prompt, sessionId);
+    // Progress is liveness: keep the idle timer from firing mid-task.
+    this.scheduleIdleTimeout(userId, prompt);
     if (prompt.settled || !prompt.emit) {
       return false;
     }
@@ -533,9 +571,13 @@ export class AiRelayService {
    * prompt (or its stream is gone). Shared by the progress, tool-activity, and
    * pending-action emitters.
    */
-  private emitToInFlight(userId: string, event: RelayServerEvent): boolean {
+  private emitToInFlight(
+    userId: string,
+    event: RelayServerEvent,
+    sessionId?: string,
+  ): boolean {
     for (const record of this.inFlight.values()) {
-      if (record.userId !== userId) {
+      if (record.userId !== userId || record.prompt.claimedBy !== sessionId) {
         continue;
       }
       const { prompt } = record;
@@ -560,21 +602,22 @@ export class AiRelayService {
     toolName: string,
     phase: "start" | "result",
     isError = false,
+    sessionId?: string,
   ): void {
-    // Deliberately does NOT stamp lastPollAt: every MCP data tool call lands
-    // here, including calls from a direct MCP client (Claude Desktop) that has
-    // nothing to do with the relay. Stamping made the user look
-    // relay-connected the instant any tool ran, which routed the direct
-    // client's own write-confirmation card to the web chat. Only the relay
-    // control tools (get_next_prompt / post_response / report_progress) prove
-    // a relay agent is present.
-    // Tool activity is liveness: keep the idle timer from firing mid-task.
-    this.bumpInFlight(userId);
+    // Deliberately does NOT stamp lastPollAt, and everything below is scoped to
+    // the CALLING session: every MCP data tool call lands here, including calls
+    // from a direct MCP client (Claude Desktop) that has nothing to do with the
+    // relay. Treating that traffic as this user's relay liveness kept an
+    // abandoned relay prompt's idle timer alive indefinitely, so the dead turn
+    // stayed in `inFlight` and captured every later direct write's confirmation
+    // card -- and mirrored the direct client's tool chips into a web chat
+    // nobody was watching.
+    this.bumpInFlight(userId, sessionId);
     const event: RelayServerEvent =
       phase === "start"
         ? { type: "tool_start", name: toolName }
         : { type: "tool_result", name: toolName, isError };
-    this.emitToInFlight(userId, event);
+    this.emitToInFlight(userId, event, sessionId);
   }
 
   /**
@@ -596,15 +639,21 @@ export class AiRelayService {
    * through to an MCP-client elicitation the web-chat user could not answer, and
    * it surfaced as a decline.
    */
-  emitPendingAction(userId: string, action: PendingAiAction): boolean {
-    if (this.emitToInFlight(userId, { type: "pending_action", action })) {
+  emitPendingAction(
+    userId: string,
+    action: PendingAiAction,
+    sessionId?: string,
+  ): boolean {
+    if (
+      this.emitToInFlight(userId, { type: "pending_action", action }, sessionId)
+    ) {
       return true;
     }
-    // No live stream. If the user has a relay turn in progress (or one that just
-    // timed out), the stream was almost certainly killed by the idle timeout
-    // while the agent composed this call -- buffer the card for pickup rather
-    // than telling the caller this is not a relay context.
-    if (this.hasRelayTurn(userId)) {
+    // No live stream. If THIS session has a relay turn in progress (or one that
+    // just timed out), the stream was almost certainly killed by the idle
+    // timeout while the agent composed this call -- buffer the card for pickup
+    // rather than telling the caller this is not a relay context.
+    if (this.hasRelayTurn(userId, sessionId)) {
       this.bufferAction(userId, action);
       return true;
     }
@@ -630,27 +679,38 @@ export class AiRelayService {
   }
 
   /**
-   * Whether the user has a relay agent currently or very recently handling a
-   * prompt: an in-flight prompt, or a prompt that timed out after a claim
-   * (awaiting a late answer). Used to decide whether a card with no live stream
-   * belongs to a relay turn (buffer it) or to a direct MCP client (let the
-   * caller elicit).
+   * Whether THIS session is currently (or was just now) handling a relay
+   * prompt: an in-flight prompt it claimed, or one of its claims that timed out
+   * and is still within the window a late answer would be retained. Used to
+   * decide whether a card with no live stream belongs to a relay turn (buffer
+   * it) or to a direct MCP client (let the caller elicit).
    *
-   * Deliberately keyed to a CLAIMED prompt only -- never to connection
-   * liveness. A relay agent that is merely parked on get_next_prompt has no
-   * prompt to be writing for, so a write arriving then is a direct MCP
-   * client's, and its confirmation must stay in that client. Treating a recent
-   * poll as a relay turn routed direct clients' confirmation cards to the web
-   * chat.
+   * Three things this deliberately is NOT:
+   *  - not connection liveness. An agent merely parked on `get_next_prompt`
+   *    has no prompt to be writing for, so a write arriving then is a direct
+   *    client's and must confirm there.
+   *  - not user-wide. A relay turn belongs to the session that claimed it;
+   *    another session's write is not part of it. Matching on userId alone let
+   *    one abandoned web-chat turn capture every direct write the same user
+   *    made afterwards.
+   *  - not unbounded in time. A late marker only stands in for a live turn for
+   *    as long as the answer buffer would have held the answer; past that the
+   *    turn is over, and an expired marker must not answer for it.
    */
-  private hasRelayTurn(userId: string): boolean {
+  private hasRelayTurn(userId: string, sessionId?: string): boolean {
     for (const record of this.inFlight.values()) {
-      if (record.userId === userId) {
+      if (record.userId === userId && record.prompt.claimedBy === sessionId) {
         return true;
       }
     }
+    this.pruneAwaitingLate();
+    const cutoff = Date.now() - BUFFER_TTL_MS;
     for (const marker of this.awaitingLate.values()) {
-      if (marker.userId === userId) {
+      if (
+        marker.userId === userId &&
+        marker.sessionId === sessionId &&
+        marker.at >= cutoff
+      ) {
         return true;
       }
     }
@@ -719,12 +779,17 @@ export class AiRelayService {
     return parked || recent ? "listening" : "offline";
   }
 
-  private claim(userId: string, entry: PendingPrompt): RelayClaimedPrompt {
+  private claim(
+    userId: string,
+    entry: PendingPrompt,
+    sessionId?: string,
+  ): RelayClaimedPrompt {
     this.inFlight.set(entry.id, { userId, prompt: entry });
     // The prompt is now an agent's responsibility: switch from the queue wait to
     // the idle timer and arm the hard backstop. The claim itself counts as
     // liveness, so the idle window starts fresh here.
     entry.claimed = true;
+    entry.claimedBy = sessionId;
     entry.hardDeadline = Date.now() + HARD_WAIT_MS;
     this.scheduleIdleTimeout(userId, entry);
     return {
@@ -759,17 +824,33 @@ export class AiRelayService {
    * Called from every liveness signal (poll, progress, tool activity) so a slow
    * but alive agent is not timed out mid-task.
    */
-  private bumpInFlight(userId: string): void {
+  private bumpInFlight(userId: string, sessionId?: string): void {
     for (const record of this.inFlight.values()) {
-      if (record.userId === userId && !record.prompt.settled) {
+      if (
+        record.userId === userId &&
+        record.prompt.claimedBy === sessionId &&
+        !record.prompt.settled
+      ) {
         this.scheduleIdleTimeout(userId, record.prompt);
       }
     }
   }
 
+  /**
+   * Adopt a new session for a prompt whose owner proved itself by knowing the
+   * (unguessable) promptId -- an agent that reconnected mid-turn arrives with a
+   * fresh MCP session id. Without this its own later writes would look like a
+   * different session's and confirm in the wrong place.
+   */
+  private adoptSession(prompt: PendingPrompt, sessionId?: string): void {
+    if (sessionId !== undefined) {
+      prompt.claimedBy = sessionId;
+    }
+  }
+
   private handOff(userId: string, entry: PendingPrompt, waiter: Waiter): void {
     clearTimeout(waiter.timer);
-    waiter.resolve(this.claim(userId, entry));
+    waiter.resolve(this.claim(userId, entry, waiter.sessionId));
   }
 
   private takeWaiter(userId: string): Waiter | undefined {
@@ -814,7 +895,11 @@ export class AiRelayService {
       // attachments around (TTL bounds them) in case the recovered agent
       // re-reads them before posting its late answer.
       this.pruneAwaitingLate();
-      this.awaitingLate.set(entry.id, { userId, at: Date.now() });
+      this.awaitingLate.set(entry.id, {
+        userId,
+        at: Date.now(),
+        sessionId: entry.claimedBy,
+      });
       this.logger.warn(
         `Relay prompt ${entry.id} for user ${userId} went quiet after claim; ` +
           `browser gave up (late answer can still be buffered)`,

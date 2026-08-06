@@ -3,6 +3,7 @@ import {
   installRelayToolActivity,
   wrapToolHandlerForRelay,
 } from "./mcp-relay-tool-activity";
+import { currentMcpSessionId } from "./mcp-session-context";
 import type { AiRelayService } from "../ai/relay/ai-relay.service";
 
 describe("wrapToolHandlerForRelay", () => {
@@ -25,10 +26,38 @@ describe("wrapToolHandlerForRelay", () => {
     const result = await wrapped({}, { sessionId: "s1" });
 
     expect(result).toEqual({ ok: true });
+    // The calling session travels with every report: it is what lets the relay
+    // tell this user's relay turn from a second, direct MCP client of theirs.
     expect((relayService as any).reportToolActivity.mock.calls).toEqual([
-      ["u1", "get_accounts", "start"],
-      ["u1", "get_accounts", "result", false],
+      ["u1", "get_accounts", "start", false, "s1"],
+      ["u1", "get_accounts", "result", false, "s1"],
     ]);
+  });
+
+  it("makes the calling session ambient for the duration of the handler", async () => {
+    // emitRelayCard reads this to decide whether a write belongs to a relay
+    // turn; without it every confirmation looks session-less and a direct
+    // client's card could be routed to the web chat.
+    const relayService = relay();
+    const seen: (string | undefined)[] = [];
+    const wrapped = wrapToolHandlerForRelay(
+      "manage_transactions",
+      async () => {
+        seen.push(currentMcpSessionId());
+        await Promise.resolve();
+        // Still ambient after an await -- handlers are async throughout.
+        seen.push(currentMcpSessionId());
+        return { ok: true };
+      },
+      resolveUser,
+      relayService,
+    );
+
+    await wrapped({}, { sessionId: "s1" });
+
+    expect(seen).toEqual(["s1", "s1"]);
+    // And it does not leak outside the call.
+    expect(currentMcpSessionId()).toBeUndefined();
   });
 
   it("reports isError:true when the tool result is an error", async () => {
@@ -47,6 +76,7 @@ describe("wrapToolHandlerForRelay", () => {
       "create_transaction",
       "result",
       true,
+      "s1",
     );
   });
 
@@ -66,6 +96,7 @@ describe("wrapToolHandlerForRelay", () => {
       "get_accounts",
       "result",
       true,
+      "s1",
     );
   });
 

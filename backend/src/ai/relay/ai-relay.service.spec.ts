@@ -188,6 +188,64 @@ describe("AiRelayService", () => {
       expect(service.takeBufferedActions(USER)).toEqual([]);
     });
 
+    it("does not hand one session's relay turn to another session's write", async () => {
+      // The web chat's agent (session A) is mid-prompt. Claude Desktop
+      // (session B) is a different MCP session of the SAME user: its write is
+      // not part of A's turn, so its confirmation must stay in Claude Desktop.
+      const emit = jest.fn();
+      service.enqueuePrompt(USER, "summarize my spending", [], emit);
+      await service.waitForPrompt(USER, "session-A");
+
+      expect(service.emitPendingAction(USER, action, "session-B")).toBe(false);
+      expect(emit).not.toHaveBeenCalled();
+      expect(service.takeBufferedActions(USER)).toEqual([]);
+
+      // The claiming session's own write still routes to the web chat.
+      expect(service.emitPendingAction(USER, action, "session-A")).toBe(true);
+      expect(emit).toHaveBeenCalledWith({ type: "pending_action", action });
+    });
+
+    it("does not let a stale timed-out turn capture a later write forever", async () => {
+      // An abandoned web-chat turn leaves an awaitingLate marker. It stands in
+      // for a live turn only while a late answer would still be retained; past
+      // that the turn is over and a direct write must confirm in its client.
+      const pending = service.enqueuePrompt(USER, "q", [], jest.fn());
+      pending.catch(() => undefined);
+      await service.waitForPrompt(USER, "session-A");
+      jest.advanceTimersByTime(180 * 1000); // idle timeout -> awaitingLate
+
+      // Still within the retention window: the marker stands in for the turn.
+      expect(service.emitPendingAction(USER, action, "session-A")).toBe(true);
+      service.takeBufferedActions(USER);
+
+      // Past the 10-minute buffer TTL: the marker no longer answers for it.
+      jest.advanceTimersByTime(10 * 60 * 1000 + 1000);
+      expect(service.emitPendingAction(USER, action, "session-A")).toBe(false);
+      expect(service.takeBufferedActions(USER)).toEqual([]);
+    });
+
+    it("keeps the turn when the claiming agent reconnects with a new session id", async () => {
+      // An agent whose transport blipped comes back with a fresh MCP session.
+      // It proves ownership by knowing the promptId, so its later card must
+      // still reach the web chat rather than its own client.
+      const emit = jest.fn();
+      service.enqueuePrompt(USER, "q", [], emit);
+      const claimed = await service.waitForPrompt(USER, "session-old");
+
+      service.reportProgress(
+        USER,
+        claimed!.promptId,
+        "still here",
+        "session-new",
+      );
+
+      expect(service.emitPendingAction(USER, action, "session-new")).toBe(true);
+      expect(emit).toHaveBeenCalledWith({ type: "pending_action", action });
+      expect(service.emitPendingAction(USER, action, "session-old")).toBe(
+        false,
+      );
+    });
+
     it("does not route a card to the web chat while a relay agent is merely parked listening", () => {
       // A relay agent polling get_next_prompt with nothing queued has no
       // claimed prompt, so a write arriving now is a direct MCP client's and
@@ -265,6 +323,51 @@ describe("AiRelayService", () => {
       expect(() =>
         service.reportToolActivity(USER, "list_categories", "start"),
       ).not.toThrow();
+    });
+
+    it("does not mirror another session's tool calls into the web chat", async () => {
+      const emit = jest.fn();
+      service.enqueuePrompt(USER, "q", [], emit);
+      await service.waitForPrompt(USER, "session-A");
+
+      // Claude Desktop (session B) working on its own, not on this prompt.
+      service.reportToolActivity(
+        USER,
+        "list_accounts",
+        "start",
+        false,
+        "session-B",
+      );
+
+      expect(emit).not.toHaveBeenCalled();
+    });
+
+    it("does not let another session's tool calls keep an abandoned turn alive", async () => {
+      // The poisoning mechanism: liveness from ANY session reset the claimed
+      // prompt's idle timer, so a relay turn whose browser was long gone never
+      // timed out -- and while it sat in flight it captured every direct write
+      // the user made. Only the claiming session's activity is its liveness.
+      const pending = service.enqueuePrompt(USER, "q", [], jest.fn());
+      const rejection = jest.fn();
+      pending.catch(rejection);
+      await service.waitForPrompt(USER, "session-A");
+
+      // Another session hammers tool calls right through the idle window.
+      for (let i = 0; i < 4; i++) {
+        jest.advanceTimersByTime(60 * 1000);
+        service.reportToolActivity(
+          USER,
+          "list_accounts",
+          "start",
+          false,
+          "session-B",
+        );
+        await Promise.resolve();
+      }
+
+      // The abandoned turn timed out on schedule despite the other session.
+      expect(rejection).toHaveBeenCalled();
+      expect(service.getStatus(USER).state).not.toBe("busy");
     });
   });
 
