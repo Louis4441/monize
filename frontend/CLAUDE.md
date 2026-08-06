@@ -110,6 +110,16 @@ Give each field an explicit `id` when two on the same screen share a label. Both
 
 Do not put the click on a button around the symbol or the name instead. It looks identical and is not: the rest of the row -- all the cell padding, every other column -- becomes dead, and clicking a row "does nothing" for the majority of its area. Controls *inside* the row (a favourite star, `RowActions`) must `stopPropagation` so they act on themselves; both already do.
 
+### A category picker lists every category in tree order as "Parent: Child"
+
+However a surface selects a category -- the transaction form's Combobox, a
+switcher, a reassign target -- the option list is the one shape: built from
+`buildCategoryTree` (each parent followed by its children), a child labelled
+`Parent: Child`, a top-level category by its bare name, and **every row
+selectable, parents included**. A bare leaf name is ambiguous once two parents
+own the same leaf, and a picker shaped differently from the transaction form's
+reads as a second component. `CategorySwitcher` carries the regression tests.
+
 ### An account balance is coloured by its sign -- `balanceColor`, never by account type
 
 `balanceColor` (`lib/format.ts`) is the one rule: negative is red, everything
