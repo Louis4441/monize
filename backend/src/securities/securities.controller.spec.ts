@@ -794,7 +794,9 @@ describe("SecuritiesController", () => {
       const prices = [{ date: "2025-01-15", close: 150.0 }];
       securityPriceService.getPriceHistory.mockResolvedValue(prices);
 
-      const result = await controller.getPriceHistory(req, "sec-1", 365);
+      const result = await controller.getPriceHistory(req, "sec-1", {
+        limit: 365,
+      });
 
       expect(securitiesService.findOne).toHaveBeenCalledWith("user-1", "sec-1");
       expect(securityPriceService.getPriceHistory).toHaveBeenCalledWith(
@@ -810,7 +812,7 @@ describe("SecuritiesController", () => {
       securitiesService.findOne.mockResolvedValue(mockSecurity);
       securityPriceService.getPriceHistory.mockResolvedValue([]);
 
-      await controller.getPriceHistory(req, "sec-1", 30);
+      await controller.getPriceHistory(req, "sec-1", { limit: 30 });
 
       expect(securityPriceService.getPriceHistory).toHaveBeenCalledWith(
         "sec-1",
@@ -818,6 +820,51 @@ describe("SecuritiesController", () => {
         undefined,
         30,
       );
+    });
+
+    it("passes a date window through to the service", async () => {
+      securitiesService.findOne.mockResolvedValue(mockSecurity);
+      securityPriceService.getPriceHistory.mockResolvedValue([]);
+
+      await controller.getPriceHistory(req, "sec-1", {
+        startDate: "2020-01-01",
+        endDate: "2025-12-31",
+      });
+
+      expect(securityPriceService.getPriceHistory).toHaveBeenCalledWith(
+        "sec-1",
+        "2020-01-01",
+        "2025-12-31",
+        undefined,
+      );
+    });
+
+    it("treats a blank date as absent rather than as a filter", async () => {
+      securitiesService.findOne.mockResolvedValue(mockSecurity);
+      securityPriceService.getPriceHistory.mockResolvedValue([]);
+
+      // A range control sitting on a preset submits empty strings; passing them
+      // on would filter on "" and return nothing.
+      await controller.getPriceHistory(req, "sec-1", {
+        startDate: "",
+        endDate: "",
+      });
+
+      expect(securityPriceService.getPriceHistory).toHaveBeenCalledWith(
+        "sec-1",
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+
+    it("checks ownership before reading any price", async () => {
+      securitiesService.findOne.mockRejectedValue(new Error("not yours"));
+
+      await expect(
+        controller.getPriceHistory(req, "sec-1", {}),
+      ).rejects.toThrow();
+      expect(securityPriceService.getPriceHistory).not.toHaveBeenCalled();
     });
   });
 

@@ -4,6 +4,10 @@ import {
   settlePendingPriceWrites,
 } from "./security-price.service";
 import { SecurityPrice } from "./entities/security-price.entity";
+import {
+  DEFAULT_PRICE_HISTORY_ROWS,
+  MAX_PRICE_HISTORY_ROWS,
+} from "./dto/price-history-query.dto";
 import { Security } from "./entities/security.entity";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
@@ -269,9 +273,56 @@ describe("SecurityPriceService", () => {
         "sp.priceDate",
         "DESC",
       );
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(365);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(
+        DEFAULT_PRICE_HISTORY_ROWS,
+      );
       expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
       expect(result).toEqual([mockPriceEntry]);
+    });
+
+    /**
+     * The rows come back newest-first and `take(n)` keeps the first `n`, so a
+     * cap shorter than the history drops its *oldest* end -- silently, because
+     * a shorter array is a perfectly well-formed answer. A caller asking for
+     * "the last five years" would get the newest 365 days of it and no
+     * indication that the rest was cut.
+     */
+    it("does not truncate the oldest end of a requested window", async () => {
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      securityPriceRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.getPriceHistory("sec-1", "2015-01-01");
+
+      // The window bounds the result; the cap is a memory bound, not a filter.
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(
+        MAX_PRICE_HISTORY_ROWS,
+      );
+      expect(mockQueryBuilder.take).not.toHaveBeenCalledWith(365);
+    });
+
+    it("still honours an explicit limit alongside a window", async () => {
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      securityPriceRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.getPriceHistory("sec-1", "2015-01-01", undefined, 50);
+
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(50);
     });
 
     it("applies startDate filter when provided", async () => {
