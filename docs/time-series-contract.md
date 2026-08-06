@@ -95,6 +95,24 @@ straight over, and the walk reports a calm zero for a period that may have
 halved. Check the spacing of the observations inside the span, and return
 `null` when any stride exceeds the window.
 
+### 2.5 An open-ended window starts at the data, not at an epoch
+
+"All time" is a request with no start date, and the answer to "when does the
+data start" is a query, not a constant. Resolve it from the scope the request
+actually names -- the earliest transaction, holding or observation across those
+accounts, falling back to when the account was created -- and use the same rule
+the stored series used to decide where it begins, so two views of the same
+scope open on the same point instead of years apart.
+
+A hardcoded fallback (`startDate || "1990-01-01"`) is safe only where stored
+rows bound the result: an over-wide window selects nothing extra from a table
+that already starts at inception. It is wrong wherever the series **enumerates
+its own sample points** from the window, because every sample between the epoch
+and the first real datum is materialized as an empty point. That is what
+issue #1081 reported: the per-security portfolio chart opened in 1990 and
+flattened three decades of nothing against the x-axis. `net-worth.service.ts`
+carries the allowlist and the scan test that holds it.
+
 ## 3. Missing returns are never zero
 
 - A period with no usable prices has `return: null`. Never `0`.

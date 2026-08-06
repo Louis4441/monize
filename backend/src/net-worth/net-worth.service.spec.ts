@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { NetWorthService } from "./net-worth.service";
 import { MonthlyAccountBalance } from "./entities/monthly-account-balance.entity";
 import {
@@ -2854,6 +2856,54 @@ describe("NetWorthService", () => {
       expect(result).toHaveLength(1);
       expect(result[0].value).toBe(3466);
     });
+
+    // Same defect as issue #1081 on the total series: omitting startDate used
+    // to enumerate a point per day back to 1990.
+    it("starts at the scope's earliest activity when no startDate is given", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      // accounts
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      // inception
+      reportQuery.mockResolvedValueOnce([{ earliest: "2025-03-01" }]);
+      // investment transactions
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2025-03-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-1", skipPriceUpdates: false },
+      ]);
+      // prices
+      reportQuery.mockResolvedValueOnce([
+        { security_id: "sec-1", price_date: "2025-03-01", close_price: "100" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        undefined,
+        "2025-03-03",
+      );
+
+      expect(result.map((p) => p.date)).toEqual([
+        "2025-03-01",
+        "2025-03-02",
+        "2025-03-03",
+      ]);
+    });
   });
 
   describe("getInvestmentBreakdown", () => {
@@ -3070,6 +3120,202 @@ describe("NetWorthService", () => {
           values: { "sec-1": 1000, other: 250 },
         },
       ]);
+    });
+
+    // Issue #1081: "all time" sent no startDate, which defaulted to a fixed
+    // 1990 epoch. The per-security series enumerates every sample between
+    // start and end, so the chart opened with three decades of empty months
+    // and flattened the real data against the x-axis.
+    describe('"all time" (no startDate)', () => {
+      it("starts at the scope's earliest activity, not a fixed epoch", async () => {
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+        // accounts
+        reportQuery.mockResolvedValueOnce([
+          {
+            id: "brok-1",
+            account_type: "INVESTMENT",
+            account_sub_type: "INVESTMENT_BROKERAGE",
+            currency_code: "USD",
+            opening_balance: 0,
+          },
+        ]);
+        // inception: earliest transaction across the scope
+        reportQuery.mockResolvedValueOnce([{ earliest: "2025-01-01" }]);
+        // investment transactions
+        reportQuery.mockResolvedValueOnce([
+          {
+            account_id: "brok-1",
+            security_id: "sec-1",
+            action: "BUY",
+            quantity: "10",
+            transaction_date: "2025-01-10",
+          },
+        ]);
+        securityRepository.findByIds.mockResolvedValue([
+          {
+            id: "sec-1",
+            symbol: "AAPL",
+            name: "Apple Inc.",
+            currencyCode: "USD",
+            skipPriceUpdates: false,
+          },
+        ]);
+        // month-end prices
+        reportQuery.mockResolvedValueOnce([
+          {
+            security_id: "sec-1",
+            price_date: "2025-01-31",
+            close_price: "100",
+          },
+        ]);
+
+        const result = await service.getInvestmentBreakdown("user-1", {
+          granularity: "monthly",
+          endDate: "2025-03-31",
+        });
+
+        expect(result.points.map((p) => p.date)).toEqual([
+          "2025-01-01",
+          "2025-02-01",
+          "2025-03-01",
+        ]);
+
+        // The inception lookup is scoped to the resolved accounts, and every
+        // downstream query inherits its date rather than the epoch.
+        const inceptionCall = reportQuery.mock.calls.find(([sql]: [string]) =>
+          /first_inv/.test(sql),
+        );
+        expect(inceptionCall[1]).toEqual([["brok-1"]]);
+        const priceCall = reportQuery.mock.calls.find(([sql]: [string]) =>
+          /FROM security_prices/.test(sql),
+        );
+        expect(JSON.stringify(priceCall[1])).not.toContain("1990");
+      });
+
+      it("falls back to the account creation date when there is no activity", async () => {
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+        reportQuery.mockResolvedValueOnce([
+          {
+            id: "cash-1",
+            account_type: "INVESTMENT",
+            account_sub_type: "INVESTMENT_CASH",
+            currency_code: "USD",
+            opening_balance: 250,
+          },
+        ]);
+        // No transactions anywhere, so the SQL COALESCEs to created_at.
+        reportQuery.mockResolvedValueOnce([{ earliest: "2025-02-01" }]);
+        // monthly cash balances (no brokerage ids, so no investment tx query)
+        reportQuery.mockResolvedValueOnce([
+          { account_id: "cash-1", month: "2025-02-01", balance: "250" },
+          { account_id: "cash-1", month: "2025-03-01", balance: "250" },
+        ]);
+
+        const result = await service.getInvestmentBreakdown("user-1", {
+          granularity: "monthly",
+          endDate: "2025-03-31",
+        });
+
+        expect(result.points.map((p) => p.date)).toEqual([
+          "2025-02-01",
+          "2025-03-01",
+        ]);
+      });
+
+      it("clamps an inception later than the window end to a single point", async () => {
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+        reportQuery.mockResolvedValueOnce([
+          {
+            id: "cash-1",
+            account_type: "INVESTMENT",
+            account_sub_type: "INVESTMENT_CASH",
+            currency_code: "USD",
+            opening_balance: 0,
+          },
+        ]);
+        // Account created after the requested end date.
+        reportQuery.mockResolvedValueOnce([{ earliest: "2025-06-01" }]);
+        reportQuery.mockResolvedValueOnce([]);
+
+        const result = await service.getInvestmentBreakdown("user-1", {
+          granularity: "monthly",
+          endDate: "2025-03-31",
+        });
+
+        expect(result.points.map((p) => p.date)).toEqual(["2025-03-01"]);
+      });
+
+      it("skips the inception lookup when a startDate is supplied", async () => {
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+        reportQuery.mockResolvedValueOnce([
+          {
+            id: "cash-1",
+            account_type: "INVESTMENT",
+            account_sub_type: "INVESTMENT_CASH",
+            currency_code: "USD",
+            opening_balance: 0,
+          },
+        ]);
+        reportQuery.mockResolvedValueOnce([]);
+
+        await service.getInvestmentBreakdown("user-1", {
+          granularity: "monthly",
+          startDate: "2025-03-01",
+          endDate: "2025-03-31",
+        });
+
+        expect(
+          reportQuery.mock.calls.some(([sql]: [string]) =>
+            /first_inv/.test(sql),
+          ),
+        ).toBe(false);
+      });
+    });
+  });
+
+  /**
+   * A fixed-epoch fallback is only safe where the query's own rows bound the
+   * output. `getMonthlyNetWorth` and `getMonthlyInvestments` read stored
+   * `monthly_account_balances` rows, which start at each account's own
+   * inception, so an over-wide window selects nothing extra. A method that
+   * *enumerates* its sample points from the window instead -- the daily and
+   * per-security replays -- turns the same fallback into three decades of
+   * empty chart, which is what issue #1081 reported. Prose did not stop it
+   * being written twice, so the allowlist is the rule.
+   */
+  describe("no new fixed-epoch window default", () => {
+    it("only the snapshot-bounded readers fall back to a hardcoded start date", () => {
+      const source = fs.readFileSync(
+        path.join(__dirname, "net-worth.service.ts"),
+        "utf8",
+      );
+      const lines = source.split("\n");
+
+      // Every method opened in the file, so an offending line can name the
+      // method it sits in rather than a line number nobody can act on.
+      const owners: string[] = [];
+      let current = "(file scope)";
+      for (const line of lines) {
+        const declared =
+          /^\s{2}(?:private |public |protected )?(?:async )?([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(
+            line,
+          );
+        if (declared) current = declared[1];
+        owners.push(current);
+      }
+
+      const ALLOWED = new Set(["getMonthlyNetWorth", "getMonthlyInvestments"]);
+      const offenders = lines
+        .map((line, i) => ({ line, owner: owners[i] }))
+        .filter(({ line }) => /\|\|\s*"\d{4}-\d{2}-\d{2}"/.test(line))
+        .filter(({ owner }) => !ALLOWED.has(owner))
+        .map(({ line, owner }) => `${owner}: ${line.trim()}`);
+
+      expect(offenders).toEqual([]);
     });
   });
 });
