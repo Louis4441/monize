@@ -22,6 +22,8 @@ import {
 } from "@nestjs/swagger";
 import { AuthGuard } from "@nestjs/passport";
 import { CategoriesService } from "./categories.service";
+import { CategoryDetailService } from "./category-detail.service";
+import { CategoryDetailDto } from "./dto/category-detail.dto";
 import { CreateCategoryDto } from "./dto/create-category.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto";
 import { ReassignTransactionsDto } from "./dto/reassign-transactions.dto";
@@ -37,7 +39,10 @@ import {
 @UseGuards(AuthGuard("jwt"))
 @ApiBearerAuth()
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly categoryDetailService: CategoryDetailService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: "Create a new category" })
@@ -150,6 +155,23 @@ export class CategoriesController {
   @ApiResponse({ status: 401, description: "Unauthorized" })
   getExpenseCategories(@Request() req) {
     return this.categoriesService.findByType(req.user.id, false);
+  }
+
+  @Get(":id/detail")
+  @AllowDelegate()
+  @ApiOperation({ summary: "Get the category detail page aggregate" })
+  @ApiParam({ name: "id", description: "Category UUID" })
+  @ApiResponse({
+    status: 200,
+    description: "Category detail for the category detail page",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  @ApiResponse({ status: 404, description: "Category not found" })
+  getDetail(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<CategoryDetailDto> {
+    return this.categoryDetailService.getDetail(req.user.id, id);
   }
 
   @Get(":id")

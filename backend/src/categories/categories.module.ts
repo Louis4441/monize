@@ -8,6 +8,7 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { ScheduledTransactionSplit } from "../scheduled-transactions/entities/scheduled-transaction-split.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { CategoriesService } from "./categories.service";
+import { CategoryDetailService } from "./category-detail.service";
 import { CategoriesController } from "./categories.controller";
 import { ActionHistoryModule } from "../action-history/action-history.module";
 
@@ -24,7 +25,7 @@ import { ActionHistoryModule } from "../action-history/action-history.module";
     ]),
     ActionHistoryModule,
   ],
-  providers: [CategoriesService],
+  providers: [CategoriesService, CategoryDetailService],
   controllers: [CategoriesController],
   exports: [CategoriesService],
 })
