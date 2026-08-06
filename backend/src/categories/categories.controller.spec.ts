@@ -1,12 +1,16 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { CategoriesController } from "./categories.controller";
 import { CategoriesService } from "./categories.service";
+import { CategoryDetailService } from "./category-detail.service";
 import { DEFAULT_CATEGORY_COUNTRY_CODES } from "./country-category-additions";
 
 describe("CategoriesController", () => {
   let controller: CategoriesController;
   let mockCategoriesService: Partial<
     Record<keyof CategoriesService, jest.Mock>
+  >;
+  let mockCategoryDetailService: Partial<
+    Record<keyof CategoryDetailService, jest.Mock>
   >;
   const mockReq = { user: { id: "user-1" } };
 
@@ -24,6 +28,9 @@ describe("CategoriesController", () => {
       getTransactionCount: jest.fn(),
       reassignTransactions: jest.fn(),
     };
+    mockCategoryDetailService = {
+      getDetail: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CategoriesController],
@@ -32,10 +39,28 @@ describe("CategoriesController", () => {
           provide: CategoriesService,
           useValue: mockCategoriesService,
         },
+        {
+          provide: CategoryDetailService,
+          useValue: mockCategoryDetailService,
+        },
       ],
     }).compile();
 
     controller = module.get<CategoriesController>(CategoriesController);
+  });
+
+  describe("getDetail()", () => {
+    it("delegates to categoryDetailService.getDetail with userId and id", () => {
+      mockCategoryDetailService.getDetail!.mockReturnValue("detail");
+
+      const result = controller.getDetail(mockReq, "cat-1");
+
+      expect(result).toBe("detail");
+      expect(mockCategoryDetailService.getDetail).toHaveBeenCalledWith(
+        "user-1",
+        "cat-1",
+      );
+    });
   });
 
   describe("create()", () => {
