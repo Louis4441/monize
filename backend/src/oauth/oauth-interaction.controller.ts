@@ -115,8 +115,7 @@ export class OAuthInteractionController {
             ? params.resource
             : this.providerService.getMcpResourceUrl(),
       });
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
+      this.setInteractionPageHeaders(res);
       res.send(html);
       return;
     }
@@ -296,6 +295,32 @@ export class OAuthInteractionController {
   }
 
   /**
+   * Headers for the HTML pages this controller serves. The Content-Security-
+   * Policy REPLACES the app-wide Helmet policy on these responses, and it must:
+   * Helmet's defaults (merged under the global config) include
+   * `form-action 'self'`, and Chrome enforces form-action against EVERY hop of
+   * the redirect chain that follows a form submission. The Allow/Deny POST is
+   * answered with a 303 to the provider's /oauth/auth resume endpoint (self),
+   * which 303s again to the OAuth client's redirect_uri (cross-origin, e.g.
+   * claude.ai) carrying the authorization code. Under `form-action 'self'`
+   * Chrome silently cancels that final hop: the server logs
+   * authorization.success, the browser stays parked on the consent form, and
+   * the client never receives its code -- the connection "never completes"
+   * with nothing visibly wrong. So this page's policy allows the chain to end
+   * at any https origin (the redirect_uri is per-client and dynamic, so it
+   * cannot be enumerated statically); everything else stays locked down.
+   */
+  private setInteractionPageHeaders(res: Response): void {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; " +
+        "style-src 'unsafe-inline'; form-action 'self' https:",
+    );
+  }
+
+  /**
    * Rendered when the page's interaction no longer exists. That covers both a
    * harmless duplicate submit after a success AND a superseded/expired attempt
    * whose client is still waiting -- the copy must not claim success, or the
@@ -303,8 +328,7 @@ export class OAuthInteractionController {
    * "never completes"). Say what is knowable and give the retry path.
    */
   private respondWithStaleInteractionPage(res: Response): void {
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "no-store");
+    this.setInteractionPageHeaders(res);
     res.status(200).send(`<!DOCTYPE html>
 <html lang="en">
 <head>

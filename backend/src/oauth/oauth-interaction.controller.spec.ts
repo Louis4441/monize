@@ -181,6 +181,32 @@ describe("OAuthInteractionController", () => {
       expect(ctx?.system).toBeUndefined();
     });
 
+    it("sets a page CSP whose form-action lets the submit's redirect chain reach the client's https callback", async () => {
+      // Helmet's app-wide policy carries the default `form-action 'self'`, and
+      // Chrome enforces form-action on every redirect hop after a form submit.
+      // The Allow POST resolves 'self' -> /oauth/auth resume -> the client's
+      // https redirect_uri (cross-origin); without 'self' https: here Chrome
+      // silently cancels the last hop -- the server logs authorization.success
+      // while the browser never delivers the code and the consent page just
+      // sits there. The consent page must therefore ship its own CSP.
+      const { controller } = makeController({
+        interactionDetails: jest.fn().mockResolvedValue({
+          uid: "u",
+          prompt: { name: "consent" },
+          params: { client_id: "claude-desktop", scope: "monize:read" },
+        }),
+      });
+      const req = { cookies: { auth_token: "valid" } } as any;
+      const res = makeRes();
+
+      await controller.render(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith(
+        "Content-Security-Policy",
+        expect.stringContaining("form-action 'self' https:"),
+      );
+    });
+
     it("renders consent HTML for authenticated user with valid prompt", async () => {
       const { controller } = makeController({
         interactionDetails: jest.fn().mockResolvedValue({
