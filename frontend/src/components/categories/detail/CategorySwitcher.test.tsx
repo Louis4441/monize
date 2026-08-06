@@ -58,28 +58,30 @@ describe('CategorySwitcher', () => {
     expect(screen.queryByRole('menuitem', { name: /Travel/ })).toBeNull();
   });
 
-  it('qualifies a child with its parent name', () => {
+  it('labels a child "Parent: Child", exactly as the transaction form dropdown does', () => {
     open(all);
-    expect(
-      screen.getByRole('menuitem', { name: /Coffee/ }).textContent,
-    ).toContain('Food');
+    expect(screen.getByRole('menuitem', { name: 'Food: Coffee' })).toBeInTheDocument();
+    // A top-level category is its bare name, not qualified by anything.
+    expect(screen.getByRole('menuitem', { name: 'Salary' })).toBeInTheDocument();
   });
 
-  it('qualifies a root category with its type instead of a parent', () => {
+  it('lists the categories in tree order: each parent followed by its children', () => {
     open(all);
-    expect(
-      screen.getByRole('menuitem', { name: /Salary/ }).textContent,
-    ).toContain('Income');
-    expect(
-      screen.getByRole('menuitem', { name: /^Food/ }).textContent,
-    ).toContain('Expense');
+    const labels = screen.getAllByRole('menuitem').map((item) => item.textContent);
+    expect(labels).toEqual(['Food', 'Food: Coffee', 'Salary']);
   });
 
-  it('selects a category and closes', () => {
+  it('selects a subcategory and closes', () => {
     const { onSelect } = open(all);
-    fireEvent.click(screen.getByRole('menuitem', { name: /Coffee/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Food: Coffee' }));
     expect(onSelect).toHaveBeenCalledWith('cat-coffee');
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('lets a top-level parent be picked, even from its own child\'s page', () => {
+    const { onSelect } = open(all, 'cat-coffee');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Food' }));
+    expect(onSelect).toHaveBeenCalledWith('cat-food');
   });
 
   it('filters a long list on the hierarchical label, not the bare leaf', () => {
