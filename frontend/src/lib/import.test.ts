@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import api from './api';
-import { importApi, autoMatchCsvColumns } from './import';
+import {
+  importApi,
+  autoMatchCsvColumns,
+  autoMatchInvestmentColumns,
+  looksLikeInvestmentCsv,
+  classifyCsvActionValue,
+} from './import';
 
 vi.mock('./api', () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
@@ -267,5 +273,108 @@ describe('autoMatchCsvColumns', () => {
     const result = autoMatchCsvColumns(['Date', 'Amount', 'Payee']);
     expect(result.tags).toBeUndefined();
     expect(result.reconciliationStatus).toBeUndefined();
+  });
+});
+
+describe('autoMatchInvestmentColumns', () => {
+  it('matches action, symbol, quantity, price, and commission headers', () => {
+    const result = autoMatchInvestmentColumns([
+      'Trade Date',
+      'Action',
+      'Symbol',
+      'Quantity',
+      'Price',
+      'Commission',
+      'Amount',
+    ]);
+    expect(result.actionColumn).toBe(1);
+    expect(result.securityColumn).toBe(2);
+    expect(result.quantityColumn).toBe(3);
+    expect(result.priceColumn).toBe(4);
+    expect(result.commissionColumn).toBe(5);
+  });
+
+  it('matches case-insensitively and via substrings', () => {
+    const result = autoMatchInvestmentColumns(['ACTIVITY', 'Ticker Symbol', 'No. of Shares']);
+    expect(result.actionColumn).toBe(0);
+    expect(result.securityColumn).toBe(1);
+    expect(result.quantityColumn).toBe(2);
+  });
+
+  it('does not double-assign the same column', () => {
+    // 'Type' matches actionColumn; nothing else should claim column 0.
+    const result = autoMatchInvestmentColumns(['Type', 'Symbol']);
+    expect(result.actionColumn).toBe(0);
+    expect(result.securityColumn).toBe(1);
+  });
+
+  it('returns empty result for a plain bank CSV', () => {
+    const result = autoMatchInvestmentColumns(['Date', 'Amount', 'Description']);
+    expect(result.actionColumn).toBeUndefined();
+    expect(result.securityColumn).toBeUndefined();
+    expect(result.quantityColumn).toBeUndefined();
+    expect(result.priceColumn).toBeUndefined();
+    expect(result.commissionColumn).toBeUndefined();
+  });
+});
+
+describe('looksLikeInvestmentCsv', () => {
+  it('is true when action, security, and quantity headers are all present', () => {
+    expect(
+      looksLikeInvestmentCsv(['Trade Date', 'Action', 'Symbol', 'Quantity', 'Price', 'Commission', 'Amount']),
+    ).toBe(true);
+  });
+
+  it('is false for a plain bank CSV', () => {
+    expect(looksLikeInvestmentCsv(['Date', 'Amount', 'Description'])).toBe(false);
+  });
+
+  it('is false when only some investment headers are present', () => {
+    // Action and Symbol without a quantity-ish header is not enough.
+    expect(looksLikeInvestmentCsv(['Date', 'Action', 'Symbol', 'Amount'])).toBe(false);
+  });
+});
+
+describe('classifyCsvActionValue', () => {
+  it('matches default keywords ("Bought" resolves to buy)', () => {
+    expect(classifyCsvActionValue('Bought')).toBe('buy');
+    expect(classifyCsvActionValue('You Sold')).toBe('sell');
+    expect(classifyCsvActionValue('Dividend')).toBe('dividend');
+  });
+
+  it('is case and whitespace insensitive', () => {
+    expect(classifyCsvActionValue('  BOUGHT  ')).toBe('buy');
+    expect(classifyCsvActionValue(' cash dividend ')).toBe('dividend');
+  });
+
+  it('user override replaces the defaults for that action', () => {
+    const overrides = { buy: ['acquisto'] };
+    // The default keyword no longer matches once buy is overridden...
+    expect(classifyCsvActionValue('bought', overrides)).toBeNull();
+    // ...and the override does.
+    expect(classifyCsvActionValue('acquisto', overrides)).toBe('buy');
+    expect(classifyCsvActionValue('ACQUISTO', overrides)).toBe('buy');
+  });
+
+  it('bare QIF code still resolves via fallback even when that action is overridden', () => {
+    // 'buy' is dropped from the keyword list by the override but is a QIF
+    // action code, so the passthrough still classifies it.
+    expect(classifyCsvActionValue('buy', { buy: ['acquisto'] })).toBe('buy');
+  });
+
+  it('an override for one action leaves other actions on their defaults', () => {
+    expect(classifyCsvActionValue('sold', { buy: ['acquisto'] })).toBe('sell');
+  });
+
+  it('passes QIF action codes through ("reinvdiv" resolves to reinvest)', () => {
+    expect(classifyCsvActionValue('reinvdiv')).toBe('reinvest');
+    expect(classifyCsvActionValue('ShrsIn')).toBe('transferIn');
+    expect(classifyCsvActionValue('cglong')).toBe('capitalGain');
+  });
+
+  it('returns null for unknown values and empty input', () => {
+    expect(classifyCsvActionValue('Journal')).toBeNull();
+    expect(classifyCsvActionValue('')).toBeNull();
+    expect(classifyCsvActionValue('   ')).toBeNull();
   });
 });

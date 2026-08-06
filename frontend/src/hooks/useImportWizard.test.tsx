@@ -27,6 +27,8 @@ const mockGetColumnMappings = vi.fn();
 const mockCreateColumnMapping = vi.fn();
 const mockDeleteColumnMapping = vi.fn();
 const mockAutoMatchCsvColumns = vi.fn();
+const mockAutoMatchInvestmentColumns = vi.fn();
+const mockLooksLikeInvestmentCsv = vi.fn();
 
 vi.mock('@/lib/import', () => ({
   importApi: {
@@ -44,6 +46,8 @@ vi.mock('@/lib/import', () => ({
     deleteColumnMapping: (...args: any[]) => mockDeleteColumnMapping(...args),
   },
   autoMatchCsvColumns: (headers: string[]) => mockAutoMatchCsvColumns(headers),
+  autoMatchInvestmentColumns: (headers: string[]) => mockAutoMatchInvestmentColumns(headers),
+  looksLikeInvestmentCsv: (headers: string[]) => mockLooksLikeInvestmentCsv(headers),
 }));
 
 const mockGetAllAccounts = vi.fn();
@@ -213,6 +217,8 @@ beforeEach(() => {
   ]);
   mockGetColumnMappings.mockResolvedValue([]);
   mockAutoMatchCsvColumns.mockReturnValue({ date: 0, amount: 1 });
+  mockAutoMatchInvestmentColumns.mockReturnValue({});
+  mockLooksLikeInvestmentCsv.mockReturnValue(false);
 });
 
 describe('useImportWizard - initial load', () => {
@@ -692,6 +698,274 @@ describe('useImportWizard - CSV upload', () => {
 
     await act(async () => { await result.current.handleDeleteColumnMapping('m1'); });
     expect(mockDeleteColumnMapping).toHaveBeenCalled();
+  });
+});
+
+describe('useImportWizard - CSV investment mode', () => {
+  const investmentHeaders = ['Trade Date', 'Action', 'Symbol', 'Quantity', 'Price', 'Commission', 'Amount'];
+  const investmentSummary = {
+    actionCounts: { buy: 3, dividend: 1 },
+    cashFallbackValues: ['Journal'],
+    uncostedShareRows: 0,
+    rejectedRows: [],
+  };
+
+  async function uploadCsv(result: any, fileName = 'trades.csv') {
+    await act(async () => {
+      await result.current.handleFileSelect(fileEvent([makeFile(fileName, 'data')]));
+    });
+  }
+
+  it('pre-enables investment mode when headers look like a brokerage export', async () => {
+    mockParseCsvHeaders.mockResolvedValue({ headers: investmentHeaders, sampleRows: [], rowCount: 0 });
+    mockLooksLikeInvestmentCsv.mockReturnValue(true);
+    mockAutoMatchInvestmentColumns.mockReturnValue({ actionColumn: 1, securityColumn: 2, quantityColumn: 3 });
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(mockGetCurrencies).toHaveBeenCalled());
+
+    await uploadCsv(result);
+
+    expect(mockLooksLikeInvestmentCsv).toHaveBeenCalledWith(investmentHeaders);
+    expect(result.current.step).toBe('csvColumnMapping');
+    expect(result.current.csvColumnMapping.investmentMode).toBe(true);
+    expect(result.current.csvColumnMapping.actionColumn).toBe(1);
+    expect(result.current.csvColumnMapping.securityColumn).toBe(2);
+    expect(result.current.csvColumnMapping.quantityColumn).toBe(3);
+  });
+
+  it('does not pre-enable investment mode for a bank-looking CSV', async () => {
+    mockParseCsvHeaders.mockResolvedValue({ headers: ['Date', 'Amount'], sampleRows: [], rowCount: 0 });
+    mockLooksLikeInvestmentCsv.mockReturnValue(false);
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(mockGetCurrencies).toHaveBeenCalled());
+
+    await uploadCsv(result, 'bank.csv');
+
+    expect(result.current.csvColumnMapping.investmentMode).toBeUndefined();
+    expect(result.current.csvColumnMapping.actionColumn).toBeUndefined();
+  });
+
+  it('enabling investment mode clears sign/type-column fields and transfer rules', async () => {
+    mockParseCsvHeaders.mockResolvedValue({ headers: investmentHeaders, sampleRows: [], rowCount: 0 });
+    mockAutoMatchInvestmentColumns.mockReturnValue({ actionColumn: 1, securityColumn: 2 });
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(mockGetCurrencies).toHaveBeenCalled());
+
+    await uploadCsv(result);
+
+    act(() => {
+      result.current.handleCsvColumnMappingChange({
+        ...result.current.csvColumnMapping,
+        amountTypeColumn: 2,
+        incomeValues: ['Income'],
+        expenseValues: ['Expense'],
+        transferOutValues: ['Out'],
+        transferInValues: ['In'],
+        transferAccountColumn: 3,
+      });
+      result.current.handleCsvTransferRulesChange([{ type: 'payee', pattern: 'x', accountName: 'A' }]);
+    });
+
+    act(() => {
+      result.current.handleCsvInvestmentModeChange(true);
+    });
+
+    const mapping = result.current.csvColumnMapping;
+    expect(mapping.investmentMode).toBe(true);
+    expect(mapping.actionColumn).toBe(1);
+    expect(mapping.securityColumn).toBe(2);
+    expect(mapping.amountTypeColumn).toBeUndefined();
+    expect(mapping.incomeValues).toBeUndefined();
+    expect(mapping.expenseValues).toBeUndefined();
+    expect(mapping.transferOutValues).toBeUndefined();
+    expect(mapping.transferInValues).toBeUndefined();
+    expect(mapping.transferAccountColumn).toBeUndefined();
+    expect(mapping.reverseSign).toBeUndefined();
+    expect(result.current.csvTransferRules).toEqual([]);
+  });
+
+  it('disabling investment mode clears the investment-specific fields', async () => {
+    mockParseCsvHeaders.mockResolvedValue({ headers: investmentHeaders, sampleRows: [], rowCount: 0 });
+    mockLooksLikeInvestmentCsv.mockReturnValue(true);
+    mockAutoMatchInvestmentColumns.mockReturnValue({
+      actionColumn: 1, securityColumn: 2, quantityColumn: 3, priceColumn: 4, commissionColumn: 5,
+    });
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(mockGetCurrencies).toHaveBeenCalled());
+
+    await uploadCsv(result);
+
+    act(() => {
+      result.current.handleCsvColumnMappingChange({
+        ...result.current.csvColumnMapping,
+        actionKeywords: { buy: ['acquisto'] },
+      });
+    });
+
+    act(() => {
+      result.current.handleCsvInvestmentModeChange(false);
+    });
+
+    const mapping = result.current.csvColumnMapping;
+    expect(mapping.investmentMode).toBe(false);
+    expect(mapping.actionColumn).toBeUndefined();
+    expect(mapping.securityColumn).toBeUndefined();
+    expect(mapping.quantityColumn).toBeUndefined();
+    expect(mapping.priceColumn).toBeUndefined();
+    expect(mapping.commissionColumn).toBeUndefined();
+    expect(mapping.actionKeywords).toBeUndefined();
+  });
+
+  it('investment parse builds security mappings and sends them in the import payload', async () => {
+    const brokerage = baseAccount({
+      id: 'brk-1', name: 'Brokerage', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE',
+    });
+    mockGetAllAccounts.mockResolvedValue([brokerage]);
+    mockParseCsvHeaders.mockResolvedValue({ headers: investmentHeaders, sampleRows: [], rowCount: 0 });
+    mockParseCsv.mockResolvedValue(baseParsedQif({
+      accountType: 'INVESTMENT',
+      categories: [],
+      securities: ['AAPL'],
+      investmentSummary,
+    }));
+    mockImportCsv.mockResolvedValue(importResult({ imported: 4 }));
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await uploadCsv(result);
+    await act(async () => {
+      await result.current.handleCsvMappingComplete();
+    });
+
+    // Flow includes the securities mapping step
+    expect(result.current.securityMappings).toHaveLength(1);
+    expect(result.current.securityMappings[0].originalName).toBe('AAPL');
+    // The parsed investment summary rides along on the file for the review step
+    expect(result.current.importFiles[0].parsedData.investmentSummary).toEqual(investmentSummary);
+
+    act(() => result.current.setSelectedAccountId('brk-1'));
+    await act(async () => {
+      await result.current.handleImport();
+    });
+
+    expect(mockImportCsv).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: 'brk-1',
+        securityMappings: [expect.objectContaining({ originalName: 'AAPL' })],
+      }),
+    );
+    expect(result.current.step).toBe('complete');
+  });
+
+  it('regular parse builds no security mappings and omits them from the payload', async () => {
+    mockGetAllAccounts.mockResolvedValue([baseAccount()]);
+    mockParseCsvHeaders.mockResolvedValue({ headers: ['Date', 'Amount'], sampleRows: [], rowCount: 0 });
+    // Even with a stray securities value, a non-investment parse must not
+    // produce security mappings.
+    mockParseCsv.mockResolvedValue(baseParsedQif({
+      accountType: 'CHEQUING',
+      categories: [],
+      securities: [],
+    }));
+    mockImportCsv.mockResolvedValue(importResult({ imported: 2 }));
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await uploadCsv(result, 'bank.csv');
+    await act(async () => {
+      await result.current.handleCsvMappingComplete();
+    });
+
+    expect(result.current.securityMappings).toEqual([]);
+    expect(result.current.step).toBe('selectAccount');
+
+    act(() => result.current.setSelectedAccountId('acc-1'));
+    await act(async () => {
+      await result.current.handleImport();
+    });
+
+    expect(mockImportCsv).toHaveBeenCalledTimes(1);
+    expect(mockImportCsv.mock.calls[0][0].securityMappings).toBeUndefined();
+  });
+
+  it('a securities list from a non-investment parse is ignored', async () => {
+    mockGetAllAccounts.mockResolvedValue([baseAccount()]);
+    mockParseCsvHeaders.mockResolvedValue({ headers: ['Date', 'Amount'], sampleRows: [], rowCount: 0 });
+    mockParseCsv.mockResolvedValue(baseParsedQif({
+      accountType: 'CHEQUING',
+      categories: [],
+      securities: ['AAPL'],
+    }));
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await uploadCsv(result, 'bank.csv');
+    await act(async () => {
+      await result.current.handleCsvMappingComplete();
+    });
+
+    expect(result.current.securityMappings).toEqual([]);
+  });
+
+  it('skips account selection for a preselected brokerage account on an investment file', async () => {
+    mockSearchParamsGet = (key) => (key === 'accountId' ? 'brk-1' : null);
+    const brokerage = baseAccount({
+      id: 'brk-1', name: 'Brokerage', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE',
+    });
+    mockGetAllAccounts.mockResolvedValue([brokerage]);
+    mockParseCsvHeaders.mockResolvedValue({ headers: investmentHeaders, sampleRows: [], rowCount: 0 });
+    mockParseCsv.mockResolvedValue(baseParsedQif({
+      accountType: 'INVESTMENT',
+      categories: [],
+      securities: ['AAPL'],
+      investmentSummary,
+    }));
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await uploadCsv(result);
+    await act(async () => {
+      await result.current.handleCsvMappingComplete();
+    });
+
+    // Preselection type matches the file mode, so the wizard jumps straight
+    // to the securities mapping step.
+    expect(result.current.step).toBe('mapSecurities');
+    expect(result.current.importFiles[0].selectedAccountId).toBe('brk-1');
+  });
+
+  it('does not skip account selection when the preselected account type mismatches the file mode', async () => {
+    mockSearchParamsGet = (key) => (key === 'accountId' ? 'acc-1' : null);
+    const brokerage = baseAccount({
+      id: 'brk-1', name: 'Brokerage', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE',
+    });
+    mockGetAllAccounts.mockResolvedValue([baseAccount(), brokerage]);
+    mockParseCsvHeaders.mockResolvedValue({ headers: investmentHeaders, sampleRows: [], rowCount: 0 });
+    mockParseCsv.mockResolvedValue(baseParsedQif({
+      accountType: 'INVESTMENT',
+      categories: [],
+      securities: [],
+    }));
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(result.current.accounts).toHaveLength(2));
+
+    await uploadCsv(result);
+    await act(async () => {
+      await result.current.handleCsvMappingComplete();
+    });
+
+    // A chequing preselection cannot receive an investment file: the user
+    // must pick a brokerage account.
+    expect(result.current.step).toBe('selectAccount');
   });
 });
 

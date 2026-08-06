@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { ReviewStep } from './ReviewStep';
 import { Account } from '@/types/account';
+import { CsvInvestmentSummary } from '@/lib/import';
 
 function createAccount(overrides: Partial<Account> = {}): Account {
   return {
@@ -228,5 +229,132 @@ describe('ReviewStep', () => {
     expect(screen.getByText(/checking\.qif/)).toBeInTheDocument();
     expect(screen.getByText(/savings\.qif/)).toBeInTheDocument();
     expect(screen.getByText(/15 transactions/)).toBeInTheDocument();
+  });
+
+  // --- Investment summary section ---
+
+  describe('investment summary', () => {
+    const investmentSummary: CsvInvestmentSummary = {
+      actionCounts: { buy: 3, dividend: 1 },
+      cashFallbackValues: ['Journal'],
+      uncostedShareRows: 2,
+      rejectedRows: [{ reason: 'missingProceeds', count: 1 }],
+    };
+
+    function investmentFile(summary: CsvInvestmentSummary | undefined, fileName = 'trades.csv') {
+      return {
+        fileName,
+        fileContent: '',
+        fileType: 'csv' as const,
+        parsedData: {
+          ...defaultProps.parsedData,
+          accountType: 'INVESTMENT',
+          transactionCount: 4,
+          investmentSummary: summary,
+        },
+        selectedAccountId: 'acc-1',
+        matchConfidence: 'exact',
+      };
+    }
+
+    it('renders per-action counts from the combined summary', () => {
+      render(
+        <ReviewStep {...defaultProps} importFiles={[investmentFile(investmentSummary)] as any[]} />
+      );
+
+      expect(screen.getByText('Investment Transactions')).toBeInTheDocument();
+      expect(screen.getByText('Buy:')).toBeInTheDocument();
+      expect(screen.getByText('Dividend:')).toBeInTheDocument();
+      const buyItem = screen.getByText('Buy:').closest('li');
+      expect(buyItem).toHaveTextContent('Buy: 3');
+      const dividendItem = screen.getByText('Dividend:').closest('li');
+      expect(dividendItem).toHaveTextContent('Dividend: 1');
+      // Actions with a zero count are not listed
+      expect(screen.queryByText('Sell:')).not.toBeInTheDocument();
+    });
+
+    it('renders the cash fallback notice listing the unmatched values', () => {
+      render(
+        <ReviewStep {...defaultProps} importFiles={[investmentFile(investmentSummary)] as any[]} />
+      );
+
+      expect(
+        screen.getByText(
+          'These action values were not recognized and will be imported as cash transactions: Journal'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('renders the uncosted share rows notice', () => {
+      render(
+        <ReviewStep {...defaultProps} importFiles={[investmentFile(investmentSummary)] as any[]} />
+      );
+
+      expect(
+        screen.getByText('2 purchase rows have no price or amount and will be imported as added shares without cost.')
+      ).toBeInTheDocument();
+    });
+
+    it('renders the rejected rows notice with per-reason counts and the go-back hint', () => {
+      render(
+        <ReviewStep {...defaultProps} importFiles={[investmentFile(investmentSummary)] as any[]} />
+      );
+
+      expect(screen.getByText('1 row cannot be imported:')).toBeInTheDocument();
+      expect(screen.getByText(/Sell without price or proceeds/)).toBeInTheDocument();
+      expect(
+        screen.getByText('Go back to the column mapping step to adjust columns or action keywords.')
+      ).toBeInTheDocument();
+    });
+
+    it('combines summaries across multiple import files', () => {
+      const second = {
+        actionCounts: { buy: 2, sell: 1 },
+        cashFallbackValues: ['Sweep'],
+        uncostedShareRows: 1,
+        rejectedRows: [{ reason: 'missingProceeds', count: 2 }],
+      };
+      render(
+        <ReviewStep
+          {...defaultProps}
+          isBulkImport={true}
+          importFiles={[investmentFile(investmentSummary), investmentFile(second, 'more.csv')] as any[]}
+        />
+      );
+
+      const buyItem = screen.getByText('Buy:').closest('li');
+      expect(buyItem).toHaveTextContent('Buy: 5');
+      const sellItem = screen.getByText('Sell:').closest('li');
+      expect(sellItem).toHaveTextContent('Sell: 1');
+      // Fallback values are merged (and sorted) across files
+      expect(screen.getByText(/cash transactions: Journal, Sweep/)).toBeInTheDocument();
+      expect(screen.getByText('3 rows cannot be imported:')).toBeInTheDocument();
+      expect(screen.getByText(/Sell without price or proceeds/)).toBeInTheDocument();
+    });
+
+    it('omits amber and red notices when the summary has nothing to warn about', () => {
+      const clean = {
+        actionCounts: { buy: 3 },
+        cashFallbackValues: [],
+        uncostedShareRows: 0,
+        rejectedRows: [],
+      };
+      render(
+        <ReviewStep {...defaultProps} importFiles={[investmentFile(clean)] as any[]} />
+      );
+
+      expect(screen.getByText('Investment Transactions')).toBeInTheDocument();
+      expect(screen.queryByText(/were not recognized/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/without cost/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/cannot be imported/)).not.toBeInTheDocument();
+    });
+
+    it('does not render the section for a parse without an investment summary', () => {
+      render(
+        <ReviewStep {...defaultProps} importFiles={[investmentFile(undefined)] as any[]} />
+      );
+
+      expect(screen.queryByText('Investment Transactions')).not.toBeInTheDocument();
+    });
   });
 });

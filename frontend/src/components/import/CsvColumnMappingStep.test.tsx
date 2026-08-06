@@ -763,6 +763,204 @@ describe('CsvColumnMappingStep', () => {
     });
   });
 
+  describe('investment mode', () => {
+    const investmentHeaders = ['Trade Date', 'Action Col', 'Symbol Col', 'Qty Col', 'Price Col', 'Amount Col'];
+    const investmentRows = [
+      ['2024-01-01', 'Bought', 'AAPL', '10', '150.00', '-1500.00'],
+      ['2024-01-02', 'Journal', 'MSFT', '5', '300.00', '-1500.00'],
+    ];
+
+    it('renders the kind select defaulting to banking', () => {
+      renderStep();
+
+      expect(screen.getByText('File contains')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Banking transactions')).toBeInTheDocument();
+    });
+
+    it('calls onInvestmentModeChange(true) when Investment is selected', () => {
+      const props = renderStep();
+
+      const kindSelect = screen.getByDisplayValue('Banking transactions');
+      fireEvent.change(kindSelect, { target: { value: 'investment' } });
+
+      expect(props.onInvestmentModeChange).toHaveBeenCalledWith(true);
+    });
+
+    it('calls onInvestmentModeChange(false) when switched back to Banking', () => {
+      const props = renderStep({
+        columnMapping: { ...defaultMapping(), amount: 1, investmentMode: true },
+      });
+
+      const kindSelect = screen.getByDisplayValue('Investment transactions');
+      fireEvent.change(kindSelect, { target: { value: 'banking' } });
+
+      expect(props.onInvestmentModeChange).toHaveBeenCalledWith(false);
+    });
+
+    it('shows investment column selects and hides Sign, Category, and transfer rules in investment mode', () => {
+      renderStep({
+        headers: investmentHeaders,
+        sampleRows: investmentRows,
+        columnMapping: { ...defaultMapping(), amount: 5, investmentMode: true },
+      });
+
+      expect(screen.getByText('Action *')).toBeInTheDocument();
+      expect(screen.getByText('Security (symbol or name) *')).toBeInTheDocument();
+      expect(screen.getByText('Quantity')).toBeInTheDocument();
+      expect(screen.getByText('Price')).toBeInTheDocument();
+      expect(screen.getByText('Commission')).toBeInTheDocument();
+
+      expect(screen.queryByText('Sign')).not.toBeInTheDocument();
+      expect(screen.queryByText('Category')).not.toBeInTheDocument();
+      expect(screen.queryByText('Subcategory')).not.toBeInTheDocument();
+      expect(screen.queryByText('Transfer Detection Rules')).not.toBeInTheDocument();
+    });
+
+    it('shows the Sign, Category, and transfer rules sections in banking mode', () => {
+      // Neutral header names so the preview table does not collide with the
+      // mapping form labels asserted below.
+      renderStep({
+        headers: ['Date Col', 'Amount Col', 'Payee Col', 'Cat Col'],
+        columnMapping: { ...defaultMapping(), amount: 1 },
+      });
+
+      expect(screen.getByText('Sign')).toBeInTheDocument();
+      expect(screen.getByText('Category')).toBeInTheDocument();
+      expect(screen.getByText('Transfer Detection Rules')).toBeInTheDocument();
+      expect(screen.queryByText('Action *')).not.toBeInTheDocument();
+    });
+
+    it('shows validation error when Next clicked without an action column', () => {
+      const props = renderStep({
+        headers: investmentHeaders,
+        sampleRows: investmentRows,
+        columnMapping: {
+          ...defaultMapping(),
+          amount: 5,
+          investmentMode: true,
+          actionColumn: undefined,
+          securityColumn: 2,
+        },
+      });
+
+      fireEvent.click(screen.getByText('Next'));
+
+      expect(screen.getByText('Action column is required for investment files')).toBeInTheDocument();
+      expect(props.onNext).not.toHaveBeenCalled();
+    });
+
+    it('shows validation error when Next clicked without a security column', () => {
+      const props = renderStep({
+        headers: investmentHeaders,
+        sampleRows: investmentRows,
+        columnMapping: {
+          ...defaultMapping(),
+          amount: 5,
+          investmentMode: true,
+          actionColumn: 1,
+          securityColumn: undefined,
+        },
+      });
+
+      fireEvent.click(screen.getByText('Next'));
+
+      expect(screen.getByText('Security column is required for investment files')).toBeInTheDocument();
+      expect(props.onNext).not.toHaveBeenCalled();
+    });
+
+    it('calls onNext when action and security columns are mapped', () => {
+      const props = renderStep({
+        headers: investmentHeaders,
+        sampleRows: investmentRows,
+        columnMapping: {
+          ...defaultMapping(),
+          amount: 5,
+          investmentMode: true,
+          actionColumn: 1,
+          securityColumn: 2,
+        },
+      });
+
+      fireEvent.click(screen.getByText('Next'));
+
+      expect(props.onNext).toHaveBeenCalledTimes(1);
+    });
+
+    it('lists action values found and flags unmatched ones', () => {
+      renderStep({
+        headers: investmentHeaders,
+        sampleRows: investmentRows,
+        columnMapping: {
+          ...defaultMapping(),
+          amount: 5,
+          investmentMode: true,
+          actionColumn: 1,
+          securityColumn: 2,
+        },
+      });
+
+      expect(screen.getByText('Action values found: Bought, Journal')).toBeInTheDocument();
+      // 'Bought' matches the buy defaults; 'Journal' matches nothing.
+      expect(
+        screen.getByText('Not matched (imported as cash by amount sign): Journal'),
+      ).toBeInTheDocument();
+    });
+
+    it('round-trips the action keyword editor', () => {
+      const props = renderStep({
+        headers: investmentHeaders,
+        sampleRows: investmentRows,
+        columnMapping: {
+          ...defaultMapping(),
+          amount: 5,
+          investmentMode: true,
+          actionColumn: 1,
+          securityColumn: 2,
+        },
+      });
+
+      // Editor is collapsed by default
+      expect(screen.queryByText('Buy')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Customize action keywords'));
+      expect(screen.getByText('Buy')).toBeInTheDocument();
+
+      // The Buy input carries the built-in defaults as its placeholder
+      const buyInput = screen.getByPlaceholderText('buy, bought, purchase, buy to open, you bought');
+      fireEvent.change(buyInput, { target: { value: 'acquisto, compra' } });
+
+      expect(props.onColumnMappingChange).toHaveBeenCalledWith(
+        expect.objectContaining({ actionKeywords: { buy: ['acquisto', 'compra'] } }),
+      );
+    });
+
+    it('removes an action override when its keyword input is cleared', () => {
+      const props = renderStep({
+        headers: investmentHeaders,
+        sampleRows: investmentRows,
+        columnMapping: {
+          ...defaultMapping(),
+          amount: 5,
+          investmentMode: true,
+          actionColumn: 1,
+          securityColumn: 2,
+          actionKeywords: { buy: ['acquisto'] },
+        },
+      });
+
+      fireEvent.click(screen.getByText('Customize action keywords'));
+
+      const buyInput = screen.getByPlaceholderText('buy, bought, purchase, buy to open, you bought') as HTMLInputElement;
+      expect(buyInput.value).toBe('acquisto');
+      fireEvent.change(buyInput, { target: { value: '' } });
+
+      // The only override is gone, so actionKeywords collapses to undefined
+      expect(props.onColumnMappingChange).toHaveBeenCalledWith(
+        expect.objectContaining({ actionKeywords: undefined }),
+      );
+    });
+  });
+
   describe('optional field mapping updates', () => {
     function labelledSelect(labelText: string) {
       const label = screen.getByText(labelText);
