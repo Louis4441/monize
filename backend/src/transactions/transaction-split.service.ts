@@ -21,6 +21,8 @@ import {
 } from "../securities/cash-impact.util";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { roundMoney, sumMoney } from "../common/round.util";
+import { resolveFxRateOrNull } from "../common/fx-entry.util";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { tr } from "../i18n/translate";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -44,7 +46,102 @@ export class TransactionSplitService {
     @Inject(forwardRef(() => NetWorthService))
     private netWorthService: NetWorthService,
     private dataSource: DataSource,
+    private exchangeRateService: ExchangeRateService,
   ) {}
+
+  /**
+   * The counterpart amount for a transfer child, in the TARGET account's
+   * currency, plus the rate used.
+   *
+   * A split's amounts are denominated in the parent account's currency. The
+   * counterpart used to be created at exactly `-split.amount` with
+   * `exchangeRate: 1` while being labelled with the target account's currency,
+   * so a 40 USD transfer child into a EUR account credited 40 EUR and recorded
+   * the pair as if the currencies were at par. That is the transfer-split half of
+   * audit P5-002, and it is the same silent 1:1 as the rest of that finding.
+   *
+   * Refuses rather than posting at par when the pair has no determinable rate.
+   */
+  private async resolveSplitTransferAmount(
+    amount: number,
+    sourceCurrencyCode: string,
+    targetCurrencyCode: string,
+    transactionDate: string,
+  ): Promise<{ amount: number; exchangeRate: number }> {
+    if (sourceCurrencyCode === targetCurrencyCode) {
+      return { amount: roundMoney(-amount), exchangeRate: 1 };
+    }
+
+    const rate = await resolveFxRateOrNull(
+      this.exchangeRateService,
+      sourceCurrencyCode,
+      targetCurrencyCode,
+      transactionDate || null,
+    );
+    if (rate === null) {
+      throw new BadRequestException(
+        tr(
+          "errors.transactions.transferRateUnavailable",
+          `Could not determine an exchange rate for ${sourceCurrencyCode} -> ${targetCurrencyCode}. Supply an exchangeRate or a destination amount so the transfer posts correctly.`,
+          { from: sourceCurrencyCode, to: targetCurrencyCode },
+        ),
+      );
+    }
+
+    const exchangeRate = rate;
+    return { amount: roundMoney(-amount * exchangeRate), exchangeRate };
+  }
+
+  /**
+   * Resolve -- and thereby store -- the market rate for every cross-currency
+   * transfer child BEFORE the caller opens its write transaction.
+   *
+   * A missing rate makes `getRateForDate` fetch a provider window over HTTP
+   * and persist it. Done lazily inside `createSplits`, that happened while
+   * holding the locked parent row, keeping the lock and the transaction's
+   * connection open for the provider's latency and serializing every
+   * concurrent writer of that split set. After this warm-up the
+   * in-transaction resolution is a plain database read.
+   *
+   * Best-effort by design: failures are swallowed because the transactional
+   * resolver remains authoritative -- it re-resolves and refuses with the
+   * proper error when the pair is genuinely unresolvable.
+   */
+  async prewarmSplitTransferRates(
+    userId: string,
+    splits: Pick<CreateTransactionSplitDto, "transferAccountId">[],
+    sourceAccountId: string,
+    transactionDate: string | Date | null | undefined,
+  ): Promise<void> {
+    const transferSplits = splits.filter((s) => s.transferAccountId);
+    if (transferSplits.length === 0) return;
+    const dateStr = !transactionDate
+      ? null
+      : typeof transactionDate === "string"
+        ? transactionDate.substring(0, 10)
+        : transactionDate.toISOString().substring(0, 10);
+    try {
+      const source = await this.accountsService.findOne(
+        userId,
+        sourceAccountId,
+      );
+      for (const split of transferSplits) {
+        const target = await this.accountsService.findOne(
+          userId,
+          split.transferAccountId!,
+        );
+        if (target.currencyCode === source.currencyCode) continue;
+        await resolveFxRateOrNull(
+          this.exchangeRateService,
+          source.currencyCode,
+          target.currencyCode,
+          dateStr,
+        );
+      }
+    } catch {
+      // Ownership and rate errors surface from the transactional path.
+    }
+  }
 
   private async validateCategoryOwnership(
     userId: string,
@@ -331,13 +428,23 @@ export class TransactionSplitService {
         ? transactionDate.toISOString().substring(0, 10)
         : "";
 
+      // The counterpart is denominated in the TARGET account's currency, so a
+      // split amount in the parent's currency has to be converted rather than
+      // copied across with `exchangeRate: 1` (audit P5-002, transfer-split half).
+      const counterpart = await this.resolveSplitTransferAmount(
+        split.amount,
+        sourceAccount.currencyCode,
+        targetAccount.currencyCode,
+        dateStr,
+      );
+
       const linkedTransaction = m.create(Transaction, {
         userId,
         accountId: split.transferAccountId,
         transactionDate: (dateStr || null) as any,
-        amount: -split.amount,
+        amount: counterpart.amount,
         currencyCode: targetAccount.currencyCode,
-        exchangeRate: 1,
+        exchangeRate: counterpart.exchangeRate,
         description: split.memo || null,
         isTransfer: true,
         payeeId: parentPayeeId || null,
@@ -364,7 +471,7 @@ export class TransactionSplitService {
       } else {
         await this.accountsService.updateBalance(
           split.transferAccountId!,
-          -split.amount,
+          counterpart.amount,
         );
       }
 
@@ -559,6 +666,14 @@ export class TransactionSplitService {
     splits: CreateTransactionSplitDto[],
     userId: string,
   ): Promise<TransactionSplit[]> {
+    // Provider rate lookups happen out here, never while holding the parent
+    // lock below; see prewarmSplitTransferRates.
+    await this.prewarmSplitTransferRates(
+      userId,
+      splits,
+      transaction.accountId,
+      transaction.transactionDate,
+    );
     return withScopedDb(this.dataSource, async (m) => {
       // Same parent lock as addSplit, so full replacement and incremental
       // addition serialize against each other, and validated against the
@@ -622,6 +737,15 @@ export class TransactionSplitService {
     if (splitDto.categoryId) {
       await this.validateCategoryOwnership(userId, splitDto.categoryId);
     }
+
+    // Provider rate lookups happen out here, never while holding the parent
+    // lock below; see prewarmSplitTransferRates.
+    await this.prewarmSplitTransferRates(
+      userId,
+      [splitDto],
+      transaction.accountId,
+      transaction.transactionDate,
+    );
 
     const savedSplitId = await withScopedDb(this.dataSource, async (m) => {
       // The aggregate check and the insert are one serialized unit.
@@ -698,13 +822,22 @@ export class TransactionSplitService {
           parent.accountId,
         );
 
+        const counterpart = await this.resolveSplitTransferAmount(
+          splitDto.amount,
+          sourceAccount.currencyCode,
+          targetAccount.currencyCode,
+          String(transaction.transactionDate),
+        );
+
         const linkedTransaction = m.create(Transaction, {
           userId,
           accountId: splitDto.transferAccountId,
+          // Date from the locked row (04-02 concurrency convention); amount is the
+          // cross-currency-converted counterpart, not a raw negation (audit P5-002).
           transactionDate: parent.transactionDate,
-          amount: -splitDto.amount,
+          amount: counterpart.amount,
           currencyCode: targetAccount.currencyCode,
-          exchangeRate: 1,
+          exchangeRate: counterpart.exchangeRate,
           description: splitDto.memo || null,
           isTransfer: true,
           payeeId: parent.payeeId || null,
@@ -725,7 +858,7 @@ export class TransactionSplitService {
         } else {
           await this.accountsService.updateBalance(
             splitDto.transferAccountId,
-            -splitDto.amount,
+            counterpart.amount,
           );
         }
       }

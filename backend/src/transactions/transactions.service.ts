@@ -72,6 +72,7 @@ import {
 import { withScopedDb } from "../common/db/scoped-db";
 import { lockTransactionRow, lockTransactionRows } from "../common/db/locks";
 import {
+  assertTransactionCurrencyMatchesAccount,
   normalizeFxEntry,
   type FxEntry,
   type FxEntryInput,
@@ -273,6 +274,13 @@ export class TransactionsService {
       this.splitService.validateSplits(splits, createTransactionDto.amount);
     }
 
+    // The stored primary currency is the account's; a mismatched request is
+    // rejected rather than persisted beside a balance in another currency.
+    const primaryCurrencyCode = assertTransactionCurrencyMatchesAccount(
+      transactionData.currencyCode,
+      account.currencyCode,
+    );
+
     // Normalize/validate foreign-currency entry against the account currency.
     const fx = this.normalizeFxEntry(
       {
@@ -330,6 +338,17 @@ export class TransactionsService {
       }
     }
 
+    // Provider rate lookups for cross-currency transfer children happen out
+    // here, before the transaction opens; see prewarmSplitTransferRates.
+    if (hasSplits) {
+      await this.splitService.prewarmSplitTransferRates(
+        userId,
+        splits,
+        createTransactionDto.accountId,
+        createTransactionDto.transactionDate,
+      );
+    }
+
     // One transaction: the row, its splits/tags, and the balance update
     // commit or roll back together. Nested service calls (split service, tags,
     // account balances) run their own withScopedDb and join this one.
@@ -338,6 +357,10 @@ export class TransactionsService {
       async (m) => {
         const transaction = m.create(Transaction, {
           ...transactionData,
+          // Derived from the account, not taken from the request: `amount` is in
+          // the account's currency, so the primary code has to be too
+          // (audit P5-003).
+          currencyCode: primaryCurrencyCode,
           payeeId: resolvedPayeeId,
           payeeName: resolvedPayeeName,
           categoryId: hasSplits ? null : categoryId,
@@ -1997,9 +2020,18 @@ export class TransactionsService {
 
     const { splits, tagIds, createdAt, ...updateData } = updateTransactionDto;
 
-    if (updateData.accountId && updateData.accountId !== oldAccountId) {
-      await this.accountsService.findOne(userId, updateData.accountId);
-    }
+    // The account the row will belong to after this update, which is what its
+    // primary currency must match. Loaded here so the currency assertion and the
+    // foreign-entry normalization below both read the real account rather than
+    // the row's own (possibly wrong) currencyCode.
+    const effectiveAccount =
+      updateData.accountId && updateData.accountId !== oldAccountId
+        ? await this.accountsService.findOne(userId, updateData.accountId)
+        : await this.accountsService.findOne(userId, oldAccountId);
+    const effectiveAccountCurrency = assertTransactionCurrencyMatchesAccount(
+      "currencyCode" in updateData ? updateData.currencyCode : undefined,
+      effectiveAccount.currencyCode,
+    );
 
     // Validate ownership of referenced payee and category. When the caller opts
     // in (createPayeeIfMissing) and only a free-text name was given, find or
@@ -2019,6 +2051,17 @@ export class TransactionsService {
       updateData.payeeId = payee.id;
       updateData.payeeName = payee.name;
     }
+    // Provider rate lookups for cross-currency transfer children happen out
+    // here, before the transaction opens; see prewarmSplitTransferRates.
+    if (Array.isArray(splits) && splits.length > 0) {
+      await this.splitService.prewarmSplitTransferRates(
+        userId,
+        splits,
+        effectiveAccount.id,
+        updateData.transactionDate ?? transaction.transactionDate,
+      );
+    }
+
     if ("categoryId" in updateData && updateData.categoryId) {
       const cat = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).findOne({
@@ -2131,19 +2174,28 @@ export class TransactionsService {
         transactionUpdateData.categoryId = updateData.categoryId ?? null;
       if ("amount" in updateData)
         transactionUpdateData.amount = updateData.amount;
-      if ("currencyCode" in updateData)
-        transactionUpdateData.currencyCode = updateData.currencyCode;
+      // Always the account's, whether or not the request mentioned it: moving a
+      // transaction to an account in another currency has to re-denominate the
+      // row, not leave it labelled with the old one.
+      transactionUpdateData.currencyCode = effectiveAccountCurrency;
       if ("exchangeRate" in updateData)
         transactionUpdateData.exchangeRate = updateData.exchangeRate;
-      // Foreign-currency entry: only re-normalize when either field is touched.
-      // Validate against the effective (possibly changed) account currency,
-      // amount, and rate; a null on either field clears the foreign metadata.
+      // Foreign-currency entry: re-normalize when either field is touched --
+      // or when the row is moving to an account in another currency while
+      // carrying a foreign entry. The tuple was normalized against the old
+      // denomination; re-labelling currencyCode above without re-normalizing
+      // left originalCurrencyCode able to equal the new primary currency
+      // beside a stale rate, a state normalizeFxEntry never produces (it
+      // strips the metadata when the currencies coincide, and validates the
+      // pair when they still differ).
+      const movingAcrossCurrencies =
+        effectiveAccountCurrency !== transaction.currencyCode &&
+        transaction.originalCurrencyCode != null;
       if (
         "originalAmount" in updateData ||
-        "originalCurrencyCode" in updateData
+        "originalCurrencyCode" in updateData ||
+        movingAcrossCurrencies
       ) {
-        const effectiveAccountCurrency =
-          updateData.currencyCode ?? transaction.currencyCode;
         const fx = this.normalizeFxEntry(
           {
             originalAmount:

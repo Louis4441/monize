@@ -11,11 +11,61 @@ import {
   TransactionStatus,
 } from "../transactions/entities/transaction.entity";
 import { ImportContext, updateAccountBalance } from "./import-context";
-import { roundToDecimals } from "../common/round.util";
+import { roundMoney, roundToDecimals } from "../common/round.util";
+import { resolveFxRateOrNull } from "../common/fx-entry.util";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 
 @Injectable()
 export class ImportInvestmentProcessorService {
   private readonly logger = new Logger(ImportInvestmentProcessorService.name);
+
+  constructor(private readonly exchangeRateService: ExchangeRateService) {}
+
+  /**
+   * A trade's cash effect, expressed in the CASH ACCOUNT's currency.
+   *
+   * `totalAmount` on an imported investment row is denominated in the security's
+   * currency. It used to be written straight onto the cash transaction with
+   * `exchangeRate: 1`, the row labelled with the *security's* currency, and the
+   * cash account's balance moved by that raw number -- so a 1,000 USD purchase
+   * settled from a CAD account took 1,000 CAD out and left a USD-labelled row
+   * sitting in a CAD account. Both halves of audit P5-003, plus the silent 1:1 of
+   * P5-009, in a path the audit could not execute.
+   *
+   * QIF and OFX carry no exchange rate, so the rate is resolved from stored
+   * history. Returns `null` when the pair cannot be resolved: a cash posting that
+   * cannot be denominated is worse than an absent one the user is warned about,
+   * because it silently moves a real balance by the wrong number.
+   */
+  private async resolveCashAmountInAccountCurrency(
+    amount: number,
+    securityCurrencyCode: string | null,
+    cashAccountCurrencyCode: string,
+    transactionDate: string | Date,
+  ): Promise<{ amount: number; exchangeRate: number } | null> {
+    if (
+      !securityCurrencyCode ||
+      securityCurrencyCode === cashAccountCurrencyCode
+    ) {
+      return { amount: roundMoney(amount), exchangeRate: 1 };
+    }
+
+    const dateStr =
+      typeof transactionDate === "string"
+        ? transactionDate.substring(0, 10)
+        : transactionDate.toISOString().substring(0, 10);
+
+    const rate = await resolveFxRateOrNull(
+      this.exchangeRateService,
+      securityCurrencyCode,
+      cashAccountCurrencyCode,
+      dateStr,
+    );
+    if (rate === null) return null;
+
+    const exchangeRate = rate;
+    return { amount: roundMoney(amount * exchangeRate), exchangeRate };
+  }
 
   async processTransaction(ctx: ImportContext, qifTx: any): Promise<void> {
     // XIn/XOut are cash-only transfers between the investment account and
@@ -322,29 +372,58 @@ export class ImportInvestmentProcessorService {
 
     if (transferAccountId) {
       ctx.affectedAccountIds.add(transferAccountId);
-      const linkedAmount = -cashAmount;
       const targetAccount = await ctx.manager.findOne(Account, {
         where: { id: transferAccountId },
       });
+      const targetCurrency = targetAccount?.currencyCode || cashCurrencyCode;
 
-      const linkedTx = ctx.manager.create(Transaction, {
-        userId: ctx.userId,
-        accountId: transferAccountId,
-        transactionDate: qifTx.date,
-        amount: linkedAmount,
-        payeeName: qifTx.payee || `Transfer from ${ctx.account.name}`,
-        description: qifTx.memo || null,
-        status,
-        currencyCode: targetAccount?.currencyCode || cashCurrencyCode,
-        isTransfer: true,
-        linkedTransactionId: savedCashTx.id,
-      });
-      const savedLinkedTx = await ctx.manager.save(linkedTx);
+      // The linked leg lives in the target account, so it is denominated
+      // there. `-cashAmount` labelled with the target's code posted equal
+      // magnitudes across two different currencies with no conversion (the
+      // P5-003 shape); convert it, or leave the cash leg standing alone
+      // rather than moving the target's balance by a mislabelled number.
+      const counterpart = await this.resolveCashAmountInAccountCurrency(
+        -cashAmount,
+        cashCurrencyCode,
+        targetCurrency,
+        qifTx.date,
+      );
+      if (counterpart === null) {
+        const pair = `${cashCurrencyCode} -> ${targetCurrency}`;
+        const message = `No exchange rate for ${pair}: the transfer counterpart in the target account was not created; the cash movement stands alone. Import an exchange rate for that pair and re-import, or record the counterpart manually.`;
+        ctx.importResult.warnings = [
+          ...(ctx.importResult.warnings ?? []),
+          message,
+        ];
+        this.logger.warn(message);
+        await ctx.manager.update(Transaction, savedCashTx.id, {
+          isTransfer: false,
+        });
+      } else {
+        const linkedTx = ctx.manager.create(Transaction, {
+          userId: ctx.userId,
+          accountId: transferAccountId,
+          transactionDate: qifTx.date,
+          amount: counterpart.amount,
+          payeeName: qifTx.payee || `Transfer from ${ctx.account.name}`,
+          description: qifTx.memo || null,
+          status,
+          currencyCode: targetCurrency,
+          exchangeRate: counterpart.exchangeRate,
+          isTransfer: true,
+          linkedTransactionId: savedCashTx.id,
+        });
+        const savedLinkedTx = await ctx.manager.save(linkedTx);
 
-      await ctx.manager.update(Transaction, savedCashTx.id, {
-        linkedTransactionId: savedLinkedTx.id,
-      });
-      await updateAccountBalance(ctx.manager, transferAccountId, linkedAmount);
+        await ctx.manager.update(Transaction, savedCashTx.id, {
+          linkedTransactionId: savedLinkedTx.id,
+        });
+        await updateAccountBalance(
+          ctx.manager,
+          transferAccountId,
+          counterpart.amount,
+        );
+      }
     }
 
     ctx.importResult.imported++;
@@ -388,7 +467,7 @@ export class ImportInvestmentProcessorService {
       return;
     }
 
-    const cashAmount =
+    const cashAmountInSecurityCurrency =
       action === InvestmentAction.BUY ? -totalAmount : totalAmount;
 
     let securitySymbol = "Unknown";
@@ -424,13 +503,35 @@ export class ImportInvestmentProcessorService {
 
     const isCrossAccountTransfer = cashAccountId !== ctx.accountId;
 
+    // The cash leg lives in the cash account, so it is denominated there.
+    const converted = await this.resolveCashAmountInAccountCurrency(
+      cashAmountInSecurityCurrency,
+      securityCurrency,
+      cashAccountCurrency,
+      investmentTx.transactionDate,
+    );
+    if (converted === null) {
+      const pair = `${securityCurrency} -> ${cashAccountCurrency}`;
+      const message = `No exchange rate for ${pair}: the cash effect of ${actionLabel} ${securitySymbol} was not posted. Import an exchange rate for that pair and re-import, or record the cash movement manually.`;
+      ctx.importResult.warnings = [
+        ...(ctx.importResult.warnings ?? []),
+        message,
+      ];
+      this.logger.warn(message);
+      // The trade itself is still recorded -- quantities and cost are valid --
+      // but no balance is moved by a number in the wrong currency.
+      await ctx.manager.save(investmentTx);
+      return;
+    }
+    const cashAmount = converted.amount;
+
     const cashTx = new Transaction();
     cashTx.userId = ctx.userId;
     cashTx.accountId = cashAccountId;
     cashTx.transactionDate = investmentTx.transactionDate;
     cashTx.amount = cashAmount;
-    cashTx.currencyCode = securityCurrency || cashAccountCurrency;
-    cashTx.exchangeRate = 1;
+    cashTx.currencyCode = cashAccountCurrency;
+    cashTx.exchangeRate = converted.exchangeRate;
     cashTx.payeeName = payeeName;
     cashTx.payeeId = null;
     cashTx.description = investmentTx.description;
@@ -442,26 +543,51 @@ export class ImportInvestmentProcessorService {
     // Create linked transaction on the brokerage side so the target account
     // is visible from both sides of the transfer
     if (isCrossAccountTransfer) {
-      const brokerageTx = new Transaction();
-      brokerageTx.userId = ctx.userId;
-      brokerageTx.accountId = ctx.accountId;
-      brokerageTx.transactionDate = investmentTx.transactionDate;
-      brokerageTx.amount = -cashAmount;
-      brokerageTx.currencyCode = securityCurrency || ctx.account.currencyCode;
-      brokerageTx.exchangeRate = 1;
-      brokerageTx.payeeName = payeeName;
-      brokerageTx.payeeId = null;
-      brokerageTx.description = investmentTx.description;
-      brokerageTx.status = TransactionStatus.CLEARED;
-      brokerageTx.isTransfer = true;
-      brokerageTx.linkedTransactionId = savedCashTx.id;
+      // The counterpart lives in the brokerage account, so it is denominated
+      // there. `-cashAmount` is a number in the CASH account's currency;
+      // labelling it with the brokerage's code wrote a row claiming EUR that
+      // was actually CAD (the P5-003 shape this importer's cash leg already
+      // avoids) -- convert it, or leave the cash leg standing alone rather
+      // than posting a mislabelled amount.
+      const counterpart = await this.resolveCashAmountInAccountCurrency(
+        -cashAmount,
+        cashAccountCurrency,
+        ctx.account.currencyCode,
+        investmentTx.transactionDate,
+      );
+      if (counterpart === null) {
+        const pair = `${cashAccountCurrency} -> ${ctx.account.currencyCode}`;
+        const message = `No exchange rate for ${pair}: the brokerage-side counterpart of ${actionLabel} ${securitySymbol} was not created; the cash movement stands alone. Import an exchange rate for that pair and re-import, or record the counterpart manually.`;
+        ctx.importResult.warnings = [
+          ...(ctx.importResult.warnings ?? []),
+          message,
+        ];
+        this.logger.warn(message);
+        savedCashTx.isTransfer = false;
+        await ctx.manager.save(savedCashTx);
+        investmentTx.transactionId = savedCashTx.id;
+      } else {
+        const brokerageTx = new Transaction();
+        brokerageTx.userId = ctx.userId;
+        brokerageTx.accountId = ctx.accountId;
+        brokerageTx.transactionDate = investmentTx.transactionDate;
+        brokerageTx.amount = counterpart.amount;
+        brokerageTx.currencyCode = ctx.account.currencyCode;
+        brokerageTx.exchangeRate = counterpart.exchangeRate;
+        brokerageTx.payeeName = payeeName;
+        brokerageTx.payeeId = null;
+        brokerageTx.description = investmentTx.description;
+        brokerageTx.status = TransactionStatus.CLEARED;
+        brokerageTx.isTransfer = true;
+        brokerageTx.linkedTransactionId = savedCashTx.id;
 
-      const savedBrokerageTx = await ctx.manager.save(brokerageTx);
+        const savedBrokerageTx = await ctx.manager.save(brokerageTx);
 
-      savedCashTx.linkedTransactionId = savedBrokerageTx.id;
-      await ctx.manager.save(savedCashTx);
+        savedCashTx.linkedTransactionId = savedBrokerageTx.id;
+        await ctx.manager.save(savedCashTx);
 
-      investmentTx.transactionId = savedBrokerageTx.id;
+        investmentTx.transactionId = savedBrokerageTx.id;
+      }
     } else {
       investmentTx.transactionId = savedCashTx.id;
     }
