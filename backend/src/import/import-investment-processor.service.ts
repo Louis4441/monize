@@ -14,6 +14,12 @@ import { ImportContext, updateAccountBalance } from "./import-context";
 import { roundMoney, roundToDecimals } from "../common/round.util";
 import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import {
+  applyActionToQuantity,
+  acquisitionUnitCost,
+  isQuantityOnlyAction,
+  SHARE_MOVING_ACTIONS,
+} from "../securities/investment-replay.util";
 
 @Injectable()
 export class ImportInvestmentProcessorService {
@@ -195,7 +201,14 @@ export class ImportInvestmentProcessorService {
     );
 
     // Update holdings
-    await this.processHoldings(ctx, action, securityId, quantity, price);
+    await this.processHoldings(
+      ctx,
+      action,
+      securityId,
+      quantity,
+      price,
+      commission,
+    );
 
     ctx.importResult.imported++;
   }
@@ -603,17 +616,14 @@ export class ImportInvestmentProcessorService {
     securityId: string | null,
     quantity: number,
     price: number,
+    commission: number,
   ): Promise<void> {
-    const holdingsActions = [
-      InvestmentAction.BUY,
-      InvestmentAction.SELL,
-      InvestmentAction.REINVEST,
-      InvestmentAction.TRANSFER_IN,
-      InvestmentAction.TRANSFER_OUT,
-      InvestmentAction.SPLIT,
-    ];
-
-    if (!holdingsActions.includes(action) || !securityId || !quantity) {
+    // ADD_SHARES and REMOVE_SHARES were missing from this list, so importing
+    // either left holdings untouched: shares booked without a purchase never
+    // reached the position at all. Same omission the three net-worth reducers
+    // had, in a path the audit could not execute. The shared list is used so a
+    // new action cannot be dropped from one surface again.
+    if (!SHARE_MOVING_ACTIONS.includes(action) || !securityId || !quantity) {
       return;
     }
 
@@ -629,25 +639,39 @@ export class ImportInvestmentProcessorService {
       if (!holding || quantity <= 0) return;
       const currentQuantity = Number(holding.quantity);
       const currentAvgCost = Number(holding.averageCost || 0);
-      holding.quantity = currentQuantity * quantity;
+      holding.quantity = applyActionToQuantity(
+        currentQuantity,
+        action,
+        quantity,
+      );
       holding.averageCost = currentAvgCost / quantity;
       await ctx.manager.save(holding);
       return;
     }
 
-    const quantityChange = [
-      InvestmentAction.SELL,
-      InvestmentAction.TRANSFER_OUT,
-    ].includes(action)
-      ? -quantity
-      : quantity;
+    // Direction from the shared reducer rather than a second hand-written list,
+    // which is how REMOVE_SHARES came to be treated as an acquisition here.
+    const quantityChange =
+      applyActionToQuantity(0, action, quantity) < 0 ? -quantity : quantity;
+
+    // ADD_SHARES / REMOVE_SHARES move shares without supplying a cost -- every
+    // other surface (isQuantityOnlyAction, adjustQuantity, computeHoldingsMap)
+    // treats them as basis-free, so blending an imported ShrsIn price into
+    // averageCost here wrote a basis the first rebuild silently erased.
+    // Per-unit acquisition cost comes through the shared helper so the
+    // commission lands in the basis exactly as a rebuild computes it -- the
+    // bare price here was the FR-008 live-vs-rebuild drift on the import
+    // surface.
+    const unitCost = isQuantityOnlyAction(action)
+      ? 0
+      : acquisitionUnitCost({ quantity: quantityChange, price, commission });
 
     if (!holding) {
       const newHolding = new Holding();
       newHolding.accountId = ctx.accountId;
       newHolding.securityId = securityId;
       newHolding.quantity = quantityChange;
-      newHolding.averageCost = price || 0;
+      newHolding.averageCost = quantityChange > 0 ? unitCost : 0;
       await ctx.manager.save(newHolding);
       return;
     }
@@ -656,9 +680,9 @@ export class ImportInvestmentProcessorService {
     const currentAvgCost = Number(holding.averageCost || 0);
     const newQuantity = currentQuantity + quantityChange;
 
-    if (quantityChange > 0 && price) {
+    if (quantityChange > 0 && unitCost > 0) {
       const totalCostBefore = currentQuantity * currentAvgCost;
-      const totalCostAdded = quantityChange * price;
+      const totalCostAdded = quantityChange * unitCost;
       holding.averageCost =
         newQuantity > 0 ? (totalCostBefore + totalCostAdded) / newQuantity : 0;
     }

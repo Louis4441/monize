@@ -16,6 +16,10 @@ import {
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
 import { Security } from "./entities/security.entity";
+import {
+  acquisitionUnitCost,
+  applyActionToQuantity,
+} from "./investment-replay.util";
 import { CreateInvestmentTransactionDto } from "./dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
 import { TransferSecurityDto } from "./dto/transfer-security.dto";
@@ -83,12 +87,13 @@ export interface LlmCapitalGainsEntry {
    * a security whose currency could not be converted into its account's. An
    * unknown component makes the sum unknown; the partial sum is not returned
    * under a field a caller would read as complete
-   * (docs/financial-calculation-contract.md section 1). `realizedGain` stays
-   * known: it derives from each transaction's own stored rate.
+   * (docs/financial-calculation-contract.md section 1). `realizedGain` is
+   * `null` when a folded row's realized gain rests on a basis carrying an
+   * unpriced acquisition -- a gain against an unknown basis is unknown.
    */
   startValue: number | null;
   endValue: number | null;
-  realizedGain: number;
+  realizedGain: number | null;
   unrealizedGain: number | null;
   totalCapitalGain: number | null;
 }
@@ -97,7 +102,8 @@ export interface LlmCapitalGainsResult {
   startDate: string;
   endDate: string;
   totals: {
-    realizedGain: number;
+    /** `null` when any row's realized gain rests on an unknown basis. */
+    realizedGain: number | null;
     /**
      * `null` when any row in the window had an unconvertible boundary value.
      * A total that silently omitted those rows would read as complete.
@@ -1739,6 +1745,7 @@ export class InvestmentTransactionsService {
       securityId,
       quantity,
       price,
+      commission,
       totalAmount,
       fundingAccountId,
     } = transaction;
@@ -1767,7 +1774,11 @@ export class InvestmentTransactionsService {
             accountId,
             securityId!,
             Number(quantity),
-            Number(price),
+            // Commission included, so the live average cost is what a share
+            // actually cost to acquire and matches what a rebuild would compute.
+            // The raw price here made the two disagree until something unrelated
+            // triggered a rebuild (review finding FR-008).
+            acquisitionUnitCost({ quantity, price, commission }),
             manager,
             allowNegative,
           );
@@ -1831,7 +1842,7 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             Number(quantity),
-            Number(price),
+            acquisitionUnitCost({ quantity, price, commission }),
             manager,
             allowNegative,
           );
@@ -1861,7 +1872,9 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             Number(quantity),
-            Number(price),
+            // An acquisition, so the same commission-inclusive unit cost the
+            // rebuild uses. An unpriced transfer still carries cost 0.
+            acquisitionUnitCost({ quantity, price, commission }),
             manager,
             allowNegative,
           );
@@ -2222,31 +2235,16 @@ export class InvestmentTransactionsService {
   }
 
   /**
-   * Apply a transaction's effect on a running share balance. Mirrors the
-   * authoritative per-action math in HoldingsService.getHoldingAt so the
-   * running totals reconcile with stored holdings.
+   * Apply a transaction's effect on a running share balance. Calls the shared
+   * reducer rather than mirroring it, so these running totals cannot drift from
+   * stored holdings or from the historical net-worth replay.
    */
   private applyQuantityToBalance(
     balance: number,
     action: InvestmentAction,
     quantity: number,
   ): number {
-    switch (action) {
-      case InvestmentAction.BUY:
-      case InvestmentAction.REINVEST:
-      case InvestmentAction.TRANSFER_IN:
-      case InvestmentAction.ADD_SHARES:
-        return balance + quantity;
-      case InvestmentAction.SELL:
-      case InvestmentAction.TRANSFER_OUT:
-      case InvestmentAction.REMOVE_SHARES:
-        return balance - quantity;
-      case InvestmentAction.SPLIT:
-        return quantity > 0 ? balance * quantity : balance;
-      default:
-        // DIVIDEND / INTEREST / CAPITAL_GAIN do not move shares.
-        return balance;
-    }
+    return applyActionToQuantity(balance, action, quantity);
   }
 
   /**
@@ -2493,18 +2491,26 @@ export class InvestmentTransactionsService {
       totalScaled: number;
       /** Set when any folded row had an unconvertible boundary value. */
       incomplete: boolean;
+      /** Set when any folded row's realized gain rests on an unknown basis. */
+      realizedIncomplete: boolean;
     }
     const buckets = new Map<string, Bucket>();
     let totalsRealizedScaled = 0;
     let totalsUnrealizedScaled = 0;
     let totalsCapitalScaled = 0;
 
-    // A row whose FX could not be resolved contributes nothing to the sums and
-    // marks them incomplete, rather than being counted as a zero-value period.
+    // A row whose FX could not be resolved -- or whose realized gain rests on
+    // an unpriced acquisition -- contributes nothing to the sums and marks
+    // them incomplete, rather than being counted as a zero-value period.
     let totalsIncomplete = false;
+    let totalsRealizedIncomplete = false;
 
     for (const e of filtered) {
-      totalsRealizedScaled += Math.round(e.realizedGain * 10000);
+      if (e.realizedGain === null) {
+        totalsRealizedIncomplete = true;
+      } else {
+        totalsRealizedScaled += Math.round(e.realizedGain * 10000);
+      }
       if (e.unrealizedGain === null || e.totalCapitalGain === null) {
         totalsIncomplete = true;
       } else {
@@ -2554,6 +2560,7 @@ export class InvestmentTransactionsService {
           unrealizedScaled: 0,
           totalScaled: 0,
           incomplete: false,
+          realizedIncomplete: false,
         };
         buckets.set(key, b);
       }
@@ -2565,7 +2572,11 @@ export class InvestmentTransactionsService {
         b.currency = null;
       }
 
-      b.realizedScaled += Math.round(e.realizedGain * 10000);
+      if (e.realizedGain === null) {
+        b.realizedIncomplete = true;
+      } else {
+        b.realizedScaled += Math.round(e.realizedGain * 10000);
+      }
       if (
         e.startValue === null ||
         e.endValue === null ||
@@ -2593,7 +2604,9 @@ export class InvestmentTransactionsService {
           ? null
           : roundMoney(b.startValueScaled / 10000),
         endValue: b.incomplete ? null : roundMoney(b.endValueScaled / 10000),
-        realizedGain: roundMoney(b.realizedScaled / 10000),
+        realizedGain: b.realizedIncomplete
+          ? null
+          : roundMoney(b.realizedScaled / 10000),
         unrealizedGain: b.incomplete
           ? null
           : roundMoney(b.unrealizedScaled / 10000),
@@ -2615,7 +2628,9 @@ export class InvestmentTransactionsService {
       startDate: options.startDate,
       endDate: options.endDate,
       totals: {
-        realizedGain: roundMoney(totalsRealizedScaled / 10000),
+        realizedGain: totalsRealizedIncomplete
+          ? null
+          : roundMoney(totalsRealizedScaled / 10000),
         unrealizedGain: totalsIncomplete
           ? null
           : roundMoney(totalsUnrealizedScaled / 10000),
@@ -3263,8 +3278,15 @@ export class InvestmentTransactionsService {
     const isFuture =
       isFutureOverride ?? isTransactionInFuture(transaction.transactionDate);
 
-    const { action, accountId, securityId, quantity, price, transactionId } =
-      transaction;
+    const {
+      action,
+      accountId,
+      securityId,
+      quantity,
+      price,
+      commission,
+      transactionId,
+    } = transaction;
 
     if (transactionId) {
       // Clear the FK reference BEFORE deleting the cash transaction
@@ -3299,7 +3321,12 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             -Number(quantity),
-            Number(price),
+            // A negative delta leaves averageCost untouched (updateHolding
+            // blends a price only for positive deltas), so this argument is
+            // read on exactly one path: recreating a holding row the reversal
+            // finds deleted, which then carries the same commissioned unit
+            // cost the apply path wrote rather than the bare price.
+            acquisitionUnitCost({ quantity, price, commission }),
             manager,
             allowNegative,
           );
@@ -3332,7 +3359,12 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             -Number(quantity),
-            Number(price),
+            // A negative delta leaves averageCost untouched (updateHolding
+            // blends a price only for positive deltas), so this argument is
+            // read on exactly one path: recreating a holding row the reversal
+            // finds deleted, which then carries the same commissioned unit
+            // cost the apply path wrote rather than the bare price.
+            acquisitionUnitCost({ quantity, price, commission }),
             manager,
             allowNegative,
           );
@@ -3346,7 +3378,12 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             -Number(quantity),
-            Number(price),
+            // A negative delta leaves averageCost untouched (updateHolding
+            // blends a price only for positive deltas), so this argument is
+            // read on exactly one path: recreating a holding row the reversal
+            // finds deleted, which then carries the same commissioned unit
+            // cost the apply path wrote rather than the bare price.
+            acquisitionUnitCost({ quantity, price, commission }),
             manager,
             allowNegative,
           );

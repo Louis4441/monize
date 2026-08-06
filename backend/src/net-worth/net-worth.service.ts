@@ -13,14 +13,12 @@ import {
   AccountType,
   AccountSubType,
 } from "../accounts/entities/account.entity";
-import {
-  InvestmentTransaction,
-  InvestmentAction,
-} from "../securities/entities/investment-transaction.entity";
+import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { Security } from "../securities/entities/security.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
 import { FxAggregate } from "../common/fx-aggregate";
+import { applyActionToQuantity } from "../securities/investment-replay.util";
 import { formatDateYMDLocal } from "../common/date-utils";
 
 const LIABILITY_TYPES: AccountType[] = [
@@ -1133,7 +1131,7 @@ export class NetWorthService {
            FROM investment_transactions
            WHERE account_id = ANY($1::UUID[])
              AND transaction_date <= $2
-           ORDER BY transaction_date ASC`,
+           ORDER BY transaction_date ASC, created_at ASC`,
             [brokerageIds, end],
           )
         : [];
@@ -1198,7 +1196,7 @@ export class NetWorthService {
            WHERE security_id = ANY($1::UUID[])
              AND action IN ('BUY', 'SELL', 'REINVEST')
              AND price IS NOT NULL AND price > 0
-           ORDER BY security_id, transaction_date`,
+           ORDER BY security_id, transaction_date, created_at`,
             [skipSecIds],
           )
         : [];
@@ -1333,20 +1331,10 @@ export class NetWorthService {
             holdingsByAccount.set(acctId, new Map());
           const acctHoldings = holdingsByAccount.get(acctId)!;
 
-          switch (tx.action) {
-            case "BUY":
-            case "REINVEST":
-            case "TRANSFER_IN":
-              acctHoldings.set(secId, (acctHoldings.get(secId) || 0) + qty);
-              break;
-            case "SELL":
-            case "TRANSFER_OUT":
-              acctHoldings.set(secId, (acctHoldings.get(secId) || 0) - qty);
-              break;
-            case "SPLIT":
-              acctHoldings.set(secId, (acctHoldings.get(secId) || 0) + qty);
-              break;
-          }
+          acctHoldings.set(
+            secId,
+            applyActionToQuantity(acctHoldings.get(secId) || 0, tx.action, qty),
+          );
         }
         txIdx++;
       }
@@ -1513,7 +1501,7 @@ export class NetWorthService {
              FROM investment_transactions
              WHERE account_id = ANY($1::UUID[])
                AND transaction_date <= $2
-             ORDER BY transaction_date ASC`,
+             ORDER BY transaction_date ASC, created_at ASC`,
             [brokerageIds, end],
           )
         : [];
@@ -1590,7 +1578,7 @@ export class NetWorthService {
              WHERE security_id = ANY($1::UUID[])
                AND action IN ('BUY', 'SELL', 'REINVEST')
                AND price IS NOT NULL AND price > 0
-             ORDER BY security_id, transaction_date`,
+             ORDER BY security_id, transaction_date, created_at`,
           [skipSecIds],
         );
         for (const r of txPriceRows) {
@@ -1691,18 +1679,10 @@ export class NetWorthService {
         const secId = tx.security_id;
         const qty = Number(tx.quantity) || 0;
         if (secId) {
-          switch (tx.action) {
-            case "BUY":
-            case "REINVEST":
-            case "TRANSFER_IN":
-            case "SPLIT":
-              holdings.set(secId, (holdings.get(secId) || 0) + qty);
-              break;
-            case "SELL":
-            case "TRANSFER_OUT":
-              holdings.set(secId, (holdings.get(secId) || 0) - qty);
-              break;
-          }
+          holdings.set(
+            secId,
+            applyActionToQuantity(holdings.get(secId) || 0, tx.action, qty),
+          );
         }
         txIdx++;
       }
@@ -2290,7 +2270,7 @@ export class NetWorthService {
           accountId: account.id,
           transactionDate: LessThanOrEqual(today),
         },
-        order: { transactionDate: "ASC" },
+        order: { transactionDate: "ASC", createdAt: "ASC" },
       }),
     );
 
@@ -2356,20 +2336,10 @@ export class NetWorthService {
         const qty = Number(tx.quantity) || 0;
 
         if (secId) {
-          switch (tx.action) {
-            case InvestmentAction.BUY:
-            case InvestmentAction.REINVEST:
-            case InvestmentAction.TRANSFER_IN:
-              holdings.set(secId, (holdings.get(secId) || 0) + qty);
-              break;
-            case InvestmentAction.SELL:
-            case InvestmentAction.TRANSFER_OUT:
-              holdings.set(secId, (holdings.get(secId) || 0) - qty);
-              break;
-            case InvestmentAction.SPLIT:
-              holdings.set(secId, (holdings.get(secId) || 0) + qty);
-              break;
-          }
+          holdings.set(
+            secId,
+            applyActionToQuantity(holdings.get(secId) || 0, tx.action, qty),
+          );
         }
         txIdx++;
       }
@@ -2508,7 +2478,7 @@ export class NetWorthService {
          AND action IN ('BUY', 'SELL', 'REINVEST')
          AND price IS NOT NULL
          AND price > 0
-       ORDER BY security_id, transaction_date`,
+       ORDER BY security_id, transaction_date, created_at`,
       [skipSecIds],
     );
 

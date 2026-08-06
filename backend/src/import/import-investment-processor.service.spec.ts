@@ -946,6 +946,75 @@ describe("ImportInvestmentProcessorService", () => {
       expect(holdingSave[0].averageCost).toBe(100);
     });
 
+    it("blends the commission into averageCost, as a rebuild computes it (FR-008)", async () => {
+      // 10 shares at 100 with 10 commission cost 101.00 per share -- the same
+      // figure acquisitionUnitCost yields on a rebuild. The bare price here
+      // was the live-vs-rebuild drift left alive on the import surface: the
+      // holdings page showed 100.00 until an unrelated recompute changed it.
+      const securityMap = new Map<string, string | null>();
+      securityMap.set("Test Stock", "sec-1");
+      const ctx = makeContext({ securityMap });
+
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        return Promise.resolve(null);
+      });
+
+      await service.processTransaction(ctx, {
+        action: "Buy",
+        security: "Test Stock",
+        quantity: 10,
+        price: 100,
+        commission: 10,
+        date: "2025-01-15",
+      });
+
+      const saveCalls = managerOf(ctx).save.mock.calls;
+      const holdingSave = saveCalls.find(
+        (call: any) =>
+          call[0] instanceof Holding || call[0]?.averageCost !== undefined,
+      );
+      expect(holdingSave).toBeDefined();
+      expect(holdingSave[0].averageCost).toBe(101);
+    });
+
+    it("books a Grant (ADD_SHARES) without writing a basis (quantity-only)", async () => {
+      // Every other surface (isQuantityOnlyAction, adjustQuantity,
+      // computeHoldingsMap) defines ADD_SHARES as basis-free: shares arrive
+      // with no cost. Seeding averageCost from an imported grant/vest price
+      // wrote a basis the first rebuild silently erased. (ShrsIn maps to
+      // TRANSFER_IN, which genuinely carries a basis.)
+      const securityMap = new Map<string, string | null>();
+      securityMap.set("Test Stock", "sec-1");
+      const ctx = makeContext({ securityMap });
+
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        return Promise.resolve(null);
+      });
+
+      await service.processTransaction(ctx, {
+        action: "Grant",
+        security: "Test Stock",
+        quantity: 10,
+        price: 50,
+        date: "2025-01-15",
+      });
+
+      const saveCalls = managerOf(ctx).save.mock.calls;
+      const holdingSave = saveCalls.find(
+        (call: any) =>
+          call[0] instanceof Holding || call[0]?.averageCost !== undefined,
+      );
+      expect(holdingSave).toBeDefined();
+      expect(holdingSave[0].quantity).toBe(10);
+      expect(holdingSave[0].averageCost).toBe(0);
+    });
+
     it("should update existing holding quantity for BUY and recalculate average cost", async () => {
       const securityMap = new Map<string, string | null>();
       securityMap.set("Test Stock", "sec-1");
@@ -2053,8 +2122,18 @@ describe("ImportInvestmentProcessorService", () => {
       // An unknown cost is persisted as NULL, never as a zero price
       expect(saved.price).toBeNull();
       expect(saved.totalAmount).toBe(0);
-      // No cash transaction: only the investment row is saved
-      expect(managerOf(ctx).save).toHaveBeenCalledTimes(1);
+      // No cash transaction leg: ADD_SHARES has no cash impact. Asserted by the
+      // absence of a saved cash Transaction (currencyCode + amount), mirroring
+      // the StkSplit sibling above -- not by a raw save count, because the
+      // holding IS now updated: folding ADD_SHARES through the shared reducer
+      // (this concept) is exactly what upstream's processHoldings dropped, so a
+      // Holding save legitimately joins the investment row.
+      const saveCalls = managerOf(ctx).save.mock.calls;
+      const cashTxCall = saveCalls.find(
+        (call: any) =>
+          call[0]?.currencyCode !== undefined && call[0]?.amount !== undefined,
+      );
+      expect(cashTxCall).toBeUndefined();
       expect(ctx.importResult.imported).toBe(1);
     });
 

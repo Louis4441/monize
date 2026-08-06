@@ -564,7 +564,11 @@ export interface CapitalGainEntry {
   endValue: number | null;
   buys: number;
   sells: number;
-  realizedGain: number;
+  /**
+   * `null` when the gain rests on a basis carrying an unpriced acquisition:
+   * unknown, never the proceeds measured against a zero basis.
+   */
+  realizedGain: number | null;
   unrealizedGain: number | null;
   totalCapitalGain: number | null;
 }

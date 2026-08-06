@@ -149,6 +149,160 @@ describe("PortfolioCalculationService.calculateRealizedGains", () => {
     expect(result[0].realizedGain).toBe(1000);
   });
 
+  it("includes the acquisition commission in the cost basis a sale is measured against (P5-006)", async () => {
+    // The audit's worked example. Buy 10 at 100 with 10 commission -- the cash
+    // debit is 1,010 -- then sell all 10 at 110 with no sell commission.
+    //
+    // Basis 1,000 reports a realized gain of 100 and taxes the commission as
+    // profit. The basis is 1,010, so the gain is 90.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "b1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        commission: 10,
+        totalAmount: 1010,
+      }),
+      makeTx({
+        id: "s1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-06-10",
+        quantity: 10,
+        price: 110,
+        commission: 0,
+        totalAmount: 1100,
+      }),
+    ]);
+
+    const result = await service.calculateRealizedGains(userId);
+    expect(result).toHaveLength(1);
+    expect(result[0].costBasis).toBe(1010);
+    expect(result[0].realizedGain).toBe(90);
+  });
+
+  it("relieves a commissioned basis proportionally on a partial sale", async () => {
+    // Buy 10 at 100 + 10 commission = 1,010 basis, 101.00 per share. Selling 4
+    // relieves 404, not 400.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "b1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        commission: 10,
+        totalAmount: 1010,
+      }),
+      makeTx({
+        id: "s1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-06-10",
+        quantity: 4,
+        price: 120,
+        commission: 0,
+        totalAmount: 480,
+      }),
+    ]);
+
+    const result = await service.calculateRealizedGains(userId);
+    expect(result[0].costBasis).toBe(404);
+    expect(result[0].realizedGain).toBe(76); // 480 - 404
+  });
+
+  it("converts the commission at the trade's rate, not separately", async () => {
+    // 10 @ 100 USD + 10 USD commission at 1.3 -> (1000 + 10) * 1.3 = 1313 CAD.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "b1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-01",
+        quantity: 10,
+        price: 100,
+        commission: 10,
+        totalAmount: 1010,
+        exchangeRate: 1.3,
+      }),
+      makeTx({
+        id: "s1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-06-01",
+        quantity: 10,
+        price: 150,
+        totalAmount: 1500,
+        exchangeRate: 1.35,
+      }),
+    ]);
+
+    const result = await service.calculateRealizedGains(userId);
+    expect(result[0].costBasis).toBe(1313);
+    expect(result[0].realizedGain).toBe(712); // 2025 - 1313
+  });
+
+  it("does not treat an unpriced acquisition as a free one", async () => {
+    // `price` is nullable. Folding null to 0 gave the position a basis of zero
+    // and reported the entire proceeds as gain.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "b1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: null as never,
+        commission: 0,
+        totalAmount: 0,
+      }),
+      makeTx({
+        id: "s1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-06-10",
+        quantity: 10,
+        price: 110,
+        totalAmount: 1100,
+      }),
+    ]);
+
+    const result = await service.calculateRealizedGains(userId);
+    // The shares still joined the position, so the sale is still reported --
+    // but no cost was invented for them.
+    expect(result[0].costBasis).toBe(0);
+  });
+
+  it("multiplies the position by a split ratio when relieving basis", async () => {
+    // Buy 10 @ 100 (basis 1,000), 2-for-1 split -> 20 shares, basis unchanged,
+    // so 50 per share. Selling all 20 at 60 realizes 1,200 - 1,000 = 200.
+    // Additive split semantics would have left 12 shares and mispriced basis.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "b1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+      makeTx({
+        id: "sp1",
+        action: InvestmentAction.SPLIT,
+        transactionDate: "2024-03-01",
+        quantity: 2,
+      }),
+      makeTx({
+        id: "s1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-06-10",
+        quantity: 20,
+        price: 60,
+        totalAmount: 1200,
+      }),
+    ]);
+
+    const result = await service.calculateRealizedGains(userId);
+    expect(result[0].costBasis).toBe(1000);
+    expect(result[0].realizedGain).toBe(200);
+  });
+
   it("filters the output by startDate but still replays history before the range", async () => {
     txRepo.find.mockResolvedValue([
       makeTx({
@@ -336,6 +490,110 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
     // Feb: (60*100) - (55*100) = +500
     expect(feb.totalCapitalGain).toBe(500);
     expect(feb.unrealizedGain).toBe(500);
+  });
+
+  it("reports gains as unknown when the basis carries an unpriced acquisition", async () => {
+    // An unpriced BUY joins the position with an unknown cost. `?? 0` replayed
+    // it as free, so the eventual SELL reported the full proceeds as confident
+    // realized gain -- while getCostBasis marks the identical row
+    // `unpriced_acquisition`. Unknown, not zero: the gain fields go null and
+    // `buys` stays the known subtotal of the priced acquisitions.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy-unpriced",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: null as never,
+        totalAmount: 0,
+      }),
+      makeTx({
+        id: "sell",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-01-20",
+        quantity: 10,
+        price: 110,
+        totalAmount: 1100,
+      }),
+    ]);
+    priceRepo.query.mockResolvedValue(
+      priceRows([
+        { date: "2023-12-31", price: 100 },
+        { date: "2024-01-31", price: 110 },
+      ]),
+    );
+
+    const result = await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+    });
+
+    expect(result).toHaveLength(1);
+    const jan = result[0];
+    expect(jan.realizedGain).toBeNull();
+    expect(jan.totalCapitalGain).toBeNull();
+    expect(jan.unrealizedGain).toBeNull();
+    expect(jan.buys).toBe(0);
+    expect(jan.sells).toBe(1100);
+  });
+
+  it("a closed position clears the unknown-basis state for later periods", async () => {
+    // Once the position holding the unknown lot is fully disposed of, a fresh
+    // priced position's gains are knowable again -- an empty position holds a
+    // known zero basis.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy-unpriced",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: null as never,
+        totalAmount: 0,
+      }),
+      makeTx({
+        id: "sell-all",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-01-20",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+      makeTx({
+        id: "buy-priced",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-02-05",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+      makeTx({
+        id: "sell-2",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-02-20",
+        quantity: 10,
+        price: 110,
+        totalAmount: 1100,
+      }),
+    ]);
+    priceRepo.query.mockResolvedValue(
+      priceRows([
+        { date: "2023-12-31", price: 100 },
+        { date: "2024-01-31", price: 100 },
+        { date: "2024-02-29", price: 110 },
+      ]),
+    );
+
+    const result = await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-02-29",
+    });
+
+    const jan = result.find((r) => r.month === "2024-01")!;
+    const feb = result.find((r) => r.month === "2024-02")!;
+    expect(jan.realizedGain).toBeNull();
+    // Feb's position was acquired at a known 1,000 and sold for 1,100.
+    expect(feb.realizedGain).toBe(100);
+    expect(feb.totalCapitalGain).toBe(100);
   });
 
   it("reports unknown boundary values when the security currency cannot be converted (P5-009)", async () => {

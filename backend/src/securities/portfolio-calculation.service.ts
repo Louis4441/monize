@@ -19,6 +19,10 @@ import { formatDateYMD, formatDateYMDLocal } from "../common/date-utils";
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
 import { FxAggregate } from "../common/fx-aggregate";
+import {
+  acquisitionCost,
+  applyActionToQuantity,
+} from "./investment-replay.util";
 import { stripBrokerageSuffix } from "../accounts/account-name.util";
 
 // "As of now" portfolio valuations fetch a live spot rate per foreign
@@ -151,15 +155,21 @@ export interface CapitalGainEntry {
    *
    * `null` when the security's currency could not be converted into the
    * account's -- the position's value at each boundary is then unknown, so a
-   * gain measured between them is too. `buys`, `sells` and `realizedGain` stay
-   * known: they come from the exchange rate stored on each transaction, not
-   * from a current-rate lookup.
+   * gain measured between them is too. `sells` stays known: it comes from the
+   * amounts and exchange rates stored on each transaction.
+   *
+   * `realizedGain` and the gains derived from `buys` are additionally `null`
+   * when the position's basis carries a lot whose cost the row cannot state
+   * (an unpriced acquisition): a gain measured against an unknown basis is
+   * unknown, never the proceeds measured against zero. `buys` itself remains
+   * the known subtotal of the priced acquisitions, which is why the gain
+   * fields carry the unknown rather than the cash-movement fields.
    */
   startValue: number | null;
   endValue: number | null;
   buys: number;
   sells: number;
-  realizedGain: number;
+  realizedGain: number | null;
   unrealizedGain: number | null;
   totalCapitalGain: number | null;
 }
@@ -254,24 +264,38 @@ function enumerateDays(startDate: string, endDate: string): PeriodBucket[] {
 }
 
 /**
- * Apply a single investment transaction to a running { quantity, costBasis }
- * state in account-currency terms. Used to seed cost basis from history that
- * predates the requested capital-gains window.
+ * Apply a single investment transaction to a running
+ * { quantity, costBasis, basisKnown } state in account-currency terms. Used to
+ * seed cost basis from history that predates the requested capital-gains
+ * window. `basisKnown` goes false when a lot joins whose cost the row cannot
+ * state -- the basis is then a subtotal, and every figure derived from it is
+ * unknown rather than confidently wrong. It resets to true when the position
+ * closes: an empty position holds a known zero basis.
  */
 function applyTxToState(
   tx: InvestmentTransaction,
-  state: { quantity: number; costBasis: number },
+  state: { quantity: number; costBasis: number; basisKnown: boolean },
 ): void {
   const quantity = Number(tx.quantity) || 0;
-  const price = Number(tx.price) || 0;
-  const exchangeRate = Number(tx.exchangeRate) || 1;
+
   switch (tx.action) {
     case InvestmentAction.BUY:
     case InvestmentAction.REINVEST:
-    case InvestmentAction.TRANSFER_IN:
-      state.costBasis += quantity * price * exchangeRate;
-      state.quantity += quantity;
+    case InvestmentAction.TRANSFER_IN: {
+      // Includes the commission, which is part of what the acquisition cost --
+      // the linked cash debit already carries it. `null` means the row cannot
+      // say what it cost, and shares whose cost is unknown must not join the
+      // basis as free -- nor leave the basis pretending to be complete.
+      const cost = acquisitionCost(tx);
+      if (cost !== null) state.costBasis += cost;
+      else state.basisKnown = false;
+      state.quantity = applyActionToQuantity(
+        state.quantity,
+        tx.action,
+        quantity,
+      );
       break;
+    }
     case InvestmentAction.SELL:
     case InvestmentAction.TRANSFER_OUT: {
       const sellQty = Math.min(quantity, state.quantity);
@@ -281,21 +305,20 @@ function applyTxToState(
       state.quantity -= sellQty;
       break;
     }
-    case InvestmentAction.ADD_SHARES:
-      state.quantity += quantity;
+    default:
+      state.quantity = applyActionToQuantity(
+        state.quantity,
+        tx.action,
+        quantity,
+      );
       break;
-    case InvestmentAction.REMOVE_SHARES:
-      state.quantity -= quantity;
-      break;
-    case InvestmentAction.SPLIT: {
-      const splitRatio = quantity || 1;
-      if (splitRatio > 0) state.quantity *= splitRatio;
-      break;
-    }
   }
+
   if (Math.abs(state.quantity) < 0.0001) {
     state.quantity = 0;
     state.costBasis = 0;
+    // A closed position holds a known zero basis; the unknown lot is gone.
+    state.basisKnown = true;
   }
 }
 
@@ -892,36 +915,26 @@ export class PortfolioCalculationService {
         }
         case InvestmentAction.BUY:
         case InvestmentAction.REINVEST: {
-          const exchangeRate = Number(tx.exchangeRate) || 1;
           // What the acquisition cost, which includes what it cost to
           // acquire. Leaving the commission out understates the basis and so
           // overstates every gain and every tax computed from it -- 20 of
           // commission on a 1,000 purchase is 20 of phantom gain and 3.80 of
           // phantom tax at 19%. The commission is recorded in the same
           // currency as the trade, so it is converted with it.
-          const commission = Number(tx.commission) || 0;
-
-          // `price` is nullable, and an acquisition without one has no cost
-          // this replay can work out. `Number(null) || 0` folded that into a
-          // free purchase: the units joined the position, nothing joined the
-          // basis, and the quantity reconciliation downstream then *passed*
-          // because the units did add up. An incomplete import came out as a
-          // confident gain and a confident tax bill.
           //
-          // A stored `0` is *no price* too, not a free acquisition. Before the
-          // acquisition guard shipped, `create()` stored `price ?? 0` and the
-          // form accepted a blank field, so real databases hold zero-price BUY
-          // and REINVEST rows that mean "unknown". Replaying one as a known
-          // zero-cost lot understates the basis and overstates every gain and
-          // tax drawn from it -- the same defect the null case closes, arriving
-          // by a different route. And no legitimate zero can be stored from
-          // here on: `assertAcquisitionPriced` refuses it, because a zero-cost
-          // purchase is not a concept this application has.
-          const priced =
-            tx.price !== null &&
-            Number.isFinite(Number(tx.price)) &&
-            Number(tx.price) > 0;
-          if (!priced && (quantity !== 0 || commission !== 0)) {
+          // `null` back means the row cannot say what it cost: `price` is
+          // nullable, and `Number(null) || 0` folded that into a free purchase
+          // -- the units joined the position, nothing joined the basis, and
+          // the quantity reconciliation downstream then *passed* because the
+          // units did add up. An incomplete import came out as a confident
+          // gain and a confident tax bill. A stored `0` is *no price* too,
+          // not a free acquisition: before the acquisition guard shipped,
+          // `create()` stored `price ?? 0` and the form accepted a blank
+          // field, so real databases hold zero-price BUY and REINVEST rows
+          // that mean "unknown" -- and no legitimate zero can be stored from
+          // here on, because `assertAcquisitionPriced` refuses it.
+          const cost = acquisitionCost(tx);
+          if (cost === null) {
             entry.quantity += quantity;
             entry.basisGap ??= "unpriced_acquisition";
             break;
@@ -949,8 +962,7 @@ export class PortfolioCalculationService {
             entry.basisGap ??= "mixed_basis_currency";
           }
 
-          const price = Number(tx.price) || 0;
-          entry.costBasis += (quantity * price + commission) * exchangeRate;
+          entry.costBasis += cost;
           entry.quantity += quantity;
           break;
         }
@@ -998,13 +1010,13 @@ export class PortfolioCalculationService {
           entry.quantity -= quantity;
           if (quantity !== 0) entry.basisGap = "quantity_only_action";
           break;
-        case InvestmentAction.SPLIT: {
-          const splitRatio = quantity || 1;
-          if (splitRatio > 0) {
-            entry.quantity *= splitRatio;
-          }
+        case InvestmentAction.SPLIT:
+          entry.quantity = applyActionToQuantity(
+            entry.quantity,
+            tx.action,
+            quantity,
+          );
           break;
-        }
         // DIVIDEND / INTEREST / CAPITAL_GAIN: cash only, no impact on cost basis
       }
 
@@ -1239,8 +1251,17 @@ export class PortfolioCalculationService {
         case InvestmentAction.BUY:
         case InvestmentAction.REINVEST:
         case InvestmentAction.TRANSFER_IN: {
-          entry.costBasis += quantity * price * exchangeRate;
-          entry.quantity += quantity;
+          // Acquisition commission belongs in the basis a later disposal is
+          // measured against; omitting it reported the commission as gain and
+          // taxed it. Shared with every other replay so the realized-gain
+          // report and the holdings page cannot disagree about the same buy.
+          const cost = acquisitionCost(tx);
+          if (cost !== null) entry.costBasis += cost;
+          entry.quantity = applyActionToQuantity(
+            entry.quantity,
+            tx.action,
+            quantity,
+          );
           break;
         }
         case InvestmentAction.SELL:
@@ -1281,17 +1302,13 @@ export class PortfolioCalculationService {
           }
           break;
         }
-        case InvestmentAction.ADD_SHARES:
-          entry.quantity += quantity;
+        default:
+          entry.quantity = applyActionToQuantity(
+            entry.quantity,
+            tx.action,
+            quantity,
+          );
           break;
-        case InvestmentAction.REMOVE_SHARES:
-          entry.quantity -= quantity;
-          break;
-        case InvestmentAction.SPLIT: {
-          const splitRatio = quantity || 1;
-          if (splitRatio > 0) entry.quantity *= splitRatio;
-          break;
-        }
       }
 
       if (Math.abs(entry.quantity) < 0.0001) {
@@ -1458,7 +1475,7 @@ export class PortfolioCalculationService {
 
     for (const group of groups.values()) {
       const txs = group.txs;
-      const state = { quantity: 0, costBasis: 0 };
+      const state = { quantity: 0, costBasis: 0, basisKnown: true };
       let txIdx = 0;
       const securityToAccountFx = await fxRate(
         group.securityCurrencyCode,
@@ -1489,20 +1506,40 @@ export class PortfolioCalculationService {
         let buys = 0;
         let sells = 0;
         let realizedGain = 0;
+        // The period's `buys` (and so its total gain) is complete only when
+        // every acquisition this period could state its cost; its realized
+        // gain only when no disposal drew on a basis with an unknown lot in
+        // it. `?? 0` here replayed an unpriced BUY as free and reported the
+        // full proceeds of the eventual sale as confident gain -- while
+        // getCostBasis marks the identical row `unpriced_acquisition`.
+        let buysComplete = true;
+        let realizedKnown = true;
 
         while (txIdx < txs.length && txs[txIdx].transactionDate <= periodEnd) {
           const tx = txs[txIdx];
           const quantity = Number(tx.quantity) || 0;
-          const price = Number(tx.price) || 0;
           const exchangeRate = Number(tx.exchangeRate) || 1;
 
           switch (tx.action) {
             case InvestmentAction.BUY:
             case InvestmentAction.REINVEST:
             case InvestmentAction.TRANSFER_IN: {
-              buys += quantity * price * exchangeRate;
-              state.costBasis += quantity * price * exchangeRate;
-              state.quantity += quantity;
+              // Commission included: it is money the period spent acquiring,
+              // so leaving it out of `buys` also inflated the period's
+              // capital gain by the same amount it understated the basis.
+              const cost = acquisitionCost(tx);
+              if (cost === null) {
+                buysComplete = false;
+                state.basisKnown = false;
+              } else {
+                buys += cost;
+                state.costBasis += cost;
+              }
+              state.quantity = applyActionToQuantity(
+                state.quantity,
+                tx.action,
+                quantity,
+              );
               break;
             }
             case InvestmentAction.SELL:
@@ -1517,25 +1554,24 @@ export class PortfolioCalculationService {
                 const proceeds = Number(tx.totalAmount) * exchangeRate;
                 sells += proceeds;
                 realizedGain += proceeds - costBasisSold;
+                // A basis carrying an unknown lot cannot price what was sold.
+                if (!state.basisKnown) realizedKnown = false;
               }
               break;
             }
-            case InvestmentAction.ADD_SHARES:
-              state.quantity += quantity;
+            default:
+              state.quantity = applyActionToQuantity(
+                state.quantity,
+                tx.action,
+                quantity,
+              );
               break;
-            case InvestmentAction.REMOVE_SHARES:
-              state.quantity -= quantity;
-              break;
-            case InvestmentAction.SPLIT: {
-              const splitRatio = quantity || 1;
-              if (splitRatio > 0) state.quantity *= splitRatio;
-              break;
-            }
           }
 
           if (Math.abs(state.quantity) < 0.0001) {
             state.quantity = 0;
             state.costBasis = 0;
+            state.basisKnown = true;
           }
           txIdx++;
         }
@@ -1548,19 +1584,24 @@ export class PortfolioCalculationService {
             ? null
             : endQuantity * endPrice * securityToAccountFx;
 
-        // Unknown boundary values make the capital gain unknown rather than
-        // making it equal to the cash movements.
+        // Unknown boundary values -- or an incomplete `buys` -- make the
+        // capital gain unknown rather than equal to the known cash movements.
         const totalCapitalGain =
-          startValue === null || endValue === null
+          startValue === null || endValue === null || !buysComplete
             ? null
             : endValue - startValue + sells - buys;
+        const periodRealizedGain = realizedKnown ? realizedGain : null;
         const unrealizedGain =
-          totalCapitalGain === null ? null : totalCapitalGain - realizedGain;
+          totalCapitalGain === null || periodRealizedGain === null
+            ? null
+            : totalCapitalGain - periodRealizedGain;
 
         const hasActivity =
           buys !== 0 ||
           sells !== 0 ||
           realizedGain !== 0 ||
+          !buysComplete ||
+          !realizedKnown ||
           startQuantity !== 0 ||
           endQuantity !== 0;
         if (!hasActivity) continue;
@@ -1585,7 +1626,7 @@ export class PortfolioCalculationService {
           endValue: roundOrNull(endValue),
           buys: round(buys),
           sells: round(sells),
-          realizedGain: round(realizedGain),
+          realizedGain: roundOrNull(periodRealizedGain),
           unrealizedGain: roundOrNull(unrealizedGain),
           totalCapitalGain: roundOrNull(totalCapitalGain),
         });
