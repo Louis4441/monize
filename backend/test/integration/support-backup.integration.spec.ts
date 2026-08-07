@@ -56,7 +56,10 @@ describe("Support backup (integration)", () => {
         // requires the token to be resolvable regardless of whether a given
         // test seeds an attachment, and this needs no extra config.
         DatabaseStorageProvider,
-        { provide: ATTACHMENT_STORAGE_PROVIDER, useExisting: DatabaseStorageProvider },
+        {
+          provide: ATTACHMENT_STORAGE_PROVIDER,
+          useExisting: DatabaseStorageProvider,
+        },
       ],
     }).compile();
 

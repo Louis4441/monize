@@ -92,7 +92,10 @@ describe("Backup export/restore round-trip (integration)", () => {
         // but BackupService's constructor requires the token to be resolvable
         // regardless, and this needs no extra config (unlike local/S3).
         DatabaseStorageProvider,
-        { provide: ATTACHMENT_STORAGE_PROVIDER, useExisting: DatabaseStorageProvider },
+        {
+          provide: ATTACHMENT_STORAGE_PROVIDER,
+          useExisting: DatabaseStorageProvider,
+        },
       ],
     }).compile();
 
