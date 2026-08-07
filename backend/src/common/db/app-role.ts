@@ -160,6 +160,17 @@ BEGIN
         EXECUTE format('REVOKE INSERT, UPDATE, DELETE ON public.%I FROM %I', infra_table, role_name);
       END IF;
     END LOOP;
+
+    -- currency_code_in_use_globally (migration 136) is SECURITY DEFINER and
+    -- revokes EXECUTE from PUBLIC in the same file -- the implicit grant every
+    -- other function keeps. Nothing re-grants it to the runtime role without
+    -- this, so RLS_MODE=enforce gets "permission denied for function" the
+    -- first time CurrenciesService.remove asks whether a code is still live
+    -- anywhere. Guarded by to_regprocedure so a boot before migration 136 has
+    -- run (or a downgrade) does not fail on a missing function.
+    IF to_regprocedure('public.currency_code_in_use_globally(varchar)') IS NOT NULL THEN
+      EXECUTE format('GRANT EXECUTE ON FUNCTION public.currency_code_in_use_globally(varchar) TO %I', role_name);
+    END IF;
   END IF;
 EXCEPTION WHEN insufficient_privilege THEN
   RAISE WARNING 'Insufficient privilege to grant DML to role %; grant it manually or via the DB owner.', role_name;

@@ -18,6 +18,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
+import type { CsvInvestmentSummary } from "../csv-parser";
 
 export class ParseQifDto {
   @ApiProperty({ description: "QIF file content as string" })
@@ -307,6 +308,12 @@ export class ParsedQifResponseDto {
 
   @ApiPropertyOptional({ description: "Date of the opening balance record" })
   openingBalanceDate: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      "Investment-mode CSV parse summary: per-action counts, cash fallbacks, and rejected rows",
+  })
+  investmentSummary?: CsvInvestmentSummary;
 }
 
 export class ImportResultDto {
@@ -509,6 +516,122 @@ export class ImportOfxDto {
 
 // --- CSV DTOs ---
 
+export class CsvActionKeywordsDto {
+  @ApiPropertyOptional({ description: "Values classified as buys" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  buy?: string[];
+
+  @ApiPropertyOptional({ description: "Values classified as sells" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  sell?: string[];
+
+  @ApiPropertyOptional({ description: "Values classified as dividends" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  dividend?: string[];
+
+  @ApiPropertyOptional({ description: "Values classified as interest" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  interest?: string[];
+
+  @ApiPropertyOptional({
+    description: "Values classified as capital gain distributions",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  capitalGain?: string[];
+
+  @ApiPropertyOptional({ description: "Values classified as reinvestments" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  reinvest?: string[];
+
+  @ApiPropertyOptional({ description: "Values classified as stock splits" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  split?: string[];
+
+  @ApiPropertyOptional({
+    description: "Values classified as share transfers in",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  transferIn?: string[];
+
+  @ApiPropertyOptional({
+    description: "Values classified as share transfers out",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  transferOut?: string[];
+
+  @ApiPropertyOptional({
+    description: "Values classified as share additions (no cost)",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  addShares?: string[];
+
+  @ApiPropertyOptional({ description: "Values classified as share removals" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  removeShares?: string[];
+
+  @ApiPropertyOptional({ description: "Values classified as cash deposits" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  cashIn?: string[];
+
+  @ApiPropertyOptional({
+    description: "Values classified as cash withdrawals/fees",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  @ArrayMaxSize(20)
+  cashOut?: string[];
+}
+
 export class CsvColumnMappingConfigDto {
   @ApiProperty({ description: "Column index for date field" })
   @IsInt()
@@ -687,6 +810,65 @@ export class CsvColumnMappingConfigDto {
   @IsString()
   @MaxLength(1)
   delimiter: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Treat rows as investment transactions classified by the action column",
+  })
+  @IsOptional()
+  @IsBoolean()
+  investmentMode?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Column index for investment action (required in investment mode)",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  actionColumn?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Column index for security symbol or name (required in investment mode)",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  securityColumn?: number;
+
+  @ApiPropertyOptional({ description: "Column index for share quantity" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  quantityColumn?: number;
+
+  @ApiPropertyOptional({ description: "Column index for per-share price" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  priceColumn?: number;
+
+  @ApiPropertyOptional({ description: "Column index for commission/fees" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  commissionColumn?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Per-action keyword overrides for classifying action-column values (a list replaces the built-in defaults for that action)",
+    type: CsvActionKeywordsDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CsvActionKeywordsDto)
+  actionKeywords?: CsvActionKeywordsDto;
 }
 
 export class CsvTransferRuleDto {
@@ -796,6 +978,17 @@ export class ImportCsvDto {
   @ValidateNested({ each: true })
   @Type(() => AccountMappingDto)
   accountMappings: AccountMappingDto[];
+
+  @ApiPropertyOptional({
+    description: "Security mappings for investment-mode imports",
+    type: [SecurityMappingDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => SecurityMappingDto)
+  securityMappings?: SecurityMappingDto[];
 
   @ApiPropertyOptional({
     description: "Date format override",

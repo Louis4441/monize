@@ -5,6 +5,8 @@ import {
   detectTagSeparator,
   splitTagValue,
   normalizeReconciliationStatus,
+  normalizeCsvAction,
+  CANONICAL_TO_QIF_ACTION,
   CsvColumnMappingConfig,
   CsvTransferRule,
 } from "./csv-parser";
@@ -1704,6 +1706,354 @@ describe("CSV Parser", () => {
       expect(
         detectTagSeparator([null as unknown as string, "a;b", "c;d"]),
       ).toBe(";");
+    });
+  });
+});
+
+describe("CSV Parser investment mode", () => {
+  const INV_HEADER = "Date,Action,Symbol,Quantity,Price,Amount,Commission";
+
+  function invConfig(
+    overrides: Partial<CsvColumnMappingConfig> = {},
+  ): CsvColumnMappingConfig {
+    return {
+      date: 0,
+      amount: 5,
+      dateFormat: "MM/DD/YYYY",
+      hasHeader: true,
+      delimiter: ",",
+      investmentMode: true,
+      actionColumn: 1,
+      securityColumn: 2,
+      quantityColumn: 3,
+      priceColumn: 4,
+      commissionColumn: 6,
+      ...overrides,
+    };
+  }
+
+  function parseRows(rows: string[], overrides: Partial<CsvColumnMappingConfig> = {}) {
+    return parseCsv([INV_HEADER, ...rows].join("\n"), invConfig(overrides));
+  }
+
+  describe("normalizeCsvAction", () => {
+    const config = invConfig();
+
+    it("matches default keywords exactly, case- and whitespace-insensitively", () => {
+      expect(normalizeCsvAction("Bought", config)).toBe("buy");
+      expect(normalizeCsvAction("  SOLD  ", config)).toBe("sell");
+      expect(normalizeCsvAction("Dividend", config)).toBe("dividend");
+      expect(normalizeCsvAction("DRIP", config)).toBe("reinvest");
+      expect(normalizeCsvAction("Deposit", config)).toBe("cashIn");
+      expect(normalizeCsvAction("Management Fee", config)).toBe("cashOut");
+    });
+
+    it("does not substring-match: 'sell to cover taxes withheld' stays unknown", () => {
+      expect(normalizeCsvAction("sell to cover taxes withheld", config)).toBeNull();
+    });
+
+    it("a user keyword list replaces the defaults for that action", () => {
+      const custom = invConfig({ actionKeywords: { buy: ["acquisto"] } });
+      expect(normalizeCsvAction("acquisto", custom)).toBe("buy");
+      // The default 'bought' is no longer active for buy and matches nothing else
+      expect(normalizeCsvAction("bought", custom)).toBeNull();
+      // Bare 'buy' still resolves through the QIF-code vocabulary
+      expect(normalizeCsvAction("buy", custom)).toBe("buy");
+    });
+
+    it("accepts QIF action codes as a final fallback", () => {
+      expect(normalizeCsvAction("reinvdiv", config)).toBe("reinvest");
+      expect(normalizeCsvAction("shrsin", config)).toBe("transferIn");
+      expect(normalizeCsvAction("cgshort", config)).toBe("capitalGain");
+      expect(normalizeCsvAction("xout", config)).toBe("cashOut");
+    });
+
+    it("returns null for unknown and empty values", () => {
+      expect(normalizeCsvAction("journal entry", config)).toBeNull();
+      expect(normalizeCsvAction("", config)).toBeNull();
+      expect(normalizeCsvAction(null, config)).toBeNull();
+    });
+  });
+
+  describe("emitted action codes", () => {
+    it("every emitted code resolves in the investment processor's actionMap vocabulary", () => {
+      // The processor falls back to BUY for unknown codes, so an emitted code
+      // outside this set would silently misfile rows as purchases.
+      const processorCodes = new Set([
+        "buy", "sell", "div", "intinc", "cglong", "stksplit", "shrsin",
+        "shrsout", "reinvdiv", "xin", "xout", "addshares", "removeshares",
+      ]);
+      for (const code of Object.values(CANONICAL_TO_QIF_ACTION)) {
+        expect(processorCodes.has(code as string)).toBe(true);
+      }
+    });
+  });
+
+  describe("parseCsv with investmentMode", () => {
+    it("emits a buy with quantity, price and commission and reports INVESTMENT", () => {
+      const result = parseRows(["01/15/2026,Buy,AAPL,10,100.00,1004.95,4.95"]);
+      expect(result.accountType).toBe("INVESTMENT");
+      expect(result.securities).toEqual(["AAPL"]);
+      expect(result.transactions).toHaveLength(1);
+      const tx = result.transactions[0];
+      expect(tx.action).toBe("buy");
+      expect(tx.security).toBe("AAPL");
+      expect(tx.quantity).toBe(10);
+      expect(tx.price).toBe(100);
+      expect(tx.commission).toBe(4.95);
+      expect(tx.isTransfer).toBe(false);
+      expect(result.investmentSummary!.actionCounts.buy).toBe(1);
+    });
+
+    it("derives a missing buy price from (amount - commission) / quantity", () => {
+      const result = parseRows(["01/15/2026,Buy,AAPL,10,,1004.95,4.95"]);
+      const tx = result.transactions[0];
+      expect(tx.action).toBe("buy");
+      // (1004.95 - 4.95) / 10 = 100; re-derived total = 10*100 + 4.95 = file amount
+      expect(tx.price).toBe(100);
+      expect(Math.round((tx.quantity * tx.price + tx.commission) * 100) / 100).toBe(1004.95);
+    });
+
+    it("rounds a derived price to 10 decimal places, never 4", () => {
+      const result = parseRows(["01/15/2026,Buy,XFN,3,,100.00,0"]);
+      expect(result.transactions[0].price).toBe(33.3333333333);
+    });
+
+    it("derives a missing sell price from (amount + commission) / quantity", () => {
+      const result = parseRows(["01/16/2026,Sold,AAPL,3,,295.05,4.95"]);
+      const tx = result.transactions[0];
+      expect(tx.action).toBe("sell");
+      // (295.05 + 4.95) / 3 = 100; re-derived proceeds = 3*100 - 4.95 = file amount
+      expect(tx.price).toBe(100);
+      expect(Math.round((tx.quantity * tx.price - tx.commission) * 100) / 100).toBe(295.05);
+    });
+
+    it("downgrades a buy with no price and no amount to uncosted addshares", () => {
+      const result = parseRows(["01/15/2026,Buy,AAPL,25,,,"]);
+      const tx = result.transactions[0];
+      expect(tx.action).toBe("addshares");
+      expect(tx.quantity).toBe(25);
+      // Price stays 0 so the processor persists NULL, never an invented cost
+      expect(tx.price).toBe(0);
+      expect(result.investmentSummary!.uncostedShareRows).toBe(1);
+      expect(result.investmentSummary!.actionCounts.addShares).toBe(1);
+      expect(result.investmentSummary!.actionCounts.buy).toBeUndefined();
+    });
+
+    it("rejects a sell with neither price nor proceeds instead of dropping the cash leg", () => {
+      const result = parseRows(["01/16/2026,Sell,AAPL,5,,,"]);
+      expect(result.transactions).toHaveLength(0);
+      expect(result.investmentSummary!.rejectedRows).toEqual([
+        { reason: "missingProceeds", count: 1 },
+      ]);
+    });
+
+    it("rejects buys and sells without a quantity", () => {
+      const result = parseRows([
+        "01/15/2026,Buy,AAPL,,100.00,1000.00,0",
+        "01/16/2026,Sell,AAPL,0,100.00,1000.00,0",
+      ]);
+      expect(result.transactions).toHaveLength(0);
+      expect(result.investmentSummary!.rejectedRows).toEqual([
+        { reason: "missingQuantity", count: 2 },
+      ]);
+    });
+
+    it("rejects security-requiring rows with an empty security cell", () => {
+      const result = parseRows(["01/15/2026,Buy,,10,100.00,1000.00,0"]);
+      expect(result.transactions).toHaveLength(0);
+      expect(result.investmentSummary!.rejectedRows).toEqual([
+        { reason: "missingSecurity", count: 1 },
+      ]);
+      expect(result.securities).toEqual([]);
+    });
+
+    it("books a dividend from the amount column, security optional", () => {
+      const result = parseRows([
+        "02/01/2026,Dividend,AAPL,,,45.67,",
+        "02/02/2026,Interest,,,,1.23,",
+      ]);
+      expect(result.transactions).toHaveLength(2);
+      expect(result.transactions[0].action).toBe("div");
+      expect(result.transactions[0].amount).toBe(45.67);
+      expect(result.transactions[0].security).toBe("AAPL");
+      expect(result.transactions[1].action).toBe("intinc");
+      expect(result.transactions[1].amount).toBe(1.23);
+      expect(result.transactions[1].security).toBe("");
+    });
+
+    it("rejects a dividend with no amount rather than booking zero income", () => {
+      const result = parseRows(["02/01/2026,Dividend,AAPL,,,,"]);
+      expect(result.transactions).toHaveLength(0);
+      expect(result.investmentSummary!.rejectedRows).toEqual([
+        { reason: "missingAmount", count: 1 },
+      ]);
+    });
+
+    it("emits a split ratio and rejects a split without one", () => {
+      const result = parseRows([
+        "03/01/2026,Stock Split,AAPL,2,,,",
+        "03/02/2026,Stock Split,MSFT,,,,",
+      ]);
+      expect(result.transactions).toHaveLength(1);
+      expect(result.transactions[0].action).toBe("stksplit");
+      expect(result.transactions[0].quantity).toBe(2);
+      expect(result.investmentSummary!.rejectedRows).toEqual([
+        { reason: "missingSplitRatio", count: 1 },
+      ]);
+    });
+
+    it("strips direction from quantity, price and commission cells", () => {
+      const result = parseRows(['01/16/2026,Sell,AAPL,-5,(10.00),,"-1.00"']);
+      const tx = result.transactions[0];
+      expect(tx.quantity).toBe(5);
+      expect(tx.price).toBe(10);
+      expect(tx.commission).toBe(1);
+    });
+
+    it("parses quantities with thousands separators and 8 decimals", () => {
+      const result = parseRows(['01/15/2026,Buy,VTI,"1,234.56789012",100.00,,0']);
+      expect(result.transactions[0].quantity).toBe(1234.56789012);
+    });
+
+    it("imports unknown-action rows as cash by amount sign and lists the values", () => {
+      const result = parseRows([
+        "04/01/2026,Journal,,,,500.00,",
+        "04/02/2026,Journal,,,,-200.00,",
+      ]);
+      expect(result.transactions).toHaveLength(2);
+      expect(result.transactions[0].action).toBe("xin");
+      expect(result.transactions[0].amount).toBe(500);
+      expect(result.transactions[1].action).toBe("xout");
+      expect(result.transactions[1].amount).toBe(-200);
+      expect(result.investmentSummary!.cashFallbackValues).toEqual(["Journal"]);
+      expect(result.investmentSummary!.actionCounts.cashIn).toBe(1);
+      expect(result.investmentSummary!.actionCounts.cashOut).toBe(1);
+    });
+
+    it("rejects an unknown-action row with no amount: nothing truthful to book", () => {
+      const result = parseRows(["04/01/2026,Mystery,,,,,"]);
+      expect(result.transactions).toHaveLength(0);
+      expect(result.investmentSummary!.cashFallbackValues).toEqual([]);
+      expect(result.investmentSummary!.rejectedRows).toEqual([
+        { reason: "missingAmount", count: 1 },
+      ]);
+    });
+
+    it("forces the direction of explicit cash keywords regardless of the file's sign", () => {
+      const result = parseRows([
+        "04/01/2026,Deposit,,,,1000.00,",
+        "04/02/2026,Fee,,,,9.99,",
+      ]);
+      expect(result.transactions[0].action).toBe("xin");
+      expect(result.transactions[0].amount).toBe(1000);
+      expect(result.transactions[1].action).toBe("xout");
+      expect(result.transactions[1].amount).toBe(-9.99);
+    });
+
+    it("supports the debit/credit pair as the amount source", () => {
+      const csv = [
+        "Date,Action,Symbol,Quantity,Price,Debit,Credit",
+        "02/01/2026,Dividend,AAPL,,,,45.67",
+        "04/02/2026,Journal,,,,20.00,",
+      ].join("\n");
+      const result = parseCsv(
+        csv,
+        invConfig({ amount: undefined, debit: 5, credit: 6, commissionColumn: undefined }),
+      );
+      expect(result.transactions[0].action).toBe("div");
+      expect(result.transactions[0].amount).toBe(45.67);
+      expect(result.transactions[1].action).toBe("xout");
+      expect(result.transactions[1].amount).toBe(-20);
+    });
+
+    it("ignores transfer rules and the sign machinery in investment mode", () => {
+      const rules: CsvTransferRule[] = [
+        { type: "payee", pattern: "journal", accountName: "Savings" },
+      ];
+      const csv = [
+        "Date,Action,Symbol,Quantity,Price,Amount,Commission,Payee",
+        "04/01/2026,Journal,,,,500.00,,Journal Transfer",
+      ].join("\n");
+      const result = parseCsv(
+        csv,
+        invConfig({ payee: 7, reverseSign: true }),
+        rules,
+      );
+      const tx = result.transactions[0];
+      expect(tx.isTransfer).toBe(false);
+      expect(tx.transferAccount).toBe("");
+      // reverseSign is inert: the deposit stays positive
+      expect(tx.amount).toBe(500);
+      expect(result.transferAccounts).toEqual([]);
+    });
+
+    it("does not collect categories in investment mode", () => {
+      const csv = [
+        "Date,Action,Symbol,Quantity,Price,Amount,Commission,Category",
+        "01/15/2026,Buy,AAPL,10,100.00,,0,Trading",
+      ].join("\n");
+      const result = parseCsv(csv, invConfig({ category: 7 }));
+      expect(result.categories).toEqual([]);
+      expect(result.transactions[0].category).toBe("");
+    });
+
+    it("keeps a mixed brokerage file straight: trades, income, cash and a bogus row", () => {
+      const result = parseRows([
+        "01/15/2026,Buy,AAPL,10,100.00,1004.95,4.95",
+        "01/20/2026,Sold,AAPL,4,110.00,435.05,4.95",
+        "02/01/2026,Dividend,AAPL,,,12.40,",
+        "02/03/2026,Reinvest Dividend,AAPL,0.1,124.00,,",
+        "02/05/2026,Deposit,,,,2000.00,",
+        "02/06/2026,Management Fee,,,,-25.00,",
+        "02/07/2026,Frobnicate,,,,75.00,",
+      ]);
+      expect(result.transactions.map((t) => t.action)).toEqual([
+        "buy", "sell", "div", "reinvdiv", "xin", "xout", "xin",
+      ]);
+      expect(result.securities).toEqual(["AAPL"]);
+      expect(result.investmentSummary).toEqual({
+        actionCounts: { buy: 1, sell: 1, dividend: 1, reinvest: 1, cashIn: 2, cashOut: 1 },
+        cashFallbackValues: ["Frobnicate"],
+        uncostedShareRows: 0,
+        rejectedRows: [],
+      });
+    });
+
+    it("reports INVESTMENT with an empty summary for empty content", () => {
+      const result = parseCsv("", invConfig());
+      expect(result.accountType).toBe("INVESTMENT");
+      expect(result.investmentSummary).toEqual({
+        actionCounts: {},
+        cashFallbackValues: [],
+        uncostedShareRows: 0,
+        rejectedRows: [],
+      });
+    });
+
+    it("regression lock: without investmentMode the parse output is unchanged in shape", () => {
+      const csv = "Date,Amount,Payee\n01/15/2026,-50.00,Grocery";
+      const config: CsvColumnMappingConfig = {
+        date: 0,
+        amount: 1,
+        payee: 2,
+        dateFormat: "MM/DD/YYYY",
+        hasHeader: true,
+        delimiter: ",",
+      };
+      const result = parseCsv(csv, config);
+      expect(result.accountType).toBe("CHEQUING");
+      expect(result.securities).toEqual([]);
+      expect(result).not.toHaveProperty("investmentSummary");
+      expect(result.transactions[0]).toMatchObject({
+        amount: -50,
+        payee: "Grocery",
+        security: "",
+        action: "",
+        price: 0,
+        quantity: 0,
+        commission: 0,
+      });
     });
   });
 });

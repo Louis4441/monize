@@ -927,6 +927,13 @@ export class ImportService {
       transferOutValues: dto.columnMapping.transferOutValues,
       transferInValues: dto.columnMapping.transferInValues,
       transferAccountColumn: dto.columnMapping.transferAccountColumn,
+      investmentMode: dto.columnMapping.investmentMode,
+      actionColumn: dto.columnMapping.actionColumn,
+      securityColumn: dto.columnMapping.securityColumn,
+      quantityColumn: dto.columnMapping.quantityColumn,
+      priceColumn: dto.columnMapping.priceColumn,
+      commissionColumn: dto.columnMapping.commissionColumn,
+      actionKeywords: dto.columnMapping.actionKeywords,
     };
 
     const transferRules: CsvTransferRule[] | undefined = dto.transferRules?.map(
@@ -945,7 +952,7 @@ export class ImportService {
       dto.accountId,
       dto.categoryMappings,
       dto.accountMappings,
-      [],
+      dto.securityMappings || [],
       dto.dateFormat as DateFormat,
     );
   }
@@ -1118,6 +1125,7 @@ export class ImportService {
       sampleDates: result.sampleDates,
       openingBalance: result.openingBalance,
       openingBalanceDate: result.openingBalanceDate,
+      investmentSummary: result.investmentSummary,
     };
   }
 

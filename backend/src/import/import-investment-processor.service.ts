@@ -78,6 +78,10 @@ export class ImportInvestmentProcessorService {
       expire: InvestmentAction.REMOVE_SHARES,
       grant: InvestmentAction.ADD_SHARES,
       vest: InvestmentAction.ADD_SHARES,
+      // Emitted by the CSV parser (CANONICAL_TO_QIF_ACTION in csv-parser.ts)
+      // for uncosted share adjustments; not part of the QIF vocabulary.
+      addshares: InvestmentAction.ADD_SHARES,
+      removeshares: InvestmentAction.REMOVE_SHARES,
     };
 
     const qifAction = (qifTx.action || "").toLowerCase();

@@ -70,6 +70,112 @@ export function detectCsvDateFormat(samples: string[]): string | null {
   return null;
 }
 
+export type CanonicalInvestmentAction =
+  | 'buy'
+  | 'sell'
+  | 'dividend'
+  | 'interest'
+  | 'capitalGain'
+  | 'reinvest'
+  | 'split'
+  | 'transferIn'
+  | 'transferOut'
+  | 'addShares'
+  | 'removeShares'
+  | 'cashIn'
+  | 'cashOut';
+
+export type CsvActionKeywords = Partial<Record<CanonicalInvestmentAction, string[]>>;
+
+/** Display/order source for the action-keyword editor. */
+export const CANONICAL_INVESTMENT_ACTIONS: CanonicalInvestmentAction[] = [
+  'buy',
+  'sell',
+  'dividend',
+  'interest',
+  'capitalGain',
+  'reinvest',
+  'split',
+  'transferIn',
+  'transferOut',
+  'addShares',
+  'removeShares',
+  'cashIn',
+  'cashOut',
+];
+
+/**
+ * Frontend copy of the backend's built-in action keyword lists
+ * (backend/src/import/csv-parser.ts), shown as placeholders in the
+ * action-keyword editor. The backend's copy is authoritative at parse time.
+ */
+export const DEFAULT_INVESTMENT_ACTION_KEYWORDS: Record<CanonicalInvestmentAction, string[]> = {
+  buy: ['buy', 'bought', 'purchase', 'buy to open', 'you bought'],
+  sell: ['sell', 'sold', 'sale', 'sell to close', 'you sold'],
+  dividend: ['div', 'dividend', 'cash dividend', 'qualified dividend', 'ordinary dividend'],
+  interest: ['int', 'interest', 'interest income', 'credit interest'],
+  capitalGain: ['capital gain', 'cap gain', 'lt cap gain', 'st cap gain', 'capital gains distribution'],
+  reinvest: ['reinvest', 'reinvestment', 'drip', 'reinvest dividend', 'dividend reinvestment', 'reinvest shares'],
+  split: ['split', 'stock split'],
+  transferIn: ['transfer in', 'shares in', 'securities in', 'receive'],
+  transferOut: ['transfer out', 'shares out', 'securities out', 'deliver'],
+  addShares: ['add', 'add shares', 'adjust up'],
+  removeShares: ['remove', 'remove shares', 'adjust down'],
+  cashIn: ['deposit', 'contribution', 'cash in', 'credit', 'funds received'],
+  cashOut: ['withdrawal', 'withdraw', 'cash out', 'fee', 'management fee', 'debit', 'tax withheld'],
+};
+
+const QIF_ACTION_CODE_TO_CANONICAL: Record<string, CanonicalInvestmentAction> = {
+  buy: 'buy',
+  sell: 'sell',
+  div: 'dividend',
+  intinc: 'interest',
+  cglong: 'capitalGain',
+  cgshort: 'capitalGain',
+  cgmid: 'capitalGain',
+  stksplit: 'split',
+  shrsin: 'transferIn',
+  shrsout: 'transferOut',
+  reinvdiv: 'reinvest',
+  reinvint: 'reinvest',
+  reinvlg: 'reinvest',
+  reinvsh: 'reinvest',
+  reinvmd: 'reinvest',
+  xin: 'cashIn',
+  xout: 'cashOut',
+};
+
+/**
+ * Frontend mirror of the backend's normalizeCsvAction, used only to preview
+ * which action-column values will match before parsing. Exact match after
+ * trim + lowercase; a user list replaces the defaults for that action.
+ */
+export function classifyCsvActionValue(
+  raw: string,
+  actionKeywords?: CsvActionKeywords,
+): CanonicalInvestmentAction | null {
+  const key = (raw ?? '').trim().toLowerCase();
+  if (!key) return null;
+  const overrides = actionKeywords || {};
+  const matches = (list?: string[]) => (list || []).some((k) => k.trim().toLowerCase() === key);
+  for (const action of CANONICAL_INVESTMENT_ACTIONS) {
+    if (matches(overrides[action])) return action;
+  }
+  for (const action of CANONICAL_INVESTMENT_ACTIONS) {
+    if (overrides[action] === undefined && matches(DEFAULT_INVESTMENT_ACTION_KEYWORDS[action])) {
+      return action;
+    }
+  }
+  return QIF_ACTION_CODE_TO_CANONICAL[key] ?? null;
+}
+
+export interface CsvInvestmentSummary {
+  actionCounts: Partial<Record<CanonicalInvestmentAction, number>>;
+  cashFallbackValues: string[];
+  uncostedShareRows: number;
+  rejectedRows: { reason: string; count: number }[];
+}
+
 export interface ParsedQifResponse {
   accountType: string;
   accountName?: string;
@@ -83,6 +189,7 @@ export interface ParsedQifResponse {
   };
   detectedDateFormat: DateFormat;
   sampleDates: string[];
+  investmentSummary?: CsvInvestmentSummary;
 }
 
 export interface CategoryMapping {
@@ -149,6 +256,13 @@ export interface CsvColumnMappingConfig {
   transferOutValues?: string[];
   transferInValues?: string[];
   transferAccountColumn?: number;
+  investmentMode?: boolean;
+  actionColumn?: number;
+  securityColumn?: number;
+  quantityColumn?: number;
+  priceColumn?: number;
+  commissionColumn?: number;
+  actionKeywords?: CsvActionKeywords;
 }
 
 /**
@@ -199,6 +313,52 @@ export function autoMatchCsvColumns(headers: string[]): Partial<CsvColumnMapping
   return result;
 }
 
+const INVESTMENT_COLUMN_PATTERNS: Record<string, string[]> = {
+  actionColumn: ['action', 'activity', 'transaction type', 'trans type', 'type'],
+  securityColumn: ['symbol', 'ticker', 'security', 'security name', 'cusip'],
+  quantityColumn: ['quantity', 'shares', 'units', 'qty', 'no. of shares'],
+  priceColumn: ['price', 'share price', 'unit price', 'price per share'],
+  commissionColumn: ['commission', 'fees', 'fee', 'commission & fees'],
+};
+
+/**
+ * Auto-detect the investment-specific column mappings from CSV headers.
+ * Only used when investment mode is (or is being) enabled; regular-mode
+ * matching stays in autoMatchCsvColumns.
+ */
+export function autoMatchInvestmentColumns(headers: string[]): Partial<CsvColumnMappingConfig> {
+  const normalized = headers.map((h) => h.trim().toLowerCase());
+  const result: Partial<CsvColumnMappingConfig> = {};
+  const used = new Set<number>();
+
+  for (const [field, keywords] of Object.entries(INVESTMENT_COLUMN_PATTERNS)) {
+    let matchIndex = normalized.findIndex((h, i) => !used.has(i) && keywords.includes(h));
+    if (matchIndex === -1) {
+      matchIndex = normalized.findIndex((h, i) => !used.has(i) && keywords.some((k) => h.includes(k)));
+    }
+    if (matchIndex !== -1) {
+      used.add(matchIndex);
+      (result as Record<string, number>)[field] = matchIndex;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Heuristic used to pre-enable investment mode: an action-ish, a
+ * security-ish and a quantity-ish header must all be present. The user
+ * keeps the final say via the mode toggle.
+ */
+export function looksLikeInvestmentCsv(headers: string[]): boolean {
+  const matched = autoMatchInvestmentColumns(headers);
+  return (
+    matched.actionColumn !== undefined &&
+    matched.securityColumn !== undefined &&
+    matched.quantityColumn !== undefined
+  );
+}
+
 export interface CsvTransferRule {
   type: 'payee' | 'category';
   pattern: string;
@@ -235,6 +395,7 @@ export interface ImportCsvRequest {
   transferRules?: CsvTransferRule[];
   categoryMappings: CategoryMapping[];
   accountMappings: AccountMapping[];
+  securityMappings?: SecurityMapping[];
   dateFormat?: DateFormat;
 }
 
