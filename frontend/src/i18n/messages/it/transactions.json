@@ -373,6 +373,10 @@
       "void": "Annullata"
     },
     "submitCreate": "Crea {mode}",
+    "submitCreateAndNew": "Crea {mode} e continua",
+    "submitCreateDescription": "Salva e chiudi questa finestra.",
+    "submitCreateAndNewDescription": "Salva e inseriscine un'altra, con lo stesso conto e la stessa data.",
+    "submitOptions": "Scegli cosa succede dopo la creazione",
     "submitUpdate": "Aggiorna {mode}",
     "reconciledConfirm": {
       "title": "Modificare la transazione riconciliata?",

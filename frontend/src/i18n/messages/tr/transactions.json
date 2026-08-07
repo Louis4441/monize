@@ -373,6 +373,10 @@
       "void": "Geçersiz"
     },
     "submitCreate": "{mode} Oluştur",
+    "submitCreateAndNew": "{mode} Oluştur ve Yeni",
+    "submitCreateDescription": "Kaydet ve bu pencereyi kapat.",
+    "submitCreateAndNewDescription": "Kaydet ve aynı hesap ve tarihle yenisine başla.",
+    "submitOptions": "Oluşturduktan sonra ne olacağını seçin",
     "submitUpdate": "{mode} Güncelle",
     "reconciledConfirm": {
       "title": "Mutabakatlı işlem düzenlensin mi?",

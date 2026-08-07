@@ -373,6 +373,10 @@
       "void": "Hủy bỏ"
     },
     "submitCreate": "Tạo {mode}",
+    "submitCreateAndNew": "Tạo {mode} và tiếp tục",
+    "submitCreateDescription": "Lưu và đóng cửa sổ này.",
+    "submitCreateAndNewDescription": "Lưu và bắt đầu mục mới, giữ nguyên tài khoản và ngày.",
+    "submitOptions": "Chọn điều xảy ra sau khi tạo",
     "submitUpdate": "Cập nhật {mode}",
     "reconciledConfirm": {
       "title": "Chỉnh sửa giao dịch đã điều hoà?",

@@ -450,6 +450,7 @@ function InvestmentsContent() {
           transaction={data.editingTransaction}
           defaultAccountId={data.getSelectedBrokerageAccountId()}
           onSuccess={handleInvestmentTransactionSuccess}
+          onCreateAndNew={data.handleFormCreateAndNew}
           onCancel={closeInvestmentTransactionModal}
           onDirtyChange={data.setFormDirty}
           onConversionStateChange={setInvestmentFormNeedsConversion}
@@ -468,6 +469,7 @@ function InvestmentsContent() {
           transaction={data.editingCashTransaction}
           defaultAccountId={data.cashAccountIds.length > 0 ? data.cashAccountIds[0] : undefined}
           onSuccess={data.handleCashFormSuccess}
+          onCreateAndNew={data.handleCashFormCreateAndNew}
           onCancel={data.closeCash}
           onDirtyChange={data.setCashFormDirty}
           submitRef={data.cashFormSubmitRef}

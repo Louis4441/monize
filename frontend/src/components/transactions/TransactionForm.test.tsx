@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor, act } from '@/test/render';
 import { TransactionForm } from './TransactionForm';
 import { TransactionStatus } from '@/types/transaction';
 import { getLocalDateString } from '@/lib/utils';
+import {
+  INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY,
+  TRANSACTION_SUBMIT_MODE_KEY,
+} from '@/hooks/useTransactionSubmitMode';
 import toast from 'react-hot-toast';
 
 // ---- Mock data ----
@@ -3780,6 +3784,279 @@ describe('TransactionForm', () => {
       const payload = mockCreate.mock.calls[0][0];
       expect(payload.originalAmount).toBe(-100);
       expect(payload.amount).toBe(-150);
+    });
+  });
+  // =========================================================================
+  // "Create & New": the submit button's two behaviours
+  // =========================================================================
+
+  describe('create and new', () => {
+    const CHEVRON = 'Choose what happens after creating';
+    const existingTransaction = createExistingTransaction();
+
+    beforeEach(() => {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    });
+
+    async function chooseCreateAndNew() {
+      fireEvent.click(screen.getByRole('button', { name: CHEVRON }));
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('menuitemradio', { name: /Create Transaction & New/ }),
+        );
+      });
+    }
+
+    it('offers no choice when the host cannot keep the window open', async () => {
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Create Transaction/i })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: CHEVRON })).not.toBeInTheDocument();
+    });
+
+    it('offers no choice when editing an existing transaction', async () => {
+      // "and enter another" is meaningless for an edit, and the button that
+      // did it would be sitting over an Update.
+      render(
+        <TransactionForm
+          transaction={existingTransaction}
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          onCreateAndNew={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Update Transaction/i })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: CHEVRON })).not.toBeInTheDocument();
+    });
+
+    it('closes as before while the default behaviour is selected', async () => {
+      const onCreateAndNew = vi.fn();
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create Transaction' }));
+      });
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+      expect(onCreateAndNew).not.toHaveBeenCalled();
+    });
+
+    it('keeps the window open and restarts the form when Create & New is selected', async () => {
+      const onCreateAndNew = vi.fn();
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await chooseCreateAndNew();
+
+      // Picking the option only sets the behaviour; nothing is posted yet.
+      expect(mockCreate).not.toHaveBeenCalled();
+
+      const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+      await act(async () => {
+        fireEvent.change(textarea, { target: { value: 'First entry' } });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create Transaction & New' }));
+      });
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(mockCreate.mock.calls[0][0].description).toBe('First entry');
+      // The host is told to refresh, and specifically not to close.
+      expect(onCreateAndNew).toHaveBeenCalledTimes(1);
+      expect(mockOnSuccess).not.toHaveBeenCalled();
+
+      // The form is back to a blank entry, still filed against the account and
+      // date the last one used -- exactly what opening it fresh would give.
+      await waitFor(() => {
+        expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
+      });
+      expect((screen.getByLabelText('Account') as HTMLSelectElement).value).toBe('acc-1');
+      expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe(getLocalDateString());
+    });
+
+    it('carries the account the entry was filed against, not the one the host named', async () => {
+      const onCreateAndNew = vi.fn();
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await chooseCreateAndNew();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'acc-2' } });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create Transaction & New' }));
+      });
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(mockCreate.mock.calls[0][0].accountId).toBe('acc-2');
+
+      // Resetting to the host's default here would send the next receipt to the
+      // wrong account, which is the whole reason the account is carried over.
+      await waitFor(() => {
+        expect((screen.getByLabelText('Account') as HTMLSelectElement).value).toBe('acc-2');
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create Transaction & New' }));
+      });
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
+      expect(mockCreate.mock.calls[1][0].accountId).toBe('acc-2');
+    });
+
+    it('remembers the choice under the regular-transaction key', async () => {
+      const onCreateAndNew = vi.fn();
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await chooseCreateAndNew();
+
+      expect(window.localStorage.getItem(TRANSACTION_SUBMIT_MODE_KEY)).toBe('"new"');
+      // The investment form reads its own key and must be untouched.
+      expect(
+        window.localStorage.getItem(INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY),
+      ).toBeNull();
+    });
+
+    it('starts with Create & New already selected when it was chosen before', async () => {
+      window.localStorage.setItem(TRANSACTION_SUBMIT_MODE_KEY, JSON.stringify('new'));
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+          onCreateAndNew={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Create Transaction & New' }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('restarts a duplicate as a blank entry, not as another copy', async () => {
+      const onCreateAndNew = vi.fn();
+      render(
+        <TransactionForm
+          duplicateFrom={existingTransaction}
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        existingTransaction.description,
+      );
+
+      await chooseCreateAndNew();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create Transaction & New' }));
+      });
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      await waitFor(() => {
+        expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
+      });
+    });
+
+    it('keeps the window open after creating a transfer too', async () => {
+      const onCreateAndNew = vi.fn();
+      mockCreateTransfer.mockResolvedValueOnce({ fromTransaction: { id: 'tx-new' } });
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await chooseCreateAndNew();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Transfer'));
+      });
+      await waitFor(() => expect(screen.getByText('To Account')).toBeInTheDocument());
+
+      const selects = document.querySelectorAll('select');
+      const toAccountSelect = Array.from(selects).find(
+        (select) =>
+          Array.from(select.options).some((option) => option.value === 'acc-2') &&
+          select.name !== 'accountId',
+      )!;
+      await act(async () => {
+        fireEvent.change(toAccountSelect, { target: { value: 'acc-2' } });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '25' } });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Create Transfer & New/i }));
+      });
+
+      await waitFor(() => expect(mockCreateTransfer).toHaveBeenCalledTimes(1));
+      expect(onCreateAndNew).toHaveBeenCalledTimes(1);
+      expect(mockOnSuccess).not.toHaveBeenCalled();
     });
   });
 });

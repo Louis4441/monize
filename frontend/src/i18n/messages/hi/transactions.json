@@ -373,6 +373,10 @@
       "void": "रद्द"
     },
     "submitCreate": "{mode} बनाएं",
+    "submitCreateAndNew": "{mode} बनाएं और नया",
+    "submitCreateDescription": "सहेजें और यह विंडो बंद करें।",
+    "submitCreateAndNewDescription": "सहेजें और उसी खाते और तारीख के साथ नया शुरू करें।",
+    "submitOptions": "चुनें कि बनाने के बाद क्या हो",
     "submitUpdate": "{mode} अपडेट करें",
     "reconciledConfirm": {
       "title": "समाधानित लेन-देन संपादित करें?",

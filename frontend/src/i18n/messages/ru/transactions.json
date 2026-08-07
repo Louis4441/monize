@@ -373,6 +373,10 @@
       "void": "Аннулирована"
     },
     "submitCreate": "Создать {mode}",
+    "submitCreateAndNew": "Создать {mode} и продолжить",
+    "submitCreateDescription": "Сохранить и закрыть это окно.",
+    "submitCreateAndNewDescription": "Сохранить и начать следующую с тем же счётом и датой.",
+    "submitOptions": "Выберите, что произойдёт после создания",
     "submitUpdate": "Обновить {mode}",
     "reconciledConfirm": {
       "title": "Изменить согласованную транзакцию?",

@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor, act } from '@/test/render';
 import { InvestmentTransactionForm } from './InvestmentTransactionForm';
 import { investmentsApi } from '@/lib/investments';
 import { getLocalDateString } from '@/lib/utils';
+import {
+  INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY,
+  TRANSACTION_SUBMIT_MODE_KEY,
+} from '@/hooks/useTransactionSubmitMode';
 import toast from 'react-hot-toast';
 
 vi.mock('@/hooks/useNumberFormat', () => ({
@@ -1955,5 +1959,184 @@ describe('InvestmentTransactionForm - extra coverage', () => {
     });
     const rate = screen.getByLabelText(/Exchange rate/i) as HTMLInputElement;
     await waitFor(() => expect(Number(rate.value)).toBeGreaterThan(0));
+  });
+
+  // =========================================================================
+  // "Create & New": the submit button's two behaviours
+  // =========================================================================
+
+  describe('create and new', () => {
+    const CHEVRON = 'Choose what happens after creating';
+
+    beforeEach(() => {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    });
+
+    async function chooseCreateAndNew() {
+      fireEvent.click(screen.getByRole('button', { name: CHEVRON }));
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('menuitemradio', { name: /Create Transaction & New/ }),
+        );
+      });
+    }
+
+    async function submitBuy(buttonName: RegExp) {
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brokerage Account'), {
+          target: { value: 'a1' },
+        });
+      });
+      await waitFor(() => {
+        expect(screen.getByLabelText('Security')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Security'), {
+          target: { value: 'sec-1' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: buttonName }));
+      });
+    }
+
+    it('offers no choice when the host cannot keep the window open', async () => {
+      render(<InvestmentTransactionForm accounts={accounts} onSuccess={vi.fn()} />);
+      await waitFor(() => {
+        expect(screen.getByText('Create Transaction')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: CHEVRON })).not.toBeInTheDocument();
+    });
+
+    it('offers no choice when editing an existing transaction', async () => {
+      const transaction = {
+        id: 't1', accountId: 'a1', action: 'BUY' as const, transactionDate: '2024-01-01',
+        quantity: 10, price: 50, commission: 5, totalAmount: 505, description: '',
+      } as any;
+      render(
+        <InvestmentTransactionForm
+          accounts={accounts}
+          transaction={transaction}
+          onCreateAndNew={vi.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.getByText('Update Transaction')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: CHEVRON })).not.toBeInTheDocument();
+    });
+
+    it('closes as before while the default behaviour is selected', async () => {
+      const onSuccess = vi.fn();
+      const onCreateAndNew = vi.fn();
+      render(
+        <InvestmentTransactionForm
+          accounts={accounts}
+          onSuccess={onSuccess}
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await submitBuy(/^Create Transaction$/);
+
+      await waitFor(() => {
+        expect(investmentsApi.createTransaction).toHaveBeenCalledTimes(1);
+      });
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onCreateAndNew).not.toHaveBeenCalled();
+    });
+
+    it('keeps the window open and restarts the form when Create & New is selected', async () => {
+      const onSuccess = vi.fn();
+      const onCreateAndNew = vi.fn();
+      render(
+        <InvestmentTransactionForm
+          accounts={accounts}
+          onSuccess={onSuccess}
+          onCreateAndNew={onCreateAndNew}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await chooseCreateAndNew();
+      expect(investmentsApi.createTransaction).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-09-09' } });
+      });
+      await submitBuy(/^Create Transaction & New$/);
+
+      await waitFor(() => {
+        expect(investmentsApi.createTransaction).toHaveBeenCalledTimes(1);
+      });
+      expect(onCreateAndNew).toHaveBeenCalledTimes(1);
+      expect(onSuccess).not.toHaveBeenCalled();
+
+      // Restarted, but still filed against the account and date just used --
+      // what a freshly opened window would show.
+      await waitFor(() => {
+        expect(screen.getByLabelText('Brokerage Account')).toHaveValue('a1');
+      });
+      expect(screen.getByLabelText('Date')).toHaveValue('2026-09-09');
+      expect(screen.getByLabelText('Security')).toHaveValue('');
+    });
+
+    it('remembers the choice under the investment key', async () => {
+      render(
+        <InvestmentTransactionForm accounts={accounts} onCreateAndNew={vi.fn()} />,
+      );
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: CHEVRON })).toBeInTheDocument();
+      });
+      await chooseCreateAndNew();
+
+      expect(
+        window.localStorage.getItem(INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY),
+      ).toBe('"new"');
+      // The regular transaction form reads its own key and must be untouched.
+      expect(window.localStorage.getItem(TRANSACTION_SUBMIT_MODE_KEY)).toBeNull();
+    });
+
+    it('starts with Create & New already selected when it was chosen before', async () => {
+      window.localStorage.setItem(
+        INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY,
+        JSON.stringify('new'),
+      );
+      render(
+        <InvestmentTransactionForm accounts={accounts} onCreateAndNew={vi.fn()} />,
+      );
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Create Transaction & New' }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('labels the option for a securities transfer in its own terms', async () => {
+      window.localStorage.setItem(
+        INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY,
+        JSON.stringify('new'),
+      );
+      render(
+        <InvestmentTransactionForm accounts={accounts} onCreateAndNew={vi.fn()} />,
+      );
+      await waitFor(() => {
+        expect(screen.getByLabelText('Transaction Type')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Transaction Type'), {
+          target: { value: 'TRANSFER' },
+        });
+      });
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Transfer Securities & New' }),
+        ).toBeInTheDocument();
+      });
+    });
   });
 });

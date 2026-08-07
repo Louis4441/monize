@@ -373,6 +373,10 @@
       "void": "Batal"
     },
     "submitCreate": "Buat {mode}",
+    "submitCreateAndNew": "Buat {mode} dan Baru",
+    "submitCreateDescription": "Simpan dan tutup jendela ini.",
+    "submitCreateAndNewDescription": "Simpan dan mulai yang baru, dengan akun dan tanggal yang sama.",
+    "submitOptions": "Pilih apa yang terjadi setelah membuat",
     "submitUpdate": "Perbarui {mode}",
     "reconciledConfirm": {
       "title": "Edit transaksi yang telah direkonsiliasi?",

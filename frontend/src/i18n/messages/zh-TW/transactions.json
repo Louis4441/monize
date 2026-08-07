@@ -373,6 +373,10 @@
       "void": "作廢"
     },
     "submitCreate": "建立{mode}",
+    "submitCreateAndNew": "建立{mode}並繼續",
+    "submitCreateDescription": "儲存並關閉此視窗。",
+    "submitCreateAndNewDescription": "儲存並開始下一筆，保留帳戶與日期。",
+    "submitOptions": "選擇建立後的行為",
     "submitUpdate": "更新{mode}",
     "reconciledConfirm": {
       "title": "編輯已對帳的交易？",

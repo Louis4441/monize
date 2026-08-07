@@ -373,6 +373,10 @@
       "void": "無効"
     },
     "submitCreate": "{mode}を作成",
+    "submitCreateAndNew": "{mode}を作成して続ける",
+    "submitCreateDescription": "保存してこのウィンドウを閉じます。",
+    "submitCreateAndNewDescription": "保存して、同じ口座と日付で次の入力を始めます。",
+    "submitOptions": "作成後の動作を選択",
     "submitUpdate": "{mode}を更新",
     "reconciledConfirm": {
       "title": "照合済みの取引を編集しますか？",

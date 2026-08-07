@@ -373,6 +373,10 @@
       "void": "무효"
     },
     "submitCreate": "{mode} 만들기",
+    "submitCreateAndNew": "{mode} 만들고 계속",
+    "submitCreateDescription": "저장하고 이 창을 닫습니다.",
+    "submitCreateAndNewDescription": "저장하고 같은 계좌와 날짜로 새로 입력합니다.",
+    "submitOptions": "만든 후 동작 선택",
     "submitUpdate": "{mode} 업데이트",
     "reconciledConfirm": {
       "title": "조정된 거래를 편집하시겠습니까?",

@@ -373,6 +373,10 @@
       "void": "Anulada"
     },
     "submitCreate": "Crear {mode}",
+    "submitCreateAndNew": "Crear {mode} y otra",
+    "submitCreateDescription": "Guardar y cerrar esta ventana.",
+    "submitCreateAndNewDescription": "Guardar y empezar otra, manteniendo la cuenta y la fecha.",
+    "submitOptions": "Elegir qué ocurre después de crear",
     "submitUpdate": "Actualizar {mode}",
     "reconciledConfirm": {
       "title": "¿Editar transacción conciliada?",
