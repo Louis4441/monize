@@ -473,7 +473,8 @@
       "nextBackup": "Volgende back-up",
       "error": "Fout",
       "success": "Geslaagd",
-      "failed": "Mislukt"
+      "failed": "Mislukt",
+      "partial": "Gedeeltelijk"
     },
     "saveButton": "Instellingen opslaan",
     "savingButton": "Opslaan...",
@@ -498,6 +499,10 @@
       "every12hours": "Elke 12 uur",
       "daily": "Dagelijks",
       "weekly": "Wekelijks"
+    },
+    "noStorage": {
+      "title": "Deze installatie heeft geen back-upopslag",
+      "body": "Automatische back-ups zouden naar {folderPath} worden geschreven, waar deze installatie niet kan schrijven. Een beheerder moet daar opslag aankoppelen voordat een schema kan worden uitgevoerd."
     }
   },
   "backupRestore": {
@@ -539,6 +544,7 @@
       },
       "toasts": {
         "success": "Back-up succesvol gedownload",
+        "incomplete": "Back-up gedownload, maar deze is ONVOLLEDIG: {unusable} van {total} bijlage(n) konden niet intact worden opgeslagen ({missing} ontbreken, {inconsistent} zijn niet door de integriteitscontrole gekomen). Beschouw dit bestand niet als een volledige back-up — herstel de bijlageopslag en exporteer opnieuw.",
         "failed": "Aanmaken van back-up mislukt"
       }
     },
@@ -568,7 +574,8 @@
       "title": "Herstel voltooid",
       "description": "Jouw gegevens zijn succesvol hersteld. Hier is een overzicht van wat is hersteld:",
       "totalRecords": "Totaal records",
-      "doneButton": "Gereed"
+      "doneButton": "Gereed",
+      "skippedAttachments": "{count, plural, one {# bijlage is niet teruggezet} other {# bijlagen zijn niet teruggezet}}: de back-up bevatte er geen bruikbare bytes voor — ze ontbraken of kwamen niet door hun checksum bij het exporteren, of het bestand is van vóór zelfstandige back-ups. Maak een nieuwe back-up zodra de bijlageopslag in orde is."
     }
   },
   "sharedAccess": {

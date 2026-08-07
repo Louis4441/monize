@@ -182,11 +182,24 @@ export interface AutoBackupSettings {
   retentionWeekly: number;
   retentionMonthly: number;
   lastBackupAt: string | null;
-  lastBackupStatus: 'success' | 'failed' | null;
+  lastBackupStatus: 'success' | 'partial' | 'failed' | null;
   lastBackupError: string | null;
   nextBackupAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Whether the deployment has somewhere to write automatic backups.
+ *
+ * This is a deployment capability, not a field from the acting-context user
+ * profile or the user's settings row.
+ */
+export interface AutoBackupCapability {
+  available: boolean;
+  folderPath: string;
+  /** Operator-facing detail when the capability is unavailable. */
+  reason?: string;
 }
 
 export interface UpdateAutoBackupSettingsData {

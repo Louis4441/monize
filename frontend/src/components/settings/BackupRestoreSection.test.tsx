@@ -102,7 +102,13 @@ describe('BackupRestoreSection', () => {
 
   it('downloads backup when export button clicked', async () => {
     const mockBlob = new Blob(['{}'], { type: 'application/json' });
-    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue(mockBlob);
+    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue({
+      blob: mockBlob,
+      complete: true,
+      missingAttachments: 0,
+      inconsistentAttachments: 0,
+      expectedAttachments: 0,
+    });
 
     // Mock URL.createObjectURL and revokeObjectURL
     const mockUrl = 'blob:http://localhost/mock-url';
@@ -121,9 +127,92 @@ describe('BackupRestoreSection', () => {
     });
   });
 
+  it('does not call an incomplete export a success, and names the file INCOMPLETE (F3RB-004)', async () => {
+    // The backend knows the artifact cannot restore every attachment it names.
+    // A success toast here is how a user ends up deleting the source system for
+    // a file that cannot bring it back.
+    const mockBlob = new Blob(['{}'], { type: 'application/json' });
+    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue({
+      blob: mockBlob,
+      complete: false,
+      missingAttachments: 2,
+      inconsistentAttachments: 0,
+      expectedAttachments: 5,
+    });
+    const anchorEl = document.createElement('a');
+    const clickSpy = vi.spyOn(anchorEl, 'click').mockImplementation(() => {});
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) =>
+      tag === 'a'
+        ? anchorEl
+        : (Document.prototype.createElement.call(
+            document,
+            tag,
+          ) as HTMLElement),
+    );
+    global.URL.createObjectURL = vi
+      .fn()
+      .mockReturnValue('blob:http://localhost/mock-url');
+    global.URL.revokeObjectURL = vi.fn();
+
+    await renderSection(localUser);
+    fireEvent.click(screen.getByText('Download Backup'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('INCOMPLETE'),
+        expect.anything(),
+      );
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(anchorEl.download).toContain('-INCOMPLETE.');
+    expect(clickSpy).toHaveBeenCalled();
+
+    vi.mocked(document.createElement).mockRestore();
+  });
+
+  it('counts a checksum-mismatched attachment as unusable, not as zero (F3RB-R2-LOW)', async () => {
+    // Reporting only `missing` said "0 of 1 attachment(s)" for an artifact whose
+    // single attachment was corrupt: a false number, and it pointed at storage
+    // when the cause was corruption. Both modes are equally unrestorable and the
+    // backend excludes both from `includedAttachments`.
+    const mockBlob = new Blob(['{}'], { type: 'application/json' });
+    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue({
+      blob: mockBlob,
+      complete: false,
+      missingAttachments: 0,
+      inconsistentAttachments: 1,
+      expectedAttachments: 1,
+    });
+    global.URL.createObjectURL = vi
+      .fn()
+      .mockReturnValue('blob:http://localhost/mock-url');
+    global.URL.revokeObjectURL = vi.fn();
+
+    await renderSection(localUser);
+    fireEvent.click(screen.getByText('Download Backup'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalled();
+    });
+    const message = (toast.error as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    // The headline count is the unusable total, not just the absent ones...
+    expect(message).toContain('1 of 1');
+    expect(message).not.toContain('0 of 1');
+    // ...and the breakdown still says which mode it was.
+    expect(message).toContain('1 failed an integrity check');
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it('names the download using the local calendar date, not UTC', async () => {
     const mockBlob = new Blob(['{}'], { type: 'application/json' });
-    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue(mockBlob);
+    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue({
+      blob: mockBlob,
+      complete: true,
+      missingAttachments: 0,
+      inconsistentAttachments: 0,
+      expectedAttachments: 0,
+    });
     global.URL.createObjectURL = vi
       .fn()
       .mockReturnValue('blob:http://localhost/mock-url');
@@ -159,7 +248,13 @@ describe('BackupRestoreSection', () => {
 
   it('dates the download by the timezone preference, not the browser timezone', async () => {
     const mockBlob = new Blob(['{}'], { type: 'application/json' });
-    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue(mockBlob);
+    (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue({
+      blob: mockBlob,
+      complete: true,
+      missingAttachments: 0,
+      inconsistentAttachments: 0,
+      expectedAttachments: 0,
+    });
     global.URL.createObjectURL = vi
       .fn()
       .mockReturnValue('blob:http://localhost/mock-url');
@@ -292,6 +387,68 @@ describe('BackupRestoreSection', () => {
     // Clicking Done closes the modal
     fireEvent.click(screen.getByText('Done'));
     expect(screen.queryByText('Restore Complete')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Attachment files live outside the database, so a restore can succeed for
+   * every ledger row while some attachments have no bytes to point at. Those
+   * rows are not written, and a summary that stays silent tells the user files
+   * came back that did not.
+   */
+  describe('attachments that could not be restored', () => {
+    async function restoreWith(result: Record<string, unknown>) {
+      (backupApi.restoreBackup as ReturnType<typeof vi.fn>).mockResolvedValue(result);
+      await renderSection(localUser);
+      fireEvent.click(screen.getByText('Restore from Backup...'));
+      const file = new File(['{}'], 'backup.json', { type: 'application/json' });
+      const fileInput = screen.getByLabelText('Select backup file') as HTMLInputElement;
+      await act(async () => {
+        fireEvent.change(fileInput, { target: { files: [file] } });
+      });
+      fireEvent.change(screen.getByPlaceholderText('Enter your password'), {
+        target: { value: 'testpass' },
+      });
+      fireEvent.click(screen.getByText('Confirm Restore'));
+      await screen.findByText('Restore Complete');
+    }
+
+    it('warns when the backend skipped some attachments', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 3 },
+        skippedAttachments: 2,
+      });
+
+      expect(
+        screen.getByText(/2 attachments were not restored/),
+      ).toBeInTheDocument();
+      // The skipped rows were not written, so they must not be added into the
+      // total: 3 restored + 2 skipped must never read as 5.
+      expect(screen.getAllByText('3').length).toBeGreaterThan(0);
+      expect(screen.queryByText('5')).not.toBeInTheDocument();
+    });
+
+    it('uses the singular form for one attachment', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+        skippedAttachments: 1,
+      });
+
+      expect(
+        screen.getByText(/1 attachment was not restored/),
+      ).toBeInTheDocument();
+    });
+
+    it('says nothing when every attachment came back', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+      });
+
+      expect(screen.queryByText(/were not restored/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/was not restored/)).not.toBeInTheDocument();
+    });
   });
 
   it('shows error toast on restore failure', async () => {
@@ -491,7 +648,13 @@ describe('BackupRestoreSection', () => {
         manageable: false,
       });
       const mockBlob = new Blob(['encrypted'], { type: 'application/octet-stream' });
-      (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue(mockBlob);
+      (backupApi.exportBackup as ReturnType<typeof vi.fn>).mockResolvedValue({
+      blob: mockBlob,
+      complete: true,
+      missingAttachments: 0,
+      inconsistentAttachments: 0,
+      expectedAttachments: 0,
+    });
       const createObjectURL = vi.fn().mockReturnValue('blob:mock');
       const revokeObjectURL = vi.fn();
       global.URL.createObjectURL = createObjectURL;

@@ -473,7 +473,8 @@
       "nextBackup": "Pencadangan berikutnya",
       "error": "Kesalahan",
       "success": "Berhasil",
-      "failed": "Gagal"
+      "failed": "Gagal",
+      "partial": "Sebagian"
     },
     "saveButton": "Simpan Pengaturan",
     "savingButton": "Menyimpan...",
@@ -498,6 +499,10 @@
       "every12hours": "Setiap 12 Jam",
       "daily": "Harian",
       "weekly": "Mingguan"
+    },
+    "noStorage": {
+      "title": "Deployment ini tidak memiliki penyimpanan backup",
+      "body": "Backup otomatis akan ditulis ke {folderPath}, yang tidak dapat ditulisi oleh deployment ini. Administrator perlu memasang penyimpanan di sana sebelum jadwal dapat berjalan."
     }
   },
   "backupRestore": {
@@ -539,6 +544,7 @@
       },
       "toasts": {
         "success": "Cadangan berhasil diunduh",
+        "incomplete": "Backup terunduh, tetapi TIDAK LENGKAP: {unusable} dari {total} lampiran tidak dapat disimpan utuh ({missing} hilang, {inconsistent} gagal pemeriksaan integritas). Jangan perlakukan berkas ini sebagai backup lengkap — perbaiki penyimpanan lampiran dan ekspor ulang.",
         "failed": "Gagal membuat cadangan"
       }
     },
@@ -568,7 +574,8 @@
       "title": "Pemulihan Selesai",
       "description": "Data Anda telah berhasil dipulihkan. Berikut ringkasan apa yang dipulihkan:",
       "totalRecords": "Total rekaman",
-      "doneButton": "Selesai"
+      "doneButton": "Selesai",
+      "skippedAttachments": "{count, plural, other {# lampiran tidak dipulihkan}}: backup tidak memuat byte yang dapat digunakan untuk lampiran tersebut — saat diekspor lampiran hilang atau gagal checksum, atau berkas dibuat sebelum backup mandiri. Ekspor backup baru setelah penyimpanan lampiran sehat."
     }
   },
   "sharedAccess": {

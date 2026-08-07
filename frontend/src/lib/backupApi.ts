@@ -1,7 +1,11 @@
-import apiClient from './api';
-import { clearAllCache } from './apiCache';
-import { filenameFromContentDisposition } from './download';
-import { AutoBackupSettings, UpdateAutoBackupSettingsData } from '@/types/auth';
+import apiClient from "./api";
+import { clearAllCache } from "./apiCache";
+import { filenameFromContentDisposition } from "./download";
+import {
+  AutoBackupCapability,
+  AutoBackupSettings,
+  UpdateAutoBackupSettingsData,
+} from "@/types/auth";
 
 // HTTP header values have their leading and trailing whitespace stripped in
 // transit (RFC 7230 "optional whitespace"), which silently corrupts passwords
@@ -11,7 +15,7 @@ import { AutoBackupSettings, UpdateAutoBackupSettingsData } from '@/types/auth';
 // credential comparison.
 function encodePasswordHeader(value: string): string {
   const bytes = new TextEncoder().encode(value);
-  let binary = '';
+  let binary = "";
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
@@ -21,23 +25,32 @@ function encodePasswordHeader(value: string): string {
 export interface RestoreResult {
   message: string;
   restored: Record<string, number>;
+  /**
+   * Attachments whose metadata was deliberately not restored because their
+   * bytes could not be made reachable (absent from the sidecar volume/bucket,
+   * failing their recorded checksum, or exported from an instance using a
+   * different storage provider). Deliberately outside `restored`, whose values
+   * are summed into a row total -- rows that were not written must not be
+   * counted as written. Absent when nothing was skipped.
+   */
+  skippedAttachments?: number;
 }
 
 export type SupportBackupSection =
-  | 'investments'
-  | 'scheduled'
-  | 'budgets'
-  | 'reports'
-  | 'importMappings'
-  | 'autoBackup';
+  | "investments"
+  | "scheduled"
+  | "budgets"
+  | "reports"
+  | "importMappings"
+  | "autoBackup";
 
 export const SUPPORT_BACKUP_SECTIONS: SupportBackupSection[] = [
-  'investments',
-  'scheduled',
-  'budgets',
-  'reports',
-  'importMappings',
-  'autoBackup',
+  "investments",
+  "scheduled",
+  "budgets",
+  "reports",
+  "importMappings",
+  "autoBackup",
 ];
 
 export interface SupportBackupInput {
@@ -92,10 +105,10 @@ export function randomSupportMultiplier(): number {
  * can still edit or regenerate it.
  */
 export function randomSupportPassword(): string {
-  const alphabet = '23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
+  const alphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
   const bytes = new Uint8Array(20);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }
 
 /**
@@ -131,7 +144,7 @@ export interface BackupEncryptionStatus {
 // Error code surfaced by the backend when an encrypted backup can't be
 // decrypted with any password we tried. Frontend uses this to prompt the
 // user for the password the backup was originally made with.
-export const BACKUP_PASSWORD_REQUIRED_CODE = 'BACKUP_PASSWORD_REQUIRED';
+export const BACKUP_PASSWORD_REQUIRED_CODE = "BACKUP_PASSWORD_REQUIRED";
 
 // Encrypted Monize backups begin with the ASCII magic "MZBE" (see the backend
 // backup-crypto.util envelope format). Sniffing the first four bytes lets the
@@ -152,40 +165,87 @@ export async function isEncryptedBackupFile(file: File): Promise<boolean> {
   } catch {
     // Reading the header failed (unusual); fall back to the extension below.
   }
-  return file.name.toLowerCase().endsWith('.mzbe');
+  return file.name.toLowerCase().endsWith(".mzbe");
 }
 
 async function compressGzip(data: ArrayBuffer): Promise<Blob> {
-  const stream = new Blob([data]).stream().pipeThrough(
-    new CompressionStream('gzip'),
-  );
+  const stream = new Blob([data])
+    .stream()
+    .pipeThrough(new CompressionStream("gzip"));
   return new Response(stream).blob();
 }
 
 export const backupApi = {
-  exportBackup: async (encryptionPassword?: string): Promise<Blob> => {
+  /**
+   * The artifact, plus whether the server could actually include everything it
+   * names.
+   *
+   * The completeness answer travels in headers rather than the body, because the
+   * body is a gzip/encrypted stream (see the backend's `markIncompleteExport`).
+   * A caller that ignores `complete` will show a plain success for a download the
+   * server knows cannot restore every attachment -- which is the defect this
+   * return shape exists to make hard.
+   */
+  exportBackup: async (
+    encryptionPassword?: string,
+  ): Promise<{
+    blob: Blob;
+    complete: boolean;
+    /** Rows whose bytes are absent from the artifact entirely. */
+    missingAttachments: number;
+    /**
+     * Rows whose bytes are present but contradict their own metadata, so they
+     * cannot be trusted either. A separate count because it is a different
+     * diagnosis: absent bytes point at storage, contradictory bytes at
+     * corruption -- and reporting only `missing` said "0 of 1" for an artifact
+     * with one corrupt attachment, which is a false number and the wrong lead.
+     */
+    inconsistentAttachments: number;
+    expectedAttachments: number;
+  }> => {
     const headers: Record<string, string> = {};
     if (encryptionPassword) {
-      headers['X-Export-Password'] = encodePasswordHeader(encryptionPassword);
+      headers["X-Export-Password"] = encodePasswordHeader(encryptionPassword);
     }
-    const response = await apiClient.post('/backup/export', {}, {
-      responseType: 'blob',
-      timeout: 120000,
-      headers,
-    });
-    return response.data;
+    const response = await apiClient.post(
+      "/backup/export",
+      {},
+      {
+        responseType: "blob",
+        timeout: 120000,
+        headers,
+      },
+    );
+    const header = (name: string): string | undefined => {
+      const value = response.headers?.[name] ?? response.headers?.[name.toLowerCase()];
+      return value === undefined || value === null ? undefined : String(value);
+    };
+    return {
+      blob: response.data,
+      // Absent header means complete: only an incomplete export marks itself, so
+      // an old server or a proxy that strips the header reads as complete rather
+      // than as a false alarm on every download.
+      complete: header("X-Backup-Complete") !== "false",
+      missingAttachments: Number(header("X-Backup-Attachments-Missing") ?? 0),
+      inconsistentAttachments: Number(
+        header("X-Backup-Attachments-Inconsistent") ?? 0,
+      ),
+      expectedAttachments: Number(header("X-Backup-Attachments-Expected") ?? 0),
+    };
   },
 
-  supportExport: async (input: SupportBackupInput): Promise<SupportBackupFile> => {
+  supportExport: async (
+    input: SupportBackupInput,
+  ): Promise<SupportBackupFile> => {
     try {
-      const response = await apiClient.post('/backup/support-export', input, {
-        responseType: 'blob',
+      const response = await apiClient.post("/backup/support-export", input, {
+        responseType: "blob",
         timeout: 120000,
       });
       return {
         blob: response.data,
         filename: filenameFromContentDisposition(
-          response.headers['content-disposition'] as string | undefined,
+          response.headers["content-disposition"] as string | undefined,
         ),
       };
     } catch (error) {
@@ -197,7 +257,7 @@ export const backupApi = {
     input: SupportBackupInput,
   ): Promise<SupportBackupPreview> => {
     const response = await apiClient.post<SupportBackupPreview>(
-      '/backup/support-export/preview',
+      "/backup/support-export/preview",
       input,
       { timeout: 120000 },
     );
@@ -215,27 +275,31 @@ export const backupApi = {
     //   *.gz/*.json.gz -> already gzipped, sent as-is
     //   anything else -> assume raw JSON, gzip it client-side
     const ext = params.file.name.toLowerCase();
-    const isEncrypted = ext.endsWith('.mzbe');
-    const isAlreadyCompressed = isEncrypted || ext.endsWith('.gz');
+    const isEncrypted = ext.endsWith(".mzbe");
+    const isAlreadyCompressed = isEncrypted || ext.endsWith(".gz");
     const body = isAlreadyCompressed
       ? params.file
       : await compressGzip(await params.file.arrayBuffer());
 
     const headers: Record<string, string> = {
-      'Content-Type': isEncrypted ? 'application/octet-stream' : 'application/gzip',
+      "Content-Type": isEncrypted
+        ? "application/octet-stream"
+        : "application/gzip",
     };
     if (params.password) {
-      headers['X-Restore-Password'] = encodePasswordHeader(params.password);
+      headers["X-Restore-Password"] = encodePasswordHeader(params.password);
     }
     if (params.oidcIdToken) {
-      headers['X-Restore-OIDC-Token'] = params.oidcIdToken;
+      headers["X-Restore-OIDC-Token"] = params.oidcIdToken;
     }
     if (params.backupPassword) {
-      headers['X-Backup-Password'] = encodePasswordHeader(params.backupPassword);
+      headers["X-Backup-Password"] = encodePasswordHeader(
+        params.backupPassword,
+      );
     }
 
     const response = await apiClient.post<RestoreResult>(
-      '/backup/restore',
+      "/backup/restore",
       body,
       { headers, timeout: 300000 },
     );
@@ -246,26 +310,42 @@ export const backupApi = {
   },
 
   getEncryptionStatus: async (): Promise<BackupEncryptionStatus> => {
-    const response = await apiClient.get<BackupEncryptionStatus>(
-      '/backup/encryption',
-    );
+    const response =
+      await apiClient.get<BackupEncryptionStatus>("/backup/encryption");
     return response.data;
   },
 
   // Set/clear the dedicated backup password. OIDC accounts only -- the backend
   // rejects a local-auth caller, whose password is recaptured at every login.
   setBackupPassword: async (backupPassword: string): Promise<void> => {
-    await apiClient.post('/backup/encryption/backup-password', {
+    await apiClient.post("/backup/encryption/backup-password", {
       backupPassword,
     });
   },
 
   disableEncryption: async (): Promise<void> => {
-    await apiClient.delete('/backup/encryption');
+    await apiClient.delete("/backup/encryption");
   },
 
   getAutoBackupSettings: async (): Promise<AutoBackupSettings> => {
-    const response = await apiClient.get<AutoBackupSettings>('/backup/auto-backup-settings');
+    const response = await apiClient.get<AutoBackupSettings>(
+      "/backup/auto-backup-settings",
+    );
+    return response.data;
+  },
+
+  /**
+   * Whether this deployment can write an automatic backup at all.
+   *
+   * Saving an enabled schedule already fails when it cannot -- the server creates
+   * the directory and probes it -- but only after the user has chosen a frequency,
+   * a time and a retention policy and pressed save, and the answer never depended
+   * on any of that. This lets the section say so first.
+   */
+  getAutoBackupCapability: async (): Promise<AutoBackupCapability> => {
+    const response = await apiClient.get<AutoBackupCapability>(
+      "/backup/auto-backup-capability",
+    );
     return response.data;
   },
 
@@ -273,7 +353,7 @@ export const backupApi = {
     data: UpdateAutoBackupSettingsData,
   ): Promise<AutoBackupSettings> => {
     const response = await apiClient.patch<AutoBackupSettings>(
-      '/backup/auto-backup-settings',
+      "/backup/auto-backup-settings",
       data,
     );
     return response.data;
@@ -283,7 +363,7 @@ export const backupApi = {
     folderPath: string,
   ): Promise<{ valid: boolean; error?: string }> => {
     const response = await apiClient.post<{ valid: boolean; error?: string }>(
-      '/backup/validate-folder',
+      "/backup/validate-folder",
       { folderPath },
     );
     return response.data;
@@ -292,17 +372,18 @@ export const backupApi = {
   browseFolders: async (
     path: string,
   ): Promise<{ current: string; directories: string[] }> => {
-    const response = await apiClient.post<{ current: string; directories: string[] }>(
-      '/backup/browse-folders',
-      { folderPath: path },
-    );
+    const response = await apiClient.post<{
+      current: string;
+      directories: string[];
+    }>("/backup/browse-folders", { folderPath: path });
     return response.data;
   },
 
   runAutoBackup: async (): Promise<{ message: string; filename: string }> => {
-    const response = await apiClient.post<{ message: string; filename: string }>(
-      '/backup/run-auto-backup',
-    );
+    const response = await apiClient.post<{
+      message: string;
+      filename: string;
+    }>("/backup/run-auto-backup");
     return response.data;
   },
 };

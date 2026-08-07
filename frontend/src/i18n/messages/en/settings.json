@@ -473,6 +473,7 @@
       "nextBackup": "Next backup",
       "error": "Error",
       "success": "Success",
+      "partial": "Partial",
       "failed": "Failed"
     },
     "saveButton": "Save Settings",
@@ -498,6 +499,10 @@
       "every12hours": "Every 12 Hours",
       "daily": "Daily",
       "weekly": "Weekly"
+    },
+    "noStorage": {
+      "title": "This deployment has no backup storage",
+      "body": "Automatic backups would be written to {folderPath}, which this deployment cannot write to. An administrator needs to mount storage there before a schedule can run."
     }
   },
   "backupRestore": {
@@ -539,7 +544,8 @@
       },
       "toasts": {
         "success": "Backup downloaded successfully",
-        "failed": "Failed to create backup"
+        "failed": "Failed to create backup",
+        "incomplete": "Backup downloaded, but it is INCOMPLETE: {unusable} of {total} attachment(s) could not be saved intact ({missing} missing, {inconsistent} failed an integrity check). Do not treat this file as a full backup — fix the attachment storage and export again."
       }
     },
     "restore": {
@@ -568,6 +574,7 @@
       "title": "Restore Complete",
       "description": "Your data has been restored successfully. Here is a summary of what was restored:",
       "totalRecords": "Total records",
+      "skippedAttachments": "{count, plural, one {# attachment was not restored} other {# attachments were not restored}}: the backup did not carry usable bytes for them — they were missing or failed their checksum when it was exported, or the file predates self-contained backups. Export a fresh backup once attachment storage is healthy to capture them.",
       "doneButton": "Done"
     }
   },
