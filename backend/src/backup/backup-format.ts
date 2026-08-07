@@ -65,9 +65,57 @@ export interface BackupCompletenessReport {
   inconsistentAttachments: number;
 }
 
+/**
+ * The envelope's completeness claim, or `null` when the artifact makes none.
+ *
+ * The same report the export returns, read back from inside the file. It travels
+ * in the document because completeness used to live only in
+ * `auto_backup_settings.lastBackupStatus`, which does not survive the artifact:
+ * copy it to another machine, restart the server, or find it in a directory
+ * rescan, and a partial artifact was indistinguishable from a complete one
+ * (F3RB-001, issue #1069). The *filename* is what retention reads -- an
+ * encrypted artifact's envelope is inside the ciphertext -- and this is the copy
+ * a rename cannot lose.
+ *
+ * `null` is "this file predates the field", not "complete" and not "partial" --
+ * see the missing-data rule in the root `CLAUDE.md`. Every count has to be a
+ * finite number and the flag a boolean, or the claim is malformed and is treated
+ * as absent rather than half-read.
+ */
+export function parseArtifactCompleteness(
+  value: unknown,
+): BackupCompletenessReport | null {
+  if (typeof value !== "object" || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.complete !== "boolean") return null;
+  const counts = [
+    "expectedAttachments",
+    "includedAttachments",
+    "missingAttachments",
+    "inconsistentAttachments",
+  ] as const;
+  for (const key of counts) {
+    if (typeof raw[key] !== "number" || !Number.isFinite(raw[key])) return null;
+  }
+  return {
+    complete: raw.complete,
+    expectedAttachments: raw.expectedAttachments as number,
+    includedAttachments: raw.includedAttachments as number,
+    missingAttachments: raw.missingAttachments as number,
+    inconsistentAttachments: raw.inconsistentAttachments as number,
+  };
+}
+
 export interface BackupData {
   version: number;
   exportedAt: string;
+  /**
+   * Whether this artifact backs up every attachment it names. Absent from
+   * artifacts written before the field existed -- see
+   * `parseArtifactCompleteness`. Not a table: every walker over `BackupData`
+   * skips non-array values, the way it already does for `supportBackup`.
+   */
+  completeness?: BackupCompletenessReport;
   currencies: Record<string, unknown>[];
   user_preferences: Record<string, unknown>[];
   user_currency_preferences: Record<string, unknown>[];

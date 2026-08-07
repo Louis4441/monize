@@ -156,10 +156,23 @@ returns a `BackupCompletenessReport`: how many attachment rows were expected, ho
 many had their bytes, how many were missing or (for the database provider,
 `assessAttachmentCompleteness`) inconsistent with their metadata. The auto-backup
 path acts on it — a partial artifact is written so the ledger is captured, but it is
-**never promoted to weekly/monthly and never used for retention**, so it cannot
-displace or age out a complete copy, and its status is `partial`, not `success`. A
-later complete backup resumes normal promotion and retention. This is the invariant
-that a backup shown as successful is one that restores in full.
+**never promoted to weekly/monthly, never given a complete artifact's filename, and
+never counted as one by retention**, so it cannot displace or age out a complete
+copy, and its status is `partial`, not `success`. A later complete backup resumes
+normal promotion and retention. This is the invariant that a backup shown as
+successful is one that restores in full; section 7 has the on-disk half of it.
+
+**The claim travels inside the artifact too (F3RB-001, issue #1069).** Every
+buffered and streamed export writes a `completeness` member into the envelope,
+beside `version` and `exportedAt`, holding the same report. Completeness used to
+live only in `auto_backup_settings.lastBackupStatus`, which is state on the instance
+that produced the file: copy the artifact elsewhere, restart, or find it in a
+directory rescan, and a partial one was indistinguishable from a complete one. A
+restore reads it back through `parseArtifactCompleteness` and logs what cannot come
+back from that file — it does not refuse, because restoring a partial artifact is
+usually the whole point and the alternative on offer is nothing. Three states, not
+two: `complete: true`, `complete: false`, and **absent**, which means the artifact
+predates the field and makes no claim at all. Absent is never read as "incomplete".
 
 **A `sha256` and a `byte_size` are checked against the carried bytes**, at both
 ends. One comparison, `attachmentBytesConsistent` (`attachment-integrity.util.ts`),
@@ -510,6 +523,39 @@ for a memory cost that only streaming repays.
 - **Confined destinations.** `BACKUP_ALLOWED_ROOTS` (defaulting to
   `BACKUP_CONTAINER_DIR`) bounds every user-influenced path, canonically — a
   symlink inside a permitted directory cannot lead out of one.
+- **Completeness is part of an artifact's identity, not a note beside it
+  (F3RB-001, issue #1069).** A run that knows its artifact is incomplete publishes
+  it as `monize-backup-partial-<date>.<ext>`, in its own retention tier; nothing
+  named `daily-`, `weekly-` or `monthly-` is ever written by such a run. The name
+  is chosen *after* the export, from what the export found, because
+  `writeFileAtomic` replaces a final name by design: choosing it first destroyed
+  that day's complete artifact and then recorded `partial` in the settings row,
+  with nothing left to preserve. Retention then read the ordinary name and counted
+  it as a complete daily, so `retentionDaily = 3` over three partial days could
+  keep two partials and delete three complete artifacts.
+
+  The tier is what makes both halves hold at once: a partial run may delete
+  **older partial artifacts and nothing else**, so a storage outage cannot fill
+  the volume with them and cannot cost a single complete copy. Partials are kept
+  to `retentionDaily` — the same depth, counted separately — because they arrive
+  on the same cadence; the two counts never draw on each other.
+
+  Retention classifies from the filename alone. That is deliberate rather than
+  lazy: the settings row is on one instance, and an encrypted artifact's envelope
+  claim is inside the ciphertext, so a rescan after a restart has nothing else to
+  read. The envelope claim (section 4) is the durable copy for everything that is
+  not retention.
+
+  **Artifacts written before this change keep their `daily-` names and keep being
+  counted as complete.** A pre-existing ordinary-named partial cannot be told from
+  a complete one — its completeness was never in the file, and for an encrypted
+  artifact could not be read back without the user's password. The fix stops new
+  losses; it does not reclassify history it cannot inspect.
+
+  What it does *not* yet fix: `Run Backup Now` still reports a partial run through
+  the ordinary "Backup created: `<filename>`" toast, so the only thing telling the
+  user is `partial-` in the name it shows them. The service returns a message
+  saying more (`runManualBackup`) and the frontend does not use it.
 
 On Kubernetes this needs `backend.persistence.backups.enabled` (see
 `helm/README.md`). With a read-only root filesystem and no mount, a schedule

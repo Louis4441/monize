@@ -234,6 +234,11 @@ Notes on sizing and behaviour:
 - Retention keeps 7 daily, 4 weekly and 6 monthly artifacts **per user** by
   default, and each is a gzipped dump of that user's whole dataset -- so size
   against the number of users, not the number of files.
+- A backup that could not include every attachment is kept apart, as
+  `monize-backup-partial-<date>`, so it can never take a complete artifact's
+  retention slot. Those are bounded by the same daily count, counted separately,
+  so a deployment whose attachment storage is failing can hold up to 7 more
+  artifacts per user than the figures above until it is fixed.
 - Each user's backups go in a server-computed subdirectory named by their user
   id. One user's retention can only ever reach their own artifacts.
 - Backup destinations are confined to `BACKUP_ALLOWED_ROOTS` (defaulting to

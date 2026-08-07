@@ -4,6 +4,7 @@ import { DataSource } from "typeorm";
 import {
   UnauthorizedException,
   BadRequestException,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { gzipSync, gunzipSync } from "zlib";
@@ -987,6 +988,85 @@ describe("BackupService", () => {
         expect(report.missingAttachments).toBe(1);
       });
 
+      /**
+       * F3RB-001 (issue #1069): the claim has to be inside the document, not
+       * only in the settings row of the instance that wrote it. A settings row
+       * does not travel with a copied artifact, does not survive a restart on
+       * another machine, and says nothing at all about a file found in a
+       * directory rescan.
+       */
+      it("records its own completeness inside the artifact when incomplete", async () => {
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [{ id: A_ID, provider: "local", byte_size: 9, sha256: "" }],
+          {},
+        );
+
+        const result = await exported();
+
+        expect(result.completeness).toEqual({
+          complete: false,
+          expectedAttachments: 1,
+          includedAttachments: 0,
+          missingAttachments: 1,
+          inconsistentAttachments: 0,
+        });
+      });
+
+      it("records its own completeness inside the artifact when complete", async () => {
+        // "This file says it is complete" and "this file says nothing" are
+        // different facts about a recovered artifact, so the claim is written
+        // either way.
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [
+            {
+              id: A_ID,
+              provider: "local",
+              byte_size: A_BYTES.length,
+              sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+            },
+          ],
+          { [A_ID]: A_BYTES },
+        );
+
+        const result = await exported();
+
+        expect(result.completeness).toEqual(
+          expect.objectContaining({ complete: true, includedAttachments: 1 }),
+        );
+      });
+
+      it("records completeness in the streamed artifact too", async () => {
+        // The streaming path assembles its own JSON, so it is a second writer of
+        // the envelope and can lose the field on its own.
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [{ id: A_ID, provider: "local", byte_size: 9, sha256: "" }],
+          {},
+        );
+        // `responseDouble` rather than a bare PassThrough: an incomplete export
+        // sets headers before the first byte, so a double without `setHeader`
+        // would fail for a reason that has nothing to do with the envelope.
+        const { res, chunks } = responseDouble();
+        const ended = new Promise<void>((resolve) =>
+          (res as unknown as PassThrough).once("end", () => resolve()),
+        );
+
+        await service.streamExport(userId, res);
+        await ended;
+
+        const streamed = JSON.parse(
+          gunzipSync(Buffer.concat(chunks)).toString("utf-8"),
+        );
+        expect(streamed.completeness).toEqual(
+          expect.objectContaining({
+            complete: false,
+            missingAttachments: 1,
+          }),
+        );
+      });
+
       it("marks an incomplete plain download in the response, before any bytes (F3RB-004)", async () => {
         // The backend knew the artifact could not restore everything it names and
         // still sent an ordinary 200 with the ordinary filename, so the UI showed
@@ -1415,6 +1495,124 @@ describe("BackupService", () => {
         ...rest,
       };
     }
+
+    /**
+     * The envelope's completeness claim is the half of F3RB-001 (issue #1069)
+     * that outlives the filename: a file that has been renamed, copied to
+     * another machine or re-uploaded still says what it is. A restore of an
+     * artifact known to be missing attachment bytes must not be silent about it
+     * -- and one that makes no claim at all (written before the field existed)
+     * must not be reported as incomplete, because absence is "not known".
+     */
+    describe("an artifact's own completeness claim", () => {
+      const incomplete = {
+        complete: false,
+        expectedAttachments: 3,
+        includedAttachments: 2,
+        missingAttachments: 1,
+        inconsistentAttachments: 0,
+      };
+
+      function warnings(): string[] {
+        return warnSpy.mock.calls.map(([message]) => String(message));
+      }
+
+      let warnSpy: jest.SpyInstance;
+
+      beforeEach(() => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        warnSpy = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      });
+
+      afterEach(() => warnSpy.mockRestore());
+
+      it("says so when restoring an artifact the export recorded as incomplete", async () => {
+        await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: { ...validBackupData, completeness: incomplete },
+          }),
+        );
+
+        expect(warnings()).toContainEqual(
+          expect.stringMatching(/incomplete.*1 attachment/is),
+        );
+      });
+
+      it("restores it anyway -- a partial artifact beats no artifact", async () => {
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: { ...validBackupData, completeness: incomplete },
+          }),
+        );
+
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("says nothing for an artifact that claims to be complete", async () => {
+        await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: {
+              ...validBackupData,
+              completeness: { ...incomplete, complete: true },
+            },
+          }),
+        );
+
+        expect(warnings()).not.toContainEqual(
+          expect.stringMatching(/incomplete/i),
+        );
+      });
+
+      it("says nothing for an artifact written before the field existed", async () => {
+        // Absence is not a claim of incompleteness, and treating it as one would
+        // put a scary warning on every older backup.
+        await service.restoreData(userId, makeInput({ password: "test" }));
+
+        expect(warnings()).not.toContainEqual(
+          expect.stringMatching(/incomplete/i),
+        );
+      });
+
+      it("ignores a malformed claim rather than half-reading it", async () => {
+        await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: {
+              ...validBackupData,
+              completeness: { complete: "no", missingAttachments: "several" },
+            },
+          }),
+        );
+
+        expect(warnings()).not.toContainEqual(
+          expect.stringMatching(/incomplete/i),
+        );
+      });
+
+      it("does not mistake the claim for a table", async () => {
+        // Every walker over `BackupData` iterates its entries; a non-array value
+        // has to fall through the id remap and the insert plan untouched.
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: { ...validBackupData, completeness: incomplete },
+          }),
+        );
+
+        expect(result.restored).toEqual(
+          expect.not.objectContaining({ completeness: expect.anything() }),
+        );
+      });
+    });
 
     it("should throw NotFoundException if user not found", async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
