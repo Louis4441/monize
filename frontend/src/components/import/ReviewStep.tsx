@@ -2,9 +2,47 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
-import { CategoryMapping, AccountMapping, SecurityMapping, ParsedQifResponse } from '@/lib/import';
+import {
+  CategoryMapping,
+  AccountMapping,
+  SecurityMapping,
+  ParsedQifResponse,
+  CsvInvestmentSummary,
+  CanonicalInvestmentAction,
+  CANONICAL_INVESTMENT_ACTIONS,
+} from '@/lib/import';
 import { Account } from '@/types/account';
 import { ImportFileData, ImportStep } from '@/app/import/import-utils';
+
+/** Merge the per-file investment summaries of a (possibly bulk) CSV parse. */
+function combineInvestmentSummaries(files: ImportFileData[]): CsvInvestmentSummary | null {
+  const summaries = files
+    .map((f) => f.parsedData?.investmentSummary)
+    .filter((s): s is CsvInvestmentSummary => !!s);
+  if (summaries.length === 0) return null;
+
+  const actionCounts: Partial<Record<CanonicalInvestmentAction, number>> = {};
+  const cashFallbackValues = new Set<string>();
+  const rejectedByReason = new Map<string, number>();
+  let uncostedShareRows = 0;
+  for (const s of summaries) {
+    for (const [action, count] of Object.entries(s.actionCounts)) {
+      const key = action as CanonicalInvestmentAction;
+      actionCounts[key] = (actionCounts[key] || 0) + (count || 0);
+    }
+    s.cashFallbackValues.forEach((v) => cashFallbackValues.add(v));
+    uncostedShareRows += s.uncostedShareRows;
+    for (const r of s.rejectedRows) {
+      rejectedByReason.set(r.reason, (rejectedByReason.get(r.reason) || 0) + r.count);
+    }
+  }
+  return {
+    actionCounts,
+    cashFallbackValues: Array.from(cashFallbackValues).sort(),
+    uncostedShareRows,
+    rejectedRows: Array.from(rejectedByReason.entries()).map(([reason, count]) => ({ reason, count })),
+  };
+}
 
 interface ReviewStepProps {
   importFiles: ImportFileData[];
@@ -47,6 +85,10 @@ export function ReviewStep({
   const mappedSecuritiesCount = securityMappings.filter((m) => m.securityId || m.createNew).length;
   const newSecuritiesCount = securityMappings.filter((m) => m.createNew).length;
   const totalTransactions = importFiles.reduce((sum, f) => sum + f.parsedData.transactionCount, 0);
+  const investmentSummary = combineInvestmentSummaries(importFiles);
+  const totalRejected = investmentSummary
+    ? investmentSummary.rejectedRows.reduce((sum, r) => sum + r.count, 0)
+    : 0;
 
   return (
     <div className="max-w-xl mx-auto">
@@ -157,6 +199,44 @@ export function ReviewStep({
                   <strong>{t('review.newSecurities')}</strong> {newSecuritiesCount}
                 </li>
               </ul>
+            </div>
+          )}
+
+          {investmentSummary && (
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+                {t('review.investmentHeading')}
+              </h3>
+              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                {CANONICAL_INVESTMENT_ACTIONS.filter((a) => (investmentSummary.actionCounts[a] || 0) > 0).map((action) => (
+                  <li key={action}>
+                    <strong>{t(`csvMapping.actionNames.${action}` as Parameters<typeof t>[0])}:</strong> {investmentSummary.actionCounts[action]}
+                  </li>
+                ))}
+              </ul>
+              {investmentSummary.cashFallbackValues.length > 0 && (
+                <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                  {t('review.cashFallbackNotice', { values: investmentSummary.cashFallbackValues.join(', ') })}
+                </p>
+              )}
+              {investmentSummary.uncostedShareRows > 0 && (
+                <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                  {t('review.uncostedNotice', { count: investmentSummary.uncostedShareRows })}
+                </p>
+              )}
+              {totalRejected > 0 && (
+                <div className="mt-2 text-sm text-red-600 dark:text-red-400 space-y-1">
+                  <p>{t('review.rejectedNotice', { count: totalRejected })}</p>
+                  <ul className="ml-4 list-disc">
+                    {investmentSummary.rejectedRows.map((r) => (
+                      <li key={r.reason}>
+                        {t(`review.rejectedReasons.${r.reason}` as Parameters<typeof t>[0])}: {r.count}
+                      </li>
+                    ))}
+                  </ul>
+                  <p>{t('review.rejectedGoBack')}</p>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -5,7 +5,17 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { CsvTransferRules } from './CsvTransferRules';
 import { ImportStep } from '@/app/import/import-utils';
-import { CsvColumnMappingConfig, CsvTransferRule, SavedColumnMapping, DATE_FORMAT_OPTIONS, detectCsvDateFormat } from '@/lib/import';
+import {
+  CsvColumnMappingConfig,
+  CsvTransferRule,
+  SavedColumnMapping,
+  DATE_FORMAT_OPTIONS,
+  detectCsvDateFormat,
+  CANONICAL_INVESTMENT_ACTIONS,
+  DEFAULT_INVESTMENT_ACTION_KEYWORDS,
+  CanonicalInvestmentAction,
+  classifyCsvActionValue,
+} from '@/lib/import';
 import { Account } from '@/types/account';
 
 interface CsvColumnMappingStepProps {
@@ -13,6 +23,7 @@ interface CsvColumnMappingStepProps {
   sampleRows: string[][];
   columnMapping: CsvColumnMappingConfig;
   onColumnMappingChange: (mapping: CsvColumnMappingConfig) => void;
+  onInvestmentModeChange: (enabled: boolean) => void;
   transferRules: CsvTransferRule[];
   onTransferRulesChange: (rules: CsvTransferRule[]) => void;
   accounts: Account[];
@@ -42,6 +53,7 @@ export function CsvColumnMappingStep({
   sampleRows,
   columnMapping,
   onColumnMappingChange,
+  onInvestmentModeChange,
   transferRules,
   onTransferRulesChange,
   accounts,
@@ -60,6 +72,8 @@ export function CsvColumnMappingStep({
   const [amountMode, setAmountMode] = useState<AmountMode>(
     columnMapping.debit !== undefined || columnMapping.credit !== undefined ? 'split' : 'single'
   );
+  const investmentMode = columnMapping.investmentMode === true;
+  const [showActionKeywords, setShowActionKeywords] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [saveName, setSaveName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -125,8 +139,37 @@ export function CsvColumnMappingStep({
       setValidationError(t('csvMapping.validationDebitCreditRequired'));
       return;
     }
+    if (investmentMode && columnMapping.actionColumn === undefined) {
+      setValidationError(t('csvMapping.validationActionRequired'));
+      return;
+    }
+    if (investmentMode && columnMapping.securityColumn === undefined) {
+      setValidationError(t('csvMapping.validationSecurityRequired'));
+      return;
+    }
     setValidationError('');
     onNext();
+  };
+
+  const actionColumnValues = investmentMode && columnMapping.actionColumn !== undefined
+    ? [...new Set(sampleRows.map((row) => (row[columnMapping.actionColumn!] || '').trim()).filter(Boolean))]
+    : [];
+  const unmatchedActionValues = actionColumnValues.filter(
+    (v) => classifyCsvActionValue(v, columnMapping.actionKeywords) === null,
+  );
+
+  const handleActionKeywordsChange = (action: CanonicalInvestmentAction, text: string) => {
+    const values = text.split(',').map((v) => v.trim()).filter(Boolean);
+    const next = { ...(columnMapping.actionKeywords || {}) };
+    if (values.length > 0) {
+      next[action] = values;
+    } else {
+      delete next[action];
+    }
+    onColumnMappingChange({
+      ...columnMapping,
+      actionKeywords: Object.keys(next).length > 0 ? next : undefined,
+    });
   };
 
   const handleSave = () => {
@@ -244,6 +287,23 @@ export function CsvColumnMappingStep({
         <div className="mb-6 space-y-3">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('csvMapping.columnMappingTitle')}</h3>
 
+          <div>
+            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.kindField')}</label>
+            <select
+              value={investmentMode ? 'investment' : 'banking'}
+              onChange={(e) => onInvestmentModeChange(e.target.value === 'investment')}
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            >
+              <option value="banking">{t('csvMapping.kindBanking')}</option>
+              <option value="investment">{t('csvMapping.kindInvestment')}</option>
+            </select>
+            {investmentMode && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {t('csvMapping.investmentModeHint')}
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.dateField')}</label>
@@ -285,6 +345,7 @@ export function CsvColumnMappingStep({
                   ))}
                 </select>
               </div>
+              {!investmentMode && (
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.signField')}</label>
                 <select
@@ -312,6 +373,7 @@ export function CsvColumnMappingStep({
                   <option value="type-column">{t('csvMapping.signTypeColumn')}</option>
                 </select>
               </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -455,6 +517,120 @@ export function CsvColumnMappingStep({
             </div>
           )}
 
+          {investmentMode && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.actionField')}</label>
+                  <select
+                    value={columnMapping.actionColumn !== undefined ? String(columnMapping.actionColumn) : ''}
+                    onChange={(e) => updateMapping('actionColumn', e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    {columnOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.securityField')}</label>
+                  <select
+                    value={columnMapping.securityColumn !== undefined ? String(columnMapping.securityColumn) : ''}
+                    onChange={(e) => updateMapping('securityColumn', e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    {columnOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.quantityField')}</label>
+                  <select
+                    value={columnMapping.quantityColumn !== undefined ? String(columnMapping.quantityColumn) : ''}
+                    onChange={(e) => updateMapping('quantityColumn', e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    {columnOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.priceField')}</label>
+                  <select
+                    value={columnMapping.priceColumn !== undefined ? String(columnMapping.priceColumn) : ''}
+                    onChange={(e) => updateMapping('priceColumn', e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    {columnOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.commissionField')}</label>
+                  <select
+                    value={columnMapping.commissionColumn !== undefined ? String(columnMapping.commissionColumn) : ''}
+                    onChange={(e) => updateMapping('commissionColumn', e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    {columnOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {actionColumnValues.length > 0 && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                  <p>{t('csvMapping.actionValuesFound', { values: actionColumnValues.join(', ') })}</p>
+                  {unmatchedActionValues.length > 0 && (
+                    <p className="text-amber-600 dark:text-amber-400">
+                      {t('csvMapping.actionValuesUnmatched', { values: unmatchedActionValues.join(', ') })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setShowActionKeywords((prev) => !prev)}
+                  className="text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+                >
+                  {showActionKeywords ? t('csvMapping.actionKeywordsHide') : t('csvMapping.actionKeywordsShow')}
+                </button>
+                {showActionKeywords && (
+                  <>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('csvMapping.actionKeywordsDescription')}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {CANONICAL_INVESTMENT_ACTIONS.map((action) => (
+                        <div key={action}>
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            {t(`csvMapping.actionNames.${action}` as Parameters<typeof t>[0])}
+                          </label>
+                          <input
+                            type="text"
+                            value={(columnMapping.actionKeywords?.[action] || []).join(', ')}
+                            onChange={(e) => handleActionKeywordsChange(action, e.target.value)}
+                            placeholder={DEFAULT_INVESTMENT_ACTION_KEYWORDS[action].join(', ')}
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
           <div>
             <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.payeeField')}</label>
             <select
@@ -468,6 +644,7 @@ export function CsvColumnMappingStep({
             </select>
           </div>
 
+          {!investmentMode && (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('csvMapping.categoryField')}</label>
@@ -494,6 +671,7 @@ export function CsvColumnMappingStep({
               </select>
             </div>
           </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -623,10 +801,12 @@ export function CsvColumnMappingStep({
           )}
         </div>
 
-        {/* Transfer Rules */}
-        <div className="mb-6">
-          <CsvTransferRules rules={transferRules} onChange={onTransferRulesChange} accounts={accounts} />
-        </div>
+        {/* Transfer Rules (inert in investment mode: rows classify by action) */}
+        {!investmentMode && (
+          <div className="mb-6">
+            <CsvTransferRules rules={transferRules} onChange={onTransferRulesChange} accounts={accounts} />
+          </div>
+        )}
 
         {/* Validation Error */}
         {validationError && (

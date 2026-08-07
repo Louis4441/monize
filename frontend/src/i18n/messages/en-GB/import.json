@@ -2,6 +2,9 @@
   "selectAccount": {
     "accountNamePlaceholder": "e.g. My Current Account"
   },
+  "csvMapping": {
+    "actionKeywordsShow": "Customise action keywords"
+  },
   "mnyReview": {
     "era": {
       "unknown": "unrecognised Money version"

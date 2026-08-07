@@ -83,6 +83,12 @@ export interface QifParseResult {
   openingBalance: number | null;
   /** Date of the opening balance record */
   openingBalanceDate: string | null;
+  /**
+   * Present only for investment-mode CSV parses (see csv-parser.ts): action
+   * classification counts and skip reporting for the wizard's preview step.
+   * QIF and OFX parses never set it.
+   */
+  investmentSummary?: import("./csv-parser").CsvInvestmentSummary;
 }
 
 export type DateFormat =

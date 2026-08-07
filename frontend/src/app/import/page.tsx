@@ -61,6 +61,7 @@ function ImportContent() {
             sampleRows={wizard.csvSampleRows}
             columnMapping={wizard.csvColumnMapping}
             onColumnMappingChange={wizard.handleCsvColumnMappingChange}
+            onInvestmentModeChange={wizard.handleCsvInvestmentModeChange}
             transferRules={wizard.csvTransferRules}
             onTransferRulesChange={wizard.handleCsvTransferRulesChange}
             accounts={wizard.accounts}
