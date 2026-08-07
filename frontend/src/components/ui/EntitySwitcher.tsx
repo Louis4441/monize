@@ -32,6 +32,13 @@ interface EntitySwitcherProps {
   onSelect: (id: string) => void;
   /** Accessible name and tooltip for the caret, e.g. "Switch payee". */
   triggerLabel: string;
+  /**
+   * Words on the trigger beside the chevron, for a page carrying two switchers
+   * -- the GEM report's scenario picker sits a few pixels from the caret that
+   * switches reports, and two bare chevrons say nothing about which is which.
+   * Omit for the usual single caret beside a title.
+   */
+  triggerText?: string;
   filterPlaceholder: string;
   noMatchesLabel: string;
   /**
@@ -64,6 +71,7 @@ export function EntitySwitcher({
   items,
   onSelect,
   triggerLabel,
+  triggerText,
   filterPlaceholder,
   noMatchesLabel,
   secondaryAlign = 'end',
@@ -164,8 +172,11 @@ export function EntitySwitcher({
         aria-expanded={isOpen}
         aria-label={triggerLabel}
         title={triggerLabel}
-        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+        className={`inline-flex items-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700 dark:hover:text-gray-200 ${
+          triggerText ? 'gap-0.5 px-1.5 py-1 text-sm' : 'p-1'
+        }`}
       >
+        {triggerText}
         <ChevronDownIcon
           className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           aria-hidden="true"

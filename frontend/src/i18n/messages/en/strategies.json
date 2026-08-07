@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Switch scenario",
+      "triggerText": "Scenario",
       "filterPlaceholder": "Filter scenarios",
       "noMatches": "No scenario matches",
       "create": "New scenario",

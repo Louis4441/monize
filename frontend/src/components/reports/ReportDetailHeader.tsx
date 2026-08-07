@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import { BackToReportsLink } from '@/components/reports/BackToReportsLink';
 import { ReportSwitcher } from '@/components/reports/ReportSwitcher';
 
@@ -29,8 +28,6 @@ export function ReportDetailHeader({
   subtitle,
   actions,
 }: ReportDetailHeaderProps) {
-  const router = useRouter();
-
   return (
     <div className="mb-6">
       <BackToReportsLink />
@@ -41,10 +38,7 @@ export function ReportDetailHeader({
             <h1 className="truncate text-2xl font-bold text-gray-900 dark:text-gray-100">
               {title}
             </h1>
-            <ReportSwitcher
-              currentId={reportId}
-              onSelect={(id) => router.push(`/reports/${id}`)}
-            />
+            <ReportSwitcher currentId={reportId} />
           </div>
           {subtitle && (
             <p className="text-gray-500 dark:text-gray-400">{subtitle}</p>

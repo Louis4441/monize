@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   EntitySwitcher,
@@ -12,7 +13,6 @@ import { useReportCatalog } from '@/components/reports/useReportCatalog';
 interface ReportSwitcherProps {
   /** The report on screen; it is not offered as a destination. */
   currentId: string;
-  onSelect: (id: string) => void;
 }
 
 /**
@@ -23,9 +23,14 @@ interface ReportSwitcherProps {
  * Fifty-odd reports are too many to read as one column, so the menu is grouped
  * by the section the Reports page files each under, in the same order its
  * filter chips use.
+ *
+ * Picking a report navigates, and the route is built here rather than by each
+ * caller: an id in this menu *is* a path under `/reports/`, and two call sites
+ * spelling that out separately is one of them getting it wrong later.
  */
-export function ReportSwitcher({ currentId, onSelect }: ReportSwitcherProps) {
+export function ReportSwitcher({ currentId }: ReportSwitcherProps) {
   const t = useTranslations('reports');
+  const router = useRouter();
   const { reports } = useReportCatalog();
 
   const items = useMemo<EntitySwitcherItem[]>(() => {
@@ -51,7 +56,7 @@ export function ReportSwitcher({ currentId, onSelect }: ReportSwitcherProps) {
     <EntitySwitcher
       currentId={currentId}
       items={items}
-      onSelect={onSelect}
+      onSelect={(id) => router.push(`/reports/${id}`)}
       triggerLabel={t('detailHeader.switchReport')}
       filterPlaceholder={t('detailHeader.switchPlaceholder')}
       noMatchesLabel={t('detailHeader.switchNoMatches')}

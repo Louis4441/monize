@@ -122,10 +122,17 @@ of them grew a breadcrumb instead, so the section read as three pages that
 happened to share a URL prefix.
 
 For reports the pair is `BackToReportsLink` and `ReportDetailHeader`
-(`components/reports/`), used by the generic `[reportId]` renderer, the custom
-and investment viewers, and the GEM report -- whose caret switches *scenarios*,
-one level in, because its title is a scenario name. `ui-conventions.test.ts`
-scans for a hand-rolled back-chevron-to-`/reports`.
+(`components/reports/`), used by the generic `[reportId]` renderer and the
+custom and investment viewers; the GEM report has its own header and mounts the
+two directly. `ReportSwitcher` builds the route itself -- an id in that menu
+*is* a path under `/reports/` -- so no call site spells it out.
+`ui-conventions.test.ts` scans for a hand-rolled back-chevron-to-`/reports`.
+
+**Two switchers on one line means at least one of them says its name.** The GEM
+report carries both: the report caret beside the title, and a scenario picker
+one level in. Two bare chevrons a few pixels apart are indistinguishable, so
+`EntitySwitcher` takes `triggerText` and the scenario one reads "Scenario ⌄".
+The bare caret stays the default -- it is unambiguous when it is the only one.
 
 A switcher list too long to scan takes `group` on its items
 (`ReportSwitcher` groups by the section the Reports page files each report

@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/Button";
 import { BackToReportsLink } from "@/components/reports/BackToReportsLink";
+import { ReportSwitcher } from "@/components/reports/ReportSwitcher";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TOUR_ANCHORS, tourAnchor } from "@/lib/tours/anchors";
 import { useDateFormat } from "@/hooks/useDateFormat";
@@ -75,10 +76,15 @@ export function GemStrategyHeader({
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {strategyName}
             </h1>
+            {/* The report caret, in the slot every other report page puts it:
+                straight after the title. The scenario controls that follow name
+                themselves, because two bare chevrons a few pixels apart say
+                nothing about which switches what. */}
+            <ReportSwitcher currentId="gem-strategy" />
             <InfoTooltip
               // The window is configurable, so the explainer names the one
               // this strategy actually runs rather than the canonical twelve.

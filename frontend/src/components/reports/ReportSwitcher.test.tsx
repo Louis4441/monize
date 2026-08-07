@@ -12,18 +12,26 @@ vi.mock('@/lib/investment-reports', () => ({
   investmentReportsApi: { getAll: vi.fn() },
 }));
 
+const push = vi.fn();
+
+// Picking a report navigates; the switcher builds the route itself, so that is
+// what these tests assert on.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+  usePathname: () => '/reports/tax-summary',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const getCustom = vi.mocked(customReportsApi.getAll);
 const getInvestment = vi.mocked(investmentReportsApi.getAll);
 
 async function openSwitcher(currentId = 'tax-summary') {
-  const onSelect = vi.fn();
   await act(async () => {
-    render(<ReportSwitcher currentId={currentId} onSelect={onSelect} />);
+    render(<ReportSwitcher currentId={currentId} />);
   });
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch to another report' }));
   });
-  return { onSelect };
 }
 
 describe('ReportSwitcher', () => {
@@ -82,7 +90,7 @@ describe('ReportSwitcher', () => {
       { id: 'i1', name: 'RRSP Holdings' },
     ] as unknown as Awaited<ReturnType<typeof investmentReportsApi.getAll>>);
 
-    const { onSelect } = await openSwitcher();
+    await openSwitcher();
     const custom = screen.getByRole('group', { name: 'Custom' });
     expect(
       within(custom).getByRole('menuitem', { name: /Groceries Deep Dive/ }),
@@ -92,9 +100,9 @@ describe('ReportSwitcher', () => {
       within(investment).getByRole('menuitem', { name: /RRSP Holdings/ }),
     ).toBeInTheDocument();
 
-    // The id is the route: `/reports/investment/i1` is where the header sends it.
+    // The id is the route the switcher builds.
     fireEvent.click(screen.getByRole('menuitem', { name: /RRSP Holdings/ }));
-    expect(onSelect).toHaveBeenCalledWith('investment/i1');
+    expect(push).toHaveBeenCalledWith('/reports/investment/i1');
   });
 
   it('reports the built-in catalog when the saved reports cannot be loaded', async () => {
@@ -109,10 +117,10 @@ describe('ReportSwitcher', () => {
     ).toBeInTheDocument();
   });
 
-  it('selects a report by its id', async () => {
-    const { onSelect } = await openSwitcher();
+  it('navigates to the report that was picked', async () => {
+    await openSwitcher();
     fireEvent.click(screen.getByRole('menuitem', { name: /Net Worth Over Time/ }));
-    expect(onSelect).toHaveBeenCalledWith('net-worth');
+    expect(push).toHaveBeenCalledWith('/reports/net-worth');
   });
 
   it('filters across a list this long', async () => {

@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "[XX-Switch scenario-XX]",
+      "triggerText": "[XX-Scenario-XX]",
       "filterPlaceholder": "[XX-Filter scenarios-XX]",
       "noMatches": "[XX-No scenario matches-XX]",
       "create": "[XX-New scenario-XX]",
