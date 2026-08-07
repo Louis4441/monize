@@ -191,7 +191,7 @@
     "supportPasswordRequired": "サポート用バックアップは暗号化が必須です。パスワードを入力してください。",
     "passwordHeaderNotBase64": "{header} ヘッダーは base64 でエンコードされている必要があります。",
     "decompressTooLarge": "バックアップが大きすぎて復元できません: 展開すると設定された上限 {limit} バイトを超えます。正規のバックアップであれば BACKUP_RESTORE_EXPANDED_LIMIT を引き上げてください。",
-    "exportTooLarge": "このバックアップは一度に生成するには大きすぎます（テーブル \"{table}\" で {limit} バイトを超過）。暗号化・自動・サポート用バックアップはメモリ上で組み立てる必要があります。ストリーミングされる通常のエクスポートを使うか、BACKUP_EXPORT_BUFFER_LIMIT を引き上げてください。",
+    "exportTooLarge": "このバックアップは一度に生成するには大きすぎます（テーブル \"{table}\" で {limit} バイトを超過）。自動バックアップとサポート用バックアップはメモリ上に保持する必要があります。ストリーミングされる手動バックアップをダウンロードするか、BACKUP_EXPORT_BUFFER_LIMIT を引き上げてください。",
     "supportExportTooLarge": "このサポート用バックアップは JSON で {{ size }} MiB となり、上限 {{ limit }} MiB を超えます。口座の選択または期間で範囲を絞るか、BACKUP_EXPORT_BUFFER_LIMIT を引き上げてください。",
     "folderUnusable": "フォルダー \"{{ path }}\" はディレクトリとして使用できません（{{ reason }}）。",
     "folderOutsideAllowedRoots": "バックアップ フォルダー \"{path}\" は許可されたルート（{roots}）の外にあります。許可するには BACKUP_ALLOWED_ROOTS を設定してください。",

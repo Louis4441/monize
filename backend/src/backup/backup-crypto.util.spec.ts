@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import {
   encryptBackup,
@@ -83,22 +83,48 @@ describe("backup-crypto.util", () => {
   });
 
   describe("key derivation stays off the event loop", () => {
-    it("uses the async scrypt, not scryptSync", () => {
-      // Comments stripped: this file's own prose explains why `scryptSync` was
+    /**
+     * Scans the module, not one file.
+     *
+     * This guard read `backup-crypto.util.ts` alone, and issue #1070 moved the
+     * derivation into `backup-envelope.ts` so both container versions could
+     * share it -- a scan pointed at the old file would have gone on passing with
+     * nothing left to find. `backend/CLAUDE.md` calls this out by name: a scan
+     * whose subject is "wherever this appears" walks the directory.
+     */
+    function moduleSources(): Array<{ file: string; code: string }> {
+      const walk = (dir: string): string[] =>
+        readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) return walk(full);
+          return entry.name.endsWith(".ts") && !entry.name.endsWith(".spec.ts")
+            ? [full]
+            : [];
+        });
+      // Comments stripped: this module's own prose explains why `scryptSync` was
       // wrong, and a marker test against the raw text would match that
       // explanation and fail forever.
-      const source = readFileSync(
-        join(__dirname, "backup-crypto.util.ts"),
-        "utf-8",
-      )
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/\/\/[^\n]*/g, "");
+      return walk(__dirname).map((full) => ({
+        file: full,
+        code: readFileSync(full, "utf-8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/\/\/[^\n]*/g, ""),
+      }));
+    }
+
+    it("uses the async scrypt, not scryptSync", () => {
       // scrypt at N=32768 is ~100ms of CPU, and maybeDecrypt tries up to three
       // candidate passwords per restore. On the event loop that stalled every
       // other request in the process for a third of a second, from one
       // authenticated caller -- the same failure the async gunzip fixed.
-      expect(source).not.toMatch(/scryptSync/);
-      expect(source).toMatch(/promisify\(crypto\.scrypt\)/);
+      const sources = moduleSources();
+      expect(sources.filter(({ code }) => /scryptSync/.test(code))).toEqual([]);
+      // Exactly one derivation in the module, so the two container versions
+      // cannot drift into different cost parameters.
+      const derivations = sources.filter(({ code }) =>
+        /promisify\(crypto\.scrypt\)/.test(code),
+      );
+      expect(derivations).toHaveLength(1);
     });
   });
 });

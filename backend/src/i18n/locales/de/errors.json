@@ -191,7 +191,7 @@
     "supportPasswordRequired": "Ein Support-Backup muss verschlüsselt sein: Bitte ein Passwort angeben.",
     "passwordHeaderNotBase64": "Der Header {header} muss base64-codiert sein.",
     "decompressTooLarge": "Backup ist zu groß zum Wiederherstellen: Es entpackt sich über das konfigurierte Limit von {limit} Bytes hinaus. Erhöhe BACKUP_RESTORE_EXPANDED_LIMIT, wenn dies ein echtes Backup ist.",
-    "exportTooLarge": "Dieses Backup ist zu groß, um in einem Stück erzeugt zu werden (über {limit} Bytes bei Tabelle \"{table}\"). Verschlüsselte, automatische und Support-Backups müssen im Speicher zusammengesetzt werden; nutze den einfachen Export, der streamt, oder erhöhe BACKUP_EXPORT_BUFFER_LIMIT.",
+    "exportTooLarge": "Dieses Backup ist zu groß, um in einem Stück erzeugt zu werden (über {limit} Bytes bei Tabelle \"{table}\"). Automatische und Support-Backups müssen im Speicher gehalten werden; lade ein manuelles Backup herunter, das streamt, oder erhöhe BACKUP_EXPORT_BUFFER_LIMIT.",
     "supportExportTooLarge": "Dieses Support-Backup wäre {{ size }} MiB JSON und liegt damit über dem Limit von {{ limit }} MiB. Schränke es mit einer Kontoauswahl oder einem Zeitraum ein, oder erhöhe BACKUP_EXPORT_BUFFER_LIMIT.",
     "folderUnusable": "Ordner \"{{ path }}\" kann nicht als Verzeichnis verwendet werden ({{ reason }}).",
     "folderOutsideAllowedRoots": "Backup-Ordner \"{path}\" liegt außerhalb der erlaubten Wurzelverzeichnisse ({roots}). Setze BACKUP_ALLOWED_ROOTS, um ihn zuzulassen.",

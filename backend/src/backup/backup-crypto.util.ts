@@ -1,82 +1,46 @@
 import * as crypto from "crypto";
-import { promisify } from "util";
+import {
+  assertSupportedKdf,
+  BackupDecryptionError,
+  backupEnvelopeVersion,
+  deriveKey,
+  IV_LENGTH,
+  KDF_SCRYPT,
+  MAGIC,
+  SALT_LENGTH,
+  TAG_LENGTH,
+  VERSION_FRAMED,
+  VERSION_MONOLITHIC,
+} from "./backup-envelope";
+import { decryptFramedBackup } from "./backup-stream-crypto";
+
+export { BackupDecryptionError };
 
 /**
- * scrypt at N=32768 takes roughly 100ms of pure CPU. `scryptSync` spent that on
- * the event loop, and `maybeDecrypt` tries up to three candidate passwords per
- * restore -- so one request stalled every other request in the process for about
- * a third of a second. Under the 100 requests/minute throttle that is a large
- * fraction of one core denied to everyone else, from a single authenticated user.
- * The async form runs the derivation on the libuv threadpool instead. Same
- * reasoning as the async gunzip in the restore path.
- */
-const scryptAsync = promisify(crypto.scrypt) as (
-  password: string,
-  salt: Buffer,
-  keylen: number,
-  options: crypto.ScryptOptions,
-) => Promise<Buffer>;
-
-// Backup file envelope format (binary, prepended to ciphertext):
-//
-//   bytes  0..3   magic        "MZBE"  (Monize Backup Encrypted)
-//   byte   4      version      0x01
-//   byte   5      kdf          0x01 = scrypt
-//   bytes  6..21  salt         16 bytes
-//   bytes 22..33  iv           12 bytes (GCM standard)
-//   bytes 34..49  authTag      16 bytes
-//   bytes 50..    ciphertext   = gzip(JSON)
-//
-// scrypt parameters are deliberately written into the format-version byte so
-// future cost increases can be rolled out without breaking old backups.
-const MAGIC = Buffer.from("MZBE", "ascii");
-const VERSION = 0x01;
-const KDF_SCRYPT = 0x01;
-const SALT_LENGTH = 16;
-const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
-const HEADER_LENGTH =
-  MAGIC.length + 1 + 1 + SALT_LENGTH + IV_LENGTH + TAG_LENGTH;
-const KEY_LENGTH = 32;
-const SCRYPT_N = 1 << 15; // 32768; tuned for ~100ms on modern hardware
-const SCRYPT_R = 8;
-const SCRYPT_P = 1;
-
-function deriveKey(password: string, salt: Buffer): Promise<Buffer> {
-  return scryptAsync(password, salt, KEY_LENGTH, {
-    N: SCRYPT_N,
-    r: SCRYPT_R,
-    p: SCRYPT_P,
-    maxmem: 64 * 1024 * 1024,
-  });
-}
-
-/**
- * True if `buf` carries the Monize encrypted-backup magic header. Used so
- * restore can tell whether the upload is a raw gzip backup (legacy) or an
- * encrypted envelope, without trying both code paths.
+ * Whole-payload encryption, and the one door every backup decryption goes
+ * through.
  *
- * Buffer.isBuffer guard is defensive: Express body-parser may deliver a
- * string or parsed JSON object depending on upstream middleware, and
- * CodeQL's taint flow flags `.length` access on the untyped form. Narrow
- * here so callers can trust the typed signature.
+ * The format itself -- both versions of it -- is documented in
+ * `backup-envelope.ts`. What lives here is the monolithic (v1) writer and a
+ * reader that accepts either version, because an artifact produced before the
+ * streaming container existed must still open. New streamed exports write v2
+ * through `createBackupEncryptStream`; the support export still writes v1,
+ * deliberately, because it assembles its payload in memory anyway and gains
+ * nothing from framing.
+ */
+
+/**
+ * True if `buf` carries the Monize encrypted-backup magic header, in either
+ * container version. Used so restore can tell whether the upload is a raw gzip
+ * backup (legacy) or an encrypted envelope, without trying both code paths.
  */
 export function isEncryptedBackup(buf: Buffer): boolean {
-  // CodeQL js/type-confusion-through-parameter-tampering: it doesn't model
-  // Buffer.isBuffer as a type guard, so narrow with the typeof/Array.isArray
-  // checks the rule recognises before accessing .length.
-  if (typeof buf === "string" || Array.isArray(buf)) return false;
-  if (!Buffer.isBuffer(buf)) return false;
-  return (
-    buf.length >= HEADER_LENGTH &&
-    buf.subarray(0, MAGIC.length).equals(MAGIC) &&
-    buf[MAGIC.length] === VERSION
-  );
+  return backupEnvelopeVersion(buf) !== null;
 }
 
 /**
  * Encrypt the gzipped-JSON payload under a password-derived AES-256-GCM key.
- * Returns the full envelope: magic + version + kdf + salt + iv + tag + ct.
+ * Returns the full v1 envelope: magic + version + kdf + salt + iv + tag + ct.
  */
 export async function encryptBackup(
   payload: Buffer,
@@ -94,7 +58,7 @@ export async function encryptBackup(
 
   return Buffer.concat([
     MAGIC,
-    Buffer.from([VERSION, KDF_SCRYPT]),
+    Buffer.from([VERSION_MONOLITHIC, KDF_SCRYPT]),
     salt,
     iv,
     authTag,
@@ -102,36 +66,27 @@ export async function encryptBackup(
   ]);
 }
 
-export class BackupDecryptionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BackupDecryptionError";
-  }
-}
-
 /**
- * Decrypt a Monize encrypted-backup envelope. A wrong password (or any
- * tampering) surfaces as a BackupDecryptionError -- callers map this to a
- * prompt-for-password response instead of a transaction failure.
+ * Decrypt a Monize encrypted-backup envelope, whichever container it uses. A
+ * wrong password (or any tampering) surfaces as a BackupDecryptionError --
+ * callers map this to a prompt-for-password response instead of a transaction
+ * failure.
  */
 export async function decryptBackup(
   envelope: Buffer,
   password: string,
 ): Promise<Buffer> {
-  // isEncryptedBackup already enforces length >= HEADER_LENGTH, so we don't
-  // re-check it here.
-  if (!isEncryptedBackup(envelope)) {
+  const version = backupEnvelopeVersion(envelope);
+  if (version === null) {
     throw new BackupDecryptionError(
       "Backup file is not in the encrypted Monize format",
     );
   }
-
-  const kdf = envelope[MAGIC.length + 1];
-  if (kdf !== KDF_SCRYPT) {
-    throw new BackupDecryptionError(
-      `Unsupported key derivation function: ${kdf}`,
-    );
+  if (version === VERSION_FRAMED) {
+    return decryptFramedBackup(envelope, password);
   }
+
+  assertSupportedKdf(envelope);
 
   let offset = MAGIC.length + 2;
   const salt = envelope.subarray(offset, offset + SALT_LENGTH);

@@ -4,20 +4,28 @@ import {
   Injectable,
   Logger,
 } from "@nestjs/common";
+import { Writable } from "stream";
 import { DataSource } from "typeorm";
-import { createGzip, gzipSync } from "zlib";
 import { withScopedDb } from "../common/db/scoped-db";
 import {
   ATTACHMENT_STORAGE_PROVIDER,
   AttachmentStorageProvider,
 } from "../attachments/storage/attachment-storage.interface";
-import { encryptBackup } from "./backup-crypto.util";
 import { resolveConfiguredBackupLimit } from "./backup-limits";
 import { attachmentBytesConsistent } from "./attachment-integrity.util";
 import { BACKUP_VERSION, BackupCompletenessReport } from "./backup-format";
+import { createExportReader, ExportReader } from "./export-cursor";
+import {
+  AttachmentAudit,
+  AttachmentReadResult,
+  auditAttachments,
+  externalAttachmentRows,
+} from "./export-attachments";
+import { ExportBufferSink } from "./export-buffer-sink";
+import { collectExportTables, exportJsonChunks } from "./export-json-stream";
+import { ExportWriter, RESPONSE_CLOSED_MESSAGE } from "./export-writer";
 import {
   buildExportTableQueries,
-  ExportRead,
   ExportTableQuery,
   INTENTIONALLY_EXCLUDED_TABLES,
 } from "./export-table-queries";
@@ -32,6 +40,26 @@ import { tr } from "../i18n/translate";
  *
  * Split out of `BackupService` (issue #1092). It knows nothing about restore:
  * the only thing the two halves share is the file format in `backup-format.ts`.
+ *
+ * ## What bounds the memory (issue #1070)
+ *
+ * Every export path here is a pull pipeline, and each stage bounds the next:
+ *
+ *  - `export-cursor.ts` fetches rows through a database cursor, so a table
+ *    contributes a batch at a time rather than all of it. `attachment_blobs`
+ *    fetches one row -- one base64-encoded object -- at a time.
+ *  - `export-json-stream.ts` serialises one row at a time and flushes at a byte
+ *    budget, instead of `JSON.stringify`-ing a whole table.
+ *  - `export-attachments.ts` opens one object store object at a time, and reaches
+ *    the completeness verdict from digests rather than from bytes, so the answer
+ *    exists before the first byte without the bytes existing at all.
+ *  - `export-writer.ts` resolves each write only once the pipeline has taken it,
+ *    so a slow client stops the reads rather than queueing behind them, and an
+ *    encrypted export writes a framed container instead of one AES-GCM message
+ *    over the whole artifact.
+ *
+ * The irreducible part is one row: a 10 MiB attachment is 13.6 MiB of base64 no
+ * matter what the budget says. Everything else is a constant.
  */
 @Injectable()
 export class BackupExportService {
@@ -43,7 +71,7 @@ export class BackupExportService {
     private readonly attachmentStorage: AttachmentStorageProvider,
   ) {}
 
-  /** Ceiling on the JSON a buffered export may accumulate. */
+  /** Ceiling on the artifact a buffered export may accumulate. */
   get exportBufferLimitBytes(): number {
     return resolveConfiguredBackupLimit(
       "BACKUP_EXPORT_BUFFER_LIMIT",
@@ -52,10 +80,30 @@ export class BackupExportService {
     );
   }
 
-  /** The export's table list, with the attachment-bytes augmentation bound. */
-  private getTableQueries(): ExportTableQuery[] {
-    return buildExportTableQueries((rows, read) =>
-      this.appendExternalAttachmentBytes(rows, read),
+  /**
+   * The export's table list, with the external-attachment rows bound.
+   *
+   * `audit` is the pre-pass verdict, when there is one: the body then carries
+   * exactly the objects the response headers said it would. Without it (the
+   * support export, which assembles in memory and reports no completeness) each
+   * object is verified as it is read, which is what the export always did.
+   */
+  private getTableQueries(audit?: AttachmentAudit): ExportTableQuery[] {
+    return buildExportTableQueries(
+      externalAttachmentRows(
+        this.attachmentStorage.name,
+        (id, row) => this.readAttachmentObject(id, row),
+        {
+          only: audit?.carriedExternalIds,
+          onDivergence: (id) =>
+            this.logger.warn(
+              `Backup export could no longer read attachment object ${id} from the ` +
+                `${this.attachmentStorage.name} store while writing the artifact, ` +
+                `although it read it moments earlier. The download's completeness ` +
+                `headers over-report by that attachment.`,
+            ),
+        },
+      ),
     );
   }
 
@@ -64,20 +112,45 @@ export class BackupExportService {
    * encrypted -- alongside a report of whether every attachment's bytes made it
    * in. Used by the auto-backup path, which must not promote or retain an
    * incomplete artifact as if it were complete.
+   *
+   * This is the one export that still holds a whole artifact, because it writes a
+   * file rather than a response. It holds the *compressed* artifact only, and
+   * refuses past `BACKUP_EXPORT_BUFFER_LIMIT` with an error naming the table it
+   * gave up at -- a pod dying mid-write leaves no artifact and no message.
    */
   async exportToBuffer(
     userId: string,
     encryptionPassword?: string,
   ): Promise<{ buffer: Buffer; report: BackupCompletenessReport }> {
-    const { buffer, report } = await this.collectGzippedExport(userId);
-    return {
-      buffer: encryptionPassword
-        ? await encryptBackup(buffer, encryptionPassword)
-        : buffer,
-      report,
-    };
+    const limit = this.exportBufferLimitBytes;
+    const sink = new ExportBufferSink(
+      limit,
+      (bytes, table) =>
+        new BadRequestException(
+          tr(
+            "errors.backup.exportTooLarge",
+            `This backup is too large to produce in one piece (past ${limit} bytes at table "${table}"). Automatic and support backups have to be held in memory; download a manual backup, which streams, or raise BACKUP_EXPORT_BUFFER_LIMIT.`,
+            { limit, table: table ?? "" },
+          ),
+        ),
+    );
+
+    const report = await this.writeExport(userId, sink, encryptionPassword, {
+      onChunkTable: (table) => sink.noteTable(table),
+    });
+    return { buffer: sink.toBuffer(), report };
   }
 
+  /**
+   * Streams a gzipped (and, with a password, framed-encrypted) backup to an
+   * express response.
+   *
+   * Both paths stream. The encrypted one used to buffer the whole artifact
+   * because AES-GCM's single auth tag needs the last byte of plaintext before it
+   * can be computed; it now writes a framed container that authenticates each
+   * chunk, so the difference between the two is one transform on the end of the
+   * pipeline (issue #1070).
+   */
   async streamExport(
     userId: string,
     res: import("express").Response,
@@ -87,149 +160,78 @@ export class BackupExportService {
       `Starting backup export for user ${userId}${encryptionPassword ? " (encrypted)" : ""}`,
     );
 
-    // Encrypted exports require the full payload up-front to compute the GCM
-    // auth tag, so we buffer JSON in memory before encrypting. Plain exports
-    // pipe through gzip instead, which avoids holding the whole *compressed*
-    // artifact -- but not the whole dataset: each table is still read into an
-    // array and serialised with one `JSON.stringify`, and every carried
-    // attachment is base64-encoded into one array before that. Peak memory
-    // therefore tracks dataset size, not chunk size (F3RB-006, issue #1070, whose
-    // closure needs a cursor inside the snapshot and per-attachment
-    // encoding). Do not read this path as bounded.
-    if (encryptionPassword) {
-      const { buffer, report } = await this.collectGzippedExport(userId);
+    await this.writeExport(userId, res, encryptionPassword, {
       // Nothing has been sent yet, so the incompleteness can be *in the
       // response* rather than only in the log (F3RB-004).
-      this.warnIfIncompleteExport(userId, report);
-      this.markIncompleteExport(res, report);
-      const encrypted = await encryptBackup(buffer, encryptionPassword);
-      res.write(encrypted);
-      res.end();
-      this.logger.log(`Backup export completed for user ${userId} (encrypted)`);
-      return;
-    }
+      onReport: (report) => this.markIncompleteExport(res, report),
+    });
 
-    const tableQueries = this.getTableQueries();
+    this.logger.log(
+      `Backup export completed for user ${userId}${encryptionPassword ? " (encrypted)" : ""}`,
+    );
+  }
 
-    // Write JSON through gzip to the response one table at a time. This bounds
-    // the compressed output and the number of tables held at once -- it does NOT
-    // bound one table, or the carried attachment set (F3RB-006).
-    const gzip = createGzip();
-    let responseAbort: Error | null = null;
-    const abortResponse = (error: Error): void => {
-      if (responseAbort === null) responseAbort = error;
-      // Rejecting the pending operation releases the snapshot transaction; the
-      // transform is destroyed separately so it cannot retain buffered output.
-      if (!gzip.destroyed) gzip.destroy();
-    };
-    const onResponseClose = (): void => {
-      if (!res.writableFinished) {
-        abortResponse(
-          new Error("Backup export response closed before completion"),
-        );
+  /**
+   * The one export pipeline, shared by the download and the file writer.
+   *
+   * The order is load-bearing: the completeness verdict is reached inside the
+   * snapshot and **before** the pipeline is attached to its target, so the
+   * response headers (and the filename) can still say the artifact is incomplete.
+   * Once a byte has gone out there is nowhere left to put that.
+   */
+  private async writeExport(
+    userId: string,
+    target: Writable,
+    encryptionPassword: string | undefined,
+    hooks: {
+      onReport?: (report: BackupCompletenessReport) => void;
+      onChunkTable?: (table: string | null) => void;
+    },
+  ): Promise<BackupCompletenessReport> {
+    const writer = await ExportWriter.create(target, encryptionPassword);
+    const onTargetClose = (): void => {
+      if (!target.writableFinished) {
+        writer.abort(new Error(RESPONSE_CLOSED_MESSAGE));
       }
     };
-    const onResponseError = (error: Error): void => abortResponse(error);
-    res.once("close", onResponseClose);
-    res.once("error", onResponseError);
-
-    /**
-     * One gzip operation that cannot wait forever after the response disappears.
-     * The write callback replaces a naked `drain` wait: `close` and `error` reject
-     * it, so `inExportSnapshot` unwinds and withScopedDb releases the transaction.
-     */
-    const gzipOperation = (
-      start: (done: (error?: Error | null) => void) => void,
-    ): Promise<void> =>
-      new Promise((resolve, reject) => {
-        if (responseAbort !== null) {
-          reject(responseAbort);
-          return;
-        }
-        let settled = false;
-        const cleanup = (): void => {
-          res.off("close", onClose);
-          res.off("error", onError);
-          gzip.off("error", onError);
-        };
-        const done = (error?: Error | null): void => {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          if (error) reject(error);
-          else resolve();
-        };
-        const onClose = (): void =>
-          done(
-            responseAbort ??
-              new Error("Backup export response closed before completion"),
-          );
-        const onError = (error: Error): void => done(error);
-        res.once("close", onClose);
-        res.once("error", onError);
-        gzip.once("error", onError);
-        try {
-          start(done);
-        } catch (error) {
-          done(error instanceof Error ? error : new Error(String(error)));
-        }
-      });
-
-    const write = (chunk: string): Promise<void> =>
-      gzipOperation((done) => {
-        gzip.write(chunk, done);
-      });
+    const onTargetError = (error: Error): void => writer.abort(error);
+    target.once("close", onTargetClose);
+    target.once("error", onTargetError);
 
     let completed = false;
     try {
-      const preRead = new Map<string, Record<string, unknown>[]>();
-      await this.inExportSnapshot(userId, async (read) => {
-        // Read the two attachment tables BEFORE the first byte goes out, so
-        // completeness can be signalled in the response headers rather than only
-        // in the log (F3RB-004). This costs no extra memory: both arrays were
-        // already retained for the end-of-stream assessment, so the only change
-        // is the order in which they are read inside the same snapshot.
-        for (const entry of tableQueries) {
-          if (
-            entry.key === "transaction_attachments" ||
-            entry.key === "attachment_blobs"
-          ) {
-            preRead.set(entry.key, await this.readTable(read, entry));
-          }
+      const report = await this.inExportSnapshot(userId, async (reader) => {
+        const audit = await this.auditAttachments(userId, reader);
+        this.warnIfIncompleteExport(userId, audit.report);
+        hooks.onReport?.(audit.report);
+
+        // Only now does anything reach the target, so the headers above are
+        // still mutable.
+        writer.start();
+        const chunks = exportJsonChunks(reader, this.getTableQueries(audit), {
+          exportedAt: new Date().toISOString(),
+          // The durable copy of the completeness claim, inside the document
+          // where a rename cannot lose it (issue #1069). It is the same report
+          // the headers, the filename and the return value carry, so the four
+          // cannot disagree about one artifact.
+          completeness: audit.report,
+        });
+        for await (const chunk of chunks) {
+          hooks.onChunkTable?.(chunk.table);
+          await writer.write(chunk.text);
         }
-        const attachments = preRead.get("transaction_attachments") ?? [];
-        const blobs = preRead.get("attachment_blobs") ?? [];
-        const report = this.assessAttachmentCompleteness(attachments, blobs);
-        this.warnIfIncompleteExport(userId, report);
-        this.markIncompleteExport(res, report);
-
-        // Only now does anything reach the socket, so the headers above are still
-        // mutable.
-        gzip.pipe(res);
-        await write(
-          `{"version":${BACKUP_VERSION},"exportedAt":"${new Date().toISOString()}"`,
-        );
-
-        for (const entry of tableQueries) {
-          const rows =
-            preRead.get(entry.key) ?? (await this.readTable(read, entry));
-          await write(`,"${entry.key}":${JSON.stringify(rows)}`);
-        }
-
-        await write(this.completenessEnvelopeTail(report));
+        return audit.report;
       });
-
-      await gzipOperation((done) => {
-        gzip.end(() => done());
-      });
+      // Outside the snapshot: every row has been read, so the transaction and its
+      // pooled connection are released before the last bytes are flushed.
+      await writer.finish();
       completed = true;
+      return report;
     } finally {
-      res.off("close", onResponseClose);
-      res.off("error", onResponseError);
-      if (!completed && !gzip.destroyed) gzip.destroy();
+      target.off("close", onTargetClose);
+      target.off("error", onTargetError);
+      if (!completed) writer.destroy();
     }
-
-    this.logger.log(`Backup export completed for user ${userId}`);
   }
 
   /**
@@ -325,7 +327,9 @@ export class BackupExportService {
    * `REPEATABLE READ` fixes the snapshot at the transaction's first statement,
    * so every table is read as of one instant. READ COMMITTED would not do, even
    * inside a single transaction: it takes a fresh snapshot per statement, which
-   * is the same problem with fewer transactions.
+   * is the same problem with fewer transactions. It is also what makes the
+   * completeness audit a fact rather than a forecast: the cursors that write the
+   * body read the same snapshot the audit judged.
    *
    * The cost is a transaction held for the length of the export -- for the
    * streaming path, for the length of the download. That is one pooled
@@ -333,13 +337,11 @@ export class BackupExportService {
    */
   private inExportSnapshot<T>(
     userId: string,
-    fn: (
-      read: (sql: string) => Promise<Record<string, unknown>[]>,
-    ) => Promise<T>,
+    fn: (reader: ExportReader) => Promise<T>,
   ): Promise<T> {
     return withScopedDb(
       this.dataSource,
-      (manager) => fn((sql) => manager.query(sql, [userId])),
+      (manager) => fn(createExportReader(manager, userId)),
       "REPEATABLE READ",
     );
   }
@@ -373,20 +375,9 @@ export class BackupExportService {
     exportedAt: string;
     tables: Record<string, Record<string, unknown>[]>;
   }> {
-    const tables: Record<string, Record<string, unknown>[]> = {};
-    await this.inExportSnapshot(userId, async (read) => {
-      for (const entry of this.getTableQueries()) {
-        const key = entry.key;
-        // A caller that will discard a table must not pay to load it. The
-        // support backup always excludes `attachment_blobs`, which is base64 --
-        // thirty 10 MiB receipts are ~400 MiB of text, the whole of the chart's
-        // default backend limit, fetched and thrown away before any ceiling was
-        // consulted. Skipping the query is the only fix that helps: a budget
-        // checked after the allocation is a budget checked too late.
-        if (options.skipTables?.has(key)) continue;
-        tables[key] = await this.readTable(read, entry);
-      }
-    });
+    const tables = await this.inExportSnapshot(userId, (reader) =>
+      collectExportTables(reader, this.getTableQueries(), options.skipTables),
+    );
     return {
       version: BACKUP_VERSION,
       exportedAt: new Date().toISOString(),
@@ -394,248 +385,84 @@ export class BackupExportService {
     };
   }
 
-  /** Reads one export table, applying its augmentation if it has one. */
-  private async readTable(
-    read: ExportRead,
-    entry: ExportTableQuery,
-  ): Promise<Record<string, unknown>[]> {
-    const rows = await read(entry.sql);
-    return entry.augment ? await entry.augment(rows, read) : rows;
-  }
-
   /**
-   * Adds the `local` and `s3` providers' attachment bytes to `attachment_blobs`.
+   * Judges whether every attachment metadata row will have its bytes, and logs
+   * what the object store could not supply.
    *
-   * **A backup that cannot restore an attachment is not a backup of it.** Only
-   * `database`-provider bytes used to travel; for `local` and `s3` the artifact
-   * carried metadata and the operator was told to restore the sidecar volume or
-   * bucket alongside it. That works only while the *target* database still holds
-   * the matching row, because the restore has to prove the caller is entitled to
-   * read the object before it reads it -- and after the ownership fix, the proof
-   * is a current `transaction_attachments` row. So the two cases backups exist for
-   * both failed: a fresh instance has no such row, and an account whose
-   * attachment was deleted has no such row either. The restore reported success
-   * and counted the attachment as skipped.
-   *
-   * There is no way to fix that with a better ownership check. An identifier, a
-   * size and a hash in an uploaded document cannot establish a right to read an
-   * object, however they are combined -- that is what the last two rounds
-   * established. The only thing that can is the bytes being *in* the artifact the
-   * user downloaded, which is what this does.
-   *
-   * What it costs: the artifact grows by the size of the attachments, and this
-   * method accumulates every carried object in memory before serialization. On the
-   * encrypted, automatic and support paths that is bounded by
-   * `BACKUP_EXPORT_BUFFER_LIMIT`, so a large attachment set is refused with the
-   * readable error rather than silently producing a file whose attachments cannot
-   * come back. **The plain export is *not* bounded** -- it was the streaming path,
-   * and this accumulation is a real hole in that claim (F3R6-001). Fixing it is the
-   * same cursor/one-object-at-a-time work as bounding the large-table reads
-   * (`docs/backup-restore-contract.md`, still open); until then, a plain export of
-   * a very large attachment set can exceed the pod. The bytes must travel for the
-   * backup to be a backup, so the accumulation is a known cost, not a regression to
-   * revert.
-   *
-   * Two things are checked, not just loaded. An object the store cannot produce is
-   * logged and omitted -- the ledger is the point of a backup, and refusing the
-   * whole file over one unreadable receipt would leave the user with nothing. And
-   * an object whose bytes no longer match the size and SHA-256 the server recorded
-   * for it is also omitted (`attachmentBytesConsistent`): export is the last moment
-   * to notice the source is already corrupt, and packaging bytes the restore will
-   * refuse would report a success the artifact cannot honour.
+   * The judgement itself is in `export-attachments.ts`; what belongs here is the
+   * storage provider and the logging, because this class owns both.
    */
-  private async appendExternalAttachmentBytes(
-    rows: Record<string, unknown>[],
-    read: ExportRead,
-  ): Promise<Record<string, unknown>[]> {
+  private async auditAttachments(
+    userId: string,
+    reader: ExportReader,
+  ): Promise<AttachmentAudit> {
     const provider = this.attachmentStorage.name;
-    // The `database` provider's bytes are already in the rows the query returned.
-    if (provider === "database") return rows;
-
-    const metadata = await read(
-      `SELECT id, storage_provider, byte_size, sha256
-         FROM transaction_attachments
-        WHERE user_id = $1
-        ORDER BY id`,
+    const audit = await auditAttachments(reader, provider, (id, row) =>
+      this.readAttachmentObject(id, row),
     );
 
-    const carried: Record<string, unknown>[] = [];
-    let unreadable = 0;
-    let inconsistent = 0;
-    for (const row of metadata) {
-      // Rows written by a different backend than this runtime configures cannot
-      // be read from here at all; they keep travelling as metadata only.
-      if (String(row.storage_provider ?? "") !== provider) continue;
-      const id = String(row.id ?? "");
-      let bytes: Buffer;
-      try {
-        bytes = await this.attachmentStorage.load(id);
-      } catch {
-        unreadable += 1;
-        continue;
-      }
-      // The object must match the size and hash the server recorded for it. This
-      // is the last moment the discrepancy can be seen: the restore checks the
-      // same thing (`attachmentBytesConsistent`) and would drop the row, but by
-      // then the export has reported success and the user believes the receipt is
-      // safe. So a source object that no longer matches its metadata -- truncated,
-      // replaced, silently corrupted in the volume or bucket -- is omitted here
-      // and never packaged. The metadata is the server's own record; the bytes
-      // are what the store returned, so this compares the store against the
-      // database rather than the file against itself.
-      if (!attachmentBytesConsistent(bytes, row)) {
-        inconsistent += 1;
-        continue;
-      }
-      carried.push({ attachment_id: id, data: bytes.toString("base64") });
-    }
-
-    if (unreadable > 0) {
+    if (audit.unreadable > 0) {
       this.logger.warn(
-        `Backup export could not read ${unreadable} attachment object(s) from the ` +
+        `Backup export could not read ${audit.unreadable} attachment object(s) from the ` +
           `${provider} store; their metadata travels without bytes and they will ` +
           `not be restorable.`,
       );
     }
-    if (inconsistent > 0) {
+    if (audit.inconsistent > 0) {
       this.logger.warn(
-        `Backup export found ${inconsistent} attachment object(s) in the ${provider} ` +
-          `store whose bytes no longer match their recorded size or checksum; they ` +
-          `are omitted and will not be restorable from this artifact.`,
+        `Backup export found ${audit.inconsistent} attachment(s) whose bytes no longer ` +
+          `match their recorded size or checksum; they are omitted and will not be ` +
+          `restorable from this artifact.`,
       );
     }
-    if (carried.length > 0) {
+    if (audit.carriedExternalIds.size > 0) {
       this.logger.log(
-        `Backup export carried ${carried.length} external attachment object(s) ` +
-          `from the ${provider} store.`,
+        `Backup export is carrying ${audit.carriedExternalIds.size} external attachment ` +
+          `object(s) from the ${provider} store for user ${userId}.`,
       );
     }
-    // Immutability: a new array rather than pushing into the caller's.
-    return [...rows, ...carried];
+    return audit;
   }
 
   /**
-   * Builds the gzipped JSON backup payload as a single Buffer in memory.
-   * Used by the encryption path (which needs the whole payload to compute
-   * the GCM auth tag) and the auto-backup writer.
+   * Opens one attachment object and checks it against the row the server holds
+   * for it.
    *
-   * Buffers rather than strings, concatenated once: `parts.join("")` followed by
-   * `Buffer.from(..., "utf-8")` held the whole payload twice at the moment of
-   * conversion -- once as a JS string, once as bytes -- on top of the per-table
-   * strings and the gzip output. On the chart's default 400 MiB backend that is
-   * the difference between a backup and an OOM kill.
+   * **This is the export's only read of an object store**, and the source guard
+   * in `backup.service.spec.ts` keeps it that way. The distinction that guard
+   * exists for: the id here was named by the *server*, from a `user_id`-scoped
+   * query against its own database, so there is nothing to authorize -- unlike
+   * the restore's staging read, which follows an id an *uploaded document*
+   * named and has to consult the ownership record first.
    *
-   * The running total is checked against `exportBufferLimitBytes` as it grows, so
-   * a dataset too large for this path is refused with an error the user can read
-   * rather than by the pod dying mid-write. The unencrypted HTTP export is
-   * unaffected: it streams, and has no total to bound.
+   * Two things are checked, not just loaded. An object the store cannot produce
+   * is reported unreadable and omitted -- the ledger is the point of a backup,
+   * and refusing the whole file over one unreadable receipt would leave the user
+   * with nothing. And an object whose bytes no longer match the size and SHA-256
+   * the server recorded is omitted too: export is the last moment to notice the
+   * source is already corrupt, and packaging bytes the restore will refuse would
+   * report a success the artifact cannot honour.
+   *
+   * The bytes are returned rather than retained. The audit drops them
+   * immediately and the writer hands them to gzip a row at a time, so one object
+   * is resident at once (issue #1070).
    */
-  private async collectGzippedExport(
-    userId: string,
-  ): Promise<{ buffer: Buffer; report: BackupCompletenessReport }> {
-    const tableQueries = this.getTableQueries();
-    const parts: Buffer[] = [
-      Buffer.from(
-        `{"version":${BACKUP_VERSION},"exportedAt":"${new Date().toISOString()}"`,
-        "utf-8",
-      ),
-    ];
-    let total = parts[0].length;
-    // Captured to judge completeness after assembly: the metadata rows and the
-    // blob rows the augment actually included.
-    let attachments: Record<string, unknown>[] = [];
-    let blobs: Record<string, unknown>[] = [];
-    await this.inExportSnapshot(userId, async (read) => {
-      for (const entry of tableQueries) {
-        const key = entry.key;
-        const rows = await this.readTable(read, entry);
-        if (key === "transaction_attachments") attachments = rows;
-        else if (key === "attachment_blobs") blobs = rows;
-        const chunk = Buffer.from(`,"${key}":${JSON.stringify(rows)}`, "utf-8");
-        total += chunk.length;
-        if (total > this.exportBufferLimitBytes) {
-          throw new BadRequestException(
-            tr(
-              "errors.backup.exportTooLarge",
-              `This backup is too large to produce in one piece (past ${this.exportBufferLimitBytes} bytes at table "${key}"). Encrypted, automatic and support backups have to be assembled in memory; use the plain export, which streams, or raise BACKUP_EXPORT_BUFFER_LIMIT.`,
-              { limit: this.exportBufferLimitBytes, table: key },
-            ),
-          );
-        }
-        parts.push(chunk);
-      }
-    });
-    const report = this.assessAttachmentCompleteness(attachments, blobs);
-    parts.push(Buffer.from(this.completenessEnvelopeTail(report), "utf-8"));
-    return { buffer: gzipSync(Buffer.concat(parts)), report };
-  }
-
-  /**
-   * The closing brace, with the completeness claim in front of it.
-   *
-   * At the tail rather than beside `version` because the buffered path cannot
-   * know the answer until every table has been read -- and one placement for
-   * both paths means a reader never has to care which produced the file. JSON
-   * member order carries no meaning; `data.completeness` reads the same either
-   * way.
-   *
-   * Written for a complete artifact too. "This file says it is complete" and
-   * "this file says nothing" are different facts about a recovered artifact, and
-   * only the first of them is evidence (`parseArtifactCompleteness`).
-   */
-  private completenessEnvelopeTail(report: BackupCompletenessReport): string {
-    return `,"completeness":${JSON.stringify(report)}}`;
-  }
-
-  /**
-   * Judges whether every attachment metadata row in the artifact has its bytes.
-   *
-   * Runs after assembly, over the two arrays actually written. A metadata row
-   * with no matching blob is *missing* -- the augment dropped an external object
-   * it could not read or that failed its checksum, or a database blob simply is
-   * not there. A database-provider blob that is present but contradicts its own
-   * metadata is *inconsistent*; external blobs were already validated when the
-   * augment carried them, so their presence is proof enough and they are not
-   * re-hashed here. Support backups exclude the attachment tables, so there are no
-   * rows and the report is trivially complete.
-   */
-  private assessAttachmentCompleteness(
-    attachments: Record<string, unknown>[],
-    blobs: Record<string, unknown>[],
-  ): BackupCompletenessReport {
-    const blobById = new Map<string, string>();
-    for (const blob of blobs ?? []) {
-      const id = String(blob.attachment_id ?? "");
-      if (id.length > 0 && typeof blob.data === "string") {
-        blobById.set(id, blob.data);
-      }
+  private async readAttachmentObject(
+    id: string,
+    row: Record<string, unknown>,
+  ): Promise<AttachmentReadResult> {
+    let bytes: Buffer;
+    try {
+      bytes = await this.attachmentStorage.load(id);
+    } catch {
+      return { status: "unreadable" };
     }
-
-    let missing = 0;
-    let inconsistent = 0;
-    for (const row of attachments ?? []) {
-      const id = String(row.id ?? "");
-      const encoded = blobById.get(id);
-      if (encoded === undefined) {
-        missing += 1;
-        continue;
-      }
-      // Only the database provider's bytes arrive here unvalidated; external ones
-      // passed `attachmentBytesConsistent` before the augment included them.
-      if (String(row.storage_provider ?? "database") === "database") {
-        const bytes = Buffer.from(encoded, "base64");
-        if (!attachmentBytesConsistent(bytes, row)) inconsistent += 1;
-      }
+    // The metadata is the server's own record and the bytes are what the store
+    // returned, so this compares the store against the database rather than the
+    // file against itself.
+    if (!attachmentBytesConsistent(bytes, row)) {
+      return { status: "inconsistent" };
     }
-
-    const expected = attachments?.length ?? 0;
-    const included = expected - missing - inconsistent;
-    return {
-      complete: missing === 0 && inconsistent === 0,
-      expectedAttachments: expected,
-      includedAttachments: included,
-      missingAttachments: missing,
-      inconsistentAttachments: inconsistent,
-    };
+    return { status: "ok", bytes };
   }
 }

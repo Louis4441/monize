@@ -2,7 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { DataSource } from "typeorm";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { gunzipSync } from "zlib";
 import {
   BackupService,
@@ -99,9 +99,10 @@ describe("Backup export/restore round-trip (integration)", () => {
         // Only consulted for backups encrypted with a stored password; the
         // round-trip tests supply the password explicitly instead.
         { provide: AiEncryptionService, useValue: { decrypt: () => "" } },
-        // The real database-backed provider: no test here seeds an attachment,
-        // but BackupService's constructor requires the token to be resolvable
-        // regardless, and this needs no extra config (unlike local/S3).
+        // The real database-backed provider, which the completeness cases below
+        // need: their whole point is that Postgres computes the digest the
+        // export judges, and a double would answer for it. It also needs no
+        // extra config, unlike local/S3.
         DatabaseStorageProvider,
         {
           provide: ATTACHMENT_STORAGE_PROVIDER,
@@ -803,6 +804,117 @@ describe("Backup export/restore round-trip (integration)", () => {
   // to the schema but never wired into the backup, so its data is silently lost
   // on restore. The synchronize:true test DB is built from entity metadata, so
   // it contains every @Entity table -- exactly where new tables come from.
+  /**
+   * The completeness verdict against a real database.
+   *
+   * The export decides, before the first byte of a download, whether every
+   * attachment it names will have its bytes -- and since issue #1070 it decides
+   * that for the `database` provider from a digest Postgres computes over the
+   * column (`octet_length`, `sha256`), because pulling every blob onto the heap
+   * to hash it was the memory defect being closed. A unit spec cannot show that
+   * works: its `manager.query` is a mock, so the SQL is never parsed and the
+   * digest is whatever the double says it is. Only a real server can.
+   */
+  describe("attachment completeness (database provider)", () => {
+    const BYTES = Buffer.from("a receipt, as bytes");
+
+    async function seedAttachment(
+      userId: string,
+      transactionId: string,
+      options: { blob: Buffer | null; declaredSha?: string },
+    ): Promise<string> {
+      const id = randomUUID();
+      await dataSource.query(
+        `INSERT INTO transaction_attachments
+           (id, user_id, transaction_id, filename, content_type, byte_size,
+            sha256, storage_provider, storage_key)
+         VALUES ($1, $2, $3, 'receipt.txt', 'text/plain', $4, $5, 'database', $6)`,
+        [
+          id,
+          userId,
+          transactionId,
+          BYTES.length,
+          options.declaredSha ??
+            createHash("sha256").update(BYTES).digest("hex"),
+          // `storage_key` equals the attachment's id for the database provider,
+          // but as text rather than as the same uuid parameter -- Postgres
+          // refuses to deduce two types for one placeholder.
+          id,
+        ],
+      );
+      if (options.blob) {
+        await dataSource.query(
+          `INSERT INTO attachment_blobs (attachment_id, data) VALUES ($1, $2)`,
+          [id, options.blob],
+        );
+      }
+      return id;
+    }
+
+    async function reportFor(userId: string): Promise<{
+      report: Awaited<ReturnType<typeof service.exportToBuffer>>["report"];
+      blobs: unknown[];
+    }> {
+      const { buffer, report } = await withUserContext(userId, () =>
+        service.exportToBuffer(userId),
+      );
+      const parsed = JSON.parse(gunzipSync(buffer).toString("utf-8"));
+      return { report, blobs: parsed.attachment_blobs };
+    }
+
+    it("counts a blob whose bytes match its metadata as included", async () => {
+      const user = await createTestUserDirect(dataSource, {
+        email: "att-ok@example.com",
+      });
+      const seeded = await seedUserData(user.id);
+      await seedAttachment(user.id, seeded.expenseTxId, { blob: BYTES });
+
+      const { report, blobs } = await reportFor(user.id);
+
+      expect(report).toMatchObject({
+        complete: true,
+        expectedAttachments: 1,
+        includedAttachments: 1,
+      });
+      // And the bytes travel, base64-encoded, so the artifact can restore them.
+      expect(blobs).toHaveLength(1);
+    });
+
+    it("reports a blob that contradicts its recorded checksum as inconsistent", async () => {
+      const user = await createTestUserDirect(dataSource, {
+        email: "att-bad@example.com",
+      });
+      const seeded = await seedUserData(user.id);
+      await seedAttachment(user.id, seeded.expenseTxId, {
+        blob: Buffer.from("different bytes entirely"),
+      });
+
+      const { report } = await reportFor(user.id);
+
+      expect(report).toMatchObject({
+        complete: false,
+        expectedAttachments: 1,
+        inconsistentAttachments: 1,
+      });
+    });
+
+    it("reports a metadata row with no blob as missing", async () => {
+      const user = await createTestUserDirect(dataSource, {
+        email: "att-missing@example.com",
+      });
+      const seeded = await seedUserData(user.id);
+      await seedAttachment(user.id, seeded.expenseTxId, { blob: null });
+
+      const { report } = await reportFor(user.id);
+
+      expect(report).toMatchObject({
+        complete: false,
+        expectedAttachments: 1,
+        missingAttachments: 1,
+      });
+    });
+  });
+
   describe("schema coverage guard", () => {
     async function listPublicTables(): Promise<string[]> {
       const rows: Array<{ table_name: string }> = await dataSource.query(
