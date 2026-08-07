@@ -527,6 +527,9 @@ export function SecurityPerformanceReport() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 space-y-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
           <div className="flex flex-wrap gap-2 items-center">
+            {/* Sized to their longest option, not to the current selection:
+                these two sit in the toolbar, and a control that stretches on
+                every pick drags the range selector around under the cursor. */}
             <div className="min-w-[250px]">
               <MultiSelect
                 ariaLabel={t('securityPerformance.selectSecuritiesPlaceholder')}
@@ -534,6 +537,7 @@ export function SecurityPerformanceReport() {
                 value={selectedSecurityIds}
                 onChange={setSelectedSecurityIds}
                 placeholder={t('securityPerformance.selectSecuritiesPlaceholder')}
+                sizeToLongestOption
               />
             </div>
             <div className="min-w-[250px]">
@@ -543,6 +547,7 @@ export function SecurityPerformanceReport() {
                 value={selectedIndexCodes}
                 onChange={setSelectedIndexCodes}
                 placeholder={t('securityPerformance.selectIndexesPlaceholder')}
+                sizeToLongestOption
               />
             </div>
           </div>

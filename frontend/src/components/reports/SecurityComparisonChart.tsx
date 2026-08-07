@@ -19,7 +19,7 @@ import {
   PerformanceExclusionReason,
   PerformanceSeriesRef,
 } from '@/types/investment';
-import { chartColors, chartSeriesColor } from '@/lib/chart-colors';
+import { CHART_SERIES, chartColors, chartSeriesColor } from '@/lib/chart-colors';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { parseLocalDate, type ChartDatePattern } from '@/lib/utils';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
@@ -61,6 +61,10 @@ export function buildPerformanceView(comparison: PerformanceComparison): {
   comparison.series
     .filter((entry) => entry.kind === 'SECURITY')
     .forEach((entry, i) => securityIndex.set(entry.key, i));
+  const indexIndex = new Map<string, number>();
+  comparison.series
+    .filter((entry) => entry.kind === 'INDEX')
+    .forEach((entry, i) => indexIndex.set(entry.key, i));
 
   const series: PerformanceSeries[] = comparison.series.map(
     (entry: PerformanceSeriesRef, i) => ({
@@ -68,14 +72,18 @@ export function buildPerformanceView(comparison: PerformanceComparison): {
       kind: entry.kind,
       label: entry.label,
       name: entry.name,
-      // A benchmark takes the neutral token and a dash, the way the GEM
-      // report's simulated line does: it is a yardstick, not one of the
-      // holdings, and it must not read as one. Securities keep the categorical
-      // palette, indexed among themselves so a holding's colour does not move
-      // when an index is added or removed.
+      // The dash is what says "benchmark" -- a yardstick, not one of the
+      // holdings. Colour is identity: each kind is indexed among its own, so a
+      // holding's colour does not move when an index is added and an index's
+      // does not move when a holding is. Securities count up from the front of
+      // the palette; indexes count down from the back, so two benchmarks are
+      // distinguishable from each other (one neutral token made them
+      // identical) and the two kinds only collide once the palette is spent.
       color:
         entry.kind === 'INDEX'
-          ? chartColors.neutral
+          ? chartSeriesColor(
+              CHART_SERIES.length - 1 - (indexIndex.get(entry.key) ?? 0),
+            )
           : chartSeriesColor(securityIndex.get(entry.key) ?? i),
       dashed: entry.kind === 'INDEX',
     }),

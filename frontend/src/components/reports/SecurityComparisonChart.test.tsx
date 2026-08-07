@@ -152,6 +152,51 @@ describe('buildPerformanceView', () => {
   });
 
   /**
+   * One neutral token made every benchmark the same grey dashed line, so two
+   * indexes on one chart could not be told apart. Each index now takes its own
+   * palette colour -- counted from the far end, so the two kinds do not collide
+   * until the palette is spent -- and the dash alone carries "benchmark".
+   */
+  it('gives each index its own colour, distinct from the securities', () => {
+    const { series } = buildPerformanceView(
+      comparison({
+        series: [
+          securityRef('s1', 'AAA'),
+          indexRef('SP500', 'S&P 500'),
+          indexRef('GSPTSE', 'S&P/TSX Composite'),
+        ],
+      }),
+    );
+    const [aaa, sp500, tsx] = series;
+    expect(sp500.color).not.toBe(tsx.color);
+    expect(sp500.color).not.toBe(aaa.color);
+    expect(tsx.color).not.toBe(aaa.color);
+    // Both still dashed: colour is identity, the dash is what says benchmark.
+    expect(sp500.dashed).toBe(true);
+    expect(tsx.dashed).toBe(true);
+  });
+
+  it("keeps an index's colour when a security is added beside it", () => {
+    const oneSecurity = buildPerformanceView(
+      comparison({
+        series: [securityRef('s1', 'AAA'), indexRef('SP500', 'S&P 500')],
+      }),
+    );
+    const twoSecurities = buildPerformanceView(
+      comparison({
+        series: [
+          securityRef('s1', 'AAA'),
+          securityRef('s2', 'BBB'),
+          indexRef('SP500', 'S&P 500'),
+        ],
+      }),
+    );
+    const indexColorOf = (view: ReturnType<typeof buildPerformanceView>) =>
+      view.series.find((s) => s.kind === 'INDEX')?.color;
+    expect(indexColorOf(twoSecurities)).toBe(indexColorOf(oneSecurity));
+  });
+
+  /**
    * A holding's colour must not move when a benchmark is added beside it: the
    * reader has already learned which line is theirs.
    */
