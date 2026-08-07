@@ -31,7 +31,9 @@ export const ONE_ACTIVE_JOB_INDEX = "idx_import_jobs_one_active_per_user";
  * The row is the coordination point: `POST /import/mny/start` inserts it
  * `pending`, exactly one worker claims it by moving it to `running`, the running
  * job writes `progress` and `heartbeat_at` in their own short transactions so a
- * poller can see them, and a reaper cron fails jobs whose heartbeat went stale.
+ * poller can see them, and a job whose heartbeat went stale is failed by the
+ * next request that reads or competes for the slot -- with an hourly cron as the
+ * backstop for a user who never asks again.
  * A failed job keeps `stagedFileId`, so Retry is a new job over the same bytes.
  *
  * The partial unique index is what makes "one import at a time per user" true:
