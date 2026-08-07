@@ -176,16 +176,19 @@ export function SecurityPerformanceReport() {
   /**
    * Benchmarks, grouped by region.
    *
-   * An index we hold no history for is left out rather than offered: selecting
-   * it could only produce an excluded row, and an option that cannot work is
-   * worse than one that is not there. The catalog carries the coverage so this
-   * is a fact rather than a guess.
+   * **Every catalog entry is offered, including one we hold no prices for yet.**
+   * Hiding those looked like courtesy and was a deadlock: an index's history is
+   * fetched when it is first selected, so filtering on stored coverage meant a
+   * fresh deployment showed an empty picker and nothing could ever fill it. The
+   * comparison already answers an unpriced benchmark honestly -- it comes back
+   * in `excluded` with a reason -- which is the right place for that to be
+   * handled.
    */
   const indexOptions = useMemo<MultiSelectOption[]>(
     () =>
       INDEX_REGIONS.flatMap((region) => {
         const inRegion = marketIndexes
-          .filter((index) => index.region === region && index.coverage.latestDate)
+          .filter((index) => index.region === region)
           .sort((a, b) => a.defaultName.localeCompare(b.defaultName));
         if (inRegion.length === 0) return [];
         return [

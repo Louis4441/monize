@@ -308,6 +308,34 @@ describe("SecurityPriceService", () => {
       expect(mockQueryBuilder.take).not.toHaveBeenCalledWith(365);
     });
 
+    /**
+     * "All time" is a request with no start date, so a chart asking for the
+     * whole history sends only an end date. Keying the cap on `startDate` alone
+     * left that case on the 365-row default -- roughly one year, handed back as
+     * everything there is, with a well-formed array and nothing to say so.
+     */
+    it("does not truncate a window that is open at its start", async () => {
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      securityPriceRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.getPriceHistory("sec-1", undefined, "2026-08-06");
+
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(
+        MAX_PRICE_HISTORY_ROWS,
+      );
+      expect(mockQueryBuilder.take).not.toHaveBeenCalledWith(
+        DEFAULT_PRICE_HISTORY_ROWS,
+      );
+    });
+
     it("still honours an explicit limit alongside a window", async () => {
       const mockQueryBuilder = {
         where: jest.fn().mockReturnThis(),

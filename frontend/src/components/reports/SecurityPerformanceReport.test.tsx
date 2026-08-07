@@ -1172,6 +1172,35 @@ describe('SecurityPerformanceReport', () => {
     expect(options).not.toHaveProperty('limit');
   });
 
+  /**
+   * "All time" resolves to no start date, and the request must say so rather
+   * than fall back to a row cap -- the server reads an absent start as "from
+   * the beginning" only when nothing else caps the read.
+   */
+  it('asks for an open-ended window on All Time, and never a row cap', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetSecurityPrices.mockResolvedValue([]);
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: SELECT_PLACEHOLDER })).toBeInTheDocument();
+    });
+    await selectSecurity('AAPL - Apple Inc.');
+    await waitFor(() => expect(mockGetSecurityPrices).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'All Time' }));
+    });
+
+    await waitFor(() => {
+      const last = mockGetSecurityPrices.mock.calls.at(-1)![1];
+      expect(last.startDate).toBeUndefined();
+      expect(last).not.toHaveProperty('limit');
+    });
+  });
+
   it('refetches when the timeframe changes', async () => {
     mockGetSecurities.mockResolvedValue(mockSecurities);
     mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
@@ -1209,7 +1238,14 @@ describe('SecurityPerformanceReport', () => {
 
   // --- index overlay -------------------------------------------------------
 
-  it('offers only the indexes we hold history for', async () => {
+  /**
+   * The regression test for an empty picker. An index's history is fetched when
+   * it is first selected, so filtering the options down to what we already hold
+   * was a deadlock: a fresh deployment stores nothing, every option was hidden,
+   * and nothing could ever fill the table. An unpriced benchmark is answered by
+   * the comparison's exclusion list, not by hiding it.
+   */
+  it('offers every catalog index, including one with no stored history yet', async () => {
     mockGetSecurities.mockResolvedValue(mockSecurities);
     mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
 
@@ -1224,9 +1260,33 @@ describe('SecurityPerformanceReport', () => {
     });
 
     expect(screen.getByText('S&P 500')).toBeInTheDocument();
-    // An option that could only ever produce an excluded row is worse than one
-    // that is not there.
-    expect(screen.queryByText('FTSE 100')).not.toBeInTheDocument();
+    // Coverage is null on this one; it is still selectable, which is what makes
+    // its first fetch possible.
+    expect(screen.getByText('FTSE 100')).toBeInTheDocument();
+  });
+
+  it('is not empty when nothing has been fetched for any index', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetMarketIndexes.mockResolvedValue(
+      mockMarketIndexes.map((index) => ({
+        ...index,
+        coverage: { earliestDate: null, latestDate: null },
+      })),
+    );
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add a market index...' }),
+      ).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add a market index...' }));
+    });
+
+    expect(screen.getByText('S&P 500')).toBeInTheDocument();
+    expect(screen.getByText('FTSE 100')).toBeInTheDocument();
   });
 
   it('switches to the comparison view when an index is added to one security', async () => {

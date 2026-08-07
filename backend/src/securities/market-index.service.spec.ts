@@ -127,6 +127,42 @@ describe("MarketIndexService", () => {
       ).toBe(true);
     });
 
+    /**
+     * "All time" has no boundary to reach behind, so no stored start can fail
+     * to satisfy it. Treating it as unsatisfiable would refetch every selected
+     * index on every open-ended request.
+     */
+    it("does not refetch on an open-ended request when the store is current", async () => {
+      manager.query.mockImplementation((sql: string) => {
+        if (sql.includes("MIN(price_date)")) {
+          return Promise.resolve([
+            {
+              index_code: "SP500",
+              earliest: "2000-01-03",
+              latest: new Date().toISOString().slice(0, 10),
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      await service.ensureHistory(["SP500"], null);
+      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(yahoo.fetchHistorical).not.toHaveBeenCalled();
+    });
+
+    it("fetches the whole history on an open-ended request with nothing stored", async () => {
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistorical.mockResolvedValue([bar("2000-01-03", 1400)]);
+
+      await service.ensureHistory(["SP500"], null);
+
+      // A bounded window would be wrong here: there is no start date to bound
+      // it with, and the answer to "all time" is whatever the provider has.
+      expect(yahoo.fetchHistorical).toHaveBeenCalledWith("^GSPC");
+      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+    });
+
     it("does not refetch an index whose stored history already covers the window", async () => {
       manager.query.mockImplementation((sql: string) => {
         if (sql.includes("MIN(price_date)")) {
@@ -258,6 +294,40 @@ describe("MarketIndexService", () => {
         String(call[0]).includes("INSERT INTO market_index_prices"),
       );
       expect(insert?.[1]).toContain(5850);
+    });
+  });
+
+  // --- start-up ------------------------------------------------------------
+
+  describe("onApplicationBootstrap", () => {
+    /**
+     * Without this a fresh deployment holds no index prices until the first
+     * weekday 17:10 ET, and every benchmark in the picker is one we cannot
+     * draw.
+     */
+    it("warms the store under system context", async () => {
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistorical.mockResolvedValue([bar("2000-01-03", 1400)]);
+
+      service.onApplicationBootstrap();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(systemContext).toHaveBeenCalledTimes(1);
+      expect(yahoo.fetchHistorical).toHaveBeenCalled();
+    });
+
+    it("returns before the provider does, so start-up is not blocked", () => {
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistorical.mockReturnValue(new Promise(() => {}));
+      expect(service.onApplicationBootstrap()).toBeUndefined();
+    });
+
+    it("does not take the process down when the provider is unreachable", async () => {
+      manager.query.mockRejectedValue(new Error("db asleep"));
+      service.onApplicationBootstrap();
+      await expect(
+        new Promise((resolve) => setImmediate(resolve)),
+      ).resolves.toBeUndefined();
     });
   });
 

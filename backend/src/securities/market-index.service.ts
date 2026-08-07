@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -76,7 +76,7 @@ interface UpsertRow {
  * see `market-indexes.ts` and the exemption note in `database/schema.sql`.
  */
 @Injectable()
-export class MarketIndexService {
+export class MarketIndexService implements OnApplicationBootstrap {
   private readonly logger = new Logger(MarketIndexService.name);
 
   constructor(
@@ -160,7 +160,7 @@ export class MarketIndexService {
    */
   async ensureHistory(
     codes: readonly string[],
-    fromDate: string,
+    fromDate: string | null,
   ): Promise<void> {
     if (codes.length === 0) return;
     const definitions = codes
@@ -177,9 +177,15 @@ export class MarketIndexService {
     const today = todayYMD();
     // The lookup that prices the window's start searches backwards, so the
     // fetch has to reach behind the boundary by the same span the rule accepts.
-    const wantedFrom = withLeadDays(fromDate, PRICE_WINDOW_LEAD_DAYS);
+    // A null `fromDate` is "all time", which has no boundary to reach behind:
+    // the whole history is what is wanted, and no stored start can satisfy it.
+    const wantedFrom = fromDate
+      ? withLeadDays(fromDate, PRICE_WINDOW_LEAD_DAYS)
+      : null;
     const staleBefore = withLeadDays(today, TOP_UP_AFTER_DAYS);
-    const acceptableStart = withLeadDays(wantedFrom, -COVERAGE_TOLERANCE_DAYS);
+    const acceptableStart = wantedFrom
+      ? withLeadDays(wantedFrom, -COVERAGE_TOLERANCE_DAYS)
+      : null;
 
     const due = definitions.filter((index) => {
       const attempted = attempts.get(index.code);
@@ -188,14 +194,31 @@ export class MarketIndexService {
       }
       const held = coverage.get(index.code);
       if (!held?.earliestDate || !held.latestDate) return true;
-      return (
-        held.earliestDate > acceptableStart || held.latestDate < staleBefore
-      );
+      if (held.latestDate < staleBefore) return true;
+      // With no requested start, whatever is stored is the history: only
+      // staleness at the near end can make it due. Treating "all time" as
+      // unsatisfiable would refetch every index on every open-ended request.
+      return acceptableStart !== null && held.earliestDate > acceptableStart;
     });
 
     for (const index of due) {
       await this.fetchInto(index, wantedFrom, today);
     }
+  }
+
+  /**
+   * Warm the store once at start-up.
+   *
+   * Without this a fresh deployment holds no index prices until the first
+   * weekday 17:10 ET, and the picker has nothing useful to say about any of
+   * them until then. Deliberately not awaited: an outbound provider call must
+   * not sit between the process starting and it serving requests.
+   */
+  onApplicationBootstrap(): void {
+    void withSystemContext(() => this.refreshAll()).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Initial market index refresh failed: ${message}`);
+    });
   }
 
   /**

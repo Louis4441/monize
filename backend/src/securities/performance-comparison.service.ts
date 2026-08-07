@@ -125,6 +125,19 @@ export class PerformanceComparisonService {
     const securities = await this.loadOwnedSecurities(userId, securityIds);
 
     const end = request.endDate ?? todayYMD();
+
+    // Fetch before resolving an open-ended start, not after. "All time" is
+    // answered from the earliest stored observation, so asking that question
+    // first and then fetching would resolve the window against a store that
+    // does not yet hold the index -- and a request naming only indexes we have
+    // never fetched would resolve its start to today and draw a single day.
+    // Failures here leave the index unpriced, which the exclusion list then
+    // reports; they are not allowed to take the securities' lines down.
+    await this.marketIndexService.ensureHistory(
+      indexCodes,
+      request.startDate ?? null,
+    );
+
     const start =
       request.startDate ??
       (await this.earliestDate(
@@ -132,11 +145,6 @@ export class PerformanceComparisonService {
         indexCodes,
       )) ??
       end;
-
-    // The index history has to reach the window before it can be read. Failures
-    // here leave the index unpriced, which the exclusion list then reports --
-    // they are not allowed to take the securities' lines down with them.
-    await this.marketIndexService.ensureHistory(indexCodes, start);
 
     const sampling = samplingFor(start, end);
     const lag = LAG_DAYS[sampling];

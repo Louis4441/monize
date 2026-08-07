@@ -778,6 +778,12 @@ export class SecurityPriceService {
    * than a filter.
    *
    * A caller that supplies neither keeps the historical default.
+   *
+   * **Either bound counts as a window.** Keying this on `startDate` alone left
+   * the trap open in the direction that matters most: "all time" is a request
+   * with no start date, so a chart asking for the whole history sent only an
+   * `endDate` and got the newest 365 rows back -- about one year, presented as
+   * everything there is.
    */
   async getPriceHistory(
     securityId: string,
@@ -787,7 +793,9 @@ export class SecurityPriceService {
   ): Promise<SecurityPrice[]> {
     const effectiveLimit =
       limit ??
-      (startDate ? MAX_PRICE_HISTORY_ROWS : DEFAULT_PRICE_HISTORY_ROWS);
+      (startDate || endDate
+        ? MAX_PRICE_HISTORY_ROWS
+        : DEFAULT_PRICE_HISTORY_ROWS);
 
     return withScopedDb(this.dataSource, (m) => {
       const query = m

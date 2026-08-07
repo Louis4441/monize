@@ -480,6 +480,43 @@ describe("PerformanceComparisonService", () => {
     expect(view.sampling).toBe("month");
   });
 
+  /**
+   * The order matters. "All time" is answered from the earliest stored
+   * observation, so resolving it before fetching would ask the question against
+   * a store that does not yet hold the index -- and a request naming only
+   * indexes we have never fetched would resolve its start to today and draw a
+   * single day.
+   */
+  it("fetches index history before resolving an open-ended window", async () => {
+    securityRepo.find.mockResolvedValue([]);
+    const order: string[] = [];
+    marketIndexService.ensureHistory.mockImplementation(async () => {
+      order.push("ensureHistory");
+    });
+    manager.query.mockImplementation(async () => {
+      order.push("earliestDate");
+      return [{ earliest: "2005-04-01" }];
+    });
+    marketIndexService.loadSeries.mockResolvedValue(
+      new Map([["SP500", dense("2005-04-01", "2025-12-30", 1000, 5000, 30)]]),
+    );
+
+    const view = await service.getComparison(USER, {
+      securityIds: [],
+      indexCodes: ["SP500"],
+      endDate: "2025-12-31",
+    });
+
+    expect(order).toEqual(["ensureHistory", "earliestDate"]);
+    // Null, not a date: there is no boundary to reach behind, and the answer to
+    // "all time" is whatever the provider has.
+    expect(marketIndexService.ensureHistory).toHaveBeenCalledWith(
+      ["SP500"],
+      null,
+    );
+    expect(view.window.start).toBe("2005-04-01");
+  });
+
   it("thins a long window and widens the boundary tolerance with it", async () => {
     securityRepo.find.mockResolvedValue([security(SEC_A, "AAA")]);
     (loadPriceSeries as jest.Mock).mockResolvedValue(
