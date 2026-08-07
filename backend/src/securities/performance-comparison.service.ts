@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { DataSource, EntityManager, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
@@ -19,6 +19,7 @@ import {
 } from "../common/time-series/price-series.util";
 import { Security } from "./entities/security.entity";
 import { MarketIndexService } from "./market-index.service";
+import { SecurityPriceService } from "./security-price.service";
 import { marketIndexByCode } from "./market-indexes";
 import {
   PerformanceComparisonView,
@@ -65,6 +66,34 @@ const LAG_DAYS: Record<PriceSampling, number> = {
   month: 45,
 };
 
+/**
+ * How long after a deep-backfill attempt the same security may be asked again.
+ * The same six hours GEM's history backfill uses, for the same reason: a
+ * provider that cannot serve the symbol must not be re-asked on every render.
+ */
+const SECURITY_BACKFILL_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * How far after the wanted start a security's usable history may begin and
+ * still count as covering it. A trading week, matching the index side.
+ */
+const SECURITY_COVERAGE_TOLERANCE_DAYS = 7;
+
+/**
+ * The provider range that covers `days` of history.
+ *
+ * Each tier keeps about two months of headroom under its nominal span, so the
+ * fetched history still reaches a lead-days-widened boundary; more headroom
+ * than that just promotes ordinary requests a whole tier up.
+ */
+function backfillRangeFor(days: number): string {
+  const months = days / 30.44;
+  if (months <= 10) return "1y";
+  if (months <= 58) return "5y";
+  if (months <= 118) return "10y";
+  return "max";
+}
+
 export interface PerformanceComparisonRequest {
   securityIds: string[];
   indexCodes: string[];
@@ -106,9 +135,12 @@ interface Resolved extends Candidate {
  */
 @Injectable()
 export class PerformanceComparisonService {
+  private readonly logger = new Logger(PerformanceComparisonService.name);
+
   constructor(
     private dataSource: DataSource,
     private marketIndexService: MarketIndexService,
+    private securityPriceService: SecurityPriceService,
   ) {}
 
   async getComparison(
@@ -126,6 +158,15 @@ export class PerformanceComparisonService {
 
     const end = request.endDate ?? todayYMD();
 
+    // The securities' priced history has to reach the window before the window
+    // can be honest about them. Creation backfills one year, and every earlier
+    // close may be transaction-derived -- raw rows the basis rule rightly
+    // refuses to splice into an adjusted series -- so a holding bought in 2010
+    // can be unpriceable in 2010 until the provider history is actually
+    // fetched. Mirrors the index side, cooldown included; failures leave the
+    // security unpriced, which the exclusion list reports.
+    await this.ensureSecuritiesHistory(securities, request.startDate ?? null);
+
     // An open-ended window is measured off the securities, and that question is
     // answered from their own rows -- so it is asked first and the benchmarks
     // are then fetched to fit it, rather than fetched blind and allowed to set
@@ -138,10 +179,7 @@ export class PerformanceComparisonService {
     const securityStart =
       request.startDate ??
       (securities.length > 0
-        ? await this.resolveOpenEndedStart(
-            securities.map((s) => s.id),
-            [],
-          )
+        ? await this.resolveSecuritiesStart(securities.map((s) => s.id))
         : null);
 
     // Failures here leave the index unpriced, which the exclusion list then
@@ -149,12 +187,7 @@ export class PerformanceComparisonService {
     await this.marketIndexService.ensureHistory(indexCodes, securityStart);
 
     const start =
-      securityStart ??
-      (await this.resolveOpenEndedStart(
-        securities.map((s) => s.id),
-        indexCodes,
-      )) ??
-      end;
+      securityStart ?? (await this.resolveIndexesStart(indexCodes)) ?? end;
 
     const sampling = samplingFor(start, end);
     const lag = LAG_DAYS[sampling];
@@ -424,7 +457,155 @@ export class PerformanceComparisonService {
   }
 
   /**
-   * Where an open-ended window opens.
+   * Per-security activity: where its **usable** priced history begins, and when
+   * the user first transacted in it.
+   *
+   * "Usable" is the operative word, and it is the basis rule restated as a
+   * window question. The loader keeps only the adjusted rows for an instrument
+   * that has any (`docs/time-series-contract.md` rule 1), so a raw
+   * transaction-derived close from 2010 sitting beside adjusted provider rows
+   * from 2025 is a row the read will never return. Counting it -- a plain
+   * `MIN(price_date)` -- opened the window on a date the series cannot answer,
+   * and the instrument was excluded from its own chart with
+   * `NO_PRICE_AT_WINDOW_START` while a price row for that very day sat in the
+   * table. The first price here is therefore computed on the same basis the
+   * loader will choose: the first adjusted row where any exist, the first raw
+   * row where none do.
+   */
+  private async securityActivity(
+    securityIds: string[],
+  ): Promise<
+    Map<
+      string,
+      { firstUsablePrice: string | null; firstTransaction: string | null }
+    >
+  > {
+    const activity = new Map<
+      string,
+      { firstUsablePrice: string | null; firstTransaction: string | null }
+    >();
+    if (securityIds.length === 0) return activity;
+    const rows: Array<{
+      security_id: string;
+      first_usable_price: string | null;
+      first_transaction: string | null;
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT ids.security_id,
+                p.first_usable_price::text AS first_usable_price,
+                t.first_transaction::text AS first_transaction
+           FROM unnest($1::uuid[]) AS ids(security_id)
+           LEFT JOIN (
+             SELECT security_id,
+                    CASE WHEN bool_or(adjusted_close IS NOT NULL)
+                         THEN MIN(price_date) FILTER (WHERE adjusted_close IS NOT NULL)
+                         ELSE MIN(price_date)
+                    END AS first_usable_price
+               FROM security_prices
+              WHERE security_id = ANY($1::uuid[])
+                AND close_price IS NOT NULL
+              GROUP BY security_id
+           ) p ON p.security_id = ids.security_id
+           LEFT JOIN (
+             SELECT security_id, MIN(transaction_date) AS first_transaction
+               FROM investment_transactions
+              WHERE security_id = ANY($1::uuid[])
+              GROUP BY security_id
+           ) t ON t.security_id = ids.security_id`,
+        [securityIds],
+      ),
+    );
+    for (const row of rows) {
+      activity.set(row.security_id, {
+        firstUsablePrice: row.first_usable_price,
+        firstTransaction: row.first_transaction,
+      });
+    }
+    return activity;
+  }
+
+  /**
+   * Fetch the provider history a selected security is missing, before the
+   * window is resolved against what is stored.
+   *
+   * The index side has had this from the start (`ensureHistory`); the
+   * securities did not, and the gap showed: creation backfills one year, so an
+   * all-time request on a holding bought in 2010 had nothing usable to open on.
+   * The wanted start is the requested date for a named window, and the first
+   * transaction for an open-ended one -- a watch-list security with no
+   * transactions wants nothing deeper than it has.
+   *
+   * The cooldown is `securities.historical_backfill_attempted_at`, stamped for
+   * every attempt whether or not it improved the data, exactly as GEM's
+   * backfill stamps it: the cooldown exists to spare the provider. Failures are
+   * logged and swallowed -- an unpriced security becomes an exclusion, not a
+   * failed request.
+   */
+  private async ensureSecuritiesHistory(
+    securities: Security[],
+    requestedStart: string | null,
+  ): Promise<void> {
+    if (securities.length === 0) return;
+    const activity = await this.securityActivity(securities.map((s) => s.id));
+    const today = todayYMD();
+    const now = Date.now();
+
+    const due: Array<{ security: Security; wantedFrom: string }> = [];
+    for (const security of securities) {
+      const known = activity.get(security.id);
+      const wanted = requestedStart ?? known?.firstTransaction ?? null;
+      if (!wanted) continue;
+      const covered =
+        known?.firstUsablePrice !== null &&
+        known?.firstUsablePrice !== undefined &&
+        known.firstUsablePrice <=
+          addDays(wanted, SECURITY_COVERAGE_TOLERANCE_DAYS);
+      if (covered) continue;
+      const last = security.historicalBackfillAttemptedAt;
+      const lastMs =
+        last instanceof Date ? last.getTime() : Date.parse(String(last ?? ""));
+      if (
+        Number.isFinite(lastMs) &&
+        now - lastMs < SECURITY_BACKFILL_COOLDOWN_MS
+      ) {
+        continue;
+      }
+      due.push({ security, wantedFrom: wanted });
+    }
+    if (due.length === 0) return;
+
+    await Promise.all(
+      due.map(({ security, wantedFrom }) =>
+        this.securityPriceService
+          .backfillSecurityRange(
+            security,
+            backfillRangeFor(daysBetween(wantedFrom, today)),
+          )
+          .catch((error: unknown) => {
+            this.logger.warn(
+              `Comparison history backfill failed for ${security.symbol}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+            return 0;
+          }),
+      ),
+    );
+
+    // Stamp every attempt, successful or not: the cooldown exists to spare the
+    // provider, not to record whether the data improved.
+    await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .update(
+          { id: In(due.map(({ security }) => security.id)) },
+          { historicalBackfillAttemptedAt: new Date() },
+        ),
+    );
+  }
+
+  /**
+   * Where an open-ended window opens when securities are selected.
    *
    * **The securities set it; the benchmarks follow.** A market index carries
    * decades the user has no part in -- the S&P 500 reaches back to 1927 -- so
@@ -435,8 +616,9 @@ export class PerformanceComparisonService {
    *
    * Per security the start is the later of two dates, and both bounds matter:
    *
-   * - the first stored close, because a window opening before we can price the
-   *   instrument excludes the very thing it was derived from;
+   * - the first **usable** stored close -- on the basis the loader will choose,
+   *   see `securityActivity` -- because a window opening before the instrument
+   *   can be priced excludes the very thing it was derived from;
    * - the first transaction, because prices are backfilled further than a
    *   holding goes and years before the user owned anything are not their
    *   performance. A security with no transactions -- a watch-list entry -- has
@@ -446,43 +628,34 @@ export class PerformanceComparisonService {
    * one of them can be priced at the boundary and the comparison is like for
    * like. Opening earlier would draw one line and exclude the rest.
    *
-   * With no securities selected, an index is the subject rather than the
-   * yardstick, and its own history is the answer.
-   *
    * `docs/time-series-contract.md` section 2.5: the answer to "when does the
    * data start" is a query against the scope the request names, never a
    * constant.
    */
-  private async resolveOpenEndedStart(
+  private async resolveSecuritiesStart(
     securityIds: string[],
+  ): Promise<string | null> {
+    const activity = await this.securityActivity(securityIds);
+    let latest: string | null = null;
+    for (const { firstUsablePrice, firstTransaction } of activity.values()) {
+      if (!firstUsablePrice) continue;
+      const start =
+        firstTransaction && firstTransaction > firstUsablePrice
+          ? firstTransaction
+          : firstUsablePrice;
+      if (latest === null || start > latest) latest = start;
+    }
+    return latest;
+  }
+
+  /**
+   * Where an open-ended window opens with no securities to measure off: the
+   * index is the subject rather than the yardstick, and its own earliest
+   * observation is the answer.
+   */
+  private async resolveIndexesStart(
     indexCodes: string[],
   ): Promise<string | null> {
-    if (securityIds.length > 0) {
-      const rows: Array<{ start: string | null }> = await withScopedDb(
-        this.dataSource,
-        (m) =>
-          m.query(
-            `SELECT MAX(activity_start)::text AS start FROM (
-               SELECT GREATEST(p.first_price, t.first_transaction) AS activity_start
-                 FROM (
-                   SELECT security_id, MIN(price_date) AS first_price
-                     FROM security_prices
-                    WHERE security_id = ANY($1::uuid[])
-                    GROUP BY security_id
-                 ) p
-                 LEFT JOIN (
-                   SELECT security_id, MIN(transaction_date) AS first_transaction
-                     FROM investment_transactions
-                    WHERE security_id = ANY($1::uuid[])
-                    GROUP BY security_id
-                 ) t ON t.security_id = p.security_id
-             ) starts`,
-            [securityIds],
-          ),
-      );
-      return rows[0]?.start ?? null;
-    }
-
     if (indexCodes.length === 0) return null;
     const rows: Array<{ start: string | null }> = await withScopedDb(
       this.dataSource,

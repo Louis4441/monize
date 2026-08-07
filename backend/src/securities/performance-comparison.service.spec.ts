@@ -1,6 +1,7 @@
 import { NotFoundException } from "@nestjs/common";
 import { PerformanceComparisonService } from "./performance-comparison.service";
 import { MarketIndexService } from "./market-index.service";
+import { SecurityPriceService } from "./security-price.service";
 import { LoadedPriceSeries } from "../common/time-series/price-series.util";
 import { Security } from "./entities/security.entity";
 import {
@@ -26,7 +27,11 @@ const USER = "11111111-1111-4111-8111-111111111111";
 const SEC_A = "22222222-2222-4222-8222-222222222222";
 const SEC_B = "33333333-3333-4333-8333-333333333333";
 
-/** A security row as the repository hands it back. */
+/**
+ * A security row as the repository hands it back. The backfill attempt stamp is
+ * fresh by default so the deep-backfill cooldown holds and specs exercise the
+ * read path; the backfill specs construct their own stampless rows.
+ */
 function security(id: string, symbol: string, currencyCode = "USD"): Security {
   return {
     id,
@@ -34,7 +39,22 @@ function security(id: string, symbol: string, currencyCode = "USD"): Security {
     symbol,
     name: `${symbol} Inc`,
     currencyCode,
+    skipPriceUpdates: false,
+    historicalBackfillAttemptedAt: new Date(),
   } as Security;
+}
+
+/** One row of the activity query, driver-shaped. */
+function activityRow(
+  securityId: string,
+  firstUsablePrice: string | null,
+  firstTransaction: string | null,
+) {
+  return {
+    security_id: securityId,
+    first_usable_price: firstUsablePrice,
+    first_transaction: firstTransaction,
+  };
 }
 
 /** A close series, oldest first, exactly as the loader hands it over. */
@@ -106,22 +126,32 @@ describe("PerformanceComparisonService", () => {
   let marketIndexService: jest.Mocked<
     Pick<MarketIndexService, "ensureHistory" | "loadSeries">
   >;
+  let securityPriceService: jest.Mocked<
+    Pick<SecurityPriceService, "backfillSecurityRange">
+  >;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    securityRepo = { find: jest.fn().mockResolvedValue([]) };
+    securityRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
     const mocks = createScopedDbMocks([[Security, securityRepo]]);
     manager = mocks.manager;
     dataSource = mocks.dataSource;
-    // MIN(price_date) for the open-ended window; overridden per test.
-    manager.query.mockResolvedValue([{ earliest: null }]);
+    // The activity/window queries; overridden per test.
+    manager.query.mockResolvedValue([]);
     marketIndexService = {
       ensureHistory: jest.fn().mockResolvedValue(undefined),
       loadSeries: jest.fn().mockResolvedValue(new Map()),
     };
+    securityPriceService = {
+      backfillSecurityRange: jest.fn().mockResolvedValue(0),
+    };
     service = new PerformanceComparisonService(
       dataSource as never,
       marketIndexService as never,
+      securityPriceService as never,
     );
   });
 
@@ -467,7 +497,9 @@ describe("PerformanceComparisonService", () => {
    */
   it("opens an all-time window on the securities, not on a benchmark's deeper history", async () => {
     securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
-    manager.query.mockResolvedValue([{ start: "2010-01-04" }]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2010-01-04", "2010-01-04"),
+    ]);
     (loadPriceSeries as jest.Mock).mockResolvedValue(
       new Map([[SEC_A, dense("2010-01-04", "2025-12-30", 50, 250, 30)]]),
     );
@@ -493,14 +525,48 @@ describe("PerformanceComparisonService", () => {
     expect(view.totals["idx:SP500"]).not.toBeNull();
   });
 
-  it("asks for the securities' activity start without consulting the indexes", async () => {
+  /**
+   * The second half of the same defect. The resolver used a plain
+   * MIN(price_date), which counts rows the loader will never return: a raw
+   * transaction-derived close from 2010 sitting beside adjusted provider rows
+   * from 2025 opened the window on 2010, the basis rule kept only the adjusted
+   * rows, and VTI was excluded from its own chart with a price row for that
+   * very day sitting in the table. The first price must be computed on the same
+   * basis the loader will choose.
+   */
+  it("opens the window where the usable series begins, not where any row does", async () => {
     securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
-    manager.query.mockResolvedValue([{ start: "2010-01-04" }]);
+    // The activity query answers basis-aware: the raw 2010 rows do not count
+    // because adjusted rows exist, so the first usable price is 2025-02-03.
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2025-02-03", "2010-01-15"),
+    ]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2025-02-03", "2025-12-30", 280, 300)]]),
+    );
+
+    const view = await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: [],
+      endDate: "2025-12-31",
+    });
+
+    // Later of first usable price and first transaction: the price, here.
+    expect(view.window.start).toBe("2025-02-03");
+    expect(view.series).toHaveLength(1);
+    expect(view.excluded).toEqual([]);
+  });
+
+  it("asks the activity question basis-aware, and without consulting the indexes", async () => {
+    securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2010-01-04", "2010-01-15"),
+    ]);
     (loadPriceSeries as jest.Mock).mockResolvedValue(
       new Map([[SEC_A, dense("2010-01-04", "2025-12-30", 50, 250, 30)]]),
     );
 
-    await service.getComparison(USER, {
+    const view = await service.getComparison(USER, {
       securityIds: [SEC_A],
       indexCodes: ["SP500"],
       endDate: "2025-12-31",
@@ -508,25 +574,26 @@ describe("PerformanceComparisonService", () => {
 
     const [sql, params] = manager.query.mock.calls[0];
     const statement = String(sql).replace(/\s+/g, " ");
-    // A unit spec cannot execute the SQL, so the rule is asserted as expressed
-    // and its semantics belong in the integration suite. Both bounds have to be
-    // there: GREATEST of the first close and the first transaction per security
-    // -- the close because a window opening before we can price the instrument
-    // excludes it, the transaction because prices are backfilled further than a
-    // holding goes -- then MAX across securities so every one is priceable at
-    // the boundary.
-    expect(statement).toContain("GREATEST(p.first_price, t.first_transaction)");
-    expect(statement).toContain("MAX(activity_start)");
-    expect(statement).toContain("MIN(price_date) AS first_price");
+    // A unit spec cannot execute the SQL, so the rule is asserted as expressed;
+    // the semantics run against a real PostgreSQL in the integration suite. The
+    // first price is the first row *the loader will return*: adjusted rows only
+    // where any exist, raw throughout where none do -- never a plain MIN over
+    // both, which counts rows the basis rule then discards.
+    expect(statement).toContain("bool_or(adjusted_close IS NOT NULL)");
+    expect(statement).toContain(
+      "MIN(price_date) FILTER (WHERE adjusted_close IS NOT NULL)",
+    );
     expect(statement).toContain("MIN(transaction_date) AS first_transaction");
-    // A LEFT JOIN, so a watch-list security with no transactions still counts.
+    // LEFT JOINs off the id list, so a watch-list security still gets a row.
     expect(statement).toContain("LEFT JOIN");
     expect(String(sql)).not.toContain("market_index_prices");
     expect(params).toEqual([[SEC_A]]);
+    // Later of the two bounds: the transaction, here.
+    expect(view.window.start).toBe("2010-01-15");
     // The benchmark is fetched to fit the window the securities set.
     expect(marketIndexService.ensureHistory).toHaveBeenCalledWith(
       ["SP500"],
-      "2010-01-04",
+      "2010-01-15",
     );
   });
 
@@ -537,7 +604,7 @@ describe("PerformanceComparisonService", () => {
    */
   it("resolves an open-ended window from the data, not an epoch", async () => {
     securityRepo.find.mockResolvedValue([security(SEC_A, "AAA")]);
-    manager.query.mockResolvedValue([{ start: "2019-05-02" }]);
+    manager.query.mockResolvedValue([activityRow(SEC_A, "2019-05-02", null)]);
     (loadPriceSeries as jest.Mock).mockResolvedValue(
       new Map([[SEC_A, dense("2019-05-02", "2025-12-30", 10, 40, 30)]]),
     );
@@ -552,6 +619,33 @@ describe("PerformanceComparisonService", () => {
     expect(view.points[0].date).toBe("2019-05-02");
     // Over six years, so the series is thinned rather than shipped daily.
     expect(view.sampling).toBe("month");
+  });
+
+  it("opens a multi-security window at the latest start, so every line is drawable", async () => {
+    securityRepo.find.mockResolvedValue([
+      security(SEC_A, "AAA"),
+      security(SEC_B, "BBB"),
+    ]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2010-01-04", "2010-01-15"),
+      activityRow(SEC_B, "2018-05-02", "2018-06-01"),
+    ]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([
+        [SEC_A, dense("2010-01-04", "2025-12-30", 50, 250, 30)],
+        [SEC_B, dense("2018-05-02", "2025-12-30", 20, 60, 30)],
+      ]),
+    );
+
+    const view = await service.getComparison(USER, {
+      securityIds: [SEC_A, SEC_B],
+      indexCodes: [],
+      endDate: "2025-12-31",
+    });
+
+    // Opening earlier would draw AAA and exclude BBB.
+    expect(view.window.start).toBe("2018-06-01");
+    expect(view.excluded).toEqual([]);
   });
 
   /**
@@ -589,6 +683,9 @@ describe("PerformanceComparisonService", () => {
 
   it("keeps an explicit window exactly as asked, benchmark history notwithstanding", async () => {
     securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2010-01-04", "2010-01-15"),
+    ]);
     (loadPriceSeries as jest.Mock).mockResolvedValue(
       new Map([[SEC_A, dense("2024-12-30", "2025-12-30", 100, 125)]]),
     );
@@ -605,8 +702,165 @@ describe("PerformanceComparisonService", () => {
 
     // A named range means what it says; nothing resolves it from the data.
     expect(view.window.start).toBe("2025-01-01");
-    expect(manager.query).not.toHaveBeenCalled();
     expect(view.series).toHaveLength(2);
+  });
+
+  // --- the on-demand deep backfill -----------------------------------------
+
+  /**
+   * The other half of the reported defect: nothing ever fetched a security's
+   * deep history. Creation backfills one year, so an all-time request on a
+   * holding bought in 2010 had nothing usable to open on -- the indexes have
+   * had `ensureHistory` from the start, and the securities now get the same.
+   */
+  it("backfills a security whose usable history starts after its first transaction", async () => {
+    const stale = {
+      ...security(SEC_A, "VTI"),
+      historicalBackfillAttemptedAt: null,
+    };
+    securityRepo.find.mockResolvedValue([stale]);
+    // Usable history starts 2025; the user first bought in 2010.
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2025-02-03", "2010-01-15"),
+    ]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2010-01-04", "2025-12-30", 50, 250, 30)]]),
+    );
+
+    await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: [],
+      endDate: "2025-12-31",
+    });
+
+    // Sixteen years back needs the provider's full history.
+    expect(securityPriceService.backfillSecurityRange).toHaveBeenCalledWith(
+      expect.objectContaining({ id: SEC_A }),
+      "max",
+    );
+    // Stamped whether or not the data improved: the cooldown spares the
+    // provider, it does not record success.
+    expect(securityRepo.update).toHaveBeenCalledWith(
+      { id: expect.anything() },
+      expect.objectContaining({
+        historicalBackfillAttemptedAt: expect.any(Date),
+      }),
+    );
+  });
+
+  it("does not backfill within the cooldown", async () => {
+    // The default fixture carries a fresh attempt stamp.
+    securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2025-02-03", "2010-01-15"),
+    ]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(new Map());
+
+    await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: [],
+      endDate: "2025-12-31",
+    });
+
+    expect(securityPriceService.backfillSecurityRange).not.toHaveBeenCalled();
+  });
+
+  it("does not backfill a security whose history already covers the window", async () => {
+    const stale = {
+      ...security(SEC_A, "VTI"),
+      historicalBackfillAttemptedAt: null,
+    };
+    securityRepo.find.mockResolvedValue([stale]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2010-01-04", "2010-01-15"),
+    ]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2010-01-04", "2025-12-30", 50, 250, 30)]]),
+    );
+
+    await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: [],
+      endDate: "2025-12-31",
+    });
+
+    expect(securityPriceService.backfillSecurityRange).not.toHaveBeenCalled();
+  });
+
+  it("does not backfill a watch-list security on an open-ended window", async () => {
+    // No transactions: there is nothing older to want, and its own stored
+    // history is where its line begins.
+    const stale = {
+      ...security(SEC_A, "WATCH"),
+      historicalBackfillAttemptedAt: null,
+    };
+    securityRepo.find.mockResolvedValue([stale]);
+    manager.query.mockResolvedValue([activityRow(SEC_A, "2019-05-02", null)]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2019-05-02", "2025-12-30", 10, 40, 30)]]),
+    );
+
+    await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: [],
+      endDate: "2025-12-31",
+    });
+
+    expect(securityPriceService.backfillSecurityRange).not.toHaveBeenCalled();
+  });
+
+  it("backfills toward a named window's own start", async () => {
+    const stale = {
+      ...security(SEC_A, "VTI"),
+      historicalBackfillAttemptedAt: null,
+    };
+    securityRepo.find.mockResolvedValue([stale]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2025-02-03", "2010-01-15"),
+    ]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2024-12-30", "2025-12-30", 100, 125)]]),
+    );
+
+    await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: [],
+      startDate: "2022-01-01",
+      endDate: "2025-12-31",
+    });
+
+    // Four years back fits inside the five-year range.
+    expect(securityPriceService.backfillSecurityRange).toHaveBeenCalledWith(
+      expect.objectContaining({ id: SEC_A }),
+      "5y",
+    );
+  });
+
+  it("survives a backfill failure and reports the exclusion instead", async () => {
+    const stale = {
+      ...security(SEC_A, "VTI"),
+      historicalBackfillAttemptedAt: null,
+    };
+    securityRepo.find.mockResolvedValue([stale]);
+    manager.query.mockResolvedValue([
+      activityRow(SEC_A, "2025-02-03", "2010-01-15"),
+    ]);
+    securityPriceService.backfillSecurityRange.mockRejectedValue(
+      new Error("provider gone"),
+    );
+    (loadPriceSeries as jest.Mock).mockResolvedValue(new Map());
+
+    const view = await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: [],
+      endDate: "2025-12-31",
+    });
+
+    expect(view.excluded).toEqual([
+      expect.objectContaining({ key: `sec:${SEC_A}` }),
+    ]);
+    // The attempt is still stamped, or the next render retries immediately.
+    expect(securityRepo.update).toHaveBeenCalled();
   });
 
   it("thins a long window and widens the boundary tolerance with it", async () => {
