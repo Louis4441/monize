@@ -373,6 +373,10 @@
       "void": "作废"
     },
     "submitCreate": "创建{mode}",
+    "submitCreateAndNew": "创建{mode}并继续",
+    "submitCreateDescription": "保存并关闭此窗口。",
+    "submitCreateAndNewDescription": "保存并开始下一笔，保留账户和日期。",
+    "submitOptions": "选择创建后的行为",
     "submitUpdate": "更新{mode}",
     "reconciledConfirm": {
       "title": "编辑已对账的交易？",

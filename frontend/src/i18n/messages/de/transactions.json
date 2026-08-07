@@ -373,6 +373,10 @@
       "void": "Ungültig"
     },
     "submitCreate": "{mode} erstellen",
+    "submitCreateAndNew": "{mode} erstellen & neu",
+    "submitCreateDescription": "Speichern und dieses Fenster schließen.",
+    "submitCreateAndNewDescription": "Speichern und eine weitere beginnen, mit demselben Konto und Datum.",
+    "submitOptions": "Wählen, was nach dem Erstellen passiert",
     "submitUpdate": "{mode} aktualisieren",
     "reconciledConfirm": {
       "title": "Abgeglichene Transaktion bearbeiten?",

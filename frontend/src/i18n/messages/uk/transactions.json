@@ -373,6 +373,10 @@
       "void": "Анульовано"
     },
     "submitCreate": "Створити {mode}",
+    "submitCreateAndNew": "Створити {mode} і продовжити",
+    "submitCreateDescription": "Зберегти й закрити це вікно.",
+    "submitCreateAndNewDescription": "Зберегти й почати наступну з тим самим рахунком і датою.",
+    "submitOptions": "Виберіть, що станеться після створення",
     "submitUpdate": "Оновити {mode}",
     "reconciledConfirm": {
       "title": "Редагувати звірену транзакцію?",

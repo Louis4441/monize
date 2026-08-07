@@ -373,6 +373,10 @@
       "void": "Ongeldig"
     },
     "submitCreate": "{mode} aanmaken",
+    "submitCreateAndNew": "{mode} aanmaken en nieuwe",
+    "submitCreateDescription": "Opslaan en dit venster sluiten.",
+    "submitCreateAndNewDescription": "Opslaan en een nieuwe beginnen, met dezelfde rekening en datum.",
+    "submitOptions": "Kiezen wat er na het aanmaken gebeurt",
     "submitUpdate": "{mode} bijwerken",
     "reconciledConfirm": {
       "title": "Afgestemde transactie bewerken?",

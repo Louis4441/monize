@@ -373,6 +373,10 @@
       "void": "Annulé"
     },
     "submitCreate": "Créer {mode}",
+    "submitCreateAndNew": "Créer {mode} et continuer",
+    "submitCreateDescription": "Enregistrer et fermer cette fenêtre.",
+    "submitCreateAndNewDescription": "Enregistrer et en saisir une autre, avec le même compte et la même date.",
+    "submitOptions": "Choisir ce qui se passe après la création",
     "submitUpdate": "Mettre à jour {mode}",
     "reconciledConfirm": {
       "title": "Modifier une transaction rapprochée ?",

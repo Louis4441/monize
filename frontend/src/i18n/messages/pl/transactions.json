@@ -373,6 +373,10 @@
       "void": "Anulowana"
     },
     "submitCreate": "Utwórz: {mode}",
+    "submitCreateAndNew": "Utwórz: {mode} i kontynuuj",
+    "submitCreateDescription": "Zapisz i zamknij to okno.",
+    "submitCreateAndNewDescription": "Zapisz i zacznij kolejną, zachowując konto i datę.",
+    "submitOptions": "Wybierz, co dzieje się po utworzeniu",
     "submitUpdate": "Zaktualizuj: {mode}",
     "reconciledConfirm": {
       "title": "Edytować uzgodnioną transakcję?",
