@@ -457,13 +457,87 @@ describe("PerformanceComparisonService", () => {
   // --- window resolution ---------------------------------------------------
 
   /**
+   * The reported defect, as a test.
+   *
+   * The S&P 500's stored history reaches back to 1927. Taking the earliest
+   * observation across the *whole* selection opened "all time" there, the
+   * security had no close within the boundary window of 1927, and it was
+   * excluded -- so the chart drew the benchmark alone. The window is measured
+   * off the securities; the benchmark follows.
+   */
+  it("opens an all-time window on the securities, not on a benchmark's deeper history", async () => {
+    securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
+    manager.query.mockResolvedValue([{ start: "2010-01-04" }]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2010-01-04", "2025-12-30", 50, 250, 30)]]),
+    );
+    marketIndexService.loadSeries.mockResolvedValue(
+      new Map([["SP500", dense("1927-12-30", "2025-12-30", 17, 5900, 30)]]),
+    );
+
+    const view = await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: ["SP500"],
+      endDate: "2025-12-31",
+    });
+
+    expect(view.window.start).toBe("2010-01-04");
+    // Both lines, and the security is emphatically not excluded.
+    expect(view.series.map((s) => s.key)).toEqual([
+      `sec:${SEC_A}`,
+      "idx:SP500",
+    ]);
+    expect(view.excluded).toEqual([]);
+    // The benchmark is rebased at the same boundary, so it reports its return
+    // since the holding began rather than since 1927.
+    expect(view.totals["idx:SP500"]).not.toBeNull();
+  });
+
+  it("asks for the securities' activity start without consulting the indexes", async () => {
+    securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
+    manager.query.mockResolvedValue([{ start: "2010-01-04" }]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2010-01-04", "2025-12-30", 50, 250, 30)]]),
+    );
+
+    await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: ["SP500"],
+      endDate: "2025-12-31",
+    });
+
+    const [sql, params] = manager.query.mock.calls[0];
+    const statement = String(sql).replace(/\s+/g, " ");
+    // A unit spec cannot execute the SQL, so the rule is asserted as expressed
+    // and its semantics belong in the integration suite. Both bounds have to be
+    // there: GREATEST of the first close and the first transaction per security
+    // -- the close because a window opening before we can price the instrument
+    // excludes it, the transaction because prices are backfilled further than a
+    // holding goes -- then MAX across securities so every one is priceable at
+    // the boundary.
+    expect(statement).toContain("GREATEST(p.first_price, t.first_transaction)");
+    expect(statement).toContain("MAX(activity_start)");
+    expect(statement).toContain("MIN(price_date) AS first_price");
+    expect(statement).toContain("MIN(transaction_date) AS first_transaction");
+    // A LEFT JOIN, so a watch-list security with no transactions still counts.
+    expect(statement).toContain("LEFT JOIN");
+    expect(String(sql)).not.toContain("market_index_prices");
+    expect(params).toEqual([[SEC_A]]);
+    // The benchmark is fetched to fit the window the securities set.
+    expect(marketIndexService.ensureHistory).toHaveBeenCalledWith(
+      ["SP500"],
+      "2010-01-04",
+    );
+  });
+
+  /**
    * Time-series contract section 2.5: "all time" is a request with no start
    * date, and where the series enumerates its own sample points a hardcoded
    * epoch materializes an empty point for every period before the first datum.
    */
-  it("resolves an open-ended window from the earliest observation, not an epoch", async () => {
+  it("resolves an open-ended window from the data, not an epoch", async () => {
     securityRepo.find.mockResolvedValue([security(SEC_A, "AAA")]);
-    manager.query.mockResolvedValue([{ earliest: "2019-05-02" }]);
+    manager.query.mockResolvedValue([{ start: "2019-05-02" }]);
     (loadPriceSeries as jest.Mock).mockResolvedValue(
       new Map([[SEC_A, dense("2019-05-02", "2025-12-30", 10, 40, 30)]]),
     );
@@ -481,24 +555,22 @@ describe("PerformanceComparisonService", () => {
   });
 
   /**
-   * The order matters. "All time" is answered from the earliest stored
-   * observation, so resolving it before fetching would ask the question against
-   * a store that does not yet hold the index -- and a request naming only
-   * indexes we have never fetched would resolve its start to today and draw a
-   * single day.
+   * With nothing to measure off, the benchmark is the subject rather than the
+   * yardstick -- and its full history has to be in hand before its own earliest
+   * observation can be read, which is what a null start asks for.
    */
-  it("fetches index history before resolving an open-ended window", async () => {
+  it("fetches an index's full history before resolving a window with no securities", async () => {
     securityRepo.find.mockResolvedValue([]);
     const order: string[] = [];
     marketIndexService.ensureHistory.mockImplementation(async () => {
       order.push("ensureHistory");
     });
     manager.query.mockImplementation(async () => {
-      order.push("earliestDate");
-      return [{ earliest: "2005-04-01" }];
+      order.push("resolveStart");
+      return [{ start: "1927-12-30" }];
     });
     marketIndexService.loadSeries.mockResolvedValue(
-      new Map([["SP500", dense("2005-04-01", "2025-12-30", 1000, 5000, 30)]]),
+      new Map([["SP500", dense("1927-12-30", "2025-12-30", 17, 5900, 30)]]),
     );
 
     const view = await service.getComparison(USER, {
@@ -507,14 +579,34 @@ describe("PerformanceComparisonService", () => {
       endDate: "2025-12-31",
     });
 
-    expect(order).toEqual(["ensureHistory", "earliestDate"]);
-    // Null, not a date: there is no boundary to reach behind, and the answer to
-    // "all time" is whatever the provider has.
+    expect(order).toEqual(["ensureHistory", "resolveStart"]);
     expect(marketIndexService.ensureHistory).toHaveBeenCalledWith(
       ["SP500"],
       null,
     );
-    expect(view.window.start).toBe("2005-04-01");
+    expect(view.window.start).toBe("1927-12-30");
+  });
+
+  it("keeps an explicit window exactly as asked, benchmark history notwithstanding", async () => {
+    securityRepo.find.mockResolvedValue([security(SEC_A, "VTI")]);
+    (loadPriceSeries as jest.Mock).mockResolvedValue(
+      new Map([[SEC_A, dense("2024-12-30", "2025-12-30", 100, 125)]]),
+    );
+    marketIndexService.loadSeries.mockResolvedValue(
+      new Map([["SP500", dense("1927-12-30", "2025-12-30", 17, 5900)]]),
+    );
+
+    const view = await service.getComparison(USER, {
+      securityIds: [SEC_A],
+      indexCodes: ["SP500"],
+      startDate: "2025-01-01",
+      endDate: "2025-12-31",
+    });
+
+    // A named range means what it says; nothing resolves it from the data.
+    expect(view.window.start).toBe("2025-01-01");
+    expect(manager.query).not.toHaveBeenCalled();
+    expect(view.series).toHaveLength(2);
   });
 
   it("thins a long window and widens the boundary tolerance with it", async () => {

@@ -126,21 +126,31 @@ export class PerformanceComparisonService {
 
     const end = request.endDate ?? todayYMD();
 
-    // Fetch before resolving an open-ended start, not after. "All time" is
-    // answered from the earliest stored observation, so asking that question
-    // first and then fetching would resolve the window against a store that
-    // does not yet hold the index -- and a request naming only indexes we have
-    // never fetched would resolve its start to today and draw a single day.
+    // An open-ended window is measured off the securities, and that question is
+    // answered from their own rows -- so it is asked first and the benchmarks
+    // are then fetched to fit it, rather than fetched blind and allowed to set
+    // a boundary from decades the user has no part in.
+    //
+    // With no securities selected there is nothing to measure off, so the index
+    // is the subject: its full history has to be in hand before its own earliest
+    // observation can be read, and `null` is what asks for it. Resolving first
+    // there would open the window on today and draw a single day.
+    const securityStart =
+      request.startDate ??
+      (securities.length > 0
+        ? await this.resolveOpenEndedStart(
+            securities.map((s) => s.id),
+            [],
+          )
+        : null);
+
     // Failures here leave the index unpriced, which the exclusion list then
     // reports; they are not allowed to take the securities' lines down.
-    await this.marketIndexService.ensureHistory(
-      indexCodes,
-      request.startDate ?? null,
-    );
+    await this.marketIndexService.ensureHistory(indexCodes, securityStart);
 
     const start =
-      request.startDate ??
-      (await this.earliestDate(
+      securityStart ??
+      (await this.resolveOpenEndedStart(
         securities.map((s) => s.id),
         indexCodes,
       )) ??
@@ -414,36 +424,76 @@ export class PerformanceComparisonService {
   }
 
   /**
-   * The earliest observation across the selection.
+   * Where an open-ended window opens.
    *
-   * "All time" is a request with no start date, and the answer to "when does the
-   * data start" is a query, not a constant. A hardcoded epoch is wrong here
-   * specifically because the series enumerates its own sample points from the
-   * window: every sample between the epoch and the first real datum would be
-   * materialized as an empty point, which is the defect
-   * `docs/time-series-contract.md` section 2.5 records.
+   * **The securities set it; the benchmarks follow.** A market index carries
+   * decades the user has no part in -- the S&P 500 reaches back to 1927 -- so
+   * taking the earliest observation across the whole selection opened "all
+   * time" in 1927, and every security was then excluded for having no price at
+   * that boundary. The chart drew the benchmark alone, which is the opposite of
+   * what it is for.
+   *
+   * Per security the start is the later of two dates, and both bounds matter:
+   *
+   * - the first stored close, because a window opening before we can price the
+   *   instrument excludes the very thing it was derived from;
+   * - the first transaction, because prices are backfilled further than a
+   *   holding goes and years before the user owned anything are not their
+   *   performance. A security with no transactions -- a watch-list entry -- has
+   *   only the first bound.
+   *
+   * Across several securities it is the **latest** of those starts, so every
+   * one of them can be priced at the boundary and the comparison is like for
+   * like. Opening earlier would draw one line and exclude the rest.
+   *
+   * With no securities selected, an index is the subject rather than the
+   * yardstick, and its own history is the answer.
+   *
+   * `docs/time-series-contract.md` section 2.5: the answer to "when does the
+   * data start" is a query against the scope the request names, never a
+   * constant.
    */
-  private async earliestDate(
+  private async resolveOpenEndedStart(
     securityIds: string[],
     indexCodes: string[],
   ): Promise<string | null> {
-    if (securityIds.length === 0 && indexCodes.length === 0) return null;
-    const rows: Array<{ earliest: string | null }> = await withScopedDb(
+    if (securityIds.length > 0) {
+      const rows: Array<{ start: string | null }> = await withScopedDb(
+        this.dataSource,
+        (m) =>
+          m.query(
+            `SELECT MAX(activity_start)::text AS start FROM (
+               SELECT GREATEST(p.first_price, t.first_transaction) AS activity_start
+                 FROM (
+                   SELECT security_id, MIN(price_date) AS first_price
+                     FROM security_prices
+                    WHERE security_id = ANY($1::uuid[])
+                    GROUP BY security_id
+                 ) p
+                 LEFT JOIN (
+                   SELECT security_id, MIN(transaction_date) AS first_transaction
+                     FROM investment_transactions
+                    WHERE security_id = ANY($1::uuid[])
+                    GROUP BY security_id
+                 ) t ON t.security_id = p.security_id
+             ) starts`,
+            [securityIds],
+          ),
+      );
+      return rows[0]?.start ?? null;
+    }
+
+    if (indexCodes.length === 0) return null;
+    const rows: Array<{ start: string | null }> = await withScopedDb(
       this.dataSource,
       (m) =>
         m.query(
-          `SELECT MIN(earliest)::text AS earliest FROM (
-             SELECT MIN(price_date) AS earliest
-               FROM security_prices
-              WHERE security_id = ANY($1::uuid[])
-             UNION ALL
-             SELECT MIN(price_date) AS earliest
-               FROM market_index_prices
-              WHERE index_code = ANY($2::text[])
-           ) starts`,
-          [securityIds, indexCodes],
+          `SELECT MIN(price_date)::text AS start
+             FROM market_index_prices
+            WHERE index_code = ANY($1::text[])`,
+          [indexCodes],
         ),
     );
-    return rows[0]?.earliest ?? null;
+    return rows[0]?.start ?? null;
   }
 }

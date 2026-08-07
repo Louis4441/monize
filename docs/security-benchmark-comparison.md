@@ -136,12 +136,31 @@ carry the March close; from 2025-04-11 the series is `null`, the span
 and `status` is `incomplete`. The series is up 8% *to March* and unknown since,
 and the second half of that sentence is the half that matters.
 
-**5.5 — an open-ended window.** `all` sends no `startDate`. The start is resolved
-from the earliest observation across the selected instruments, not from a
-constant: a hardcoded epoch would materialize a sample point for every empty
-period between it and the first real datum, which is the defect
-`docs/time-series-contract.md` section 2.5 records against the per-security
-portfolio chart.
+**5.5 — an open-ended window.** `all` sends no `startDate`, and the start is
+resolved from the data rather than from a constant: a hardcoded epoch would
+materialize a sample point for every empty period between it and the first real
+datum, which is the defect `docs/time-series-contract.md` section 2.5 records
+against the per-security portfolio chart.
+
+**The securities set that boundary; the benchmarks follow it.** An index carries
+decades the user has no part in -- the S&P 500 reaches back to 1927 -- so
+resolving the start across the whole selection opened "all time" there, every
+security failed the boundary test, and the chart drew the benchmark alone. Per
+security the start is the **later** of its first stored close and its first
+transaction: the close because a window opening before the instrument can be
+priced excludes the very thing it was derived from, the transaction because
+prices are backfilled further back than a holding goes and years before the user
+owned anything are not their performance. A watch-list security with no
+transactions has only the first bound. Across several securities the window opens
+at the **latest** of those starts, so every one of them is priceable at the
+boundary and the comparison is like for like.
+
+With no securities selected the index is the subject rather than the yardstick,
+and its own earliest observation is the answer.
+
+This applies to the open-ended case only. A named range means what it says: on a
+5Y window a security with two years of history is excluded with its reason, not
+quietly given a shorter chart than the one it asked for.
 
 ## 6. Missing-data policy summary
 
@@ -171,7 +190,12 @@ can tell "considered and irrelevant" from "not considered".
 | Adjusted rows plus a transaction-derived raw row | adjusted only, `basis: "ADJUSTED"` (example 5.3) |
 | No adjusted rows anywhere in the window | raw throughout, `basis: "RAW"` |
 | Index and security on different market calendars | each carried forward within bound; neither punches a hole in the other |
-| `all` range | start from the earliest observation in the selection |
+| `all` range, security plus a benchmark with far deeper history | window opens on the security's activity; both are drawn, neither excluded |
+| `all` range, security whose prices start after its first transaction | window opens where it can first be priced |
+| `all` range, security whose prices start before its first transaction | window opens at the first transaction |
+| `all` range, two securities starting years apart | window opens at the later start, so both are drawn |
+| `all` range, benchmarks only | start from the index's own earliest observation |
+| Named range (5Y) with a benchmark reaching further back | the window is unchanged; coverage is answered by exclusions |
 | `2024-02-29`, `2025-01-31`, `2025-12-31` as boundaries | resolve without off-by-one |
 | A `securityId` owned by another user | `404`; nothing about it in the payload |
 | Empty selection, unknown index code, 21 security ids | rejected by the real validation pipeline, not by the service |

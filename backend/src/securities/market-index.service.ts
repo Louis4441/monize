@@ -202,7 +202,14 @@ export class MarketIndexService implements OnApplicationBootstrap {
     });
 
     for (const index of due) {
-      await this.fetchInto(index, wantedFrom, today);
+      // An index we hold nothing for gets its whole history, whatever window
+      // was asked for. A bounded first fetch would store exactly the requested
+      // span and then sit behind the cooldown for six hours, so a user who
+      // widened the window straight afterwards would be told the benchmark
+      // could not be priced at the new boundary.
+      const held = coverage.get(index.code);
+      const from = held?.earliestDate ? wantedFrom : null;
+      await this.fetchInto(index, from, today);
     }
   }
 

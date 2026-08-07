@@ -104,13 +104,45 @@ describe("MarketIndexService", () => {
       expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
     });
 
+    /**
+     * Whatever window was asked for. A bounded first fetch would store exactly
+     * that span and then sit behind the cooldown for six hours, so a user who
+     * widened the window straight afterwards would be told the benchmark could
+     * not be priced at the new boundary.
+     */
     it("fetches the whole history the first time an index is asked for", async () => {
       // No coverage rows, no sync rows.
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistoricalWindow.mockResolvedValue([
+      yahoo.fetchHistorical.mockResolvedValue([
         bar("2025-01-02", 5900),
         bar("2025-01-03", 5910),
       ]);
+
+      await service.ensureHistory(["SP500"], "2025-01-01");
+
+      expect(yahoo.fetchHistorical).toHaveBeenCalledWith("^GSPC");
+      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(
+        statements().some((sql) =>
+          sql.includes("INSERT INTO market_index_prices"),
+        ),
+      ).toBe(true);
+    });
+
+    it("tops an existing history up with a bounded window, not the whole thing", async () => {
+      manager.query.mockImplementation((sql: string) => {
+        if (sql.includes("MIN(price_date)")) {
+          return Promise.resolve([
+            {
+              index_code: "SP500",
+              earliest: "2020-01-02",
+              latest: "2020-06-01",
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2025-01-02", 5900)]);
 
       await service.ensureHistory(["SP500"], "2025-01-01");
 
@@ -120,11 +152,7 @@ describe("MarketIndexService", () => {
       // The lookup that prices the window start searches backwards, so the
       // fetch has to reach behind the boundary.
       expect(from.toISOString().slice(0, 10) < "2025-01-01").toBe(true);
-      expect(
-        statements().some((sql) =>
-          sql.includes("INSERT INTO market_index_prices"),
-        ),
-      ).toBe(true);
+      expect(yahoo.fetchHistorical).not.toHaveBeenCalled();
     });
 
     /**
@@ -210,10 +238,10 @@ describe("MarketIndexService", () => {
         }
         return Promise.resolve([]);
       });
-      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2025-01-02", 5900)]);
+      yahoo.fetchHistorical.mockResolvedValue([bar("2025-01-02", 5900)]);
 
       await service.ensureHistory(["SP500"], "2025-01-01");
-      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalledTimes(1);
+      expect(yahoo.fetchHistorical).toHaveBeenCalledTimes(1);
     });
 
     /**
@@ -256,7 +284,7 @@ describe("MarketIndexService", () => {
     });
 
     it("drops bars the provider could not price, rather than storing a zero", async () => {
-      yahoo.fetchHistoricalWindow.mockResolvedValue([
+      yahoo.fetchHistorical.mockResolvedValue([
         bar("2025-01-02", 5900),
         bar("2025-01-03", 0),
         bar("2025-01-06", Number.NaN),
@@ -273,7 +301,7 @@ describe("MarketIndexService", () => {
     });
 
     it("refuses to erase a stored adjusted close with a null one", async () => {
-      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2025-01-02", 5900)]);
+      yahoo.fetchHistorical.mockResolvedValue([bar("2025-01-02", 5900)]);
       await service.ensureHistory(["SP500"], "2025-01-01");
       const insert = manager.query.mock.calls.find((call) =>
         String(call[0]).includes("INSERT INTO market_index_prices"),
@@ -286,9 +314,7 @@ describe("MarketIndexService", () => {
     });
 
     it("keeps an adjusted close the provider did supply", async () => {
-      yahoo.fetchHistoricalWindow.mockResolvedValue([
-        bar("2025-01-02", 5900, 5850),
-      ]);
+      yahoo.fetchHistorical.mockResolvedValue([bar("2025-01-02", 5900, 5850)]);
       await service.ensureHistory(["SP500"], "2025-01-01");
       const insert = manager.query.mock.calls.find((call) =>
         String(call[0]).includes("INSERT INTO market_index_prices"),
