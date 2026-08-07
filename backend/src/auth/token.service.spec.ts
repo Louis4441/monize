@@ -31,6 +31,7 @@ describe("TokenService", () => {
   let refreshTokensRepository: Record<string, jest.Mock>;
   let jwtService: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
+  let scopedManager: Record<string, jest.Mock>;
 
   const mockUser = {
     id: "user-1",
@@ -66,9 +67,13 @@ describe("TokenService", () => {
       sign: jest.fn().mockReturnValue("mock-access-token"),
     };
 
-    dataSource = createScopedDbMocks([
+    const scoped = createScopedDbMocks([
       [RefreshToken, refreshTokensRepository as never],
-    ]).dataSource as unknown as Record<string, jest.Mock>;
+    ]);
+    // The advisory family lock and the family-discovery SELECT both go through
+    // the manager, so the spec drives them directly.
+    scopedManager = scoped.manager;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -196,6 +201,7 @@ describe("TokenService", () => {
 
   describe("refreshTokens", () => {
     let mockManager: Record<string, jest.Mock>;
+    let stageRefresh: (token: unknown, user?: unknown) => void;
 
     beforeEach(() => {
       mockManager = {
@@ -203,6 +209,25 @@ describe("TokenService", () => {
         update: jest.fn().mockResolvedValue({ affected: 1 }),
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
         create: jest.fn().mockImplementation((_Entity, data) => data),
+        // The family advisory lock, taken before any row lock so rotation and
+        // revocation cannot deadlock (audit P4-011).
+        query: jest.fn().mockResolvedValue([]),
+      };
+
+      /**
+       * Queue the answers `refreshTokens` reads, in the order it reads them.
+       *
+       * There are two token reads now, not one: an unlocked probe that only
+       * learns the family id, then the locked re-read once the family lock is
+       * held. Both see the same row.
+       */
+      stageRefresh = (token: unknown, user?: unknown) => {
+        mockManager.findOne
+          .mockResolvedValueOnce(token)
+          .mockResolvedValueOnce(token);
+        if (user !== undefined) {
+          mockManager.findOne.mockResolvedValueOnce(user);
+        }
       };
 
       dataSource.transaction.mockImplementation(async (callback) => {
@@ -217,9 +242,7 @@ describe("TokenService", () => {
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),
       };
 
-      mockManager.findOne
-        .mockResolvedValueOnce(existingToken)
-        .mockResolvedValueOnce(mockUser);
+      stageRefresh(existingToken, mockUser);
 
       const result = await service.refreshTokens("raw-refresh-token");
 
@@ -269,9 +292,7 @@ describe("TokenService", () => {
         actingAsUserId: "owner-9",
         delegationId: "deleg-9",
       };
-      mockManager.findOne
-        .mockResolvedValueOnce(existingToken)
-        .mockResolvedValueOnce(mockUser);
+      stageRefresh(existingToken, mockUser);
 
       await service.refreshTokens("raw-refresh-token");
 
@@ -305,7 +326,7 @@ describe("TokenService", () => {
         familyId: "family-1",
       };
 
-      mockManager.findOne.mockResolvedValueOnce(revokedToken);
+      stageRefresh(revokedToken);
 
       await expect(service.refreshTokens("reused-token")).rejects.toThrow(
         UnauthorizedException,
@@ -324,7 +345,7 @@ describe("TokenService", () => {
         isRevoked: true,
       };
 
-      mockManager.findOne.mockResolvedValueOnce(revokedToken);
+      stageRefresh(revokedToken);
 
       await expect(service.refreshTokens("reused-token")).rejects.toThrow(
         "Refresh token reuse detected",
@@ -338,7 +359,7 @@ describe("TokenService", () => {
         expiresAt: new Date(Date.now() - 1000),
       };
 
-      mockManager.findOne.mockResolvedValueOnce(expiredToken);
+      stageRefresh(expiredToken);
 
       await expect(service.refreshTokens("expired-token")).rejects.toThrow(
         UnauthorizedException,
@@ -355,7 +376,7 @@ describe("TokenService", () => {
         expiresAt: new Date(Date.now() - 1000),
       };
 
-      mockManager.findOne.mockResolvedValueOnce(expiredToken);
+      stageRefresh(expiredToken);
 
       await expect(service.refreshTokens("expired-token")).rejects.toThrow(
         "Refresh token expired",
@@ -370,9 +391,7 @@ describe("TokenService", () => {
         familyId: "family-1",
       };
 
-      mockManager.findOne
-        .mockResolvedValueOnce(validToken)
-        .mockResolvedValueOnce(null);
+      stageRefresh(validToken, null);
 
       await expect(service.refreshTokens("valid-token")).rejects.toThrow(
         UnauthorizedException,
@@ -395,9 +414,7 @@ describe("TokenService", () => {
 
       const inactiveUser = { ...mockUser, isActive: false };
 
-      mockManager.findOne
-        .mockResolvedValueOnce(validToken)
-        .mockResolvedValueOnce(inactiveUser);
+      stageRefresh(validToken, inactiveUser);
 
       await expect(service.refreshTokens("valid-token")).rejects.toThrow(
         "User not found or inactive",
@@ -465,13 +482,132 @@ describe("TokenService", () => {
   });
 
   describe("revokeAllUserRefreshTokens", () => {
-    it("should batch revoke all non-revoked tokens for user", async () => {
+    /**
+     * Stage the first-round family-discovery SELECT. The family set is captured
+     * once, up front (finding 4), so the code reads it a single time and every
+     * revoke pass is scoped to that set -- advisory locks and everything else
+     * answer with an empty result.
+     */
+    function stageFirstRound(families: Array<{ family_id: string }>): void {
+      scopedManager.query.mockImplementation(async (sql: string) => {
+        if (String(sql).includes("DISTINCT family_id")) return families;
+        return [];
+      });
+    }
+
+    it("captures the families once and batch-revokes them, scoped to that set", async () => {
+      stageFirstRound([{ family_id: "family-2" }, { family_id: "family-1" }]);
+      refreshTokensRepository.update
+        .mockResolvedValueOnce({ affected: 2 })
+        .mockResolvedValue({ affected: 0 });
+
       await service.revokeAllUserRefreshTokens("user-1");
 
-      expect(refreshTokensRepository.update).toHaveBeenCalledWith(
-        { userId: "user-1", isRevoked: false },
-        { isRevoked: true },
+      const [where, patch] = refreshTokensRepository.update.mock.calls[0];
+      expect(where.userId).toBe("user-1");
+      expect(where.isRevoked).toBe(false);
+      // Scoped to exactly the captured families via `familyId IN (...)`, never a
+      // blanket `user_id AND is_revoked = false` that would sweep a session
+      // opened mid-operation (finding 4).
+      expect(where.familyId?._type).toBe("in");
+      expect(where.familyId?._value).toEqual(["family-1", "family-2"]);
+      expect(patch).toEqual({ isRevoked: true });
+
+      // Ascending family order, the same fixed order every other multi-lock path
+      // uses, so this cannot deadlock against a rotation holding one family.
+      const lockedFamilies = scopedManager.query.mock.calls
+        .filter((c) => String(c[0]).includes("pg_advisory_xact_lock"))
+        .map((c) => (c[1] as unknown[])[1]);
+      expect(lockedFamilies.slice(0, 2)).toEqual(["family-1", "family-2"]);
+    });
+
+    it("does nothing when the user has no live sessions", async () => {
+      stageFirstRound([]);
+
+      await service.revokeAllUserRefreshTokens("user-1");
+
+      expect(refreshTokensRepository.update).not.toHaveBeenCalled();
+    });
+
+    it("does not sweep a session opened after the first round (finding 4)", async () => {
+      // The regression guard for finding 4. The first round sees only family-1.
+      // A concurrent login then opens family-2, which a *later* read would
+      // report -- but the earlier code re-discovered families each pass and
+      // revoked with a blanket `WHERE user_id AND is_revoked = false`, sweeping
+      // that brand-new session. Revocation must stay scoped to the families
+      // captured up front, so family-2 is neither re-discovered, locked, nor
+      // revoked.
+      let selects = 0;
+      scopedManager.query.mockImplementation(async (sql: string) => {
+        if (String(sql).includes("pg_advisory_xact_lock")) return [];
+        if (String(sql).includes("DISTINCT family_id")) {
+          selects++;
+          return selects === 1
+            ? [{ family_id: "family-1" }]
+            : [{ family_id: "family-1" }, { family_id: "family-2" }];
+        }
+        return [];
+      });
+      refreshTokensRepository.update
+        .mockResolvedValueOnce({ affected: 1 })
+        .mockResolvedValue({ affected: 0 });
+
+      await service.revokeAllUserRefreshTokens("user-1");
+
+      // The family set is captured exactly once -- not re-discovered each pass,
+      // which is how family-2 would otherwise enter the sweep.
+      expect(selects).toBe(1);
+
+      // Every revoke is scoped to the first round's families; family-2 is absent.
+      for (const [where] of refreshTokensRepository.update.mock.calls) {
+        expect(where.familyId?._type).toBe("in");
+        expect(where.familyId?._value).toEqual(["family-1"]);
+      }
+
+      // family-2 is never locked either.
+      const lockedFamilies = scopedManager.query.mock.calls
+        .filter((c) => String(c[0]).includes("pg_advisory_xact_lock"))
+        .map((c) => (c[1] as unknown[])[1]);
+      expect(lockedFamilies).not.toContain("family-2");
+    });
+
+    it("loops until a pass revokes nothing", async () => {
+      // The regression guard for the statement-snapshot blind spot behind
+      // P4-011: one `UPDATE ... WHERE is_revoked = false` cannot see a
+      // replacement a concurrent rotation inserted after its snapshot. Re-locking
+      // the captured families and re-revoking until a pass changes nothing
+      // converges.
+      stageFirstRound([{ family_id: "family-1" }]);
+      refreshTokensRepository.update
+        .mockResolvedValueOnce({ affected: 1 })
+        .mockResolvedValueOnce({ affected: 1 })
+        .mockResolvedValueOnce({ affected: 0 });
+
+      await service.revokeAllUserRefreshTokens("user-1");
+
+      expect(refreshTokensRepository.update.mock.calls.length).toBeGreaterThan(
+        1,
       );
+      // Captured once, not re-discovered each pass.
+      const selects = scopedManager.query.mock.calls.filter((c) =>
+        String(c[0]).includes("DISTINCT family_id"),
+      );
+      expect(selects).toHaveLength(1);
+    });
+
+    it("gives up after a bounded number of passes", async () => {
+      // A client rotating in a loop must not spin here forever. The cap is a
+      // backstop, not an expectation about legitimate clients.
+      stageFirstRound([{ family_id: "family-1" }]);
+      refreshTokensRepository.update.mockResolvedValue({ affected: 1 });
+      const warn = jest
+        .spyOn(service["logger"], "warn")
+        .mockImplementation(() => undefined);
+
+      await service.revokeAllUserRefreshTokens("user-1");
+
+      expect(warn).toHaveBeenCalled();
+      expect(refreshTokensRepository.update.mock.calls.length).toBe(10);
     });
   });
 

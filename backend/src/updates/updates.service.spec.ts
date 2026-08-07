@@ -4,6 +4,10 @@ import { DataSource } from "typeorm";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
+  createUserPreferenceRepoMock,
+  type UserPreferenceRepoMock,
+} from "../test-helpers/user-preference-testing";
+import {
   UpdatesService,
   isNewerVersion,
   parseVersion,
@@ -39,6 +43,7 @@ describe("version helpers", () => {
 
 describe("UpdatesService", () => {
   let service: UpdatesService;
+  let prefsMock: UserPreferenceRepoMock;
   let preferencesRepo: Record<string, jest.Mock>;
   let configGet: jest.Mock;
   let originalFetch: typeof fetch;
@@ -69,10 +74,10 @@ describe("UpdatesService", () => {
     }) as unknown as Response;
 
   beforeEach(async () => {
-    preferencesRepo = {
-      findOne: jest.fn(),
-      save: jest.fn().mockImplementation((p) => p),
-    };
+    // The row-modelling double so `dismiss` can exercise the column-scoped
+    // writer (insert-if-absent + UPDATE of only the named column).
+    prefsMock = createUserPreferenceRepoMock(null);
+    preferencesRepo = prefsMock.repo;
     configGet = jest.fn().mockReturnValue(undefined);
 
     const { dataSource } = createScopedDbMocks([
@@ -226,42 +231,46 @@ describe("UpdatesService", () => {
   });
 
   describe("dismiss", () => {
-    it("saves latestVersion to user preferences when they exist", async () => {
+    it("writes only the dismissed-version column when a row exists", async () => {
       fetchMock.mockResolvedValueOnce(mockOkResponse(buildRelease()));
       await service.refreshLatestRelease();
-
-      const existingPrefs = {
-        userId: "user-1",
-        dismissedUpdateVersion: null as string | null,
-      };
-      preferencesRepo.findOne.mockResolvedValueOnce(existingPrefs);
+      prefsMock.seed({ userId: "user-1", dismissedUpdateVersion: null });
 
       const result = await service.dismiss("user-1");
+
       expect(result).toEqual({ dismissed: true, version: "99.0.0" });
-      expect(preferencesRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ dismissedUpdateVersion: "99.0.0" }),
-      );
+      // Column-scoped: only dismissed_update_version is written, never a whole
+      // entity that would revert a concurrent change to another preference
+      // (finding 3).
+      expect(preferencesRepo.save).not.toHaveBeenCalled();
+      expect(prefsMock.patches()).toEqual([
+        { dismissedUpdateVersion: "99.0.0" },
+      ]);
+      expect(prefsMock.row()?.dismissedUpdateVersion).toBe("99.0.0");
     });
 
-    it("creates preferences row if none exists", async () => {
+    it("materializes the row through the writer when none exists", async () => {
       fetchMock.mockResolvedValueOnce(mockOkResponse(buildRelease()));
       await service.refreshLatestRelease();
-      preferencesRepo.findOne.mockResolvedValueOnce(null);
+      prefsMock.seed(null);
 
       const result = await service.dismiss("user-1");
+
       expect(result).toEqual({ dismissed: true, version: "99.0.0" });
-      expect(preferencesRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: "user-1",
-          dismissedUpdateVersion: "99.0.0",
-        }),
-      );
+      // The writer's ON CONFLICT DO NOTHING insert creates the row from the
+      // shared defaults, then the scoped UPDATE sets the dismissed version.
+      expect(prefsMock.insertAttempts().length).toBeGreaterThan(0);
+      expect(prefsMock.row()?.userId).toBe("user-1");
+      expect(prefsMock.row()?.dismissedUpdateVersion).toBe("99.0.0");
     });
 
     it("is a no-op when no latest release has been fetched", async () => {
       const result = await service.dismiss("user-1");
       expect(result).toEqual({ dismissed: false, version: null });
       expect(preferencesRepo.save).not.toHaveBeenCalled();
+      // The early return never reaches the writer at all.
+      expect(prefsMock.patches()).toHaveLength(0);
+      expect(prefsMock.insertAttempts()).toHaveLength(0);
     });
   });
 

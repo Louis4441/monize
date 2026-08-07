@@ -21,6 +21,11 @@ import { currentRequestLocale } from "../i18n/request-locale";
 import { User } from "./entities/user.entity";
 import { UserPreference } from "./entities/user-preference.entity";
 import { buildDefaultPreferences } from "./user-preference.factory";
+import {
+  ensureUserPreferencesRow,
+  patchUserPreferences,
+  type UserPreferencePatch,
+} from "./user-preference-writer";
 import { lockAdminsForUpdate, wouldRemoveLastAdmin } from "./last-admin.util";
 import { TrustedDevice } from "./entities/trusted-device.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
@@ -169,96 +174,105 @@ export class UsersService {
     userId: string,
     dto: UpdatePreferencesDto,
   ): Promise<UserPreference> {
-    let preferences = await this.scoped(UserPreference, (repo) =>
-      repo.findOne({
-        where: { userId },
-      }),
-    );
-
-    if (!preferences) {
-      // Create with defaults first
-      preferences = await this.getPreferences(userId);
-    }
-
-    const previousDefaultCurrency = preferences.defaultCurrency;
-
-    // Update only provided fields
+    // Write exactly the columns the DTO carries, and nothing else. The Settings
+    // form is one of many writers of this single-row table (a dismissed tour, a
+    // "What's New" acknowledgement, enabling 2FA), so reading the whole row and
+    // `save`-ing it back would revert a column another request changed in
+    // between -- switch the theme in one tab while a tour is dismissed in
+    // another and the theme reverts, silently. `patchUserPreferences` sets only
+    // the named columns; see user-preference-writer.ts.
+    const patch: UserPreferencePatch = {};
     if (dto.defaultCurrency !== undefined) {
-      preferences.defaultCurrency = dto.defaultCurrency;
+      patch.defaultCurrency = dto.defaultCurrency;
     }
     if (dto.dateFormat !== undefined) {
-      preferences.dateFormat = dto.dateFormat;
+      patch.dateFormat = dto.dateFormat;
     }
     if (dto.numberFormat !== undefined) {
-      preferences.numberFormat = dto.numberFormat;
+      patch.numberFormat = dto.numberFormat;
     }
     if (dto.theme !== undefined) {
-      preferences.theme = dto.theme;
+      patch.theme = dto.theme;
     }
     if (dto.colorTheme !== undefined) {
-      preferences.colorTheme = dto.colorTheme;
+      patch.colorTheme = dto.colorTheme;
     }
     if (dto.timezone !== undefined) {
-      preferences.timezone = dto.timezone;
+      patch.timezone = dto.timezone;
     }
     if (dto.notificationEmail !== undefined) {
-      preferences.notificationEmail = dto.notificationEmail;
+      patch.notificationEmail = dto.notificationEmail;
     }
     if (dto.notificationBrowser !== undefined) {
-      preferences.notificationBrowser = dto.notificationBrowser;
+      patch.notificationBrowser = dto.notificationBrowser;
     }
     if (dto.gettingStartedDismissed !== undefined) {
-      preferences.gettingStartedDismissed = dto.gettingStartedDismissed;
+      patch.gettingStartedDismissed = dto.gettingStartedDismissed;
     }
     if (dto.aiBubbleEnabled !== undefined) {
-      preferences.aiBubbleEnabled = dto.aiBubbleEnabled;
+      patch.aiBubbleEnabled = dto.aiBubbleEnabled;
     }
     if (dto.showWhatsNew !== undefined) {
-      preferences.showWhatsNew = dto.showWhatsNew;
+      patch.showWhatsNew = dto.showWhatsNew;
     }
     if (dto.weekStartsOn !== undefined) {
-      preferences.weekStartsOn = dto.weekStartsOn;
+      patch.weekStartsOn = dto.weekStartsOn;
     }
     if (dto.budgetDigestEnabled !== undefined) {
-      preferences.budgetDigestEnabled = dto.budgetDigestEnabled;
+      patch.budgetDigestEnabled = dto.budgetDigestEnabled;
     }
     if (dto.budgetDigestDay !== undefined) {
-      preferences.budgetDigestDay = dto.budgetDigestDay;
+      patch.budgetDigestDay = dto.budgetDigestDay;
     }
     if (dto.favouriteReportIds !== undefined) {
-      preferences.favouriteReportIds = dto.favouriteReportIds;
+      patch.favouriteReportIds = dto.favouriteReportIds;
     }
     if (dto.dashboardWidgets !== undefined) {
-      preferences.dashboardWidgets = dto.dashboardWidgets;
+      patch.dashboardWidgets = dto.dashboardWidgets;
     }
     if (dto.dashboardWidgetConfig !== undefined) {
-      preferences.dashboardWidgetConfig = dto.dashboardWidgetConfig;
+      patch.dashboardWidgetConfig = dto.dashboardWidgetConfig;
     }
     if (dto.showCreatedAt !== undefined) {
-      preferences.showCreatedAt = dto.showCreatedAt;
+      patch.showCreatedAt = dto.showCreatedAt;
     }
     if (dto.timeFormat !== undefined) {
-      preferences.timeFormat = dto.timeFormat;
+      patch.timeFormat = dto.timeFormat;
     }
     if (dto.preferredExchanges !== undefined) {
-      preferences.preferredExchanges = dto.preferredExchanges;
+      patch.preferredExchanges = dto.preferredExchanges;
     }
     if (dto.defaultQuoteProvider !== undefined) {
-      preferences.defaultQuoteProvider = dto.defaultQuoteProvider;
+      patch.defaultQuoteProvider = dto.defaultQuoteProvider;
     }
     if (dto.recentTransactionsLimit !== undefined) {
-      preferences.recentTransactionsLimit = dto.recentTransactionsLimit;
+      patch.recentTransactionsLimit = dto.recentTransactionsLimit;
     }
     // In demo mode the account is shared across all visitors, so the UI
     // language must not be persisted to it -- otherwise one visitor's choice
     // would follow the next person until the nightly reset. The locale cookie
     // (set client-side) still applies the language for the current visit.
     if (dto.language !== undefined && !this.demoModeService.isDemo) {
-      preferences.language = dto.language;
+      patch.language = dto.language;
     }
 
-    const saved = await this.scoped(UserPreference, (repo) =>
-      repo.save(preferences),
+    const { saved, previousDefaultCurrency } = await withScopedDb(
+      this.dataSource,
+      async (manager) => {
+        const repo = manager.getRepository(UserPreference);
+        // Materialize the row first (same baseline as getPreferences) so the
+        // currency-change comparison below reads the value this request actually
+        // replaced, rather than undefined for a user whose row did not exist
+        // yet. patchUserPreferences then writes only `patch`'s columns.
+        await ensureUserPreferencesRow(manager, userId);
+        const before = await repo.findOne({ where: { userId } });
+        await patchUserPreferences(manager, userId, patch);
+        const after = await repo.findOne({ where: { userId } });
+        return {
+          saved: after!,
+          previousDefaultCurrency: before?.defaultCurrency,
+        };
+      },
     );
 
     // Fetch fresh exchange rates whenever the user picks a new default
