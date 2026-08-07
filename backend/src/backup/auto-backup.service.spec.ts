@@ -132,6 +132,16 @@ describe("AutoBackupService", () => {
   let defaultEnv: Record<string, string>;
 
   beforeEach(async () => {
+    // A backup run promotes its daily artifact to a weekly copy on days 7, 14,
+    // 21 and 28 and to a monthly copy on day 1, so a test that reads the real
+    // clock writes two files on five days of every month and one on the other
+    // twenty-five. Every assertion below that counts artifacts was written on
+    // one of the twenty-five, which is why the suite passed for weeks and then
+    // failed on the 7th with no code change. Freeze the whole suite on an
+    // ordinary day; the cases that mean to exercise promotion set their own
+    // system time.
+    jest.useFakeTimers().setSystemTime(new Date("2026-04-15T12:00:00Z"));
+
     root = mkdtempSync(join(tmpdir(), "monize-backup-spec-"));
     defaultEnv = { BACKUP_CONTAINER_DIR: root };
 
@@ -185,6 +195,7 @@ describe("AutoBackupService", () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
     rmSync(root, { recursive: true, force: true });
   });
