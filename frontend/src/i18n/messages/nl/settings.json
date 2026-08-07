@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Deze installatie heeft geen back-upopslag",
       "body": "Automatische back-ups zouden naar {folderPath} worden geschreven, waar deze installatie niet kan schrijven. Een beheerder moet daar opslag aankoppelen voordat een schema kan worden uitgevoerd."
-    }
+    },
+    "never": "Nooit"
   },
   "backupRestore": {
     "heading": "Back-up en herstel",

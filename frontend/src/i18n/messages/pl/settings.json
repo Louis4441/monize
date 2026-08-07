@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Ta instalacja nie ma magazynu kopii zapasowych",
       "body": "Automatyczne kopie zapasowe byłyby zapisywane w {folderPath}, gdzie ta instalacja nie może pisać. Administrator musi zamontować tam magazyn, zanim harmonogram będzie mógł działać."
-    }
+    },
+    "never": "Nigdy"
   },
   "backupRestore": {
     "heading": "Kopia zapasowa i przywracanie",

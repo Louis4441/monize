@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Diese Installation hat keinen Backup-Speicher",
       "body": "Automatische Backups würden nach {folderPath} geschrieben, wohin diese Installation nicht schreiben kann. Ein Administrator muss dort Speicher einbinden, bevor ein Zeitplan laufen kann."
-    }
+    },
+    "never": "Nie"
   },
   "backupRestore": {
     "heading": "Backup & Wiederherstellung",

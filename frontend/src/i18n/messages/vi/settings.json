@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Bản triển khai này không có bộ lưu trữ sao lưu",
       "body": "Bản sao lưu tự động sẽ được ghi vào {folderPath}, nơi bản triển khai này không thể ghi. Quản trị viên cần gắn bộ lưu trữ ở đó trước khi lịch trình có thể chạy."
-    }
+    },
+    "never": "Không bao giờ"
   },
   "backupRestore": {
     "heading": "Sao lưu & Khôi phục",

@@ -128,9 +128,10 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
       const {
         blob,
         complete,
+        expectedAttachments,
+        includedAttachments,
         missingAttachments,
         inconsistentAttachments,
-        expectedAttachments,
       } = await backupApi.exportBackup(encryptionPassword);
       // Date the filename by the user's configured timezone preference, not UTC
       // or the browser's timezone. `toISOString()` renders in UTC (an evening
@@ -161,7 +162,11 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
         // the wrong cause. The breakdown keeps the diagnosis.
         toast.error(
           t('export.toasts.incomplete', {
-            unusable: missingAttachments + inconsistentAttachments,
+            // Everything the server could not include, taken from its
+            // authoritative included count rather than re-summing the known
+            // exclusion reasons -- so a future exclusion the breakdown does not
+            // name still counts here.
+            unusable: expectedAttachments - includedAttachments,
             total: expectedAttachments,
             missing: missingAttachments,
             inconsistent: inconsistentAttachments,

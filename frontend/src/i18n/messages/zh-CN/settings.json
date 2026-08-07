@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "此部署没有备份存储",
       "body": "自动备份将写入 {folderPath}，但此部署无法向该位置写入。管理员需要先在该位置挂载存储，计划任务才能运行。"
-    }
+    },
+    "never": "从未"
   },
   "backupRestore": {
     "heading": "备份与恢复",

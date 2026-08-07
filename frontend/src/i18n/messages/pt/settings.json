@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Esta instalação não tem armazenamento para backups",
       "body": "As cópias automáticas seriam escritas em {folderPath}, onde esta instalação não consegue escrever. Um administrador tem de montar armazenamento nesse local antes de um agendamento poder ser executado."
-    }
+    },
+    "never": "Nunca"
   },
   "backupRestore": {
     "heading": "Cópia de Segurança e Restauro",

@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Esta instalação não tem armazenamento para backups",
       "body": "Os backups automáticos seriam gravados em {folderPath}, onde esta instalação não consegue gravar. Um administrador precisa montar armazenamento nesse local antes que um agendamento possa ser executado."
-    }
+    },
+    "never": "Nunca"
   },
   "backupRestore": {
     "heading": "Backup e Restauração",

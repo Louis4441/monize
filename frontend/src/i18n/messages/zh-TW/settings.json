@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "此部署沒有備份儲存空間",
       "body": "自動備份將寫入 {folderPath}，但此部署無法寫入該位置。管理員需要先在該位置掛載儲存空間，排程才能執行。"
-    }
+    },
+    "never": "從未"
   },
   "backupRestore": {
     "heading": "備份與還原",

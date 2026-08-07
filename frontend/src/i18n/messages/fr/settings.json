@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Cette installation n'a aucun stockage de sauvegarde",
       "body": "Les sauvegardes automatiques seraient écrites dans {folderPath}, où cette installation ne peut pas écrire. Un administrateur doit y monter un stockage avant qu'une planification puisse s'exécuter."
-    }
+    },
+    "never": "Jamais"
   },
   "backupRestore": {
     "heading": "Sauvegarde et restauration",

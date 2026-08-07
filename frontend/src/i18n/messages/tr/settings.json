@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Bu kurulumda yedek deposu yok",
       "body": "Otomatik yedekler {folderPath} konumuna yazılacaktı, ancak bu kurulum oraya yazamıyor. Bir zamanlamanın çalışabilmesi için yöneticinin oraya depolama bağlaması gerekir."
-    }
+    },
+    "never": "Hiçbir zaman"
   },
   "backupRestore": {
     "heading": "Yedekleme ve Geri Yükleme",

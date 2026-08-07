@@ -503,7 +503,8 @@
     "noStorage": {
       "title": "Questa installazione non ha spazio di archiviazione per i backup",
       "body": "I backup automatici verrebbero scritti in {folderPath}, dove questa installazione non può scrivere. Un amministratore deve montare uno spazio di archiviazione lì prima che una pianificazione possa essere eseguita."
-    }
+    },
+    "never": "Mai"
   },
   "backupRestore": {
     "heading": "Backup e ripristino",

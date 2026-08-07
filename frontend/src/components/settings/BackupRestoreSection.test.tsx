@@ -108,6 +108,7 @@ describe('BackupRestoreSection', () => {
       missingAttachments: 0,
       inconsistentAttachments: 0,
       expectedAttachments: 0,
+      includedAttachments: 0,
     });
 
     // Mock URL.createObjectURL and revokeObjectURL
@@ -138,6 +139,7 @@ describe('BackupRestoreSection', () => {
       missingAttachments: 2,
       inconsistentAttachments: 0,
       expectedAttachments: 5,
+      includedAttachments: 3,
     });
     const anchorEl = document.createElement('a');
     const clickSpy = vi.spyOn(anchorEl, 'click').mockImplementation(() => {});
@@ -182,6 +184,7 @@ describe('BackupRestoreSection', () => {
       missingAttachments: 0,
       inconsistentAttachments: 1,
       expectedAttachments: 1,
+      includedAttachments: 0,
     });
     global.URL.createObjectURL = vi
       .fn()
@@ -212,6 +215,7 @@ describe('BackupRestoreSection', () => {
       missingAttachments: 0,
       inconsistentAttachments: 0,
       expectedAttachments: 0,
+      includedAttachments: 0,
     });
     global.URL.createObjectURL = vi
       .fn()
@@ -254,6 +258,7 @@ describe('BackupRestoreSection', () => {
       missingAttachments: 0,
       inconsistentAttachments: 0,
       expectedAttachments: 0,
+      includedAttachments: 0,
     });
     global.URL.createObjectURL = vi
       .fn()
@@ -654,6 +659,7 @@ describe('BackupRestoreSection', () => {
       missingAttachments: 0,
       inconsistentAttachments: 0,
       expectedAttachments: 0,
+      includedAttachments: 0,
     });
       const createObjectURL = vi.fn().mockReturnValue('blob:mock');
       const revokeObjectURL = vi.fn();

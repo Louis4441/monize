@@ -66,6 +66,7 @@ describe('backupApi', () => {
       headers: {
         'x-backup-complete': 'false',
         'x-backup-attachments-missing': '2',
+        'x-backup-attachments-included': '3',
         'x-backup-attachments-expected': '5',
       },
     });
@@ -74,7 +75,33 @@ describe('backupApi', () => {
 
     expect(result.complete).toBe(false);
     expect(result.missingAttachments).toBe(2);
+    // The backend also reports how many attachments it did write; the frontend
+    // reads it rather than leaving the header on the floor.
+    expect(result.includedAttachments).toBe(3);
     expect(result.expectedAttachments).toBe(5);
+  });
+
+  it('exportBackup treats a malformed attachment-count header as zero, not NaN', async () => {
+    // A proxy that duplicates a header hands axios a joined value like "2, 2",
+    // and Number() of that is NaN. Without a finite check that NaN flows into
+    // the incomplete-export toast as "NaN of NaN attachment(s)" -- the one
+    // message that has to be trusted when someone reaches for a backup.
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: new Blob(['data']),
+      headers: {
+        'x-backup-complete': 'false',
+        'x-backup-attachments-missing': '2, 2',
+        'x-backup-attachments-included': 'not-a-number',
+        'x-backup-attachments-expected': '',
+      },
+    });
+
+    const result = await backupApi.exportBackup();
+
+    expect(result.complete).toBe(false);
+    expect(result.missingAttachments).toBe(0);
+    expect(result.includedAttachments).toBe(0);
+    expect(result.expectedAttachments).toBe(0);
   });
 
   it('exportBackup reads the inconsistent-attachment header, not just the missing one', async () => {
