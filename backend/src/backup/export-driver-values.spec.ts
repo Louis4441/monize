@@ -29,10 +29,14 @@ import { RESTORE_PLAN } from "./restore-plan";
  */
 
 const SCHEMA_PATH = join(__dirname, "..", "..", "..", "database", "schema.sql");
-const SERVICE_PATH = join(__dirname, "backup.service.ts");
+/** Where the export's per-table SQL lives (issue #1092 moved it out of the service). */
+const QUERIES_PATH = join(__dirname, "export-table-queries.ts");
+/** Where the restore's insert -- and its bytea decode -- lives. */
+const INSERT_PATH = join(__dirname, "backup-restore-database.service.ts");
 
 const schema = readFileSync(SCHEMA_PATH, "utf8");
-const service = readFileSync(SERVICE_PATH, "utf8");
+const exportSource = readFileSync(QUERIES_PATH, "utf8");
+const restoreSource = readFileSync(INSERT_PATH, "utf8");
 
 /** Uncommented schema, so a column documented in prose cannot match. */
 const uncommentedSchema = schema
@@ -55,10 +59,17 @@ function byteaColumns(): string[] {
 
 /** The SQL of each export query, keyed by the table it reads. */
 function exportQueries(): Map<string, string> {
-  const block = service.slice(
-    service.indexOf("private getTableQueries()"),
-    service.indexOf("private async collectGzippedExport"),
+  const start = exportSource.indexOf(
+    "export function buildExportTableQueries(",
   );
+  // A moved or renamed builder must fail loudly rather than yield zero queries:
+  // an empty map makes every assertion in this file vacuously true.
+  if (start === -1) {
+    throw new Error(
+      `buildExportTableQueries not found in ${QUERIES_PATH}; this parser is stale`,
+    );
+  }
+  const block = exportSource.slice(start);
   const queries = new Map<string, string>();
   for (const match of block.matchAll(
     /key:\s*"(\w+)",\s*\n?\s*sql:\s*(`[\s\S]*?`|"[\s\S]*?")/g,
@@ -123,7 +134,9 @@ describe("export driver values", () => {
   it("keeps the restore's bytea decode in step with the export's encode", () => {
     // The two halves are separated by the file format, so a change to one that
     // misses the other produces bytes that survive the round trip only by luck.
-    expect(service).toMatch(/data_type === "bytea"/);
-    expect(service).toMatch(/decode\(\$\$\{i \+ 1\}, 'base64'\)|decode\(\$/);
+    expect(restoreSource).toMatch(/data_type === "bytea"/);
+    expect(restoreSource).toMatch(
+      /decode\(\$\$\{i \+ 1\}, 'base64'\)|decode\(\$/,
+    );
   });
 });

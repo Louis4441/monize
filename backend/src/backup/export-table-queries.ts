@@ -1,0 +1,322 @@
+/**
+ * What a backup reads, in the order it is read, plus the tables it deliberately
+ * does not read.
+ *
+ * Extracted from `BackupService` so the list and its rationale live in one file
+ * rather than in the middle of a 2,600-line class. `export-driver-values.spec.ts`
+ * parses this file (see the markers it looks for) to prove every BYTEA column is
+ * selected through `encode(col, 'base64')`.
+ */
+
+/** A reader bound to one export snapshot and one user id (`$1`). */
+export type ExportRead = (sql: string) => Promise<Record<string, unknown>[]>;
+
+/**
+ * Adds the bytes an object store holds to the `attachment_blobs` rows the query
+ * returned. Supplied by `BackupExportService.appendExternalAttachmentBytes`,
+ * which owns the storage provider; the query list stays free of it.
+ */
+export type AttachmentBlobAugment = (
+  rows: Record<string, unknown>[],
+  read: ExportRead,
+) => Promise<Record<string, unknown>[]>;
+
+/**
+ * One table in the export.
+ *
+ * `augment` exists for the one table whose contents are not entirely in the
+ * database: `attachment_blobs` carries the `database` provider's bytes as rows,
+ * and the `local`/`s3` providers' bytes have to be read from the object store and
+ * added. Every export path runs it, so no path can quietly produce an artifact
+ * missing the bytes.
+ */
+export interface ExportTableQuery {
+  key: string;
+  sql: string;
+  augment?: AttachmentBlobAugment;
+}
+
+/**
+ * User-owned tables that are deliberately NOT part of a backup, each with the
+ * reason. The coverage guard test asserts every table in the database is either
+ * exported (see `BackupExportService.getBackedUpTableNames`) or listed here, so adding a new entity
+ * forces an explicit decision instead of silently dropping data on restore.
+ */
+export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
+  "users", // the account row itself; a restore targets an existing user
+  "action_history", // undo/redo log, wiped on restore (not undoable to prior state)
+  "ai_insights", // regenerable AI cache
+  "ai_usage_logs", // usage telemetry, not user content
+  "exchange_rates", // global shared reference data, not per-user
+  "market_index_prices", // global market reference data, refetched from the provider
+  "market_index_sync", // provider fetch bookkeeping for the above
+  "account_delegates", // cross-user sharing relationship
+  "account_delegate_grants", // cross-user sharing relationship
+  "delegate_account_favourites", // cross-user sharing state
+  "delegate_net_worth_exclusions", // cross-user sharing state (joint accounts)
+  "emergency_access_contacts", // cross-user emergency-access config
+  "emergency_access_settings", // cross-user emergency-access config
+  "oauth_payloads", // transient OIDC state
+  // Import working state, not user content: the staged bytes are a decrypted
+  // upload with a 24 h TTL, and a job row describes one in-flight import. Both
+  // are meaningless after the fact, and the staged file would multiply a
+  // backup's size by the size of whatever was last uploaded.
+  "import_staged_files",
+  "import_jobs",
+  "personal_access_tokens", // auth credentials -- never exported
+  "refresh_tokens", // auth session tokens -- never exported
+  "trusted_devices", // 2FA device registrations -- never exported
+  "schema_migrations", // migration bookkeeping (no entity; system table)
+]);
+
+export function buildExportTableQueries(
+  augmentAttachmentBlobs: AttachmentBlobAugment,
+): ExportTableQuery[] {
+  return [
+    {
+      // Every currency this user's data depends on, not just the ones they
+      // created. Currencies are shared: any user may activate a code another
+      // user defined, so `created_by_user_id = $1` exported the references
+      // without the definition. On a fresh instance the restore then
+      // synthesised name, symbol and decimal places from a fallback -- `PTS /
+      // Family Points / * / 0 decimals` came back as `PTS / PTS / PTS / 2
+      // decimals`, so a balance of 7 rendered `PTS 7.00` instead of `*7`. The
+      // amounts were right; what they meant was not.
+      //
+      // Canonical currencies are included too. Their metadata usually resolves
+      // from the curated catalog anyway, but exporting the row costs one line
+      // and makes the restore reproduce what the source instance actually had
+      // rather than what this instance would guess. `ON CONFLICT (code) DO
+      // NOTHING` means an existing row on the target always wins, so this can
+      // never overwrite a definition the target already holds.
+      //
+      // The referencing columns live in `currency_codes_referenced_by_user`
+      // (migration 137) rather than being spelled out here: this list has
+      // drifted before, and currency-references.spec.ts checks the function
+      // against the schema.
+      key: "currencies",
+      sql: `SELECT * FROM currencies
+             WHERE created_by_user_id = $1
+                OR code IN (SELECT currency_codes_referenced_by_user($1))
+             ORDER BY code`,
+    },
+    {
+      key: "user_preferences",
+      sql: "SELECT * FROM user_preferences WHERE user_id = $1",
+    },
+    {
+      key: "user_currency_preferences",
+      sql: "SELECT * FROM user_currency_preferences WHERE user_id = $1",
+    },
+    {
+      key: "categories",
+      sql: "SELECT * FROM categories WHERE user_id = $1 ORDER BY parent_id NULLS FIRST, name",
+    },
+    {
+      key: "payees",
+      sql: "SELECT * FROM payees WHERE user_id = $1 ORDER BY name",
+    },
+    {
+      key: "payee_aliases",
+      sql: "SELECT * FROM payee_aliases WHERE user_id = $1",
+    },
+    {
+      // Institutions must be exported (and restored) before accounts because
+      // accounts.institution_id has an FK to institutions(id). The logo_data
+      // BYTEA column is base64-encoded so it survives JSON serialization;
+      // insertRows decodes it back to bytea on restore.
+      key: "institutions",
+      sql: `SELECT id, user_id, name, website, country,
+                   encode(logo_data, 'base64') AS logo_data,
+                   logo_content_type, has_logo, logo_fetched_at,
+                   created_at, updated_at
+            FROM institutions WHERE user_id = $1 ORDER BY name`,
+    },
+    {
+      key: "accounts",
+      sql: "SELECT * FROM accounts WHERE user_id = $1 ORDER BY name",
+    },
+    {
+      key: "tags",
+      sql: "SELECT * FROM tags WHERE user_id = $1 ORDER BY name",
+    },
+    {
+      key: "transactions",
+      sql: "SELECT * FROM transactions WHERE user_id = $1 ORDER BY transaction_date, created_at",
+    },
+    {
+      key: "transaction_splits",
+      sql: `SELECT ts.* FROM transaction_splits ts
+            JOIN transactions t ON ts.transaction_id = t.id
+            WHERE t.user_id = $1`,
+    },
+    {
+      // Attachment metadata. Restored after transactions (FK) and before
+      // attachment_blobs (which references transaction_attachments).
+      key: "transaction_attachments",
+      sql: "SELECT * FROM transaction_attachments WHERE user_id = $1",
+    },
+    {
+      // Attachment bytes, base64-encoded so they survive JSON; insertRows
+      // decodes them back to bytea on restore (auto-detected via
+      // information_schema).
+      //
+      // The query covers the `database` provider, whose bytes are in this
+      // table. `augment` adds the `local` and `s3` providers', which are not --
+      // see `appendExternalAttachmentBytes` for why they have to travel too.
+      key: "attachment_blobs",
+      sql: `SELECT ab.attachment_id, encode(ab.data, 'base64') AS data
+            FROM attachment_blobs ab
+            JOIN transaction_attachments ta ON ab.attachment_id = ta.id
+            WHERE ta.user_id = $1`,
+      augment: augmentAttachmentBlobs,
+    },
+    {
+      key: "transaction_tags",
+      sql: `SELECT tt.* FROM transaction_tags tt
+            JOIN transactions t ON tt.transaction_id = t.id
+            WHERE t.user_id = $1`,
+    },
+    {
+      key: "transaction_split_tags",
+      sql: `SELECT tst.* FROM transaction_split_tags tst
+            JOIN transaction_splits ts ON tst.transaction_split_id = ts.id
+            JOIN transactions t ON ts.transaction_id = t.id
+            WHERE t.user_id = $1`,
+    },
+    {
+      key: "scheduled_transactions",
+      sql: "SELECT * FROM scheduled_transactions WHERE user_id = $1",
+    },
+    {
+      key: "scheduled_transaction_splits",
+      sql: `SELECT sts.* FROM scheduled_transaction_splits sts
+            JOIN scheduled_transactions st ON sts.scheduled_transaction_id = st.id
+            WHERE st.user_id = $1`,
+    },
+    {
+      key: "scheduled_transaction_overrides",
+      sql: `SELECT sto.* FROM scheduled_transaction_overrides sto
+            JOIN scheduled_transactions st ON sto.scheduled_transaction_id = st.id
+            WHERE st.user_id = $1`,
+    },
+    {
+      key: "scheduled_transaction_split_tags",
+      sql: `SELECT stst.* FROM scheduled_transaction_split_tags stst
+            JOIN scheduled_transaction_splits sts ON stst.scheduled_transaction_split_id = sts.id
+            JOIN scheduled_transactions st ON sts.scheduled_transaction_id = st.id
+            WHERE st.user_id = $1`,
+    },
+    { key: "securities", sql: "SELECT * FROM securities WHERE user_id = $1" },
+    {
+      key: "security_prices",
+      sql: `SELECT sp.* FROM security_prices sp
+            JOIN securities s ON sp.security_id = s.id
+            WHERE s.user_id = $1`,
+    },
+    {
+      key: "security_documents",
+      sql: "SELECT * FROM security_documents WHERE user_id = $1",
+    },
+    {
+      key: "holdings",
+      sql: `SELECT h.* FROM holdings h
+            JOIN accounts a ON h.account_id = a.id
+            WHERE a.user_id = $1`,
+    },
+    {
+      key: "investment_transactions",
+      sql: "SELECT * FROM investment_transactions WHERE user_id = $1",
+    },
+    {
+      // Join tags between securities and tags. Owned transitively via the
+      // securities/tags rows, so scope by the security's owner.
+      key: "security_tags",
+      sql: `SELECT st.* FROM security_tags st
+            JOIN securities s ON st.security_id = s.id
+            WHERE s.user_id = $1`,
+    },
+    {
+      key: "loan_rate_changes",
+      sql: "SELECT * FROM loan_rate_changes WHERE user_id = $1",
+    },
+    {
+      key: "loan_scenarios",
+      sql: "SELECT * FROM loan_scenarios WHERE user_id = $1",
+    },
+    { key: "budgets", sql: "SELECT * FROM budgets WHERE user_id = $1" },
+    {
+      key: "budget_categories",
+      sql: `SELECT bc.* FROM budget_categories bc
+            JOIN budgets b ON bc.budget_id = b.id
+            WHERE b.user_id = $1`,
+    },
+    {
+      key: "budget_periods",
+      sql: `SELECT bp.* FROM budget_periods bp
+            JOIN budgets b ON bp.budget_id = b.id
+            WHERE b.user_id = $1`,
+    },
+    {
+      key: "budget_period_categories",
+      sql: `SELECT bpc.* FROM budget_period_categories bpc
+            JOIN budget_periods bp ON bpc.budget_period_id = bp.id
+            JOIN budgets b ON bp.budget_id = b.id
+            WHERE b.user_id = $1`,
+    },
+    {
+      key: "budget_alerts",
+      sql: "SELECT * FROM budget_alerts WHERE user_id = $1",
+    },
+    {
+      key: "custom_reports",
+      sql: "SELECT * FROM custom_reports WHERE user_id = $1",
+    },
+    {
+      key: "investment_reports",
+      sql: "SELECT * FROM investment_reports WHERE user_id = $1",
+    },
+    {
+      key: "import_column_mappings",
+      sql: "SELECT * FROM import_column_mappings WHERE user_id = $1",
+    },
+    {
+      key: "monthly_account_balances",
+      sql: "SELECT * FROM monthly_account_balances WHERE user_id = $1",
+    },
+    {
+      key: "auto_backup_settings",
+      sql: "SELECT * FROM auto_backup_settings WHERE user_id = $1",
+    },
+    {
+      key: "ai_provider_configs",
+      sql: "SELECT * FROM ai_provider_configs WHERE user_id = $1",
+    },
+    {
+      key: "monte_carlo_scenarios",
+      sql: "SELECT * FROM monte_carlo_scenarios WHERE user_id = $1",
+    },
+    {
+      key: "monte_carlo_cash_flows",
+      sql: `SELECT mccf.* FROM monte_carlo_cash_flows mccf
+            JOIN monte_carlo_scenarios mcs ON mccf.scenario_id = mcs.id
+            WHERE mcs.user_id = $1`,
+    },
+    {
+      key: "gem_strategies",
+      sql: "SELECT * FROM gem_strategies WHERE user_id = $1",
+    },
+    {
+      key: "gem_strategy_accounts",
+      sql: "SELECT * FROM gem_strategy_accounts WHERE user_id = $1",
+    },
+    {
+      key: "gem_strategy_assets",
+      sql: "SELECT * FROM gem_strategy_assets WHERE user_id = $1",
+    },
+    {
+      key: "gem_strategy_signals",
+      sql: "SELECT * FROM gem_strategy_signals WHERE user_id = $1",
+    },
+  ];
+}

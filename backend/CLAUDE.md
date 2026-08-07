@@ -283,6 +283,27 @@ accepts any truthy header value. It is an open defect with a written plan, not a
 design choice -- see section 5 of the contract before touching
 `verifyAuthentication`.
 
+### `BackupService` is a facade; put new code in the component that owns it
+
+Issue #1092 split the 2,600-line original into `BackupExportService`,
+`BackupRestoreService`, `BackupAttachmentTransferService` and
+`BackupRestoreDatabaseService`, with the file format in `backup-format.ts` and
+the table list in `export-table-queries.ts`. Section 0 of the contract says which
+owns what. `BackupService` itself is one delegation per method and holds no
+`DataSource` and no storage provider -- a query there is how the original grew,
+and `src/backup/module-shape.spec.ts` fails on the dependency as well as on the
+line count. That spec's grandfather list may only shrink.
+
+**A source-scanning guard names a file, so a split disarms it silently.** Four of
+them pointed at `backup.service.ts` -- the two attachment readers, the trigger-DDL
+ban, the export's bytea encoding and `currency-references.spec.ts`'s "one
+predicate" check -- and every one would have gone on passing while scanning code
+that had moved out from under it. A scan whose subject is "wherever this appears"
+walks the directory (`backupModuleSources()` in `backup.service.spec.ts` is the
+pattern); one that must name a file throws when its marker is missing rather than
+returning an empty match set. Grep `readFileSync(` under the module you are
+splitting before you split it.
+
 ## Testing Conventions
 
 Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTestingModule` with mocks injected via `getRepositoryToken()`. E2E tests live in `test/` with helpers under `test/helpers/` (`auth-helper.ts`, `test-database.ts`, `test-factories.ts`).

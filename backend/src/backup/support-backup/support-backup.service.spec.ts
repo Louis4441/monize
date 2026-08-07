@@ -2,8 +2,11 @@ import { BadRequestException, PayloadTooLargeException } from "@nestjs/common";
 import { gunzipSync } from "zlib";
 import { BackupService } from "../backup.service";
 import { decryptBackup } from "../backup-crypto.util";
+import { readFileSync, readdirSync } from "fs";
+import { join, relative } from "path";
 import {
   allocatePseudonymCode,
+  randomPseudonymLetter,
   SupportBackupService,
 } from "./support-backup.service";
 import { CURRENCY_METADATA } from "../../currencies/currency-metadata";
@@ -904,5 +907,102 @@ describe("SupportBackupService custom currencies", () => {
     }
     expect(issued.has("KEN")).toBe(false);
     expect(issued.has("PLN")).toBe(false);
+  });
+
+  /**
+   * CodeQL `js/biased-cryptographic-random`.
+   *
+   * The allocator drew a byte and took `% 26`. 256 is not a multiple of 26, so
+   * bytes 0-233 cover the alphabet nine times and 234-255 cover A-V a tenth
+   * time: A-V come up 10/256 each and W-Z 9/256, an 11% excess for twenty-two of
+   * the twenty-six letters. For a pseudonym whose only job is to be
+   * unpredictable, a distribution an attacker can predict is the defect --
+   * modest here (the codes are decorrelated per artifact, not secret) and fatal
+   * the moment the same helper is reached for by something that is.
+   *
+   * A distribution test rather than a shape assertion, because the defect was
+   * the distribution. 260,000 draws puts the uniform standard error on
+   * P(W|X|Y|Z) at ~0.07 percentage points, so the biased path's 14.06% sits
+   * about eighteen sigma from the uniform 15.38%; the one-percentage-point
+   * tolerance below is fourteen sigma of headroom against a false failure and
+   * still refuses the bias outright.
+   */
+  it("draws each letter uniformly (biased-modulo guard)", () => {
+    const DRAWS = 260_000;
+    const counts = new Map<string, number>();
+    for (let i = 0; i < DRAWS; i += 1) {
+      const letter = randomPseudonymLetter();
+      counts.set(letter, (counts.get(letter) ?? 0) + 1);
+    }
+
+    // Every letter is reachable: a rejection bound off by one would silently
+    // retire the tail of the alphabet rather than skew it.
+    expect(counts.size).toBe(26);
+
+    // The four letters the biased path under-produced, against the twenty-two it
+    // over-produced. Uniform puts them at 4/26; `% 26` on a raw byte puts them
+    // at 36/256.
+    const tail = ["W", "X", "Y", "Z"].reduce(
+      (sum, letter) => sum + (counts.get(letter) ?? 0),
+      0,
+    );
+    expect(tail / DRAWS).toBeCloseTo(4 / 26, 2);
+
+    // And no individual letter drifts either -- the aggregate above would pass a
+    // bias that moved letters within each group.
+    for (const [, count] of counts) {
+      expect(count / DRAWS).toBeGreaterThan(1 / 26 - 0.005);
+      expect(count / DRAWS).toBeLessThan(1 / 26 + 0.005);
+    }
+  });
+
+  /**
+   * The half of the rule a scan can hold: `%` applied to bytes straight out of a
+   * cryptographic source is biased unless something rejects the tail first.
+   *
+   * Written as a scan rather than a paragraph because the mistake is mechanical
+   * and reads as correct at every individual site -- `bytes[0] % 26` is what
+   * anyone writes. Every other crypto random in `src/` goes through
+   * `.toString("hex")` or `crypto.randomInt`, both unbiased, so the allowlist
+   * has exactly one entry: the function that does the rejection.
+   */
+  it("never reduces a cryptographic random with % outside the rejection sampler (source guard)", () => {
+    const SRC = join(__dirname, "..", "..");
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) return walk(full);
+        return entry.name.endsWith(".ts") && !entry.name.endsWith(".spec.ts")
+          ? [full]
+          : [];
+      });
+
+    /** The one place a `%` may follow a draw, because it rejects the tail first. */
+    const REJECTION_SAMPLER = "backup/support-backup/support-backup.service.ts";
+
+    const offenders: string[] = [];
+    for (const full of walk(SRC)) {
+      const file = relative(SRC, full).split("\\").join("/");
+      const lines = readFileSync(full, "utf8").split("\n");
+      for (const [index, line] of lines.entries()) {
+        if (!/\brandom(Bytes|FillSync)\s*\(/.test(line)) continue;
+        // The reduction lands within a few lines of the draw in every shape this
+        // has taken; a wider window would sweep in unrelated arithmetic.
+        const window = lines.slice(index, index + 4).join("\n");
+        // Not a comment, and not a string: an actual modulo operator.
+        const reduces = window
+          .split("\n")
+          .some(
+            (text) => !/^\s*(\*|\/\/)/.test(text) && /[^%]%[^%=]/.test(text),
+          );
+        if (reduces && file !== REJECTION_SAMPLER) {
+          offenders.push(`${file}:${index + 1}`);
+        }
+      }
+    }
+
+    // Reach for `crypto.randomInt`, or reject the tail as `randomPseudonymLetter`
+    // does. Do not take `%` of a raw byte.
+    expect(offenders).toEqual([]);
   });
 });

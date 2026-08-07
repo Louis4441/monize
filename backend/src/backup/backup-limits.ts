@@ -390,3 +390,27 @@ export function warnIfLimitExceedsMemory(
       `limit.`,
   );
 }
+
+/**
+ * One resolution path for both backup ceilings -- the operator's value if they
+ * set one, otherwise a share of the container's memory limit, and a warning
+ * either way when the number cannot protect the process it is meant to protect.
+ *
+ * Read per call rather than cached at construction: each is consulted once per
+ * request, so the cost is nothing, and a limit that can only be observed at
+ * construction time is a limit no test can vary.
+ *
+ * The default is derived from this container's memory limit, not fixed. A
+ * ceiling larger than the process it protects cannot fire -- the pod is killed
+ * first -- and that is exactly what a hardcoded 1 GiB default was on the chart's
+ * 400 MiB backend.
+ */
+export function resolveConfiguredBackupLimit(
+  name: string,
+  raw: string | undefined,
+  onWarn: (message: string) => void,
+): number {
+  const limit = resolveByteLimit(raw, deriveDefaultLimitBytes(), onWarn);
+  warnIfLimitExceedsMemory(name, limit, onWarn);
+  return limit;
+}

@@ -1,0 +1,126 @@
+import { BadRequestException } from "@nestjs/common";
+
+/**
+ * The backup file format: the envelope version, the shape of a parsed artifact,
+ * and the two result types the export and restore paths hand back.
+ *
+ * These live apart from any service because four of them now share the format --
+ * `BackupExportService` writes it, `BackupRestoreService` reads it,
+ * `BackupAttachmentTransferService` rewrites its attachment tables, and
+ * `BackupRestoreDatabaseService` inserts from it. A format described in the class
+ * that happens to be biggest is a format the next class re-describes.
+ */
+export const BACKUP_VERSION = 1;
+
+export interface RestoreBackupInput {
+  compressedData: Buffer;
+  password?: string;
+  oidcIdToken?: string;
+  // Password used to encrypt the backup file. For local users this is usually
+  // the same as `password`; if the user rotated their login password since the
+  // backup was made, the frontend re-prompts and sends the old one here.
+  backupPassword?: string;
+}
+
+export interface RestoreResult {
+  message: string;
+  /** Rows written, keyed by `RestoreStep.countKey`. The client sums these. */
+  restored: Record<string, number>;
+  /**
+   * Attachments whose metadata was deliberately not written because their bytes
+   * could not be made reachable -- absent from the sidecar store, failing their
+   * recorded checksum, or exported from an instance using a different storage
+   * provider. Kept out of `restored` so it is never added into a row total.
+   * Omitted when nothing was skipped, so "no field" and "zero" agree.
+   */
+  skippedAttachments?: number;
+}
+
+export class BackupPasswordRequiredError extends BadRequestException {
+  constructor(message: string) {
+    super({ message, code: "BACKUP_PASSWORD_REQUIRED" });
+  }
+}
+
+/**
+ * Whether a produced artifact backs up every attachment it names.
+ *
+ * A backup that carries an attachment's metadata row but not its bytes is not a
+ * backup of that attachment (`docs/backup-restore-contract.md` §4). External
+ * bytes can be unreadable or inconsistent at export time (a truncated or replaced
+ * object), and a database-provider blob can be missing or wrong for its metadata.
+ * The export omits those bytes rather than packaging a lie -- but then the
+ * *artifact* is incomplete, and the caller has to know, because an incomplete
+ * backup must never be promoted or retained as if it were a complete one.
+ */
+export interface BackupCompletenessReport {
+  complete: boolean;
+  /** Attachment metadata rows in the artifact. */
+  expectedAttachments: number;
+  /** Rows whose bytes are present and consistent. */
+  includedAttachments: number;
+  /** Rows whose bytes could not be included at all. */
+  missingAttachments: number;
+  /** Rows whose (database-provider) bytes contradict their own metadata. */
+  inconsistentAttachments: number;
+}
+
+export interface BackupData {
+  version: number;
+  exportedAt: string;
+  currencies: Record<string, unknown>[];
+  user_preferences: Record<string, unknown>[];
+  user_currency_preferences: Record<string, unknown>[];
+  categories: Record<string, unknown>[];
+  payees: Record<string, unknown>[];
+  payee_aliases: Record<string, unknown>[];
+  institutions: Record<string, unknown>[];
+  accounts: Record<string, unknown>[];
+  tags: Record<string, unknown>[];
+  transactions: Record<string, unknown>[];
+  transaction_splits: Record<string, unknown>[];
+  transaction_attachments: Record<string, unknown>[];
+  attachment_blobs: Record<string, unknown>[];
+  transaction_tags: Record<string, unknown>[];
+  transaction_split_tags: Record<string, unknown>[];
+  scheduled_transactions: Record<string, unknown>[];
+  scheduled_transaction_splits: Record<string, unknown>[];
+  scheduled_transaction_overrides: Record<string, unknown>[];
+  securities: Record<string, unknown>[];
+  security_prices: Record<string, unknown>[];
+  security_documents: Record<string, unknown>[];
+  holdings: Record<string, unknown>[];
+  investment_transactions: Record<string, unknown>[];
+  loan_rate_changes: Record<string, unknown>[];
+  loan_scenarios: Record<string, unknown>[];
+  security_tags: Record<string, unknown>[];
+  budgets: Record<string, unknown>[];
+  budget_categories: Record<string, unknown>[];
+  budget_periods: Record<string, unknown>[];
+  budget_period_categories: Record<string, unknown>[];
+  budget_alerts: Record<string, unknown>[];
+  custom_reports: Record<string, unknown>[];
+  investment_reports: Record<string, unknown>[];
+  import_column_mappings: Record<string, unknown>[];
+  monthly_account_balances: Record<string, unknown>[];
+  auto_backup_settings: Record<string, unknown>[];
+  scheduled_transaction_split_tags: Record<string, unknown>[];
+  monte_carlo_scenarios: Record<string, unknown>[];
+  monte_carlo_cash_flows: Record<string, unknown>[];
+  ai_provider_configs: Record<string, unknown>[];
+  gem_strategies: Record<string, unknown>[];
+  gem_strategy_accounts: Record<string, unknown>[];
+  gem_strategy_assets: Record<string, unknown>[];
+  gem_strategy_signals: Record<string, unknown>[];
+}
+
+/** A backup's tables addressed by name, for the paths that walk them generically. */
+export type BackupTables = Record<
+  string,
+  Record<string, unknown>[] | undefined
+>;
+
+/** `data` viewed as plain table -> rows, without an `as unknown as` at each site. */
+export function backupTables(data: BackupData): BackupTables {
+  return data as unknown as BackupTables;
+}

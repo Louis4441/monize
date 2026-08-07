@@ -56,13 +56,40 @@ const GENERIC_CURRENCY_SYMBOL = "¤";
  * bought a handful of samples for seconds of CPU; the wiring and the allocation
  * property are now tested separately, and the second one thoroughly.
  */
+const PSEUDONYM_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/**
+ * The largest multiple of 26 that fits in a byte (256 - 256 % 26 = 234).
+ *
+ * `randomBytes(1)[0] % 26` is *not* uniform: bytes 0-21 map to A-V one more
+ * time than 22-25 map to W-Z, so those six letters appear ~9.4% more often
+ * (CodeQL `js/biased-cryptographic-random`). Discarding the 22 values at or
+ * above this bound leaves an exact multiple of 26 and restores uniformity.
+ */
+const UNBIASED_BYTE_CEILING = 256 - (256 % PSEUDONYM_LETTERS.length);
+
+/**
+ * One uniformly-distributed letter, by rejection sampling.
+ *
+ * Draws in blocks rather than a byte at a time so the (22/256 ≈ 8.6%) rejection
+ * rate costs no extra syscall in practice. Exported for its own distribution
+ * test.
+ */
+export function randomPseudonymLetter(): string {
+  for (;;) {
+    for (const byte of randomBytes(16)) {
+      if (byte < UNBIASED_BYTE_CEILING) {
+        return PSEUDONYM_LETTERS[byte % PSEUDONYM_LETTERS.length];
+      }
+    }
+  }
+}
+
 export function allocatePseudonymCode(taken: Set<string>): string {
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   // 17,576 combinations against a catalog of a few hundred, so this converges
   // immediately; the bound exists so a pathological `taken` cannot spin forever.
   for (let attempt = 0; attempt < 10000; attempt += 1) {
-    const bytes = randomBytes(3);
-    const code = `${letters[bytes[0] % 26]}${letters[bytes[1] % 26]}${letters[bytes[2] % 26]}`;
+    const code = `${randomPseudonymLetter()}${randomPseudonymLetter()}${randomPseudonymLetter()}`;
     if (!taken.has(code) && CURRENCY_METADATA[code] === undefined) {
       taken.add(code);
       return code;

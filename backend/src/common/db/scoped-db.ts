@@ -142,7 +142,7 @@ export const MISSING_CONTEXT_MESSAGE =
  * Isolation levels callers may request. Two paths need one: registration
  * (SERIALIZABLE, to close the first-user-admin race) and the backup export
  * (REPEATABLE READ, so every table in one file comes from the same snapshot --
- * `BackupService.withExportSnapshot`). Everything else uses the connection
+ * `BackupExportService.inExportSnapshot`). Everything else uses the connection
  * default, exactly as before.
  *
  * Spelled out rather than imported from `typeorm/driver/types/IsolationLevel`:
