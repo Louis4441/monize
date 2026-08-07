@@ -1,10 +1,12 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { promises as fs } from "fs";
-import { basename, dirname, resolve, sep } from "path";
+import { dirname, resolve, sep } from "path";
 import { tr } from "../../i18n/translate";
-import { isShardableId, shardedSegments } from "../../common/shard-path.util";
+import { shardedSegments } from "../../common/shard-path.util";
 import { AttachmentStorageProvider } from "./attachment-storage.interface";
+import { writeFileAtomic } from "../../backup/atomic-file";
+import { assertSafeStorageKey } from "./storage-key.util";
 
 /**
  * Folder attachment bytes are written to when ATTACHMENT_CONTAINER_DIR is unset.
@@ -26,9 +28,17 @@ export const DEFAULT_ATTACHMENT_CONTAINER_DIR = "/data/attachments";
  * single directory -- the shared layout in `common/shard-path.util.ts`, which
  * automatic backups use for their per-user folders too.
  *
- * Bytes live outside the database, so they are not embedded in the application
- * backup; only the metadata row travels with a backup and the directory must be
- * backed up alongside it (see .env.example).
+ * Bytes live outside the database, but they DO travel in an application backup:
+ * the export reads each object and carries it base64-encoded in
+ * `attachment_blobs` (see `appendExternalAttachmentBytes`), and a restore stages
+ * it back through this provider. That is what makes a backup restorable onto a
+ * fresh instance, and it means this directory does not have to be backed up
+ * separately. An artifact exported before that change carries only metadata, and
+ * restoring one needs more than this store: the bytes are read from the CURRENT
+ * instance and only after it confirms the user already owns a matching
+ * `transaction_attachments` row (same id, provider, size, SHA-256), so on a fresh
+ * instance every external attachment is skipped however faithfully the store was
+ * restored.
  */
 @Injectable()
 export class LocalStorageProvider implements AttachmentStorageProvider {
@@ -53,20 +63,15 @@ export class LocalStorageProvider implements AttachmentStorageProvider {
   }
 
   /**
-   * Validate `key` and return it. Keys are server-generated, but treat them as
-   * untrusted: strip any directory component and require the result to be an
-   * unchanged id from the shared safe alphabet. A key that survives this cannot
-   * contain a separator, a dot, or a NUL, so any shard path derived from it
-   * stays inside `baseDir` by construction.
+   * Validate `key` and return it. Shared with the S3 provider (see
+   * storage-key.util.ts): the rule is the same for every backend, and it lived
+   * only here while the S3 path took the key unchecked.
+   *
+   * A key that survives this cannot contain a separator, a dot, or a NUL, so any
+   * shard path derived from it stays inside `baseDir` by construction.
    */
   private safeKey(key: string): string {
-    const safe = basename(key ?? "");
-    if (!safe || safe !== key || !isShardableId(safe)) {
-      throw new NotFoundException(
-        tr("errors.attachments.notFound", "Attachment not found"),
-      );
-    }
-    return safe;
+    return assertSafeStorageKey(key);
   }
 
   /** Resolve a path inside `baseDir`, asserting containment before use. */
@@ -97,7 +102,12 @@ export class LocalStorageProvider implements AttachmentStorageProvider {
   async save(key: string, data: Buffer): Promise<void> {
     const target = this.shardedPath(this.safeKey(key));
     await fs.mkdir(dirname(target), { recursive: true });
-    await fs.writeFile(target, data);
+    // Temp file, fsync, rename -- not `fs.writeFile` onto the final path, which
+    // truncates first. A kill or an ENOSPC mid-write left a file whose bytes did
+    // not match the SHA-256 the metadata row records, and nothing checked: the
+    // download simply served a truncated receipt. The same hazard the automatic
+    // backup had (see atomic-file.ts).
+    await writeFileAtomic(target, data);
   }
 
   async load(key: string): Promise<Buffer> {

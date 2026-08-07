@@ -6,6 +6,20 @@ import * as express from "express";
 import cookieParser from "cookie-parser";
 import * as pg from "pg";
 import { AppModule } from "./app.module";
+import {
+  PEAK_MULTIPLE,
+  UPLOAD_WARNING_SHARE,
+  detectProcessMemoryLimitBytes,
+  resolveRestoreExpandedLimitBytes,
+  resolveRestoreUploadLimitBytes,
+  warnIfLimitExceedsMemory,
+  warnIfRestoreUploadLimitIsCramped,
+} from "./backup/backup-limits";
+import { createRestoreUploadAdmission } from "./backup/restore-upload-admission";
+import {
+  computeRestoreProcessingSlots,
+  restoreProcessingGate,
+} from "./backup/restore-processing-gate";
 import { OAuthProviderService } from "./oauth/oauth-provider.service";
 import { oauthDebugLogger } from "./oauth/oauth-debug-logger.middleware";
 import { isOidcProviderPath } from "./oauth/oidc-provider-paths";
@@ -128,7 +142,86 @@ async function bootstrap() {
   //
   // The limit is configurable (BACKUP_RESTORE_LIMIT) because backups now embed
   // transaction attachment bytes and can grow well past the old 100mb ceiling.
-  const backupRestoreLimit = process.env.BACKUP_RESTORE_LIMIT || "500mb";
+  //
+  // Unset, it is derived from this container's memory limit rather than fixed.
+  // It used to default to "500mb" while the chart's backend limit is 400Mi, and
+  // `express.raw` buffers the whole body onto the heap *before* the controller,
+  // the guards, the authentication lookup, the decryption and every service-level
+  // ceiling -- so the process could die on a request none of those layers ever
+  // saw. No care further down the path can reach an allocation that happens
+  // first.
+  const memoryLimitBytes = detectProcessMemoryLimitBytes();
+  const backupRestoreLimit = resolveRestoreUploadLimitBytes(
+    process.env.BACKUP_RESTORE_LIMIT,
+    memoryLimitBytes,
+  );
+  const bootstrapLogger = new Logger("Bootstrap");
+  bootstrapLogger.log(
+    `Restore upload limit: ${Math.round(backupRestoreLimit / (1024 * 1024))}MiB`,
+  );
+  // An operator override the container cannot absorb is a killed process rather
+  // than a refused request, so say it at startup instead of leaving them to infer
+  // it from a restart. Checked against the same share the default is derived from,
+  // in the same units the operator sets, so the derived default never warns about
+  // itself and the figure suggested is one they can paste back.
+  warnIfLimitExceedsMemory(
+    "BACKUP_RESTORE_LIMIT",
+    backupRestoreLimit,
+    (message) => bootstrapLogger.warn(message),
+    undefined,
+    UPLOAD_WARNING_SHARE,
+  );
+  // On a small container the safe upload limit can drop below what ordinary
+  // backups need. It stays safe rather than flooring into a number the pod cannot
+  // survive, but the operator should hear that restores are constrained here.
+  warnIfRestoreUploadLimitIsCramped(
+    backupRestoreLimit,
+    process.env.BACKUP_RESTORE_LIMIT,
+    (message) => bootstrapLogger.warn(message),
+  );
+  // Concurrent restore *processing* is capped separately from upload admission: a
+  // small gzip expands to the expanded ceiling, so the wire budget cannot bound
+  // decompressed memory. The cap budgets against the *resolved* expanded limit the
+  // parser enforces, minus the process baseline, so an operator override is
+  // accounted for and the ordinary process is not double-counted (F3R7-002).
+  const restoreExpandedLimit = resolveRestoreExpandedLimitBytes(
+    process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
+    memoryLimitBytes,
+  );
+  const honestSlots = computeRestoreProcessingSlots(
+    memoryLimitBytes,
+    restoreExpandedLimit,
+  );
+  restoreProcessingGate.configure(honestSlots);
+  bootstrapLogger.log(`Concurrent restore processing slots: ${honestSlots}`);
+  if (honestSlots < 1) {
+    // Zero means zero (F3RB-005): the gate refuses a restore with 503 rather
+    // than admitting one that its own model says cannot fit. Flooring to one
+    // turned a fixable misconfiguration into an OOM kill mid-restore, which is
+    // the worst moment to lose the process. This is a configuration to fix.
+    bootstrapLogger.error(
+      `A single restore's modeled peak memory does not fit this container ` +
+        `(limit ${Math.round((memoryLimitBytes ?? 0) / (1024 * 1024))}MiB, ` +
+        `expanded limit ${Math.round(restoreExpandedLimit / (1024 * 1024))}MiB). ` +
+        `Restores will be REFUSED with 503 until this is fixed: raise the ` +
+        `container memory limit or lower BACKUP_RESTORE_EXPANDED_LIMIT.`,
+    );
+  }
+  // Aggregate admission ahead of the parser: the per-request ceiling bounds one
+  // request, and two concurrent uploads just under it exceed a container sized
+  // for one. The JWT guard and the throttler are Nest guards, so they cannot
+  // reach this allocation.
+  const restoreAdmission = createRestoreUploadAdmission(
+    backupRestoreLimit,
+    // The budget is one request's worth of peak -- which is the container share
+    // the wire limit was derived from -- so a large restore is effectively
+    // serialised. A restore is a rare, deliberate, destructive operation:
+    // refusing the second one costs a retry, and admitting it costs everyone the
+    // replica serves.
+    backupRestoreLimit * PEAK_MULTIPLE,
+    (message) => bootstrapLogger.warn(`Restore upload refused: ${message}`),
+  );
+  app.use("/api/v1/backup/restore", restoreAdmission.middleware);
   app.use(
     "/api/v1/backup/restore",
     express.raw({

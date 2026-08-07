@@ -8,17 +8,50 @@ import {
 } from "@nestjs/common";
 import { gzipSync, gunzipSync } from "zlib";
 import { PassThrough } from "stream";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { getRequestContext } from "../common/request-context";
 import { OidcReauthService } from "../auth/oidc/oidc-reauth.service";
 import { BackupService, RestoreBackupInput } from "./backup.service";
+import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
 import { encryptBackup } from "./backup-crypto.util";
 import * as bcrypt from "bcryptjs";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import {
+  ATTACHMENT_STORAGE_PROVIDER,
+  AttachmentStorageProvider,
+} from "../attachments/storage/attachment-storage.interface";
+
+/**
+ * A `PassThrough` standing in for an express `Response`, carrying the header
+ * surface the real object always has.
+ *
+ * A bare `PassThrough` is a stream and nothing else, so a service that sets a
+ * response header -- as the export does to mark an incomplete artifact -- blew up
+ * on a double that a real Response could never be. Header calls are recorded so a
+ * test can assert them.
+ */
+function responseDouble(): {
+  res: import("express").Response;
+  chunks: Buffer[];
+  headers: Record<string, string>;
+} {
+  const stream = new PassThrough();
+  const chunks: Buffer[] = [];
+  stream.on("data", (c: Buffer) => chunks.push(c));
+  const headers: Record<string, string> = {};
+  const res = Object.assign(stream, {
+    setHeader: (name: string, value: string | number) => {
+      headers[name] = String(value);
+      return res;
+    },
+    getHeader: (name: string) => headers[name],
+  }) as unknown as import("express").Response;
+  return { res, chunks, headers };
+}
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -47,6 +80,28 @@ describe("BackupService", () => {
   let mockUserRepo: Record<string, jest.Mock>;
   let mockDataSource: Record<string, jest.Mock>;
   let mockQueryRunner: Record<string, jest.Mock>;
+  // Typed rather than Record<string, jest.Mock>: this is one of our own
+  // interfaces, so tsc should reject a return shape the real provider cannot
+  // produce (backend/CLAUDE.md, "a mock must return what the real collaborator
+  // returns").
+  let attachmentStorage: jest.Mocked<AttachmentStorageProvider>;
+  let attachmentStorageName: string;
+
+  /**
+   * What `transaction_attachments` holds for the restoring user right now.
+   *
+   * The restore reads this before the destructive delete to decide whether the
+   * uploader is entitled to read an external source object -- the uploaded file
+   * cannot establish that on its own. Leaving it empty is the "you do not own
+   * that object" case, which is the default for every test that does not
+   * deliberately seed ownership.
+   */
+  let ownedAttachments: Array<{
+    id: string;
+    storage_provider: string;
+    byte_size: number;
+    sha256: string | null;
+  }>;
 
   const userId = "test-user-id";
   const mockUser = {
@@ -88,6 +143,7 @@ describe("BackupService", () => {
       "notes",
       "sort_order",
       "linked_account_id",
+      "linked_loan_account_id",
       "source_account_id",
       "scheduled_transaction_id",
       "principal_category_id",
@@ -384,9 +440,34 @@ describe("BackupService", () => {
       "created_at",
       "updated_at",
     ],
+    transaction_attachments: [
+      "id",
+      "user_id",
+      "transaction_id",
+      "filename",
+      "content_type",
+      "byte_size",
+      "sha256",
+      "storage_provider",
+      "storage_key",
+      "created_at",
+    ],
+    attachment_blobs: ["attachment_id", "data"],
   };
 
   function mockQueryHandler(sql: string, params?: unknown[]) {
+    if (
+      typeof sql === "string" &&
+      sql.includes("FROM transaction_attachments") &&
+      sql.includes("storage_provider, byte_size")
+    ) {
+      // The ownership read. Scoped by user_id in the real query, so the mock
+      // answers only for the ids the service asked about.
+      const ids = Array.isArray(params) ? ((params[1] as string[]) ?? []) : [];
+      return Promise.resolve(
+        ownedAttachments.filter((row) => ids.includes(row.id)),
+      );
+    }
     if (typeof sql === "string" && sql.includes("information_schema.columns")) {
       // Extract table name from params (insertRows) or from the SQL itself (ensureCurrenciesExist)
       let tableName: string | undefined;
@@ -437,6 +518,7 @@ describe("BackupService", () => {
     mockUserRepo = {
       findOne: jest.fn(),
     };
+    ownedAttachments = [];
 
     // Export reads and the restore transaction now both run through
     // `withScopedDb`, so the former QueryRunner is the transaction's
@@ -448,6 +530,20 @@ describe("BackupService", () => {
     scoped.dataSource.query = scoped.manager.query;
     mockQueryRunner = { query: scoped.manager.query };
     mockDataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
+
+    // `name` is readonly on the real provider (it is persisted into
+    // transaction_attachments.storage_provider), so the double exposes it as a
+    // getter over a mutable local rather than a writable field -- tsc rejects
+    // the assignment, which is the point of typing the mock.
+    attachmentStorageName = "database";
+    attachmentStorage = {
+      get name() {
+        return attachmentStorageName;
+      },
+      save: jest.fn().mockResolvedValue(undefined),
+      load: jest.fn().mockRejectedValue(new Error("no such object")),
+      delete: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AttachmentStorageProvider>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -471,10 +567,577 @@ describe("BackupService", () => {
             ),
           },
         },
+        {
+          provide: ATTACHMENT_STORAGE_PROVIDER,
+          useValue: attachmentStorage,
+        },
       ],
     }).compile();
 
     service = module.get<BackupService>(BackupService);
+  });
+
+  /**
+   * A backup has to be one snapshot of the database. Each table query used to
+   * open its own short transaction, so the export observed a different committed
+   * state per table: create an account and a transaction for it between the
+   * `accounts` query and the `transactions` query and the artifact holds the
+   * transaction without its account -- valid gzip, valid envelope, and a restore
+   * that fails on `transactions.account_id`.
+   */
+  describe("export snapshot", () => {
+    it.each([
+      [
+        "streamExport",
+        async (s: BackupService) => {
+          const res = new PassThrough();
+          res.resume();
+          await s.streamExport(
+            userId,
+            res as unknown as import("express").Response,
+          );
+        },
+      ],
+      [
+        "exportToBuffer",
+        async (s: BackupService) => {
+          await s.exportToBuffer(userId);
+        },
+      ],
+      [
+        "collectRawExport",
+        async (s: BackupService) => {
+          await s.collectRawExport(userId);
+        },
+      ],
+    ])(
+      "reads every table in one REPEATABLE READ transaction (%s)",
+      async (_name, run) => {
+        mockDataSource.transaction.mockClear();
+
+        await run(service);
+
+        const isolationLevels = mockDataSource.transaction.mock.calls.map(
+          ([first]) => (typeof first === "string" ? first : undefined),
+        );
+        // Exactly one transaction, and it fixes its snapshot up front. READ
+        // COMMITTED would not do even as a single transaction: it takes a fresh
+        // snapshot per statement, which is the same defect with fewer transactions.
+        expect(isolationLevels).toEqual(["REPEATABLE READ"]);
+      },
+    );
+  });
+
+  /**
+   * Currencies are shared: any user may activate a code another user defined.
+   * Selecting them by `created_by_user_id` exported the references without the
+   * definition, so restoring onto a fresh instance invented name, symbol and
+   * decimal places -- `PTS / Family Points / * / 0 decimals` came back as
+   * `PTS / PTS / PTS / 2 decimals`, and a balance of 7 rendered `PTS 7.00`
+   * instead of `*7`. Same stored amount, different meaning.
+   */
+  describe("currency export selection", () => {
+    it("selects by what the user's data references, not by who created it", () => {
+      const sql = (
+        service as unknown as {
+          getTableQueries(): Array<{ key: string; sql: string }>;
+        }
+      )
+        .getTableQueries()
+        .find((q) => q.key === "currencies")!.sql;
+
+      expect(sql).toContain("currency_codes_referenced_by_user($1)");
+      // Rows the user created are still exported even when nothing references
+      // them yet, so a currency defined and not yet used survives a round trip.
+      expect(sql).toContain("created_by_user_id = $1");
+      // The referencing columns must not be spelled out here: that list has
+      // drifted twice already (currencies/currency-references.spec.ts).
+      expect(sql).not.toMatch(/FROM accounts/);
+    });
+  });
+
+  /**
+   * The export half of F3R5-001. Only `database`-provider bytes used to travel;
+   * `local` and `s3` metadata went out with the bytes left behind in a volume or
+   * a bucket, which the restore could only read while the target database still
+   * held the matching row. Now every provider's bytes are in the artifact.
+   */
+  describe("external attachment bytes in the artifact", () => {
+    const A_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const B_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const A_BYTES = Buffer.from("receipt-a");
+    const B_BYTES = Buffer.from("receipt-b-longer");
+
+    /** Answers the metadata sweep the augmentation runs, and nothing else. */
+    function storeHolds(
+      rows: Array<{ id: string; provider: string }>,
+      objects: Record<string, Buffer>,
+    ) {
+      mockDataSource.query.mockImplementation((sql: string) => {
+        if (
+          String(sql).includes("FROM transaction_attachments") &&
+          String(sql).includes("storage_provider, byte_size")
+        ) {
+          return Promise.resolve(
+            rows.map((row) => ({
+              id: row.id,
+              storage_provider: row.provider,
+              byte_size: (objects[row.id]?.length ?? 0).toString(),
+              sha256: "",
+            })),
+          );
+        }
+        return mockQueryHandler(sql);
+      });
+      attachmentStorage.load.mockImplementation(async (key: string) => {
+        const bytes = objects[key];
+        if (!bytes) throw new Error(`no such object: ${key}`);
+        return bytes;
+      });
+    }
+
+    async function exported(): Promise<Record<string, unknown>> {
+      const { buffer } = await service.exportToBuffer(userId);
+      return JSON.parse(gunzipSync(buffer).toString("utf-8"));
+    }
+
+    it("carries every external object it can read", async () => {
+      attachmentStorageName = "local";
+      storeHolds(
+        [
+          { id: A_ID, provider: "local" },
+          { id: B_ID, provider: "local" },
+        ],
+        { [A_ID]: A_BYTES, [B_ID]: B_BYTES },
+      );
+
+      const result = await exported();
+
+      expect(result.attachment_blobs).toEqual([
+        { attachment_id: A_ID, data: A_BYTES.toString("base64") },
+        { attachment_id: B_ID, data: B_BYTES.toString("base64") },
+      ]);
+    });
+
+    it("reads nothing from the store on a database-provider deployment", async () => {
+      // Those bytes are already in `attachment_blobs`; there is no object store.
+      attachmentStorageName = "database";
+      storeHolds([{ id: A_ID, provider: "database" }], { [A_ID]: A_BYTES });
+
+      await exported();
+
+      expect(attachmentStorage.load).not.toHaveBeenCalled();
+    });
+
+    it("skips a row written by a provider this runtime cannot address", async () => {
+      attachmentStorageName = "local";
+      storeHolds([{ id: A_ID, provider: "s3" }], { [A_ID]: A_BYTES });
+
+      const result = await exported();
+
+      expect(attachmentStorage.load).not.toHaveBeenCalled();
+      expect(result.attachment_blobs).toEqual([]);
+    });
+
+    it("finishes the export when one object cannot be read", async () => {
+      // The ledger is the point of a backup. Refusing the whole file over an
+      // unreadable receipt would leave the user with nothing at all.
+      attachmentStorageName = "local";
+      storeHolds(
+        [
+          { id: A_ID, provider: "local" },
+          { id: B_ID, provider: "local" },
+        ],
+        { [B_ID]: B_BYTES },
+      );
+
+      const result = await exported();
+
+      expect(result.attachment_blobs).toEqual([
+        { attachment_id: B_ID, data: B_BYTES.toString("base64") },
+      ]);
+    });
+
+    /**
+     * F3R6-002: the object must match the size and hash the server recorded, or
+     * the export is packaging bytes it knows the restore will refuse. Export is
+     * the last moment to see the discrepancy -- afterwards the user believes the
+     * receipt is safe in the artifact.
+     */
+    function storeHoldsWithMetadata(
+      rows: Array<{
+        id: string;
+        provider: string;
+        byte_size: number;
+        sha256: string;
+      }>,
+      objects: Record<string, Buffer>,
+    ) {
+      const metadataRows = () =>
+        rows.map((row) => ({
+          id: row.id,
+          user_id: userId,
+          storage_provider: row.provider,
+          byte_size: String(row.byte_size),
+          sha256: row.sha256,
+        }));
+      mockDataSource.query.mockImplementation((sql: string) => {
+        // Both the augment's metadata sweep and the `transaction_attachments`
+        // table query resolve to the same rows in production; the completeness
+        // check reads the table query, so answer both here.
+        if (
+          String(sql).includes("FROM transaction_attachments") &&
+          !String(sql).includes("attachment_blobs")
+        ) {
+          return Promise.resolve(metadataRows());
+        }
+        return mockQueryHandler(sql);
+      });
+      attachmentStorage.load.mockImplementation(async (key: string) => {
+        const bytes = objects[key];
+        if (!bytes) throw new Error(`no such object: ${key}`);
+        return bytes;
+      });
+    }
+
+    it("omits an object whose stored bytes are the wrong size", async () => {
+      attachmentStorageName = "local";
+      const good = Buffer.from("intact-object");
+      storeHoldsWithMetadata(
+        [
+          // A_ID's recorded size is a byte longer than the object on disk: the
+          // source was truncated out from under its row.
+          {
+            id: A_ID,
+            provider: "local",
+            byte_size: A_BYTES.length + 1,
+            sha256: "",
+          },
+          {
+            id: B_ID,
+            provider: "local",
+            byte_size: good.length,
+            sha256: createHash("sha256").update(good).digest("hex"),
+          },
+        ],
+        { [A_ID]: A_BYTES, [B_ID]: good },
+      );
+
+      const result = await exported();
+
+      // The corrupt one is dropped; the intact one still travels.
+      expect(result.attachment_blobs).toEqual([
+        { attachment_id: B_ID, data: good.toString("base64") },
+      ]);
+    });
+
+    it("omits an object whose stored bytes fail their recorded checksum", async () => {
+      attachmentStorageName = "local";
+      storeHoldsWithMetadata(
+        [
+          {
+            id: A_ID,
+            provider: "local",
+            byte_size: A_BYTES.length,
+            // Right size, wrong hash: the bytes were replaced, not truncated.
+            sha256: createHash("sha256")
+              .update(Buffer.from("something else entirely!"))
+              .digest("hex"),
+          },
+        ],
+        { [A_ID]: A_BYTES },
+      );
+
+      const result = await exported();
+
+      expect(result.attachment_blobs).toEqual([]);
+    });
+
+    it("carries an object that matches its recorded size and hash", async () => {
+      // The discriminating half: the same wiring, honest metadata, and it travels.
+      attachmentStorageName = "local";
+      storeHoldsWithMetadata(
+        [
+          {
+            id: A_ID,
+            provider: "local",
+            byte_size: A_BYTES.length,
+            sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+          },
+        ],
+        { [A_ID]: A_BYTES },
+      );
+
+      const result = await exported();
+
+      expect(result.attachment_blobs).toEqual([
+        { attachment_id: A_ID, data: A_BYTES.toString("base64") },
+      ]);
+    });
+
+    /**
+     * F3R7-001: omitting an attachment's bytes does not silently produce a
+     * "successful" backup. The buffer is still written -- the ledger is captured
+     * -- but the completeness report says it is not a complete backup of those
+     * attachments, and the auto-backup path uses that to refuse promotion and
+     * retention.
+     */
+    describe("completeness report", () => {
+      it("reports complete when every object is present and consistent", async () => {
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [
+            {
+              id: A_ID,
+              provider: "local",
+              byte_size: A_BYTES.length,
+              sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+            },
+          ],
+          { [A_ID]: A_BYTES },
+        );
+
+        const { report } = await service.exportToBuffer(userId);
+
+        expect(report.complete).toBe(true);
+        expect(report.expectedAttachments).toBe(1);
+        expect(report.includedAttachments).toBe(1);
+        expect(report.missingAttachments).toBe(0);
+      });
+
+      it("reports incomplete when an external object cannot be read", async () => {
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [{ id: A_ID, provider: "local", byte_size: 9, sha256: "" }],
+          {}, // the object is not in the store
+        );
+
+        const { report } = await service.exportToBuffer(userId);
+
+        expect(report.complete).toBe(false);
+        expect(report.expectedAttachments).toBe(1);
+        expect(report.includedAttachments).toBe(0);
+        expect(report.missingAttachments).toBe(1);
+      });
+
+      it("reports incomplete when an external object fails its checksum", async () => {
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [
+            {
+              id: A_ID,
+              provider: "local",
+              byte_size: A_BYTES.length,
+              sha256: createHash("sha256")
+                .update(Buffer.from("different"))
+                .digest("hex"),
+            },
+          ],
+          { [A_ID]: A_BYTES },
+        );
+
+        const { report } = await service.exportToBuffer(userId);
+
+        expect(report.complete).toBe(false);
+        expect(report.missingAttachments).toBe(1);
+      });
+
+      it("marks an incomplete plain download in the response, before any bytes (F3RB-004)", async () => {
+        // The backend knew the artifact could not restore everything it names and
+        // still sent an ordinary 200 with the ordinary filename, so the UI showed
+        // an ordinary success -- and a user could delete the source system on the
+        // strength of it. The streaming path is the hard half: the answer has to
+        // be known before the first byte, because nothing can be added after.
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [
+            {
+              id: A_ID,
+              provider: "local",
+              byte_size: A_BYTES.length,
+              sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+            },
+          ],
+          {},
+        );
+        const { res, headers, chunks } = responseDouble();
+        res.setHeader(
+          "Content-Disposition",
+          'attachment; filename="monize-backup-2026-08-05.json.gz"',
+        );
+
+        await service.streamExport(userId, res);
+
+        expect(headers["X-Backup-Complete"]).toBe("false");
+        expect(headers["X-Backup-Attachments-Expected"]).toBe("1");
+        expect(headers["X-Backup-Attachments-Missing"]).toBe("1");
+        // The filename carries the warning too: a header is invisible six months
+        // later on a disk, a filename is not.
+        expect(headers["Content-Disposition"]).toContain("-INCOMPLETE.json.gz");
+        // The bytes are still sent: a partial artifact beats no artifact.
+        expect(Buffer.concat(chunks).length).toBeGreaterThan(0);
+      });
+
+      it("marks an incomplete encrypted download in the response (F3RB-004)", async () => {
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [
+            {
+              id: A_ID,
+              provider: "local",
+              byte_size: A_BYTES.length,
+              sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+            },
+          ],
+          {},
+        );
+        const { res, headers } = responseDouble();
+        res.setHeader(
+          "Content-Disposition",
+          'attachment; filename="monize-backup-2026-08-05.mzbe"',
+        );
+
+        await service.streamExport(userId, res, "backup-secret");
+
+        expect(headers["X-Backup-Complete"]).toBe("false");
+        expect(headers["Content-Disposition"]).toContain("-INCOMPLETE.mzbe");
+      });
+
+      it("leaves a complete download's response untouched", async () => {
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [
+            {
+              id: A_ID,
+              provider: "local",
+              byte_size: A_BYTES.length,
+              sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+            },
+          ],
+          { [A_ID]: A_BYTES },
+        );
+        const { res, headers } = responseDouble();
+        res.setHeader(
+          "Content-Disposition",
+          'attachment; filename="monize-backup-2026-08-05.json.gz"',
+        );
+
+        await service.streamExport(userId, res);
+
+        expect(headers["X-Backup-Complete"]).toBeUndefined();
+        expect(headers["Content-Disposition"]).not.toContain("INCOMPLETE");
+      });
+
+      it("reports incomplete when a database blob is missing (F3R7-001 scenario B)", async () => {
+        // The database provider was previously not checked at export at all.
+        attachmentStorageName = "database";
+        mockDataSource.query.mockImplementation((sql: string) => {
+          if (String(sql).includes("FROM transaction_attachments WHERE")) {
+            // metadata row exists...
+            return Promise.resolve([
+              {
+                id: A_ID,
+                user_id: userId,
+                storage_provider: "database",
+                byte_size: A_BYTES.length,
+                sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+              },
+            ]);
+          }
+          // ...but the attachment_blobs join returns nothing.
+          return mockQueryHandler(sql);
+        });
+
+        const { report } = await service.exportToBuffer(userId);
+
+        expect(report.complete).toBe(false);
+        expect(report.missingAttachments).toBe(1);
+      });
+
+      it("reports incomplete when a database blob contradicts its metadata", async () => {
+        attachmentStorageName = "database";
+        mockDataSource.query.mockImplementation((sql: string) => {
+          if (
+            String(sql).includes("FROM transaction_attachments WHERE") &&
+            !String(sql).includes("attachment_blobs")
+          ) {
+            return Promise.resolve([
+              {
+                id: A_ID,
+                user_id: userId,
+                storage_provider: "database",
+                byte_size: A_BYTES.length,
+                sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+              },
+            ]);
+          }
+          if (String(sql).includes("FROM attachment_blobs")) {
+            // A blob whose bytes are not what the metadata records.
+            return Promise.resolve([
+              {
+                attachment_id: A_ID,
+                data: Buffer.from("wrong bytes").toString("base64"),
+              },
+            ]);
+          }
+          return mockQueryHandler(sql);
+        });
+
+        const { report } = await service.exportToBuffer(userId);
+
+        expect(report.complete).toBe(false);
+        expect(report.inconsistentAttachments).toBe(1);
+      });
+    });
+
+    it("carries them in the streaming export too", async () => {
+      // Three export paths read the same table list, and an artifact missing the
+      // bytes is indistinguishable from one that has them until a restore.
+      attachmentStorageName = "local";
+      storeHolds([{ id: A_ID, provider: "local" }], { [A_ID]: A_BYTES });
+
+      const mockRes = new PassThrough();
+      const chunks: Buffer[] = [];
+      const collected = (async () => {
+        for await (const chunk of mockRes) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        }
+      })();
+      await service.streamExport(userId, mockRes as any);
+      await collected;
+      const result = JSON.parse(
+        gunzipSync(Buffer.concat(chunks)).toString("utf-8"),
+      );
+
+      expect(result.attachment_blobs).toEqual([
+        { attachment_id: A_ID, data: A_BYTES.toString("base64") },
+      ]);
+    });
+
+    it("carries them in the raw export the support backup reads", async () => {
+      attachmentStorageName = "local";
+      storeHolds([{ id: A_ID, provider: "local" }], { [A_ID]: A_BYTES });
+
+      const raw = await service.collectRawExport(userId);
+
+      expect(raw.tables.attachment_blobs).toEqual([
+        { attachment_id: A_ID, data: A_BYTES.toString("base64") },
+      ]);
+    });
+
+    it("does not read the store for a table the caller is skipping", async () => {
+      // The support backup always discards `attachment_blobs`. Reading every
+      // receipt off disk to throw it away is the same defect as loading the table
+      // to discard it (F3RR-004), one layer out.
+      attachmentStorageName = "local";
+      storeHolds([{ id: A_ID, provider: "local" }], { [A_ID]: A_BYTES });
+
+      await service.collectRawExport(userId, {
+        skipTables: new Set(["attachment_blobs"]),
+      });
+
+      expect(attachmentStorage.load).not.toHaveBeenCalled();
+    });
   });
 
   describe("streamExport", () => {
@@ -567,12 +1230,45 @@ describe("BackupService", () => {
       expect(written.subarray(0, 4).toString("ascii")).toBe("MZBE");
       expect(mockRes.end).toHaveBeenCalled();
     });
+
+    it("rejects instead of hanging when the response closes mid-export (PR1077-REV-004)", async () => {
+      // The plain export writes JSON through gzip inside the REPEATABLE READ
+      // snapshot. The old write helper waited on a `drain` that a cancelled
+      // client never emits, so the callback never returned and the snapshot
+      // transaction and its pooled connection were pinned for the process
+      // lifetime. Closing the response mid-export must settle the promise.
+      const { res } = responseDouble();
+
+      let releaseAttachments: (rows: unknown[]) => void = () => {};
+      const attachmentsRead = new Promise<unknown[]>((resolve) => {
+        releaseAttachments = resolve;
+      });
+      mockDataSource.query.mockImplementation((sql: string) => {
+        if (String(sql).includes("FROM transaction_attachments")) {
+          return attachmentsRead;
+        }
+        return Promise.resolve([]);
+      });
+
+      const exportPromise = service.streamExport(userId, res);
+      // Let the export park on the pending attachment read inside the snapshot.
+      await new Promise((r) => setImmediate(r));
+      // The client goes away; then the read the snapshot was blocked on returns.
+      res.emit("close");
+      releaseAttachments([]);
+
+      // The invariant is that this settles at all -- a hang fails the test by
+      // timing out rather than by assertion.
+      await expect(exportPromise).rejects.toThrow(
+        /response closed before completion/,
+      );
+    });
   });
 
   describe("exportToBuffer", () => {
     it("returns gzipped JSON for unencrypted exports", async () => {
       mockDataSource.query.mockResolvedValue([]);
-      const buf = await service.exportToBuffer(userId);
+      const { buffer: buf } = await service.exportToBuffer(userId);
       // gzip magic 1f 8b
       expect(buf[0]).toBe(0x1f);
       expect(buf[1]).toBe(0x8b);
@@ -580,7 +1276,7 @@ describe("BackupService", () => {
 
     it("returns an encrypted envelope when a password is provided", async () => {
       mockDataSource.query.mockResolvedValue([]);
-      const buf = await service.exportToBuffer(userId, "pw");
+      const { buffer: buf } = await service.exportToBuffer(userId, "pw");
       expect(buf.subarray(0, 4).toString("ascii")).toBe("MZBE");
     });
   });
@@ -681,6 +1377,1284 @@ describe("BackupService", () => {
       await expect(
         service.restoreData(userId, makeInput({ password: "test" })),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    /**
+     * Express caps the compressed upload; it says nothing about what comes out
+     * of gzip. `gunzipSync` with no `maxOutputLength` allocated the whole
+     * expansion before the version check, the format check, or anything that
+     * could refuse the request -- and it did so on the event loop, so one upload
+     * froze every other request in the process.
+     */
+    describe("decompression ceiling", () => {
+      const previousLimit = process.env.BACKUP_RESTORE_EXPANDED_LIMIT;
+
+      afterEach(() => {
+        if (previousLimit === undefined) {
+          delete process.env.BACKUP_RESTORE_EXPANDED_LIMIT;
+        } else {
+          process.env.BACKUP_RESTORE_EXPANDED_LIMIT = previousLimit;
+        }
+      });
+
+      /** A small gzip that expands to far more than it weighs. */
+      function gzipBomb(expandedBytes: number): Buffer {
+        const filler = "A".repeat(expandedBytes);
+        return gzipSync(
+          Buffer.from(
+            JSON.stringify({
+              version: 1,
+              exportedAt: "2026-01-01T00:00:00.000Z",
+              filler,
+            }),
+            "utf-8",
+          ),
+        );
+      }
+
+      it("rejects a payload that expands past the limit, before touching data", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        process.env.BACKUP_RESTORE_EXPANDED_LIMIT = "64kb";
+
+        const bomb = gzipBomb(512 * 1024);
+        // The compressed form is a rounding error next to what it expands to --
+        // which is exactly why bounding the upload bounds nothing.
+        expect(bomb.length).toBeLessThan(8 * 1024);
+
+        await expect(
+          service.restoreData(userId, {
+            compressedData: bomb,
+            password: "test",
+          }),
+        ).rejects.toThrow(BadRequestException);
+
+        // The ceiling is hit before the destructive phase. (A transaction *is*
+        // opened before this point -- the user lookup runs in one -- so the
+        // claim worth asserting is that no data was deleted.)
+        const deletes = mockQueryRunner.query.mock.calls.filter(
+          ([sql]) => typeof sql === "string" && sql.includes("DELETE FROM"),
+        );
+        expect(deletes).toEqual([]);
+      });
+
+      it("says the backup is too large, not that it is corrupt", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        process.env.BACKUP_RESTORE_EXPANDED_LIMIT = "64kb";
+
+        // "Not valid gzip" would send the user hunting for a corrupt file.
+        await expect(
+          service.restoreData(userId, {
+            compressedData: gzipBomb(512 * 1024),
+            password: "test",
+          }),
+        ).rejects.toThrow(/too large/i);
+      });
+
+      it("accepts a payload inside the limit", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        process.env.BACKUP_RESTORE_EXPANDED_LIMIT = "1mb";
+
+        const result = await service.restoreData(
+          userId,
+          makeInput({ password: "test" }),
+        );
+        expect(result.message).toBe("Backup restored successfully");
+      });
+    });
+
+    describe("buffered export ceiling", () => {
+      const previousLimit = process.env.BACKUP_EXPORT_BUFFER_LIMIT;
+
+      afterEach(() => {
+        if (previousLimit === undefined) {
+          delete process.env.BACKUP_EXPORT_BUFFER_LIMIT;
+        } else {
+          process.env.BACKUP_EXPORT_BUFFER_LIMIT = previousLimit;
+        }
+      });
+
+      it("refuses to assemble a buffered export past the limit", async () => {
+        process.env.BACKUP_EXPORT_BUFFER_LIMIT = "1kb";
+        // Every table query returns a row, so the accumulated JSON passes 1 kB
+        // within the first few tables.
+        mockQueryRunner.query.mockImplementation((sql: string, params) => {
+          if (String(sql).includes("SELECT * FROM")) {
+            return Promise.resolve([
+              { id: randomUUID(), padding: "x".repeat(400) },
+            ]);
+          }
+          return mockQueryHandler(sql, params as unknown[]);
+        });
+
+        // The pod dying mid-write leaves no artifact and no message; an error
+        // naming the limit and the table it was reached at is recoverable.
+        await expect(service.exportToBuffer(userId)).rejects.toThrow(
+          /too large to produce/i,
+        );
+      });
+
+      it("leaves the streaming export unbounded", async () => {
+        process.env.BACKUP_EXPORT_BUFFER_LIMIT = "1kb";
+        mockQueryRunner.query.mockImplementation((sql: string, params) => {
+          if (String(sql).includes("SELECT * FROM")) {
+            return Promise.resolve([
+              { id: randomUUID(), padding: "x".repeat(400) },
+            ]);
+          }
+          return mockQueryHandler(sql, params as unknown[]);
+        });
+
+        // The plain HTTP export streams through gzip and holds no total, so the
+        // buffered ceiling must not apply to it.
+        const { res, chunks } = responseDouble();
+        await service.streamExport(userId, res);
+        expect(Buffer.concat(chunks).length).toBeGreaterThan(0);
+      });
+    });
+
+    /**
+     * Attachment bytes only travel inside a backup for the `database` provider.
+     * For `local` and `s3` the metadata carries a `storage_key` equal to the
+     * attachment's UUID, and the restore mints a new UUID for every row -- so
+     * the restore has to move the bytes to the new key or admit it did not.
+     *
+     * These cases are the ones the suite was missing: it had no external-
+     * provider attachment anywhere, so changing what the restore does with them
+     * broke nothing.
+     */
+    describe("external attachment bytes", () => {
+      const BYTES = Buffer.from("receipt-pdf-bytes");
+      const SHA256 = createHash("sha256").update(BYTES).digest("hex");
+      const OLD_ID = "11111111-1111-4111-8111-111111111111";
+      const TX_ID = "22222222-2222-4222-8222-222222222222";
+
+      function backupWithLocalAttachment(
+        overrides: Record<string, unknown> = {},
+      ) {
+        return {
+          ...validBackupData,
+          transaction_attachments: [
+            {
+              id: OLD_ID,
+              user_id: userId,
+              transaction_id: TX_ID,
+              filename: "receipt.pdf",
+              content_type: "application/pdf",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+              storage_provider: "local",
+              storage_key: OLD_ID,
+              ...overrides,
+            },
+          ],
+        };
+      }
+
+      beforeEach(() => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        attachmentStorageName = "local";
+        // The ordinary case is a user restoring their own backup, so the server
+        // still holds the row the file describes. Tests about a crafted file
+        // clear or contradict this.
+        ownedAttachments = [
+          {
+            id: OLD_ID,
+            storage_provider: "local",
+            byte_size: BYTES.length,
+            sha256: SHA256,
+          },
+        ];
+      });
+
+      it("runs the whole restore inside the processing gate (F3R6-004)", async () => {
+        // The gate caps concurrent decompression/parsing, which the compressed
+        // upload budget cannot. Prove restoreData routes its expensive region
+        // through it -- the gate's own concurrency behaviour is covered in
+        // restore-processing-gate.spec.ts.
+        attachmentStorage.load.mockResolvedValue(BYTES);
+        const runSpy = jest.spyOn(restoreProcessingGate, "run");
+
+        await service.restoreData(
+          userId,
+          makeInput({ password: "test", data: backupWithLocalAttachment() }),
+        );
+
+        expect(runSpy).toHaveBeenCalledTimes(1);
+        runSpy.mockRestore();
+      });
+
+      it("copies the bytes to the remapped key before restoring the metadata", async () => {
+        attachmentStorage.load.mockResolvedValue(BYTES);
+
+        const result = await service.restoreData(
+          userId,
+          makeInput({ password: "test", data: backupWithLocalAttachment() }),
+        );
+
+        // Read at the key the object actually sits under...
+        expect(attachmentStorage.load).toHaveBeenCalledWith(OLD_ID);
+        // ...and written under the fresh id the restored row will name.
+        expect(attachmentStorage.save).toHaveBeenCalledTimes(1);
+        const [writtenKey, writtenBytes] = attachmentStorage.save.mock.calls[0];
+        expect(writtenKey).not.toBe(OLD_ID);
+        expect(writtenBytes).toEqual(BYTES);
+
+        const insertedKey = mockQueryRunner.query.mock.calls
+          .filter(([sql]) =>
+            String(sql).includes('INSERT INTO "transaction_attachments"'),
+          )
+          .flatMap(([, params]) => params as unknown[])
+          .find((value) => value === writtenKey);
+        expect(insertedKey).toBe(writtenKey);
+        expect(result.restored.transactionAttachments).toBe(1);
+        expect(result.skippedAttachments).toBeUndefined();
+      });
+
+      it("drops the metadata and reports it when the object is missing", async () => {
+        attachmentStorage.load.mockRejectedValue(new Error("ENOENT"));
+
+        const result = await service.restoreData(
+          userId,
+          makeInput({ password: "test", data: backupWithLocalAttachment() }),
+        );
+
+        expect(attachmentStorage.save).not.toHaveBeenCalled();
+        expect(result.restored.transactionAttachments).toBe(0);
+        expect(result.skippedAttachments).toBe(1);
+        // The count of rows deliberately not written must not be inside
+        // `restored` -- the client sums those values into a row total.
+        expect(
+          Object.keys(result.restored).includes("skippedAttachments"),
+        ).toBe(false);
+      });
+
+      it("drops the metadata when the stored bytes fail their checksum", async () => {
+        attachmentStorage.load.mockResolvedValue(Buffer.from("tampered"));
+
+        const result = await service.restoreData(
+          userId,
+          makeInput({ password: "test", data: backupWithLocalAttachment() }),
+        );
+
+        expect(attachmentStorage.save).not.toHaveBeenCalled();
+        expect(result.skippedAttachments).toBe(1);
+      });
+
+      it("drops the metadata when the backup used a different storage provider", async () => {
+        attachmentStorage.load.mockResolvedValue(BYTES);
+
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: backupWithLocalAttachment({ storage_provider: "s3" }),
+          }),
+        );
+
+        // No point reading: this runtime has one provider and no cross-provider
+        // migration path.
+        expect(attachmentStorage.load).not.toHaveBeenCalled();
+        expect(result.skippedAttachments).toBe(1);
+      });
+
+      it("drops a database-provider attachment whose blob did not travel", async () => {
+        attachmentStorageName = "database";
+
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: backupWithLocalAttachment({ storage_provider: "database" }),
+          }),
+        );
+
+        // Metadata with no bytes anywhere is a download that 404s, which the
+        // user cannot tell from a working attachment.
+        expect(result.restored.transactionAttachments).toBe(0);
+        expect(result.skippedAttachments).toBe(1);
+      });
+
+      /**
+       * The other half of the bytes-live-outside-the-database problem (F3R-006).
+       *
+       * A destructive restore deletes every `transaction_attachments` row the
+       * user had. For `local` and `s3` the bytes are not in those rows, so they
+       * used to stay in the volume or the bucket forever, referenced by nothing:
+       * a receipt or a medical document surviving the replacement of the account
+       * it belonged to, still present in whatever backs that storage up, and now
+       * impossible to find again because the metadata that named it is gone.
+       */
+      describe("objects the restore displaced", () => {
+        const EXISTING_KEY = "99999999-9999-4999-8999-999999999999";
+
+        /** The target user's current external attachments, read before the delete. */
+        const targetHolds = (...keys: string[]) => {
+          mockQueryRunner.query.mockImplementation(
+            (sql: string, params?: unknown[]) => {
+              if (
+                String(sql).includes(
+                  "SELECT storage_key FROM transaction_attachments",
+                )
+              ) {
+                return Promise.resolve(keys.map((k) => ({ storage_key: k })));
+              }
+              return mockQueryHandler(sql, params);
+            },
+          );
+        };
+
+        it("deletes the user's old external objects after a successful restore", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          targetHolds(EXISTING_KEY);
+
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+
+          expect(attachmentStorage.delete).toHaveBeenCalledWith(EXISTING_KEY);
+        });
+
+        it("leaves them alone when the restore fails", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          mockQueryRunner.query.mockImplementation(
+            (sql: string, params?: unknown[]) => {
+              if (
+                String(sql).includes(
+                  "SELECT storage_key FROM transaction_attachments",
+                )
+              ) {
+                return Promise.resolve([{ storage_key: EXISTING_KEY }]);
+              }
+              if (
+                String(sql).includes('INSERT INTO "transaction_attachments"')
+              ) {
+                return Promise.reject(new Error("constraint violation"));
+              }
+              return mockQueryHandler(sql, params);
+            },
+          );
+
+          await expect(
+            service.restoreData(
+              userId,
+              makeInput({
+                password: "test",
+                data: backupWithLocalAttachment(),
+              }),
+            ),
+          ).rejects.toThrow();
+
+          // The metadata rolled back, so those bytes are still referenced.
+          // Deleting them would leave a row promising a download that is gone --
+          // which the user cannot tell from a working attachment.
+          expect(attachmentStorage.delete).not.toHaveBeenCalledWith(
+            EXISTING_KEY,
+          );
+        });
+
+        it("never deletes a key the restore just staged", async () => {
+          // Restoring a backup taken from this same account re-uses ids, so a
+          // displaced key and a newly written key can be the same string.
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          let stagedKey: string | undefined;
+          attachmentStorage.save.mockImplementation(async (key: string) => {
+            stagedKey = key;
+          });
+          // The target's current key set includes whatever gets staged, which is
+          // only knowable after the fact -- so claim both and assert on the one
+          // that matters.
+          mockQueryRunner.query.mockImplementation(
+            (sql: string, params?: unknown[]) => {
+              if (
+                String(sql).includes(
+                  "SELECT storage_key FROM transaction_attachments",
+                )
+              ) {
+                return Promise.resolve(
+                  [OLD_ID, EXISTING_KEY].map((k) => ({ storage_key: k })),
+                );
+              }
+              return mockQueryHandler(sql, params);
+            },
+          );
+
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+
+          expect(stagedKey).toBeDefined();
+          expect(attachmentStorage.delete).not.toHaveBeenCalledWith(stagedKey);
+          // The genuinely displaced one still goes.
+          expect(attachmentStorage.delete).toHaveBeenCalledWith(EXISTING_KEY);
+        });
+
+        it("does not read or delete anything for the database provider", async () => {
+          // Those bytes are in `attachment_blobs` and go with the rows, inside
+          // the transaction. There is nothing outside to clean up.
+          attachmentStorageName = "database";
+          const keyQueries = () =>
+            mockQueryRunner.query.mock.calls.filter(([sql]) =>
+              String(sql).includes(
+                "SELECT storage_key FROM transaction_attachments",
+              ),
+            );
+
+          await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              data: backupWithLocalAttachment({ storage_provider: "database" }),
+            }),
+          );
+
+          expect(keyQueries()).toHaveLength(0);
+          expect(attachmentStorage.delete).not.toHaveBeenCalled();
+        });
+
+        it("completes the restore even when the cleanup cannot delete", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          targetHolds(EXISTING_KEY);
+          attachmentStorage.delete.mockRejectedValue(new Error("EACCES"));
+
+          // The database is already the backup's. Turning a committed restore
+          // into a failure over an orphaned object would be the wrong trade.
+          await expect(
+            service.restoreData(
+              userId,
+              makeInput({
+                password: "test",
+                data: backupWithLocalAttachment(),
+              }),
+            ),
+          ).resolves.toMatchObject({ message: "Backup restored successfully" });
+        });
+      });
+
+      /**
+       * The key in the uploaded file is attacker-controlled (F3RR-001).
+       *
+       * The destination used to come from `row.storage_key`, and a key the restore
+       * did not recognise as a remapped id was treated as "legacy or
+       * operator-chosen" -- skip the load, skip the checksum, skip the copy, on
+       * the grounds that the object already sat where the metadata pointed. So a
+       * crafted backup could name any syntactically valid key, including another
+       * tenant's, and the row was inserted under the uploader's `user_id` without
+       * a byte being read. `assertSafeStorageKey` proves a key is a safe *string*;
+       * nothing proved it was *theirs*.
+       */
+      describe("a storage_key the backup did not earn", () => {
+        const VICTIM_KEY = "cafe1234-0000-4000-8000-00000000cafe";
+
+        it("stages the row instead of trusting the key and skipping", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+
+          await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              // A key that is not this backup's attachment id and not in its id
+              // remap -- i.e. somebody else's object.
+              data: backupWithLocalAttachment({ storage_key: VICTIM_KEY }),
+            }),
+          );
+
+          // The old code's shortcut was the vulnerability: an unrecognised key
+          // meant "the object is already where the metadata points", so it wrote
+          // nothing and read nothing and inserted the key. A crafted row now goes
+          // through the same staging as any other -- read the source the backup
+          // names, write the destination the restore derives.
+          expect(attachmentStorage.load).toHaveBeenCalledWith(OLD_ID);
+          expect(attachmentStorage.save).toHaveBeenCalledTimes(1);
+          const [writtenKey] = attachmentStorage.save.mock.calls[0];
+          expect(writtenKey).not.toBe(VICTIM_KEY);
+        });
+
+        it("never writes it into the restored metadata", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+
+          await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              data: backupWithLocalAttachment({ storage_key: VICTIM_KEY }),
+            }),
+          );
+
+          const inserted = mockQueryRunner.query.mock.calls
+            .filter(([sql]) =>
+              String(sql).includes('INSERT INTO "transaction_attachments"'),
+            )
+            .flatMap(([, params]) => (params ?? []) as unknown[]);
+          // The crafted key must not survive anywhere in the insert -- otherwise
+          // the uploader owns a row addressing another tenant's object.
+          expect(inserted).not.toContain(VICTIM_KEY);
+        });
+
+        it("addresses the object by the remapped attachment id", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+
+          // Source is the id the backup was written with; destination is the id
+          // the restore minted. Both come from the remap, so neither is the
+          // file's to choose.
+          expect(attachmentStorage.load).toHaveBeenCalledWith(OLD_ID);
+          const [writtenKey] = attachmentStorage.save.mock.calls[0];
+          expect(writtenKey).not.toBe(OLD_ID);
+          const inserted = mockQueryRunner.query.mock.calls
+            .filter(([sql]) =>
+              String(sql).includes('INSERT INTO "transaction_attachments"'),
+            )
+            .flatMap(([, params]) => (params ?? []) as unknown[]);
+          expect(inserted).toContain(writtenKey);
+        });
+      });
+
+      /**
+       * The *id* in the uploaded file is attacker-controlled too (F3RRR-001).
+       *
+       * The F3RR-001 fix stopped deriving the source from `row.storage_key` and
+       * derived it from the id remap instead, on the reasoning that "a row whose
+       * id is not in the remap did not come from this backup's graph". But the
+       * graph is the uploaded graph: `collectRowIdRemap` admits every UUID-shaped
+       * `row.id` in the file, so for any well-formed crafted row the guard could
+       * not fire. Putting the victim's attachment id in `transaction_attachments.id`
+       * -- with the byte size and SHA-256 that a standard backup publishes beside
+       * it -- made the restore read the victim's object and copy it under the
+       * attacker's ownership.
+       *
+       * So the entitlement now comes from `transaction_attachments` as the server
+       * holds it, read before the destructive delete. Nothing in the file can
+       * establish it.
+       */
+      describe("an attachment id the uploader does not own", () => {
+        const VICTIM_ID = "deadbeef-0000-4000-8000-00000000beef";
+
+        /** The victim's row, exactly as a standard backup would publish it. */
+        const craftedFromVictim = () =>
+          backupWithLocalAttachment({
+            id: VICTIM_ID,
+            // Both fields are honest -- they describe the victim's object. That
+            // is the point: agreeing with the stored values is not ownership.
+            byte_size: BYTES.length,
+            sha256: SHA256,
+          });
+
+        it("never reads the object when the server holds no such row for this user", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          // The uploader owns nothing: a fresh account, or simply not this row.
+          ownedAttachments = [];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: craftedFromVictim() }),
+          );
+
+          // The disclosure was the read. It must not happen at all -- not fail a
+          // checksum afterwards, not be copied and then rolled back.
+          expect(attachmentStorage.load).not.toHaveBeenCalled();
+          expect(attachmentStorage.save).not.toHaveBeenCalled();
+          expect(result.restored.transactionAttachments).toBe(0);
+          expect(result.skippedAttachments).toBe(1);
+        });
+
+        it("does not let the uploader's own attachment vouch for someone else's", async () => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          // This user genuinely owns OLD_ID, so the ownership read returns a row
+          // -- just not the one the crafted id names.
+          const data = {
+            ...backupWithLocalAttachment(),
+            transaction_attachments: [
+              ...backupWithLocalAttachment().transaction_attachments,
+              ...craftedFromVictim().transaction_attachments,
+            ],
+          };
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data }),
+          );
+
+          // Their own row restores; the crafted one is dropped, and its source
+          // object is never opened.
+          expect(attachmentStorage.load).toHaveBeenCalledWith(OLD_ID);
+          expect(attachmentStorage.load).not.toHaveBeenCalledWith(VICTIM_ID);
+          expect(result.restored.transactionAttachments).toBe(1);
+          expect(result.skippedAttachments).toBe(1);
+        });
+
+        it("never writes the victim's bytes anywhere the uploader can reach", async () => {
+          // If the read did somehow happen, the copy must not: a staged object
+          // plus a restored metadata row is a working download of another
+          // tenant's file.
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          ownedAttachments = [];
+
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: craftedFromVictim() }),
+          );
+
+          expect(attachmentStorage.save).not.toHaveBeenCalled();
+          const inserted = mockQueryRunner.query.mock.calls
+            .filter(([sql]) =>
+              String(sql).includes('INSERT INTO "transaction_attachments"'),
+            )
+            .flatMap(([, params]) => (params ?? []) as unknown[]);
+          expect(inserted).not.toContain(VICTIM_ID);
+        });
+
+        it("drops the row when the stored attachment is on another provider", async () => {
+          // Same id, but the object it names lives in a backend this runtime
+          // cannot address -- so there is nothing here to be entitled to.
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          ownedAttachments = [
+            {
+              id: OLD_ID,
+              storage_provider: "s3",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+            },
+          ];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+
+          expect(attachmentStorage.load).not.toHaveBeenCalled();
+          expect(result.skippedAttachments).toBe(1);
+        });
+
+        /**
+         * The behavioural tests above prove the restore's read path checks
+         * ownership. They cannot prove a *second* read path will not be added
+         * beside it, and this defect has now appeared three times in this file --
+         * so the half of the rule a scan can hold, it holds.
+         *
+         * There are exactly two places in the module that open an external
+         * object, and the distinction between them is the whole point:
+         *
+         *  - `appendExternalAttachmentBytes` (export) reads objects the *server*
+         *    named, from a `user_id`-scoped query against its own database. There
+         *    is no uploaded document involved, so there is nothing to authorize.
+         *  - `stageAttachmentObjects` (restore) reads an object an *uploaded* file
+         *    named, which is the case that needs the database's ownership record
+         *    first -- and it is the legacy path now, used only for an artifact
+         *    that does not carry its own bytes.
+         *
+         * A scan cannot tell an uploaded identifier from a derived one, so this is
+         * not the whole rule. It is the part that catches the next reader wherever
+         * it appears, and makes whoever adds a third one say which kind it is.
+         */
+        it("opens an external object in exactly two places, and the restore's is ownership-gated (source guard)", () => {
+          const source = fs.readFileSync(
+            path.join(__dirname, "backup.service.ts"),
+            "utf8",
+          );
+          const reads = [
+            ...source.matchAll(/this\.attachmentStorage\.load\(/g),
+          ].map((match) => match.index as number);
+          expect(reads).toHaveLength(2);
+
+          /** The slice from a method's signature to the start of the next one. */
+          const methodBody = (signature: string) => {
+            const start = source.indexOf(signature);
+            expect(start).toBeGreaterThan(-1);
+            const next = source.indexOf("\n  private ", start + 1);
+            return { start, end: next === -1 ? source.length : next };
+          };
+
+          const exporting = methodBody(
+            "private async appendExternalAttachmentBytes(",
+          );
+          const staging = methodBody("private async stageAttachmentObjects(");
+
+          const inExport = reads.filter(
+            (at) => at > exporting.start && at < exporting.end,
+          );
+          const inStaging = reads.filter(
+            (at) => at > staging.start && at < staging.end,
+          );
+          // One each, so a new reader anywhere else fails this.
+          expect(inExport).toHaveLength(1);
+          expect(inStaging).toHaveLength(1);
+
+          // The restore's read is preceded by loading and consulting the
+          // database's ownership record.
+          const beforeRestoreRead = source.slice(staging.start, inStaging[0]);
+          expect(beforeRestoreRead).toContain("loadOwnedAttachmentSources(");
+          expect(beforeRestoreRead).toContain("ownedSources.get(");
+
+          // The export's read is preceded by the server's own scoped query, and
+          // the export never sees an uploaded document at all.
+          const exportBody = source.slice(exporting.start, exporting.end);
+          expect(exportBody).toContain("WHERE user_id = $1");
+          expect(exportBody).not.toContain("BackupData");
+        });
+
+        it("drops the row when the file's metadata contradicts the stored row", async () => {
+          // An uploaded field that has to equal a stored field is no longer a
+          // field the uploader controls -- and a row whose size or hash disagrees
+          // does not describe the object sitting under that id, so restoring its
+          // metadata would publish a checksum the bytes do not satisfy.
+          attachmentStorage.load.mockResolvedValue(BYTES);
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              data: backupWithLocalAttachment({ byte_size: BYTES.length + 1 }),
+            }),
+          );
+
+          expect(attachmentStorage.load).not.toHaveBeenCalled();
+          expect(result.skippedAttachments).toBe(1);
+        });
+      });
+
+      /**
+       * A backup that can only be restored once is not a backup (F3RR-002).
+       *
+       * The post-commit cleanup added for F3R-006 deleted every displaced key --
+       * and for a backup taken from this same account, its *source* objects are
+       * the account's displaced objects. So the first restore worked and deleted
+       * the artifact's source bytes; a second restore of the same file skipped
+       * every attachment and then deleted the copy the first restore had made,
+       * losing the content while still reporting success.
+       *
+       * `stageAttachmentObjects` said "old-key objects are deliberately left
+       * alone: the same backup may be restored more than once" the whole time.
+       * Two pieces of the same change, with opposite intentions about the same
+       * object.
+       */
+      /**
+       * The recovery half of P3-002, and the cost of the ownership fix (F3R5-001).
+       *
+       * Making the database the authority for reading an external object closed
+       * the disclosure, and made a current metadata row a *prerequisite* for
+       * recovery. So the two situations backups exist for both broke: a fresh
+       * instance has no such row, and an account whose attachment was deleted has
+       * no such row either. The restore reported success and counted the
+       * attachment as skipped, with the sidecar volume sitting there intact.
+       *
+       * No better ownership check fixes that. An identifier, a size and a hash in
+       * an uploaded document cannot establish a right to read an object, however
+       * they are combined. The only thing that can is the bytes being *in* the
+       * artifact -- so now they are, for every provider.
+       */
+      describe("bytes carried in the artifact", () => {
+        /** A backup that carries its external attachment's bytes, as the export now does. */
+        const selfContained = (
+          overrides: Record<string, unknown> = {},
+          blobOverrides: Record<string, unknown> = {},
+        ) => {
+          const base = backupWithLocalAttachment(overrides);
+          return {
+            ...base,
+            attachment_blobs: [
+              {
+                attachment_id: OLD_ID,
+                data: BYTES.toString("base64"),
+                ...blobOverrides,
+              },
+            ],
+          };
+        };
+
+        it("restores an attachment on an instance that has never seen it", async () => {
+          // The disaster-recovery case: fresh database, no metadata for anything.
+          ownedAttachments = [];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: selfContained() }),
+          );
+
+          // Nothing outside the artifact is consulted -- there is nothing there.
+          expect(attachmentStorage.load).not.toHaveBeenCalled();
+          expect(attachmentStorage.save).toHaveBeenCalledTimes(1);
+          const [writtenKey, writtenBytes] =
+            attachmentStorage.save.mock.calls[0];
+          expect(writtenBytes).toEqual(BYTES);
+          expect(result.restored.transactionAttachments).toBe(1);
+          expect(result.skippedAttachments).toBeUndefined();
+
+          // The restored row addresses the object that was just written.
+          const inserted = mockQueryRunner.query.mock.calls
+            .filter(([sql]) =>
+              String(sql).includes('INSERT INTO "transaction_attachments"'),
+            )
+            .flatMap(([, params]) => (params ?? []) as unknown[]);
+          expect(inserted).toContain(writtenKey);
+        });
+
+        it("restores an attachment whose metadata was deleted from the live account", async () => {
+          // Same shape as the fresh instance, different cause: the user deleted
+          // the attachment and wants it back from the backup.
+          ownedAttachments = [];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: selfContained() }),
+          );
+
+          expect(result.restored.transactionAttachments).toBe(1);
+          expect(result.skippedAttachments).toBeUndefined();
+        });
+
+        it("does not insert a blob row for bytes it put in the object store", async () => {
+          // `attachment_blobs` is the database provider's storage. A row there for
+          // an externally stored attachment is a second copy of the same bytes
+          // that nothing ever reads.
+          ownedAttachments = [];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: selfContained() }),
+          );
+
+          const blobInserts = mockQueryRunner.query.mock.calls.filter(([sql]) =>
+            String(sql).includes('INSERT INTO "attachment_blobs"'),
+          );
+          expect(blobInserts).toHaveLength(0);
+          expect(result.restored.attachmentBlobs).toBe(0);
+          // Paired with the positive half, or this passes for the wrong reason:
+          // before the bytes travelled, the attachment was skipped entirely and
+          // there was no blob row to insert either.
+          expect(attachmentStorage.save).toHaveBeenCalledTimes(1);
+          expect(result.restored.transactionAttachments).toBe(1);
+        });
+
+        it("puts the bytes where this runtime keeps them, not where the source did", async () => {
+          // A backup taken under `local` restoring onto a `database` deployment
+          // used to be skipped outright. The bytes travelled, so the only question
+          // left is where they land -- and that is this runtime's decision.
+          attachmentStorageName = "database";
+          ownedAttachments = [];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: selfContained() }),
+          );
+
+          expect(attachmentStorage.save).not.toHaveBeenCalled();
+          expect(result.restored.transactionAttachments).toBe(1);
+          expect(result.restored.attachmentBlobs).toBe(1);
+          // And the row says database, not the `local` the file claimed.
+          const providers = mockQueryRunner.query.mock.calls
+            .filter(([sql]) =>
+              String(sql).includes('INSERT INTO "transaction_attachments"'),
+            )
+            .flatMap(([, params]) => (params ?? []) as unknown[]);
+          expect(providers).toContain("database");
+          expect(providers).not.toContain("local");
+        });
+
+        it("restores a database-provider backup onto an external deployment", async () => {
+          // The mirror image, which was also a skip.
+          const result = await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              data: selfContained({ storage_provider: "database" }),
+            }),
+          );
+
+          expect(attachmentStorage.save).toHaveBeenCalledTimes(1);
+          expect(attachmentStorage.save.mock.calls[0][1]).toEqual(BYTES);
+          expect(result.restored.transactionAttachments).toBe(1);
+          expect(result.restored.attachmentBlobs).toBe(0);
+        });
+
+        it("drops the row when the carried bytes do not match their own checksum", async () => {
+          // Both sides come from the same file, so this proves consistency rather
+          // than authority. What it catches is a corrupt or truncated artifact:
+          // restoring a row whose sha256 does not describe its own bytes publishes
+          // a checksum the download cannot satisfy.
+          ownedAttachments = [];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              data: selfContained(
+                {},
+                { data: Buffer.from("tampered").toString("base64") },
+              ),
+            }),
+          );
+
+          expect(attachmentStorage.save).not.toHaveBeenCalled();
+          expect(result.restored.transactionAttachments).toBe(0);
+          expect(result.skippedAttachments).toBe(1);
+
+          // The discriminating half: the identical backup with intact bytes does
+          // restore. Without this, the assertions above also hold for code that
+          // skips every external attachment, which is what they used to do.
+          jest.clearAllMocks();
+          mockUserRepo.findOne.mockResolvedValue(mockUser);
+          (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+          mockQueryRunner.query.mockImplementation(mockQueryHandler);
+          const intact = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: selfContained() }),
+          );
+          expect(intact.restored.transactionAttachments).toBe(1);
+          expect(intact.skippedAttachments).toBeUndefined();
+        });
+
+        it("drops the row when the carried bytes are the wrong length", async () => {
+          ownedAttachments = [];
+          const shorter = BYTES.subarray(0, BYTES.length - 1);
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              data: selfContained(
+                { sha256: createHash("sha256").update(shorter).digest("hex") },
+                { data: shorter.toString("base64") },
+              ),
+            }),
+          );
+
+          // The hash agrees with the bytes; the declared size does not.
+          expect(attachmentStorage.save).not.toHaveBeenCalled();
+          expect(result.skippedAttachments).toBe(1);
+        });
+
+        it("still refuses a crafted id when the artifact carries no bytes", async () => {
+          // The legacy path has to stay ownership-gated: carrying bytes is what
+          // removes the need for authority, and a file that carries none has none.
+          ownedAttachments = [];
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+
+          expect(attachmentStorage.load).not.toHaveBeenCalled();
+          expect(attachmentStorage.save).not.toHaveBeenCalled();
+          expect(result.skippedAttachments).toBe(1);
+        });
+      });
+
+      /**
+       * The legacy ownership preload is sized by legacy attachment rows, not by
+       * every UUID in the uploaded graph (PR1077-REV-005).
+       *
+       * The read used to receive `[...idRemap.keys()]` -- every remapped row in
+       * the artifact, transactions and splits and prices included -- to authorize
+       * a handful of legacy external attachments. A current-format artifact that
+       * carries its own bytes needs no authority outside itself, so it must issue
+       * no ownership query at all; a mixed artifact must query only the original
+       * ids of the legacy rows that actually read a source object.
+       */
+      describe("legacy ownership query scope", () => {
+        const ownershipQueryCalls = () =>
+          mockQueryRunner.query.mock.calls.filter(([sql]) =>
+            String(sql).includes("id = ANY($2::uuid[])"),
+          );
+
+        const attachmentRow = (id: string) => ({
+          id,
+          user_id: userId,
+          transaction_id: TX_ID,
+          filename: "receipt.pdf",
+          content_type: "application/pdf",
+          byte_size: BYTES.length,
+          sha256: SHA256,
+          storage_provider: "local",
+          storage_key: id,
+        });
+
+        it("issues no ownership query when every attachment carries its own bytes", async () => {
+          // Carried bytes, and a graph of unrelated rows the old code would have
+          // copied into the query parameter. The read must not happen.
+          ownedAttachments = [];
+          const data = {
+            ...validBackupData,
+            transactions: Array.from({ length: 40 }, () => ({
+              id: randomUUID(),
+            })),
+            transaction_attachments: [attachmentRow(OLD_ID)],
+            attachment_blobs: [
+              { attachment_id: OLD_ID, data: BYTES.toString("base64") },
+            ],
+          };
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data }),
+          );
+
+          expect(ownershipQueryCalls()).toHaveLength(0);
+          expect(attachmentStorage.load).not.toHaveBeenCalled();
+          expect(result.restored.transactionAttachments).toBe(1);
+        });
+
+        it("queries only the original ids of the legacy attachments, deduplicated", async () => {
+          const CARRIED = "aaaaaaaa-0000-4000-8000-000000000001";
+          const LEGACY_A = "bbbbbbbb-0000-4000-8000-000000000002";
+          const LEGACY_B = "cccccccc-0000-4000-8000-000000000003";
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          // The server holds the two legacy rows; the ownership read authorizes
+          // them and nothing else.
+          ownedAttachments = [
+            {
+              id: LEGACY_A,
+              storage_provider: "local",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+            },
+            {
+              id: LEGACY_B,
+              storage_provider: "local",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+            },
+          ];
+          const data = {
+            ...validBackupData,
+            transactions: Array.from({ length: 30 }, () => ({
+              id: randomUUID(),
+            })),
+            transaction_attachments: [
+              attachmentRow(CARRIED),
+              attachmentRow(LEGACY_A),
+              attachmentRow(LEGACY_B),
+            ],
+            attachment_blobs: [
+              { attachment_id: CARRIED, data: BYTES.toString("base64") },
+            ],
+          };
+
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data }),
+          );
+
+          const calls = ownershipQueryCalls();
+          expect(calls).toHaveLength(1);
+          const queriedIds = [
+            ...((calls[0][1] as unknown[])[1] as string[]),
+          ].sort();
+          expect(queriedIds).toEqual([LEGACY_A, LEGACY_B].sort());
+        });
+      });
+
+      /**
+       * Duplicate blob rows for one id (F3R6-003).
+       *
+       * Staging validates the *last* row for a duplicated id (Map last-wins), but
+       * `attachment_blobs.attachment_id` is a primary key and Phase-2 inserts with
+       * `ON CONFLICT DO NOTHING`, so a raw uploaded array would commit the *first*.
+       * A crafted backup could pair valid bytes (checked, accepted) with corrupt
+       * bytes (inserted). The restore rebuilds `attachment_blobs` from the
+       * validated bytes, one row per id, so the row inserted is the row checked --
+       * and the outcome does not depend on the duplicate order.
+       */
+      describe("duplicate blob rows", () => {
+        const GOOD = BYTES;
+        const BAD = Buffer.from("corrupted-different-length-bytes");
+
+        const twoBlobs = (first: Buffer, second: Buffer) => ({
+          ...backupWithLocalAttachment({ storage_provider: "database" }),
+          attachment_blobs: [
+            { attachment_id: OLD_ID, data: first.toString("base64") },
+            { attachment_id: OLD_ID, data: second.toString("base64") },
+          ],
+        });
+
+        const insertedBlobParams = () =>
+          mockQueryRunner.query.mock.calls
+            .filter(([sql]) =>
+              String(sql).includes('INSERT INTO "attachment_blobs"'),
+            )
+            .flatMap(([, params]) => (params ?? []) as unknown[]);
+
+        beforeEach(() => {
+          attachmentStorageName = "database";
+        });
+
+        it("inserts the validated bytes, not the first duplicate (bad-first, good-last)", async () => {
+          // Map keeps GOOD (last), validation passes, rebuild inserts GOOD.
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: twoBlobs(BAD, GOOD) }),
+          );
+
+          const params = insertedBlobParams();
+          expect(params).toContain(GOOD.toString("base64"));
+          expect(params).not.toContain(BAD.toString("base64"));
+          expect(result.restored.transactionAttachments).toBe(1);
+          expect(result.restored.attachmentBlobs).toBe(1);
+        });
+
+        it("drops the attachment rather than committing unverified bytes (good-first, bad-last)", async () => {
+          // Map keeps BAD (last), which fails the metadata check, so the whole
+          // attachment is unrestorable -- never a committed corrupt blob.
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: twoBlobs(GOOD, BAD) }),
+          );
+
+          const params = insertedBlobParams();
+          expect(params).not.toContain(BAD.toString("base64"));
+          expect(params).not.toContain(GOOD.toString("base64"));
+          expect(result.skippedAttachments).toBe(1);
+          expect(result.restored.attachmentBlobs ?? 0).toBe(0);
+        });
+
+        it("collapses duplicates to a single row even when both are valid", async () => {
+          // No integrity issue -- just two identical rows. The primary key would
+          // reject the second anyway; the rebuild means only one is offered.
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: twoBlobs(GOOD, GOOD) }),
+          );
+
+          const inserts = mockQueryRunner.query.mock.calls.filter(([sql]) =>
+            String(sql).includes('INSERT INTO "attachment_blobs"'),
+          );
+          const idParams = inserts
+            .flatMap(([, params]) => (params ?? []) as unknown[])
+            .filter((v) => v === GOOD.toString("base64"));
+          expect(idParams).toHaveLength(1);
+          expect(result.restored.attachmentBlobs).toBe(1);
+        });
+      });
+
+      describe("restoring the same backup twice", () => {
+        /** An in-memory object store, so the second restore sees the first's effects. */
+        function statefulStore(seed: Record<string, Buffer>) {
+          const objects = new Map(Object.entries(seed));
+          attachmentStorage.load.mockImplementation(async (key: string) => {
+            const bytes = objects.get(key);
+            if (!bytes) throw new Error(`no such object: ${key}`);
+            return bytes;
+          });
+          attachmentStorage.save.mockImplementation(
+            async (key: string, bytes: Buffer) => {
+              objects.set(key, bytes);
+            },
+          );
+          attachmentStorage.delete.mockImplementation(async (key: string) => {
+            objects.delete(key);
+          });
+          return objects;
+        }
+
+        /**
+         * The target's current external keys, tracked from what the restore
+         * inserted -- so the second call sees the row the first one wrote rather
+         * than a fixture frozen before either.
+         */
+        function trackingQueries(initialKeys: string[]) {
+          let current = [...initialKeys];
+          mockQueryRunner.query.mockImplementation(
+            (sql: string, params?: unknown[]) => {
+              const text = String(sql);
+              if (
+                text.includes("SELECT storage_key FROM transaction_attachments")
+              ) {
+                return Promise.resolve(
+                  current.map((storage_key) => ({ storage_key })),
+                );
+              }
+              if (text.includes('INSERT INTO "transaction_attachments"')) {
+                const written = (params ?? []).filter(
+                  (v): v is string =>
+                    typeof v === "string" &&
+                    /^[0-9a-f-]{36}$/i.test(v) &&
+                    v !== userId,
+                );
+                // The storage_key is among the row's UUID-shaped params; the
+                // restore normalises it to the attachment id, so either is right.
+                current = written.slice(-2);
+              }
+              return mockQueryHandler(sql, params);
+            },
+          );
+        }
+
+        it("restores the attachment both times", async () => {
+          const objects = statefulStore({ [OLD_ID]: BYTES });
+          trackingQueries([OLD_ID]);
+
+          const first = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+          expect(first.restored.transactionAttachments).toBe(1);
+          expect(first.skippedAttachments).toBeUndefined();
+
+          // The artifact still names OLD_ID, so OLD_ID must still exist.
+          expect(objects.has(OLD_ID)).toBe(true);
+
+          const second = await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+          // The failure this pins: the second restore used to skip the
+          // attachment and delete the first restore's copy, so the bytes were
+          // gone from every reachable key while the restore reported success.
+          expect(second.restored.transactionAttachments).toBe(1);
+          expect(second.skippedAttachments).toBeUndefined();
+          expect(objects.has(OLD_ID)).toBe(true);
+        });
+
+        it("keeps some copy of the bytes reachable after both restores", async () => {
+          const objects = statefulStore({ [OLD_ID]: BYTES });
+          trackingQueries([OLD_ID]);
+
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+          await service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          );
+
+          // Whatever the keys ended up being, the receipt still exists.
+          const remaining = [...objects.values()];
+          expect(remaining.length).toBeGreaterThan(0);
+          expect(remaining.some((b) => b.equals(BYTES))).toBe(true);
+        });
+      });
+
+      it("removes staged objects when the restore transaction fails", async () => {
+        attachmentStorage.load.mockResolvedValue(BYTES);
+        mockQueryRunner.query.mockImplementation((sql: string, params) => {
+          if (String(sql).includes('INSERT INTO "transaction_attachments"')) {
+            return Promise.reject(new Error("constraint violation"));
+          }
+          return mockQueryHandler(sql, params as unknown[]);
+        });
+
+        await expect(
+          service.restoreData(
+            userId,
+            makeInput({ password: "test", data: backupWithLocalAttachment() }),
+          ),
+        ).rejects.toThrow("constraint violation");
+
+        const stagedKey = attachmentStorage.save.mock.calls[0][0];
+        // The database rolled back; the object write did not, so it must not be
+        // left behind with nothing referencing it.
+        expect(attachmentStorage.delete).toHaveBeenCalledWith(stagedKey);
+      });
     });
 
     it("should throw UnauthorizedException if password is missing for local user", async () => {
@@ -882,7 +2856,7 @@ describe("BackupService", () => {
     // a custom currency and let the daily rate refresh run got
     // "violates foreign key constraint exchange_rates_to_currency_fkey" and
     // could not restore at all.
-    it("guards the user-created-currency delete against every FK to currencies", async () => {
+    it("guards the user-created-currency delete with the shared global check", async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -894,20 +2868,16 @@ describe("BackupService", () => {
           call[0].includes("DELETE FROM currencies"),
       ) as [string];
 
-      for (const referrer of [
-        "exchange_rates",
-        "user_currency_preferences",
-        "accounts",
-        "transactions",
-        "securities",
-        "scheduled_transactions",
-        "budgets",
-        "user_preferences",
-      ]) {
-        expect(sql).toContain(referrer);
-      }
-      // transactions references currencies twice (paid-in currency included).
-      expect(sql).toContain("original_currency_code");
+      // The `NOT EXISTS` chain this replaced listed every referencing column,
+      // and was still wrong: running inside the restoring user's transaction, it
+      // could not see the other users' rows those clauses were looking for, and
+      // the ON DELETE CASCADE on user_currency_preferences fired.
+      //
+      // Whether the shared function consults every FK is asserted against the
+      // schema in currencies/currency-references.spec.ts, which a new migration
+      // cannot leave behind.
+      expect(sql).toContain("NOT currency_code_in_use_globally(c.code)");
+      expect(sql).not.toContain("NOT EXISTS");
     });
 
     it("should rollback transaction on error", async () => {
@@ -1354,7 +3324,7 @@ describe("BackupService", () => {
         return Promise.resolve([]);
       });
 
-      const buf = await service.exportToBuffer(userId);
+      const { buffer: buf } = await service.exportToBuffer(userId);
       const json = JSON.parse(gunzipSync(buf).toString("utf-8"));
 
       expect(json.institutions).toEqual(mockInstitutions);
@@ -2286,7 +4256,7 @@ describe("BackupService", () => {
         mockUserRepo.findOne.mockResolvedValue(mockUser);
         (bcrypt.compare as jest.Mock).mockResolvedValue(true);
         const result = await service.restoreData(userId, {
-          compressedData: encryptedBlob(validBackupData, "user-password"),
+          compressedData: await encryptedBlob(validBackupData, "user-password"),
           password: "user-password",
         });
         expect(result.message).toBe("Backup restored successfully");
@@ -2296,7 +4266,10 @@ describe("BackupService", () => {
         mockUserRepo.findOne.mockResolvedValue(mockUser);
         (bcrypt.compare as jest.Mock).mockResolvedValue(true);
         const result = await service.restoreData(userId, {
-          compressedData: encryptedBlob(validBackupData, "old-backup-password"),
+          compressedData: await encryptedBlob(
+            validBackupData,
+            "old-backup-password",
+          ),
           password: "new-login-password",
           backupPassword: "old-backup-password",
         });
@@ -2313,7 +4286,7 @@ describe("BackupService", () => {
           backupPasswordEnc: "enc:stored-bk-pw",
         });
         const result = await service.restoreData(userId, {
-          compressedData: encryptedBlob(validBackupData, "stored-bk-pw"),
+          compressedData: await encryptedBlob(validBackupData, "stored-bk-pw"),
           oidcIdToken: oidcArtifact(),
         });
         expect(result.message).toBe("Backup restored successfully");
@@ -2324,7 +4297,7 @@ describe("BackupService", () => {
         (bcrypt.compare as jest.Mock).mockResolvedValue(true);
         await expect(
           service.restoreData(userId, {
-            compressedData: encryptedBlob(validBackupData, "real-pw"),
+            compressedData: await encryptedBlob(validBackupData, "real-pw"),
             password: "different-pw",
           }),
         ).rejects.toMatchObject({

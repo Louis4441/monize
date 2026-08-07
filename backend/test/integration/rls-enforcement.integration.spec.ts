@@ -130,6 +130,18 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
     } as never);
     await dataSource.initialize();
 
+    // `synchronize` builds from entity metadata, and `schema_migrations` has no
+    // entity -- it is the migration runner's own ledger (same gap
+    // runtime-role.integration.spec.ts's MT-13 setup closes). Create it before
+    // the role is provisioned, so the revoke below the migration-bookkeeping
+    // tests exercise is not a silent no-op against a table that does not exist.
+    await dataSource.query(
+      `CREATE TABLE IF NOT EXISTS schema_migrations (
+         filename VARCHAR(255) PRIMARY KEY,
+         applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+       )`,
+    );
+
     // Real policies + the M3 enable, applied in filename order (T1's harness).
     await applyRlsPolicies(dataSource, { includeEnable: true });
 
@@ -763,6 +775,329 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
         }
         await appDataSource.destroy();
       }
+    });
+  });
+
+  /**
+   * `currencies` is exempt reference data, but `user_currency_preferences` is
+   * not -- and its FK to `currencies(code)` is `ON DELETE CASCADE`. So a
+   * decision to delete a shared currency row, taken from inside one tenant's
+   * transaction, deletes rows that tenant cannot see.
+   *
+   * That is what happened: `CurrenciesService.remove` counted the remaining
+   * preference rows for the code with a tenant-scoped query, got zero because
+   * RLS had filtered away the other user's row, and deleted the currency --
+   * cascading that user's activation away. The restore's cleanup had the same
+   * blindness in a different shape.
+   *
+   * Only enforcement can demonstrate this, which is why it lives here: under
+   * `RLS_MODE=off` the app connects as the owner and every query sees
+   * everything, so the old code looked correct in every unit test.
+   */
+  describe("currency liveness is global, not tenant-scoped", () => {
+    const CODE = "PTS";
+
+    it("sees another user's activation that a tenant-scoped count cannot", async () => {
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Family Points', '*', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+      // Only user B activates it. A has no preference row for the code at all,
+      // which is exactly the state `remove` reaches after deleting its own.
+      await dataSource.query(
+        `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
+         VALUES ($1, $2, true)
+         ON CONFLICT (user_id, currency_code) DO NOTHING`,
+        [USER_B, CODE],
+      );
+
+      const appDataSource = new DataSource({
+        ...INTEGRATION_TYPEORM_OPTIONS,
+        username: TEST_APP_ROLE,
+        password: TEST_APP_ROLE_PASSWORD,
+        synchronize: false,
+        dropSchema: false,
+        extra: { max: 1 },
+      } as never);
+      await appDataSource.initialize();
+      const previousMode = process.env.RLS_MODE;
+      process.env.RLS_MODE = "enforce";
+      try {
+        const { tenantView, globalAnswer } = await withUserContext(USER_A, () =>
+          withScopedDb(appDataSource, async (m) => {
+            const [counted] = await m.query(
+              `SELECT count(*)::int AS n FROM user_currency_preferences
+                  WHERE currency_code = $1`,
+              [CODE],
+            );
+            const [answer] = await m.query(
+              `SELECT currency_code_in_use_globally($1) AS "inUse"`,
+              [CODE],
+            );
+            return { tenantView: counted.n, globalAnswer: answer.inUse };
+          }),
+        );
+
+        // The query the old code trusted: B's row is invisible, so it says the
+        // code is unused and the delete looks safe.
+        expect(tenantView).toBe(0);
+        // The SECURITY DEFINER function, in the same transaction as that query,
+        // gives the answer the delete actually needs.
+        expect(globalAnswer).toBe(true);
+      } finally {
+        if (previousMode === undefined) {
+          delete process.env.RLS_MODE;
+        } else {
+          process.env.RLS_MODE = previousMode;
+        }
+        await appDataSource.destroy();
+      }
+    });
+
+    it("reports an unreferenced code as free", async () => {
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ('ZZZ', 'Nothing Points', '?', 0, true, $1)
+         ON CONFLICT (code) DO NOTHING`,
+        [USER_A],
+      );
+      // "Unknown" is not the answer here: nothing references the code, which is
+      // a settled fact, and reporting it as live would strand the row forever.
+      const [{ inUse }] = await dataSource.query(
+        `SELECT currency_code_in_use_globally('ZZZ') AS "inUse"`,
+      );
+      expect(inUse).toBe(false);
+    });
+
+    /**
+     * The race the definer function alone does not close (F3R-005).
+     *
+     * Deleting a currency is: check whether anybody still references the code,
+     * then delete the row. `user_currency_preferences.currency_code` cascades on
+     * delete, so a preference another user inserts and commits between those two
+     * steps is removed by the cascade -- they get a success response and
+     * immediately lose the setting.
+     *
+     * `SELECT ... FOR UPDATE` on the parent is what serialises it, through the FK
+     * machinery rather than around it: an FK check takes `FOR KEY SHARE` on the
+     * parent row, which conflicts. So the concurrent insert waits, and once the
+     * deleting transaction commits, the insert fails with a plain FK violation.
+     *
+     * Two real connections, because one cannot demonstrate a lock.
+     */
+    it("makes a concurrent activation wait for the delete, then fail cleanly", async () => {
+      const CODE = "RCE";
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Race Points', 'R', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+
+      const other = new DataSource({
+        ...INTEGRATION_TYPEORM_OPTIONS,
+        synchronize: false,
+        dropSchema: false,
+        extra: { max: 1 },
+      } as never);
+      await other.initialize();
+
+      try {
+        let activationSettled = false;
+        let activationError: unknown;
+        // Populated inside the transaction below; declared here so the
+        // deleter's callback does not have to return it. Returning a promise
+        // from a TypeORM transaction callback is implicitly awaited before
+        // the transaction commits -- and this promise cannot settle until
+        // that same commit releases the lock B is waiting on. Awaiting it
+        // from inside the transaction is therefore a guaranteed deadlock, not
+        // a race: A waits on B, B waits on A's commit, and nothing ever
+        // completes. It is awaited instead after `deleter` resolves, below.
+        let activation!: Promise<void>;
+
+        // A: hold the lock the delete path takes, with nothing else in flight.
+        const deleter = dataSource.transaction(async (m) => {
+          await m.query("SELECT 1 FROM currencies WHERE code = $1 FOR UPDATE", [
+            CODE,
+          ]);
+
+          // B: activate the same code. Its FK check needs FOR KEY SHARE on the
+          // locked parent, so it must block rather than commit.
+          activation = other
+            .transaction(async (n) =>
+              n.query(
+                `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
+                 VALUES ($1, $2, true)`,
+                [USER_B, CODE],
+              ),
+            )
+            .then(
+              () => {
+                activationSettled = true;
+              },
+              (error) => {
+                activationSettled = true;
+                activationError = error;
+              },
+            );
+
+          // Give it real time to prove it is waiting rather than merely slow.
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          expect(activationSettled).toBe(false);
+
+          await m.query("DELETE FROM currencies WHERE code = $1", [CODE]);
+        });
+
+        await deleter;
+        // The commit just released the lock; B's blocked insert can now settle
+        // one way or the other. `activation`'s own .then never rejects, so this
+        // cannot throw -- it only waits.
+        await activation;
+
+        // The forbidden outcome is a committed preference the cascade removed.
+        // Either B failed, or B holds a preference for a currency that still
+        // exists -- never a success that left nothing behind.
+        expect(activationSettled).toBe(true);
+        const surviving = await dataSource.query(
+          "SELECT 1 FROM user_currency_preferences WHERE user_id = $1 AND currency_code = $2",
+          [USER_B, CODE],
+        );
+        if (activationError === undefined) {
+          expect(surviving).toHaveLength(1);
+        } else {
+          expect(surviving).toHaveLength(0);
+        }
+        // And the code really is gone, so the delete was not what lost.
+        const currency = await dataSource.query(
+          "SELECT 1 FROM currencies WHERE code = $1",
+          [CODE],
+        );
+        expect(currency).toHaveLength(0);
+      } finally {
+        await other.destroy();
+        await dataSource.query(
+          "DELETE FROM user_currency_preferences WHERE currency_code = $1",
+          [CODE],
+        );
+        await dataSource.query("DELETE FROM currencies WHERE code = $1", [
+          CODE,
+        ]);
+      }
+    });
+
+    /**
+     * The per-user companion, which the delete gate asks before removing the
+     * caller's activation row. `CurrenciesService.isInUse` used to spell the
+     * referencing columns out itself and was missing `budgets.currency_code`, so
+     * a user with a budget denominated in a custom currency was told the code was
+     * not in use, lost their activation row, and was left with a budget in a
+     * currency that no longer appeared anywhere in their settings.
+     *
+     * A unit spec cannot show this -- it mocks `manager.query` and gets back
+     * whatever the fixture says. Only the real function over real rows can.
+     */
+    it("counts a budget as a reference to the currency it is denominated in", async () => {
+      const CODE = "BGT";
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Budget Points', 'B', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+      await dataSource.query(
+        `INSERT INTO budgets (user_id, name, period_start, currency_code)
+         VALUES ($1, 'Points budget', DATE '2026-01-01', $2)`,
+        [USER_A, CODE],
+      );
+
+      const referenced: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user_data($1) AS referenced(code)`,
+        [USER_A],
+      );
+      expect(referenced.map((r) => r.code)).toContain(CODE);
+
+      // And the other user's answer must not include it, or a shared code would
+      // become undeletable for everyone.
+      const otherUser: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user_data($1) AS referenced(code)`,
+        [USER_B],
+      );
+      expect(otherUser.map((r) => r.code)).not.toContain(CODE);
+    });
+
+    /**
+     * The two per-user functions differ by exactly one branch, and the difference
+     * is load-bearing in both directions: the backup export needs the activation
+     * row counted so an activated-but-unspent currency definition travels with
+     * the file, and the delete gate needs it *not* counted or no currency could
+     * ever be deleted.
+     */
+    it("counts an activation only in the composite, not in the data answer", async () => {
+      const CODE = "ACT";
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ($1, 'Activated Points', 'A', 0, true, $2)
+         ON CONFLICT (code) DO NOTHING`,
+        [CODE, USER_A],
+      );
+      // Activated and nothing else: no account, no budget, no transaction.
+      await dataSource.query(
+        `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
+         VALUES ($1, $2, true)
+         ON CONFLICT (user_id, currency_code) DO NOTHING`,
+        [USER_A, CODE],
+      );
+
+      const data: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user_data($1) AS referenced(code)`,
+        [USER_A],
+      );
+      const all: Array<{ code: string }> = await dataSource.query(
+        `SELECT code FROM currency_codes_referenced_by_user($1) AS referenced(code)`,
+        [USER_A],
+      );
+
+      expect(data.map((r) => r.code)).not.toContain(CODE);
+      expect(all.map((r) => r.code)).toContain(CODE);
+    });
+  });
+
+  describe("runtime role privileges on migration bookkeeping", () => {
+    it("cannot write schema_migrations", async () => {
+      // The blanket table grant includes it. Inserting a filename makes the next
+      // deployment skip required DDL; deleting one makes a migration body re-run.
+      await expect(
+        asAppRole(identity(USER_A), (m) =>
+          m.query(
+            "INSERT INTO schema_migrations (filename) VALUES ('999_hostile.sql')",
+          ),
+        ),
+      ).rejects.toThrow(/permission denied/i);
+
+      await expect(
+        asAppRole(identity(USER_A), (m) =>
+          m.query("DELETE FROM schema_migrations"),
+        ),
+      ).rejects.toThrow(/permission denied/i);
+    });
+
+    // Reading the ledger is intentionally left granted -- asserted against the
+    // running role in MT-13
+    // (runtime-role.integration.spec.ts: "may read the migration ledger but not
+    // write it"), which asserts SELECT succeeds. An earlier version of this
+    // test asserted the opposite (SELECT denied too) and contradicted that
+    // already-reviewed design; removed rather than fixed to keep the one
+    // authoritative assertion of this grant surface in MT-13's file instead of
+    // two specs quietly disagreeing about it.
+
+    it("still has DML on an ordinary user table", async () => {
+      // The revoke has to be surgical: revoking too much would break the app.
+      const rows = await asAppRole(identity(USER_A), (m) =>
+        m.query("SELECT count(*)::int AS n FROM accounts"),
+      );
+      expect(rows[0].n).toBeGreaterThanOrEqual(0);
     });
   });
 });

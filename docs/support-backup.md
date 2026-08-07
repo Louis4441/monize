@@ -31,6 +31,19 @@ Starting from the same rows the normal export produces, the support backup:
   transactions — so nothing drifts by a rounding cent.
 - **Remaps** every identifier (and the user's own id) to fresh UUIDs, so a
   shared file can't be correlated with the account or with another shared file.
+- **Pseudonymises user-created currencies.** `currencies` is mostly public
+  reference data, and for the canonical rows (`created_by_user_id IS NULL`) the
+  code, name and symbol are kept — masking `USD` would make a reproduction
+  harder to read for no gain. For a row a *user* created, all three are free
+  text: the code is any three characters, the name up to 100, the symbol up to
+  10. So `KEN / Kenneth Lasko Family Credits / KL` used to travel unchanged,
+  beside the masked payee and account names it contradicted. Custom rows now get
+  a random three-letter code (not derived from the original, so two artifacts
+  cannot be lined up by it, and never one the curated catalog claims), a masked
+  name and a generic `¤` symbol, and every reference to the old code is
+  rewritten. `decimal_places` is kept: it is the arithmetic, and changing it
+  would alter what every amount means in a file whose purpose is reproducing a
+  calculation.
 - **Keeps masked values unique** on every UNIQUE column: masking is not
   injective (short values collapse to all-asterisks, e.g. tickers `AAPL`/`MSFT`
   both become `****`, and any two values sharing their first/last two characters
@@ -44,7 +57,12 @@ Starting from the same rows the normal export produces, the support backup:
 - **Always encrypts** the file: the modal pre-fills a random password (editable,
   regenerable) and the export refuses to run without one -- a support backup is
   made to leave the user's machine, so it never ships in the clear. Share the
-  password through a separate channel.
+  password through a separate channel. The refusal is in
+  `SupportBackupService.generate`, not only in `CreateSupportBackupDto`: the
+  service used to fall back to plain gzip when no password was supplied, so the
+  guarantee held for HTTP callers and for nothing else, and a future cron, CLI or
+  admin path that omitted the field would have produced an unencrypted
+  de-identified dump with no error.
 - Supports an optional **date range**: history outside the window is trimmed
   and each account's opening balance is advanced by the removed transactions,
   so the trimmed file still reconciles to the true balance.

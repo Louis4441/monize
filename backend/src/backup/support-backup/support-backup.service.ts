@@ -1,7 +1,12 @@
-import { Injectable } from "@nestjs/common";
-import { randomUUID } from "crypto";
+import {
+  BadRequestException,
+  Injectable,
+  PayloadTooLargeException,
+} from "@nestjs/common";
+import { randomBytes, randomUUID } from "crypto";
 import { gzipSync } from "zlib";
 import { BackupService } from "../backup.service";
+import { tr } from "../../i18n/translate";
 import { encryptBackup } from "../backup-crypto.util";
 import { applyJsonbHandler } from "./support-backup-jsonb";
 import { collectRowIdRemap, deepRemapIds } from "../backup-id-remap.util";
@@ -16,6 +21,8 @@ import {
   TableMap,
 } from "./support-backup-scope";
 import { maskText, scaleMoney, scaleQuantity } from "./support-backup.util";
+import { CURRENCY_METADATA } from "../../currencies/currency-metadata";
+import { CURRENCY_REFERENCE_COLUMNS } from "../../currencies/currency-reference-columns";
 import {
   ALWAYS_EXCLUDED_TABLES,
   ColumnRule,
@@ -26,6 +33,45 @@ import {
 } from "./support-backup-rules";
 
 const ALL_SECTIONS = Object.keys(SECTION_TABLES) as SupportBackupSection[];
+
+/** U+00A4, the generic currency sign, for a pseudonymised custom currency. */
+const GENERIC_CURRENCY_SYMBOL = "¤";
+
+/**
+ * A three-letter code no row in this payload uses and no real currency claims.
+ *
+ * Random rather than derived from the original: a derived code would let two
+ * artifacts from the same user be lined up by it, which is the correlation the
+ * whole remapping step exists to prevent.
+ *
+ * The catalog is consulted here rather than only through `taken`. The caller does
+ * seed `taken` with every catalogued code, so the end-to-end path was safe -- but
+ * the guarantee in the sentence above was the caller's to keep, and a second
+ * caller that seeded only the payload's own codes would have emitted `USD` as a
+ * pseudonym with nothing to stop it. `taken` is still needed for the codes this
+ * payload uses, which the catalog does not know about.
+ *
+ * Exported for its own test. The end-to-end path costs two scrypt derivations
+ * per export (~200 ms), so probing the allocator's randomness through `generate`
+ * bought a handful of samples for seconds of CPU; the wiring and the allocation
+ * property are now tested separately, and the second one thoroughly.
+ */
+export function allocatePseudonymCode(taken: Set<string>): string {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  // 17,576 combinations against a catalog of a few hundred, so this converges
+  // immediately; the bound exists so a pathological `taken` cannot spin forever.
+  for (let attempt = 0; attempt < 10000; attempt += 1) {
+    const bytes = randomBytes(3);
+    const code = `${letters[bytes[0] % 26]}${letters[bytes[1] % 26]}${letters[bytes[2] % 26]}`;
+    if (!taken.has(code) && CURRENCY_METADATA[code] === undefined) {
+      taken.add(code);
+      return code;
+    }
+  }
+  throw new Error(
+    "Could not allocate a pseudonymous currency code: every three-letter combination is taken.",
+  );
+}
 
 /** How long a collected raw export is reused across preview/generate calls.
  *  A support snapshot being up to this stale is harmless, and it turns the
@@ -52,6 +98,12 @@ export interface SupportBackupOptions {
    * reproduced concerns prices or valuations.
    */
   includePriceHistory?: boolean;
+  /**
+   * Password the produced file is encrypted under (AES-256-GCM).
+   *
+   * Optional on the shared options type because `preview` takes the same object
+   * and produces no file, but `generate` requires it -- see the check there.
+   */
   password?: string;
 }
 
@@ -92,7 +144,11 @@ export class SupportBackupService {
     const cached = this.rawCache.get(userId);
     if (cached && cached.expires > now) return cached.promise;
 
-    const promise = this.backupService.collectRawExport(userId);
+    // Never query what this artifact always excludes -- `attachment_blobs` above
+    // all, which is base64 and can be the largest thing in the database.
+    const promise = this.backupService.collectRawExport(userId, {
+      skipTables: ALWAYS_EXCLUDED_TABLES,
+    });
     this.rawCache.set(userId, { expires: now + RAW_EXPORT_TTL_MS, promise });
     // A failed dump must not be cached as a poisoned promise.
     promise.catch(() => this.rawCache.delete(userId));
@@ -103,11 +159,33 @@ export class SupportBackupService {
     userId: string,
     options: SupportBackupOptions,
   ): Promise<{ buffer: Buffer; encrypted: boolean }> {
+    // A support backup is produced in order to leave the user's machine, so it
+    // never ships in the clear. `CreateSupportBackupDto` requires a password, so
+    // no HTTP caller can reach this -- but the branch that returned plain gzip
+    // when `options.password` was absent still existed, and the guarantee lived
+    // only at the edge. A future internal caller (a cron, a CLI, an admin path)
+    // that forgot the field would have got an unencrypted de-identified dump and
+    // no error at all. The producer of the file enforces it now, and the DTO is
+    // the second line rather than the only one.
+    const password = options.password;
+    if (typeof password !== "string" || password.length === 0) {
+      throw new BadRequestException(
+        tr(
+          "errors.backup.supportPasswordRequired",
+          "A support backup must be encrypted: supply a password.",
+        ),
+      );
+    }
+
     const raw = await this.collectRawExport(userId);
     const sections = this.resolveSections(options.sections);
     const scoped = this.scopeAndSection(raw.tables, sections, options);
     const obfuscated = this.obfuscate(scoped, options.multiplier);
-    const remapped = this.remapIdentifiers(obfuscated, userId);
+    const withoutCustomCodes = this.pseudonymiseCustomCurrencies(
+      obfuscated,
+      userId,
+    );
+    const remapped = this.remapIdentifiers(withoutCustomCodes, userId);
 
     const payload: Record<string, unknown> = {
       version: raw.version,
@@ -116,13 +194,38 @@ export class SupportBackupService {
       sections,
       ...remapped,
     };
-    const gzipped = gzipSync(Buffer.from(JSON.stringify(payload), "utf-8"));
+    // The support path holds more copies of the dataset at once than any other
+    // export -- the raw tables, the scoped copy, the obfuscated copy, the
+    // currency-rewritten copy, the remapped copy, then a JSON string, then a
+    // Buffer of it, then the gzip output -- and it had no ceiling at all. It
+    // cannot stream, because reconciling scaled balances needs every table
+    // together, so the ceiling is the only thing standing between a large
+    // dataset and an OOM-killed pod that leaves no artifact and no readable
+    // error. The same budget the buffered export uses, since the peak is worse
+    // here, not better.
+    const json = JSON.stringify(payload);
+    const limit = this.backupService.exportBufferLimitBytes;
+    const size = Buffer.byteLength(json, "utf-8");
+    if (size > limit) {
+      throw new PayloadTooLargeException(
+        tr(
+          "errors.backup.supportExportTooLarge",
+          `This support backup would be ${Math.round(size / (1024 * 1024))} MiB of JSON, ` +
+            `above the ${Math.round(limit / (1024 * 1024))} MiB limit. Narrow it with an ` +
+            `account selection or a date range, or raise BACKUP_EXPORT_BUFFER_LIMIT.`,
+          {
+            size: Math.round(size / (1024 * 1024)),
+            limit: Math.round(limit / (1024 * 1024)),
+          },
+        ),
+      );
+    }
+
+    const gzipped = gzipSync(Buffer.from(json, "utf-8"));
     // encryptBackup derives its AES-256-GCM key from the user's password
     // (scrypt), not from AI_ENCRYPTION_KEY, so a support backup encrypts fine
     // regardless of whether that env var is configured.
-    return options.password
-      ? { buffer: encryptBackup(gzipped, options.password), encrypted: true }
-      : { buffer: gzipped, encrypted: false };
+    return { buffer: await encryptBackup(gzipped, password), encrypted: true };
   }
 
   async preview(
@@ -329,6 +432,106 @@ export class SupportBackupService {
       ...(tables.transactions ? { transactions } : {}),
       ...(tables.accounts ? { accounts } : {}),
     };
+  }
+
+  /**
+   * Replaces user-created currency codes, names and symbols, and rewrites every
+   * reference to them.
+   *
+   * `currencies.code`, `name` and `symbol` were kept verbatim, on the reasoning
+   * that the table holds public reference data. For the canonical rows it does.
+   * For a row a user created, all three are free text: the code is any three
+   * characters, the name is up to 100, the symbol up to 10. So a currency called
+   * `KEN / Kenneth Lasko Family Credits / KL` travelled unchanged inside an
+   * artifact documented as de-identified, next to the masked payee and account
+   * names it contradicted. Encryption does not help: it protects the file in
+   * transit, and the recipient is the person the masking is for.
+   *
+   * Canonical rows (`created_by_user_id IS NULL`) keep everything -- they are
+   * genuinely public, and masking `USD` would make a reproduction harder to read
+   * for no gain.
+   *
+   * The replacement code is random per export rather than derived from the
+   * original, so two artifacts from the same user cannot be lined up by it. It
+   * stays three characters (the column's width, and what every reference
+   * expects), and avoids both the codes already in this payload and the curated
+   * catalog, so a pseudonym can never be mistaken for a real currency.
+   *
+   * `decimal_places` is kept: it is the arithmetic, and changing it would alter
+   * every amount's meaning in a file whose whole purpose is reproducing a
+   * calculation.
+   *
+   * References are rewritten through `CURRENCY_REFERENCE_COLUMNS` -- named
+   * columns, not a string sweep. A three-character code appears by chance inside
+   * masked text often enough that a generic walker would corrupt unrelated
+   * values, and the schema-scanning guard in
+   * `currencies/currency-references.spec.ts` is what keeps the named list honest.
+   *
+   * `created_by_user_id` is rewritten to the exporting user's own id, which
+   * `remapIdentifiers` then replaces along with everything else. Currencies are
+   * shared, and the export deliberately includes every code the user's data
+   * references whoever defined it -- so a custom currency another user of the same
+   * instance created arrives here carrying *that* user's real UUID. It has no
+   * `id` column for the row-id sweep to catch, so the value would survive
+   * remapping verbatim and defeat the one thing remapping is for: two support
+   * files from two users of one instance could be lined up by the creator id they
+   * share. The restore overwrites this column with the restoring user's id in any
+   * case, so nothing downstream depends on the original.
+   */
+  private pseudonymiseCustomCurrencies(
+    tables: TableMap,
+    userId: string,
+  ): TableMap {
+    const currencies = tables.currencies;
+    if (!currencies?.length) return tables;
+
+    const custom = currencies.filter(
+      (row) =>
+        row.created_by_user_id !== null && row.created_by_user_id !== undefined,
+    );
+    if (custom.length === 0) return tables;
+
+    const taken = new Set<string>([
+      ...currencies.map((row) => String(row.code)),
+      ...Object.keys(CURRENCY_METADATA),
+    ]);
+    const codeMap = new Map<string, string>();
+    for (const row of custom) {
+      const original = String(row.code);
+      codeMap.set(original, allocatePseudonymCode(taken));
+    }
+
+    const result: TableMap = { ...tables };
+    result.currencies = currencies.map((row) => {
+      const replacement = codeMap.get(String(row.code));
+      if (!replacement) return row;
+      return {
+        ...row,
+        code: replacement,
+        name: maskText(row.name),
+        // A generic currency sign: shape-preserving replacements leak length,
+        // and one character is all any renderer needs.
+        symbol: GENERIC_CURRENCY_SYMBOL,
+        // Another user's real UUID would otherwise survive remapping, since
+        // `currencies` has no `id` column for the row-id sweep to collect.
+        created_by_user_id: userId,
+      };
+    });
+
+    for (const [table, columns] of Object.entries(CURRENCY_REFERENCE_COLUMNS)) {
+      const rows = result[table];
+      if (!rows) continue;
+      result[table] = rows.map((row) => {
+        let next = row;
+        for (const column of columns) {
+          const replacement = codeMap.get(String(row[column]));
+          if (replacement) next = { ...next, [column]: replacement };
+        }
+        return next;
+      });
+    }
+
+    return result;
   }
 
   /**

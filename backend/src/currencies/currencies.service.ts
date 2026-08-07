@@ -353,6 +353,28 @@ export class CurrenciesService implements OnApplicationBootstrap {
     const upperCode = code.toUpperCase();
     const currency = await this.findOne(upperCode);
 
+    // Lock the parent row before anything that depends on its liveness.
+    //
+    // Without this, the transaction boundary alone is not enough. A concurrent
+    // activation is an INSERT into `user_currency_preferences`, whose FK to
+    // `currencies(code)` is `ON DELETE CASCADE`: another user could insert and
+    // commit a preference after the global liveness check said the code was free
+    // and before the DELETE ran, and the cascade then removed the row they had
+    // just been told was saved. They got a success response and lost the setting.
+    //
+    // `FOR UPDATE` on the parent is what serialises this, and it does so through
+    // the FK machinery rather than in spite of it: an FK check takes `FOR KEY
+    // SHARE` on the parent row, which conflicts with `FOR UPDATE`. So B's insert
+    // waits, and once this transaction commits the delete, B's FK check fails
+    // with a plain violation -- a clear error instead of a silent removal.
+    //
+    // `findOne` above is a plain read and cannot carry the lock, so this is a
+    // separate statement rather than a locked variant of it: the row identity is
+    // already known, and what is needed here is the lock, not the columns.
+    await manager.query("SELECT 1 FROM currencies WHERE code = $1 FOR UPDATE", [
+      upperCode,
+    ]);
+
     // Check if in use by this user
     const inUse = await this.isInUse(userId, upperCode);
     if (inUse) {
@@ -373,37 +395,49 @@ export class CurrenciesService implements OnApplicationBootstrap {
       currencyCode: upperCode,
     });
 
-    // If non-system currency and no other users reference it, clean up the currency row
+    // A user-created currency nothing points at any more is cleaned up. The
+    // preference row above is deleted as of this transaction, so a remaining
+    // reference is somebody else's -- and the check has to be able to see
+    // somebody else's rows, which is what makes it a SECURITY DEFINER function
+    // rather than a query here.
+    //
+    // The counting query this replaced (`prefRepo.count({ currencyCode })`) ran
+    // under the caller's RLS scope, so it only ever counted the row just
+    // deleted: it reported zero for a code another user had activated, and the
+    // ON DELETE CASCADE on `user_currency_preferences.currency_code` then took
+    // that user's activation with it.
     if (currency.createdByUserId !== null) {
-      const remainingPrefs = await prefRepo.count({
-        where: { currencyCode: upperCode },
-      });
-
-      if (remainingPrefs === 0) {
-        // Also check no global references (accounts, securities, transactions from any user)
-        const globallyInUse = await this.isInUseGlobally(upperCode);
-        if (!globallyInUse) {
-          await manager.getRepository(Currency).remove(currency);
-        }
+      if (!(await this.isInUseGlobally(manager, upperCode))) {
+        await manager.getRepository(Currency).remove(currency);
       }
     }
   }
 
+  /**
+   * Does this user's own data still depend on `code`?
+   *
+   * The referencing columns are not spelled out here. They were, and the list
+   * was missing `budgets.currency_code`: a user with a budget denominated in a
+   * custom currency was told the code was not "in use by your accounts,
+   * securities, or other records", had their activation row deleted, and was
+   * left holding a budget in a currency that no longer appeared anywhere in
+   * their settings -- so they could neither see it nor reactivate it. That is
+   * the third time this list has been written out and been wrong, which is why
+   * it now lives in `currency_codes_referenced_by_user_data` (migration 137)
+   * where `currency-references.spec.ts` can check it against the schema.
+   *
+   * The `_data` variant, not the composite: this runs *before* the caller's own
+   * `user_currency_preferences` row is deleted, and the composite counts that
+   * row -- so it would report every visible currency as in use and no currency
+   * could ever be deleted.
+   */
   async isInUse(userId: string, code: string): Promise<boolean> {
     const result = await withScopedDb(this.dataSource, (manager) =>
       manager.query(
         `SELECT EXISTS (
-        SELECT 1 FROM accounts WHERE currency_code = $1 AND user_id = $2
-        UNION ALL SELECT 1 FROM securities WHERE currency_code = $1 AND user_id = $2
-        UNION ALL SELECT 1 FROM transactions t
-          JOIN accounts a ON a.id = t.account_id
-          WHERE (t.currency_code = $1 OR t.original_currency_code = $1)
-            AND a.user_id = $2
-        UNION ALL SELECT 1 FROM scheduled_transactions st
-          WHERE (st.currency_code = $1 OR st.original_currency_code = $1)
-            AND st.user_id = $2
-        UNION ALL SELECT 1 FROM user_preferences WHERE default_currency = $1 AND user_id = $2
-      ) AS "inUse"`,
+           SELECT 1 FROM currency_codes_referenced_by_user_data($2) AS referenced(code)
+            WHERE referenced.code = $1
+         ) AS "inUse"`,
         [code.toUpperCase(), userId],
       ),
     );
@@ -537,20 +571,31 @@ export class CurrenciesService implements OnApplicationBootstrap {
     );
   }
 
-  private async isInUseGlobally(code: string): Promise<boolean> {
-    const result = await withScopedDb(this.dataSource, (manager) =>
-      manager.query(
-        `SELECT EXISTS (
-        SELECT 1 FROM accounts WHERE currency_code = $1
-        UNION ALL SELECT 1 FROM securities WHERE currency_code = $1
-        UNION ALL SELECT 1 FROM transactions
-          WHERE currency_code = $1 OR original_currency_code = $1
-        UNION ALL SELECT 1 FROM scheduled_transactions
-          WHERE currency_code = $1 OR original_currency_code = $1
-        UNION ALL SELECT 1 FROM user_preferences WHERE default_currency = $1
-      ) AS "inUse"`,
-        [code.toUpperCase()],
-      ),
+  /**
+   * Whether any row anywhere still references the code -- including rows this
+   * tenant cannot see.
+   *
+   * Written out here, this query answered a different question than its name
+   * claimed. It listed only some of the columns that reference
+   * `currencies(code)` (missing `budgets.currency_code` and both
+   * `exchange_rates` columns), and it ran inside the caller's scoped
+   * transaction, where RLS filters every table to the current user. So
+   * "referenced by anybody" was really "referenced by me" -- and the caller had
+   * already established that it was not, which made the check a no-op that
+   * cleared the way for the `user_currency_preferences` cascade to delete
+   * another user's activation.
+   *
+   * `currency_code_in_use_globally` (migration 136) is SECURITY DEFINER, so it
+   * sees every row, and it runs inside this transaction, so the answer cannot
+   * go stale between the check and the delete it guards.
+   */
+  private async isInUseGlobally(
+    manager: EntityManager,
+    code: string,
+  ): Promise<boolean> {
+    const result = await manager.query(
+      `SELECT currency_code_in_use_globally($1) AS "inUse"`,
+      [code.toUpperCase()],
     );
     return result[0]?.inUse === true;
   }

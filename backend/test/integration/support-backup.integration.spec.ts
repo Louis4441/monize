@@ -16,6 +16,8 @@ import {
 import { User } from "@/users/entities/user.entity";
 import { OidcReauthService } from "@/auth/oidc/oidc-reauth.service";
 import { AiEncryptionService } from "@/ai/ai-encryption.service";
+import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
+import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
 import {
   createTestUserDirect,
   INTEGRATION_TYPEORM_OPTIONS,
@@ -50,6 +52,11 @@ describe("Support backup (integration)", () => {
         // keep this suite green through the removal of the check it gates.
         OidcReauthService,
         { provide: AiEncryptionService, useValue: { decrypt: () => "" } },
+        // The real database-backed provider: BackupService's constructor
+        // requires the token to be resolvable regardless of whether a given
+        // test seeds an attachment, and this needs no extra config.
+        DatabaseStorageProvider,
+        { provide: ATTACHMENT_STORAGE_PROVIDER, useExisting: DatabaseStorageProvider },
       ],
     }).compile();
 
@@ -205,6 +212,7 @@ describe("Support backup (integration)", () => {
     const { buffer } = await withUserContext(userA.id, () =>
       supportService.generate(userA.id, {
         multiplier: 2.5,
+        password: PASSWORD,
       }),
     );
 
@@ -269,6 +277,7 @@ describe("Support backup (integration)", () => {
     const { buffer } = await withUserContext(userA.id, () =>
       supportService.generate(userA.id, {
         multiplier: 2.5,
+        password: PASSWORD,
       }),
     );
     const result = await withUserContext(userB.id, () =>

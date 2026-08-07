@@ -989,7 +989,6 @@ COMMENT ON FUNCTION app_real_user_id() IS
   'RLS: authenticated user id from the app.real_user_id GUC (the delegate while acting; equals app_current_user_id() otherwise).';
 COMMENT ON FUNCTION app_bypass_rls() IS
   'RLS: true inside a withSystemContext scope, letting cross-user jobs (cron, seed, admin, pre-session auth) see every row.';
-
 -- Triggers for updated_at timestamps.
 --
 -- Honours the app.preserve_timestamps GUC so backup restore can write rows with
@@ -2236,3 +2235,163 @@ BEGIN
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     END LOOP;
 END $$;
+
+-- -------------------------------------------------------------------------
+-- One global answer to "is this currency code still referenced?" (migration 136).
+--
+-- `currencies` is shared reference data, and columns across most of the
+-- financial tables point at `currencies(code)`. Deleting a row any of them still
+-- holds either aborts with a foreign-key violation or -- for
+-- `user_currency_preferences`, the one FK that cascades -- silently removes
+-- another user's activation.
+--
+-- The two callers that used to decide this each got it wrong: the currencies
+-- service enumerated only some of the columns, and the backup restore's
+-- cleanup enumerated all of them but ran inside the restoring user's transaction,
+-- where RLS hides the other users' rows the `NOT EXISTS` clauses were looking
+-- for. So the predicate lives here and both call it.
+--
+-- SECURITY DEFINER is what makes it global: policies are evaluated against
+-- `current_user`, which inside a definer function is this function's owner, and
+-- the owner is not subject to its own policies (FORCE ROW LEVEL SECURITY is
+-- deliberately unused -- see the RLS notes at the end of this file). It runs in
+-- the caller's transaction, so the check and the delete it guards stay one
+-- read-modify-write, which a separate system-context connection could not be.
+--
+-- The privilege is one VARCHAR in, one boolean out: no row contents leave the
+-- function and the caller cannot influence which tables are consulted.
+-- `search_path` is pinned so `public` cannot be shadowed. EXECUTE is revoked
+-- from PUBLIC and re-granted to the runtime role by db-init (a GRANT naming that
+-- role cannot live in SQL that runs before the role exists).
+--
+-- `currency-references.spec.ts` fails when a FK to `currencies(code)` is not
+-- consulted below, so a migration adding one cannot leave this behind.
+CREATE OR REPLACE FUNCTION currency_code_in_use_globally(p_code VARCHAR)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM user_currency_preferences WHERE currency_code = p_code
+    UNION ALL SELECT 1 FROM exchange_rates
+      WHERE from_currency = p_code OR to_currency = p_code
+    UNION ALL SELECT 1 FROM accounts WHERE currency_code = p_code
+    UNION ALL SELECT 1 FROM transactions
+      WHERE currency_code = p_code OR original_currency_code = p_code
+    UNION ALL SELECT 1 FROM securities WHERE currency_code = p_code
+    UNION ALL SELECT 1 FROM scheduled_transactions
+      WHERE currency_code = p_code OR original_currency_code = p_code
+    UNION ALL SELECT 1 FROM budgets WHERE currency_code = p_code
+    UNION ALL SELECT 1 FROM user_preferences WHERE default_currency = p_code
+  )
+$$;
+
+COMMENT ON FUNCTION currency_code_in_use_globally(VARCHAR) IS
+  'True when any row anywhere still references currencies(code) = p_code. '
+  'SECURITY DEFINER so the answer is genuinely global rather than the calling '
+  'tenant''s view of it; runs in the caller''s transaction so the check and the '
+  'delete it guards are one read-modify-write. Must consult every FK to '
+  'currencies(code) -- enforced by currency-references.spec.ts.';
+
+REVOKE ALL ON FUNCTION currency_code_in_use_globally(VARCHAR) FROM PUBLIC;
+
+-- -------------------------------------------------------------------------
+-- Which currency codes does one user reference?
+--
+-- The companion to `currency_code_in_use_globally` (migration 136), and a
+-- separate question: that one asks whether *anybody* still holds a code, this
+-- one asks which codes a single user holds. Both enumerate the columns that
+-- reference `currencies(code)`, which is precisely the list that has drifted
+-- before, so both live in SQL beside each other and
+-- `currency-references.spec.ts` checks each against the schema.
+--
+-- Two callers ask it in two slightly different ways, so it is two functions --
+-- one list, derived twice, rather than the list written twice:
+--
+--   * `currency_codes_referenced_by_user_data` -- the codes this user's *data*
+--     is denominated in. What the delete gate needs: deleting a currency the
+--     caller still has a budget or an account in has to be refused.
+--   * `currency_codes_referenced_by_user` -- the above plus the user's own
+--     activation row. What the backup export needs: a currency the user
+--     activated but has not spent anything in yet must still travel with the
+--     backup, or the restore has a preference row pointing at a definition that
+--     is not in the file.
+--
+-- The composite calls the data function rather than repeating its branches. The
+-- delete gate could not use the composite: it runs *before* deleting the
+-- caller's own preference row, so the activation it is about to remove would
+-- always answer "in use" and no currency could ever be deleted.
+--
+-- The backup export needs this because it selected currencies by
+-- `created_by_user_id`. Currencies are shared -- any user may activate a code
+-- another user created -- so a user whose accounts are denominated in somebody
+-- else's custom currency exported the references without the definition, and a
+-- restore onto a fresh instance invented name, symbol and decimal places from a
+-- fallback. A currency defined as `PTS / Family Points / * / 0 decimals` came
+-- back as `PTS / PTS / PTS / 2 decimals`: the stored amounts were unchanged, but
+-- a balance of 7 rendered as `PTS 7.00` instead of `*7`.
+--
+-- The delete gate needs it because `CurrenciesService.isInUse` was a third
+-- hand-written spelling of the same list and was missing `budgets.currency_code`
+-- -- so a user with a budget denominated in a custom currency was told the code
+-- was not "in use by your accounts, securities, or other records", had their
+-- activation deleted, and was left with a budget in a currency they could no
+-- longer see or reactivate.
+--
+-- Both are deliberately SECURITY INVOKER, unlike their sibling in 133. They must
+-- answer for the calling tenant only, and under RLS the caller's own policies
+-- give exactly that -- so the ordinary rules apply and no privilege is granted.
+--
+-- `exchange_rates` is absent on purpose: it is global reference data with no
+-- `user_id`, so it cannot contribute to a per-user answer. The guard test knows
+-- this rule (a referencing table with no `user_id` column is exempt here) rather
+-- than carrying an exception list.
+
+-- NULLs are filtered once here rather than per branch: three of the columns are
+-- nullable, and a NULL in the result set turns a caller's `NOT IN` into a
+-- silently empty answer.
+CREATE OR REPLACE FUNCTION currency_codes_referenced_by_user_data(p_user_id uuid)
+RETURNS SETOF varchar
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT code FROM (
+    SELECT default_currency AS code FROM user_preferences WHERE user_id = p_user_id
+    UNION SELECT currency_code FROM accounts WHERE user_id = p_user_id
+    UNION SELECT currency_code FROM transactions WHERE user_id = p_user_id
+    UNION SELECT original_currency_code FROM transactions WHERE user_id = p_user_id
+    UNION SELECT currency_code FROM securities WHERE user_id = p_user_id
+    UNION SELECT currency_code FROM scheduled_transactions WHERE user_id = p_user_id
+    UNION SELECT original_currency_code FROM scheduled_transactions WHERE user_id = p_user_id
+    UNION SELECT currency_code FROM budgets WHERE user_id = p_user_id
+  ) referenced
+  WHERE code IS NOT NULL
+$$;
+
+COMMENT ON FUNCTION currency_codes_referenced_by_user_data(uuid) IS
+  'The currency codes one user''s data is denominated in, excluding their own '
+  'user_currency_preferences activation row. What the delete gate needs, since it '
+  'runs before removing that row. SECURITY INVOKER: the answer is meant to be the '
+  'calling tenant''s, which the caller''s own RLS policies already give. Must '
+  'consult every FK to currencies(code) whose table has a user_id -- enforced by '
+  'currency-references.spec.ts. exchange_rates is excluded: global reference data '
+  'with no owner cannot contribute to a per-user answer.';
+
+CREATE OR REPLACE FUNCTION currency_codes_referenced_by_user(p_user_id uuid)
+RETURNS SETOF varchar
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT currency_code FROM user_currency_preferences WHERE user_id = p_user_id
+  UNION SELECT referenced.code
+    FROM currency_codes_referenced_by_user_data(p_user_id) AS referenced(code)
+$$;
+
+COMMENT ON FUNCTION currency_codes_referenced_by_user(uuid) IS
+  'Every currency code one user references: the codes their data is denominated '
+  'in, plus the codes they have activated. What the backup export needs, so an '
+  'activated-but-unused currency definition still travels with the backup. '
+  'Derives from currency_codes_referenced_by_user_data rather than repeating its '
+  'branches -- that list has drifted three times.';

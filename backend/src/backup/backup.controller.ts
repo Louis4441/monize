@@ -26,14 +26,39 @@ import { CreateSupportBackupDto } from "./support-backup/dto/create-support-back
 import { SetBackupPasswordDto } from "./dto/backup-encryption.dto";
 import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
 import { tr } from "../i18n/translate";
+import { releaseRestoreReservation } from "./restore-upload-admission";
 
 // Password header values are base64-encoded by the client so leading/trailing
 // whitespace (and non-ASCII characters) survive HTTP header transport, which
 // otherwise strips surrounding whitespace per RFC 7230. Decode them back to the
 // exact password the user typed before any credential comparison or decryption.
-function decodePasswordHeader(value: string | undefined): string | undefined {
+//
+// The round-trip check is the point. Node's base64 decoder is lenient: it
+// silently discards characters outside the alphabet rather than failing, so a
+// client that sent the password unencoded (or encoded it wrongly) got a mangled
+// string back and no error anywhere. On `x-restore-password` that is a
+// confusing 401; on `x-export-password` it is unrecoverable, because the export
+// is then encrypted under a password nobody knows and reported as a success.
+// Better to refuse the request than to hand back a file that can never be
+// opened.
+function decodePasswordHeader(
+  value: string | undefined,
+  header: string,
+): string | undefined {
   if (value === undefined) return undefined;
-  return Buffer.from(value, "base64").toString("utf8");
+  const decoded = Buffer.from(value, "base64");
+  if (
+    decoded.toString("base64").replace(/=+$/, "") !== value.replace(/=+$/, "")
+  ) {
+    throw new BadRequestException(
+      tr(
+        "errors.backup.passwordHeaderNotBase64",
+        `The ${header} header must be base64-encoded.`,
+        { header },
+      ),
+    );
+  }
+  return decoded.toString("utf8");
 }
 
 /**
@@ -79,6 +104,7 @@ export class BackupController {
     // and so it never lands in server access logs as a query string.
     const encryptionPassword = decodePasswordHeader(
       req.headers["x-export-password"] as string | undefined,
+      "x-export-password",
     );
 
     this.setBackupDownloadHeaders(res, !!encryptionPassword, "monize-backup");
@@ -129,7 +155,26 @@ export class BackupController {
   })
   @ApiResponse({ status: 200, description: "Data restored successfully" })
   @ApiResponse({ status: 401, description: "Invalid credentials" })
-  @ApiResponse({ status: 400, description: "Invalid backup format" })
+  @ApiResponse({
+    status: 400,
+    description:
+      "Invalid backup format, a decompression or JSON failure, or a decompressed payload over BACKUP_RESTORE_EXPANDED_LIMIT -- the expanded ceiling answers 400, not 413, because by then the request body was within its own limit",
+  })
+  @ApiResponse({
+    status: 413,
+    description:
+      "Compressed upload exceeds BACKUP_RESTORE_LIMIT. A request declaring an oversized Content-Length is refused before its body is read; without a usable one -- absent header, chunked transfer, or a declared length under what is actually sent -- express.raw enforces the same limit while receiving, so the refusal arrives mid-transfer instead",
+  })
+  @ApiResponse({
+    status: 408,
+    description:
+      "Upload did not arrive within the receive deadline; its memory reservation was released",
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      "Two different conditions, distinguishable by the header: the aggregate upload budget is occupied, which is transient and carries Retry-After; or modeled processing capacity is zero, which persists until an operator raises the container memory or lowers BACKUP_RESTORE_EXPANDED_LIMIT and carries no Retry-After. Contention for a slot while capacity is positive queues rather than answering 503.",
+  })
   async restoreBackup(@Request() req) {
     const body: unknown = req.body;
     // CodeQL js/type-confusion-through-parameter-tampering doesn't model
@@ -151,21 +196,31 @@ export class BackupController {
 
     const password = decodePasswordHeader(
       req.headers["x-restore-password"] as string | undefined,
+      "x-restore-password",
     );
     const oidcIdToken = req.headers["x-restore-oidc-token"] as
       | string
       | undefined;
     const backupPassword = decodePasswordHeader(
       req.headers["x-backup-password"] as string | undefined,
+      "x-backup-password",
     );
 
-    const result = await this.backupService.restoreData(req.user.id, {
-      compressedData: body,
-      password,
-      oidcIdToken,
-      backupPassword,
-    });
-    return result;
+    try {
+      return await this.backupService.restoreData(req.user.id, {
+        compressedData: body,
+        password,
+        oidcIdToken,
+        backupPassword,
+      });
+    } finally {
+      // The upload's memory reservation is held from before the body was parsed
+      // (see `createRestoreUploadAdmission`) and only the handler knows when the
+      // expensive work is over. Releasing on the response socket closing instead
+      // freed it while decryption, staging and SQL were still running, so a
+      // second large upload could be admitted beside this one.
+      releaseRestoreReservation(req);
+    }
   }
 
   @Get("encryption")
