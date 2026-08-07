@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, within } from '@testing-library/react';
 import { render } from '@/test/render';
 import { EntitySwitcher, type EntitySwitcherItem } from './EntitySwitcher';
 
@@ -101,6 +101,64 @@ describe('EntitySwitcher', () => {
     fireEvent.click(screen.getByRole('button', { name: LABELS.triggerLabel }));
     fireEvent.click(screen.getByRole('button', { name: LABELS.triggerLabel }));
     expect(screen.getByRole('menuitem', { name: /Thing number 3/ })).toBeInTheDocument();
+  });
+
+  describe('grouped items', () => {
+    /** Two sections, deliberately interleaved in the input array. */
+    const grouped: EntitySwitcherItem[] = [
+      { id: 'item-1', primary: 'Alpha', group: 'Spending' },
+      { id: 'item-2', primary: 'Beta', group: 'Spending' },
+      { id: 'item-3', primary: 'Gamma', group: 'Budget' },
+    ];
+
+    it('puts each row under its section heading', () => {
+      open(grouped);
+      const spending = screen.getByRole('group', { name: 'Spending' });
+      const budget = screen.getByRole('group', { name: 'Budget' });
+      // Alpha is the current entity, so Spending keeps only Beta.
+      expect(within(spending).getByRole('menuitem', { name: /Beta/ })).toBeInTheDocument();
+      expect(within(budget).getByRole('menuitem', { name: /Gamma/ })).toBeInTheDocument();
+    });
+
+    it('orders the sections by where each first appears, and reunites strays', () => {
+      // Interleaved on purpose: Beta arrives after a Budget row, and still
+      // belongs under the heading its section opened with.
+      open(
+        [
+          { id: 'item-1', primary: 'Alpha', group: 'Spending' },
+          { id: 'item-3', primary: 'Gamma', group: 'Budget' },
+          { id: 'item-2', primary: 'Beta', group: 'Spending' },
+        ],
+        // Not one of them, so nothing is filtered out of the sections.
+        'elsewhere',
+      );
+      const headings = screen
+        .getAllByRole('group')
+        .map((g) => g.getAttribute('aria-label'));
+      expect(headings).toEqual(['Spending', 'Budget']);
+      const spending = screen.getByRole('group', { name: 'Spending' });
+      expect(
+        within(spending)
+          .getAllByRole('menuitem')
+          .map((row) => row.textContent),
+      ).toEqual(['Alpha', 'Beta']);
+    });
+
+    it('drops a section whose every row was filtered out', () => {
+      // Long enough for the filter box; only the Budget row matches "gamma".
+      open([...many(9), ...grouped], 'item-0');
+      fireEvent.change(screen.getByPlaceholderText(LABELS.filterPlaceholder), {
+        target: { value: 'gamma' },
+      });
+      expect(screen.getByRole('group', { name: 'Budget' })).toBeInTheDocument();
+      // A heading with nothing under it reads as a section that lost its rows.
+      expect(screen.queryByRole('group', { name: 'Spending' })).toBeNull();
+    });
+
+    it('leaves an ungrouped list free of headings', () => {
+      open(two);
+      expect(screen.queryAllByRole('group')).toEqual([]);
+    });
   });
 
   it('closes on Escape and returns focus to the caret', () => {

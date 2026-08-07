@@ -9,9 +9,6 @@
       "pp": "{value} p.p."
     },
     "header": {
-      "breadcrumbAriaLabel": "Percorso di navigazione",
-      "breadcrumbRoot": "Report",
-      "title": "Strategia GEM",
       "subtitle": "Momentum azionario globale – azioni contro un'attività sicura",
       "explainer": "Global Equities Momentum investe tutto il portafoglio della strategia in una sola attività per ogni periodo: le azioni quando il loro rendimento a {months} mesi batte quello dell'attività priva di rischio (momentum assoluto), altrimenti l'attività sicura. Tra le azioni vince il mercato con il rendimento a {months} mesi più alto (momentum relativo).",
       "cadence": "Frequenza di valutazione: {cadence}",

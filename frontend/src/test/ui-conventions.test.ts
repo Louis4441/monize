@@ -305,6 +305,43 @@ describe("a tab bar is the shared Tabs component", () => {
   });
 });
 
+describe("the way back to a section list is the shared link", () => {
+  /**
+   * Every report page returns to the list the same way: a chevron and "Back to
+   * Reports" above the title, matching the account, payee, category and
+   * security detail pages. `BackToReportsLink` is that control. The rule is a
+   * scan because a hand-rolled one is never wrong on its own file's terms --
+   * the GEM report had a breadcrumb, the two report viewers had an outline
+   * button among their actions, and each looked deliberate until they were on
+   * screen next to each other.
+   *
+   * Matched on the pair (a back chevron *and* a link to `/reports`), so the
+   * editor pages' "Back to Reports" cancel button -- which is an action on a
+   * form, not the way out of a detail page -- is deliberately left alone.
+   */
+  const SHARED = "/src/components/reports/BackToReportsLink.tsx";
+  const REPORTS_HREF = /href=["']\/reports["']/;
+  const BACK_CHEVRON = /<ChevronLeftIcon\b/;
+
+  it("has no hand-rolled back-to-reports link", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== SHARED)
+      .filter(
+        ([, source]) => REPORTS_HREF.test(source) && BACK_CHEVRON.test(source),
+      )
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the shared link, so the rule cannot pass by accident", () => {
+    const shared = sources[SHARED];
+    expect(shared, `${SHARED} not found -- update SHARED in this test`).toBeTruthy();
+    expect(REPORTS_HREF.test(shared)).toBe(true);
+    expect(BACK_CHEVRON.test(shared)).toBe(true);
+  });
+});
+
 describe("nothing interactive is nested inside a button", () => {
   /**
    * `<button>`'s content model forbids interactive descendants, and the

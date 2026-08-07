@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "Relatório Não Encontrado",
-    "notFoundDesc": "O relatório solicitado não existe.",
-    "backToReports": "Voltar aos Relatórios"
+    "notFoundDesc": "O relatório solicitado não existe."
   },
   "error": {
     "defaultMessage": "Falha ao carregar dados do relatório. Tente novamente.",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "Relatório não encontrado",
-    "backToReports": "Voltar aos Relatórios",
     "labelTimeframe": "Período",
     "useSavedTimeframe": "Usar período guardado",
     "labelStartDate": "Data de Início",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Relatório não encontrado",
-    "backToReports": "Voltar aos Relatórios",
     "accountsLabel": "Contas",
     "accountsPlaceholder": "Todas as contas de investimento",
     "labelAsOfDate": "Com referência à data",

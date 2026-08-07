@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "未找到报告",
-    "notFoundDesc": "所请求的报告不存在。",
-    "backToReports": "返回报告"
+    "notFoundDesc": "所请求的报告不存在。"
   },
   "error": {
     "defaultMessage": "加载报告数据失败。请重试。",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "未找到报告",
-    "backToReports": "返回报告",
     "labelTimeframe": "时间范围",
     "useSavedTimeframe": "使用保存的时间范围",
     "labelStartDate": "开始日期",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "未找到报告",
-    "backToReports": "返回报告",
     "accountsLabel": "账户",
     "accountsPlaceholder": "所有投资账户",
     "labelAsOfDate": "截至日期",

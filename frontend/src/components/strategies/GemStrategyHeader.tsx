@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
   CalendarDaysIcon,
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/Button";
+import { BackToReportsLink } from "@/components/reports/BackToReportsLink";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { TOUR_ANCHORS, tourAnchor } from "@/lib/tours/anchors";
 import { useDateFormat } from "@/hooks/useDateFormat";
@@ -43,8 +43,8 @@ interface GemStrategyHeaderProps {
 }
 
 /**
- * Page header: breadcrumb, title with the strategy explainer, and the
- * evaluation cadence block. The cadence/next-evaluation pair lives here so the
+ * Page header: the way back to Reports, the title with the strategy explainer,
+ * and the evaluation cadence block. The cadence/next-evaluation pair lives here so the
  * summary cards below do not repeat it.
  */
 export function GemStrategyHeader({
@@ -67,22 +67,11 @@ export function GemStrategyHeader({
 
   return (
     <header className="mb-4" {...tourAnchor(TOUR_ANCHORS.gemStrategyHeader)}>
-      <nav aria-label={t("gem.header.breadcrumbAriaLabel")} className="mb-1">
-        <ol className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-          <li>
-            <Link
-              href="/reports"
-              className="rounded hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-blue-400"
-            >
-              {t("gem.header.breadcrumbRoot")}
-            </Link>
-          </li>
-          <li aria-hidden="true">/</li>
-          <li className="text-gray-700 dark:text-gray-300" aria-current="page">
-            {t("gem.header.title")}
-          </li>
-        </ol>
-      </nav>
+      {/* The same way back the other report pages carry. The title below is the
+          scenario's name, so the caret beside it switches scenarios rather than
+          reports -- one level in from the report switcher, the way the account
+          detail page's caret switches accounts. */}
+      <BackToReportsLink />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>

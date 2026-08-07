@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "Laporan Tidak Ditemukan",
-    "notFoundDesc": "Laporan yang diminta tidak ada.",
-    "backToReports": "Kembali ke Laporan"
+    "notFoundDesc": "Laporan yang diminta tidak ada."
   },
   "error": {
     "defaultMessage": "Gagal memuat data laporan. Silakan coba lagi.",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "Laporan tidak ditemukan",
-    "backToReports": "Kembali ke Laporan",
     "labelTimeframe": "Kerangka Waktu",
     "useSavedTimeframe": "Gunakan kerangka waktu yang disimpan",
     "labelStartDate": "Tanggal Mulai",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Laporan tidak ditemukan",
-    "backToReports": "Kembali ke Laporan",
     "accountsLabel": "Akun",
     "accountsPlaceholder": "Semua akun investasi",
     "labelAsOfDate": "Per tanggal",

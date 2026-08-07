@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "レポートが見つかりません",
-    "notFoundDesc": "リクエストされたレポートは存在しません。",
-    "backToReports": "レポートに戻る"
+    "notFoundDesc": "リクエストされたレポートは存在しません。"
   },
   "error": {
     "defaultMessage": "レポートデータの読み込みに失敗しました。再試行してください。",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "レポートが見つかりません",
-    "backToReports": "レポートに戻る",
     "labelTimeframe": "期間",
     "useSavedTimeframe": "保存した期間を使用",
     "labelStartDate": "開始日",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "レポートが見つかりません",
-    "backToReports": "レポートに戻る",
     "accountsLabel": "口座",
     "accountsPlaceholder": "すべての投資口座",
     "labelAsOfDate": "基準日",

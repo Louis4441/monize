@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
 import { ReportChart } from './ReportChart';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { ReportDetailHeader } from '@/components/reports/ReportDetailHeader';
 import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
 import { Select } from '@/components/ui/Select';
@@ -33,6 +32,7 @@ interface CustomReportViewerProps {
 
 export function CustomReportViewer({ reportId }: CustomReportViewerProps) {
   const t = useTranslations('reports');
+  const tc = useTranslations('common');
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -151,7 +151,7 @@ export function CustomReportViewer({ reportId }: CustomReportViewerProps) {
       <div className="text-center py-12">
         <p className="text-gray-500 dark:text-gray-400">{t('customReportViewer.notFound')}</p>
         <Button variant="outline" onClick={() => router.push('/reports')} className="mt-4">
-          {t('customReportViewer.backToReports')}
+          {t('detailHeader.backToReports')}
         </Button>
       </div>
     );
@@ -159,22 +159,18 @@ export function CustomReportViewer({ reportId }: CustomReportViewerProps) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <ReportDetailHeader
+        reportId={`custom/${reportId}`}
         title={report.name}
         subtitle={report.description ?? undefined}
         actions={
-          <div className="flex items-center gap-3 w-full justify-between sm:w-auto sm:justify-end">
-            <Link href="/reports" className="order-1 sm:order-2">
-              <Button variant="outline">{t('customReportViewer.backToReports')}</Button>
-            </Link>
-            <Button
-              variant="outline"
-              className="shrink-0 order-2 sm:order-1"
-              onClick={() => router.push(`/reports/custom/${reportId}/edit`)}
-            >
-              Edit
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            className="shrink-0"
+            onClick={() => router.push(`/reports/custom/${reportId}/edit`)}
+          >
+            {tc('edit')}
+          </Button>
         }
       />
 

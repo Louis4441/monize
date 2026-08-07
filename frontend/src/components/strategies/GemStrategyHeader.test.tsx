@@ -17,16 +17,13 @@ describe("GemStrategyHeader", () => {
     daysUntilNextEvaluation: 28,
   };
 
-  it("shows the breadcrumb, title, cadence and days remaining", () => {
+  it("shows the way back, title, cadence and days remaining", () => {
     render(<GemStrategyHeader {...baseProps} onEditSettings={vi.fn()} />);
 
+    // The same back link the other report pages carry, above the title.
     expect(
-      screen.getByRole("navigation", { name: "Breadcrumb" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute(
-      "href",
-      "/reports",
-    );
+      screen.getByRole("link", { name: "Back to Reports" }),
+    ).toHaveAttribute("href", "/reports");
     expect(
       screen.getByRole("heading", { level: 1, name: /GEM Strategy/ }),
     ).toBeInTheDocument();

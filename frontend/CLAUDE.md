@@ -110,6 +110,29 @@ Give each field an explicit `id` when two on the same screen share a label. Both
 
 Do not put the click on a button around the symbol or the name instead. It looks identical and is not: the rest of the row -- all the cell padding, every other column -- becomes dead, and clicking a row "does nothing" for the majority of its area. Controls *inside* the row (a favourite star, `RowActions`) must `stopPropagation` so they act on themselves; both already do.
 
+### A detail page returns to its list above the title, and switches with the caret beside it
+
+Every detail page in the app -- an account, a payee, a category, a security, a
+report -- carries the same two controls: a chevron and "Back to <List>" on the
+line *above* the title, and `EntitySwitcher`'s caret immediately after the
+title, which jumps straight to another entity of the same kind. The way back is
+not an action on the thing being viewed, so it does not belong among the
+buttons on the right; that is where it drifted to on the report pages, and one
+of them grew a breadcrumb instead, so the section read as three pages that
+happened to share a URL prefix.
+
+For reports the pair is `BackToReportsLink` and `ReportDetailHeader`
+(`components/reports/`), used by the generic `[reportId]` renderer, the custom
+and investment viewers, and the GEM report -- whose caret switches *scenarios*,
+one level in, because its title is a scenario name. `ui-conventions.test.ts`
+scans for a hand-rolled back-chevron-to-`/reports`.
+
+A switcher list too long to scan takes `group` on its items
+(`ReportSwitcher` groups by the section the Reports page files each report
+under, in `REPORT_CATEGORIES` order). Sections follow the order their first
+item appears in, so ordering happens in the caller, and a section whose rows
+are all filtered out takes its heading with it.
+
 ### A category picker lists every category in tree order as "Parent: Child"
 
 However a surface selects a category -- the transaction form's Combobox, a

@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "找不到報表",
-    "notFoundDesc": "所請求的報表不存在。",
-    "backToReports": "返回報表"
+    "notFoundDesc": "所請求的報表不存在。"
   },
   "error": {
     "defaultMessage": "載入報表資料失敗。請再試一次。",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "找不到報表",
-    "backToReports": "返回報表",
     "labelTimeframe": "時間範圍",
     "useSavedTimeframe": "使用已儲存的時間範圍",
     "labelStartDate": "開始日期",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "找不到報表",
-    "backToReports": "返回報表",
     "accountsLabel": "科目",
     "accountsPlaceholder": "所有投資科目",
     "labelAsOfDate": "截至日期",

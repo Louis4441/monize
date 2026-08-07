@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { ReportDetailHeader } from '@/components/reports/ReportDetailHeader';
 import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -228,7 +227,7 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
       <div className="text-center py-12">
         <p className="text-gray-500 dark:text-gray-400">{t('investmentReportViewer.notFound')}</p>
         <Button variant="outline" onClick={() => router.push('/reports')} className="mt-4">
-          {t('investmentReportViewer.backToReports')}
+          {t('detailHeader.backToReports')}
         </Button>
       </div>
     );
@@ -238,22 +237,18 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <ReportDetailHeader
+        reportId={`investment/${reportId}`}
         title={report.name}
         subtitle={report.description ?? undefined}
         actions={
-          <div className="flex items-center gap-3 w-full justify-between sm:w-auto sm:justify-end">
-            <Link href="/reports" className="order-1 sm:order-2">
-              <Button variant="outline">{t('investmentReportViewer.backToReports')}</Button>
-            </Link>
-            <Button
-              variant="outline"
-              className="shrink-0 order-2 sm:order-1"
-              onClick={() => router.push(`/reports/investment/${reportId}/edit`)}
-            >
-              {tc('edit')}
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            className="shrink-0"
+            onClick={() => router.push(`/reports/investment/${reportId}/edit`)}
+          >
+            {tc('edit')}
+          </Button>
         }
       />
 

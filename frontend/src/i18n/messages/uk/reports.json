@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "Звіт не знайдено",
-    "notFoundDesc": "Запитуваний звіт не існує.",
-    "backToReports": "Назад до звітів"
+    "notFoundDesc": "Запитуваний звіт не існує."
   },
   "error": {
     "defaultMessage": "Не вдалося завантажити дані звіту. Будь ласка, спробуйте ще раз.",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "Звіт не знайдено",
-    "backToReports": "Назад до звітів",
     "labelTimeframe": "Часовий проміжок",
     "useSavedTimeframe": "Використати збережений часовий проміжок",
     "labelStartDate": "Дата початку",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Звіт не знайдено",
-    "backToReports": "Назад до звітів",
     "accountsLabel": "Рахунки",
     "accountsPlaceholder": "Усі інвестиційні рахунки",
     "labelAsOfDate": "Станом на дату",

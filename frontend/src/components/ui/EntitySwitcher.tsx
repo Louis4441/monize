@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useClickOutside } from '@/hooks/useClickOutside';
 
@@ -15,6 +15,13 @@ export interface EntitySwitcherItem {
    * a reader would actually type (a security matches on symbol or name).
    */
   searchText?: string;
+  /**
+   * Heading this row sits under, for a list long enough that sections are how
+   * a reader finds anything (the reports switcher groups by section). Sections
+   * appear in the order their first item does, so the caller decides the order
+   * by ordering `items`. Omit on every item for a flat list.
+   */
+  group?: string;
 }
 
 interface EntitySwitcherProps {
@@ -43,6 +50,9 @@ const FILTER_THRESHOLD = 8;
  * the same kind, without going back to the list and clicking through again. The
  * securities, payees and accounts detail headers all use it, so the behaviour is
  * defined once rather than reimplemented per page.
+ *
+ * Items may carry a `group`, in which case the menu is split into labelled
+ * sections -- how the reports switcher makes fifty entries scannable.
  *
  * The filter appears only once the list is long enough to need it: for a handful
  * of entities the box is one more thing to skip past, and for a hundred it is
@@ -91,8 +101,54 @@ export function EntitySwitcher({
     );
   }, [others, query]);
 
+  /**
+   * The matches split into sections, in first-appearance order. Built from the
+   * filtered set rather than the whole list, so a section whose every row was
+   * filtered out takes its heading with it.
+   */
+  const sections = useMemo(() => {
+    const names = matches.reduce<string[]>((acc, item) => {
+      const name = item.group ?? '';
+      return acc.includes(name) ? acc : [...acc, name];
+    }, []);
+    return names.map((name) => ({
+      name,
+      items: matches.filter((item) => (item.group ?? '') === name),
+    }));
+  }, [matches]);
+
   // Nothing to switch to: the caret would open an empty list.
   if (others.length === 0) return null;
+
+  const renderItem = (item: EntitySwitcherItem) => (
+    <button
+      key={item.id}
+      type="button"
+      role="menuitem"
+      onClick={() => {
+        close();
+        onSelect(item.id);
+      }}
+      className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
+    >
+      <span
+        className={`text-sm font-medium text-gray-900 dark:text-gray-100 ${
+          secondaryAlign === 'inline' ? 'shrink-0' : 'min-w-0 truncate'
+        }`}
+      >
+        {item.primary}
+      </span>
+      {item.secondary != null && item.secondary !== '' && (
+        <span
+          className={`text-xs text-gray-500 dark:text-gray-400 ${
+            secondaryAlign === 'inline' ? 'truncate' : 'ml-auto shrink-0'
+          }`}
+        >
+          {item.secondary}
+        </span>
+      )}
+    </button>
+  );
 
   return (
     <div ref={containerRef} className="relative inline-block">
@@ -141,39 +197,26 @@ export function EntitySwitcher({
                 {noMatchesLabel}
               </p>
             ) : (
-              matches.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    close();
-                    onSelect(item.id);
-                  }}
-                  className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <span
-                    className={`text-sm font-medium text-gray-900 dark:text-gray-100 ${
-                      secondaryAlign === 'inline'
-                        ? 'shrink-0'
-                        : 'min-w-0 truncate'
-                    }`}
-                  >
-                    {item.primary}
-                  </span>
-                  {item.secondary != null && item.secondary !== '' && (
-                    <span
-                      className={`text-xs text-gray-500 dark:text-gray-400 ${
-                        secondaryAlign === 'inline'
-                          ? 'truncate'
-                          : 'ml-auto shrink-0'
-                      }`}
+              sections.map((section) =>
+                section.name === '' ? (
+                  <Fragment key="ungrouped">
+                    {section.items.map(renderItem)}
+                  </Fragment>
+                ) : (
+                  // `role="group"` carries the section's name for assistive
+                  // technology, so the visible heading is decoration and is
+                  // hidden from it rather than announced twice.
+                  <div key={section.name} role="group" aria-label={section.name}>
+                    <p
+                      aria-hidden="true"
+                      className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500"
                     >
-                      {item.secondary}
-                    </span>
-                  )}
-                </button>
-              ))
+                      {section.name}
+                    </p>
+                    {section.items.map(renderItem)}
+                  </div>
+                ),
+              )
             )}
           </div>
         </div>

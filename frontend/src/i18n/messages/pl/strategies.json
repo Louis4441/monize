@@ -9,9 +9,6 @@
       "pp": "{value} pp"
     },
     "header": {
-      "breadcrumbAriaLabel": "Ścieżka nawigacji",
-      "breadcrumbRoot": "Raporty",
-      "title": "Strategia GEM",
       "subtitle": "Globalne momentum akcji – akcje kontra aktywo bezpieczne",
       "explainer": "Global Equities Momentum w każdym okresie lokuje cały portfel strategii w jedno aktywo: w akcje, gdy ich {months}-miesięczna stopa zwrotu przewyższa aktywo wolne od ryzyka (momentum absolutne), w przeciwnym razie w aktywo bezpieczne. Wśród akcji wygrywa rynek z najwyższą {months}-miesięczną stopą zwrotu (momentum relatywne).",
       "cadence": "Częstotliwość oceny: {cadence}",

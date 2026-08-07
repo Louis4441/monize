@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "Rapport niet gevonden",
-    "notFoundDesc": "Het gevraagde rapport bestaat niet.",
-    "backToReports": "Terug naar rapporten"
+    "notFoundDesc": "Het gevraagde rapport bestaat niet."
   },
   "error": {
     "defaultMessage": "Rapportgegevens konden niet worden geladen. Probeer het opnieuw.",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "Rapport niet gevonden",
-    "backToReports": "Terug naar rapporten",
     "labelTimeframe": "Tijdsbestek",
     "useSavedTimeframe": "Opgeslagen tijdsbestek gebruiken",
     "labelStartDate": "Begindatum",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Rapport niet gevonden",
-    "backToReports": "Terug naar rapporten",
     "accountsLabel": "Rekeningen",
     "accountsPlaceholder": "Alle beleggingsrekeningen",
     "labelAsOfDate": "Peildatum",

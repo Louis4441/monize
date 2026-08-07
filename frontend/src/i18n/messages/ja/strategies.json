@@ -9,9 +9,6 @@
       "pp": "{value}ポイント"
     },
     "header": {
-      "breadcrumbAriaLabel": "パンくずリスト",
-      "breadcrumbRoot": "レポート",
-      "title": "GEM戦略",
       "subtitle": "グローバル株式モメンタム – 株式と安全資産の比較",
       "explainer": "Global Equities Momentumは、各期間で戦略ポートフォリオ全体を1つの資産に配分します。株式の{months}か月リターンが無リスク資産を上回れば株式へ（絶対モメンタム）、そうでなければ安全資産へ。株式の中では、{months}か月リターンが最も高い市場が選ばれます（相対モメンタム）。",
       "cadence": "評価頻度: {cadence}",

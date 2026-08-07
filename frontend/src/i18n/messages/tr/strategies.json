@@ -9,9 +9,6 @@
       "pp": "{value} puan"
     },
     "header": {
-      "breadcrumbAriaLabel": "Site haritası",
-      "breadcrumbRoot": "Raporlar",
-      "title": "GEM stratejisi",
       "subtitle": "Küresel hisse momentumu – hisseler ile güvenli varlık karşılaştırması",
       "explainer": "Global Equities Momentum her dönemde stratejinin tüm portföyünü tek bir varlığa yatırır: {months} aylık getirisi risksiz varlığı geçtiğinde hisselere (mutlak momentum), aksi hâlde güvenli varlığa. Hisseler arasında {months} aylık getirisi en yüksek olan piyasa kazanır (göreli momentum).",
       "cadence": "Değerlendirme sıklığı: {cadence}",

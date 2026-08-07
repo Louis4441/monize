@@ -9,9 +9,6 @@
       "pp": "{value} điểm phần trăm"
     },
     "header": {
-      "breadcrumbAriaLabel": "Đường dẫn điều hướng",
-      "breadcrumbRoot": "Báo cáo",
-      "title": "Chiến lược GEM",
       "subtitle": "Đà tăng cổ phiếu toàn cầu – cổ phiếu so với tài sản an toàn",
       "explainer": "Global Equities Momentum phân bổ toàn bộ danh mục của chiến lược vào một tài sản duy nhất trong mỗi kỳ: cổ phiếu khi lợi nhuận {months} tháng của chúng vượt tài sản không rủi ro (đà tăng tuyệt đối), nếu không thì tài sản an toàn. Trong nhóm cổ phiếu, thị trường có lợi nhuận {months} tháng cao nhất sẽ thắng (đà tăng tương đối).",
       "cadence": "Tần suất đánh giá: {cadence}",

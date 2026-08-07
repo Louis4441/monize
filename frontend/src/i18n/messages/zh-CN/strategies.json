@@ -9,9 +9,6 @@
       "pp": "{value} 个百分点"
     },
     "header": {
-      "breadcrumbAriaLabel": "面包屑导航",
-      "breadcrumbRoot": "报告",
-      "title": "GEM 策略",
       "subtitle": "全球股票动量 — 股票对比避险资产",
       "explainer": "Global Equities Momentum 在每个周期把策略的整个组合投入单一资产：当股票的 {months} 个月回报高于无风险资产时投股票（绝对动量），否则投避险资产。在股票中，{months} 个月回报最高的市场胜出（相对动量）。",
       "cadence": "评估频率：{cadence}",

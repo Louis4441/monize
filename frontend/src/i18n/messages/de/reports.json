@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "Bericht nicht gefunden",
-    "notFoundDesc": "Der angeforderte Bericht existiert nicht.",
-    "backToReports": "Zurück zu Berichten"
+    "notFoundDesc": "Der angeforderte Bericht existiert nicht."
   },
   "error": {
     "defaultMessage": "Berichtsdaten konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "Bericht nicht gefunden",
-    "backToReports": "Zurück zu Berichten",
     "labelTimeframe": "Zeitraum",
     "useSavedTimeframe": "Gespeicherten Zeitraum verwenden",
     "labelStartDate": "Startdatum",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Bericht nicht gefunden",
-    "backToReports": "Zurück zu Berichten",
     "accountsLabel": "Konten",
     "accountsPlaceholder": "Alle Anlagekonten",
     "labelAsOfDate": "Stichtag",

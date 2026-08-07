@@ -9,9 +9,6 @@
       "pp": "{value}%p"
     },
     "header": {
-      "breadcrumbAriaLabel": "탐색 경로",
-      "breadcrumbRoot": "리포트",
-      "title": "GEM 전략",
       "subtitle": "글로벌 주식 모멘텀 – 주식과 안전자산 비교",
       "explainer": "Global Equities Momentum은 매 기간 전략 포트폴리오 전체를 하나의 자산에 배분합니다. 주식의 {months}개월 수익률이 무위험 자산을 앞서면 주식으로(절대 모멘텀), 그렇지 않으면 안전자산으로 이동합니다. 주식 중에서는 {months}개월 수익률이 가장 높은 시장이 선택됩니다(상대 모멘텀).",
       "cadence": "평가 주기: {cadence}",

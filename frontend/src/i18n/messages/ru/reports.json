@@ -132,8 +132,7 @@
   },
   "reportPage": {
     "notFound": "Отчёт не найден",
-    "notFoundDesc": "Запрошенный отчёт не существует.",
-    "backToReports": "Назад к отчётам"
+    "notFoundDesc": "Запрошенный отчёт не существует."
   },
   "error": {
     "defaultMessage": "Не удалось загрузить данные отчёта. Повторите попытку.",
@@ -379,7 +378,6 @@
   },
   "customReportViewer": {
     "notFound": "Отчёт не найден",
-    "backToReports": "Назад к отчётам",
     "labelTimeframe": "Временной интервал",
     "useSavedTimeframe": "Использовать сохранённый интервал",
     "labelStartDate": "Начальная дата",
@@ -677,7 +675,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Отчёт не найден",
-    "backToReports": "Назад к отчётам",
     "accountsLabel": "Счета",
     "accountsPlaceholder": "Все инвестиционные счета",
     "labelAsOfDate": "По состоянию на",

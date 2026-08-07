@@ -9,9 +9,6 @@
       "pp": "[XX-{value} pp-XX]"
     },
     "header": {
-      "breadcrumbAriaLabel": "[XX-Breadcrumb-XX]",
-      "breadcrumbRoot": "[XX-Reports-XX]",
-      "title": "[XX-GEM Strategy-XX]",
       "subtitle": "[XX-Global equities momentum – equities versus a safe asset-XX]",
       "explainer": "[XX-Global Equities Momentum allocates the whole strategy portfolio to a single asset each period: equities when their {months}-month return beats the risk-free asset (absolute momentum), otherwise the safe asset. Among equities, the market with the strongest {months}-month return wins (relative momentum).-XX]",
       "cadence": "[XX-Evaluation frequency: {cadence}-XX]",

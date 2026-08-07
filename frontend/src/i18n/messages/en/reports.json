@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Heatmap grid showing 12 months across all categories to identify seasonal spending patterns."
     }
   },
+  "detailHeader": {
+    "backToReports": "Back to Reports",
+    "switchReport": "Switch to another report",
+    "switchPlaceholder": "Filter reports...",
+    "switchNoMatches": "No reports match"
+  },
   "reportPage": {
     "notFound": "Report Not Found",
-    "notFoundDesc": "The requested report does not exist.",
-    "backToReports": "Back to Reports"
+    "notFoundDesc": "The requested report does not exist."
   },
   "error": {
     "defaultMessage": "Failed to load report data. Please try again.",
@@ -376,7 +381,6 @@
   },
   "customReportViewer": {
     "notFound": "Report not found",
-    "backToReports": "Back to Reports",
     "labelTimeframe": "Timeframe",
     "useSavedTimeframe": "Use saved timeframe",
     "labelStartDate": "Start Date",
@@ -674,7 +678,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Report not found",
-    "backToReports": "Back to Reports",
     "accountsLabel": "Accounts",
     "accountsPlaceholder": "All investment accounts",
     "labelAsOfDate": "As of date",
