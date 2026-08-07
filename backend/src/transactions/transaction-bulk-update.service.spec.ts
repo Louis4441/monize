@@ -9,6 +9,8 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { TagsService } from "../tags/tags.service";
+import { TransactionSplitService } from "./transaction-split.service";
+import { ActionHistoryService } from "../action-history/action-history.service";
 import { BulkUpdateDto, BulkDeleteDto } from "./dto/bulk-update.dto";
 import { Brackets, DataSource } from "typeorm";
 import { lockTransactionRows } from "../common/db/locks";
@@ -47,10 +49,13 @@ describe("TransactionBulkUpdateService", () => {
   let accountsService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let tagsService: Record<string, jest.Mock>;
+  let splitService: Record<string, jest.Mock>;
+  let actionHistoryService: Record<string, jest.Mock>;
   let mockDataSource: DataSourceMock;
   let mockManagerCreateQueryBuilder: jest.Mock;
   let mockManagerGetRepository: jest.Mock;
   let mockManagerFind: jest.Mock;
+  let mockManagerQuery: jest.Mock;
 
   const userId = "user-1";
 
@@ -183,6 +188,16 @@ describe("TransactionBulkUpdateService", () => {
       setSplitTagsBulk: jest.fn().mockResolvedValue(undefined),
     };
 
+    // Split-line recategorization: default "no lines changed", the shape the
+    // real method returns for a batch with no matching category-kind lines.
+    splitService = {
+      bulkRecategorizeCategorySplits: jest.fn().mockResolvedValue([]),
+    };
+
+    actionHistoryService = {
+      record: jest.fn().mockResolvedValue(null),
+    };
+
     // withScopedDb EntityManager with createQueryBuilder and entity-routed
     // getRepository.
     mockManagerCreateQueryBuilder = jest.fn();
@@ -215,6 +230,10 @@ describe("TransactionBulkUpdateService", () => {
     // syncLinkedTransfers looks up owning splits to tell split-transfer
     // legs apart from plain transfer legs. Default: none (plain transfers).
     manager.find = mockManagerFind;
+    // readParentSnapshot's raw SELECTs (undo snapshot + tag snapshot). Tests
+    // that need rows route by SQL substring via mockImplementation.
+    mockManagerQuery = manager.query;
+    mockManagerQuery.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -222,6 +241,8 @@ describe("TransactionBulkUpdateService", () => {
         { provide: AccountsService, useValue: accountsService },
         { provide: NetWorthService, useValue: netWorthService },
         { provide: TagsService, useValue: tagsService },
+        { provide: TransactionSplitService, useValue: splitService },
+        { provide: ActionHistoryService, useValue: actionHistoryService },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -396,7 +417,7 @@ describe("TransactionBulkUpdateService", () => {
       expect(syncUpdateQb.execute).toHaveBeenCalled();
     });
 
-    it("skips split transactions when updating category", async () => {
+    it("recategorizes split lines instead of skipping split parents when updating category", async () => {
       const tx1 = makeTransaction({ id: "tx-1" });
       const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
 
@@ -406,19 +427,32 @@ describe("TransactionBulkUpdateService", () => {
       const resolveQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
       });
-      const exclusionsQb = createMockQueryBuilder({
+      const classifyQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([tx1, tx2]),
       });
 
       transactionsRepository.createQueryBuilder
         .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb);
+        .mockReturnValueOnce(classifyQb);
 
       // Batch update via queryRunner.manager
       const updateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       });
       mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([
+        {
+          splitId: "split-1",
+          transactionId: "tx-2",
+          previousCategoryId: "old-a",
+        },
+        {
+          splitId: "split-2",
+          transactionId: "tx-2",
+          previousCategoryId: "old-b",
+        },
+      ]);
 
       const dto: BulkUpdateDto = {
         mode: "ids",
@@ -428,14 +462,347 @@ describe("TransactionBulkUpdateService", () => {
 
       const result = await service.bulkUpdate(userId, dto);
 
+      // The split parent received writes (its lines), so it counts as updated;
+      // the changed lines are a sibling count, never folded into `updated` (I5).
+      expect(result.updated).toBe(2);
+      expect(result.skipped).toBe(0);
+      expect(result.skippedReasons).toEqual([]);
+      expect(result.splitLinesUpdated).toBe(2);
+
+      // ids mode carries no category filter, so the restriction is undefined
+      // (all category-kind lines).
+      expect(splitService.bulkRecategorizeCategorySplits).toHaveBeenCalledWith(
+        userId,
+        ["tx-2"],
+        "cat-1",
+        undefined,
+      );
+
+      // I1: the parent-level categoryId UPDATE excludes the split parent --
+      // its category_id stays NULL.
+      expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(updateQb.where).toHaveBeenCalledWith("id IN (:...ids)", {
+        ids: ["tx-1"],
+      });
+    });
+
+    it("applies category null clears to split lines too", async () => {
+      const tx1 = makeTransaction({ id: "tx-1" });
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx1, tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      const updateQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([
+        {
+          splitId: "split-1",
+          transactionId: "tx-2",
+          previousCategoryId: "old-a",
+        },
+      ]);
+
+      const dto: BulkUpdateDto = {
+        mode: "ids",
+        transactionIds: ["tx-1", "tx-2"],
+        categoryId: null,
+      };
+
+      const result = await service.bulkUpdate(userId, dto);
+
+      // Decision 3 (split-bulk-update.md): clearing treats split lines
+      // uniformly -- matching lines get a NULL category.
+      expect(splitService.bulkRecategorizeCategorySplits).toHaveBeenCalledWith(
+        userId,
+        ["tx-2"],
+        null,
+        undefined,
+      );
+      expect(result.updated).toBe(2);
+      expect(result.splitLinesUpdated).toBe(1);
+      expect(updateQb.where).toHaveBeenCalledWith("id IN (:...ids)", {
+        ids: ["tx-1"],
+      });
+    });
+
+    it("skips a split parent with no matching lines in a category-only run, but not when a parent field also applies", async () => {
+      const tx1 = makeTransaction({ id: "tx-1" });
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      categoriesRepository.findOne.mockResolvedValue({ id: "cat-1", userId });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx1, tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      const updateQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
+
+      // No line of the split parent matched the category update.
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([]);
+
+      const result = await service.bulkUpdate(userId, {
+        mode: "ids",
+        transactionIds: ["tx-1", "tx-2"],
+        categoryId: "cat-1",
+      });
+
+      // Truth table A row 2/3: category-only and zero changed lines -> the
+      // split parent received nothing and is skipped with the One reason.
       expect(result.updated).toBe(1);
       expect(result.skipped).toBe(1);
-      expect(result.skippedReasons).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("1 split transaction"),
-        ]),
+      expect(result.skippedReasons).toEqual([
+        "1 split transaction was skipped because none of its split lines matched the category update",
+      ]);
+      // Zero changed lines: the sibling count is omitted, not 0.
+      expect(result).not.toHaveProperty("splitLinesUpdated");
+      expect(updateQb.where).toHaveBeenCalledWith("id IN (:...ids)", {
+        ids: ["tx-1"],
+      });
+    });
+
+    it("updates a no-matching-lines split parent anyway when the run also sets a parent field", async () => {
+      const tx1 = makeTransaction({ id: "tx-1" });
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      categoriesRepository.findOne.mockResolvedValue({ id: "cat-1", userId });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx1, tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      const fullUpdateQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      const splitParentQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      mockManagerCreateQueryBuilder
+        .mockReturnValueOnce(fullUpdateQb)
+        .mockReturnValueOnce(splitParentQb);
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([]);
+
+      const result = await service.bulkUpdate(userId, {
+        mode: "ids",
+        transactionIds: ["tx-1", "tx-2"],
+        categoryId: "cat-1",
+        payeeName: "New Payee",
+      });
+
+      // Truth table A row 4: parent fields applied, so the split parent is
+      // updated and no skip reason is produced.
+      expect(result.updated).toBe(2);
+      expect(result.skipped).toBe(0);
+      expect(result.skippedReasons).toEqual([]);
+      expect(result).not.toHaveProperty("splitLinesUpdated");
+
+      // Two parent UPDATEs: the non-split row gets every field, the split
+      // parent gets the fields minus categoryId (I1).
+      expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(2);
+      expect(fullUpdateQb.set).toHaveBeenCalledWith({
+        payeeName: "New Payee",
+        categoryId: "cat-1",
+      });
+      expect(fullUpdateQb.where).toHaveBeenCalledWith("id IN (:...ids)", {
+        ids: ["tx-1"],
+      });
+      expect(splitParentQb.set).toHaveBeenCalledWith({
+        payeeName: "New Payee",
+      });
+      expect(splitParentQb.where).toHaveBeenCalledWith("id IN (:...ids)", {
+        ids: ["tx-2"],
+      });
+    });
+
+    it("restricts split-line recategorization to the descendant-expanded filter categories", async () => {
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      categoriesRepository.findOne.mockResolvedValue({ id: "cat-1", userId });
+      // getAllCategoryIdsWithChildren reads the user's category tree.
+      categoriesRepository.find.mockResolvedValue([
+        { id: "cat-1", parentId: null },
+        { id: "cat-1-child", parentId: "cat-1" },
+      ]);
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([
+        {
+          splitId: "split-1",
+          transactionId: "tx-2",
+          previousCategoryId: "cat-1-child",
+        },
+      ]);
+
+      const result = await service.bulkUpdate(userId, {
+        mode: "filter",
+        filters: { categoryIds: ["cat-1"] },
+        categoryId: "cat-1",
+      });
+
+      // Filter mode with a real category id: only lines whose category is in
+      // the descendant-expanded set change, matching the selection semantics.
+      expect(splitService.bulkRecategorizeCategorySplits).toHaveBeenCalledWith(
+        userId,
+        ["tx-2"],
+        "cat-1",
+        ["cat-1", "cat-1-child"],
       );
-      expect(result.skippedReasons[0]).toContain("updated individually");
+      expect(result.updated).toBe(1);
+      expect(result.splitLinesUpdated).toBe(1);
+    });
+
+    it("passes no restriction when the category filter holds only pseudo-ids", async () => {
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      categoriesRepository.findOne.mockResolvedValue({ id: "cat-1", userId });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([
+        { splitId: "split-1", transactionId: "tx-2", previousCategoryId: null },
+      ]);
+
+      await service.bulkUpdate(userId, {
+        mode: "filter",
+        filters: { categoryIds: ["uncategorized", "transfer"] },
+        categoryId: "cat-1",
+      });
+
+      // "uncategorized"/"transfer" are pseudo-ids, not real categories: after
+      // stripping them the restriction set is empty, which means unrestricted.
+      expect(splitService.bulkRecategorizeCategorySplits).toHaveBeenCalledWith(
+        userId,
+        ["tx-2"],
+        "cat-1",
+        undefined,
+      );
+    });
+
+    it("records the bulk_update undo snapshot with split lines and no parent categoryId on split parents", async () => {
+      const tx1 = makeTransaction({ id: "tx-1" });
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      categoriesRepository.findOne.mockResolvedValue({ id: "cat-1", userId });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx1, tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      const updateQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
+
+      // The pre-write snapshot SELECT returns driver-shaped rows.
+      mockManagerQuery.mockImplementation((sql: string) =>
+        Promise.resolve(
+          typeof sql === "string" && sql.includes("FROM transactions")
+            ? [
+                { id: "tx-1", account_id: "account-1", category_id: "old-cat" },
+                { id: "tx-2", account_id: "account-1", category_id: null },
+              ]
+            : [],
+        ),
+      );
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([
+        {
+          splitId: "split-1",
+          transactionId: "tx-2",
+          previousCategoryId: "old-split-cat",
+        },
+      ]);
+
+      await service.bulkUpdate(userId, {
+        mode: "ids",
+        transactionIds: ["tx-1", "tx-2"],
+        categoryId: "cat-1",
+      });
+
+      // Exact payload: undo restores the before side, redo replays the after
+      // side, and neither side may carry a parent categoryId for a split
+      // parent (I1) -- its change rides along as splits: [{ id, categoryId }].
+      expect(actionHistoryService.record).toHaveBeenCalledTimes(1);
+      expect(actionHistoryService.record).toHaveBeenCalledWith(userId, {
+        entityType: "bulk_transaction",
+        entityId: null,
+        action: "bulk_update",
+        beforeData: {
+          transactions: [
+            { id: "tx-1", accountId: "account-1", categoryId: "old-cat" },
+            {
+              id: "tx-2",
+              accountId: "account-1",
+              splits: [{ id: "split-1", categoryId: "old-split-cat" }],
+            },
+          ],
+        },
+        afterData: {
+          transactions: [
+            { id: "tx-1", accountId: "account-1", categoryId: "cat-1" },
+            {
+              id: "tx-2",
+              accountId: "account-1",
+              splits: [{ id: "split-1", categoryId: "cat-1" }],
+            },
+          ],
+        },
+        description: "Bulk updated 2 transactions",
+        descriptionKey: "bulkUpdatedTransactions",
+        descriptionParams: { count: 2 },
+      });
+      const [, entry] = actionHistoryService.record.mock.calls[0];
+      expect(entry.beforeData.transactions[1]).not.toHaveProperty("categoryId");
+      expect(entry.afterData.transactions[1]).not.toHaveProperty("categoryId");
     });
 
     it("includes transfers when updating category (does not skip)", async () => {
@@ -1102,7 +1469,7 @@ describe("TransactionBulkUpdateService", () => {
       expect(resolveQb.andWhere).toHaveBeenCalled();
     });
 
-    it("returns zero when all transactions are excluded", async () => {
+    it("skips a lone split parent whose lines all miss, with the One reason and no parent UPDATE", async () => {
       const tx = makeTransaction({
         id: "tx-1",
         isSplit: true,
@@ -1117,14 +1484,15 @@ describe("TransactionBulkUpdateService", () => {
       const resolveQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }]),
       });
-      const exclusionsQb = createMockQueryBuilder({
+      const classifyQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([tx]),
       });
 
       transactionsRepository.createQueryBuilder
         .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb);
+        .mockReturnValueOnce(classifyQb);
 
+      // Default split-service mock: no lines matched.
       const dto: BulkUpdateDto = {
         mode: "ids",
         transactionIds: ["tx-1"],
@@ -1135,6 +1503,13 @@ describe("TransactionBulkUpdateService", () => {
 
       expect(result.updated).toBe(0);
       expect(result.skipped).toBe(1);
+      expect(result.skippedReasons).toEqual([
+        "1 split transaction was skipped because none of its split lines matched the category update",
+      ]);
+      // Category-only over an all-splits batch: no parent-row UPDATE at all
+      // (I1), and nothing was updated so no undo entry is recorded.
+      expect(mockManagerCreateQueryBuilder).not.toHaveBeenCalled();
+      expect(actionHistoryService.record).not.toHaveBeenCalled();
     });
 
     it("excludes future-dated transactions from balance updates when changing status to VOID", async () => {
@@ -1785,7 +2160,7 @@ describe("TransactionBulkUpdateService", () => {
       expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
-    it("pluralizes skipped reasons correctly for multiple split transactions", async () => {
+    it("pluralizes the skip reason when several split parents have no matching lines", async () => {
       const tx1 = makeTransaction({ id: "tx-1", isSplit: true });
       const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
       const tx3 = makeTransaction({ id: "tx-3" });
@@ -1797,19 +2172,20 @@ describe("TransactionBulkUpdateService", () => {
           .fn()
           .mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }, { id: "tx-3" }]),
       });
-      const exclusionsQb = createMockQueryBuilder({
+      const classifyQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([tx1, tx2, tx3]),
       });
 
       transactionsRepository.createQueryBuilder
         .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb);
+        .mockReturnValueOnce(classifyQb);
 
       const updateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       });
       mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
 
+      // Default split-service mock: no lines matched on either split parent.
       const dto: BulkUpdateDto = {
         mode: "ids",
         transactionIds: ["tx-1", "tx-2", "tx-3"],
@@ -1820,7 +2196,14 @@ describe("TransactionBulkUpdateService", () => {
 
       expect(result.updated).toBe(1);
       expect(result.skipped).toBe(2);
-      expect(result.skippedReasons[0]).toContain("2 split transactions");
+      expect(result.skippedReasons).toEqual([
+        "2 split transactions were skipped because none of their split lines matched the category update",
+      ]);
+      expect(result).not.toHaveProperty("splitLinesUpdated");
+      // The parent categoryId UPDATE still targets only the non-split row.
+      expect(updateQb.where).toHaveBeenCalledWith("id IN (:...ids)", {
+        ids: ["tx-3"],
+      });
     });
   });
 
@@ -2358,6 +2741,113 @@ describe("TransactionBulkUpdateService", () => {
       expect(resolveQb.andWhere).not.toHaveBeenCalledWith(
         "transaction.id NOT IN (:...excludedIds)",
         expect.anything(),
+      );
+    });
+
+    it("applies amount bounds and split-aware tag filters", async () => {
+      const tx = makeTransaction({ id: "tx-1" });
+
+      const innerTagBuilder = {
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+      };
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }]),
+        andWhere: jest.fn().mockImplementation(function (arg) {
+          if (arg instanceof Brackets) {
+            (arg as any).whereFactory(innerTagBuilder);
+          }
+          return resolveQb;
+        }),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx]),
+      });
+
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      const updateQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
+
+      // amountFrom 0 on purpose: falsy but defined, so the bound must still
+      // apply (the guard is `!== undefined`, not truthiness).
+      const dto: BulkUpdateDto = {
+        mode: "filter",
+        filters: { amountFrom: 0, amountTo: 250.5, tagIds: ["tag-1"] },
+        description: "test",
+      };
+
+      const result = await service.bulkUpdate(userId, dto);
+
+      expect(result.updated).toBe(1);
+      expect(resolveQb.andWhere).toHaveBeenCalledWith(
+        "transaction.amount >= :amountFrom",
+        { amountFrom: 0 },
+      );
+      expect(resolveQb.andWhere).toHaveBeenCalledWith(
+        "transaction.amount <= :amountTo",
+        { amountTo: 250.5 },
+      );
+      // Split-aware tag match: a tag on the parent or on any split line.
+      expect(resolveQb.leftJoin).toHaveBeenCalledWith(
+        "transaction.tags",
+        "filterTags",
+      );
+      expect(resolveQb.leftJoin).toHaveBeenCalledWith(
+        "transaction.splits",
+        "tagSplits",
+      );
+      expect(resolveQb.leftJoin).toHaveBeenCalledWith(
+        "tagSplits.tags",
+        "filterSplitTags",
+      );
+      expect(innerTagBuilder.where).toHaveBeenCalledWith(
+        "filterTags.id IN (:...filterTagIds)",
+        { filterTagIds: ["tag-1"] },
+      );
+      expect(innerTagBuilder.orWhere).toHaveBeenCalledWith(
+        "filterSplitTags.id IN (:...filterTagIds)",
+        { filterTagIds: ["tag-1"] },
+      );
+    });
+
+    it("applies amount and tag filters through the shared applyFilters in bulkDelete", async () => {
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+      transactionsRepository.createQueryBuilder.mockReturnValueOnce(resolveQb);
+
+      const dto: BulkDeleteDto = {
+        mode: "filter",
+        filters: { amountFrom: 0, amountTo: 100, tagIds: ["tag-1"] },
+      };
+
+      const result = await service.bulkDelete(userId, dto);
+
+      expect(result).toEqual({ deleted: 0 });
+      expect(resolveQb.andWhere).toHaveBeenCalledWith(
+        "transaction.amount >= :amountFrom",
+        { amountFrom: 0 },
+      );
+      expect(resolveQb.andWhere).toHaveBeenCalledWith(
+        "transaction.amount <= :amountTo",
+        { amountTo: 100 },
+      );
+      expect(resolveQb.leftJoin).toHaveBeenCalledWith(
+        "transaction.tags",
+        "filterTags",
+      );
+      expect(resolveQb.leftJoin).toHaveBeenCalledWith(
+        "transaction.splits",
+        "tagSplits",
+      );
+      expect(resolveQb.leftJoin).toHaveBeenCalledWith(
+        "tagSplits.tags",
+        "filterSplitTags",
       );
     });
   });
