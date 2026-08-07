@@ -271,6 +271,8 @@ export interface BulkUpdateResult {
   updated: number;
   skipped: number;
   skippedReasons: string[];
+  /** Split lines recategorized across split parents; present only when > 0. */
+  splitLinesUpdated?: number;
 }
 
 export interface BulkDeleteData {

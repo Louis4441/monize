@@ -184,7 +184,7 @@ export function BulkUpdateModal({
     await onSubmit(updateData);
   };
 
-  // Info notes about what gets skipped
+  // Info notes about side effects of the enabled fields
   const showTransferNote = enablePayee;
   const showSplitNote = enableCategory;
 

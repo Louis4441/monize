@@ -171,12 +171,13 @@ describe('BulkUpdateModal', () => {
     render(<BulkUpdateModal {...defaultProps} />);
     // Initially no split note
     await waitFor(() => {
-      expect(screen.queryByText(/Split transactions will be skipped/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/the new category is applied to their split lines/)).not.toBeInTheDocument();
     });
     // Enable category
     const checkboxes = screen.getAllByRole('checkbox');
     fireEvent.click(checkboxes[1]); // Category checkbox
-    expect(screen.getByText(/Split transactions will be skipped/)).toBeInTheDocument();
+    expect(screen.getByText(/the new category is applied to their split lines/)).toBeInTheDocument();
+    expect(screen.getByText(/Transfer and investment lines are unchanged/)).toBeInTheDocument();
   });
 
   it('does not show transfer note when only category is enabled', async () => {
@@ -190,7 +191,7 @@ describe('BulkUpdateModal', () => {
     // Transfer note should not appear for category-only
     expect(screen.queryByText(/Transfer transactions will have their linked counterpart/)).not.toBeInTheDocument();
     // Split note should appear
-    expect(screen.getByText(/Split transactions will be skipped/)).toBeInTheDocument();
+    expect(screen.getByText(/the new category is applied to their split lines/)).toBeInTheDocument();
   });
 
   it('sends payeeName along with payeeId when selecting from dropdown', async () => {
