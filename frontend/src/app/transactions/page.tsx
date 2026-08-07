@@ -475,6 +475,14 @@ function TransactionsContent() {
     loadData();
   };
 
+  // "Create & New" keeps the window open and the form resets itself, so the
+  // page only refreshes the register behind it. Deliberately no state change
+  // here: `duplicatingFrom` and `formKey` both feed the form's key, and
+  // touching either would remount the form the user is still typing in.
+  const handleCreateAndNew = () => {
+    loadData();
+  };
+
   // A payee name in a row opens that payee's page. Editing the payee lives
   // there (and on the payee info widget's pencil), so the row's primary click
   // goes to the fuller view rather than straight into a form.
@@ -1092,6 +1100,7 @@ function TransactionsContent() {
               return account?.accountType === 'ASSET' ? (account.assetCategoryId || undefined) : undefined;
             })()}
             onSuccess={handleFormSuccess}
+            onCreateAndNew={handleCreateAndNew}
             onCancel={handleClose}
             onDirtyChange={setFormDirty}
             submitRef={formSubmitRef}

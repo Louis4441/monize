@@ -373,6 +373,10 @@
       "void": "Void"
     },
     "submitCreate": "Create {mode}",
+    "submitCreateAndNew": "Create {mode} & New",
+    "submitCreateDescription": "Save it and close this window.",
+    "submitCreateAndNewDescription": "Save it and start another, keeping the account and date.",
+    "submitOptions": "Choose what happens after creating",
     "submitUpdate": "Update {mode}",
     "reconciledConfirm": {
       "title": "Edit reconciled transaction?",

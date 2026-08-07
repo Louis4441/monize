@@ -412,9 +412,15 @@ export function useInvestmentData() {
   const handleNewTransaction = () => openCreate();
   const handleEditTransaction = (transaction: InvestmentTransaction) => openEdit(transaction);
 
+  // "Create & New" keeps the form open, so the page only refreshes what it
+  // shows behind it -- everything `handleFormSuccess` does bar the close.
+  const handleFormCreateAndNew = () => {
+    loadAllPortfolioData(selectedAccountIds, currentPage, transactionFilters);
+  };
+
   const handleFormSuccess = () => {
     close();
-    loadAllPortfolioData(selectedAccountIds, currentPage, transactionFilters);
+    handleFormCreateAndNew();
   };
 
   // Cash transaction handlers
@@ -440,8 +446,7 @@ export function useInvestmentData() {
     setCashTransactions(prev => prev.map(tx => tx.id === updatedTx.id ? updatedTx : tx));
   }, []);
 
-  const handleCashFormSuccess = () => {
-    closeCash();
+  const handleCashFormCreateAndNew = () => {
     loadCashTransactions(cashAccountIds, cashCurrentPage, cashFiltersObj);
     // The portfolio summary drives the Holdings by Account section's cash
     // balances, so refresh it when a cash transaction changes.
@@ -450,6 +455,11 @@ export function useInvestmentData() {
     // which writes to the linked brokerage account; refresh the brokerage
     // transaction list so the new row appears without a manual reload.
     loadTransactions(selectedAccountIds, currentPage, transactionFilters);
+  };
+
+  const handleCashFormSuccess = () => {
+    closeCash();
+    handleCashFormCreateAndNew();
   };
 
   const refreshCashTransactions = useCallback(() => {
@@ -522,6 +532,7 @@ export function useInvestmentData() {
     transactions, pagination, currentPage,
     transactionFilters, handleFiltersChange,
     handleDeleteTransaction, handleNewTransaction, handleEditTransaction, handleFormSuccess,
+    handleFormCreateAndNew,
     handleSecurityClick, goToPage,
 
     // Transaction form modal
@@ -542,6 +553,7 @@ export function useInvestmentData() {
     showCashFilters, setShowCashFilters,
     hasActiveCashFilters, activeCashFilterCount,
     handleEditCashTransaction, handleCashTransactionUpdate, handleCashFormSuccess,
+    handleCashFormCreateAndNew,
     refreshCashTransactions, clearCashFilters,
     goToCashPage, handleCashClick,
     loadCashFilterData, loadCashTransactionsIfNeeded,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, MutableRefObject } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, MutableRefObject } from 'react';
 import { useTranslations } from 'next-intl';
 import { useForm, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
@@ -61,6 +61,10 @@ import { optionalUuid, optionalString } from '@/lib/zod-helpers';
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
+import {
+  TRANSACTION_SUBMIT_MODE_KEY,
+  useTransactionSubmitMode,
+} from '@/hooks/useTransactionSubmitMode';
 
 const logger = createLogger('TransactionForm');
 
@@ -131,18 +135,35 @@ interface TransactionFormProps {
   onCancel?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
   submitRef?: MutableRefObject<(() => void) | null>;
+  /**
+   * Called after a successful create when the user chose "Create & New": the
+   * form has already reset itself for the next entry, so the host keeps the
+   * modal open and uses this only to refresh whatever it shows behind. Leave it
+   * off and the submit button offers no such option.
+   */
+  onCreateAndNew?: () => void;
+}
+
+interface TransactionFormFieldsProps extends TransactionFormProps {
+  /** Set by the wrapper below; carries the account the entry was filed against. */
+  onCreateAnother?: (accountId: string) => void;
 }
 
 // Transaction mode type
 type TransactionMode = 'normal' | 'split' | 'transfer';
 
-export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, defaultCategoryId, onSuccess, onCancel, onDirtyChange, submitRef }: TransactionFormProps) {
+function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, defaultCategoryId, onSuccess, onCancel, onDirtyChange, submitRef, onCreateAnother }: TransactionFormFieldsProps) {
   const t = useTranslations('transactions');
   const { defaultCurrency, formatCurrency, formatNumber } = useNumberFormat();
   const showCreatedAt = usePreferencesStore((s) => s.preferences?.showCreatedAt ?? false);
   const timeFormat = usePreferencesStore((s) => s.preferences?.timeFormat ?? '24h');
   const timezonePref = usePreferencesStore((s) => s.preferences?.timezone);
   const [isLoading, setIsLoading] = useState(false);
+  // What the submit button does once a *new* transaction has been created.
+  // Only offered when creating and only when the host can keep the window open;
+  // an edit always hands back to the page.
+  const [submitMode, setSubmitMode] = useTransactionSubmitMode(TRANSACTION_SUBMIT_MODE_KEY);
+  const canCreateAnother = !transaction && !!onCreateAnother;
   // Files chosen in the New Transaction window before the transaction exists;
   // uploaded once it has been created. Empty (and unused) when editing.
   const [stagedAttachments, setStagedAttachments] = useState<File[]>([]);
@@ -1048,6 +1069,36 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
     }
   };
 
+  const modeLabel = t(mode === 'transfer' ? 'form.modeLabel.transfer' : 'form.modeLabel.transaction');
+  // The two behaviours the create button can carry. Order is fixed: 'close'
+  // first, because it is what the button did before this choice existed.
+  const submitOptions = [
+    {
+      id: 'close',
+      label: t('form.submitCreate', { mode: modeLabel }),
+      description: t('form.submitCreateDescription'),
+    },
+    {
+      id: 'new',
+      label: t('form.submitCreateAndNew', { mode: modeLabel }),
+      description: t('form.submitCreateAndNewDescription'),
+    },
+  ];
+
+  /**
+   * Hand back to the host after a successful *create*. With "Create & New"
+   * selected the form restarts in place (the wrapper remounts it, pre-filled
+   * with this account and the date just used) and the modal stays open;
+   * otherwise this is the ordinary `onSuccess` that closes it.
+   */
+  const finishAfterCreate = (accountId: string) => {
+    if (canCreateAnother && submitMode === 'new') {
+      onCreateAnother?.(accountId);
+      return;
+    }
+    onSuccess?.();
+  };
+
   const performSubmit = async (data: TransactionFormData) => {
     // Joint accounts: a free-text payee would auto-create on the OWNER's
     // ledger, which needs the delegation's payees-can-create capability. The
@@ -1115,14 +1166,15 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           }
           await transactionsApi.updateTransfer(transaction.id, transferData);
           toast.success(t('form.toasts.transferUpdated'));
+          onSuccess?.();
         } else {
           const transfer = await transactionsApi.createTransfer(transferData);
           toast.success(t('form.toasts.transferCreated'));
           rememberTransactionDate(LAST_TRANSACTION_DATE_KEY, data.transactionDate);
           // Attach staged files to the "from" leg (the account being edited).
           await uploadStagedAttachments(transfer.fromTransaction.id);
+          finishAfterCreate(data.accountId);
         }
-        onSuccess?.();
         return;
       }
 
@@ -1200,6 +1252,7 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         }
         await transactionsApi.update(transaction.id, updatePayload);
         toast.success(t('form.toasts.transactionUpdated'));
+        onSuccess?.();
       } else {
         const created = await transactionsApi.create(payload);
         toast.success(t('form.toasts.transactionCreated'));
@@ -1208,8 +1261,8 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         // ('' when the account currency was used, which clears the stickiness).
         rememberTransactionCurrency(isForeign ? entryCurrency : '');
         await uploadStagedAttachments(created.id);
+        finishAfterCreate(data.accountId);
       }
-      onSuccess?.();
     } catch (error) {
       logger.error('Submit error:', error);
       toast.error(getErrorMessage(error, t('form.toasts.saveFailed')));
@@ -1606,8 +1659,12 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
       <FormActions
         anchorProps={tourAnchor(TOUR_ANCHORS.transactionFormActions)}
         onCancel={onCancel}
-        submitLabel={t(transaction ? 'form.submitUpdate' : 'form.submitCreate', { mode: t(mode === 'transfer' ? 'form.modeLabel.transfer' : 'form.modeLabel.transaction') })}
+        submitLabel={t(transaction ? 'form.submitUpdate' : 'form.submitCreate', { mode: modeLabel })}
         isSubmitting={isLoading}
+        submitOptions={canCreateAnother ? submitOptions : undefined}
+        selectedSubmitOptionId={submitMode}
+        onSubmitOptionChange={(id) => setSubmitMode(id === 'new' ? 'new' : 'close')}
+        submitOptionsLabel={t('form.submitOptions')}
       />
 
       {/* Reactivate Payee Dialog */}
@@ -1631,5 +1688,49 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         onCancel={() => setReconciledConfirmData(null)}
       />
     </form>
+  );
+}
+
+/**
+ * The transaction form as every caller sees it.
+ *
+ * Its only job beyond rendering the fields is "Create & New": when the user
+ * asks to keep entering, the form has to go back to exactly the state a freshly
+ * opened window would be in. The fields component carries a great deal of
+ * derived state -- mode, splits, tags, the FX pair, staged attachments, the
+ * payee reactivation flow -- so it is restarted by remounting it under a new
+ * key rather than by a field-by-field reset that would quietly miss one of
+ * them. The account just used is passed back in as the default (the date and
+ * entry currency come from the same remembered values a fresh open reads), so
+ * the next entry starts where the last one left off.
+ */
+export function TransactionForm(props: TransactionFormProps) {
+  const { onCreateAndNew, defaultAccountId, defaultCategoryId } = props;
+  const [restart, setRestart] = useState<{ n: number; accountId: string } | null>(null);
+
+  const handleCreateAnother = useCallback(
+    (accountId: string) => {
+      setRestart((prev) => ({ n: (prev?.n ?? 0) + 1, accountId }));
+      onCreateAndNew?.();
+    },
+    [onCreateAndNew],
+  );
+
+  return (
+    <TransactionFormFields
+      {...props}
+      key={restart?.n ?? 0}
+      // A restarted form is a blank new entry, not another copy of whatever the
+      // first one was duplicated from.
+      duplicateFrom={restart ? undefined : props.duplicateFrom}
+      defaultAccountId={restart?.accountId ?? defaultAccountId}
+      // The host's default category belongs to the account the host named (an
+      // asset account's own category). Once the user has filed an entry against
+      // a different account, it no longer applies.
+      defaultCategoryId={
+        restart && restart.accountId !== defaultAccountId ? undefined : defaultCategoryId
+      }
+      onCreateAnother={onCreateAndNew ? handleCreateAnother : undefined}
+    />
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, MutableRefObject } from 'react';
+import { useState, useEffect, useMemo, useCallback, MutableRefObject } from 'react';
 import { useTranslations } from 'next-intl';
 import { useForm, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
@@ -37,6 +37,10 @@ import { createLogger } from '@/lib/logger';
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
+import {
+  INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY,
+  useTransactionSubmitMode,
+} from '@/hooks/useTransactionSubmitMode';
 
 const logger = createLogger('InvestmentTxForm');
 
@@ -93,6 +97,19 @@ interface InvestmentTransactionFormProps {
   onDirtyChange?: (isDirty: boolean) => void;
   onConversionStateChange?: (needsConversion: boolean) => void;
   submitRef?: MutableRefObject<(() => void) | null>;
+  /**
+   * Called after a successful create when the user chose "Create & New": the
+   * form has already reset itself for the next entry, so the host keeps the
+   * modal open and uses this only to refresh whatever it shows behind. Leave it
+   * off and the submit button offers no such option.
+   */
+  onCreateAndNew?: () => void;
+}
+
+interface InvestmentTransactionFormFieldsProps
+  extends InvestmentTransactionFormProps {
+  /** Set by the wrapper below; carries the account the entry was filed against. */
+  onCreateAnother?: (accountId: string) => void;
 }
 
 // Actions that require a security selection. Transfers (the combined create
@@ -153,7 +170,7 @@ function deriveSplitOldSharesDefault(
   return deriveSplitNewSharesDefault(storedQuantity) === undefined ? undefined : 1;
 }
 
-export function InvestmentTransactionForm({
+function InvestmentTransactionFormFields({
   accounts,
   allAccounts,
   transaction,
@@ -163,7 +180,8 @@ export function InvestmentTransactionForm({
   onDirtyChange,
   onConversionStateChange,
   submitRef,
-}: InvestmentTransactionFormProps) {
+  onCreateAnother,
+}: InvestmentTransactionFormFieldsProps) {
   const t = useTranslations('investments');
   const actionLabels: Record<InvestmentAction, string> = {
     BUY: t('transactionForm.actionBuy'),
@@ -181,6 +199,13 @@ export function InvestmentTransactionForm({
   const { defaultCurrency, formatCurrency } = useNumberFormat();
   const { formatDate } = useDateFormat();
   const [isLoading, setIsLoading] = useState(false);
+  // What the submit button does once a *new* transaction has been created.
+  // Kept under its own key: entering a batch of trades and entering a batch of
+  // everyday transactions are different habits.
+  const [submitMode, setSubmitMode] = useTransactionSubmitMode(
+    INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY,
+  );
+  const canCreateAnother = !transaction && !!onCreateAnother;
   const [securities, setSecurities] = useState<Security[]>([]);
   const [securitiesLoaded, setSecuritiesLoaded] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
@@ -659,6 +684,39 @@ export function InvestmentTransactionForm({
     }
   };
 
+  // The two behaviours the create button can carry. Order is fixed: 'close'
+  // first, because it is what the button did before this choice existed.
+  const submitOptions = [
+    {
+      id: 'close',
+      label: isTransfer
+        ? t('transactionForm.submitTransfer')
+        : t('transactionForm.submitCreate'),
+      description: t('transactionForm.submitCreateDescription'),
+    },
+    {
+      id: 'new',
+      label: isTransfer
+        ? t('transactionForm.submitTransferAndNew')
+        : t('transactionForm.submitCreateAndNew'),
+      description: t('transactionForm.submitCreateAndNewDescription'),
+    },
+  ];
+
+  /**
+   * Hand back to the host after a successful *create*. With "Create & New"
+   * selected the form restarts in place (the wrapper remounts it, pre-filled
+   * with this account and the date just used) and the modal stays open;
+   * otherwise this is the ordinary `onSuccess` that closes it.
+   */
+  const finishAfterCreate = (accountId: string) => {
+    if (canCreateAnother && submitMode === 'new') {
+      onCreateAnother?.(accountId);
+      return;
+    }
+    onSuccess?.();
+  };
+
   const onSubmit = async (data: InvestmentTransactionFormData) => {
     setIsLoading(true);
     try {
@@ -708,7 +766,7 @@ export function InvestmentTransactionForm({
           LAST_INVESTMENT_TRANSACTION_DATE_KEY,
           data.transactionDate,
         );
-        onSuccess?.();
+        finishAfterCreate(data.accountId);
         return;
       }
 
@@ -840,6 +898,7 @@ export function InvestmentTransactionForm({
       if (transaction) {
         await investmentsApi.updateTransaction(transaction.id, payload);
         toast.success(t('transactionForm.toastUpdated'));
+        onSuccess?.();
       } else {
         await investmentsApi.createTransaction(payload);
         toast.success(t('transactionForm.toastCreated'));
@@ -847,8 +906,8 @@ export function InvestmentTransactionForm({
           LAST_INVESTMENT_TRANSACTION_DATE_KEY,
           data.transactionDate,
         );
+        finishAfterCreate(data.accountId);
       }
-      onSuccess?.();
     } catch (error) {
       toast.error(getErrorMessage(error, t('transactionForm.toastSaveFailed')));
     } finally {
@@ -1320,7 +1379,15 @@ export function InvestmentTransactionForm({
       )}
 
       {/* Form Actions */}
-      <FormActions onCancel={onCancel} submitLabel={isTransfer ? t('transactionForm.submitTransfer') : transaction ? t('transactionForm.submitUpdate') : t('transactionForm.submitCreate')} isSubmitting={isLoading} />
+      <FormActions
+        onCancel={onCancel}
+        submitLabel={isTransfer ? t('transactionForm.submitTransfer') : transaction ? t('transactionForm.submitUpdate') : t('transactionForm.submitCreate')}
+        isSubmitting={isLoading}
+        submitOptions={canCreateAnother ? submitOptions : undefined}
+        selectedSubmitOptionId={submitMode}
+        onSubmitOptionChange={(id) => setSubmitMode(id === 'new' ? 'new' : 'close')}
+        submitOptionsLabel={t('transactionForm.submitOptions')}
+      />
     </form>
 
     <Modal isOpen={showSecurityModal} onClose={() => setShowSecurityModal(false)} maxWidth="lg" className="p-6">
@@ -1333,5 +1400,40 @@ export function InvestmentTransactionForm({
       />
     </Modal>
     </>
+  );
+}
+
+/**
+ * The investment transaction form as every caller sees it.
+ *
+ * Its only job beyond rendering the fields is "Create & New": when the user
+ * asks to keep entering, the form has to go back to exactly the state a freshly
+ * opened window would be in. The fields component carries a good deal of
+ * derived state -- the action, the security, the split-ratio pair, the holding
+ * preview, the transfer's linked leg -- so it is restarted by remounting it
+ * under a new key rather than by a field-by-field reset that would quietly miss
+ * one of them. The account just used is passed back in as the default (the date
+ * comes from the same remembered value a fresh open reads), so the next entry
+ * starts where the last one left off.
+ */
+export function InvestmentTransactionForm(props: InvestmentTransactionFormProps) {
+  const { onCreateAndNew, defaultAccountId } = props;
+  const [restart, setRestart] = useState<{ n: number; accountId: string } | null>(null);
+
+  const handleCreateAnother = useCallback(
+    (accountId: string) => {
+      setRestart((prev) => ({ n: (prev?.n ?? 0) + 1, accountId }));
+      onCreateAndNew?.();
+    },
+    [onCreateAndNew],
+  );
+
+  return (
+    <InvestmentTransactionFormFields
+      {...props}
+      key={restart?.n ?? 0}
+      defaultAccountId={restart?.accountId ?? defaultAccountId}
+      onCreateAnother={onCreateAndNew ? handleCreateAnother : undefined}
+    />
   );
 }

@@ -67,4 +67,68 @@ describe('FormActions', () => {
     expect(container.querySelector('[data-tour-id]')).toBeNull();
     expect((container.firstChild as HTMLElement).children).toHaveLength(2);
   });
+
+  describe('submit options', () => {
+    const OPTIONS = [
+      { id: 'close', label: 'Create' },
+      { id: 'new', label: 'Create & New' },
+    ];
+
+    it('renders a split submit button labelled with the selected option', () => {
+      render(
+        <FormActions
+          submitLabel="ignored"
+          submitOptions={OPTIONS}
+          selectedSubmitOptionId="new"
+          onSubmitOptionChange={vi.fn()}
+          submitOptionsLabel="Choose what happens after creating"
+        />,
+      );
+      expect(screen.getByRole('button', { name: 'Create & New' })).toBeInTheDocument();
+      expect(screen.queryByText('ignored')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Choose what happens after creating' }),
+      ).toBeInTheDocument();
+    });
+
+    it('reports the chosen option', () => {
+      const onSubmitOptionChange = vi.fn();
+      render(
+        <FormActions
+          submitOptions={OPTIONS}
+          selectedSubmitOptionId="close"
+          onSubmitOptionChange={onSubmitOptionChange}
+          submitOptionsLabel="Choose what happens after creating"
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Choose what happens after creating' }),
+      );
+      fireEvent.click(screen.getByRole('menuitemradio', { name: 'Create & New' }));
+      expect(onSubmitOptionChange).toHaveBeenCalledWith('new');
+    });
+
+    it.each([
+      ['a single option', { submitOptions: [OPTIONS[0]] }],
+      ['no selection', { selectedSubmitOptionId: undefined }],
+      ['no change handler', { onSubmitOptionChange: undefined }],
+      ['no accessible name for the chevron', { submitOptionsLabel: undefined }],
+      ['no options at all', { submitOptions: undefined }],
+    ])('keeps the plain submit button with %s', (_case, overrides) => {
+      render(
+        <FormActions
+          submitLabel="Create"
+          submitOptions={OPTIONS}
+          selectedSubmitOptionId="close"
+          onSubmitOptionChange={vi.fn()}
+          submitOptionsLabel="Choose what happens after creating"
+          {...overrides}
+        />,
+      );
+      // An incomplete set of option props must degrade to the button every
+      // other form in the app uses, never to an unlabelled chevron.
+      expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
+      expect(screen.getAllByRole('button')).toHaveLength(1);
+    });
+  });
 });
