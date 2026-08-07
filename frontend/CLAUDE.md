@@ -104,6 +104,10 @@ Both components take a *number*, not the field's text: `value: number | undefine
 
 Give each field an explicit `id` when two on the same screen share a label. Both components derive `id` from the label text, so a "Years"/"Months" pair rendered twice (term and amortization) collides and every label points at the first input.
 
+**A field that hands back its own value has not been edited.** Both components re-parse whatever text is on screen on blur (and `CurrencyInput` on every keystroke and on Enter), and for a field nobody touched that text *is* the parent's value formatted to two decimals. Reporting it is invisible to a parent that only stores the number and destructive to one that does more: the FX panels derive an exchange rate from the converted total and mark it user-overridden, so tabbing through the field replaced the fetched 10dp rate with one reverse-engineered from the cents-rounded total (`1.365234` became `54.61 / 40 = 1.365250`) and stopped the date effect re-fetching -- a rate the user never chose, posted against a date it was never quoted for. Both components now notify only when the value actually moved (`notifyIfChanged`), and both carry a blurred-untouched regression test.
+
+The general rule that follows: **an `onChange` that does more than store the number must also be idempotent**, because a controlled field can legitimately re-report the same value. Guard the side effect on the value having changed at the handler too -- `handleConvertedTotalChange` and `handleConvertedTotalOverride` both return early when the incoming total already equals the derived one -- rather than trusting the field to be the only caller.
+
 ### A clickable table row -- `useLongPress({ onClick })`
 
 `useLongPress` takes an `onClick` alongside `onLongPress` for exactly this: a plain click runs the row's primary action, a 750ms press (or right-click) opens the mobile action sheet, and a click that followed a long-press is suppressed. Spread `getRowHandlers(item)` on the `<tr>` and add `cursor-pointer`. The accounts, payees, tags, categories and securities lists all do this.
@@ -415,6 +419,18 @@ await waitFor(() => expect(screen.getByText('Error message')).toBeInTheDocument(
 ```
 
 Never use synchronous `act(() => {...})` for calls that trigger async side-effects — always `await act(async () => {...})`.
+
+**`vitest run` does not show you the warnings.** The default reporter buffers console output and prints it only for failing tests, so a suite full of act warnings looks spotless locally and prints eighty of them in CI. Use `npx vitest run --reporter=verbose` when checking for them, and grep for `not wrapped in act`.
+
+**A store reset in a file's `afterEach` runs while the tree is still mounted.** Testing Library registers its `cleanup` at import time and vitest runs after-hooks in reverse registration order, so the file's own hook goes first. Writing to a Zustand store there re-renders the mounted component outside act, once per selector it reads through -- `SecurityDetailHeader` emitted three warnings in every one of its tests for exactly this. Call `cleanup()` at the top of the hook; a second cleanup afterwards is a no-op. `src/test/test-hygiene.test.ts` scans for it.
+
+**Three quieter sources of the same warning**, all of which show up as "an update to X inside a test was not wrapped in act":
+
+- A **synchronous `render(...)` of a component that fetches on mount** -- even in a test that only asserts on static copy, and even when the fetch is a stubbed `mockResolvedValue([])`. `GemStrategyHeader`'s tests were clean-looking for this reason; the switcher beside the title loads saved reports. Give the file one `await act(async () => { render(...) })` helper and use it everywhere, not only in the tests that await something.
+- An **awaited handler behind a click**: `fireEvent.click` is act-wrapped, but the `finally { setBusy(false) }` after an `await` lands in a later microtask. Wrap that click in `await act(async () => ...)`.
+- A **bare `await new Promise(r => setTimeout(r, n))`** used to let a `requestAnimationFrame` run. Whatever rAF you were waiting on is inside act; the ones beside it are not. Put the wait inside `await act(async () => { ... })`.
+
+**A mocked hook must return a stable object if the real one does.** `useRouter()` returns the same router every render; a mock written as `useRouter: () => ({ push: vi.fn(), ... })` returns a new one per call. Every `useCallback([router])` then changes identity each render, every effect depending on such a callback re-runs each render, and an effect that also sets state loops forever. The Transactions page made **83 `transactions.getAll` calls in 300ms** under its own local mock -- invisible except as a slow test file and sixteen act warnings from updates still landing after the test had ended. The mock in `src/test/setup.ts` builds one router for the run; a file overriding it to observe `push` must do the same (build it lazily inside the factory -- `vi.mock` is hoisted above the `const mockPush` it closes over). The same reasoning applies to any mocked hook returning an object or array.
 
 ## Testing Conventions
 

@@ -153,6 +153,21 @@ describe('NumericInput', () => {
     expect(onChange).toHaveBeenLastCalledWith(15);
   });
 
+  it('stays silent when the field is blurred untouched', () => {
+    // Blur re-parses what the field is showing, which for an unedited field is
+    // the parent's own value. Reporting that as a change is invisible to a
+    // parent that only stores the number and destructive to one that does more
+    // -- the same defect CurrencyInput carried, where a bare blur on the
+    // converted total re-derived the exchange rate from a rounded figure.
+    const onChange = vi.fn();
+    render(<NumericInput label="Rate" value={3.14} onChange={onChange} />);
+    const input = screen.getByLabelText('Rate');
+    fireEvent.focus(input);
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input).toHaveValue('3.14');
+  });
+
   it('calls onFocus callback', () => {
     const onFocus = vi.fn();
     render(<NumericInput label="Qty" value={0} onChange={vi.fn()} onFocus={onFocus} />);

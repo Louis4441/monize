@@ -140,7 +140,12 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
         // Apply min/max validation
         const finalValue = clampToRange(parsed);
         setDisplayValue(formatValue(finalValue, decimalPlaces));
-        onChange(finalValue);
+        // Blur re-parses what the field is showing, which for an unedited field
+        // is the parent's own value formatted to `decimalPlaces`. Handing that
+        // back is not an edit, and a parent whose `onChange` does more than
+        // store the number cannot tell the two apart. Same rule as
+        // `CurrencyInput.notifyIfChanged`.
+        if (finalValue !== value) onChange(finalValue);
       } else if (displayValue.trim() === '') {
         setDisplayValue('');
       } else {

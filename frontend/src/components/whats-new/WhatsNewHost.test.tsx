@@ -152,10 +152,14 @@ describe('WhatsNewHost', () => {
 
     // Same tab, same session, same unacknowledged version: the second mount
     // stands in for the refresh.
-    useWhatsNewStore.setState({
-      isOpen: false,
-      pausedForTour: false,
-      backendVersion: undefined,
+    // The first host is still mounted and subscribed, so this store write
+    // re-renders it -- it belongs inside act.
+    act(() => {
+      useWhatsNewStore.setState({
+        isOpen: false,
+        pausedForTour: false,
+        backendVersion: undefined,
+      });
     });
     await renderHost();
 
@@ -231,10 +235,14 @@ describe('WhatsNewHost', () => {
 
     // Still unacknowledged, but this browser has already had its one
     // announcement for 1.13.0.
-    useWhatsNewStore.setState({
-      isOpen: false,
-      pausedForTour: false,
-      backendVersion: undefined,
+    // The first host is still mounted and subscribed, so this store write
+    // re-renders it -- it belongs inside act.
+    act(() => {
+      useWhatsNewStore.setState({
+        isOpen: false,
+        pausedForTour: false,
+        backendVersion: undefined,
+      });
     });
     await renderHost();
 

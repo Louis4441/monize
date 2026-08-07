@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup } from '@/test/render';
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@/test/render';
 import { TourTooltip, type TourTooltipLabels } from './TourTooltip';
 
 const LABELS: TourTooltipLabels = {
@@ -242,8 +242,11 @@ describe('TourTooltip', () => {
     document.body.appendChild(input);
     input.focus();
     setup({ leaveFocusToForm: true });
-    // Give the focus rAF a chance to (not) run.
-    await new Promise((r) => setTimeout(r, 30));
+    // Give the focus rAF a chance to (not) run. Inside act, because the
+    // measuring rAF beside it *does* run and sets the card's size.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
     expect(document.activeElement).toBe(input);
   });
 });

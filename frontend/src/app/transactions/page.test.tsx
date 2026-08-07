@@ -6,17 +6,28 @@ import TransactionsPage from './page';
 // observed. This one keeps a stable `push` for the navigation assertions; the
 // rest matches the global mock (this file never reads search params).
 const mockPush = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
+vi.mock('next/navigation', () => {
+  // One stable object, as the real hook returns. A fresh router per call makes
+  // every `useCallback([router])` change identity each render, and this page's
+  // filter effect depends on one of those -- so it re-ran on every render,
+  // re-fetched, set state, and looped. See the note in `src/test/setup.ts`.
+  // Built on first use rather than here: the factory is hoisted above
+  // `mockPush`'s declaration, so reading it eagerly is a temporal-dead-zone
+  // error.
+  let router: ReturnType<typeof buildRouter> | null = null;
+  const buildRouter = () => ({
     push: mockPush,
     replace: vi.fn(),
     back: vi.fn(),
     prefetch: vi.fn(),
     refresh: vi.fn(),
-  }),
-  usePathname: () => '/transactions',
-  useSearchParams: () => new URLSearchParams(),
-}));
+  });
+  return {
+    useRouter: () => (router ??= buildRouter()),
+    usePathname: () => '/transactions',
+    useSearchParams: () => new URLSearchParams(),
+  };
+});
 
 // Mock next/image
 vi.mock('next/image', () => ({

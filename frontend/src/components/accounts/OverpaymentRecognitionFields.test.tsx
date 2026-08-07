@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@/test/render';
+import { render, screen, waitFor, act, fireEvent } from '@/test/render';
 import { OverpaymentRecognitionFields } from './OverpaymentRecognitionFields';
 import type { Category } from '@/types/category';
 
@@ -47,7 +47,9 @@ const categories: Category[] = [
   { id: 'c1', name: 'Loan Overpayment', parentId: null } as Category,
 ];
 
-function renderFields(overrides = {}) {
+// Payees are fetched on mount, so the render has async work behind it -- act
+// keeps that state update wrapped even in the tests that never await it.
+async function renderFields(overrides = {}) {
   const props = {
     categories,
     selectedInterestCategoryId: '',
@@ -62,11 +64,13 @@ function renderFields(overrides = {}) {
     errors: {},
     ...overrides,
   };
-  render(
-    <OverpaymentRecognitionFields
-      {...(props as unknown as Parameters<typeof OverpaymentRecognitionFields>[0])}
-    />,
-  );
+  await act(async () => {
+    render(
+      <OverpaymentRecognitionFields
+        {...(props as unknown as Parameters<typeof OverpaymentRecognitionFields>[0])}
+      />,
+    );
+  });
   return props;
 }
 
@@ -74,7 +78,7 @@ describe('OverpaymentRecognitionFields', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('renders the category and payee pickers and loads payees', async () => {
-    renderFields();
+    await renderFields();
     expect(screen.getByText('Overpayment recognition')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByRole('option', { name: 'Bank Overpayment' })).toBeInTheDocument();
@@ -84,11 +88,10 @@ describe('OverpaymentRecognitionFields', () => {
   });
 
   it('reports the chosen payee', async () => {
-    const props = renderFields();
+    const props = await renderFields();
     await waitFor(() =>
       expect(screen.getByRole('option', { name: 'Bank Overpayment' })).toBeInTheDocument(),
     );
-    const { fireEvent } = await import('@testing-library/react');
     fireEvent.change(screen.getByLabelText('Overpayment payee'), {
       target: { value: 'p1' },
     });
@@ -96,8 +99,7 @@ describe('OverpaymentRecognitionFields', () => {
   });
 
   it('reports the chosen interest booking mode', async () => {
-    const props = renderFields();
-    const { fireEvent } = await import('@testing-library/react');
+    const props = await renderFields();
     fireEvent.change(screen.getByLabelText('How is interest recorded?'), {
       target: { value: 'SEPARATE' },
     });

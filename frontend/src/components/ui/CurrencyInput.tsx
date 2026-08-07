@@ -105,6 +105,23 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     const inputPaddingRight =
       rightButtonCount === 0 ? undefined : rightButtonCount === 1 ? '2.25rem' : '3.75rem';
 
+    /**
+     * Report a value only when it differs from the one the parent already
+     * holds. Every path here re-parses whatever text is on screen, and for a
+     * field nobody edited -- one tabbed through, or typed back to the same
+     * number -- that text is the parent's own value formatted to two decimals.
+     * Handing it back is not an edit. It is invisible to a parent that only
+     * stores the number and destructive to one that does more: the FX panels
+     * derive an exchange rate from the converted total and mark it
+     * user-overridden, so a bare blur replaced a fetched 10dp rate with one
+     * reverse-engineered from the cents-rounded total (1.365234 -> 1.365250)
+     * and stopped the date effect re-fetching.
+     */
+    const notifyIfChanged = (next: number | undefined) => {
+      if (next === value) return;
+      onChange(next);
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       // Use calculator filter if calculator is enabled, otherwise standard currency filter
       let filtered = allowCalculator
@@ -121,8 +138,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       // Only notify parent immediately if not a calculator expression
       // (expressions are evaluated on blur)
       if (!allowCalculator || !hasCalculatorOperators(filtered)) {
-        const parsed = parseAmount(filtered);
-        onChange(parsed);
+        notifyIfChanged(parseAmount(filtered));
       }
     };
 
@@ -155,11 +171,11 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           setDisplayValue(formatAmountWithCommas(value));
         } else {
           setDisplayValue(formatAmountWithCommas(finalValue));
-          onChange(finalValue);
+          notifyIfChanged(finalValue);
         }
       } else if (displayValue.trim() === '') {
         setDisplayValue('');
-        onChange(undefined);
+        notifyIfChanged(undefined);
       } else {
         // Invalid input - reset to last valid value
         setDisplayValue(formatAmountWithCommas(value));
@@ -185,7 +201,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
             result = Math.abs(result);
           }
           setDisplayValue(formatAmountWithCommas(result));
-          onChange(result);
+          notifyIfChanged(result);
         }
       }
     };
