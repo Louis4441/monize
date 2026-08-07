@@ -9,9 +9,6 @@
       "pp": "{value} poin"
     },
     "header": {
-      "breadcrumbAriaLabel": "Tautan navigasi",
-      "breadcrumbRoot": "Laporan",
-      "title": "Strategi GEM",
       "subtitle": "Momentum saham global – saham versus aset aman",
       "explainer": "Global Equities Momentum menempatkan seluruh portofolio strategi pada satu aset di setiap periode: saham bila imbal hasil {months} bulannya mengalahkan aset tanpa risiko (momentum absolut), jika tidak maka aset aman. Di antara saham, pasar dengan imbal hasil {months} bulan tertinggi yang menang (momentum relatif).",
       "cadence": "Frekuensi evaluasi: {cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Ganti skenario",
+      "triggerText": "Skenario",
       "filterPlaceholder": "Saring skenario",
       "noMatches": "Tidak ada skenario yang cocok",
       "create": "Skenario baru",

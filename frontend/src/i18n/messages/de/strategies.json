@@ -9,9 +9,6 @@
       "pp": "{value} Pp."
     },
     "header": {
-      "breadcrumbAriaLabel": "Brotkrumennavigation",
-      "breadcrumbRoot": "Berichte",
-      "title": "GEM-Strategie",
       "subtitle": "Globales Aktien-Momentum – Aktien gegen ein sicheres Anlagegut",
       "explainer": "Global Equities Momentum legt das gesamte Strategiedepot in jeder Periode in ein einziges Anlagegut: in Aktien, wenn deren {months}-Monats-Rendite die des risikofreien Anlageguts übertrifft (absolutes Momentum), sonst in das sichere Anlagegut. Unter den Aktien gewinnt der Markt mit der stärksten {months}-Monats-Rendite (relatives Momentum).",
       "cadence": "Auswertungsintervall: {cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Szenario wechseln",
+      "triggerText": "Szenario",
       "filterPlaceholder": "Szenarien filtern",
       "noMatches": "Kein Szenario passt",
       "create": "Neues Szenario",

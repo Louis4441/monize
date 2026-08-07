@@ -1,8 +1,29 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@/test/render";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, act, within } from "@/test/render";
 import { GemStrategyHeader } from "./GemStrategyHeader";
 
+const push = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+  usePathname: () => "/reports/gem-strategy",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// The report switcher lists the user's saved reports beside the built-in ones.
+vi.mock("@/lib/custom-reports", () => ({
+  customReportsApi: { getAll: vi.fn().mockResolvedValue([]) },
+}));
+
+vi.mock("@/lib/investment-reports", () => ({
+  investmentReportsApi: { getAll: vi.fn().mockResolvedValue([]) },
+}));
+
 describe("GemStrategyHeader", () => {
+  beforeEach(() => {
+    push.mockClear();
+  });
+
   const baseProps = {
     strategyId: "strategy-1",
     strategyName: "GEM Strategy",
@@ -17,16 +38,13 @@ describe("GemStrategyHeader", () => {
     daysUntilNextEvaluation: 28,
   };
 
-  it("shows the breadcrumb, title, cadence and days remaining", () => {
+  it("shows the way back, title, cadence and days remaining", () => {
     render(<GemStrategyHeader {...baseProps} onEditSettings={vi.fn()} />);
 
+    // The same back link the other report pages carry, above the title.
     expect(
-      screen.getByRole("navigation", { name: "Breadcrumb" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute(
-      "href",
-      "/reports",
-    );
+      screen.getByRole("link", { name: "Back to Reports" }),
+    ).toHaveAttribute("href", "/reports");
     expect(
       screen.getByRole("heading", { level: 1, name: /GEM Strategy/ }),
     ).toBeInTheDocument();
@@ -89,6 +107,72 @@ describe("GemStrategyHeader", () => {
     expect(
       screen.getByText("Next evaluation not scheduled"),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * The page carries two switchers, one inside the other's subject: the caret
+   * beside the title moves to another report, the scenario control moves within
+   * this one. They sit on the same line, so each has to say which it is -- and
+   * the report caret has to be there at all, which is the whole point of the
+   * section reading the same way on every page.
+   */
+  describe("the two switchers on the title line", () => {
+    const twoScenarios = [
+      { id: "strategy-1", name: "GEM Strategy" },
+      { id: "strategy-2", name: "GEM 6-month" },
+    ];
+
+    it("switches reports from the caret beside the title", async () => {
+      await act(async () => {
+        render(<GemStrategyHeader {...baseProps} onEditSettings={vi.fn()} />);
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "Switch to another report" }),
+        );
+      });
+      // Grouped by section, like every other report page's caret.
+      const budget = screen.getByRole("group", { name: "Budget" });
+      fireEvent.click(
+        within(budget).getByRole("menuitem", { name: /Savings Rate/ }),
+      );
+      expect(push).toHaveBeenCalledWith("/reports/savings-rate");
+    });
+
+    it("does not offer this report as a destination", async () => {
+      await act(async () => {
+        render(<GemStrategyHeader {...baseProps} onEditSettings={vi.fn()} />);
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "Switch to another report" }),
+        );
+      });
+      expect(screen.queryByRole("menuitem", { name: /^GEM Strategy/ })).toBeNull();
+    });
+
+    it("names the scenario control, so the second caret is not a mystery", async () => {
+      const onSelectScenario = vi.fn();
+      await act(async () => {
+        render(
+          <GemStrategyHeader
+            {...baseProps}
+            scenarios={twoScenarios}
+            onSelectScenario={onSelectScenario}
+            onEditSettings={vi.fn()}
+          />,
+        );
+      });
+      const scenarioTrigger = screen.getByRole("button", {
+        name: "Switch scenario",
+      });
+      expect(scenarioTrigger).toHaveTextContent("Scenario");
+      // And it still switches scenarios rather than navigating anywhere.
+      fireEvent.click(scenarioTrigger);
+      fireEvent.click(screen.getByRole("menuitem", { name: /GEM 6-month/ }));
+      expect(onSelectScenario).toHaveBeenCalledWith("strategy-2");
+      expect(push).not.toHaveBeenCalled();
+    });
   });
 
   it("reports the settings request", () => {

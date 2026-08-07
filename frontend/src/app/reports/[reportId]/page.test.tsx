@@ -6,6 +6,18 @@ let paramsValue: Record<string, string> = { reportId: 'spending-by-category' };
 
 vi.mock('next/navigation', () => ({
   useParams: () => paramsValue,
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+// The header's report switcher lists the user's saved reports alongside the
+// built-in ones; this page's tests are about the built-in renderer, so the two
+// lookups answer empty rather than reaching for the network.
+vi.mock('@/lib/custom-reports', () => ({
+  customReportsApi: { getAll: vi.fn().mockResolvedValue([]) },
+}));
+
+vi.mock('@/lib/investment-reports', () => ({
+  investmentReportsApi: { getAll: vi.fn().mockResolvedValue([]) },
 }));
 
 // ProtectedRoute passthrough so ReportContent renders directly.
@@ -24,24 +36,6 @@ vi.mock('@/hooks/useOnAiAction', () => ({
 vi.mock('@/components/layout/PageLayout', () => ({
   PageLayout: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="page-layout">{children}</div>
-  ),
-}));
-
-vi.mock('@/components/layout/PageHeader', () => ({
-  PageHeader: ({
-    title,
-    subtitle,
-    actions,
-  }: {
-    title?: string;
-    subtitle?: string;
-    actions?: React.ReactNode;
-  }) => (
-    <div data-testid="page-header">
-      <h1>{title}</h1>
-      {subtitle && <p data-testid="subtitle">{subtitle}</p>}
-      {actions}
-    </div>
   ),
 }));
 
@@ -148,11 +142,18 @@ describe('ReportPage', () => {
       render(<ReportPage />);
     });
     await act(async () => {});
-    expect(await screen.findByText('Spending by Category')).toBeInTheDocument();
-    expect(screen.getByTestId('subtitle')).toHaveTextContent(
-      /See where your money goes/,
-    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Spending by Category' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/See where your money goes/),
+    ).toBeInTheDocument();
     expect(screen.getByText('Back to Reports')).toBeInTheDocument();
+    // The caret beside the title jumps to another report without going back to
+    // the list -- the same control the account and payee detail pages carry.
+    expect(
+      screen.getByRole('button', { name: 'Switch to another report' }),
+    ).toBeInTheDocument();
   });
 
   it('renders the Report Not Found state for an unknown report id', async () => {
@@ -164,8 +165,15 @@ describe('ReportPage', () => {
     expect(
       screen.getByText('The requested report does not exist.'),
     ).toBeInTheDocument();
-    // The header (with Back to Reports) is not rendered in the not-found branch.
-    expect(screen.queryByText('Back to Reports')).not.toBeInTheDocument();
+    // A stale link lands here, so the way out is offered even though there is
+    // no report to head a switcher with.
+    expect(screen.getByRole('link', { name: 'Back to Reports' })).toHaveAttribute(
+      'href',
+      '/reports',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Switch to another report' }),
+    ).toBeNull();
   });
 
   it('renders the back link pointing to /reports', async () => {
@@ -188,7 +196,7 @@ describe('ReportPage', () => {
     await act(async () => {});
     expect(await screen.findByTestId(`r-${id}`)).toBeInTheDocument();
     // The header is shown for every known report.
-    expect(screen.getByTestId('page-header')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(screen.getByText('Back to Reports')).toBeInTheDocument();
   });
 });

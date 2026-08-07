@@ -45,7 +45,7 @@ function NewCustomReportContent() {
           subtitle={t('customPages.createSubtitle')}
           actions={
             <Link href="/reports">
-              <Button variant="outline">{t('reportPage.backToReports')}</Button>
+              <Button variant="outline">{t('detailHeader.backToReports')}</Button>
             </Link>
           }
         />

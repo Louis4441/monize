@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Тепловая карта, показывающая 12 месяцев по всем категориям для выявления сезонных паттернов расходов."
     }
   },
+  "detailHeader": {
+    "backToReports": "Назад к отчётам",
+    "switchReport": "Перейти к другому отчёту",
+    "switchPlaceholder": "Фильтр отчётов...",
+    "switchNoMatches": "Нет подходящих отчётов"
+  },
   "reportPage": {
     "notFound": "Отчёт не найден",
-    "notFoundDesc": "Запрошенный отчёт не существует.",
-    "backToReports": "Назад к отчётам"
+    "notFoundDesc": "Запрошенный отчёт не существует."
   },
   "error": {
     "defaultMessage": "Не удалось загрузить данные отчёта. Повторите попытку.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Отчёт не найден",
-    "backToReports": "Назад к отчётам",
     "labelTimeframe": "Временной интервал",
     "useSavedTimeframe": "Использовать сохранённый интервал",
     "labelStartDate": "Начальная дата",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Отчёт не найден",
-    "backToReports": "Назад к отчётам",
     "accountsLabel": "Счета",
     "accountsPlaceholder": "Все инвестиционные счета",
     "labelAsOfDate": "По состоянию на",

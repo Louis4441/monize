@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Grille thermique affichant 12 mois sur toutes les catégories pour identifier les tendances saisonnières des dépenses."
     }
   },
+  "detailHeader": {
+    "backToReports": "Retour aux rapports",
+    "switchReport": "Passer à un autre rapport",
+    "switchPlaceholder": "Filtrer les rapports...",
+    "switchNoMatches": "Aucun rapport ne correspond"
+  },
   "reportPage": {
     "notFound": "Rapport introuvable",
-    "notFoundDesc": "Le rapport demandé n'existe pas.",
-    "backToReports": "Retour aux rapports"
+    "notFoundDesc": "Le rapport demandé n'existe pas."
   },
   "error": {
     "defaultMessage": "Impossible de charger les données du rapport. Veuillez réessayer.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Rapport introuvable",
-    "backToReports": "Retour aux rapports",
     "labelTimeframe": "Période",
     "useSavedTimeframe": "Utiliser la période enregistrée",
     "labelStartDate": "Date de début",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Rapport introuvable",
-    "backToReports": "Retour aux rapports",
     "accountsLabel": "Comptes",
     "accountsPlaceholder": "Tous les comptes d'investissement",
     "labelAsOfDate": "À la date du",

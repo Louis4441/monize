@@ -136,6 +136,10 @@ export function GemScenarioSwitcher({
             items={items}
             onSelect={onSelect}
             triggerLabel={t("gem.scenarios.switch")}
+            // Named on the control itself: the caret beside the title switches
+            // reports, this one switches scenarios, and they sit on the same
+            // line.
+            triggerText={t("gem.scenarios.triggerText")}
             filterPlaceholder={t("gem.scenarios.filterPlaceholder")}
             noMatchesLabel={t("gem.scenarios.noMatches")}
           />

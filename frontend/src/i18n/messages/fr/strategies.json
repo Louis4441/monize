@@ -9,9 +9,6 @@
       "pp": "{value} pts"
     },
     "header": {
-      "breadcrumbAriaLabel": "Fil d'Ariane",
-      "breadcrumbRoot": "Rapports",
-      "title": "Stratégie GEM",
       "subtitle": "Momentum actions mondial – actions contre actif sûr",
       "explainer": "Global Equities Momentum place tout le portefeuille de la stratégie sur un seul actif à chaque période : les actions lorsque leur rendement sur {months} mois dépasse celui de l'actif sans risque (momentum absolu), sinon l'actif sûr. Parmi les actions, le marché au rendement sur {months} mois le plus élevé l'emporte (momentum relatif).",
       "cadence": "Fréquence d'évaluation : {cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Changer de scénario",
+      "triggerText": "Scénario",
       "filterPlaceholder": "Filtrer les scénarios",
       "noMatches": "Aucun scénario ne correspond",
       "create": "Nouveau scénario",

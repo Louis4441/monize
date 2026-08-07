@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Siatka mapy cieplnej przedstawiająca 12 miesięcy dla wszystkich kategorii w celu rozpoznania sezonowych wzorców wydatków."
     }
   },
+  "detailHeader": {
+    "backToReports": "Powrót do raportów",
+    "switchReport": "Przejdź do innego raportu",
+    "switchPlaceholder": "Filtruj raporty...",
+    "switchNoMatches": "Brak dopasowanych raportów"
+  },
   "reportPage": {
     "notFound": "Nie znaleziono raportu",
-    "notFoundDesc": "Żądany raport nie istnieje.",
-    "backToReports": "Powrót do raportów"
+    "notFoundDesc": "Żądany raport nie istnieje."
   },
   "error": {
     "defaultMessage": "Nie udało się załadować danych raportu. Spróbuj ponownie.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Nie znaleziono raportu",
-    "backToReports": "Powrót do raportów",
     "labelTimeframe": "Zakres czasu",
     "useSavedTimeframe": "Użyj zapisanego zakresu czasu",
     "labelStartDate": "Data początkowa",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Nie znaleziono raportu",
-    "backToReports": "Powrót do raportów",
     "accountsLabel": "Konta",
     "accountsPlaceholder": "Wszystkie konta inwestycyjne",
     "labelAsOfDate": "Na dzień",

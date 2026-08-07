@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Lưới bản đồ nhiệt hiển thị 12 tháng trên tất cả danh mục để xác định mô hình chi tiêu theo mùa."
     }
   },
+  "detailHeader": {
+    "backToReports": "Quay lại báo cáo",
+    "switchReport": "Chuyển sang báo cáo khác",
+    "switchPlaceholder": "Lọc báo cáo...",
+    "switchNoMatches": "Không có báo cáo nào khớp"
+  },
   "reportPage": {
     "notFound": "Không tìm thấy báo cáo",
-    "notFoundDesc": "Báo cáo được yêu cầu không tồn tại.",
-    "backToReports": "Quay lại báo cáo"
+    "notFoundDesc": "Báo cáo được yêu cầu không tồn tại."
   },
   "error": {
     "defaultMessage": "Không thể tải dữ liệu báo cáo. Vui lòng thử lại.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Không tìm thấy báo cáo",
-    "backToReports": "Quay lại báo cáo",
     "labelTimeframe": "Khung thời gian",
     "useSavedTimeframe": "Sử dụng khung thời gian đã lưu",
     "labelStartDate": "Ngày bắt đầu",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Không tìm thấy báo cáo",
-    "backToReports": "Quay lại báo cáo",
     "accountsLabel": "Tài khoản",
     "accountsPlaceholder": "Tất cả tài khoản đầu tư",
     "labelAsOfDate": "Tính đến ngày",

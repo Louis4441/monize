@@ -9,9 +9,6 @@
       "pp": "{value} pp"
     },
     "header": {
-      "breadcrumbAriaLabel": "Breadcrumb",
-      "breadcrumbRoot": "Reports",
-      "title": "GEM Strategy",
       "subtitle": "Global equities momentum – equities versus a safe asset",
       "explainer": "Global Equities Momentum allocates the whole strategy portfolio to a single asset each period: equities when their {months}-month return beats the risk-free asset (absolute momentum), otherwise the safe asset. Among equities, the market with the strongest {months}-month return wins (relative momentum).",
       "cadence": "Evaluation frequency: {cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Switch scenario",
+      "triggerText": "Scenario",
       "filterPlaceholder": "Filter scenarios",
       "noMatches": "No scenario matches",
       "create": "New scenario",

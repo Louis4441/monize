@@ -9,9 +9,6 @@
       "pp": "{value} p.p."
     },
     "header": {
-      "breadcrumbAriaLabel": "Ruta de navegación",
-      "breadcrumbRoot": "Informes",
-      "title": "Estrategia GEM",
       "subtitle": "Momentum global de renta variable: acciones frente a un activo seguro",
       "explainer": "Global Equities Momentum asigna toda la cartera de la estrategia a un único activo en cada periodo: acciones cuando su rentabilidad a {months} meses supera la del activo libre de riesgo (momentum absoluto) y, si no, el activo seguro. Entre las acciones gana el mercado con la mayor rentabilidad a {months} meses (momentum relativo).",
       "cadence": "Frecuencia de evaluación: {cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Cambiar de escenario",
+      "triggerText": "Escenario",
       "filterPlaceholder": "Filtrar escenarios",
       "noMatches": "Ningún escenario coincide",
       "create": "Nuevo escenario",

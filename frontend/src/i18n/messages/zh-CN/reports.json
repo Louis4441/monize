@@ -130,10 +130,15 @@
       "seasonal-spending-map": "显示所有分类 12 个月的热图，识别季节性支出模式。"
     }
   },
+  "detailHeader": {
+    "backToReports": "返回报告",
+    "switchReport": "切换到其他报告",
+    "switchPlaceholder": "筛选报告...",
+    "switchNoMatches": "没有匹配的报告"
+  },
   "reportPage": {
     "notFound": "未找到报告",
-    "notFoundDesc": "所请求的报告不存在。",
-    "backToReports": "返回报告"
+    "notFoundDesc": "所请求的报告不存在。"
   },
   "error": {
     "defaultMessage": "加载报告数据失败。请重试。",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "未找到报告",
-    "backToReports": "返回报告",
     "labelTimeframe": "时间范围",
     "useSavedTimeframe": "使用保存的时间范围",
     "labelStartDate": "开始日期",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "未找到报告",
-    "backToReports": "返回报告",
     "accountsLabel": "账户",
     "accountsPlaceholder": "所有投资账户",
     "labelAsOfDate": "截至日期",

@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Kisi peta panas yang menunjukkan 12 bulan di semua kategori untuk mengidentifikasi pola pengeluaran musiman."
     }
   },
+  "detailHeader": {
+    "backToReports": "Kembali ke Laporan",
+    "switchReport": "Pindah ke laporan lain",
+    "switchPlaceholder": "Saring laporan...",
+    "switchNoMatches": "Tidak ada laporan yang cocok"
+  },
   "reportPage": {
     "notFound": "Laporan Tidak Ditemukan",
-    "notFoundDesc": "Laporan yang diminta tidak ada.",
-    "backToReports": "Kembali ke Laporan"
+    "notFoundDesc": "Laporan yang diminta tidak ada."
   },
   "error": {
     "defaultMessage": "Gagal memuat data laporan. Silakan coba lagi.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Laporan tidak ditemukan",
-    "backToReports": "Kembali ke Laporan",
     "labelTimeframe": "Kerangka Waktu",
     "useSavedTimeframe": "Gunakan kerangka waktu yang disimpan",
     "labelStartDate": "Tanggal Mulai",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Laporan tidak ditemukan",
-    "backToReports": "Kembali ke Laporan",
     "accountsLabel": "Akun",
     "accountsPlaceholder": "Semua akun investasi",
     "labelAsOfDate": "Per tanggal",

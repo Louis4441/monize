@@ -57,7 +57,15 @@ vi.mock("@/lib/custom-reports", () => ({
   customReportsApi: {
     getById: (...args: any[]) => mockGetById(...args),
     execute: (...args: any[]) => mockExecute(...args),
+    // The header's report switcher lists the user's saved reports beside the
+    // built-in ones; these tests are about the viewer, so both lookups answer
+    // empty rather than reaching for the network.
+    getAll: vi.fn().mockResolvedValue([]),
   },
+}));
+
+vi.mock("@/lib/investment-reports", () => ({
+  investmentReportsApi: { getAll: vi.fn().mockResolvedValue([]) },
 }));
 
 vi.mock("@/lib/logger", () => ({

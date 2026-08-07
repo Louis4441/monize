@@ -2,11 +2,10 @@
 
 import { Suspense, lazy, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { PageLayout } from '@/components/layout/PageLayout';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/Button';
+import { BackToReportsLink } from '@/components/reports/BackToReportsLink';
+import { ReportDetailHeader } from '@/components/reports/ReportDetailHeader';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
@@ -112,6 +111,9 @@ function ReportContent() {
     return (
       <PageLayout>
         <div className="px-4 sm:px-6 lg:px-12 pt-6 pb-8">
+          {/* An id that names no report is where the way back matters most:
+              without it the page is a dead end reachable from any stale link. */}
+          <BackToReportsLink />
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-8 text-center">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               {t('reportPage.notFound')}
@@ -128,14 +130,10 @@ function ReportContent() {
   return (
     <PageLayout>
       <main className="px-4 sm:px-6 lg:px-12 pt-6 pb-8">
-        <PageHeader
+        <ReportDetailHeader
+          reportId={reportId}
           title={t(`page.names.${reportId}` as Parameters<typeof t>[0])}
           subtitle={t(`page.descriptions.${reportId}` as Parameters<typeof t>[0])}
-          actions={
-            <Link href="/reports">
-              <Button variant="outline">{t('reportPage.backToReports')}</Button>
-            </Link>
-          }
         />
         <Suspense fallback={<ReportSkeleton />}>
           <ReportComponent key={refreshKey} />

@@ -9,9 +9,6 @@
       "pp": "{value} 個百分點"
     },
     "header": {
-      "breadcrumbAriaLabel": "階層導覽",
-      "breadcrumbRoot": "報表",
-      "title": "GEM 策略",
       "subtitle": "全球股票動能 — 股票對比避險資產",
       "explainer": "Global Equities Momentum 在每個週期把策略的整個投資組合投入單一資產：當股票的 {months} 個月報酬高於無風險資產時投入股票（絕對動能），否則投入避險資產。在股票之中，{months} 個月報酬最高的市場勝出（相對動能）。",
       "cadence": "評估頻率：{cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "切換方案",
+      "triggerText": "方案",
       "filterPlaceholder": "篩選方案",
       "noMatches": "沒有相符的方案",
       "create": "新增方案",

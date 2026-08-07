@@ -9,9 +9,6 @@
       "pp": "{value} p.p."
     },
     "header": {
-      "breadcrumbAriaLabel": "Trilho de navegação",
-      "breadcrumbRoot": "Relatórios",
-      "title": "Estratégia GEM",
       "subtitle": "Momentum global de ações – ações contra um ativo seguro",
       "explainer": "A Global Equities Momentum aloca toda a carteira da estratégia num único ativo em cada período: ações quando o seu retorno a {months} meses supera o do ativo sem risco (momentum absoluto), caso contrário o ativo seguro. Entre as ações vence o mercado com o retorno a {months} meses mais elevado (momentum relativo).",
       "cadence": "Frequência de avaliação: {cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Mudar de cenário",
+      "triggerText": "Cenário",
       "filterPlaceholder": "Filtrar cenários",
       "noMatches": "Nenhum cenário corresponde",
       "create": "Novo cenário",

@@ -21,6 +21,7 @@ import { createLogger } from '@/lib/logger';
 import {
   Report,
   ReportCategory,
+  REPORT_CATEGORIES,
   builtInReports,
   categoryColors,
 } from '@/components/reports/report-definitions';
@@ -351,7 +352,7 @@ function ReportsContent() {
           >
             {t('page.allReports')}
           </button>
-          {(Object.keys(categoryColors) as ReportCategory[]).map((cat) => (
+          {REPORT_CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => selectCategory(cat)}

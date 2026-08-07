@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Grade de mapa de calor mostrando 12 meses em todas as categorias para identificar padrões de despesas sazonais."
     }
   },
+  "detailHeader": {
+    "backToReports": "Voltar aos Relatórios",
+    "switchReport": "Mudar para outro relatório",
+    "switchPlaceholder": "Filtrar relatórios...",
+    "switchNoMatches": "Nenhum relatório corresponde"
+  },
   "reportPage": {
     "notFound": "Relatório Não Encontrado",
-    "notFoundDesc": "O relatório solicitado não existe.",
-    "backToReports": "Voltar aos Relatórios"
+    "notFoundDesc": "O relatório solicitado não existe."
   },
   "error": {
     "defaultMessage": "Falha ao carregar dados do relatório. Tente novamente.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Relatório não encontrado",
-    "backToReports": "Voltar aos Relatórios",
     "labelTimeframe": "Período",
     "useSavedTimeframe": "Usar período salvo",
     "labelStartDate": "Data de Início",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Relatório não encontrado",
-    "backToReports": "Voltar aos Relatórios",
     "accountsLabel": "Contas",
     "accountsPlaceholder": "Todas as contas de investimento",
     "labelAsOfDate": "Com referência à data",

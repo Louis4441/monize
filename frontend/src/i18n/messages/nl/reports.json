@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Heatmapraster met 12 maanden over alle categorieën om seizoensgebonden uitgavenpatronen te herkennen."
     }
   },
+  "detailHeader": {
+    "backToReports": "Terug naar rapporten",
+    "switchReport": "Naar een ander rapport gaan",
+    "switchPlaceholder": "Rapporten filteren...",
+    "switchNoMatches": "Geen rapporten gevonden"
+  },
   "reportPage": {
     "notFound": "Rapport niet gevonden",
-    "notFoundDesc": "Het gevraagde rapport bestaat niet.",
-    "backToReports": "Terug naar rapporten"
+    "notFoundDesc": "Het gevraagde rapport bestaat niet."
   },
   "error": {
     "defaultMessage": "Rapportgegevens konden niet worden geladen. Probeer het opnieuw.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Rapport niet gevonden",
-    "backToReports": "Terug naar rapporten",
     "labelTimeframe": "Tijdsbestek",
     "useSavedTimeframe": "Opgeslagen tijdsbestek gebruiken",
     "labelStartDate": "Begindatum",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Rapport niet gevonden",
-    "backToReports": "Terug naar rapporten",
     "accountsLabel": "Rekeningen",
     "accountsPlaceholder": "Alle beleggingsrekeningen",
     "labelAsOfDate": "Peildatum",

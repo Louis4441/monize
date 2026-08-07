@@ -130,10 +130,15 @@
       "seasonal-spending-map": "Mevsimsel harcama kalıplarını belirlemek için tüm kategorilerde 12 ay gösteren ısı haritası ızgarası."
     }
   },
+  "detailHeader": {
+    "backToReports": "Raporlara Geri Dön",
+    "switchReport": "Başka bir rapora geç",
+    "switchPlaceholder": "Raporları filtrele...",
+    "switchNoMatches": "Eşleşen rapor yok"
+  },
   "reportPage": {
     "notFound": "Rapor Bulunamadı",
-    "notFoundDesc": "İstenen rapor mevcut değil.",
-    "backToReports": "Raporlara Geri Dön"
+    "notFoundDesc": "İstenen rapor mevcut değil."
   },
   "error": {
     "defaultMessage": "Rapor verileri yüklenemedi. Lütfen tekrar deneyin.",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "Rapor bulunamadı",
-    "backToReports": "Raporlara Geri Dön",
     "labelTimeframe": "Zaman Çerçevesi",
     "useSavedTimeframe": "Kaydedilen zaman çerçevesini kullan",
     "labelStartDate": "Başlangıç Tarihi",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "Rapor bulunamadı",
-    "backToReports": "Raporlara Geri Dön",
     "accountsLabel": "Hesaplar",
     "accountsPlaceholder": "Tüm yatırım hesapları",
     "labelAsOfDate": "İtibariyle tarih",

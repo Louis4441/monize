@@ -9,9 +9,6 @@
       "pp": "{value} pp"
     },
     "header": {
-      "breadcrumbAriaLabel": "Kruimelpad",
-      "breadcrumbRoot": "Rapporten",
-      "title": "GEM-strategie",
       "subtitle": "Wereldwijd aandelenmomentum – aandelen tegen een veilige belegging",
       "explainer": "Global Equities Momentum belegt de hele strategieportefeuille elke periode in één belegging: aandelen wanneer hun {months}-maandsrendement dat van de risicovrije belegging verslaat (absoluut momentum), anders de veilige belegging. Binnen de aandelen wint de markt met het hoogste {months}-maandsrendement (relatief momentum).",
       "cadence": "Evaluatiefrequentie: {cadence}",
@@ -22,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Scenario wisselen",
+      "triggerText": "Scenario",
       "filterPlaceholder": "Scenario's filteren",
       "noMatches": "Geen scenario komt overeen",
       "create": "Nieuw scenario",

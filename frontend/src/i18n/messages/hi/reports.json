@@ -130,10 +130,15 @@
       "seasonal-spending-map": "मौसमी व्यय पैटर्न की पहचान करने के लिए सभी श्रेणियों में 12 महीने दिखाने वाला हीटमैप ग्रिड।"
     }
   },
+  "detailHeader": {
+    "backToReports": "रिपोर्ट पर वापस जाएँ",
+    "switchReport": "किसी दूसरी रिपोर्ट पर जाएँ",
+    "switchPlaceholder": "रिपोर्ट छाँटें...",
+    "switchNoMatches": "कोई रिपोर्ट मेल नहीं खाती"
+  },
   "reportPage": {
     "notFound": "रिपोर्ट नहीं मिली",
-    "notFoundDesc": "अनुरोधित रिपोर्ट मौजूद नहीं है।",
-    "backToReports": "रिपोर्ट पर वापस जाएँ"
+    "notFoundDesc": "अनुरोधित रिपोर्ट मौजूद नहीं है।"
   },
   "error": {
     "defaultMessage": "रिपोर्ट डेटा लोड करने में विफल। कृपया पुनः प्रयास करें।",
@@ -379,7 +384,6 @@
   },
   "customReportViewer": {
     "notFound": "रिपोर्ट नहीं मिली",
-    "backToReports": "रिपोर्ट पर वापस जाएँ",
     "labelTimeframe": "समय-सीमा",
     "useSavedTimeframe": "सहेजी गई समय-सीमा उपयोग करें",
     "labelStartDate": "प्रारंभ तिथि",
@@ -677,7 +681,6 @@
   },
   "investmentReportViewer": {
     "notFound": "रिपोर्ट नहीं मिली",
-    "backToReports": "रिपोर्ट पर वापस जाएँ",
     "accountsLabel": "खाते",
     "accountsPlaceholder": "सभी निवेश खाते",
     "labelAsOfDate": "इस तिथि के अनुसार",

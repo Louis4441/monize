@@ -2,7 +2,27 @@
 // the dashboard's Favourite Reports widget. Names and descriptions live in
 // the `reports` i18n namespace (`page.names.{id}` / `page.descriptions.{id}`).
 
-export type ReportCategory = 'spending' | 'income' | 'networth' | 'tax' | 'debt' | 'investment' | 'insights' | 'maintenance' | 'bills' | 'budget' | 'custom';
+/**
+ * The sections a report belongs to, in the order they are offered -- the filter
+ * chips on the Reports page and the group headings in the report switcher both
+ * read this, so the two cannot drift apart. The type is derived from the list
+ * rather than declared beside it, so adding a section is one edit.
+ */
+export const REPORT_CATEGORIES = [
+  'spending',
+  'income',
+  'networth',
+  'tax',
+  'debt',
+  'investment',
+  'insights',
+  'maintenance',
+  'bills',
+  'budget',
+  'custom',
+] as const;
+
+export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
 
 export interface Report {
   id: string;
