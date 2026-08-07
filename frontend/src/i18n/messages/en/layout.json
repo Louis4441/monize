@@ -109,6 +109,7 @@
       "createdTransaction": "Created transaction {payee} {amount}",
       "updatedTransaction": "Updated transaction {payee} {amount}",
       "deletedTransaction": "Deleted transaction {payee} {amount}",
+      "bulkUpdatedTransactions": "Bulk updated {count, plural, one {# transaction} other {# transactions}}",
       "createdTransfer": "Created transfer {amount} from {from} to {to}",
       "createdInvestmentTransaction": "Created {action} transaction",
       "updatedInvestmentTransaction": "Updated {action} transaction",

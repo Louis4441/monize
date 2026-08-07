@@ -404,6 +404,85 @@ export class TransactionSplitService {
   }
 
   /**
+   * Recategorize the category-kind lines of a set of split parents in one
+   * statement, returning what each changed line held before the write so the
+   * caller can record an undoable snapshot.
+   *
+   * Invariants owned here (docs/future-plans/split-bulk-update.md):
+   * - I2: only `kind = 'category'` rows are written; transfer and investment
+   *   lines are never touched.
+   * - I3: the pre-read joins back to `transactions` on `user_id`; the UPDATE
+   *   then writes only ids that pre-read proved (join is defense-in-depth).
+   * - I6: the parent rows are locked first (`lockTransactionRows`), the same
+   *   lock `updateSplits`/`addSplit` take, so split-set writers serialize.
+   *
+   * `restrictToCategoryIds` is the descendant-expanded category filter set;
+   * `undefined` means all category-kind lines. Joins the caller's ambient
+   * transaction when called from inside one (bulk update).
+   */
+  async bulkRecategorizeCategorySplits(
+    userId: string,
+    parentIds: string[],
+    newCategoryId: string | null,
+    restrictToCategoryIds?: string[],
+  ): Promise<
+    {
+      splitId: string;
+      transactionId: string;
+      previousCategoryId: string | null;
+    }[]
+  > {
+    if (parentIds.length === 0) return [];
+    if (
+      restrictToCategoryIds !== undefined &&
+      restrictToCategoryIds.length === 0
+    )
+      return [];
+
+    return withScopedDb(this.dataSource, async (m) => {
+      // Parents only, never the full eligible set: locking a parent together
+      // with its own counterpart leg is refused by lockTransactionRows.
+      await lockTransactionRows(m, parentIds, userId);
+
+      const params: unknown[] = [userId, parentIds];
+      let restrictClause = "";
+      if (restrictToCategoryIds !== undefined) {
+        params.push(restrictToCategoryIds);
+        restrictClause = " AND s.category_id = ANY($3)";
+      }
+
+      const rows: {
+        id: string;
+        transaction_id: string;
+        category_id: string | null;
+      }[] = await m.query(
+        `SELECT s.id, s.transaction_id, s.category_id
+           FROM transaction_splits s
+           JOIN transactions t ON t.id = s.transaction_id
+          WHERE t.user_id = $1
+            AND s.transaction_id = ANY($2)
+            AND s.kind = 'category'${restrictClause}
+          ORDER BY s.id
+            FOR UPDATE OF s`,
+        params,
+      );
+
+      if (rows.length === 0) return [];
+
+      await m.query(
+        `UPDATE transaction_splits SET category_id = $1 WHERE id = ANY($2)`,
+        [newCategoryId, rows.map((r) => r.id)],
+      );
+
+      return rows.map((r) => ({
+        splitId: r.id,
+        transactionId: r.transaction_id,
+        previousCategoryId: r.category_id,
+      }));
+    });
+  }
+
+  /**
    * Reverse a split transaction's side effects (embedded investment holdings,
    * transfer counterpart rows and their balance impact) ahead of deleting or
    * rebuilding its splits. Joins the caller's ambient transaction; every call

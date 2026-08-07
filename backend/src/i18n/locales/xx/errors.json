@@ -497,6 +497,8 @@
     "splitTransferLegAccountLocked": "[XX-This transfer is part of a split transaction. Change its accounts by editing the split on the source transaction instead.-XX]",
     "notFoundById": "[XX-Transaction with ID {{ id }} not found-XX]",
     "bulkUpdateNoFields": "[XX-At least one update field must be provided-XX]",
+    "bulkSplitNoMatchingLinesOne": "[XX-1 split transaction was skipped because none of its split lines matched the category update-XX]",
+    "bulkSplitNoMatchingLinesMany": "[XX-{{ count }} split transactions were skipped because none of their split lines matched the category update-XX]",
     "payeeNotFound": "[XX-Payee not found-XX]",
     "fxFieldsIncomplete": "[XX-originalAmount and originalCurrencyCode must be provided together-XX]",
     "fxRateRequired": "[XX-A positive exchange rate is required for a foreign-currency transaction-XX]",

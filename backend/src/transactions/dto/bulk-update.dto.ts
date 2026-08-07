@@ -1,11 +1,15 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsDateString,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
   ValidateIf,
 } from "class-validator";
@@ -48,6 +52,27 @@ export class BulkUpdateFilterDto {
   @IsString()
   @MaxLength(200)
   search?: string;
+
+  @ApiPropertyOptional({ description: "Minimum amount (inclusive)" })
+  @IsOptional()
+  @IsNumber()
+  @Min(-999999999999)
+  @Max(999999999999)
+  amountFrom?: number;
+
+  @ApiPropertyOptional({ description: "Maximum amount (inclusive)" })
+  @IsOptional()
+  @IsNumber()
+  @Min(-999999999999)
+  @Max(999999999999)
+  amountTo?: number;
+
+  @ApiPropertyOptional({ description: "Filter by tag IDs" })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID("4", { each: true })
+  tagIds?: string[];
 }
 
 export class BulkUpdateDto {
