@@ -34,6 +34,7 @@ import {
   BackupData,
   BackupPasswordRequiredError,
   backupTables,
+  parseArtifactCompleteness,
   RestoreBackupInput,
   RestoreResult,
 } from "./backup-format";
@@ -139,6 +140,8 @@ export class BackupRestoreService {
           `Restoring a de-identified support backup for user ${userId} (names masked, amounts scaled)`,
         );
       }
+
+      this.warnIfArtifactIncomplete(userId, rawData);
 
       // Remap every primary key in the backup to a fresh UUID (and rewrite all
       // references to those keys, including ids embedded in JSONB columns) so the
@@ -397,6 +400,35 @@ export class BackupRestoreService {
         );
       }
     }
+  }
+
+  /**
+   * Say so when the artifact itself declares it was never complete.
+   *
+   * The claim travels in the envelope precisely so it outlives the run that
+   * produced it: the settings row is on the instance the backup came from, and
+   * the filename is gone the moment somebody renames or re-uploads the file. A
+   * restore that silently replaces everything from an artifact known to be
+   * missing attachment bytes is the outcome F3R7-001 exists to prevent, arrived
+   * at from the other end.
+   *
+   * Not a refusal: restoring a partial artifact is often exactly what the user
+   * means to do, and the alternative on offer is usually nothing. An artifact
+   * that makes no claim (written before the field existed) is silent here --
+   * absence is "not known", not "incomplete".
+   */
+  private warnIfArtifactIncomplete(userId: string, data: BackupData): void {
+    const completeness = parseArtifactCompleteness(
+      (data as { completeness?: unknown }).completeness,
+    );
+    if (completeness === null || completeness.complete) return;
+    this.logger.warn(
+      `Restoring an artifact its export recorded as incomplete for user ${userId}: ` +
+        `${completeness.missingAttachments} attachment(s) had no bytes and ` +
+        `${completeness.inconsistentAttachments} contradicted their metadata, of ` +
+        `${completeness.expectedAttachments} total. Those attachments cannot come back ` +
+        `from this file.`,
+    );
   }
 
   private validateBackupFormat(data: BackupData): void {

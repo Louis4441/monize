@@ -368,6 +368,13 @@ describe("Backup export/restore round-trip (integration)", () => {
     const parsed = JSON.parse(gunzipSync(buffer).toString("utf-8"));
     expect(parsed.version).toBe(1);
     expect(parsed.exportedAt).toBeDefined();
+    // ...and its own completeness claim, so the artifact still says what it is
+    // after it has been copied off this machine (F3RB-001, issue #1069). The
+    // restore below is the other half: a non-array envelope member must fall
+    // through the id remap and the insert plan untouched against a real schema.
+    expect(parsed.completeness).toEqual(
+      expect.objectContaining({ complete: true }),
+    );
     expect(parsed.transactions).toHaveLength(4);
     // Recently-added tables must be present in the export payload.
     expect(parsed.security_tags).toHaveLength(1);

@@ -216,7 +216,7 @@ export class BackupExportService {
           await write(`,"${entry.key}":${JSON.stringify(rows)}`);
         }
 
-        await write("}");
+        await write(this.completenessEnvelopeTail(report));
       });
 
       await gzipOperation((done) => {
@@ -565,11 +565,26 @@ export class BackupExportService {
         parts.push(chunk);
       }
     });
-    parts.push(Buffer.from("}", "utf-8"));
-    return {
-      buffer: gzipSync(Buffer.concat(parts)),
-      report: this.assessAttachmentCompleteness(attachments, blobs),
-    };
+    const report = this.assessAttachmentCompleteness(attachments, blobs);
+    parts.push(Buffer.from(this.completenessEnvelopeTail(report), "utf-8"));
+    return { buffer: gzipSync(Buffer.concat(parts)), report };
+  }
+
+  /**
+   * The closing brace, with the completeness claim in front of it.
+   *
+   * At the tail rather than beside `version` because the buffered path cannot
+   * know the answer until every table has been read -- and one placement for
+   * both paths means a reader never has to care which produced the file. JSON
+   * member order carries no meaning; `data.completeness` reads the same either
+   * way.
+   *
+   * Written for a complete artifact too. "This file says it is complete" and
+   * "this file says nothing" are different facts about a recovered artifact, and
+   * only the first of them is evidence (`parseArtifactCompleteness`).
+   */
+  private completenessEnvelopeTail(report: BackupCompletenessReport): string {
+    return `,"completeness":${JSON.stringify(report)}}`;
   }
 
   /**

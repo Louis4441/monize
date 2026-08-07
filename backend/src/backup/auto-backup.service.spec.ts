@@ -1422,6 +1422,19 @@ describe("AutoBackupService", () => {
       });
     });
 
+    it("publishes it under its own tier name, never a daily one", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+
+      const result = await service.runManualBackup(userId);
+
+      expect(result.filename).toMatch(
+        /^monize-backup-partial-\d{4}-\d{2}-\d{2}\.json\.gz$/,
+      );
+      expect(await listBackups(folderFor())).toEqual([result.filename]);
+    });
+
     async function seed(names: string[]): Promise<void> {
       await fs.mkdir(folderFor(), { recursive: true });
       for (const name of names) {
@@ -1445,7 +1458,7 @@ describe("AutoBackupService", () => {
       expect(result.message).toMatch(/not promoted|not.*retention|attachment/i);
     });
 
-    it("still writes the daily artifact so the ledger is captured", async () => {
+    it("still writes the artifact so the ledger is captured", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ enabled: true, folderPath: root }),
       );
@@ -1562,6 +1575,257 @@ describe("AutoBackupService", () => {
       expect(mockSettingsRepo.save).toHaveBeenLastCalledWith(
         expect.objectContaining({ lastBackupStatus: "success" }),
       );
+    });
+  });
+
+  /**
+   * F3RB-001 (issue #1069): a partial artifact used to be published under the
+   * ordinary `daily-<date>` name and only afterwards *recorded* as partial, in
+   * the settings row -- so it replaced that day's complete artifact before
+   * anything looked at completeness, and every later retention pass counted it
+   * as a complete daily. With `retentionDaily = 3`, three complete recovery
+   * points could become one.
+   *
+   * These tests assert on the artifacts' **bytes**, not on their names. A name
+   * is what the previous design got wrong, so a suite that reads names to decide
+   * which artifact survived would be asking the defect to grade itself.
+   */
+  describe("a partial artifact never displaces or ages out a complete one", () => {
+    const COMPLETE = {
+      complete: true,
+      expectedAttachments: 3,
+      includedAttachments: 3,
+      missingAttachments: 0,
+      inconsistentAttachments: 0,
+    };
+    const PARTIAL = {
+      complete: false,
+      expectedAttachments: 3,
+      includedAttachments: 2,
+      missingAttachments: 1,
+      inconsistentAttachments: 0,
+    };
+
+    /** The next export produces exactly `content`, complete or not. */
+    function nextExport(content: string, complete: boolean): void {
+      mockBackupService.exportToBuffer.mockResolvedValueOnce({
+        buffer: Buffer.from(content),
+        report: complete ? COMPLETE : PARTIAL,
+      });
+    }
+
+    /** An artifact already on disk when this run starts. */
+    async function put(name: string, content: string): Promise<void> {
+      await fs.mkdir(folderFor(), { recursive: true });
+      await fs.writeFile(join(folderFor(), name), content);
+    }
+
+    /** The bytes under `name`, or `null` when nothing is there. */
+    async function read(name: string): Promise<string | null> {
+      try {
+        return await fs.readFile(join(folderFor(), name), "utf-8");
+      } catch {
+        return null;
+      }
+    }
+
+    /** What every artifact in the user's folder currently holds. */
+    async function contents(): Promise<Record<string, string>> {
+      const names = await listBackups(folderFor());
+      const entries = await Promise.all(
+        names.map(async (name) => [name, await read(name)] as const),
+      );
+      return Object.fromEntries(entries) as Record<string, string>;
+    }
+
+    it("a same-day partial run leaves the complete artifact's bytes intact", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+
+      nextExport("complete-02:00", true);
+      const complete = await service.runManualBackup(userId);
+      nextExport("partial-08:00", false);
+      const partial = await service.runManualBackup(userId);
+
+      expect(partial.filename).not.toBe(complete.filename);
+      // The whole of the defect: this used to read "partial-08:00".
+      expect(await read(complete.filename)).toBe("complete-02:00");
+      expect(await read(partial.filename)).toBe("partial-08:00");
+    });
+
+    it("every6hours: an 08:00 partial cron run does not replace the 02:00 complete one", async () => {
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          frequency: "every6hours",
+          nextBackupAt: new Date("2000-01-01"),
+        }),
+      ]);
+
+      nextExport("complete-02:00", true);
+      await service.handleAutoBackupCron();
+      nextExport("partial-08:00", false);
+      await service.handleAutoBackupCron();
+
+      expect(await contents()).toEqual({
+        "monize-backup-daily-2026-04-15.json.gz": "complete-02:00",
+        "monize-backup-partial-2026-04-15.json.gz": "partial-08:00",
+      });
+    });
+
+    it("keeps retentionDaily complete recovery points across a run of partial days", async () => {
+      // The issue's worked example: days 1-3 complete, days 4-6 partial, a
+      // complete backup on day 7 running retention with `retentionDaily = 3`.
+      // Under the defect the three partial days occupied the three daily slots
+      // and every complete artifact was deleted.
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          retentionDaily: 3,
+          retentionWeekly: 0,
+          retentionMonthly: 0,
+        }),
+      );
+      await put("monize-backup-daily-2026-04-01.json.gz", "complete-day-1");
+      await put("monize-backup-daily-2026-04-02.json.gz", "complete-day-2");
+      await put("monize-backup-daily-2026-04-03.json.gz", "complete-day-3");
+
+      for (const day of ["04", "05", "06"]) {
+        await withClockAt(`2026-04-${day}T02:00:00Z`, async () => {
+          nextExport(`partial-day-${day}`, false);
+          await service.runManualBackup(userId);
+        });
+      }
+      await withClockAt("2026-04-10T02:00:00Z", async () => {
+        nextExport("complete-day-10", true);
+        await service.runManualBackup(userId);
+      });
+
+      // Three complete recovery points, judged by what the files hold rather
+      // than by what they are called.
+      const onDisk = await contents();
+      const complete = Object.values(onDisk).filter((body) =>
+        body.startsWith("complete-"),
+      );
+      expect(complete.sort()).toEqual([
+        "complete-day-10",
+        "complete-day-2",
+        "complete-day-3",
+      ]);
+      // ...and the three partial days are all still there, kept to their own
+      // count in their own tier. Neither number is spent on the other's
+      // artifacts: three complete recovery points and three partial ones.
+      expect(
+        Object.values(onDisk)
+          .filter((body) => body.startsWith("partial-"))
+          .sort(),
+      ).toEqual(["partial-day-04", "partial-day-05", "partial-day-06"]);
+    });
+
+    it("classifies artifacts on a rescan, with no settings row to consult", async () => {
+      // Completeness has to live in the artifact's identity, because the state
+      // that used to hold it does not survive a restart, a copied file or a
+      // directory somebody else mounted. A fresh service instance and a settings
+      // row that remembers nothing must sweep both tiers correctly from the
+      // listing alone.
+      await put("monize-backup-daily-2026-04-01.json.gz", "complete-day-1");
+      await put("monize-backup-daily-2026-04-02.json.gz", "complete-day-2");
+      await put("monize-backup-partial-2026-04-03.json.gz", "partial-day-3");
+      await put("monize-backup-partial-2026-04-04.json.gz", "partial-day-4");
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          retentionDaily: 1,
+          retentionWeekly: 0,
+          retentionMonthly: 0,
+          lastBackupStatus: null,
+        }),
+      );
+
+      const restarted = await createService();
+      nextExport("complete-today", true);
+      await restarted.runManualBackup(userId);
+
+      expect(await contents()).toEqual({
+        "monize-backup-daily-2026-04-15.json.gz": "complete-today",
+        "monize-backup-partial-2026-04-04.json.gz": "partial-day-4",
+      });
+    });
+
+    it("publishes a complete and a partial run concurrently without either losing", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      nextExport("complete-bytes", true);
+      nextExport("partial-bytes", false);
+
+      await Promise.all([
+        service.runManualBackup(userId),
+        service.runManualBackup(userId),
+      ]);
+
+      // Two replicas, or a manual run beside a cron one: sharing one filename
+      // made the outcome a race whose loser was a whole recovery point.
+      expect(await contents()).toEqual({
+        "monize-backup-daily-2026-04-15.json.gz": "complete-bytes",
+        "monize-backup-partial-2026-04-15.json.gz": "partial-bytes",
+      });
+    });
+
+    it("leaves a promoted weekly copy alone when a later partial run follows", async () => {
+      // Derived from the service's own promotion calendar rather than hardcoded,
+      // for the reason the suite-clock guard above exists.
+      const weeklyDay = String(WEEKLY_DAYS[0]).padStart(2, "0");
+      await withClockAt(`2026-04-${weeklyDay}T02:00:00Z`, async () => {
+        mockSettingsRepo.findOne.mockResolvedValue(
+          createSettings({ enabled: true, folderPath: root }),
+        );
+        nextExport("complete-promoted", true);
+        await service.runManualBackup(userId);
+        nextExport("partial-later", false);
+        await service.runManualBackup(userId);
+
+        expect(await contents()).toEqual({
+          [`monize-backup-daily-2026-04-${weeklyDay}.json.gz`]:
+            "complete-promoted",
+          [`monize-backup-weekly-2026-04-${weeklyDay}.json.gz`]:
+            "complete-promoted",
+          [`monize-backup-partial-2026-04-${weeklyDay}.json.gz`]:
+            "partial-later",
+        });
+      });
+    });
+
+    it("a partial run bounds older partial artifacts and no complete ones", async () => {
+      // The other half of giving partials a tier: they must not accumulate
+      // without bound while storage is broken. The only thing a partial run may
+      // delete is an older partial.
+      await put("monize-backup-daily-2026-04-01.json.gz", "complete-day-1");
+      await put("monize-backup-daily-2026-04-02.json.gz", "complete-day-2");
+      await put("monize-backup-partial-2026-04-03.json.gz", "partial-day-3");
+      await put("monize-backup-partial-2026-04-04.json.gz", "partial-day-4");
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          retentionDaily: 1,
+          retentionWeekly: 0,
+          retentionMonthly: 0,
+        }),
+      );
+
+      nextExport("partial-today", false);
+      await service.runManualBackup(userId);
+
+      expect(await contents()).toEqual({
+        "monize-backup-daily-2026-04-01.json.gz": "complete-day-1",
+        "monize-backup-daily-2026-04-02.json.gz": "complete-day-2",
+        "monize-backup-partial-2026-04-15.json.gz": "partial-today",
+      });
     });
   });
 

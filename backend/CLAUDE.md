@@ -278,6 +278,19 @@ them:
   `INTENTIONALLY_EXCLUDED_TABLES` with a reason, and classified in the support
   backup rules.
 
+**A file's name is its identity, so anything that decides whether it may be
+deleted has to be in the name.** An automatic backup that could not include every
+attachment is published as `monize-backup-partial-<date>` in its own retention
+tier, and the name is chosen *after* the export from what the export found --
+`writeFileAtomic` replaces a final name by design, so a partial artifact written
+under the ordinary `daily-` name had already destroyed that day's complete copy
+by the time `applyBackupOutcome` recorded `partial` in the settings row, and
+every later retention pass then counted it as a complete daily. State beside the
+file (a status column, a variable, a later check) cannot govern a decision the
+write has already made. The durable copy of the same fact goes *inside* the
+document (`completeness` in the envelope), because a filename does not survive a
+rename and a settings row does not survive the machine.
+
 And one thing about `verifyAuthentication` that is easy to undo by accident. An
 OIDC restore is authorized by a single-use `OidcReauthService` artifact, and the
 round trip that mints one loses the user's file selection -- so the restore
