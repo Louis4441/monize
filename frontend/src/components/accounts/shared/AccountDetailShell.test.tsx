@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
+import { render, screen, fireEvent, act } from '@/test/render';
 import { AccountDetailShell } from './AccountDetailShell';
 import type { Account } from '@/types/account';
 
@@ -45,7 +45,7 @@ describe('AccountDetailShell', () => {
     expect(screen.queryByText('Export')).not.toBeInTheDocument();
   });
 
-  it('fires the standard action handlers', () => {
+  it('fires the standard action handlers', async () => {
     const onViewTransactions = vi.fn();
     const onReconcile = vi.fn();
     const onEdit = vi.fn();
@@ -67,7 +67,11 @@ describe('AccountDetailShell', () => {
     fireEvent.click(screen.getByText('View Transactions'));
     fireEvent.click(screen.getByText('Reconcile'));
     fireEvent.click(screen.getByText('Edit Account'));
-    fireEvent.click(screen.getByText('Export PDF'));
+    // Export awaits its handler, so clearing the busy flag lands in a later
+    // microtask -- act, not a bare fireEvent.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Export PDF'));
+    });
     fireEvent.click(screen.getByText('Back to Accounts'));
 
     expect(onViewTransactions).toHaveBeenCalledTimes(1);

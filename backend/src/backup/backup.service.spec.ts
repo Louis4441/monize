@@ -4,11 +4,13 @@ import { DataSource } from "typeorm";
 import {
   UnauthorizedException,
   BadRequestException,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { gzipSync, gunzipSync } from "zlib";
 import { PassThrough } from "stream";
 import { createHash, randomUUID } from "crypto";
+import * as jwt from "jsonwebtoken";
 import * as fs from "fs";
 import * as path from "path";
 import { getRequestContext } from "../common/request-context";
@@ -530,9 +532,10 @@ describe("BackupService", () => {
   // Signing key for the re-authentication artifacts below. The service reads it
   // fresh from the environment, so a spec that mints one has to supply it.
   const ORIGINAL_JWT_SECRET = process.env.JWT_SECRET;
+  const SPEC_JWT_SECRET = "spec-jwt-secret-of-at-least-32-characters";
 
   beforeAll(() => {
-    process.env.JWT_SECRET = "spec-jwt-secret-of-at-least-32-characters";
+    process.env.JWT_SECRET = SPEC_JWT_SECRET;
   });
 
   afterAll(() => {
@@ -987,6 +990,85 @@ describe("BackupService", () => {
         expect(report.missingAttachments).toBe(1);
       });
 
+      /**
+       * F3RB-001 (issue #1069): the claim has to be inside the document, not
+       * only in the settings row of the instance that wrote it. A settings row
+       * does not travel with a copied artifact, does not survive a restart on
+       * another machine, and says nothing at all about a file found in a
+       * directory rescan.
+       */
+      it("records its own completeness inside the artifact when incomplete", async () => {
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [{ id: A_ID, provider: "local", byte_size: 9, sha256: "" }],
+          {},
+        );
+
+        const result = await exported();
+
+        expect(result.completeness).toEqual({
+          complete: false,
+          expectedAttachments: 1,
+          includedAttachments: 0,
+          missingAttachments: 1,
+          inconsistentAttachments: 0,
+        });
+      });
+
+      it("records its own completeness inside the artifact when complete", async () => {
+        // "This file says it is complete" and "this file says nothing" are
+        // different facts about a recovered artifact, so the claim is written
+        // either way.
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [
+            {
+              id: A_ID,
+              provider: "local",
+              byte_size: A_BYTES.length,
+              sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+            },
+          ],
+          { [A_ID]: A_BYTES },
+        );
+
+        const result = await exported();
+
+        expect(result.completeness).toEqual(
+          expect.objectContaining({ complete: true, includedAttachments: 1 }),
+        );
+      });
+
+      it("records completeness in the streamed artifact too", async () => {
+        // The streaming path assembles its own JSON, so it is a second writer of
+        // the envelope and can lose the field on its own.
+        attachmentStorageName = "local";
+        storeHoldsWithMetadata(
+          [{ id: A_ID, provider: "local", byte_size: 9, sha256: "" }],
+          {},
+        );
+        // `responseDouble` rather than a bare PassThrough: an incomplete export
+        // sets headers before the first byte, so a double without `setHeader`
+        // would fail for a reason that has nothing to do with the envelope.
+        const { res, chunks } = responseDouble();
+        const ended = new Promise<void>((resolve) =>
+          (res as unknown as PassThrough).once("end", () => resolve()),
+        );
+
+        await service.streamExport(userId, res);
+        await ended;
+
+        const streamed = JSON.parse(
+          gunzipSync(Buffer.concat(chunks)).toString("utf-8"),
+        );
+        expect(streamed.completeness).toEqual(
+          expect.objectContaining({
+            complete: false,
+            missingAttachments: 1,
+          }),
+        );
+      });
+
       it("marks an incomplete plain download in the response, before any bytes (F3RB-004)", async () => {
         // The backend knew the artifact could not restore everything it names and
         // still sent an ordinary 200 with the ordinary filename, so the UI showed
@@ -1415,6 +1497,124 @@ describe("BackupService", () => {
         ...rest,
       };
     }
+
+    /**
+     * The envelope's completeness claim is the half of F3RB-001 (issue #1069)
+     * that outlives the filename: a file that has been renamed, copied to
+     * another machine or re-uploaded still says what it is. A restore of an
+     * artifact known to be missing attachment bytes must not be silent about it
+     * -- and one that makes no claim at all (written before the field existed)
+     * must not be reported as incomplete, because absence is "not known".
+     */
+    describe("an artifact's own completeness claim", () => {
+      const incomplete = {
+        complete: false,
+        expectedAttachments: 3,
+        includedAttachments: 2,
+        missingAttachments: 1,
+        inconsistentAttachments: 0,
+      };
+
+      function warnings(): string[] {
+        return warnSpy.mock.calls.map(([message]) => String(message));
+      }
+
+      let warnSpy: jest.SpyInstance;
+
+      beforeEach(() => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        warnSpy = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      });
+
+      afterEach(() => warnSpy.mockRestore());
+
+      it("says so when restoring an artifact the export recorded as incomplete", async () => {
+        await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: { ...validBackupData, completeness: incomplete },
+          }),
+        );
+
+        expect(warnings()).toContainEqual(
+          expect.stringMatching(/incomplete.*1 attachment/is),
+        );
+      });
+
+      it("restores it anyway -- a partial artifact beats no artifact", async () => {
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: { ...validBackupData, completeness: incomplete },
+          }),
+        );
+
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("says nothing for an artifact that claims to be complete", async () => {
+        await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: {
+              ...validBackupData,
+              completeness: { ...incomplete, complete: true },
+            },
+          }),
+        );
+
+        expect(warnings()).not.toContainEqual(
+          expect.stringMatching(/incomplete/i),
+        );
+      });
+
+      it("says nothing for an artifact written before the field existed", async () => {
+        // Absence is not a claim of incompleteness, and treating it as one would
+        // put a scary warning on every older backup.
+        await service.restoreData(userId, makeInput({ password: "test" }));
+
+        expect(warnings()).not.toContainEqual(
+          expect.stringMatching(/incomplete/i),
+        );
+      });
+
+      it("ignores a malformed claim rather than half-reading it", async () => {
+        await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: {
+              ...validBackupData,
+              completeness: { complete: "no", missingAttachments: "several" },
+            },
+          }),
+        );
+
+        expect(warnings()).not.toContainEqual(
+          expect.stringMatching(/incomplete/i),
+        );
+      });
+
+      it("does not mistake the claim for a table", async () => {
+        // Every walker over `BackupData` iterates its entries; a non-array value
+        // has to fall through the id remap and the insert plan untouched.
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: { ...validBackupData, completeness: incomplete },
+          }),
+        );
+
+        expect(result.restored).toEqual(
+          expect.not.objectContaining({ completeness: expect.anything() }),
+        );
+      });
+    });
 
     it("should throw NotFoundException if user not found", async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
@@ -2743,6 +2943,16 @@ describe("BackupService", () => {
       await expect(
         service.restoreData(userId, makeInput({ password: "wrong-password" })),
       ).rejects.toThrow(UnauthorizedException);
+
+      // Same obligation the OIDC forgery table carries: the backup file itself is
+      // valid, so the refusal is the only thing between this request and an
+      // erased account. The local path is where re-authentication has always
+      // worked, which is exactly why a reordering would be noticed here last.
+      const deletes = mockQueryRunner.query.mock.calls.filter(
+        ([sql]: [unknown]) =>
+          typeof sql === "string" && sql.includes("DELETE FROM"),
+      );
+      expect(deletes).toEqual([]);
     });
 
     it("should throw UnauthorizedException if OIDC token is missing for OIDC user", async () => {
@@ -4040,10 +4250,11 @@ describe("BackupService", () => {
       }
     });
 
-    it("accepts the session-confirmed sentinel for OIDC users (soft re-auth)", async () => {
-      // OIDC restore mirrors account deletion: the live JWT session is the
-      // re-authentication, so any present confirmation token is accepted -- the
-      // frontend sends a non-JWT sentinel it cannot cryptographically sign.
+    it("accepts a genuine re-authentication artifact for OIDC users", async () => {
+      // The one shape that may restore an OIDC account: signed with JWT_SECRET,
+      // minted for this user and for "restore-backup", unspent, unexpired. Every
+      // rejection below is a near miss of this, so this case is what proves they
+      // fail for the reason claimed rather than because the path is broken.
       const oidcModule = {
         ...mockUser,
         authProvider: "oidc",
@@ -4060,26 +4271,117 @@ describe("BackupService", () => {
       expect(result.message).toBe("Backup restored successfully");
     });
 
-    // P2-005. Restore is the most destructive action in the product: it deletes
-    // everything the user has and writes the file's contents in its place. Each
-    // of these used to be accepted, because the check was only whether the field
-    // was non-empty.
-    it.each([
-      ["the sentinel the client used to send", "oidc-session-confirmed"],
-      ["any non-empty string", "x"],
-      ["an unsigned JWT-shaped value", "a.b.c"],
-    ])("refuses %s as re-authentication for restore", async (_label, token) => {
-      mockUserRepo.findOne.mockResolvedValue({
-        ...mockUser,
-        authProvider: "oidc",
-        passwordHash: null,
-        oidcSubject: "sub-1",
-      });
+    // P2-005 / F3RB-007. Restore is the most destructive action in the product:
+    // it deletes everything the user has and writes the file's contents in its
+    // place. Every one of these used to be accepted, because the check was only
+    // whether the field was non-empty -- and the first entry is the exact string
+    // the shipped frontend sent, so it is the one a regression reaches first.
+    //
+    // Each case is a *near miss* of the artifact the test above accepts: one
+    // property wrong and nothing else. That is what makes them evidence about
+    // the individual checks rather than about the path being broken.
+    //
+    // Minted lazily. Signing at table-construction time would run before the
+    // beforeAll that installs JWT_SECRET.
+    const REAUTH_FORGERIES: ReadonlyArray<readonly [string, () => string]> = [
+      ["the sentinel the client used to send", () => "oidc-session-confirmed"],
+      ["any non-empty string", () => "x"],
+      ["an unsigned JWT-shaped value", () => "a.b.c"],
+      [
+        "an alg=none token carrying every correct claim",
+        () =>
+          jwt.sign(
+            {
+              sub: userId,
+              type: "oidc_reauth",
+              purpose: "restore-backup",
+              jti: randomUUID(),
+            },
+            "",
+            { algorithm: "none" },
+          ),
+      ],
+      [
+        "a correct payload signed with a foreign key",
+        () =>
+          jwt.sign(
+            {
+              sub: userId,
+              type: "oidc_reauth",
+              purpose: "restore-backup",
+              jti: randomUUID(),
+            },
+            "a-different-secret-of-at-least-32-characters",
+            { algorithm: "HS256", expiresIn: 300 },
+          ),
+      ],
+      [
+        "an artifact that has expired",
+        () =>
+          jwt.sign(
+            {
+              sub: userId,
+              type: "oidc_reauth",
+              purpose: "restore-backup",
+              jti: randomUUID(),
+            },
+            SPEC_JWT_SECRET,
+            { algorithm: "HS256", expiresIn: -10 },
+          ),
+      ],
+      [
+        // A session token is the factor the artifact exists to be independent
+        // of. Accepting one collapses the second proof into the first, which is
+        // precisely the defect.
+        "an ordinary access token for the same user",
+        () =>
+          jwt.sign({ sub: userId, type: "access" }, SPEC_JWT_SECRET, {
+            algorithm: "HS256",
+            expiresIn: 900,
+          }),
+      ],
+      [
+        // Signed by us, bound to this user and this purpose -- but minted by the
+        // step-up service, which for an OIDC account issues on the strength of a
+        // re-auth artifact. Spending one here would let a single round trip be
+        // laundered into a second authorization.
+        "a step-up token for the same user and purpose",
+        () =>
+          jwt.sign(
+            { sub: userId, type: "step_up", purpose: "restore-backup" },
+            SPEC_JWT_SECRET,
+            { algorithm: "HS256", expiresIn: 300 },
+          ),
+      ],
+    ];
 
-      await expect(
-        service.restoreData(userId, makeInput({ oidcIdToken: token })),
-      ).rejects.toThrow(UnauthorizedException);
-    });
+    it.each(REAUTH_FORGERIES)(
+      "refuses %s as re-authentication for restore",
+      async (_label, mint) => {
+        mockUserRepo.findOne.mockResolvedValue({
+          ...mockUser,
+          authProvider: "oidc",
+          passwordHash: null,
+          oidcSubject: "sub-1",
+        });
+
+        await expect(
+          service.restoreData(userId, makeInput({ oidcIdToken: mint() })),
+        ).rejects.toThrow(UnauthorizedException);
+
+        // The half that matters more than the status code. The file here is a
+        // perfectly valid backup, so everything ahead of the check succeeds and
+        // the only thing standing between this request and an erased account is
+        // `verifyAuthentication`. A 401 the client sees cannot un-delete a row,
+        // so assert the database was never touched -- not merely that the call
+        // threw. (A transaction *is* open by this point; the user lookup runs in
+        // one. The claim is that no data was destroyed.)
+        const deletes = mockQueryRunner.query.mock.calls.filter(
+          ([sql]) => typeof sql === "string" && sql.includes("DELETE FROM"),
+        );
+        expect(deletes).toEqual([]);
+      },
+    );
 
     it("refuses an artifact minted to delete data rather than restore", async () => {
       mockUserRepo.findOne.mockResolvedValue({

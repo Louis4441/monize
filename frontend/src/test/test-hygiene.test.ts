@@ -1,0 +1,62 @@
+import { describe, it, expect } from 'vitest';
+
+/**
+ * Guard tests for the testing conventions in `frontend/CLAUDE.md`.
+ *
+ * Sibling of `ui-conventions.test.ts`, for mistakes in the *tests* rather than
+ * in the components. Each one here produced act warnings that a green suite
+ * happily printed and nobody read, so the rule needs a failing test rather than
+ * a paragraph.
+ */
+const sources = import.meta.glob('/src/**/*.{test,spec}.{ts,tsx}', {
+  query: '?raw',
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
+/** The body of every `afterEach(...)` callback in a file, braces balanced. */
+function afterEachBodies(content: string): string[] {
+  const bodies: string[] = [];
+  const opener = /afterEach\(\s*(?:async\s*)?\(\s*\)\s*=>\s*\{/g;
+  let match: RegExpExecArray | null;
+  while ((match = opener.exec(content)) !== null) {
+    const start = content.indexOf('{', match.index);
+    let depth = 0;
+    for (let i = start; i < content.length; i += 1) {
+      if (content[i] === '{') depth += 1;
+      else if (content[i] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          bodies.push(content.slice(start, i + 1));
+          break;
+        }
+      }
+    }
+  }
+  return bodies;
+}
+
+describe('a shared store is reset only after the tree is unmounted', () => {
+  /**
+   * Testing Library registers its `cleanup` at import time, and vitest runs
+   * after-hooks in reverse registration order -- so a file's own `afterEach`
+   * runs *first*, while the component it rendered is still mounted and still
+   * subscribed. Writing to a Zustand store there re-renders that component
+   * outside act, once per selector it reads through. `SecurityDetailHeader`
+   * produced three such warnings in every one of its tests for exactly this.
+   *
+   * Call `cleanup()` at the top of the hook. A second cleanup afterwards is a
+   * no-op, so this costs nothing where the hazard does not apply.
+   */
+  it('has no afterEach that writes a store before calling cleanup()', () => {
+    const offenders = Object.entries(sources)
+      .filter(([, content]) =>
+        afterEachBodies(content).some(
+          (body) => /\w+\.setState\(/.test(body) && !body.includes('cleanup('),
+        ),
+      )
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+});

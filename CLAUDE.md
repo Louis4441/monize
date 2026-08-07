@@ -192,6 +192,7 @@ await withScopedDb(this.dataSource, async (m) => {
 - A callback that returns early (before writing) commits an empty transaction — that is the correct replacement for an explicit rollback, not a bug.
 - Pass an isolation level as the optional third argument only when the logic depends on it (registration uses `"SERIALIZABLE"` for the first-user-admin race). Requesting one while joining an ambient transaction throws rather than silently downgrading.
 - At `RLS_MODE=off` (the default) `withScopedDb` still wraps the transaction but skips the identity GUCs, so behavior is identical to pre-RLS. See `docs/future-plans/row-level-security.md`.
+- **`docs/row-level-security-contract.md` is canonical** for which tables are exempt from RLS, why, and which direct-`DataSource` access paths are sanctioned. There is exactly one such exception -- `oauth_payloads`, reached by the `oidc-provider` adapter with **no ambient context at all**, because the provider is mounted as raw Express middleware outside Nest's pipeline. It is not precedent for a user-owned table, and `eslint.config.mjs`'s `OAUTH_PAYLOAD_ALLOWLIST` plus `backend/src/oauth/oauth-payload-access.spec.ts` fail when a second production reader appears. The exempt-table list itself lives once, as `RLS_EXEMPT_TABLES` -- it was previously kept in five places, four of which disagreed, and the rationale written beside it in four of them was factually wrong about the code for over a year.
 
 ## Financial Math
 

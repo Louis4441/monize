@@ -97,36 +97,29 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- ---------------------------------------------------------------------------
 -- Deliberately NOT policied (and therefore never enabled in M3).
 --
--- The catalog-driven test in T2 asserts this exact list: a new table that lands
--- in neither a policy migration nor this exemption list fails the suite, so
--- forgetting one is a test failure rather than a review miss.
+-- The exemption set and the rationale for each entry are no longer written out
+-- here. This file has already been applied on every deployed database, so
+-- db-migrate will never re-read it (the tracker keys off the filename, not the
+-- content) -- which makes it the worst of the five places this list was kept,
+-- and the one that drifted furthest: it documented four tables while the schema
+-- and both integration specs carried six, and claimed the catalog-driven test
+-- asserted "this exact list" when by then the test asserted a different one.
 --
---   currencies       Global reference data keyed by ISO 4217 code, shared
---                    across all users. It does carry created_by_user_id, but
---                    that column is attribution (NULL = system currency), not
---                    ownership: any user may reference a custom code through
---                    accounts.currency_code, and a created_by_user_id policy
---                    would hide every system currency (the column is NULL
---                    there) and break those foreign keys. Per-user visibility
---                    is already expressed by user_currency_preferences, which
---                    IS policied.
+-- Canonical, in order of authority:
+--   docs/row-level-security-contract.md         -- the rationale and boundaries
+--   backend/src/common/db/rls-exempt-tables.ts  -- the machine-readable set
+--   database/schema.sql                         -- `rls-exempt:` marker block
 --
---   exchange_rates   Global reference data with no owner column at all;
---                    written by the scheduled refresh under system context.
+-- backend/src/common/db/rls-exempt-tables.spec.ts checks the last two against
+-- each other in both directions without a database.
 --
---   oauth_payloads   No owner column exists -- rows are keyed by opaque
---                    id/model/grant_id/uid. Every access happens in the
---                    pre-session OAuth flow, which runs under withSystemContext
---                    regardless, so a policy would consist of nothing but its
---                    bypass arm. Reviewed and confirmed in task C1: keep the
---                    runtime role's DML grants, leave the table exempt. The
---                    stronger option (revoke the grants and give the OAuth
---                    module an owner DataSource) was considered and declined --
---                    the table is a short-lived token store keyed by random id
---                    and is never queried per end-user.
---
---   schema_migrations  Migration infrastructure, written only by db-migrate
---                    running as the owner.
+-- One correction worth stating where the wrong claim was made: this block used
+-- to assert that all oauth_payloads access "runs under withSystemContext
+-- regardless". It does not, and never did. node-oidc-provider is mounted as raw
+-- Express middleware outside Nest's request pipeline, so PostgresAdapter runs
+-- with no ambient identity context at all. The exemption is still correct --
+-- the table has no owner column and is keyed by opaque provider ids -- but for
+-- the reasons the contract gives, not that one.
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):

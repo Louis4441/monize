@@ -108,6 +108,93 @@ const BAN_WITH_CONTEXT = {
     "as a reviewed decision (RLS task L1).",
 };
 
+/**
+ * DR-03: files allowed to import the `OAuthPayload` entity.
+ *
+ * `oauth_payloads` is the one *application* table reached without
+ * `withScopedDb` -- `node-oidc-provider` is mounted as raw Express middleware
+ * (`main.ts`), outside the Nest request pipeline, so its adapter holds a bare
+ * `DataSource` and runs with no ambient identity at all. That is safe only
+ * because the table is RLS-exempt, has no owner column, and is keyed by opaque
+ * provider ids; it is **not** precedent for any user-owned table. The boundary,
+ * the review triggers and the two permitted access paths are
+ * `docs/row-level-security-contract.md`.
+ *
+ * The ban is on the *import*, not on `getRepository`: `m.getRepository(X)` off a
+ * scoped `EntityManager` is the correct pattern everywhere in this codebase, so
+ * a `no-restricted-syntax` selector for it would fire on hundreds of correct
+ * call sites -- and `src/common/db/lint-bans.spec.ts` scrapes exactly that
+ * selector shape out of this file and then requires `CLAUDE.md` and
+ * `CONTRIBUTING.md` to name the banned call, which would put false guidance in
+ * the instruction files. `src/oauth/oauth-payload-access.spec.ts` covers what
+ * an import ban cannot: a re-export laundering the entity, or raw SQL naming
+ * the table.
+ */
+const OAUTH_PAYLOAD_ALLOWLIST = [
+  "src/oauth/entities/oauth-payload.entity.ts",
+  "src/oauth/oauth.module.ts",
+  // The `oidc-provider` Adapter implementation -- the reason the exception
+  // exists. Every method is keyed by an opaque provider id.
+  "src/oauth/postgres.adapter.ts",
+  // `revokeAllForUser`, the second access path, and the one the exemption's
+  // original rationale claimed did not exist ("never queried per end-user").
+  // It deletes by `payload ->> 'accountId'`, so it IS keyed by an application
+  // user id -- admin-initiated only, id server-derived, never request-supplied.
+  // Documented as a bounded exception in the contract; a third such query is a
+  // deliberate edit here, not an unnoticed one.
+  "src/oauth/oauth-provider.service.ts",
+];
+
+const BAN_OAUTH_PAYLOAD_ENTITY = {
+  group: [
+    "**/oauth/entities/oauth-payload.entity",
+    "**/entities/oauth-payload.entity",
+    "./entities/oauth-payload.entity",
+    "./oauth-payload.entity",
+  ],
+  message:
+    "OAuthPayload is import-restricted: oauth_payloads is RLS-exempt and reached without " +
+    "withScopedDb, so a new production reader must be added to OAUTH_PAYLOAD_ALLOWLIST in " +
+    "eslint.config.mjs as a reviewed decision. This exception does not extend to user-owned " +
+    "tables -- see docs/row-level-security-contract.md (DR-03).",
+};
+
+/**
+ * `no-restricted-imports` options for a block, given the pattern bans that
+ * block deliberately lifts.
+ *
+ * Flat config replaces a rule's whole options object per block, so an override
+ * must restate every ban it does *not* mean to lift -- the trap the comment on
+ * BAN_INJECT_REPOSITORY names. Two allowlists now overlap
+ * (`src/oauth/oauth-provider.service.ts` is in both), so which bans survive is
+ * computed per file group rather than written out four times. Writing a list
+ * out four times is exactly what produced the drifted RLS exemption arrays;
+ * see `src/common/db/rls-exempt-tables.ts`.
+ *
+ * `BAN_INJECT_REPOSITORY` is never lifted by any override.
+ */
+const importRule = (lifted = []) => {
+  const patterns = [BAN_WITH_CONTEXT, BAN_OAUTH_PAYLOAD_ENTITY].filter(
+    (ban) => !lifted.includes(ban),
+  );
+  return [
+    "error",
+    patterns.length
+      ? { paths: [BAN_INJECT_REPOSITORY], patterns }
+      : { paths: [BAN_INJECT_REPOSITORY] },
+  ];
+};
+
+const inBothAllowlists = OAUTH_PAYLOAD_ALLOWLIST.filter((file) =>
+  WITH_CONTEXT_ALLOWLIST.includes(file),
+);
+const withContextOnly = WITH_CONTEXT_ALLOWLIST.filter(
+  (file) => !OAUTH_PAYLOAD_ALLOWLIST.includes(file),
+);
+const oauthPayloadOnly = OAUTH_PAYLOAD_ALLOWLIST.filter(
+  (file) => !WITH_CONTEXT_ALLOWLIST.includes(file),
+);
+
 export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -151,10 +238,7 @@ export default tseslint.config(
       // exception is the oidc-provider log bridge, which has to hold the real
       // console methods to forward everything that is not a provider notice.
       "no-console": "error",
-      "no-restricted-imports": [
-        "error",
-        { paths: [BAN_INJECT_REPOSITORY], patterns: [BAN_WITH_CONTEXT] },
-      ],
+      "no-restricted-imports": importRule(),
       "no-restricted-syntax": [
         "error",
         {
@@ -182,10 +266,32 @@ export default tseslint.config(
     },
   },
   {
-    // The allowlisted with-context importers keep every other ban.
-    files: WITH_CONTEXT_ALLOWLIST,
+    // The allowlisted with-context importers keep every other ban -- including
+    // the OAuthPayload one, which is why this block is not simply the whole
+    // WITH_CONTEXT_ALLOWLIST any more.
+    files: withContextOnly,
     rules: {
-      "no-restricted-imports": ["error", { paths: [BAN_INJECT_REPOSITORY] }],
+      "no-restricted-imports": importRule([BAN_WITH_CONTEXT]),
+    },
+  },
+  {
+    // The allowlisted OAuthPayload importers keep every other ban.
+    files: oauthPayloadOnly,
+    rules: {
+      "no-restricted-imports": importRule([BAN_OAUTH_PAYLOAD_ENTITY]),
+    },
+  },
+  {
+    // Files on both allowlists. Without this block the later of the two
+    // overrides above would silently reinstate the ban the earlier one lifted:
+    // `src/oauth/oauth-provider.service.ts` legitimately imports both
+    // `with-context` and the entity.
+    files: inBothAllowlists,
+    rules: {
+      "no-restricted-imports": importRule([
+        BAN_WITH_CONTEXT,
+        BAN_OAUTH_PAYLOAD_ENTITY,
+      ]),
     },
   },
   {

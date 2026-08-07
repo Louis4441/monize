@@ -2186,49 +2186,29 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
   WITH CHECK (owner_user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls()));
 
 -- ---------------------------------------------------------------------------
--- Deliberately NOT policied (and therefore never enabled in M3).
+-- RLS exemptions: tables deliberately NOT policied, and therefore never
+-- enabled by 123_rls_enable.sql.
 --
--- The catalog-driven test in T2 asserts this exact list: a new table that lands
--- in neither a policy migration nor this exemption list fails the suite, so
--- forgetting one is a test failure rather than a review miss.
+-- The rationale for each entry -- and the boundary each one does NOT authorize
+-- -- is docs/row-level-security-contract.md. That document is canonical: this
+-- block is the machine-readable set, not a second copy of the reasoning.
 --
---   currencies       Global reference data keyed by ISO 4217 code, shared
---                    across all users. It does carry created_by_user_id, but
---                    that column is attribution (NULL = system currency), not
---                    ownership: any user may reference a custom code through
---                    accounts.currency_code, and a created_by_user_id policy
---                    would hide every system currency (the column is NULL
---                    there) and break those foreign keys. Per-user visibility
---                    is already expressed by user_currency_preferences, which
---                    IS policied.
+-- The `rls-exempt:` lines below are parsed by
+-- backend/src/common/db/rls-exempt-tables.spec.ts, which checks them against
+-- RLS_EXEMPT_TABLES in backend/src/common/db/rls-exempt-tables.ts in both
+-- directions and throws if this marker block goes missing. That constant is
+-- what the two RLS integration specs import, so the list exists once.
 --
---   exchange_rates   Global reference data with no owner column at all;
---                    written by the scheduled refresh under system context.
+-- Adding a table here is a deliberate decision that needs a contract entry: a
+-- table in neither a policy migration nor this list fails
+-- backend/test/integration/rls-enforcement.integration.spec.ts.
 --
---   market_index_prices, market_index_sync
---                    The same shape as exchange_rates, and for the same reason:
---                    a market index has no owner and nobody holds units of it,
---                    so one S&P 500 close serves every user. No owner column
---                    exists to policy on, the rows are written only by the
---                    scheduled refresh and the on-demand backfill under system
---                    context, and the reads expose nothing about any user. The
---                    alternative -- a per-user securities row per index --
---                    would put a fake instrument in every holdings list and
---                    multiply provider traffic by the number of accounts.
---
---   oauth_payloads   No owner column exists -- rows are keyed by opaque
---                    id/model/grant_id/uid. Every access happens in the
---                    pre-session OAuth flow, which runs under withSystemContext
---                    regardless, so a policy would consist of nothing but its
---                    bypass arm. Reviewed and confirmed in task C1: keep the
---                    runtime role's DML grants, leave the table exempt. The
---                    stronger option (revoke the grants and give the OAuth
---                    module an owner DataSource) was considered and declined --
---                    the table is a short-lived token store keyed by random id
---                    and is never queried per end-user.
---
---   schema_migrations  Migration infrastructure, written only by db-migrate
---                    running as the owner.
+-- rls-exempt: currencies
+-- rls-exempt: exchange_rates
+-- rls-exempt: market_index_prices
+-- rls-exempt: market_index_sync
+-- rls-exempt: oauth_payloads
+-- rls-exempt: schema_migrations
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):

@@ -1,6 +1,35 @@
+import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { CurrencyInput } from './CurrencyInput';
+
+/**
+ * A parent that actually stores what the field reports, which is what every
+ * real call site is. A `vi.fn()` on its own leaves `value` frozen, so the
+ * field's own re-sync effect pulls the display back to the stale number and
+ * hides whatever the interaction did.
+ */
+function Controlled({
+  label,
+  initial,
+  onChange,
+}: {
+  label: string;
+  initial: number | undefined;
+  onChange: (value: number | undefined) => void;
+}) {
+  const [value, setValue] = useState<number | undefined>(initial);
+  return (
+    <CurrencyInput
+      label={label}
+      value={value}
+      onChange={(next) => {
+        onChange(next);
+        setValue(next);
+      }}
+    />
+  );
+}
 
 describe('CurrencyInput', () => {
   it('renders with label', () => {
@@ -77,10 +106,9 @@ describe('CurrencyInput', () => {
 
   it('formats value on blur', () => {
     const onChange = vi.fn();
-    render(<CurrencyInput label="Amount" value={50} onChange={onChange} />);
+    render(<Controlled label="Amount" initial={0} onChange={onChange} />);
     const input = screen.getByLabelText('Amount');
     fireEvent.focus(input);
-    // After focus, "50.00" becomes "50.00" stripped of commas -> "50.00", then since it's not zero it stays
     fireEvent.change(input, { target: { value: '50' } });
     fireEvent.blur(input);
     // Should format to 2 decimal places
@@ -102,15 +130,82 @@ describe('CurrencyInput', () => {
 
   it('evaluates calculator expression on blur', () => {
     const onChange = vi.fn();
-    render(<CurrencyInput label="Amount" value={113} onChange={onChange} />);
+    render(<Controlled label="Amount" initial={0} onChange={onChange} />);
     const input = screen.getByLabelText('Amount');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '100*1.13' } });
     fireEvent.blur(input);
     // Should evaluate 100 * 1.13 = 113.00 and format
-    // onChange is called with 113 and display re-syncs with value prop (113)
     expect(onChange).toHaveBeenCalledWith(113);
     expect(input).toHaveValue('113.00');
+  });
+
+  // A field the user tabbed through, or one whose text round-trips to the value
+  // it was already showing, has not been edited. Reporting it as a change is
+  // invisible to a parent that only stores the number and destructive to one
+  // that does more: the FX panels derive an exchange rate from the converted
+  // total and mark it user-overridden, so a bare blur replaced the fetched 10dp
+  // rate with one reverse-engineered from the cents-rounded total on screen.
+  describe('a blur that changes nothing does not report a change', () => {
+    it('stays silent when the field is blurred untouched', () => {
+      const onChange = vi.fn();
+      render(<CurrencyInput label="Total" value={-54.61} onChange={onChange} />);
+      const input = screen.getByLabelText('Total');
+      fireEvent.focus(input);
+      fireEvent.blur(input);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(input).toHaveValue('-54.61');
+    });
+
+    it('stays silent when the typed text parses back to the same value', () => {
+      const onChange = vi.fn();
+      render(<CurrencyInput label="Total" value={-54.61} onChange={onChange} />);
+      const input = screen.getByLabelText('Total');
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: '-54.610' } });
+      fireEvent.blur(input);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('stays silent when an expression evaluates to the value already held', () => {
+      const onChange = vi.fn();
+      render(<CurrencyInput label="Total" value={113} onChange={onChange} />);
+      const input = screen.getByLabelText('Total');
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: '100*1.13' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(input).toHaveValue('113.00');
+    });
+
+    it('stays silent when an empty field is blurred while the value is undefined', () => {
+      const onChange = vi.fn();
+      render(<CurrencyInput label="Total" value={undefined} onChange={onChange} />);
+      const input = screen.getByLabelText('Total');
+      fireEvent.focus(input);
+      fireEvent.blur(input);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('still reports a real edit', () => {
+      const onChange = vi.fn();
+      render(<CurrencyInput label="Total" value={-54.61} onChange={onChange} />);
+      const input = screen.getByLabelText('Total');
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: '-60' } });
+      fireEvent.blur(input);
+      expect(onChange).toHaveBeenLastCalledWith(-60);
+    });
+
+    it('still reports a field the user cleared', () => {
+      const onChange = vi.fn();
+      render(<CurrencyInput label="Total" value={-54.61} onChange={onChange} />);
+      const input = screen.getByLabelText('Total');
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: '' } });
+      fireEvent.blur(input);
+      expect(onChange).toHaveBeenLastCalledWith(undefined);
+    });
   });
 
   it('evaluates calculator expression on Enter without submitting form', () => {

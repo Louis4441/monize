@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { cleanup, screen } from '@testing-library/react';
 import { render } from '@/test/render';
 import { SecurityDetailHeader, type SecurityQuote } from './SecurityDetailHeader';
 import { usePreferencesStore } from '@/store/preferencesStore';
@@ -87,6 +87,12 @@ describe('SecurityDetailHeader', () => {
   });
 
   afterEach(() => {
+    // Unmount first. Testing Library's own cleanup is registered at import
+    // time, and after-hooks run in reverse registration order, so it lands
+    // *after* this one -- leaving the header mounted and subscribed while the
+    // store is reset below. Each of its preference reads then re-renders it
+    // outside act, which is where this file's act warnings came from.
+    cleanup();
     vi.useRealTimers();
     usePreferencesStore.setState({ preferences: null, isLoaded: false } as never);
   });

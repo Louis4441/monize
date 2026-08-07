@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { fireEvent } from '@testing-library/react';
+import { cleanup, fireEvent } from '@testing-library/react';
 import { render, screen } from '@/test/render';
 import { AppVersion } from './AppVersion';
 import { useWhatsNewStore } from '@/store/whatsNewStore';
@@ -10,6 +10,10 @@ describe('AppVersion', () => {
   });
 
   afterEach(() => {
+    // Unmount before touching shared state: Testing Library's cleanup is
+    // registered at import time and after-hooks run in reverse order, so it
+    // runs after this one. See `test-hygiene.test.ts`.
+    cleanup();
     vi.unstubAllEnvs();
     useWhatsNewStore.setState({ isOpen: false });
   });

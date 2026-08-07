@@ -64,6 +64,41 @@ const WEEKLY_FILE_PATTERN =
   /^monize-backup-weekly-(\d{4}-\d{2}-\d{2})\.(json\.gz|mzbe)$/;
 const MONTHLY_FILE_PATTERN =
   /^monize-backup-monthly-(\d{2}-\d{2})\.(json\.gz|mzbe)$/;
+/**
+ * An artifact that could not include every attachment it names. Its own tier,
+ * and deliberately not `daily-` -- see `PARTIAL_TIER_NAME`.
+ */
+const PARTIAL_FILE_PATTERN =
+  /^monize-backup-partial-(\d{4}-\d{2}-\d{2})\.(json\.gz|mzbe)$/;
+
+/**
+ * The tier name a partial artifact is published under (F3RB-001, issue #1069).
+ *
+ * A partial artifact used to be written under the ordinary `daily-<date>` name
+ * and only afterwards *recorded* as partial, in the settings row. Two things
+ * followed, and both cost recovery points a configured policy promised:
+ *
+ * - the write replaced that day's complete artifact before anything looked at
+ *   completeness, so a healthy 02:00 backup was destroyed by an 08:00 run that
+ *   could not read one attachment (and `Run Backup Now` did the same); and
+ * - every later retention pass matched it against `DAILY_FILE_PATTERN` and
+ *   counted it as a complete daily, so `retentionDaily = 3` could keep two
+ *   partials and delete three complete artifacts.
+ *
+ * Completeness is therefore part of the artifact's identity, not a note beside
+ * it: a partial gets its own name, its own retention tier, and (inside the
+ * document, where a rename cannot lose it) its own `completeness` envelope
+ * field. Nothing named `daily-`, `weekly-` or `monthly-` is written by a run
+ * that knows the artifact is incomplete.
+ *
+ * **Artifacts written before this change are unaffected and stay `daily-`.** A
+ * pre-existing ordinary-named partial is indistinguishable from a complete one
+ * -- its completeness was never in the file, and for an encrypted artifact it
+ * could not be read back without the user's password -- so it keeps being
+ * counted as a complete daily. That is the compatibility position: the fix stops
+ * new losses rather than reclassifying history it cannot inspect.
+ */
+const PARTIAL_TIER_NAME = "partial";
 
 /**
  * Days of the month on which a daily artifact is also promoted to weekly, and
@@ -97,6 +132,8 @@ const FREQUENCY_HOURS: Record<AutoBackupFrequency, number> = {
   weekly: 168,
 };
 
+type BackupTier = "daily" | "weekly" | "monthly" | "partial";
+
 interface BackupFile {
   name: string;
   /** Directory the file was found in -- the user's folder, or the legacy flat base. */
@@ -104,7 +141,7 @@ interface BackupFile {
   /** True for a file written by a version that wrote flat into the base folder. */
   legacy: boolean;
   date: Date;
-  tier: "daily" | "weekly" | "monthly";
+  tier: BackupTier;
 }
 
 function parseDateString(ds: string): Date | null {
@@ -580,15 +617,11 @@ export class AutoBackupService {
       userFolder,
       timezone,
     );
-    // A partial artifact skips promotion and retention *for this run*, because
-    // both of those delete.
-    //
-    // It does NOT yet get a distinct identity: the file is published under the
-    // ordinary date-only name, so a same-day partial replaces a complete
-    // artifact, and a later complete run's retention pass counts the partial as
-    // an ordinary daily backup (F3RB-001, tracked as issue #1069 -- fixing it
-    // changes on-disk naming, which is a compatibility decision). Do not read
-    // the skip below as "a partial cannot displace a complete copy".
+    // A partial artifact is published under its own `partial-<date>` name and
+    // its own retention tier, so it cannot replace this day's complete artifact
+    // and no later retention pass counts it as one (F3RB-001, issue #1069). It
+    // is never promoted, and the only deletion its run may make is of older
+    // partial artifacts.
     await this.applyBackupOutcome(
       settings,
       userFolder,
@@ -611,7 +644,7 @@ export class AutoBackupService {
     return {
       message: report.complete
         ? "Backup completed successfully"
-        : "Backup written, but some attachments could not be included; it was not promoted or used for retention",
+        : "Backup written, but some attachments could not be included; it was saved as a partial artifact, was not promoted, and did not replace or age out any complete backup",
       filename,
     };
   }
@@ -620,11 +653,15 @@ export class AutoBackupService {
    * Records the backup's outcome and runs promotion + retention only when the
    * artifact is complete.
    *
-   * `success` promotes weekly/monthly copies and enforces retention. `partial`
-   * does neither: the daily artifact stays on disk so the ledger is backed up,
-   * but nothing that deletes a complete copy runs. A later complete backup
-   * resumes normal promotion and retention. This is the invariant that a backup
-   * shown as successful is a backup that can be restored in full (F3R7-001).
+   * `success` promotes weekly/monthly copies and enforces retention across every
+   * tier. `partial` promotes nothing and never deletes a complete artifact: the
+   * incomplete artifact stays on disk under its own `partial-` name so the
+   * ledger is backed up, and the only deletion that run may make is of *older
+   * partial artifacts*, which is what keeps a storage outage from filling the
+   * volume with them. A later complete backup resumes normal promotion and
+   * retention. This is the invariant that a backup shown as successful is a
+   * backup that can be restored in full (F3R7-001), and that a partial one can
+   * neither replace nor age out a complete copy (F3RB-001, issue #1069).
    */
   private async applyBackupOutcome(
     settings: AutoBackupSettings,
@@ -641,12 +678,16 @@ export class AutoBackupService {
       settings.lastBackupError = null;
       return;
     }
+    this.enforceRetention(folder, settings.folderPath, settings, [
+      PARTIAL_TIER_NAME,
+    ]);
     settings.lastBackupStatus = "partial";
     settings.lastBackupError =
       `${report.missingAttachments} attachment(s) could not be included and ` +
       `${report.inconsistentAttachments} did not match their metadata, of ` +
-      `${report.expectedAttachments} total. This artifact was written but not ` +
-      `promoted or used for retention, so complete backups are preserved.`;
+      `${report.expectedAttachments} total. This artifact was written as ` +
+      `${filename} and not promoted, and no complete backup was deleted for ` +
+      `it, so complete backups are preserved.`;
     this.logger.warn(
       `Auto-backup for user ${settings.userId} is partial: ${settings.lastBackupError}`,
     );
@@ -881,8 +922,6 @@ export class AutoBackupService {
 
     const dateStr = this.getLocalDateString(new Date(), timezone);
     const ext = encryptionPassword ? "mzbe" : "json.gz";
-    const filename = `${BACKUP_FILE_PREFIX}daily-${dateStr}.${ext}`;
-    const filepath = this.safePath(userFolder, filename);
 
     // Leftovers from an interrupted write, cleared before this one rather than
     // by retention: a partial file is not a backup, so counting it towards
@@ -898,6 +937,14 @@ export class AutoBackupService {
       userId,
       encryptionPassword,
     );
+    // The name is chosen AFTER the export, from what the export found. Choosing
+    // it first published an incomplete artifact over that day's complete one and
+    // only then noticed -- and `writeFileAtomic` replaces the final name by
+    // design, so there was nothing left to preserve by the time
+    // `applyBackupOutcome` recorded `partial` (F3RB-001, issue #1069).
+    const tier = report.complete ? "daily" : PARTIAL_TIER_NAME;
+    const filename = `${BACKUP_FILE_PREFIX}${tier}-${dateStr}.${ext}`;
+    const filepath = this.safePath(userFolder, filename);
     // Temp file, fsync, rename: `fs.writeFile` truncated the final name first,
     // so a kill or an ENOSPC mid-write left a partial artifact with a valid
     // extension that sorted newest and that retention counted.
@@ -1000,6 +1047,19 @@ export class AutoBackupService {
         if (date) files.push({ name, dir, legacy, date, tier: "monthly" });
         continue;
       }
+      // Its own tier, so it can never occupy a complete artifact's retention
+      // slot. Classified from the name alone, which is why the name carries it:
+      // a rescan after a restart -- or on another machine entirely -- has no
+      // settings row to consult, and an encrypted artifact's envelope is inside
+      // the ciphertext.
+      const partialMatch = PARTIAL_FILE_PATTERN.exec(name);
+      if (partialMatch) {
+        const date = parseDateString(partialMatch[1]);
+        if (date) {
+          files.push({ name, dir, legacy, date, tier: PARTIAL_TIER_NAME });
+        }
+        continue;
+      }
     }
     return files;
   }
@@ -1015,11 +1075,17 @@ export class AutoBackupService {
    * them under a limit that no longer looks at them. On an equal date the
    * legacy copy is the one deleted, so the file that is definitely this user's
    * is the one kept.
+   *
+   * `tiers` restricts which tiers may be swept. A partial run passes
+   * `["partial"]`: it must bound its own artifacts without being able to delete
+   * a complete one, and a tier list is the form of that rule a caller cannot get
+   * half right (F3RB-001, issue #1069).
    */
   private enforceRetention(
     userFolder: string,
     basePath: string,
     settings: AutoBackupSettings,
+    tiers: readonly BackupTier[] = ["daily", "weekly", "monthly", "partial"],
   ): void {
     const files = [
       ...this.collectBackupFiles(userFolder, false),
@@ -1027,7 +1093,8 @@ export class AutoBackupService {
     ];
 
     // Sort each tier newest first and delete beyond retention limit
-    const deleteExcess = (tier: BackupFile["tier"], limit: number) => {
+    const deleteExcess = (tier: BackupTier, limit: number) => {
+      if (!tiers.includes(tier)) return;
       const sorted = files
         .filter((f) => f.tier === tier)
         .sort(
@@ -1050,6 +1117,14 @@ export class AutoBackupService {
     deleteExcess("daily", settings.retentionDaily);
     deleteExcess("weekly", settings.retentionWeekly);
     deleteExcess("monthly", settings.retentionMonthly);
+    // Partial artifacts are kept to the same depth as complete dailies, in their
+    // own tier: they arrive on the same cadence, so the daily count is already
+    // the user's answer to "how many recovery points of that age do I want", and
+    // a separate setting would be a migration and a fourth number in the UI for a
+    // question nobody has asked. What matters is that the two counts are
+    // *independent* -- a partial can neither take a complete artifact's slot nor
+    // accumulate without bound while storage is broken.
+    deleteExcess(PARTIAL_TIER_NAME, settings.retentionDaily);
   }
 
   private getLocalDateString(date: Date, timezone: string): string {
