@@ -122,8 +122,11 @@ export function useMnyImport(): UseMnyImportResult {
               stopPolling();
             }
           })
-          // A dropped poll is not a failed import: the next tick tries again,
-          // and the reaper is what decides a job is really dead.
+          // A dropped poll is not a failed import: the next tick tries again.
+          // The server decides a job is really dead -- the poll endpoint reaps
+          // this user's stale jobs before it reads, so a worker that died comes
+          // back as `failed` + retryable on a subsequent tick, not as a
+          // progress bar that never moves.
           .catch(() => undefined);
       }, MNY_POLL_INTERVAL_MS);
     },

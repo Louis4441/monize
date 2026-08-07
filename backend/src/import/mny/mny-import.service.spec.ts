@@ -470,8 +470,8 @@ describe("MnyImportService", () => {
 
     it("gives the import slot back when the wipe is refused", async () => {
       // Otherwise the pending row it took blocks every import this user starts
-      // until the reaper sweeps it five minutes later -- for a job that will
-      // never run, over a request that already returned an error.
+      // until it has been stale long enough for the next start to reap it --
+      // for a job that will never run, over a request that already errored.
       usersService.deleteData.mockRejectedValue(new Error("bad password"));
 
       await expect(
@@ -515,9 +515,9 @@ describe("MnyImportService", () => {
     });
 
     it("fails the job when the background start never got going", async () => {
-      // Otherwise the row sits pending until the reaper's five-minute sweep,
-      // and `hasActiveJob` counts pending -- so the user could start nothing at
-      // all in the meantime, with no error to explain why.
+      // Otherwise the row sits pending until it goes stale, and the wizard
+      // polls a row that says `pending` for the whole staleness window with no
+      // error to explain why nothing is happening.
       jobs.runClaimed.mockRejectedValue(new Error("pool exhausted"));
 
       await service.start("user-1", { stagedFileId: "staged-1" });

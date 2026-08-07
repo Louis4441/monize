@@ -29,6 +29,15 @@ import { MnyImportOptions } from "./model/mny-import-options";
  * racing over that one job produce one winner; and a running job heartbeats, so
  * a job whose pod died is reaped into `failed` + retryable instead of appearing
  * to run forever.
+ *
+ * Reaping is demand-driven. A stale row is not a tidiness problem -- the partial
+ * unique index makes it refuse every future import that user starts, and
+ * `discard` cannot touch it once it reached `running` -- so the two requests that
+ * care clear it in their own transaction before deciding: `create`, which is
+ * about to be refused by it, and `findOne`, which the wizard polls and which
+ * would otherwise keep rendering a progress bar for a worker that is gone.
+ * `reapStaleJobs` remains as an hourly cross-user backstop for the user who
+ * closed the tab and never asked again.
  */
 
 /** A job with no heartbeat for this long is presumed dead. */
@@ -59,6 +68,62 @@ export class MnyImportSlotLostError extends Error {
 
 /** PostgreSQL SQLSTATE for a unique violation. */
 const UNIQUE_VIOLATION = "23505";
+
+/**
+ * The condition deciding that a job's worker is gone, in terms of `$1` -- the
+ * staleness threshold in milliseconds.
+ *
+ * Written once because three callers ask the same question and have to agree:
+ * the per-user reap inside `create`, the same reap inside the poller's
+ * `findOne`, and `hasActiveJob`, which must consider *inactive* exactly what
+ * those two would clear. A fourth copy of these clauses, drifted by one, is a
+ * user told an import is already running by a row the very next statement would
+ * have reaped -- and no test would see it, because each site would still be
+ * self-consistent.
+ *
+ * A `running` row with no heartbeat at all counts as stale. `claim` stamps one
+ * in the same UPDATE that sets the status, so it should be unreachable; without
+ * the null arm it is the one state nothing can ever clear, because `NULL <
+ * timestamp` is NULL and the row matches neither the reap nor its negation.
+ */
+export const STALE_ACTIVE_JOB_CONDITION = `(
+              status = 'running'
+          AND (
+                heartbeat_at IS NULL
+             OR heartbeat_at < CURRENT_TIMESTAMP - ($1::text || ' milliseconds')::interval
+              )
+            )
+            OR (
+              status = 'pending'
+          AND created_at < CURRENT_TIMESTAMP - ($1::text || ' milliseconds')::interval
+            )`;
+
+/**
+ * The reap, in terms of `$1` (staleness threshold, ms) and `$2` (the i18n key);
+ * `scopedToUser` restricts it to `$3` and is how the per-request reap stays
+ * inside the caller's own rows.
+ *
+ * The `AND` binds tighter than the condition's `OR`, so the parenthesis around
+ * it is the whole difference between "this user's stale jobs" and "this user's
+ * jobs, plus everybody's stale pending ones". `reapStatement` is exported so a
+ * test can assert that grouping rather than trusting the reader to see it.
+ */
+export const reapStatement = (scopedToUser: boolean): string => `
+    UPDATE import_jobs
+        SET status = 'failed',
+            error_key = $2,
+            error_detail = CASE
+              WHEN status = 'running'
+                THEN 'Import worker stopped reporting progress'
+              ELSE 'Import was never picked up by a worker'
+            END,
+            retryable = true,
+            progress = NULL,
+            completed_at = CURRENT_TIMESTAMP
+      WHERE ${scopedToUser ? "user_id = $3 AND " : ""}(
+            ${STALE_ACTIVE_JOB_CONDITION}
+          )
+      RETURNING id`;
 
 /**
  * True when this error is the one-active-import-per-user index refusing an
@@ -133,6 +198,11 @@ export class MnyImportJobService {
    * twice, with fresh transaction UUIDs each time so nothing deduplicated the
    * second run. The partial unique index makes the loser block on the winner
    * and then fail, so the check and the write are one atomic act.
+   *
+   * The stale reap runs first, in that same transaction, because only a row
+   * whose worker is still alive has any business refusing this request. Reaped
+   * in a separate transaction it would settle nothing: the answer could change
+   * between the two, which is the same defect as counting before inserting.
    */
   async create(
     userId: string,
@@ -141,6 +211,7 @@ export class MnyImportJobService {
   ): Promise<ImportJob> {
     try {
       return await withScopedDb(this.dataSource, async (manager) => {
+        await this.reapStaleJobsForUser(manager, userId);
         const repo = manager.getRepository(ImportJob);
         return repo.save(
           repo.create({
@@ -180,32 +251,92 @@ export class MnyImportJobService {
     );
   }
 
-  /** The job, or null when it never existed or belongs to another user. */
+  /**
+   * The job, or null when it never existed or belongs to another user.
+   *
+   * This is what the wizard polls, every 1.5s, which makes it the first place a
+   * dead worker can be noticed. Reaping this user's stale jobs first -- in the
+   * transaction that then reads the row, so the caller cannot see the pre-reap
+   * state -- is what turns a progress bar frozen at 40% into the retryable
+   * failure it has actually been since the pod died. Without it the wizard
+   * renders `running` forever, because nothing in the request path ever
+   * contradicts the row.
+   */
   async findOne(userId: string, jobId: string): Promise<ImportJob | null> {
-    return withScopedDb(this.dataSource, (manager) =>
-      manager
+    return withScopedDb(this.dataSource, async (manager) => {
+      await this.reapStaleJobsForUser(manager, userId);
+      return manager
         .getRepository(ImportJob)
-        .findOne({ where: { id: jobId, userId } }),
-    );
+        .findOne({ where: { id: jobId, userId } });
+    });
   }
 
   /**
-   * True when this user already has an import in flight.
+   * True when this user has an import in flight *and still alive*.
    *
    * Advisory only: it answers the question a moment before the answer can
    * change, so it buys a friendly 409 without an INSERT attempt and nothing
    * more. The guarantee lives in `create`'s unique index.
+   *
+   * The staleness exclusion is not an optimization, it is what makes the
+   * advisory answer agree with the authoritative one. This runs *before*
+   * `create`, so counting a stale row as active would throw the 409 from here
+   * and the request would never reach the transaction that was about to reap
+   * it -- restoring, through the pre-check, exactly the lockout the reap
+   * exists to end. Hence the shared `STALE_ACTIVE_JOB_CONDITION`: negated here,
+   * asserted there, one definition.
    */
   async hasActiveJob(userId: string): Promise<boolean> {
-    const count = await withScopedDb(this.dataSource, (manager) =>
-      manager.getRepository(ImportJob).count({
-        where: [
-          { userId, status: "pending" },
-          { userId, status: "running" },
-        ],
-      }),
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `SELECT id FROM import_jobs
+          WHERE user_id = $2
+            AND status IN ('pending', 'running')
+            AND NOT (${STALE_ACTIVE_JOB_CONDITION})
+          LIMIT 1`,
+        [String(JOB_STALE_AFTER_MS), userId],
+      ),
     );
-    return count > 0;
+    return returnedRows<{ id: string }>(rows).length > 0;
+  }
+
+  /**
+   * Fails this user's stale jobs **inside the caller's transaction**, and
+   * returns what it cleared.
+   *
+   * This is the reap that matters to a person waiting. A stale row locks its
+   * user out of importing entirely: the partial unique index refuses the next
+   * start, `discard` is restricted to `pending` so a dead `running` job is
+   * beyond the client's reach, and no other request path clears it. Running the
+   * reap in the transaction that is about to need the answer means the lockout
+   * ends the moment the user next asks, instead of whenever the cron happens to
+   * fire.
+   *
+   * Scoped to one user deliberately. It runs under the caller's own identity,
+   * so it can only reach rows they own -- no bypass, and no way for one user's
+   * request to retire another's live import. The cross-user sweep stays on the
+   * cron, under a system context.
+   *
+   * @param manager the EntityManager of the ACTIVE transaction whose decision
+   *   this clears the way for. Reaped in a separate transaction it guarantees
+   *   nothing, because the row can be re-read as active before the caller acts.
+   */
+  async reapStaleJobsForUser(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<string[]> {
+    const result = await manager.query(reapStatement(true), [
+      String(JOB_STALE_AFTER_MS),
+      JOB_STALLED_ERROR_KEY,
+      userId,
+    ]);
+    const reaped = returnedRows<{ id: string }>(result).map((row) => row.id);
+    if (reaped.length > 0) {
+      this.logger.warn(
+        `Reaped ${reaped.length} stalled import job(s) for user ${userId}: ${reaped.join(", ")}`,
+      );
+    }
+    return reaped;
   }
 
   /**
@@ -410,49 +541,32 @@ export class MnyImportJobService {
   }
 
   /**
-   * Fails jobs whose worker stopped heartbeating -- a killed pod, an OOM, a
-   * rolling restart mid-import.
+   * The cross-user backstop for jobs whose worker stopped heartbeating -- a
+   * killed pod, an OOM, a rolling restart mid-import -- and for `pending` rows
+   * no worker ever claimed, reaped on the same rule measured from creation.
    *
-   * A `pending` job is reaped on the same rule, measured from creation. Nothing
-   * else would ever clear one: `start` inserts the row and then claims it from an
-   * unawaited task, so a pod that dies in between -- or a claim that throws --
-   * leaves the row pending forever. `hasActiveJob` counts pending, so that one
-   * row would refuse every future import this user ever starts, with no way back
-   * short of a DBA. Five minutes is far longer than the microseconds the real
-   * gap takes.
+   * Hourly, because it is no longer what any waiting user depends on.
+   * `reapStaleJobsForUser` runs on the two requests that care, so the person
+   * whose import died sees it fail on their next poll -- about 1.5 seconds after
+   * the job goes stale -- and can start another immediately. Firing this every
+   * five minutes bought a worst case of ten minutes for a lockout that the
+   * request path now ends by itself; what is left for a schedule is the user who
+   * closed the tab and never asked again, whose row would otherwise sit
+   * `running` in the table indefinitely and misreport the import history.
    *
    * Marked retryable: the staged file is untouched, so the wizard can offer Retry
    * rather than making the user upload 200 MB again. Idempotent across replicas,
    * because the predicate only matches rows still in the state being reaped.
    */
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_HOUR)
   async reapStaleJobs(): Promise<void> {
     try {
       const reaped = await withSystemContext(() =>
         withScopedDb(this.dataSource, async (manager) => {
-          const result = await manager.query(
-            `UPDATE import_jobs
-                SET status = 'failed',
-                    error_key = $2,
-                    error_detail = CASE
-                      WHEN status = 'running'
-                        THEN 'Import worker stopped reporting progress'
-                      ELSE 'Import was never picked up by a worker'
-                    END,
-                    retryable = true,
-                    progress = NULL,
-                    completed_at = CURRENT_TIMESTAMP
-              WHERE (
-                      status = 'running'
-                  AND heartbeat_at < CURRENT_TIMESTAMP - ($1::text || ' milliseconds')::interval
-                    )
-                 OR (
-                      status = 'pending'
-                  AND created_at < CURRENT_TIMESTAMP - ($1::text || ' milliseconds')::interval
-                    )
-              RETURNING id`,
-            [String(JOB_STALE_AFTER_MS), JOB_STALLED_ERROR_KEY],
-          );
+          const result = await manager.query(reapStatement(false), [
+            String(JOB_STALE_AFTER_MS),
+            JOB_STALLED_ERROR_KEY,
+          ]);
           return returnedRows<{ id: string }>(result).map((row) => row.id);
         }),
       );
