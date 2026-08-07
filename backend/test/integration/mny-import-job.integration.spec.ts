@@ -732,6 +732,24 @@ describe("MnyImportJobService (integration)", () => {
       expect(job!.stagedFileId).not.toBeNull();
     });
 
+    it("reaps a running job that somehow has no heartbeat at all", async () => {
+      // `claim` stamps one in the same UPDATE that sets the status, so this
+      // should be unreachable -- but `NULL < timestamp` is NULL, so without the
+      // explicit null arm it is the one state nothing can ever clear, and the
+      // user is locked out permanently by a row no sweep will touch.
+      const jobId = await newJob();
+      await asUser(userA, () => jobs.claim(jobId));
+      await dataSource.query(
+        "UPDATE import_jobs SET heartbeat_at = NULL WHERE id = $1",
+        [jobId],
+      );
+
+      await jobs.reapStaleJobs();
+
+      const job = await asUser(userA, () => jobs.findOne(userA, jobId));
+      expect(job).toMatchObject({ status: "failed", retryable: true });
+    });
+
     it("is idempotent: a second sweep changes nothing", async () => {
       const jobId = await newJob();
       await asUser(userA, () => jobs.claim(jobId));
@@ -746,6 +764,28 @@ describe("MnyImportJobService (integration)", () => {
       const second = await asUser(userA, () => jobs.findOne(userA, jobId));
 
       expect(second!.completedAt).toEqual(first!.completedAt);
+    });
+
+    it("still reaps for a user who never comes back, which is all it is for", async () => {
+      // The request-path reap only fires when the user asks. Somebody who
+      // closed the tab never asks, so their row would sit `running` in the
+      // table indefinitely and misreport their import history. That is what is
+      // left for a schedule -- at an hour, not five minutes, because nobody is
+      // waiting on it.
+      const jobId = await newJob();
+      await asUser(userA, () => jobs.claim(jobId));
+      await dataSource.query(
+        "UPDATE import_jobs SET heartbeat_at = CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id = $1",
+        [jobId],
+      );
+
+      await jobs.reapStaleJobs();
+
+      const row = await dataSource.query(
+        "SELECT status FROM import_jobs WHERE id = $1",
+        [jobId],
+      );
+      expect(row[0].status).toBe("failed");
     });
 
     it("reaps across users, since it runs under a system context", async () => {
@@ -765,6 +805,212 @@ describe("MnyImportJobService (integration)", () => {
       expect(
         (await asUser(userB, () => jobs.findOne(userB, jobB)))!.status,
       ).toBe("failed");
+    });
+  });
+
+  /**
+   * The reap that a waiting person actually depends on. A stale row is a
+   * lockout, not litter: the partial unique index refuses their next start, and
+   * `discard` is restricted to `pending`, so a dead `running` job cannot be
+   * cleared from the client at all. These assert that the request which needs
+   * the answer produces it, rather than waiting for a schedule.
+   */
+  describe("demand-driven reaping", () => {
+    /** A job of this user's, claimed and then aged past the staleness window. */
+    async function abandonedJob(userId = userA): Promise<string> {
+      const jobId = await newJob(userId);
+      await asUser(userId, () => jobs.claim(jobId));
+      await dataSource.query(
+        "UPDATE import_jobs SET heartbeat_at = CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id = $1",
+        [jobId],
+      );
+      return jobId;
+    }
+
+    const statusOf = async (jobId: string): Promise<string> => {
+      const rows = await dataSource.query(
+        "SELECT status FROM import_jobs WHERE id = $1",
+        [jobId],
+      );
+      return rows[0].status;
+    };
+
+    it("lets the next start through, without any sweep having run", async () => {
+      // The whole point. Before this, the user waited out the cron: up to five
+      // minutes of staleness plus up to five more until it fired.
+      const stale = await abandonedJob();
+
+      const fresh = await newJob();
+
+      expect(await statusOf(stale)).toBe("failed");
+      expect(await statusOf(fresh)).toBe("pending");
+    });
+
+    it("marks what it reaped retryable, with the stalled key and its bytes", async () => {
+      // Retry has to be one click, so the reap must leave the row in the same
+      // state the cron would have -- otherwise the demand path is a second,
+      // subtly different reaper.
+      const stale = await abandonedJob();
+
+      await newJob();
+
+      const job = await asUser(userA, () => jobs.findOne(userA, stale));
+      expect(job).toMatchObject({
+        status: "failed",
+        errorKey: JOB_STALLED_ERROR_KEY,
+        retryable: true,
+      });
+      expect(job!.stagedFileId).not.toBeNull();
+    });
+
+    it("does not touch another user's stale running job", async () => {
+      const theirs = await abandonedJob(userB);
+
+      await newJob(userA);
+
+      expect(await statusOf(theirs)).toBe("running");
+    });
+
+    it("does not touch another user's stale pending job", async () => {
+      // Not a duplicate of the case above, and the ordering of the clauses is
+      // why. The reap is `user_id = $3 AND (running-stale OR pending-stale)`;
+      // drop the parenthesis and it becomes `(user_id = $3 AND running-stale)
+      // OR pending-stale`, so the *pending* arm escapes the user restriction
+      // entirely and one tenant's start retires another tenant's import. The
+      // running arm still looks correct throughout, which is exactly why a
+      // fixture that claims the job first proves nothing here.
+      const theirs = await newJob(userB);
+      await dataSource.query(
+        "UPDATE import_jobs SET created_at = CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id = $1",
+        [theirs],
+      );
+
+      await newJob(userA);
+
+      expect(await statusOf(theirs)).toBe("pending");
+    });
+
+    it("still refuses a start when the existing job is alive", async () => {
+      // The reap must not become a way to steal your own live slot: a second
+      // tab starting an import has to lose, exactly as before.
+      const alive = await newJob();
+      await asUser(userA, () => jobs.claim(alive));
+
+      await expect(asUser(userA, () => newJob())).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(await statusOf(alive)).toBe("running");
+    });
+
+    it("has exactly one winner when two starts race over a stale row", async () => {
+      // Both reap the same row. The loser blocks on it, re-reads it as already
+      // failed, matches nothing, and then loses the INSERT to the unique index
+      // -- one new job, not two, and no deadlock between the two statements.
+      const stale = await abandonedJob();
+      const stagedFileId = (
+        await asUser(userA, () =>
+          staging.stage(userA, {
+            filename: "money.mny",
+            data: Buffer.from("bytes"),
+          }),
+        )
+      ).id;
+
+      const results = await Promise.allSettled([
+        asUser(userA, () =>
+          jobs.create(userA, stagedFileId, DEFAULT_MNY_IMPORT_OPTIONS),
+        ),
+        asUser(userA, () =>
+          jobs.create(userA, stagedFileId, DEFAULT_MNY_IMPORT_OPTIONS),
+        ),
+      ]);
+
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+      expect(await statusOf(stale)).toBe("failed");
+      const active = await dataSource.query(
+        `SELECT COUNT(*)::int AS count FROM import_jobs
+          WHERE user_id = $1 AND status IN ('pending', 'running')`,
+        [userA],
+      );
+      expect(active[0].count).toBe(1);
+    });
+
+    it("turns the wizard's next poll into a retryable failure", async () => {
+      // The frozen-progress-bar case: the user is watching, so the row has to
+      // stop claiming to be running the moment it is asked, not whenever the
+      // cron fires.
+      const stale = await abandonedJob();
+
+      const polled = await asUser(userA, () => jobs.findOne(userA, stale));
+
+      expect(polled).toMatchObject({
+        status: "failed",
+        errorKey: JOB_STALLED_ERROR_KEY,
+        retryable: true,
+      });
+    });
+
+    it("never hands the poller the row as it was before the reap", async () => {
+      // Reaping and reading in one transaction is what makes this true. Split
+      // across two, the poll can return `running` for a job it has just
+      // retired, and the wizard renders a progress bar for it until the next
+      // tick.
+      const stale = await abandonedJob();
+
+      const first = await asUser(userA, () => jobs.findOne(userA, stale));
+
+      expect(first!.status).not.toBe("running");
+    });
+
+    it("leaves a live job alone when the poller asks about it", async () => {
+      const alive = await newJob();
+      await asUser(userA, () => jobs.claim(alive));
+
+      const polled = await asUser(userA, () => jobs.findOne(userA, alive));
+
+      expect(polled!.status).toBe("running");
+    });
+
+    it("does not report a stale job as active, so the pre-check cannot block", async () => {
+      // `start` calls `hasActiveJob` before `create`. Counting a stale row here
+      // throws the 409 from the pre-check and the request never reaches the
+      // transaction that would have reaped it -- restoring the exact lockout,
+      // through the advisory check, that the reap exists to end.
+      await abandonedJob();
+
+      expect(await asUser(userA, () => jobs.hasActiveJob(userA))).toBe(false);
+    });
+
+    it("still reports a live job as active", async () => {
+      const alive = await newJob();
+      await asUser(userA, () => jobs.claim(alive));
+
+      expect(await asUser(userA, () => jobs.hasActiveJob(userA))).toBe(true);
+    });
+
+    it("reaps a pending job that no worker ever claimed", async () => {
+      // The pod that died between the INSERT and the unawaited claim. Measured
+      // from creation, since a pending row has never heartbeated.
+      const jobId = await newJob();
+      await dataSource.query(
+        "UPDATE import_jobs SET created_at = CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id = $1",
+        [jobId],
+      );
+
+      expect(await asUser(userA, () => jobs.hasActiveJob(userA))).toBe(false);
+      const fresh = await newJob();
+      expect(await statusOf(jobId)).toBe("failed");
+      expect(await statusOf(fresh)).toBe("pending");
+    });
+
+    it("leaves a freshly pending job alone -- its worker is about to claim it", async () => {
+      const jobId = await newJob();
+
+      expect(await asUser(userA, () => jobs.hasActiveJob(userA))).toBe(true);
+      expect(
+        (await asUser(userA, () => jobs.findOne(userA, jobId)))!.status,
+      ).toBe("pending");
     });
   });
 });

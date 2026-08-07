@@ -170,9 +170,10 @@ export class MnyImportService {
           "import-wipe",
         );
       } catch (error) {
-        // The request is refused, so the slot it took must go back: leaving the
-        // row pending would block every import this user starts for the five
-        // minutes until the reaper sweeps it.
+        // The request is refused, so the slot it took must go back. The stale
+        // reap in `create` would clear it on the next start anyway, but only
+        // after it has been stale for JOB_STALE_AFTER_MS -- and the user is
+        // looking at the failed wipe now, so the retry is immediate.
         await this.jobs.discard(userId, job.id).catch(() => undefined);
         throw error;
       }
@@ -193,9 +194,9 @@ export class MnyImportService {
       this.logger.error(`Import job ${job.id} could not be started: ${detail}`);
       // `runClaimed` reports its own body's failures; reaching here means the
       // claim or the status write itself failed, which would otherwise leave the
-      // row pending until the reaper's five-minute sweep -- and `hasActiveJob`
-      // counts pending, so the user could start nothing in the meantime. Failing
-      // it now turns that into an immediate, retryable error in the wizard.
+      // row pending until something reaped it -- and the wizard would poll a row
+      // that says `pending` for JOB_STALE_AFTER_MS first. Failing it now turns
+      // that wait into an immediate, retryable error.
       await withUserContext(userId, () =>
         this.jobs.fail(job.id, JOB_FAILED_ERROR_KEY, detail, true),
       ).catch(() => undefined);

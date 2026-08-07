@@ -242,9 +242,18 @@ are deleted on completion and swept by a TTL cron (24 h).
 `heartbeat_at`), claims it atomically (`UPDATE ... WHERE id = $1 AND status = 'pending'`), and
 runs the import as an unawaited in-process task wrapped in `withUserContext`. The wizard polls
 `GET /import/mny/jobs/:id` (~1.5 s). Progress updates are written in their own short `withScopedDb`
-(writes inside the import transaction would be invisible to pollers). A reaper cron marks jobs
-with a stale heartbeat (> 5 min) failed-retryable; the staged file survives, so retry is
+(writes inside the import transaction would be invisible to pollers). A job with a stale
+heartbeat (> 5 min) is marked failed-retryable; the staged file survives, so retry is
 one click (new job, same staged file). No queue library, no Redis, no new process.
+
+Reaping is demand-driven, because a stale row is a *lockout*, not litter: the partial unique
+index refuses the user's next start, and `discard` is restricted to `pending`, so a dead
+`running` job cannot be cleared from the client at all. `reapStaleJobsForUser` therefore runs
+inside the transaction of the two requests that care -- `create`, which the row is about to
+refuse, and the poll's `findOne`, which would otherwise keep rendering a progress bar for a
+worker that is gone. `hasActiveJob` negates the same shared condition, so the advisory 409 and
+the authoritative one cannot disagree. `reapStaleJobs` stays on an hourly cron as the
+cross-user backstop for a user who closed the tab and never asked again.
 
 **ADR-4 — Parsing layers** (each its own file, spec-covered):
 `msisam/msisam-decrypt.ts` -> `vendor/mdb-reader/` -> `msisam/open-mny.ts` (wrapper exposing
