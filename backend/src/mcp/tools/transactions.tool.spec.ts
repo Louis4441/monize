@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { McpTransactionsTools } from "./transactions.tool";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import { UserContextResolver } from "../mcp-context";
@@ -21,6 +22,7 @@ describe("McpTransactionsTools", () => {
   let relayAttachmentStore: Record<string, jest.Mock>;
   let resolve: jest.MockedFunction<UserContextResolver>;
   const handlers: Record<string, (...args: any[]) => any> = {};
+  const toolConfigs: Record<string, { description?: string }> = {};
 
   beforeEach(() => {
     transactionsService = {
@@ -143,8 +145,9 @@ describe("McpTransactionsTools", () => {
 
     elicitInput = jest.fn();
     server = {
-      registerTool: jest.fn((name, _opts, handler) => {
+      registerTool: jest.fn((name, opts, handler) => {
         handlers[name] = handler;
+        toolConfigs[name] = opts;
       }),
       // confirmWrite() reads capabilities + elicits via server.server. Default
       // to no elicitation capability so writes proceed (matches a client that
@@ -161,6 +164,18 @@ describe("McpTransactionsTools", () => {
 
   it("should register 3 tools", () => {
     expect(server.registerTool).toHaveBeenCalledTimes(3);
+  });
+
+  it("documents the existing-split update contract in the manage_transactions description", () => {
+    const description = toolConfigs["manage_transactions"].description ?? "";
+    // Parent fields work without splits; category/amount changes require
+    // resending the complete set; read tools expose one row per line. Keeps
+    // this surface's wording in step with the AI Assistant's
+    // tool-definitions.ts (same contract, both adapters).
+    expect(description).toContain("EXISTING split transaction");
+    expect(description).toContain("COMPLETE splits array");
+    expect(description).toContain("splitId");
+    expect(description).toContain("one item at a time");
   });
 
   describe("list_transactions", () => {
@@ -1735,7 +1750,7 @@ describe("McpTransactionsTools", () => {
       expect(transactionsService.create).not.toHaveBeenCalled();
     });
 
-    it("replaces splits on a split update", async () => {
+    it("replaces splits on a split update in one update() call carrying the splits", async () => {
       acceptingClient();
       prepService.prepareUpdate.mockResolvedValue({
         kind: "standard",
@@ -1769,17 +1784,126 @@ describe("McpTransactionsTools", () => {
         },
         { sessionId: "s1" },
       );
-      expect(transactionsService.update).toHaveBeenCalled();
-      expect(transactionsService.updateSplits).toHaveBeenCalledWith(
+      // The splits ride inside the same DTO so update() rebuilds the set in
+      // the same transaction under the same row lock as the scalar fields --
+      // never as a separate follow-up updateSplits write.
+      expect(transactionsService.update).toHaveBeenCalledWith(
         "u1",
         "t1",
-        [
-          { categoryId: "c1", amount: -30, memo: undefined },
-          { categoryId: "c2", amount: -20, memo: "soap" },
-        ],
+        expect.objectContaining({
+          amount: -50,
+          categoryId: undefined,
+          splits: [
+            { categoryId: "c1", amount: -30, memo: undefined },
+            { categoryId: "c2", amount: -20, memo: "soap" },
+          ],
+        }),
+        { createPayeeIfMissing: true },
       );
+      expect(transactionsService.updateSplits).not.toHaveBeenCalled();
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.id).toBe("t1");
+    });
+
+    it("declines a split update and writes nothing", async () => {
+      decliningClient();
+      prepService.prepareUpdate.mockResolvedValue({
+        kind: "standard",
+        preview: {
+          transactionId: "t1",
+          accountName: "Checking",
+          amount: -50,
+          transactionDate: "2025-01-15",
+          payeeId: null,
+          payeeName: null,
+          categoryId: null,
+          description: null,
+          currencyCode: "USD",
+        },
+        createPayee: true,
+        splits: resolvedSplits,
+      });
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "update",
+          items: [
+            {
+              transactionId: "11111111-1111-4111-8111-111111111111",
+              splits: [
+                { categoryName: "Groceries", amount: -30 },
+                { categoryName: "Household", amount: -20 },
+              ],
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+      expect(result.isError).toBe(true);
+      expect(transactionsService.update).not.toHaveBeenCalled();
+      expect(transactionsService.updateSplits).not.toHaveBeenCalled();
+    });
+
+    it("errors actionably on a category-only update of an existing split", async () => {
+      prepService.prepareUpdate.mockRejectedValue(
+        new BadRequestException(
+          "This is a split transaction: its categories live on its split lines, not on the parent. Read the transaction's current split lines first, then resend the update with the complete splits array.",
+        ),
+      );
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "update",
+          items: [
+            {
+              transactionId: "11111111-1111-4111-8111-111111111111",
+              categoryName: "Dining",
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("complete splits array");
+      expect(transactionsService.update).not.toHaveBeenCalled();
+    });
+
+    it("dry-run update of an existing split returns split previews without writing", async () => {
+      prepService.prepareUpdate.mockResolvedValue({
+        kind: "standard",
+        preview: {
+          transactionId: "t1",
+          accountName: "Checking",
+          amount: -50,
+          transactionDate: "2025-01-15",
+          payeeId: null,
+          payeeName: null,
+          categoryId: null,
+          description: null,
+          currencyCode: "USD",
+        },
+        createPayee: true,
+        splits: resolvedSplits,
+      });
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "update",
+          dryRun: true,
+          items: [
+            {
+              transactionId: "11111111-1111-4111-8111-111111111111",
+              splits: [
+                { categoryName: "Groceries", amount: -30 },
+                { categoryName: "Household", amount: -20 },
+              ],
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.dryRun).toBe(true);
+      expect(parsed.previews[0].splits).toHaveLength(2);
+      expect(transactionsService.update).not.toHaveBeenCalled();
+      expect(transactionsService.updateSplits).not.toHaveBeenCalled();
     });
 
     it("dry-run create returns split previews without writing", async () => {

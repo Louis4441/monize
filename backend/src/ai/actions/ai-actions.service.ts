@@ -63,6 +63,7 @@ import {
   TransactionRowDescriptor,
   MAX_BULK_ACTION_ROWS,
   AttachmentRefDescriptor,
+  toSplitDtoRows,
 } from "./ai-action.types";
 import { CreateTransferDto } from "../../transactions/dto/create-transfer.dto";
 import { UpdateTransferDto } from "../../transactions/dto/update-transfer.dto";
@@ -543,6 +544,10 @@ export class AiActionsService {
         ? undefined
         : (descriptor.categoryId ?? undefined),
       description: descriptor.description ?? undefined,
+      // Splits ride inside the same DTO so update() rebuilds the set in the
+      // same transaction, under the same row lock, as the scalar fields
+      // (invariant I1) -- never as a separate follow-up write.
+      splits: descriptor.splits ? toSplitDtoRows(descriptor.splits) : undefined,
     });
     const transaction = await this.transactionsService.update(
       userId,
@@ -550,19 +555,6 @@ export class AiActionsService {
       dto,
       { createPayeeIfMissing: descriptor.createPayee === true },
     );
-    // Replace the split set after the scalar fields are applied (each call is
-    // internally transactional). updateSplits re-validates the sum/sign rules.
-    if (descriptor.splits) {
-      await this.transactionsService.updateSplits(
-        userId,
-        descriptor.transactionId,
-        descriptor.splits.map((s) => ({
-          categoryId: s.categoryId,
-          amount: s.amount,
-          memo: s.memo ?? undefined,
-        })),
-      );
-    }
     await this.persistAttachments(userId, transaction.id, files, refIds);
     return { type: "update_transaction", id: transaction.id };
   }
@@ -689,13 +681,7 @@ export class AiActionsService {
         ? undefined
         : (descriptor.categoryId ?? undefined),
       description: descriptor.description ?? undefined,
-      splits: descriptor.splits
-        ? descriptor.splits.map((s) => ({
-            categoryId: s.categoryId,
-            amount: s.amount,
-            memo: s.memo ?? undefined,
-          }))
-        : undefined,
+      splits: descriptor.splits ? toSplitDtoRows(descriptor.splits) : undefined,
     });
     const transaction = await this.transactionsService.create(userId, dto, {
       createPayeeIfMissing: descriptor.createPayee === true,

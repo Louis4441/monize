@@ -563,9 +563,13 @@ export class TransactionsService {
    * transaction is loaded by owner), validates a changed category, and resolves
    * a changed payee name to an existing payee exactly like `previewCreate`.
    *
-   * Transfers and split transactions are rejected here: their linked legs and
-   * child splits need the dedicated edit flows, so this single-record path
-   * would leave them inconsistent.
+   * Transfers are still rejected here: their linked legs need the dedicated
+   * edit flow. Split transactions are editable per Truth table B in
+   * docs/future-plans/split-bulk-update.md: parent fields (payee, date,
+   * description) change freely, and a category or amount change is allowed
+   * only when a complete replacement splits array accompanies the edit
+   * (`splitsAccompany`), because a split parent's categories live on its lines
+   * and its amount must equal their sum (invariant I1).
    */
   async previewUpdate(
     userId: string,
@@ -578,6 +582,13 @@ export class TransactionsService {
       description?: string;
       /** Auto-create a payee for an unmatched name. Defaults to true. */
       createPayeeIfMissing?: boolean;
+      /**
+       * True when the caller sends a complete replacement splits array with
+       * this edit (the splits themselves are resolved and validated by the
+       * caller against the preview's amount). Gates category/amount changes on
+       * an existing split and counts as a change on its own.
+       */
+      splitsAccompany?: boolean;
     },
   ): Promise<UpdateTransactionPreview> {
     const existing = await this.findOne(userId, transactionId);
@@ -590,13 +601,23 @@ export class TransactionsService {
         ),
       );
     }
-    if (existing.isSplit) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.cannotEditSplit",
-          "Split transactions can't be edited here. Edit the split from the Transactions screen.",
-        ),
-      );
+    if (existing.isSplit && !input.splitsAccompany) {
+      if (input.categoryId !== undefined) {
+        throw new BadRequestException(
+          tr(
+            "errors.transactions.splitCategoryNeedsSplits",
+            "This is a split transaction: its categories live on its split lines, not on the parent. Read the transaction's current split lines first, then resend the update with the complete splits array (every line: categoryName, amount, optional memo) with the category change applied.",
+          ),
+        );
+      }
+      if (input.amount !== undefined) {
+        throw new BadRequestException(
+          tr(
+            "errors.transactions.splitAmountNeedsSplits",
+            "This is a split transaction: its amount must equal the sum of its split lines. Resend the update with both the new amount and the complete splits array (every line: categoryName, amount, optional memo) summing to it.",
+          ),
+        );
+      }
     }
 
     const hasChange =
@@ -604,7 +625,10 @@ export class TransactionsService {
       input.transactionDate !== undefined ||
       input.payeeName !== undefined ||
       input.categoryId !== undefined ||
-      input.description !== undefined;
+      input.description !== undefined ||
+      // A splits-only replacement changes the transaction even though no
+      // scalar field does.
+      input.splitsAccompany === true;
     if (!hasChange) {
       throw new BadRequestException(
         tr(

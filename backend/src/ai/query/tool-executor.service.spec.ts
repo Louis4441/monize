@@ -1384,6 +1384,13 @@ describe("ToolExecutorService", () => {
       });
 
       expect(splitService.validateSplits).toHaveBeenCalled();
+      // The accompanying splits are what permit this edit on an existing
+      // split transaction (Truth table B) -- previewUpdate must know.
+      expect(transactions.previewUpdate).toHaveBeenCalledWith(
+        userId,
+        "11111111-1111-4111-8111-111111111111",
+        expect.objectContaining({ splitsAccompany: true }),
+      );
       expect(result.pendingAction?.type).toBe("update_transaction");
       const descriptor = result.pendingAction?.descriptor as {
         categoryId: string | null;
@@ -1774,15 +1781,22 @@ describe("ToolExecutorService", () => {
       expect(result.pendingAction?.type).toBe("update_transfer");
     });
 
-    it("surfaces a 4xx preview error", async () => {
+    it("surfaces the actionable resend-splits refusal of a category/amount change on an existing split", async () => {
+      // previewUpdate refuses a category or amount change on an existing
+      // split unless a complete splits array accompanies it (Truth table B);
+      // the actionable message must reach the model verbatim so it can read
+      // the lines and resend the full set.
       transactions.previewUpdate.mockRejectedValueOnce(
-        new BadRequestException("Split transactions can't be edited here."),
+        new BadRequestException(
+          "This is a split transaction: its amount must equal the sum of its split lines. Resend the update with both the new amount and the complete splits array summing to it.",
+        ),
       );
       const result = await service.execute(userId, "manage_transactions", {
         operation: "update",
         items: [{ transactionId: TXID, amount: -5 }],
       });
       expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.data)).toContain("complete splits array");
     });
 
     const TXID2 = "22222222-2222-4222-8222-222222222222";
@@ -1810,6 +1824,49 @@ describe("ToolExecutorService", () => {
         ],
       });
       expect(result.pendingActions).toHaveLength(2);
+    });
+
+    it("prepares a batch containing a split parent when its row has only parent fields", async () => {
+      // A split parent inside a batch (no splits on any row) is fine as long
+      // as its row changes only parent fields: the preview arrives with
+      // categoryId null and the amount unchanged, and the batch card carries
+      // no category for it.
+      transactions.previewUpdate.mockResolvedValue({
+        transactionId: "tx-1",
+        accountId: "acc-1",
+        accountName: "Checking",
+        amount: -100,
+        transactionDate: "2026-02-01",
+        payeeId: "payee-1",
+        payeeName: "New Payee",
+        payeeMatched: true,
+        payeeWillBeCreated: false,
+        categoryId: null,
+        categoryName: null,
+        description: null,
+        currencyCode: "USD",
+      });
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: Array.from({ length: 6 }, () => ({
+          transactionId: TXID,
+          payeeName: "New Payee",
+        })),
+      });
+      expect(result.isError).toBeFalsy();
+      expect(result.pendingAction?.type).toBe("batch_actions");
+      const descriptor = result.pendingAction?.descriptor as {
+        rows: Array<{ categoryId: string | null; amount: number }>;
+      };
+      expect(descriptor.rows).toHaveLength(6);
+      expect(descriptor.rows[0].categoryId).toBeNull();
+      expect(descriptor.rows[0].amount).toBe(-100);
+      // No splits accompany any batch row.
+      expect(transactions.previewUpdate).toHaveBeenCalledWith(
+        userId,
+        TXID,
+        expect.objectContaining({ splitsAccompany: false }),
+      );
     });
 
     it("individual update returns one card per item", async () => {

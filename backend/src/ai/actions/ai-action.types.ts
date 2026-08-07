@@ -124,6 +124,25 @@ export interface ResolvedSplitLine extends SplitRowDescriptor {
 }
 
 /**
+ * Map resolved/signed split lines to the `CreateTransactionSplitDto` shape
+ * `TransactionsService.create`/`update` accept inside their DTO. Written once
+ * for both confirm-time executors (AI Assistant and MCP): the splits must ride
+ * in the SAME DTO as the scalar fields so the whole edit commits in one
+ * transaction under one row lock -- a follow-up `updateSplits` call would
+ * commit separately and a failure between the two would strand the parent
+ * amount against the old lines.
+ */
+export function toSplitDtoRows(
+  splits: readonly SplitRowDescriptor[],
+): { categoryId: string; amount: number; memo: string | undefined }[] {
+  return splits.map((s) => ({
+    categoryId: s.categoryId,
+    amount: s.amount,
+    memo: s.memo ?? undefined,
+  }));
+}
+
+/**
  * One chat/MCP-supplied file to persist as a transaction attachment when the
  * action is confirmed. The bytes themselves never travel in the descriptor:
  * they are parked server-side in the RelayAttachmentStore under

@@ -483,6 +483,13 @@ describe("TransactionToolPrepService", () => {
       expect(analytics.resolveLlmCategoryIds).toHaveBeenCalledWith(userId, [
         "Dining",
       ]);
+      // No splits on the item: previewUpdate must know none accompany the
+      // edit, so it can refuse category/amount changes on an existing split.
+      expect(transactions.previewUpdate).toHaveBeenCalledWith(
+        userId,
+        "t1",
+        expect.objectContaining({ splitsAccompany: false }),
+      );
     });
 
     it("resolves splits against the effective amount and clears the category", async () => {
@@ -504,8 +511,27 @@ describe("TransactionToolPrepService", () => {
       expect(transactions.previewUpdate).toHaveBeenCalledWith(
         userId,
         "t1",
-        expect.objectContaining({ categoryId: undefined }),
+        expect.objectContaining({
+          categoryId: undefined,
+          // The complete replacement set accompanies the edit, which is what
+          // permits category/amount changes on an existing split.
+          splitsAccompany: true,
+        }),
       );
+    });
+
+    it("surfaces previewUpdate's actionable refusal of a category-only edit on an existing split", async () => {
+      transactions.previewUpdate.mockRejectedValueOnce(
+        new BadRequestException(
+          "This is a split transaction: its categories live on its split lines, not on the parent.",
+        ),
+      );
+      await expect(
+        service.prepareUpdate(userId, {
+          transactionId: "t1",
+          categoryName: "Dining",
+        }),
+      ).rejects.toThrow(/categories live on its split lines/);
     });
 
     it("rejects splits on a transfer", async () => {
@@ -682,6 +708,53 @@ describe("TransactionToolPrepService", () => {
         { transactionId: "t1", amount: -1 },
       ]);
       expect(result.skipped[0].reason).toBe("Could not be prepared.");
+    });
+
+    it("maps a split parent's parent-field edit to a batch row with a null category and unchanged amount", async () => {
+      // A split parent's preview carries categoryId null (categories live on
+      // the lines) and the stored amount; the batch row must not invent
+      // either. Batch rows deliberately carry no splits -- both adapters
+      // reject a multi-row batch containing a split row before prep runs.
+      transactions.previewUpdate.mockResolvedValueOnce({
+        transactionId: "t1",
+        accountId: "a1",
+        accountName: "Checking",
+        amount: -30,
+        transactionDate: "2026-02-01",
+        payeeId: "p1",
+        payeeName: "New Payee",
+        payeeMatched: true,
+        payeeWillBeCreated: false,
+        categoryId: null,
+        categoryName: null,
+        description: null,
+        currencyCode: "USD",
+      });
+      const result = await service.prepareUpdateBulk(userId, [
+        { transactionId: "t1", payeeName: "New Payee" },
+      ]);
+      expect(result.okRows).toHaveLength(1);
+      expect(result.okRows[0].categoryId).toBeNull();
+      expect(result.okRows[0].amount).toBe(-30);
+      // Batch rows never resend splits.
+      expect(result.okRows[0]).not.toHaveProperty("splits");
+    });
+
+    it("skips a category-only split row with the actionable resend-splits reason", async () => {
+      transactions.previewUpdate.mockRejectedValueOnce(
+        new BadRequestException(
+          "This is a split transaction: its categories live on its split lines, not on the parent. Read the transaction's current split lines first, then resend the update with the complete splits array.",
+        ),
+      );
+      const result = await service.prepareUpdateBulk(userId, [
+        { transactionId: "t1", categoryName: "Dining" },
+      ]);
+      expect(result.okRows).toHaveLength(0);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped[0].reason).toContain(
+        "resend the update with the complete splits array",
+      );
+      expect(result.previewRows[0].status).toBe("error");
     });
   });
 
