@@ -8,32 +8,45 @@
  * selected through `encode(col, 'base64')`.
  */
 
-/** A reader bound to one export snapshot and one user id (`$1`). */
-export type ExportRead = (sql: string) => Promise<Record<string, unknown>[]>;
+import {
+  BLOB_EXPORT_BATCH_ROWS,
+  ExportReader,
+  ExportRead,
+} from "./export-cursor";
+
+export { ExportRead };
 
 /**
- * Adds the bytes an object store holds to the `attachment_blobs` rows the query
- * returned. Supplied by `BackupExportService.appendExternalAttachmentBytes`,
- * which owns the storage provider; the query list stays free of it.
+ * Rows a table contributes that its query cannot return, produced one at a time.
+ *
+ * There is exactly one: `attachment_blobs` carries the `database` provider's
+ * bytes as rows, and the `local`/`s3` providers' bytes have to be read from the
+ * object store and appended. It is an async **generator** rather than an array
+ * builder because that is the difference the memory ceiling turns on -- the old
+ * `augment` returned every carried object in one array, so thirty 10 MiB
+ * receipts were ~400 MiB of base64 resident before a byte could be written
+ * (issue #1070). Yielding one row at a time lets the writer hand each object to
+ * gzip and drop it.
+ *
+ * Supplied by `BackupExportService`, which owns the storage provider; the query
+ * list stays free of it.
  */
-export type AttachmentBlobAugment = (
-  rows: Record<string, unknown>[],
-  read: ExportRead,
-) => Promise<Record<string, unknown>[]>;
+export type ExportRowSource = (
+  reader: ExportReader,
+) => AsyncIterable<Record<string, unknown>>;
 
 /**
  * One table in the export.
  *
- * `augment` exists for the one table whose contents are not entirely in the
- * database: `attachment_blobs` carries the `database` provider's bytes as rows,
- * and the `local`/`s3` providers' bytes have to be read from the object store and
- * added. Every export path runs it, so no path can quietly produce an artifact
- * missing the bytes.
+ * `batchRows` is how many rows the cursor fetches at once. It is left unset for
+ * every table whose rows are small and set to `BLOB_EXPORT_BATCH_ROWS` for the
+ * one whose single row can be megabytes.
  */
 export interface ExportTableQuery {
   key: string;
   sql: string;
-  augment?: AttachmentBlobAugment;
+  batchRows?: number;
+  trailingRows?: ExportRowSource;
 }
 
 /**
@@ -70,7 +83,7 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
 ]);
 
 export function buildExportTableQueries(
-  augmentAttachmentBlobs: AttachmentBlobAugment,
+  externalAttachmentRows: ExportRowSource,
 ): ExportTableQuery[] {
   return [
     {
@@ -162,14 +175,19 @@ export function buildExportTableQueries(
       // information_schema).
       //
       // The query covers the `database` provider, whose bytes are in this
-      // table. `augment` adds the `local` and `s3` providers', which are not --
-      // see `appendExternalAttachmentBytes` for why they have to travel too.
+      // table. `trailingRows` adds the `local` and `s3` providers', which are
+      // not -- see `BackupExportService.externalAttachmentRows` for why they
+      // have to travel too.
+      //
+      // One row per fetch: each row is a whole base64-encoded object, so the
+      // batch size is the number of attachments resident at once.
       key: "attachment_blobs",
       sql: `SELECT ab.attachment_id, encode(ab.data, 'base64') AS data
             FROM attachment_blobs ab
             JOIN transaction_attachments ta ON ab.attachment_id = ta.id
             WHERE ta.user_id = $1`,
-      augment: augmentAttachmentBlobs,
+      batchRows: BLOB_EXPORT_BATCH_ROWS,
+      trailingRows: externalAttachmentRows,
     },
     {
       key: "transaction_tags",

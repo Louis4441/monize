@@ -191,7 +191,7 @@
     "supportPasswordRequired": "Kopia zapasowa do wsparcia musi być zaszyfrowana: podaj hasło.",
     "passwordHeaderNotBase64": "Nagłówek {header} musi być zakodowany w base64.",
     "decompressTooLarge": "Kopia zapasowa jest zbyt duża, aby ją przywrócić: po rozpakowaniu przekracza skonfigurowany limit {limit} bajtów. Zwiększ BACKUP_RESTORE_EXPANDED_LIMIT, jeśli to prawdziwa kopia.",
-    "exportTooLarge": "Ta kopia zapasowa jest zbyt duża, aby utworzyć ją w całości (powyżej {limit} bajtów przy tabeli \"{table}\"). Kopie zaszyfrowane, automatyczne i do wsparcia muszą być składane w pamięci; użyj zwykłego eksportu, który strumieniuje, albo zwiększ BACKUP_EXPORT_BUFFER_LIMIT.",
+    "exportTooLarge": "Ta kopia zapasowa jest zbyt duża, aby utworzyć ją w całości (powyżej {limit} bajtów przy tabeli \"{table}\"). Kopie automatyczne i do wsparcia muszą być przechowywane w pamięci; pobierz kopię ręczną, która strumieniuje, albo zwiększ BACKUP_EXPORT_BUFFER_LIMIT.",
     "supportExportTooLarge": "Ta kopia do wsparcia miałaby {{ size }} MiB JSON-a, powyżej limitu {{ limit }} MiB. Zawęź ją wyborem kont lub zakresem dat albo zwiększ BACKUP_EXPORT_BUFFER_LIMIT.",
     "folderUnusable": "Folder \"{{ path }}\" nie może być użyty jako katalog ({{ reason }}).",
     "folderOutsideAllowedRoots": "Folder kopii zapasowych \"{path}\" jest poza dozwolonymi katalogami głównymi ({roots}). Ustaw BACKUP_ALLOWED_ROOTS, aby na niego pozwolić.",

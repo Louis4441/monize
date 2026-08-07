@@ -191,7 +191,7 @@
     "supportPasswordRequired": "Bản sao lưu hỗ trợ phải được mã hoá: hãy cung cấp mật khẩu.",
     "passwordHeaderNotBase64": "Tiêu đề {header} phải được mã hoá base64.",
     "decompressTooLarge": "Bản sao lưu quá lớn để phục hồi: khi giải nén nó vượt quá giới hạn {limit} byte đã cấu hình. Hãy tăng BACKUP_RESTORE_EXPANDED_LIMIT nếu đây là bản sao lưu hợp lệ.",
-    "exportTooLarge": "Bản sao lưu này quá lớn để tạo trong một lần (vượt {limit} byte tại bảng \"{table}\"). Bản sao lưu được mã hoá, tự động và hỗ trợ phải được ghép trong bộ nhớ; hãy dùng xuất thông thường có truyền theo luồng, hoặc tăng BACKUP_EXPORT_BUFFER_LIMIT.",
+    "exportTooLarge": "Bản sao lưu này quá lớn để tạo trong một lần (vượt {limit} byte tại bảng \"{table}\"). Bản sao lưu tự động và hỗ trợ phải được giữ trong bộ nhớ; hãy tải bản sao lưu thủ công có truyền theo luồng, hoặc tăng BACKUP_EXPORT_BUFFER_LIMIT.",
     "supportExportTooLarge": "Bản sao lưu hỗ trợ này sẽ là {{ size }} MiB JSON, vượt giới hạn {{ limit }} MiB. Hãy thu hẹp bằng cách chọn tài khoản hoặc khoảng thời gian, hoặc tăng BACKUP_EXPORT_BUFFER_LIMIT.",
     "folderUnusable": "Không thể dùng thư mục \"{{ path }}\" làm thư mục ({{ reason }}).",
     "folderOutsideAllowedRoots": "Thư mục sao lưu \"{path}\" nằm ngoài các gốc được phép ({roots}). Hãy đặt BACKUP_ALLOWED_ROOTS để cho phép.",

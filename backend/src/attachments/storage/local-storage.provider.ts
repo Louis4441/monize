@@ -30,7 +30,7 @@ export const DEFAULT_ATTACHMENT_CONTAINER_DIR = "/data/attachments";
  *
  * Bytes live outside the database, but they DO travel in an application backup:
  * the export reads each object and carries it base64-encoded in
- * `attachment_blobs` (see `appendExternalAttachmentBytes`), and a restore stages
+ * `attachment_blobs` (see `externalAttachmentRows`), and a restore stages
  * it back through this provider. That is what makes a backup restorable onto a
  * fresh instance, and it means this directory does not have to be backed up
  * separately. An artifact exported before that change carries only metadata, and

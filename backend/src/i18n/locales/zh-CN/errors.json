@@ -191,7 +191,7 @@
     "supportPasswordRequired": "支持用备份必须加密：请提供密码。",
     "passwordHeaderNotBase64": "{header} 标头必须使用 base64 编码。",
     "decompressTooLarge": "备份过大，无法恢复：解压后超出配置的 {limit} 字节上限。如果这是正常备份，请提高 BACKUP_RESTORE_EXPANDED_LIMIT。",
-    "exportTooLarge": "此备份过大，无法一次性生成（在表 \"{table}\" 处超出 {limit} 字节）。加密备份、自动备份和支持用备份必须在内存中组装；请使用采用流式处理的普通导出，或提高 BACKUP_EXPORT_BUFFER_LIMIT。",
+    "exportTooLarge": "此备份过大，无法一次性生成（在表 \"{table}\" 处超出 {limit} 字节）。自动备份和支持用备份必须保存在内存中；请下载采用流式处理的手动备份，或提高 BACKUP_EXPORT_BUFFER_LIMIT。",
     "supportExportTooLarge": "此支持用备份将有 {{ size }} MiB 的 JSON，超过 {{ limit }} MiB 上限。请通过选择账户或日期范围缩小范围，或提高 BACKUP_EXPORT_BUFFER_LIMIT。",
     "folderUnusable": "文件夹 \"{{ path }}\" 无法作为目录使用（{{ reason }}）。",
     "folderOutsideAllowedRoots": "备份文件夹 \"{path}\" 位于允许的根目录（{roots}）之外。请设置 BACKUP_ALLOWED_ROOTS 以允许它。",

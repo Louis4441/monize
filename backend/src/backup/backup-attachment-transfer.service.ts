@@ -137,7 +137,7 @@ export class BackupAttachmentTransferService {
    *
    * **Two paths, and the first is the one new artifacts take.** A backup now
    * carries attachment bytes for *every* provider, base64 in `attachment_blobs`
-   * (see `appendExternalAttachmentBytes`). When the bytes are in the artifact the
+   * (see `externalAttachmentRows`). When the bytes are in the artifact the
    * restore uses them directly -- validates them against their own metadata, and
    * places them where this runtime keeps its attachments (in the blob rows for the
    * `database` provider, in the object store for `local`/`s3`, whichever the target

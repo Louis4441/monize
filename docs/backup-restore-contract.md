@@ -25,6 +25,11 @@ concerns this document describes:
 |---|---|
 | `backend/src/backup/backup.service.ts` | The facade the controller, the auto-backup cron and the support export call. One delegation per method, no decisions. |
 | `backend/src/backup/backup-export.service.ts` | §1 and §4's export half: the `REPEATABLE READ` snapshot, the streamed and buffered assemblies, the carried attachment bytes, the completeness report. |
+| `backend/src/backup/export-cursor.ts` | §6's bounded reads: the database cursor every export table is fetched through, and the batch sizes. |
+| `backend/src/backup/export-json-stream.ts` | The document, assembled one row at a time under a chunk budget (and the in-memory collection the support export needs). |
+| `backend/src/backup/export-attachments.ts` | The completeness audit that holds no bytes, and the external objects carried one at a time. |
+| `backend/src/backup/export-writer.ts` | gzip, the encrypted container, backpressure, and unwinding when the client leaves. |
+| `backend/src/backup/backup-envelope.ts`, `backup-stream-crypto.ts` | The encrypted-backup format: both container versions, and the framed one's writer and reader. |
 | `backend/src/backup/backup-restore.service.ts` | §3 and §6: the processing gate, decryption, decompression, format validation, re-authentication ordering, id remapping, and the one transaction the rest runs inside. |
 | `backend/src/backup/backup-attachment-transfer.service.ts` | §4's restore half: staging carried bytes, the legacy ownership proof, and both object-store cleanup paths. |
 | `backend/src/backup/backup-restore-database.service.ts` | The restore's SQL: teardown, currency preparation, row inserts, deferred-FK repair. |
@@ -48,8 +53,9 @@ every live table is either exported or named in
 
 - Every user-owned table in `RESTORE_PLAN` (`backend/src/backup/restore-plan.ts`).
 - Attachment **metadata** for every provider.
-- Attachment **bytes** only for the `database` provider, base64-encoded in
-  `attachment_blobs`. See section 4.
+- Attachment **bytes** for every provider, base64-encoded in `attachment_blobs`.
+  (This said "only for the `database` provider" long after section 4 stopped
+  being true of it.) See section 4.
 - Every currency definition the user's data references, whoever created it —
   not just the ones they created. Currencies are shared, and a code without its
   definition means the restore invents a name, symbol and decimal places.
@@ -127,7 +133,7 @@ For the `database` provider the bytes were always in the artifact, base64 in
 metadata, and the operator was told to restore the sidecar volume or bucket
 alongside it. Every problem below follows from that split, and the fix is to end
 it — **the export now reads every external object and carries it in
-`attachment_blobs` too** (`appendExternalAttachmentBytes`), for all three export
+`attachment_blobs` too** (`externalAttachmentRows`), for all three export
 paths.
 
 That makes the artifact self-sufficient, which has three consequences:
@@ -146,14 +152,12 @@ That makes the artifact self-sufficient, which has three consequences:
   keeps them and `storage_provider` is rewritten to match. Both directions used to
   be an unrestorable skip.
 
-What it costs, stated plainly: artifacts are larger, and this method accumulates
-every carried object in memory before serialising. The encrypted, automatic and
-support paths assemble in memory anyway, so a large attachment set meets
-`BACKUP_EXPORT_BUFFER_LIMIT` and is refused with an error naming the ceiling. **The
-plain export is not exempt** — it was billed as the streaming path, but it
-materialises each table and every carried attachment too, and it has no ceiling, so
-a large attachment set can exceed the pod there. Bounding it is the cursor work
-below (§6, still open).
+What it costs, stated plainly: artifacts are larger. What it no longer costs is
+memory. The export used to accumulate every carried object as base64 in one array
+before serialising — thirty 10 MiB receipts are ~400 MiB of text on a pod the
+chart sizes at 400 MiB — and each object is now opened, written and dropped one
+at a time (§6). The bytes still have to travel for the backup to be a backup;
+they no longer have to be resident all at once.
 
 **An omitted or inconsistent object does not silently pass as a complete backup
 (F3R7-001).** An object the store cannot produce is logged and omitted — the ledger
@@ -161,7 +165,7 @@ is the point, and one unreadable receipt must not cost the user the whole file �
 the artifact is then **incomplete**, and the export says so. Every buffered export
 returns a `BackupCompletenessReport`: how many attachment rows were expected, how
 many had their bytes, how many were missing or (for the database provider,
-`assessAttachmentCompleteness`) inconsistent with their metadata. The auto-backup
+`auditAttachments`) inconsistent with their metadata. The auto-backup
 path acts on it — a partial artifact is written so the ledger is captured, but it is
 **never promoted to weekly/monthly, never given a complete artifact's filename, and
 never counted as one by retention**, so it cannot displace or age out a complete
@@ -181,9 +185,23 @@ usually the whole point and the alternative on offer is nothing. Three states, n
 two: `complete: true`, `complete: false`, and **absent**, which means the artifact
 predates the field and makes no claim at all. Absent is never read as "incomplete".
 
+**The verdict is reached before the first byte, and without holding the bytes.**
+The completeness report is produced by an audit (`auditAttachments`) that runs
+inside the export snapshot ahead of the body: for the `database` provider,
+Postgres computes `octet_length` and `sha256` over each blob and only the digests
+travel; for `local`/`s3`, each object is opened, checked and dropped. Because both
+passes read the same `REPEATABLE READ` snapshot, the database half of the verdict
+is a fact rather than a forecast. The external half costs one extra read of each
+object — the deliberate price of knowing the answer before the download starts,
+and it trades bounded work for bounded memory rather than the other way round. An
+object that changes between the two passes is caught again by the second and
+logged; the artifact never carries an object the headers said was missing.
+
 **A `sha256` and a `byte_size` are checked against the carried bytes**, at both
 ends. One comparison, `attachmentBytesConsistent` (`attachment-integrity.util.ts`),
-used from both ends with different provenance. At export, the store is compared
+used from both ends with different provenance — and `attachmentDigestConsistent`
+beneath it, so the audit's SQL-computed digest goes through the same judgement
+rather than restating it in SQL. At export, the store is compared
 against the database, so a source object that was truncated or replaced is caught
 before it is packaged. At restore, the carried bytes are compared against their own
 metadata — same file both sides, so that proves consistency rather than authority,
@@ -406,7 +424,7 @@ Three, for three different failure modes. All configurable, all fail loudly.
 |---|---|---|
 | `BACKUP_RESTORE_LIMIT` | the compressed upload | the half-share peak divided by `PEAK_MULTIPLE` (~a sixth), no floor |
 | `BACKUP_RESTORE_EXPANDED_LIMIT` | the **decompressed** payload | a quarter of the container's memory limit |
-| `BACKUP_EXPORT_BUFFER_LIMIT` | JSON a buffered export may accumulate | a quarter of the container's memory limit |
+| `BACKUP_EXPORT_BUFFER_LIMIT` | the artifact a buffered export may accumulate | a quarter of the container's memory limit |
 
 The expanded and buffered defaults are cgroup-derived with a 64 MiB usability
 floor, a 1024 MiB cap and a 256 MiB fallback when there is no limit to read. There
@@ -427,10 +445,23 @@ kilobytes of repeated text expands to gigabytes. Decompression is asynchronous
 past the ceiling nor blocks the event loop. `JSON.parse` still needs a whole
 document — unavoidably — but it now gets a string of bounded length.
 
-The buffered ceiling exists because three paths cannot stream: AES-GCM needs the
-whole plaintext for its auth tag, and the support export holds every table at
-once to reconcile scaled balances. The plain HTTP export streams and is
-deliberately unbounded.
+The buffered ceiling now applies to two paths, not three: the **automatic** backup,
+which writes a file and therefore holds the artifact, and the **support** export,
+which holds every table at once to reconcile scaled balances. Both HTTP downloads
+stream and are deliberately unbounded. The encrypted download used to be on the
+buffered side because AES-GCM's single auth tag needs the whole plaintext before
+it can be computed; it writes a framed container now (below), so it streams like
+the plain one and a large encrypted export is no longer refused.
+
+**What that ceiling counts changed with it.** It used to bound the uncompressed
+JSON, because that JSON really was accumulated — per-table strings, a
+concatenated buffer and gzip's output all live at the peak. The buffered path now
+holds only the compressed (and, when encrypted, framed) artifact, so the limit is
+measured against the bytes actually resident. That is more permissive for
+compressible data and stricter for attachments, which are already-compressed
+bytes in base64 — and in both directions it is measuring the thing it protects
+rather than a proxy for it. The quarter-share default already assumes the payload
+is resident more than once, which covers the single `Buffer.concat` at the end.
 
 **Every default is derived from the container's cgroup memory limit**, not fixed.
 A ceiling larger than the process it protects cannot fire — the pod is killed
@@ -533,22 +564,56 @@ passes `ALWAYS_EXCLUDED_TABLES` — and, since attachment bytes now travel, that
 augmentation does not read a single object off disk for a table the caller is going
 to discard either.
 
-**Not fixed, and now triply load-bearing (F3R6-001):** large tables are still read
-whole through `manager.query` rather than a cursor, so one enormous table is bounded
-only by the ceiling that follows it; `attachment_blobs` accumulates every attachment
-before that ceiling is consulted; and the **plain HTTP export**, described above as
-the streaming path, materialises each table (and every carried attachment) in full
-before writing it, so it is no longer the unbounded-safe path it was billed as. The
-encrypted, automatic and support paths at least *refuse* an over-large set with the
-error naming `BACKUP_EXPORT_BUFFER_LIMIT`; the plain path has no ceiling and can
-exceed the pod outright. A cursor inside the repeatable-read snapshot that
-serialises rows and base64-encodes one attachment at a time, under a per-chunk
-budget, is what fixes all three — the same work that would let the encrypted path
-stream through an authenticated container format instead of a monolithic AES-GCM
-buffer, and the same work that would replace `PEAK_MULTIPLE` with a measured bound
-on the restore side. It is the single highest-value open item in this document, and
-the reason attachment bytes travelling (§4) currently trades a recoverability fix
-for a memory cost that only streaming repays.
+### The export is bounded by its chunk size, not by the dataset (F3R6-001, issue #1070)
+
+This was open through five audits under four labels, and the shape of it never
+changed: the export was described as streaming because it wrote a table at a
+time, while each individual step held something whole. All of it is now a pull
+pipeline, and each stage bounds the one before it:
+
+- **Rows** arrive through a database cursor declared inside the snapshot
+  (`export-cursor.ts`), so a table contributes a batch at a time rather than one
+  `manager.query` result the size of the table.
+- **`attachment_blobs` fetches one row at a time**, because one row is one whole
+  base64-encoded object. That batch size is the number of attachments resident at
+  once, and a source guard fails if it is removed.
+- **The document is serialised per row** under a 256 KiB chunk budget
+  (`export-json-stream.ts`) instead of one `JSON.stringify` per table, which used
+  to make the array and a string of the array live at the same instant.
+- **External objects are opened one at a time** and dropped once written, rather
+  than accumulated into one array of base64 before serialisation began.
+- **The writer resolves each write only when the pipeline has taken it**
+  (`export-writer.ts`), so a slow client stops the database reads instead of
+  letting a queue grow behind the socket, and a client that disappears unwinds the
+  snapshot rather than pinning it.
+- **The encrypted download streams too**, through the framed container below.
+
+What is irreducible: one row. A 10 MiB attachment is 13.6 MiB of base64 whatever
+the budget says, because a row is serialised whole. The floor is therefore the
+largest single attachment, not the largest table.
+
+**The framed encrypted container (`MZBE` v2).** AES-GCM's auth tag covers the whole
+message, so a single-tag envelope cannot emit a byte until the last byte of
+plaintext exists — which is exactly why the encrypted export buffered. v2 seals
+256 KiB frames, each with its own tag, following the STREAM construction: the
+nonce is `prefix || counter || finalFlag`, and the header is additional
+authenticated data for every frame. So a frame cannot be reordered, duplicated,
+moved between files, or **dropped from the end** — the frame that would become
+last was sealed as non-final and is opened expecting the final flag. Truncation is
+the failure a naive chunked format gets wrong, and half a backup that decrypts
+cleanly is worse than one that does not decrypt at all. v1 envelopes still open:
+every backup a user already holds is one, and the support export still writes one
+because it assembles in memory anyway.
+
+**What this does not settle.** The claim is bounded peak RSS, and the honest
+measurement of that is the cgroup-constrained harness this repository still does
+not have (`DR-F3R6-002` / `DR-F3R7-003`). What the suite proves instead is the
+property the claim rests on — the export never has the whole of anything in hand:
+reads happen in batches, objects are opened one at a time between writes, bytes go
+out before the last table is read, and a blocked client stops the reads
+(`export-streaming.spec.ts`). `PEAK_MULTIPLE` on the **restore** side is untouched
+and still an estimate: the restore's `express.raw` upload is buffered before any
+of our code runs, so bounding it is a different change with a different shape.
 
 ## 7. Automatic backups on disk
 
@@ -609,7 +674,15 @@ Known and unresolved; none of these is a bug report waiting to be filed:
 
 - **Format version is strict equality.** Only `1` is accepted, rejected before
   any deletion. There is no compatibility window and no offline upgrader; define
-  one before incrementing.
+  one before incrementing. This is the `version` field *inside* the document; the
+  encrypted **envelope** carries its own version and accepts both containers
+  (§6), which is a separate number and deliberately not strict.
+- **A framed envelope does not open on an older instance.** Encrypted downloads
+  are `MZBE` v2 as of issue #1070, and a build from before it recognises only v1 —
+  it reports the file as not being in the encrypted Monize format. Restoring
+  backwards across that boundary means an unencrypted export, or restoring on a
+  build at least as new as the one that produced the file. The reverse direction
+  is fine: every version reads v1.
 - **`ai_provider_configs.api_key_enc` is instance-key ciphertext.** It is exported
   and restored verbatim, so a restore onto an instance with a different
   `AI_ENCRYPTION_KEY` leaves provider configs present and unusable. Re-entering

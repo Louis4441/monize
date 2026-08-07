@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { gzipSync, gunzipSync } from "zlib";
 import { PassThrough } from "stream";
-import { createHash, randomUUID } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import * as jwt from "jsonwebtoken";
 import * as fs from "fs";
 import * as path from "path";
@@ -21,12 +21,14 @@ import { BackupRestoreService } from "./backup-restore.service";
 import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
 import { buildExportTableQueries } from "./export-table-queries";
+import { ATTACHMENT_EXPORT_SQL } from "./export-attachments";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
 import { encryptBackup } from "./backup-crypto.util";
 import * as bcrypt from "bcryptjs";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { emulatePgCursors } from "../test-helpers/pg-cursor-mock";
 import {
   ATTACHMENT_STORAGE_PROVIDER,
   AttachmentStorageProvider,
@@ -569,8 +571,18 @@ describe("BackupService", () => {
     // pointed at the same statements.
     const scoped = createScopedDbMocks([[User, mockUserRepo as never]]);
     scoped.manager.query.mockImplementation(mockQueryHandler);
-    scoped.dataSource.query = scoped.manager.query;
-    mockQueryRunner = { query: scoped.manager.query };
+    // The export reads large tables through a database cursor, so what reaches
+    // the manager is `DECLARE ... CURSOR FOR <the query>` followed by `FETCH`
+    // (issue #1070). The emulation unwraps that and hands the inner SELECT to
+    // the same jest.fn every spec below configures and asserts against -- so a
+    // test that mocks `sql.includes("FROM accounts")` still answers, and
+    // `mock.calls` still records the query rather than the cursor plumbing.
+    const select = scoped.manager.query;
+    scoped.manager.query = jest.fn(
+      emulatePgCursors((sql, params) => select(sql, params)),
+    ) as jest.Mock;
+    scoped.dataSource.query = select;
+    mockQueryRunner = { query: select };
     mockDataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     // `name` is readonly on the real provider (it is persisted into
@@ -690,7 +702,7 @@ describe("BackupService", () => {
     it("selects by what the user's data references, not by who created it", () => {
       // The list is module-level data now (issue #1092), so this reads it
       // directly instead of reaching through a cast into a private method.
-      const sql = buildExportTableQueries(async (rows) => rows).find(
+      const sql = buildExportTableQueries(async function* () {}).find(
         (q) => q.key === "currencies",
       )!.sql;
 
@@ -1155,65 +1167,89 @@ describe("BackupService", () => {
         expect(headers["Content-Disposition"]).not.toContain("INCOMPLETE");
       });
 
+      /**
+       * The database provider's completeness is now judged from a digest
+       * Postgres computes (`octet_length` + `sha256` over the column) rather
+       * than from the base64 the artifact carries -- the verdict has to exist
+       * before the first byte of a download, and pulling every blob onto the
+       * heap to reach it is the memory defect issue #1070 closed. So the double
+       * answers two queries: the metadata sweep, and the digest sweep.
+       */
+      function databaseProviderHolds(
+        metadata: Record<string, unknown>,
+        digest: Record<string, unknown> | null,
+      ) {
+        mockDataSource.query.mockImplementation((sql: string) => {
+          const text = String(sql);
+          if (
+            text.includes("FROM transaction_attachments") &&
+            !text.includes("attachment_blobs")
+          ) {
+            return Promise.resolve([metadata]);
+          }
+          if (text.includes("FROM attachment_blobs")) {
+            return Promise.resolve(digest === null ? [] : [digest]);
+          }
+          return mockQueryHandler(sql);
+        });
+      }
+
+      const A_METADATA = {
+        id: A_ID,
+        user_id: userId,
+        storage_provider: "database",
+        byte_size: A_BYTES.length,
+        sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+      };
+
       it("reports incomplete when a database blob is missing (F3R7-001 scenario B)", async () => {
         // The database provider was previously not checked at export at all.
         attachmentStorageName = "database";
-        mockDataSource.query.mockImplementation((sql: string) => {
-          if (String(sql).includes("FROM transaction_attachments WHERE")) {
-            // metadata row exists...
-            return Promise.resolve([
-              {
-                id: A_ID,
-                user_id: userId,
-                storage_provider: "database",
-                byte_size: A_BYTES.length,
-                sha256: createHash("sha256").update(A_BYTES).digest("hex"),
-              },
-            ]);
-          }
-          // ...but the attachment_blobs join returns nothing.
-          return mockQueryHandler(sql);
-        });
+        // The metadata row exists, but nothing in `attachment_blobs` answers for it.
+        databaseProviderHolds(A_METADATA, null);
 
         const { report } = await service.exportToBuffer(userId);
 
         expect(report.complete).toBe(false);
         expect(report.missingAttachments).toBe(1);
+        // And nothing reached for an object store: on a database deployment
+        // there is none, and a missing blob is a missing blob.
+        expect(attachmentStorage.load).not.toHaveBeenCalled();
       });
 
       it("reports incomplete when a database blob contradicts its metadata", async () => {
         attachmentStorageName = "database";
-        mockDataSource.query.mockImplementation((sql: string) => {
-          if (
-            String(sql).includes("FROM transaction_attachments WHERE") &&
-            !String(sql).includes("attachment_blobs")
-          ) {
-            return Promise.resolve([
-              {
-                id: A_ID,
-                user_id: userId,
-                storage_provider: "database",
-                byte_size: A_BYTES.length,
-                sha256: createHash("sha256").update(A_BYTES).digest("hex"),
-              },
-            ]);
-          }
-          if (String(sql).includes("FROM attachment_blobs")) {
-            // A blob whose bytes are not what the metadata records.
-            return Promise.resolve([
-              {
-                attachment_id: A_ID,
-                data: Buffer.from("wrong bytes").toString("base64"),
-              },
-            ]);
-          }
-          return mockQueryHandler(sql);
+        const wrong = Buffer.from("wrong bytes");
+        databaseProviderHolds(A_METADATA, {
+          attachment_id: A_ID,
+          byte_size: wrong.length,
+          sha256: createHash("sha256").update(wrong).digest("hex"),
         });
 
         const { report } = await service.exportToBuffer(userId);
 
         expect(report.complete).toBe(false);
         expect(report.inconsistentAttachments).toBe(1);
+      });
+
+      it("counts a blob whose digest matches as included", async () => {
+        // The negative case for the digest comparison above: without it, a
+        // report that says "incomplete" for every database-provider attachment
+        // would pass both tests before this one.
+        attachmentStorageName = "database";
+        databaseProviderHolds(A_METADATA, {
+          attachment_id: A_ID,
+          byte_size: A_BYTES.length,
+          sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+        });
+
+        const { report } = await service.exportToBuffer(userId);
+
+        expect(report).toMatchObject({
+          complete: true,
+          expectedAttachments: 1,
+          includedAttachments: 1,
+        });
       });
     });
 
@@ -1345,17 +1381,19 @@ describe("BackupService", () => {
         return Promise.resolve([]);
       });
 
-      const chunks: Buffer[] = [];
-      const mockRes = {
-        write: jest.fn((c: Buffer) => chunks.push(c)),
-        end: jest.fn(),
-      };
-      await service.streamExport(userId, mockRes as any, "secret");
+      // A real Writable, not a `{ write, end }` pair: the encrypted export is a
+      // pipeline now rather than one `res.write(buffer)`, because AES-GCM's
+      // single auth tag was what forced the whole artifact into memory (issue
+      // #1070). A double that cannot be piped to cannot exercise it.
+      const { res, chunks } = responseDouble();
+      await service.streamExport(userId, res, "secret");
 
       const written = Buffer.concat(chunks);
-      // Magic header check -- the file starts with MZBE
+      // Magic header check -- the file starts with MZBE, and it is the framed
+      // container version.
       expect(written.subarray(0, 4).toString("ascii")).toBe("MZBE");
-      expect(mockRes.end).toHaveBeenCalled();
+      expect(written[4]).toBe(2);
+      expect(res.writableEnded).toBe(true);
     });
 
     it("rejects instead of hanging when the response closes mid-export (PR1077-REV-004)", async () => {
@@ -1721,14 +1759,26 @@ describe("BackupService", () => {
         }
       });
 
+      /**
+       * Incompressible padding, deliberately.
+       *
+       * The ceiling used to count the uncompressed JSON, because that JSON was
+       * genuinely accumulated -- per-table strings, a concatenated buffer and
+       * gzip's output all live at the peak. The export streams through gzip now
+       * (issue #1070), so the only thing this path still holds is the compressed
+       * artifact, and that is what the limit counts. A row of `"x".repeat(400)`
+       * would gzip to almost nothing and prove only that the assertion had
+       * stopped meaning anything.
+       */
+      const incompressible = (bytes: number) =>
+        randomBytes(bytes).toString("base64");
+
       it("refuses to assemble a buffered export past the limit", async () => {
         process.env.BACKUP_EXPORT_BUFFER_LIMIT = "1kb";
-        // Every table query returns a row, so the accumulated JSON passes 1 kB
-        // within the first few tables.
         mockQueryRunner.query.mockImplementation((sql: string, params) => {
           if (String(sql).includes("SELECT * FROM")) {
             return Promise.resolve([
-              { id: randomUUID(), padding: "x".repeat(400) },
+              { id: randomUUID(), padding: incompressible(400) },
             ]);
           }
           return mockQueryHandler(sql, params as unknown[]);
@@ -1741,22 +1791,64 @@ describe("BackupService", () => {
         );
       });
 
+      it("names the table the buffered export gave up at", async () => {
+        process.env.BACKUP_EXPORT_BUFFER_LIMIT = "1kb";
+        mockQueryRunner.query.mockImplementation((sql: string, params) => {
+          // One table large enough that the writer flushes a chunk while it is
+          // still inside it, so the name in the message is the table the
+          // document had actually reached rather than the last one overall.
+          if (String(sql).includes("FROM transactions ")) {
+            return Promise.resolve(
+              Array.from({ length: 800 }, () => ({
+                id: randomUUID(),
+                padding: incompressible(600),
+              })),
+            );
+          }
+          return mockQueryHandler(sql, params as unknown[]);
+        });
+
+        await expect(service.exportToBuffer(userId)).rejects.toThrow(
+          /"transactions"/,
+        );
+      });
+
       it("leaves the streaming export unbounded", async () => {
         process.env.BACKUP_EXPORT_BUFFER_LIMIT = "1kb";
         mockQueryRunner.query.mockImplementation((sql: string, params) => {
           if (String(sql).includes("SELECT * FROM")) {
             return Promise.resolve([
-              { id: randomUUID(), padding: "x".repeat(400) },
+              { id: randomUUID(), padding: incompressible(400) },
             ]);
           }
           return mockQueryHandler(sql, params as unknown[]);
         });
 
-        // The plain HTTP export streams through gzip and holds no total, so the
-        // buffered ceiling must not apply to it.
+        // The HTTP export streams and holds no total, so the buffered ceiling
+        // must not apply to it.
         const { res, chunks } = responseDouble();
         await service.streamExport(userId, res);
         expect(Buffer.concat(chunks).length).toBeGreaterThan(0);
+      });
+
+      it("leaves the encrypted streaming export unbounded too", async () => {
+        // This is the behaviour change issue #1070 bought: the encrypted
+        // download used to be assembled in memory to compute one AES-GCM auth
+        // tag, so a large dataset met this ceiling and was refused outright.
+        // With a framed container it streams like the plain one.
+        process.env.BACKUP_EXPORT_BUFFER_LIMIT = "1kb";
+        mockQueryRunner.query.mockImplementation((sql: string, params) => {
+          if (String(sql).includes("SELECT * FROM")) {
+            return Promise.resolve([
+              { id: randomUUID(), padding: incompressible(400) },
+            ]);
+          }
+          return mockQueryHandler(sql, params as unknown[]);
+        });
+
+        const { res, chunks } = responseDouble();
+        await service.streamExport(userId, res, "secret");
+        expect(Buffer.concat(chunks).length).toBeGreaterThan(1024);
       });
     });
 
@@ -2289,9 +2381,9 @@ describe("BackupService", () => {
          * There are exactly two places in the module that open an external
          * object, and the distinction between them is the whole point:
          *
-         *  - `appendExternalAttachmentBytes` (export) reads objects the *server*
-         *    named, from a `user_id`-scoped query against its own database. There
-         *    is no uploaded document involved, so there is nothing to authorize.
+         *  - `readAttachmentObject` (export) reads objects the *server* named,
+         *    from a `user_id`-scoped query against its own database. There is no
+         *    uploaded document involved, so there is nothing to authorize.
          *  - `stageAttachmentObjects` (restore) reads an object an *uploaded* file
          *    named, which is the case that needs the database's ownership record
          *    first -- and it is the legacy path now, used only for an artifact
@@ -2331,7 +2423,7 @@ describe("BackupService", () => {
 
           const exporting = methodBody(
             "backup-export.service.ts",
-            "private async appendExternalAttachmentBytes(",
+            "private async readAttachmentObject(",
           );
           const staging = methodBody(
             "backup-attachment-transfer.service.ts",
@@ -2363,14 +2455,23 @@ describe("BackupService", () => {
           expect(beforeRestoreRead).toContain("loadOwnedAttachmentSources(");
           expect(beforeRestoreRead).toContain("ownedSources.get(");
 
-          // The export's read is preceded by the server's own scoped query, and
-          // the export never sees an uploaded document at all.
+          // The export never sees an uploaded document at all: the only ids it
+          // is ever handed come from its own `user_id`-scoped sweep, which is
+          // the single query in `export-attachments.ts` that produces them.
           const exportBody = exporting.text.slice(
             exporting.start,
             exporting.end,
           );
-          expect(exportBody).toContain("WHERE user_id = $1");
           expect(exportBody).not.toContain("BackupData");
+          const attachmentSql = sourceOf(sources, "export-attachments.ts");
+          expect(ATTACHMENT_EXPORT_SQL.metadata).toContain(
+            "WHERE user_id = $1",
+          );
+          // ...and that sweep is the only place the export names an attachment
+          // id, so there is no second, unscoped route to one.
+          expect([
+            ...attachmentSql.matchAll(/FROM transaction_attachments\b/g),
+          ]).toHaveLength(1);
         });
 
         it("drops the row when the file's metadata contradicts the stored row", async () => {
@@ -4625,6 +4726,27 @@ describe("BackupService", () => {
       function encryptedBlob(data: Record<string, unknown>, password: string) {
         return encryptBackup(compressBackupData(data), password);
       }
+
+      it("restores what the streaming export actually writes (framed container)", async () => {
+        // The two halves are separated by the file format, so a change to one
+        // that misses the other produces a download nobody can restore. This
+        // takes the bytes the export emits -- a v2 framed envelope since issue
+        // #1070 -- and feeds them back in rather than re-encrypting a fixture.
+        const { res, chunks } = responseDouble();
+        await service.streamExport(userId, res, "round-trip-password");
+        const artifact = Buffer.concat(chunks);
+        expect(artifact[4]).toBe(2);
+
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const result = await service.restoreData(userId, {
+          compressedData: artifact,
+          password: "login-password",
+          backupPassword: "round-trip-password",
+        });
+
+        expect(result.message).toBe("Backup restored successfully");
+      });
 
       it("decrypts using the auth password when nothing more specific is provided", async () => {
         mockUserRepo.findOne.mockResolvedValue(mockUser);

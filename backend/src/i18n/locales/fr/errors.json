@@ -191,7 +191,7 @@
     "supportPasswordRequired": "Une sauvegarde de support doit être chiffrée : fournissez un mot de passe.",
     "passwordHeaderNotBase64": "L'en-tête {header} doit être encodé en base64.",
     "decompressTooLarge": "La sauvegarde est trop volumineuse pour être restaurée : décompressée, elle dépasse la limite configurée de {limit} octets. Augmentez BACKUP_RESTORE_EXPANDED_LIMIT s'il s'agit d'une sauvegarde légitime.",
-    "exportTooLarge": "Cette sauvegarde est trop volumineuse pour être produite d'un seul bloc (au-delà de {limit} octets à la table \"{table}\"). Les sauvegardes chiffrées, automatiques et de support doivent être assemblées en mémoire ; utilisez l'export simple, qui diffuse, ou augmentez BACKUP_EXPORT_BUFFER_LIMIT.",
+    "exportTooLarge": "Cette sauvegarde est trop volumineuse pour être produite d'un seul bloc (au-delà de {limit} octets à la table \"{table}\"). Les sauvegardes automatiques et de support doivent être conservées en mémoire ; téléchargez une sauvegarde manuelle, qui diffuse, ou augmentez BACKUP_EXPORT_BUFFER_LIMIT.",
     "supportExportTooLarge": "Cette sauvegarde de support représenterait {{ size }} Mio de JSON, au-delà de la limite de {{ limit }} Mio. Restreignez-la avec une sélection de comptes ou une plage de dates, ou augmentez BACKUP_EXPORT_BUFFER_LIMIT.",
     "folderUnusable": "Le dossier \"{{ path }}\" ne peut pas être utilisé comme répertoire ({{ reason }}).",
     "folderOutsideAllowedRoots": "Le dossier de sauvegarde \"{path}\" se trouve en dehors des racines autorisées ({roots}). Définissez BACKUP_ALLOWED_ROOTS pour l'autoriser.",

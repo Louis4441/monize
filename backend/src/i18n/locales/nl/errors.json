@@ -191,7 +191,7 @@
     "supportPasswordRequired": "Een supportback-up moet versleuteld zijn: geef een wachtwoord op.",
     "passwordHeaderNotBase64": "De header {header} moet base64-gecodeerd zijn.",
     "decompressTooLarge": "Back-up is te groot om terug te zetten: uitgepakt komt deze boven de ingestelde limiet van {limit} bytes. Verhoog BACKUP_RESTORE_EXPANDED_LIMIT als dit een echte back-up is.",
-    "exportTooLarge": "Deze back-up is te groot om in één keer te maken (voorbij {limit} bytes bij tabel \"{table}\"). Versleutelde, automatische en supportback-ups moeten in het geheugen worden samengesteld; gebruik de gewone export, die streamt, of verhoog BACKUP_EXPORT_BUFFER_LIMIT.",
+    "exportTooLarge": "Deze back-up is te groot om in één keer te maken (voorbij {limit} bytes bij tabel \"{table}\"). Automatische en supportback-ups moeten in het geheugen worden gehouden; download een handmatige back-up, die streamt, of verhoog BACKUP_EXPORT_BUFFER_LIMIT.",
     "supportExportTooLarge": "Deze supportback-up zou {{ size }} MiB JSON zijn, boven de limiet van {{ limit }} MiB. Beperk deze met een rekeningselectie of een datumbereik, of verhoog BACKUP_EXPORT_BUFFER_LIMIT.",
     "folderUnusable": "Map \"{{ path }}\" kan niet als directory worden gebruikt ({{ reason }}).",
     "folderOutsideAllowedRoots": "Back-upmap \"{path}\" ligt buiten de toegestane roots ({roots}). Stel BACKUP_ALLOWED_ROOTS in om deze toe te staan.",

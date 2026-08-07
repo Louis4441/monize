@@ -291,6 +291,18 @@ write has already made. The durable copy of the same fact goes *inside* the
 document (`completeness` in the envelope), because a filename does not survive a
 rename and a settings row does not survive the machine.
 
+**Nothing in the export path may hold a whole table, a whole artifact, or a whole
+attachment set.** Rows come through the cursor in `src/backup/export-cursor.ts`,
+the document is serialised a row at a time under the chunk budget in
+`export-json-stream.ts`, and an object store is opened one object at a time and
+the bytes dropped once written. A `manager.query` for an export table, a
+`JSON.stringify` over an array of rows, or an array of base64 built before
+serialising are each the same defect (issue #1070), and each looks reasonable in
+isolation -- which is how it survived five audits. The guards are in
+`src/backup/export-streaming.spec.ts`: they assert the ordering (batched fetches,
+loads interleaved with writes, reads that stop when the client does) rather than
+the memory, because peak RSS needs a cgroup harness this repository does not have.
+
 And one thing about `verifyAuthentication` that is easy to undo by accident. An
 OIDC restore is authorized by a single-use `OidcReauthService` artifact, and the
 round trip that mints one loses the user's file selection -- so the restore

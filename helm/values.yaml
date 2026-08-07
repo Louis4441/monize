@@ -88,8 +88,14 @@ backend:
   # provider, not only the database one, so artifacts are larger than they were.
   # A deployment whose users keep many receipts in local or S3 storage wants both
   # a larger memory limit and a larger restoreUpload.
+  #
+  # exportBuffer applies to the automatic backup (which writes a file) and the
+  # support export (which reconciles every table at once). Both HTTP downloads
+  # stream and are not bounded by it, the encrypted one included: it writes a
+  # framed AES-GCM container rather than one message over the whole artifact, so
+  # a large encrypted export is no longer refused for want of memory.
   backupLimits:
-    # -- JSON a buffered export may accumulate (e.g. "96mb")
+    # -- Artifact a buffered export may accumulate (e.g. "96mb")
     exportBuffer: ""
     # -- Decompressed size a restore payload may reach (e.g. "96mb")
     restoreExpanded: ""

@@ -191,7 +191,7 @@
     "supportPasswordRequired": "Un backup di supporto deve essere cifrato: fornisci una password.",
     "passwordHeaderNotBase64": "L'intestazione {header} deve essere codificata in base64.",
     "decompressTooLarge": "Il backup è troppo grande per essere ripristinato: decompresso supera il limite configurato di {limit} byte. Aumenta BACKUP_RESTORE_EXPANDED_LIMIT se si tratta di un backup legittimo.",
-    "exportTooLarge": "Questo backup è troppo grande per essere prodotto in un unico blocco (oltre {limit} byte alla tabella \"{table}\"). I backup cifrati, automatici e di supporto devono essere assemblati in memoria; usa l'esportazione semplice, che trasmette in streaming, oppure aumenta BACKUP_EXPORT_BUFFER_LIMIT.",
+    "exportTooLarge": "Questo backup è troppo grande per essere prodotto in un unico blocco (oltre {limit} byte alla tabella \"{table}\"). I backup automatici e di supporto devono essere tenuti in memoria; scarica un backup manuale, che viene trasmesso in streaming, oppure aumenta BACKUP_EXPORT_BUFFER_LIMIT.",
     "supportExportTooLarge": "Questo backup di supporto sarebbe di {{ size }} MiB di JSON, oltre il limite di {{ limit }} MiB. Restringilo con una selezione di conti o un intervallo di date, oppure aumenta BACKUP_EXPORT_BUFFER_LIMIT.",
     "folderUnusable": "La cartella \"{{ path }}\" non può essere usata come directory ({{ reason }}).",
     "folderOutsideAllowedRoots": "La cartella di backup \"{path}\" è fuori dalle radici consentite ({roots}). Imposta BACKUP_ALLOWED_ROOTS per consentirla.",
