@@ -975,11 +975,20 @@ guards against (wrapping landing in a later PR than the conversion) never existe
   test) — it is the highest-QPS query in the system, so bypass must never be its steady state.
 - **Exempt (no user data — note only):** `health.controller` (`SELECT 1` connectivity probe only);
   `oauth-metadata.controller` and the OIDC discovery documents (static config); the node-oidc-provider
-  Express mount's `oauth_payloads` reads/writes (that table is deliberately **RLS-exempt**, see M2).
+  Express mount's `oauth_payloads` reads/writes (that table is deliberately **RLS-exempt**; the
+  canonical rationale is `docs/row-level-security-contract.md` section 3).
 - **`oauth_payloads` hardening decision:** keep the `monize_app` DML grants and leave the table
   RLS-exempt (matches M2's exclusion list) — no owner-DataSource split. `oauth_payloads` is a
-  short-lived opaque token/grant store keyed by random id, never queried per end-user, so an owner
-  policy would add no isolation.
+  short-lived opaque token/grant store keyed by random id, so an owner policy would add no
+  isolation.
+
+  > **Amended (DR-03, issue #1066).** Two claims in this record were wrong when it was written.
+  > The adapter's reads/writes do **not** run under `withSystemContext` — `node-oidc-provider` is
+  > mounted as raw Express middleware outside Nest's request pipeline, so `PostgresAdapter` holds a
+  > bare `DataSource` with no ambient context at all. And the table **is** queried per end-user, by
+  > `OAuthProviderService.revokeAllForUser`, which deletes on `payload ->> 'accountId'` for admin
+  > deactivate/password-reset flows. The decision above still stands, but for the reasons set out in
+  > `docs/row-level-security-contract.md` section 3, which is canonical.
 - **Flagged, NOT wrapped (out of C1's file scope):**
   - `AccountDelegateGuard` (`backend/src/delegation/guards/account-delegate.guard.ts`) runs in the
     guard phase *before* `AuthGuard('jwt')` and, **for delegate tokens only**, calls

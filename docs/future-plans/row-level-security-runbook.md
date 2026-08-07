@@ -91,7 +91,7 @@ Fail-loud helper: `withScopedDb()` **throws** (`DB access outside request/user/s
 | PAT-authenticated request (incl. all MCP traffic) | Same as an authenticated request once resolved; the PAT **lookup itself** (token-hash scan across users) runs in `withSystemContext()`. |
 | Auth bootstrap (login-by-email / OIDC callback / register / refresh — genuinely pre-identity) | `withSystemContext(fn)` |
 | Password reset / email verification token lookups | `withSystemContext(fn)` |
-| MCP-connector OAuth flow (`oauth_payloads` during authorize, pre-session) | `withSystemContext(fn)` |
+| MCP-connector OAuth flow (`oauth_payloads` during authorize, pre-session) | **No context at all** -- `PostgresAdapter` holds a bare `DataSource`, because `node-oidc-provider` is mounted as raw Express middleware outside Nest's request pipeline. This row read `withSystemContext(fn)` for a long time and was simply wrong. The table is RLS-exempt with no owner column, so nothing depends on an identity GUC here; see `docs/row-level-security-contract.md` section 3 for what the safety argument actually is. |
 | Emergency-access claim (grantee or claim token acting on the **grantor's** rows) | `withSystemContext(fn)` |
 | Cron job, per-user work | `withUserContext(userId, fn)` |
 | Cron job, cross-user fan-out (e.g. "all users in timezone X") | `withSystemContext(fn)` |

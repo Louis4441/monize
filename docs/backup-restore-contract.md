@@ -100,11 +100,18 @@ A restore deletes everything the user owns and then inserts the backup, in one
 transaction. Everything that can refuse the request must refuse it before the
 delete:
 
-- credential/step-up verification (section 5);
 - decryption;
 - decompression, under a hard expanded-size ceiling (section 6);
 - version and envelope validation;
+- re-authentication (section 5);
 - **staging of external attachment objects** (section 4).
+
+That list is in execution order, and the position of re-authentication is a
+decision rather than an accident: it is last among the refusals because the OIDC
+artifact is single-use and minting a replacement costs the user their file
+selection, so nothing that can fail for free may fail *after* it. Section 5 has
+the reasoning. What the ordering must never become is re-authentication after any
+write — the check precedes every `DELETE FROM` on every path.
 
 Any SQL or foreign-key error rolls the whole transaction back. The one effect
 that is not transactional is the object store; that is what makes staging-first
@@ -317,44 +324,79 @@ the module routes its key through the validator, and names the database
 provider's exemption (a parameterised primary-key lookup) rather than assuming
 it.
 
-## 5. Confirming a destructive restore — known gap
+## 5. Confirming a destructive restore
 
-A restore requires the user's password (local accounts, bcrypt-checked). For OIDC
-accounts it requires `x-restore-oidc-token`, and **`verifyAuthentication` checks
-only that the value is truthy.** `x-restore-oidc-token: x` passes. The header is
-documentation, not a control, so anything holding a live OIDC session can erase
-and replace a user's entire financial history with no barrier.
+`verifyAuthentication` in `backend/src/backup/backup-restore.service.ts` decides
+this, and it has exactly three branches — there is no fall-through that proves
+nothing:
 
-This is a known open defect (audit P3-009), not a design decision.
+| Account | Second proof |
+|---------|--------------|
+| Local, password set | `password`, bcrypt-checked against `passwordHash`. |
+| Local, no `passwordHash` (admin-provisioned, reset never completed) | **Refused.** No proof is available, so the restore is not offered — this branch used to fall off the end of the `else if` and require nothing. |
+| OIDC | A signed, action-bound, single-use re-authentication artifact from `OidcReauthService`, consumed for the purpose `"restore-backup"`. |
 
-The repository already contains the right mechanism, used by emergency access:
+### The OIDC artifact, and what it replaced
 
-- `STEP_UP_PURPOSES` in `backend/src/auth/step-up/dto/verify-step-up.dto.ts`
-- `@RequireStepUp(purpose)` + `StepUpGuard` — JWT-signed, purpose-scoped,
-  expiring, with attempt lockout
-- `StepUpAuthModal` and `useStepUpTokenStore` on the frontend, which already
-  handle local password, TOTP, and the OIDC redirect
+Until #1060 this branch read `if (!input.oidcIdToken) reject` and nothing else.
+The frontend sent the literal `"oidc-session-confirmed"`, so `x` passed just as
+well: the second proof for the most destructive action in the product was
+possession of the session that was already required (audit P3-009 / F3RB-007).
 
-The fix is therefore small and should reuse that mechanism rather than invent a
-second one:
+What is there now is `OidcReauthService`
+(`backend/src/auth/oidc/oidc-reauth.service.ts`), shared by every destructive
+surface rather than reimplemented per caller. `GET /auth/oidc/reauth?purpose=…`
+sends the user to the identity provider with `prompt=login` and `max_age=0`; the
+callback — after `openid-client` has verified state, nonce, issuer, audience and
+signature — mints an artifact signed with `JWT_SECRET`, carrying the user id, the
+purpose, a one-time `jti`, and a five-minute expiry. `consume(userId, purpose,
+token)` checks all of it: signature, type, subject, action, freshness, single
+use. Every rejection is the same `401` with the same message, because which check
+failed is a fact about the server's state.
 
-1. Add `"backup-restore"` to `STEP_UP_PURPOSES`.
-2. Put `@UseGuards(StepUpGuard)` and `@RequireStepUp("backup-restore")` on the
-   restore handler.
-3. Delete the `oidcIdToken` branch from `verifyAuthentication`.
-4. Open `StepUpAuthModal` in `BackupRestoreSection` before restoring and send the
-   resulting token as `x-step-up-token`.
+Two bindings matter and are easy to lose:
 
-Note when doing it: the step-up mechanism's own OIDC branch is also a
-session-based soft check (`oidcConfirmed`), so this makes the proof signed,
-expiring and action-scoped without making it a *fresh* identity-provider
-authentication. Closing that remaining half needs a real step-up transaction
-(`prompt=login`, `max_age=0`, an `auth_time` freshness check) and a browser round
-trip that survives having a large file selected. Account deletion shares the same
-sentinel and should be converted in the same change.
+- **Purpose.** `"restore-backup"` is not `"delete-data"`. An artifact minted to
+  empty an account must not authorize overwriting it with someone else's file.
+- **The round trip.** The pending marker carries a hash of the `state` it was
+  issued alongside, so an artifact is bound to *its own* challenge and not merely
+  to the fact that one was started. Without that, an ordinary `GET /auth/oidc`
+  answered silently from a live SSO session minted a valid artifact for a
+  challenge nobody ever answered (FV-001).
 
-Steps 1–4 change the restore path for every user, so they need exercising in a
-browser: the failure mode is "the user cannot restore their backup".
+`STEP_UP_PURPOSES` is a different mechanism for a different question, and this
+path deliberately does not route through it: a step-up token is a second proof,
+but for an OIDC account it was itself issued on a client-asserted
+`oidcConfirmed: true`. That branch now consumes the same artifact
+(`backend/src/auth/step-up/step-up.service.ts`), so there is one implementation of
+cryptographic step-up in the repository rather than two.
+
+### Naming: the header does not carry an ID token
+
+The wire names are historical. The header is `X-Restore-OIDC-Token` and the field
+is `oidcIdToken` (`backend/src/backup/backup-format.ts`,
+`frontend/src/lib/backupApi.ts`), but the value is a Monize-minted
+re-authentication artifact, **not** an OIDC ID token — nothing verifies it against
+the provider's JWKS, and it would fail if it did. Do not add ID-token claim
+checks here on the strength of the name.
+
+### The artifact is spent last, and that is a requirement
+
+The round trip that mints the artifact navigates away from the settings page,
+which loses the user's file selection. So a restore that fails for a reason
+having nothing to do with identity — a wrong backup password, a truncated file,
+a foreign JSON document — must not cost one: the user would have to re-select a
+large file *and* re-authenticate, and the retry's honest failure would read as a
+spent artifact.
+
+`restoreData` therefore runs everything free first — decrypt, decompress under
+the expanded-size ceiling, validate the envelope — and calls
+`verifyAuthentication` only once the file is known to be restorable. This is the
+one place where section 3's "refuse before the destruction" ordering is refined
+rather than simply followed: the check still precedes every write, but it no
+longer precedes the checks that cost nothing. `backup.service.spec.ts` pins both
+halves — a bad file leaves the artifact spendable, and no `DELETE FROM` reaches
+the database on any path where the artifact is refused.
 
 ## 6. Size ceilings
 

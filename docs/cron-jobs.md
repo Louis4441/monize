@@ -17,6 +17,7 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 | `scheduled-transactions.service` | `25 17 * * 1-5` (America/New_York) | 5:25 PM ET weekdays | Re-derive the account-currency estimate on foreign-currency schedules from the rates the 5:05 PM refresh just stored |
 | `exchange-rate.service` | `5 17 * * 1-5` (America/New_York) | 5:05 PM ET weekdays | Fetch exchange rates (staggered after price refresh) |
 | `accounts.service` | `0 * * * *` | Hourly | Fold future-dated transactions into account balances as their date arrives in each user's local timezone |
+| `net-worth.service` | `0 */30 * * * *` | Every 30 minutes | Recompute current-month net-worth snapshots for accounts whose balance moved since the snapshot was taken (owner-scoped, idempotent across replicas) |
 | `mortgage-reminder.service` | `0 08 * * *` | Daily 8 AM | Mortgage payment reminders |
 | `bill-reminder.service` | `0 08 * * *` | Daily 8 AM | Bill payment reminders |
 | `budget-period-cron.service` | `0 0 1 * *` | 1st of month, midnight | Create new budget periods |

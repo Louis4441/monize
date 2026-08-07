@@ -281,7 +281,7 @@ them:
 **A file's name is its identity, so anything that decides whether it may be
 deleted has to be in the name.** An automatic backup that could not include every
 attachment is published as `monize-backup-partial-<date>` in its own retention
-tier, and the name is chosen *after* the export from what the export found —
+tier, and the name is chosen *after* the export from what the export found --
 `writeFileAtomic` replaces a final name by design, so a partial artifact written
 under the ordinary `daily-` name had already destroyed that day's complete copy
 by the time `applyBackupOutcome` recorded `partial` in the settings row, and
@@ -291,10 +291,15 @@ write has already made. The durable copy of the same fact goes *inside* the
 document (`completeness` in the envelope), because a filename does not survive a
 rename and a settings row does not survive the machine.
 
-And one that no test can catch: the destructive restore's step-up for OIDC users
-accepts any truthy header value. It is an open defect with a written plan, not a
-design choice -- see section 5 of the contract before touching
-`verifyAuthentication`.
+And one thing about `verifyAuthentication` that is easy to undo by accident. An
+OIDC restore is authorized by a single-use `OidcReauthService` artifact, and the
+round trip that mints one loses the user's file selection -- so the restore
+validates everything free (decrypt, decompress, envelope) *before* spending it,
+and a wrong backup password costs no identity-provider round trip. That makes it
+the one refusal in the path that is deliberately not first; it still precedes
+every write. Do not reorder it forward to match section 3's list, and do not
+reorder it backward past a `DELETE FROM`. Section 5 of the contract has the
+reasoning, and `backup.service.spec.ts` pins both edges.
 
 ### `BackupService` is a facade; put new code in the component that owns it
 

@@ -88,9 +88,12 @@ GUCs through `withScopedDb` and the policies compare each row's owner against th
      bespoke policy (`114_rls_policies_special.sql`), plus an entry in the spec's owner-column map.
    - **Indirect**: no owner column → an `EXISTS` back to the owning parent
      (`113_rls_policies_indirect.sql`), plus an entry in the spec's indirect map.
-   - **Exempt**: global reference data with a documented rationale in the migration comment
-     (`currencies`, `exchange_rates`, `oauth_payloads`, `schema_migrations`), plus the spec's
-     exemption list.
+   - **Exempt**: no owner column to policy on. The set is `RLS_EXEMPT_TABLES` in
+     `backend/src/common/db/rls-exempt-tables.ts`, mirrored as `rls-exempt:` marker lines in
+     `database/schema.sql` and checked against it in both directions (with no database) by
+     `backend/src/common/db/rls-exempt-tables.spec.ts`. Do not write the list out anywhere else --
+     it was previously kept in five places and had already drifted. Exempting a table takes a
+     rationale in `docs/row-level-security-contract.md`, which is canonical.
 
    Keep the `(SELECT app_current_user_id())` initplan form — a bare function call relies on
    SQL-function inlining and evaluates per row on sequential scans.

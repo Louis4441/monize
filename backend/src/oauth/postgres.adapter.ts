@@ -10,6 +10,25 @@ const GRANTABLE_MODELS = new Set([
   "BackchannelAuthenticationRequest",
 ]);
 
+/**
+ * `oidc-provider`'s storage adapter, and the one place in the application that
+ * reaches a table through a bare `DataSource` rather than `withScopedDb`.
+ *
+ * This is deliberate, and narrowly bounded. `node-oidc-provider` is mounted as
+ * raw Express middleware in `main.ts`, outside Nest's request pipeline, so
+ * these calls have **no ambient identity context at all** -- not a request
+ * scope, and not `withSystemContext` either. Their safety does not come from
+ * identity GUCs. It comes from `oauth_payloads` being RLS-exempt with no owner
+ * column, addressed only by opaque provider identifiers, and from the runtime
+ * role's grants on it being confined to the DML below.
+ *
+ * This is not precedent for any user-owned table: everything else goes through
+ * `withScopedDb` (`src/common/db/scoped-db.ts`). The full boundary -- rejected
+ * alternatives, consequences, and the triggers that would invalidate the
+ * exception -- is `docs/row-level-security-contract.md`, and
+ * `src/oauth/oauth-payload-access.spec.ts` plus the `OAUTH_PAYLOAD_ALLOWLIST`
+ * ban in `eslint.config.mjs` fail when a new production reader appears.
+ */
 export class PostgresAdapter implements Adapter {
   constructor(
     private readonly model: string,
