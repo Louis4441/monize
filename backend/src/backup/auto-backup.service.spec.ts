@@ -1057,6 +1057,10 @@ describe("AutoBackupService", () => {
   });
 
   describe("runManualBackup", () => {
+    // These tests assert the daily-only outcome. The suite-wide clock
+    // (SUITE_CLOCK) is already pinned to a plain day-of-month, so no promotion
+    // to weekly/monthly interferes; the tests that exercise promotion move the
+    // clock with withClockAt.
     it("should back up under BACKUP_CONTAINER_DIR when no settings exist", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(null);
 
@@ -1234,6 +1238,8 @@ describe("AutoBackupService", () => {
    * replica and two users was enough.
    */
   describe("tenant isolation on a shared root", () => {
+    // These tests assert the daily-only artifact set; the suite-wide SUITE_CLOCK
+    // is already a plain day-of-month, so nothing promotes. See runManualBackup.
     it("writes two users' same-day backups to different files", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ folderPath: root }),
@@ -1279,6 +1285,10 @@ describe("AutoBackupService", () => {
   });
 
   describe("handleAutoBackupCron", () => {
+    // These tests assert the daily-only artifact set; the suite-wide SUITE_CLOCK
+    // is already a plain day-of-month, so nothing promotes. Promotion behaviour
+    // is covered, with its own dates, in the partial-backup and retention
+    // describes below.
     it("should do nothing if no backups are due", async () => {
       mockSettingsRepo.find.mockResolvedValue([]);
 

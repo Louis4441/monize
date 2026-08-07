@@ -125,19 +125,55 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
   const runExport = async (encryptionPassword?: string) => {
     setIsExporting(true);
     try {
-      const blob = await backupApi.exportBackup(encryptionPassword);
+      const {
+        blob,
+        complete,
+        expectedAttachments,
+        includedAttachments,
+        missingAttachments,
+        inconsistentAttachments,
+      } = await backupApi.exportBackup(encryptionPassword);
       // Date the filename by the user's configured timezone preference, not UTC
       // or the browser's timezone. `toISOString()` renders in UTC (an evening
       // export in a negative-offset zone would be stamped with tomorrow), and
       // the browser's own timezone can differ from the preference the user set
       // in Settings (e.g. an Australia/Sydney preference viewed from US/Eastern).
       const today = getDateStringInTimezone(resolveTimezone(timezonePref));
-      const filename = encryptionPassword
-        ? `monize-backup-${today}.mzbe`
-        : `monize-backup-${today}.json.gz`;
+      const extension = encryptionPassword ? 'mzbe' : 'json.gz';
+      // An incomplete artifact is named as one on disk, matching what the server
+      // put in Content-Disposition: a toast is gone in five seconds, a filename
+      // is still there when somebody reaches for this file in a crisis.
+      const filename = complete
+        ? `monize-backup-${today}.${extension}`
+        : `monize-backup-${today}-INCOMPLETE.${extension}`;
       downloadBlob(blob, filename);
 
-      toast.success(t('export.toasts.success'));
+      if (complete) {
+        toast.success(t('export.toasts.success'));
+      } else {
+        // Deliberately not a success toast. The server could not include every
+        // attachment it named, so calling this a successful backup is how a user
+        // ends up deleting the source system for an artifact that cannot restore
+        // it.
+        // Both failure modes count: absent bytes and bytes that contradict their
+        // own metadata are equally unrestorable, and the backend excludes both
+        // from `includedAttachments`. Reporting only `missing` said "0 of 1" for
+        // an artifact with one corrupt attachment -- a false number pointing at
+        // the wrong cause. The breakdown keeps the diagnosis.
+        toast.error(
+          t('export.toasts.incomplete', {
+            // Everything the server could not include, taken from its
+            // authoritative included count rather than re-summing the known
+            // exclusion reasons -- so a future exclusion the breakdown does not
+            // name still counts here.
+            unusable: expectedAttachments - includedAttachments,
+            total: expectedAttachments,
+            missing: missingAttachments,
+            inconsistent: inconsistentAttachments,
+          }),
+          { duration: 12000 },
+        );
+      }
       setExportPasswordPrompt(false);
       setExportPassword('');
     } catch (error) {
@@ -580,6 +616,18 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
                 {Object.values(restoreResult.restored).reduce((sum, n) => sum + n, 0).toLocaleString()}
               </span>
             </div>
+
+            {/* Attachments whose bytes could not be found are not restored, and
+                a success dialogue that says nothing about them leaves the user
+                believing files came back that did not. Reported outside the
+                record total on purpose: they were not written. */}
+            {!!restoreResult.skippedAttachments && (
+              <p className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                {t('restoreResult.skippedAttachments', {
+                  count: restoreResult.skippedAttachments,
+                })}
+              </p>
+            )}
 
             <div className="mt-6 flex justify-end">
               <Button onClick={() => setRestoreResult(null)}>

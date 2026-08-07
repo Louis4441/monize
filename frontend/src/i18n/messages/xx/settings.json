@@ -473,6 +473,7 @@
       "nextBackup": "[XX-Next backup-XX]",
       "error": "[XX-Error-XX]",
       "success": "[XX-Success-XX]",
+      "partial": "[XX-Partial-XX]",
       "failed": "[XX-Failed-XX]"
     },
     "saveButton": "[XX-Save Settings-XX]",
@@ -498,7 +499,12 @@
       "every12hours": "[XX-Every 12 Hours-XX]",
       "daily": "[XX-Daily-XX]",
       "weekly": "[XX-Weekly-XX]"
-    }
+    },
+    "noStorage": {
+      "title": "[XX-This deployment has no backup storage-XX]",
+      "body": "[XX-Automatic backups would be written to {folderPath}, which this deployment cannot write to. An administrator needs to mount storage there before a schedule can run.-XX]"
+    },
+    "never": "[XX-Never-XX]"
   },
   "backupRestore": {
     "heading": "[XX-Backup & Restore-XX]",
@@ -539,7 +545,8 @@
       },
       "toasts": {
         "success": "[XX-Backup downloaded successfully-XX]",
-        "failed": "[XX-Failed to create backup-XX]"
+        "failed": "[XX-Failed to create backup-XX]",
+        "incomplete": "[XX-Backup downloaded, but it is INCOMPLETE: {unusable} of {total} attachment(s) could not be saved intact ({missing} missing, {inconsistent} failed an integrity check). Do not treat this file as a full backup — fix the attachment storage and export again.-XX]"
       }
     },
     "restore": {
@@ -568,6 +575,7 @@
       "title": "[XX-Restore Complete-XX]",
       "description": "[XX-Your data has been restored successfully. Here is a summary of what was restored:-XX]",
       "totalRecords": "[XX-Total records-XX]",
+      "skippedAttachments": "[XX-{count, plural, one {# attachment was not restored} other {# attachments were not restored}}: the backup did not carry usable bytes for them — they were missing or failed their checksum when it was exported, or the file predates self-contained backups. Export a fresh backup once attachment storage is healthy to capture them.-XX]",
       "doneButton": "[XX-Done-XX]"
     }
   },

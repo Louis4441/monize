@@ -473,7 +473,8 @@
       "nextBackup": "下次备份",
       "error": "错误",
       "success": "成功",
-      "failed": "失败"
+      "failed": "失败",
+      "partial": "不完整"
     },
     "saveButton": "保存设置",
     "savingButton": "保存中...",
@@ -498,7 +499,12 @@
       "every12hours": "每 12 小时",
       "daily": "每天",
       "weekly": "每周"
-    }
+    },
+    "noStorage": {
+      "title": "此部署没有备份存储",
+      "body": "自动备份将写入 {folderPath}，但此部署无法向该位置写入。管理员需要先在该位置挂载存储，计划任务才能运行。"
+    },
+    "never": "从未"
   },
   "backupRestore": {
     "heading": "备份与恢复",
@@ -539,6 +545,7 @@
       },
       "toasts": {
         "success": "备份已成功下载",
+        "incomplete": "备份已下载，但内容不完整：{total} 个附件中有 {unusable} 个未能完整保存（{missing} 个缺失，{inconsistent} 个未通过完整性校验）。请勿将此文件视为完整备份——修复附件存储后重新导出。",
         "failed": "创建备份失败"
       }
     },
@@ -568,7 +575,8 @@
       "title": "恢复完成",
       "description": "您的数据已成功恢复。以下是恢复内容摘要：",
       "totalRecords": "总记录数",
-      "doneButton": "完成"
+      "doneButton": "完成",
+      "skippedAttachments": "{count, plural, other {# 个附件未被恢复}}：备份中没有可用的字节——导出时它们缺失或未通过校验和，或该文件早于自包含备份。请在附件存储恢复正常后重新导出备份。"
     }
   },
   "sharedAccess": {

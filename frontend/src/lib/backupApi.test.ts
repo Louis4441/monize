@@ -45,7 +45,7 @@ beforeEach(() => {
 describe('backupApi', () => {
   it('exportBackup posts to /backup/export with blob response type', async () => {
     const mockBlob = new Blob(['data']);
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockBlob });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: mockBlob, headers: {} });
 
     const result = await backupApi.exportBackup();
     expect(apiClient.post).toHaveBeenCalledWith('/backup/export', {}, {
@@ -53,11 +53,97 @@ describe('backupApi', () => {
       timeout: 120000,
       headers: {},
     });
-    expect(result).toBe(mockBlob);
+    expect(result.blob).toBe(mockBlob);
+    // No marker header means the server considered the artifact complete; an old
+    // server or a header-stripping proxy must not read as a false alarm.
+    expect(result.complete).toBe(true);
+  });
+
+  it('exportBackup reports an incomplete artifact from the response headers', async () => {
+    const mockBlob = new Blob(['data']);
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: mockBlob,
+      headers: {
+        'x-backup-complete': 'false',
+        'x-backup-attachments-missing': '2',
+        'x-backup-attachments-included': '3',
+        'x-backup-attachments-expected': '5',
+      },
+    });
+
+    const result = await backupApi.exportBackup();
+
+    expect(result.complete).toBe(false);
+    expect(result.missingAttachments).toBe(2);
+    // The backend also reports how many attachments it did write; the frontend
+    // reads it rather than leaving the header on the floor.
+    expect(result.includedAttachments).toBe(3);
+    expect(result.expectedAttachments).toBe(5);
+  });
+
+  it('exportBackup treats a malformed attachment-count header as zero, not NaN', async () => {
+    // A proxy that duplicates a header hands axios a joined value like "2, 2",
+    // and Number() of that is NaN. Without a finite check that NaN flows into
+    // the incomplete-export toast as "NaN of NaN attachment(s)" -- the one
+    // message that has to be trusted when someone reaches for a backup.
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: new Blob(['data']),
+      headers: {
+        'x-backup-complete': 'false',
+        'x-backup-attachments-missing': '2, 2',
+        'x-backup-attachments-included': 'not-a-number',
+        'x-backup-attachments-expected': '',
+      },
+    });
+
+    const result = await backupApi.exportBackup();
+
+    expect(result.complete).toBe(false);
+    expect(result.missingAttachments).toBe(0);
+    expect(result.includedAttachments).toBe(0);
+    expect(result.expectedAttachments).toBe(0);
+  });
+
+  it('exportBackup reads the inconsistent-attachment header, not just the missing one', async () => {
+    // The HTTP contract itself: a component spec mocks the already-parsed result,
+    // so it cannot catch this header being ignored. An artifact whose only
+    // attachment failed its integrity check has missing=0 -- reading only that
+    // header reported "0 of 1", a false number pointing at the wrong cause.
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: new Blob(['data']),
+      headers: {
+        'x-backup-complete': 'false',
+        'x-backup-attachments-missing': '0',
+        'x-backup-attachments-inconsistent': '1',
+        'x-backup-attachments-expected': '1',
+      },
+    });
+
+    const result = await backupApi.exportBackup();
+
+    expect(result.complete).toBe(false);
+    expect(result.missingAttachments).toBe(0);
+    expect(result.inconsistentAttachments).toBe(1);
+    expect(result.expectedAttachments).toBe(1);
+  });
+
+  it('exportBackup defaults every count to zero when the server sends no markers', async () => {
+    // An older server or a header-stripping proxy must read as complete, not as
+    // a false alarm on every download.
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: new Blob(['data']),
+      headers: {},
+    });
+
+    const result = await backupApi.exportBackup();
+
+    expect(result.complete).toBe(true);
+    expect(result.missingAttachments).toBe(0);
+    expect(result.inconsistentAttachments).toBe(0);
   });
 
   it('exportBackup forwards encryption password as a base64-encoded header', async () => {
-    vi.mocked(apiClient.post).mockResolvedValue({ data: new Blob() });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: new Blob(), headers: {} });
     await backupApi.exportBackup('my-pw');
     expect(apiClient.post).toHaveBeenCalledWith('/backup/export', {}, {
       responseType: 'blob',
@@ -67,7 +153,7 @@ describe('backupApi', () => {
   });
 
   it('exportBackup preserves a leading space in the password header', async () => {
-    vi.mocked(apiClient.post).mockResolvedValue({ data: new Blob() });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: new Blob(), headers: {} });
     await backupApi.exportBackup(' leading-space');
     const config = vi.mocked(apiClient.post).mock.calls[0]?.[2] as
       | { headers?: Record<string, string> }

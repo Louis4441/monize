@@ -10,7 +10,11 @@ import { Select } from '@/components/ui/Select';
 import { backupApi } from '@/lib/backupApi';
 import { getErrorMessage } from '@/lib/errors';
 import { resolveTimezone, isoToDatetimeLocal, formatDatetimeLocal } from '@/lib/utils';
-import { AutoBackupSettings, UpdateAutoBackupSettingsData } from '@/types/auth';
+import {
+  AutoBackupCapability,
+  AutoBackupSettings,
+  UpdateAutoBackupSettingsData,
+} from '@/types/auth';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 
@@ -26,14 +30,16 @@ function formatDateTime(
   timezone: string,
   dateFormat: string,
   timeFormat: '24h' | '12h',
+  neverLabel: string,
 ): string {
-  if (!dateStr) return 'Never';
+  if (!dateStr) return neverLabel;
   const datetimeLocal = isoToDatetimeLocal(dateStr, timezone);
   return formatDatetimeLocal(datetimeLocal, dateFormat, timeFormat);
 }
 
 export function AutoBackupSection() {
   const t = useTranslations('settings.autoBackup');
+  const tCommon = useTranslations('common');
   const preferences = usePreferencesStore((s) => s.preferences);
   const userTimezone = resolveTimezone(preferences?.timezone);
   const dateFormat = preferences?.dateFormat || 'browser';
@@ -60,6 +66,39 @@ export function AutoBackupSection() {
   const [isBrowseOpen, setIsBrowseOpen] = useState(false);
   const [browsePath, setBrowsePath] = useState('/');
   const [browseEntries, setBrowseEntries] = useState<string[]>([]);
+  const [capability, setCapability] = useState<AutoBackupCapability | null>(
+    null,
+  );
+  const [isCapabilityLoading, setIsCapabilityLoading] = useState(true);
+  const storageUnavailable = capability?.available === false;
+  const capabilityBlocksArming = isCapabilityLoading || storageUnavailable;
+  // Use the persisted state, not the mutable toggle. A schedule that was already
+  // armed stays switchable off even when storage is unavailable; a schedule that
+  // was persisted disabled must not be armed while capability is unknown or
+  // unavailable.
+  const scheduleWasEnabled = settings?.enabled === true;
+  const cannotArm = capabilityBlocksArming && !scheduleWasEnabled;
+  const saveWouldArm = enabled && !scheduleWasEnabled;
+  const saveBlockedByCapability = saveWouldArm && capabilityBlocksArming;
+
+  // Deployment capability is a separate concern from the settings row: it is
+  // re-probed on mount and after the two actions that can change the answer
+  // (validating a folder, saving the folder), never on a manual run, which
+  // cannot change where the server can write.
+  const loadCapability = useCallback(async () => {
+    try {
+      const value = await backupApi.getAutoBackupCapability();
+      setCapability(value);
+    } catch {
+      // Fail open: a capability probe we could not read is not a refusal. The
+      // server still creates and probes the directory on save, so it stays the
+      // authoritative guard; blocking here on a transient error or a backend
+      // that predates this endpoint would strand the controls with no way back.
+      setCapability(null);
+    } finally {
+      setIsCapabilityLoading(false);
+    }
+  }, []);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -83,6 +122,10 @@ export function AutoBackupSection() {
     loadSettings();
   }, [loadSettings]);
 
+  useEffect(() => {
+    loadCapability();
+  }, [loadCapability]);
+
   const handleValidateFolder = async () => {
     if (!folderPath.trim()) {
       setFolderValid(false);
@@ -98,6 +141,10 @@ export function AutoBackupSection() {
       setFolderError(result.error ?? null);
       if (result.valid) {
         toast.success(t('toasts.folderValid'));
+        // A folder that now validates may have flipped the deployment from
+        // "no storage" to writable; re-probe so the banner and the arming
+        // controls reflect it without waiting for a save.
+        await loadCapability();
       } else {
         toast.error(result.error ?? t('folderErrors.validationFailed'));
       }
@@ -126,6 +173,9 @@ export function AutoBackupSection() {
       setSettings(updated);
       setIsDirty(false);
       toast.success(t('toasts.saved'));
+      // The saved folder is what the server now probes, so re-read capability
+      // against it rather than leaving a stale mount-time answer on screen.
+      await loadCapability();
     } catch (error) {
       toast.error(getErrorMessage(error, t('toasts.saveFailed')));
     } finally {
@@ -215,11 +265,24 @@ export function AutoBackupSection() {
         {t('adminManagedNote')}
       </p>
 
+      {storageUnavailable && (
+        <div
+          className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+          role="status"
+        >
+          <p className="font-medium">{t('noStorage.title')}</p>
+          <p className="mt-1">
+            {t('noStorage.body', { folderPath: capability?.folderPath ?? '' })}
+          </p>
+        </div>
+      )}
+
       {/* Enable toggle */}
       <div className="mb-6">
         <label className="flex items-center gap-3 cursor-pointer">
           <ToggleSwitch
             checked={enabled}
+            disabled={cannotArm}
             onChange={(v) => {
               setEnabled(v);
               markDirty();
@@ -287,7 +350,7 @@ export function AutoBackupSection() {
                 variant="outline"
                 onClick={handleCloseBrowse}
               >
-                Cancel
+                {tCommon('cancel')}
               </Button>
             </div>
             <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-800">
@@ -450,10 +513,21 @@ export function AutoBackupSection() {
               <div className="flex justify-between">
                 <dt className="text-gray-600 dark:text-gray-400">{t('status.lastBackup')}</dt>
                 <dd className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                  {formatDateTime(settings.lastBackupAt, userTimezone, dateFormat, timeFormat)}
+                  {formatDateTime(
+                    settings.lastBackupAt,
+                    userTimezone,
+                    dateFormat,
+                    timeFormat,
+                    t('never'),
+                  )}
                   {settings.lastBackupStatus === 'success' && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                       {t('status.success')}
+                    </span>
+                  )}
+                  {settings.lastBackupStatus === 'partial' && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                      {t('status.partial')}
                     </span>
                   )}
                   {settings.lastBackupStatus === 'failed' && (
@@ -464,19 +538,29 @@ export function AutoBackupSection() {
                 </dd>
               </div>
             )}
-            {settings.lastBackupStatus === 'failed' && settings.lastBackupError && (
-              <div className="flex justify-between">
-                <dt className="text-gray-600 dark:text-gray-400">{t('status.error')}</dt>
-                <dd className="text-red-600 dark:text-red-400 text-right max-w-xs truncate">
-                  {settings.lastBackupError}
-                </dd>
-              </div>
-            )}
+            {(settings.lastBackupStatus === 'failed' ||
+              settings.lastBackupStatus === 'partial') &&
+              settings.lastBackupError && (
+                <div className="flex justify-between">
+                  <dt className="text-gray-600 dark:text-gray-400">
+                    {t('status.error')}
+                  </dt>
+                  <dd className="text-red-600 dark:text-red-400 text-right max-w-xs truncate">
+                    {settings.lastBackupError}
+                  </dd>
+                </div>
+              )}
             {settings.nextBackupAt && (
               <div className="flex justify-between">
                 <dt className="text-gray-600 dark:text-gray-400">{t('status.nextBackup')}</dt>
                 <dd className="font-medium text-gray-900 dark:text-white">
-                  {formatDateTime(settings.nextBackupAt, userTimezone, dateFormat, timeFormat)}
+                  {formatDateTime(
+                    settings.nextBackupAt,
+                    userTimezone,
+                    dateFormat,
+                    timeFormat,
+                    t('never'),
+                  )}
                 </dd>
               </div>
             )}
@@ -488,7 +572,7 @@ export function AutoBackupSection() {
       <div className="flex gap-2">
         <Button
           onClick={handleSave}
-          disabled={isSaving || !isDirty}
+          disabled={isSaving || !isDirty || saveBlockedByCapability}
         >
           {isSaving ? t('savingButton') : t('saveButton')}
         </Button>
@@ -496,7 +580,9 @@ export function AutoBackupSection() {
           <Button
             variant="outline"
             onClick={handleRunNow}
-            disabled={isRunning}
+            // Nowhere to write means a run can only produce a failure the banner
+            // has already explained.
+            disabled={isRunning || capabilityBlocksArming}
           >
             {isRunning ? t('runningButton') : t('runNowButton')}
           </Button>

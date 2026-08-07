@@ -5,6 +5,7 @@ import { AutoBackupSection } from './AutoBackupSection';
 vi.mock('@/lib/backupApi', () => ({
   backupApi: {
     getAutoBackupSettings: vi.fn(),
+    getAutoBackupCapability: vi.fn(),
     updateAutoBackupSettings: vi.fn(),
     validateFolder: vi.fn(),
     browseFolders: vi.fn(),
@@ -56,6 +57,12 @@ async function renderAutoBackupSection() {
 describe('AutoBackupSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (
+      backupApi.getAutoBackupCapability as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      available: true,
+      folderPath: '/data/backups',
+    });
     (backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>).mockResolvedValue(
       defaultSettings,
     );
@@ -532,6 +539,235 @@ describe('AutoBackupSection', () => {
       expect(
         screen.getByText(/Only administrators can change these settings/),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Saving an enabled schedule already fails when the deployment cannot write --
+   * the server creates the directory and probes it. But that happens only after
+   * the user has chosen a frequency, a time and a retention policy and pressed
+   * save, and the answer never depended on any of those. The capability endpoint
+   * exists so the section can say so first; the server refusal stays the
+   * authoritative guard.
+   */
+  describe('when the deployment has no backup storage', () => {
+    beforeEach(() => {
+      (
+        backupApi.getAutoBackupCapability as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        available: false,
+        folderPath: '/data/backups',
+        reason: 'EROFS: read-only file system',
+      });
+    });
+
+    it('says so, and names the folder', async () => {
+      await renderAutoBackupSection();
+
+      // Scoped to the banner: the section's own intro copy also mentions
+      // /data/backups, so an unscoped query matches both and proves nothing
+      // about the banner.
+      const banner = await screen.findByRole('status');
+      expect(banner).toHaveTextContent(/no backup storage/i);
+      expect(banner).toHaveTextContent('/data/backups');
+    });
+
+    it('disables the enable toggle rather than letting the save fail', async () => {
+      await renderAutoBackupSection();
+      await screen.findByRole('status');
+
+      const toggle = screen.getByRole('switch');
+      expect(toggle).toBeDisabled();
+    });
+
+    /**
+     * The first version of the banner disabled the toggle unconditionally, which
+     * is wrong in the case that matters most: storage that *used* to work. A
+     * volume unmounted or turned read-only leaves a schedule armed and failing,
+     * and the user arrives at this screen wanting to switch it off. Disabling
+     * the control in both directions leaves them looking at a setting they can
+     * see is broken and cannot change (F3RRR-005).
+     */
+    it('still lets the user switch an already-armed schedule off', async () => {
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: true,
+        folderPath: '/data/backups',
+      });
+      (
+        backupApi.updateAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ ...defaultSettings, enabled: false });
+
+      await renderAutoBackupSection();
+      await screen.findByRole('status');
+
+      const toggle = screen.getByRole('switch');
+      expect(toggle).not.toBeDisabled();
+
+      await act(async () => {
+        fireEvent.click(toggle);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Settings'));
+      });
+
+      // Off has to reach the server, not merely the local state -- the schedule
+      // runs from the stored row.
+      expect(backupApi.updateAutoBackupSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ enabled: false }),
+      );
+    });
+
+    it('does not offer a backup run that has nowhere to write', async () => {
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: true,
+        folderPath: '/data/backups',
+      });
+
+      await renderAutoBackupSection();
+      await screen.findByRole('status');
+
+      expect(
+        screen.getByRole('button', { name: 'Run Backup Now' }),
+      ).toBeDisabled();
+    });
+  });
+
+  describe('when the capability cannot be read', () => {
+    it('fails open: a capability read that errors does not lock the controls', async () => {
+      // A capability probe we could not read is not a refusal (maintainer
+      // finding). Blocking here on a transient error, or on a backend that
+      // predates the endpoint (rolling deploy), would strand the toggle and Run
+      // Now with no way back; the server still creates and probes the folder on
+      // save, so it stays the authoritative guard.
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: false,
+        folderPath: '/data/backups',
+      });
+      (
+        backupApi.getAutoBackupCapability as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(new Error('network'));
+
+      await renderAutoBackupSection();
+      await act(async () => {}); // flush the capability rejection handler
+
+      await waitFor(() => {
+        expect(screen.getByRole('switch')).not.toBeDisabled();
+      });
+      expect(
+        screen.getByText('Run Backup Now').closest('button'),
+      ).not.toBeDisabled();
+      // A failed read is not a definitive "unavailable", so no banner either.
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('still lets an already-enabled schedule be switched off when storage is unavailable', async () => {
+      // The other direction: a user whose backups have started failing must be
+      // able to turn them off. A persisted-enabled schedule stays interactive
+      // even when the capability is unavailable (uses the persisted state, not
+      // the mutable toggle).
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: true,
+        folderPath: '/data/backups',
+      });
+      (
+        backupApi.getAutoBackupCapability as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        available: false,
+        folderPath: '/data/backups',
+        reason: 'not writable',
+      });
+
+      await renderAutoBackupSection();
+
+      await waitFor(() => {
+        expect(screen.getByRole('switch')).not.toBeDisabled();
+      });
+    });
+  });
+
+  describe('re-reads capability after actions that can change it', () => {
+    it('re-checks after a folder validates, clearing a stale no-storage banner', async () => {
+      // Capability is read once at mount; without a re-check, pointing at a
+      // writable alternate folder and validating it leaves the toggle disabled
+      // until a full save (maintainer finding). A successful validate re-probes.
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: false,
+        folderPath: '/data/backups',
+      });
+      (backupApi.getAutoBackupCapability as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ available: false, folderPath: '/data/backups' })
+        .mockResolvedValueOnce({ available: true, folderPath: '/data/backups' });
+      (backupApi.validateFolder as ReturnType<typeof vi.fn>).mockResolvedValue({
+        valid: true,
+      });
+
+      await renderAutoBackupSection();
+      await screen.findByRole('status');
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Backup Folder'), {
+          target: { value: '/data/backups' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Validate'));
+      });
+
+      await waitFor(() => {
+        expect(backupApi.getAutoBackupCapability).toHaveBeenCalledTimes(2);
+      });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.getByRole('switch')).not.toBeDisabled();
+    });
+
+    it('re-checks after settings are saved', async () => {
+      // The saved folder is what the server now probes, so capability is re-read
+      // against it rather than leaving the mount-time answer on screen.
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: false,
+        folderPath: '/data/backups',
+      });
+      (backupApi.getAutoBackupCapability as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ available: false, folderPath: '/data/backups' })
+        .mockResolvedValueOnce({ available: true, folderPath: '/new' });
+      (
+        backupApi.updateAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ ...defaultSettings, folderPath: '/new' });
+
+      await renderAutoBackupSection();
+      await screen.findByRole('status');
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Backup Folder'), {
+          target: { value: '/new' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Settings'));
+      });
+
+      await waitFor(() => {
+        expect(backupApi.getAutoBackupCapability).toHaveBeenCalledTimes(2);
+      });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 });

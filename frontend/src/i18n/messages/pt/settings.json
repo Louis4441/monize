@@ -473,7 +473,8 @@
       "nextBackup": "Próxima cópia de segurança",
       "error": "Erro",
       "success": "Sucesso",
-      "failed": "Falhou"
+      "failed": "Falhou",
+      "partial": "Parcial"
     },
     "saveButton": "Guardar Definições",
     "savingButton": "A guardar...",
@@ -498,7 +499,12 @@
       "every12hours": "A cada 12 horas",
       "daily": "Diariamente",
       "weekly": "Semanalmente"
-    }
+    },
+    "noStorage": {
+      "title": "Esta instalação não tem armazenamento para backups",
+      "body": "As cópias automáticas seriam escritas em {folderPath}, onde esta instalação não consegue escrever. Um administrador tem de montar armazenamento nesse local antes de um agendamento poder ser executado."
+    },
+    "never": "Nunca"
   },
   "backupRestore": {
     "heading": "Cópia de Segurança e Restauro",
@@ -539,6 +545,7 @@
       },
       "toasts": {
         "success": "Cópia de segurança transferida com sucesso",
+        "incomplete": "Backup descarregado, mas está INCOMPLETO: {unusable} de {total} anexo(s) não puderam ser guardados intactos ({missing} em falta, {inconsistent} falharam a verificação de integridade). Não trate este ficheiro como um backup completo — corrija o armazenamento de anexos e exporte novamente.",
         "failed": "Falha ao criar a cópia de segurança"
       }
     },
@@ -568,7 +575,8 @@
       "title": "Restauro Concluído",
       "description": "Os seus dados foram restaurados com sucesso. Aqui está um resumo do que foi restaurado:",
       "totalRecords": "Total de registos",
-      "doneButton": "Concluído"
+      "doneButton": "Concluído",
+      "skippedAttachments": "{count, plural, one {# anexo não foi restaurado} other {# anexos não foram restaurados}}: o backup não continha bytes utilizáveis para eles — faltavam ou falharam a soma de verificação na exportação, ou o ficheiro é anterior aos backups autossuficientes. Exporte um backup novo quando o armazenamento de anexos estiver saudável."
     }
   },
   "sharedAccess": {

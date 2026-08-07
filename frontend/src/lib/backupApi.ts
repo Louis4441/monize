@@ -1,7 +1,11 @@
 import apiClient from './api';
 import { clearAllCache } from './apiCache';
 import { filenameFromContentDisposition } from './download';
-import { AutoBackupSettings, UpdateAutoBackupSettingsData } from '@/types/auth';
+import {
+  AutoBackupCapability,
+  AutoBackupSettings,
+  UpdateAutoBackupSettingsData,
+} from '@/types/auth';
 
 // HTTP header values have their leading and trailing whitespace stripped in
 // transit (RFC 7230 "optional whitespace"), which silently corrupts passwords
@@ -21,6 +25,15 @@ function encodePasswordHeader(value: string): string {
 export interface RestoreResult {
   message: string;
   restored: Record<string, number>;
+  /**
+   * Attachments whose metadata was deliberately not restored because their
+   * bytes could not be made reachable (absent from the sidecar volume/bucket,
+   * failing their recorded checksum, or exported from an instance using a
+   * different storage provider). Deliberately outside `restored`, whose values
+   * are summed into a row total -- rows that were not written must not be
+   * counted as written. Absent when nothing was skipped.
+   */
+  skippedAttachments?: number;
 }
 
 export type SupportBackupSection =
@@ -163,7 +176,30 @@ async function compressGzip(data: ArrayBuffer): Promise<Blob> {
 }
 
 export const backupApi = {
-  exportBackup: async (encryptionPassword?: string): Promise<Blob> => {
+  /**
+   * The artifact, plus whether the server could actually include every
+   * attachment it names. The completeness answer travels in headers rather than
+   * the body, because the body is a gzip/encrypted stream (see the backend's
+   * `markIncompleteExport`). A caller that ignores `complete` shows a plain
+   * success for a download the server knows cannot restore every attachment --
+   * the defect this return shape exists to make hard.
+   */
+  exportBackup: async (
+    encryptionPassword?: string,
+  ): Promise<{
+    blob: Blob;
+    complete: boolean;
+    expectedAttachments: number;
+    /** Attachments the server actually wrote into the artifact. */
+    includedAttachments: number;
+    /** Rows whose bytes are absent from the artifact entirely. */
+    missingAttachments: number;
+    /**
+     * Rows whose bytes are present but contradict their own metadata, so they
+     * cannot be trusted either -- a different diagnosis from absent bytes.
+     */
+    inconsistentAttachments: number;
+  }> => {
     const headers: Record<string, string> = {};
     if (encryptionPassword) {
       headers['X-Export-Password'] = encodePasswordHeader(encryptionPassword);
@@ -173,7 +209,25 @@ export const backupApi = {
       timeout: 120000,
       headers,
     });
-    return response.data;
+    // Axios lowercases response header names, so index them lowercase (matching
+    // the `content-disposition` read in supportExport below). A malformed or
+    // duplicated numeric header parses to NaN; treat that as zero rather than
+    // letting a "NaN of NaN attachment(s)" reach the incomplete-export toast.
+    const count = (name: string): number => {
+      const parsed = Number(response.headers?.[name]);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    return {
+      blob: response.data,
+      // Absent marker means complete: only an incomplete export sets the header,
+      // so an old server or a header-stripping proxy reads as complete rather
+      // than as a false alarm on every download.
+      complete: String(response.headers?.['x-backup-complete']) !== 'false',
+      expectedAttachments: count('x-backup-attachments-expected'),
+      includedAttachments: count('x-backup-attachments-included'),
+      missingAttachments: count('x-backup-attachments-missing'),
+      inconsistentAttachments: count('x-backup-attachments-inconsistent'),
+    };
   },
 
   supportExport: async (input: SupportBackupInput): Promise<SupportBackupFile> => {
@@ -266,6 +320,20 @@ export const backupApi = {
 
   getAutoBackupSettings: async (): Promise<AutoBackupSettings> => {
     const response = await apiClient.get<AutoBackupSettings>('/backup/auto-backup-settings');
+    return response.data;
+  },
+
+  /**
+   * Whether this deployment can write an automatic backup at all. Saving an
+   * enabled schedule already fails when it cannot -- the server creates the
+   * directory and probes it -- but only after the user has chosen a frequency,
+   * a time and a retention policy and pressed save, and the answer never
+   * depended on any of that. This lets the section say so first.
+   */
+  getAutoBackupCapability: async (): Promise<AutoBackupCapability> => {
+    const response = await apiClient.get<AutoBackupCapability>(
+      '/backup/auto-backup-capability',
+    );
     return response.data;
   },
 
