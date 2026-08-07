@@ -1097,10 +1097,21 @@ describe("HoldingsService", () => {
   });
 
   describe("remove", () => {
+    /**
+     * `remove` re-reads the holding inside its transaction, under the lock every
+     * holdings writer takes, and checks the zero-quantity rule against *that*
+     * row. Checked outside, a buy committing in between would have its shares
+     * deleted by a request that had seen zero (P4-006).
+     */
+    function stageHolding(holding: unknown): void {
+      const qb = createMockQueryBuilder(holding);
+      holdingsRepository.createQueryBuilder.mockReturnValue(qb);
+      holdingsRepository.findOne.mockResolvedValue(holding);
+    }
+
     it("removes holding with zero quantity", async () => {
       const zeroHolding = { ...mockHolding, quantity: 0 };
-      const qb = createMockQueryBuilder(zeroHolding);
-      holdingsRepository.createQueryBuilder.mockReturnValue(qb);
+      stageHolding(zeroHolding);
 
       await service.remove("11111111-1111-1111-1111-111111111111", "hold-1");
 
@@ -1108,9 +1119,7 @@ describe("HoldingsService", () => {
     });
 
     it("throws ForbiddenException when holding has non-zero quantity", async () => {
-      const nonZeroHolding = { ...mockHolding, quantity: 50 };
-      const qb = createMockQueryBuilder(nonZeroHolding);
-      holdingsRepository.createQueryBuilder.mockReturnValue(qb);
+      stageHolding({ ...mockHolding, quantity: 50 });
 
       await expect(
         service.remove("11111111-1111-1111-1111-111111111111", "hold-1"),
@@ -1118,9 +1127,7 @@ describe("HoldingsService", () => {
     });
 
     it("throws ForbiddenException with descriptive message for non-zero quantity", async () => {
-      const nonZeroHolding = { ...mockHolding, quantity: 10 };
-      const qb = createMockQueryBuilder(nonZeroHolding);
-      holdingsRepository.createQueryBuilder.mockReturnValue(qb);
+      stageHolding({ ...mockHolding, quantity: 10 });
 
       await expect(
         service.remove("11111111-1111-1111-1111-111111111111", "hold-1"),
@@ -1128,23 +1135,53 @@ describe("HoldingsService", () => {
     });
 
     it("throws NotFoundException when holding does not exist", async () => {
-      const qb = createMockQueryBuilder(null);
-      holdingsRepository.createQueryBuilder.mockReturnValue(qb);
+      stageHolding(null);
 
       await expect(
         service.remove("11111111-1111-1111-1111-111111111111", "nonexistent"),
       ).rejects.toThrow(NotFoundException);
     });
 
+    it("refuses when the committed row gained shares after the outer read", async () => {
+      // The regression guard: the outer read says zero, the locked re-read says
+      // 50. Before the re-read existed, the outer snapshot won and the shares
+      // were deleted.
+      const qb = createMockQueryBuilder({ ...mockHolding, quantity: 0 });
+      holdingsRepository.createQueryBuilder.mockReturnValue(qb);
+      holdingsRepository.findOne.mockResolvedValue({
+        ...mockHolding,
+        quantity: 50,
+      });
+
+      await expect(
+        service.remove("11111111-1111-1111-1111-111111111111", "hold-1"),
+      ).rejects.toThrow(ForbiddenException);
+      expect(holdingsRepository.remove).not.toHaveBeenCalled();
+    });
+
     it("handles string quantity '0' correctly (decimal from DB)", async () => {
       // Decimals from the database often come as strings
       const zeroHolding = { ...mockHolding, quantity: "0.00000000" };
-      const qb = createMockQueryBuilder(zeroHolding);
-      holdingsRepository.createQueryBuilder.mockReturnValue(qb);
+      stageHolding(zeroHolding);
 
       await service.remove("11111111-1111-1111-1111-111111111111", "hold-1");
 
       expect(holdingsRepository.remove).toHaveBeenCalledWith(zeroHolding);
+    });
+
+    it("re-reads the holding scoped to the owner-verified account, not a bare id", async () => {
+      // Holdings carry no user_id column; ownership is the account's. The outer
+      // findOne(userId, id) established the owner via the account join, so the
+      // locked re-read has to stay inside that account scope. A bare
+      // `where: { id }` dropped the owner scope even though the lock is on the
+      // same account -- this asserts the scope is carried through.
+      stageHolding({ ...mockHolding, accountId: "acc-1", quantity: 0 });
+
+      await service.remove("11111111-1111-1111-1111-111111111111", "hold-1");
+
+      expect(holdingsRepository.findOne).toHaveBeenCalledWith({
+        where: { id: "hold-1", accountId: "acc-1" },
+      });
     });
   });
 

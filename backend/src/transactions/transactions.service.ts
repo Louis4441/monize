@@ -68,6 +68,7 @@ import {
   bulkSkipReason,
 } from "../common/bulk-create.types";
 import { withScopedDb } from "../common/db/scoped-db";
+import { lockTransactionRow, lockTransactionRows } from "../common/db/locks";
 import {
   normalizeFxEntry,
   type FxEntry,
@@ -376,6 +377,7 @@ export class TransactionsService {
         if (savedTransaction.status !== TransactionStatus.VOID) {
           if (isTransactionInFuture(createTransactionDto.transactionDate)) {
             await this.accountsService.recalculateCurrentBalance(
+              userId,
               createTransactionDto.accountId,
             );
           } else {
@@ -1965,11 +1967,7 @@ export class TransactionsService {
   ): Promise<Transaction> {
     const transaction = await this.findOne(userId, id);
     const beforeSnapshot = this.snapshotTransaction(transaction);
-    const oldAmount = Number(transaction.amount);
     const oldAccountId = transaction.accountId;
-    const oldTransactionDate = transaction.transactionDate;
-    const oldStatus = transaction.status;
-    const wasVoid = oldStatus === TransactionStatus.VOID;
 
     const { splits, tagIds, createdAt, ...updateData } = updateTransactionDto;
 
@@ -2017,24 +2015,64 @@ export class TransactionsService {
     // One transaction: split rebuild, field update, tags, and balance
     // adjustments commit or roll back together. Nested service calls join it.
     await withScopedDb(this.dataSource, async (m) => {
+      // The values a balance delta reverses are read HERE, under a row lock,
+      // not from the snapshot `findOne` above returned.
+      //
+      // That snapshot is a claim that nothing changed in between, and two
+      // concurrent updates each held it: PostgreSQL serialized the row writes,
+      // but the second request never refreshed its "old amount" after waiting,
+      // so it reversed an amount the first had already replaced. Opening
+      // balance 100.00, one -10.00 row, A updates it to -20.00 and B to -30.00:
+      // the ledger ends at -30.00 while the stored balance says 60.00 instead
+      // of 70.00 (audit P4-003).
+      const locked = await lockTransactionRow(m, id, userId);
+      if (!locked) {
+        throw new NotFoundException(
+          tr(
+            "errors.transactions.notFoundById",
+            `Transaction with ID ${id} not found`,
+            { id },
+          ),
+        );
+      }
+      const oldAmount = locked.amount;
+      const oldLockedAccountId = locked.accountId;
+      const oldTransactionDate = locked.transactionDate;
+      const wasVoid = locked.status === TransactionStatus.VOID;
+
       if (splits !== undefined) {
         if (Array.isArray(splits) && splits.length > 0) {
+          // Re-validate against the amount the locked row holds. The check above
+          // ran on the pre-transaction snapshot, which is an early rejection and
+          // not an authoritative one: a request that only replaces the splits
+          // takes its parent amount from that snapshot, so a concurrent amount
+          // edit that committed while this one waited for the row lock would let
+          // a split set through that does not sum to the parent it is attached
+          // to (audit FV4-002).
+          this.splitService.validateSplits(
+            splits,
+            updateData.amount ?? locked.amount,
+          );
+
           await this.splitService.deleteSplitSideEffects(id, userId);
           await m.delete(TransactionSplit, {
             transactionId: id,
           });
 
-          const accountId = updateData.accountId ?? transaction.accountId;
-          const txDate =
-            updateData.transactionDate ?? transaction.transactionDate;
+          // Fallbacks come off the locked row, never the caller's snapshot: the
+          // counterpart and embedded investment rows describe the parent's
+          // account, date and payee, so a stale fallback writes rows describing a
+          // parent that has already moved.
+          const accountId = updateData.accountId ?? locked.accountId;
+          const txDate = updateData.transactionDate ?? locked.transactionDate;
           const savedSplits = await this.splitService.createSplits(
             id,
             splits,
             userId,
             accountId,
             new Date(txDate),
-            updateData.payeeName ?? transaction.payeeName,
-            updateData.payeeId ?? transaction.payeeId,
+            updateData.payeeName ?? locked.payeeName,
+            updateData.payeeId ?? locked.payeeId,
           );
 
           // Set split-level tags (and mirror them onto any transfer counterpart)
@@ -2161,21 +2199,41 @@ export class TransactionsService {
       const anyFuture = oldIsFuture || newIsFuture;
 
       if (anyFuture) {
-        const affectedAccounts = new Set([oldAccountId, newAccountId]);
+        // Deterministic order so two accounts locked by both this path and a
+        // transfer cannot be taken in opposite orders.
+        const affectedAccounts = [
+          ...new Set([oldLockedAccountId, newAccountId]),
+        ].sort();
         for (const accId of affectedAccounts) {
-          await this.accountsService.recalculateCurrentBalance(accId);
+          await this.accountsService.recalculateCurrentBalance(userId, accId);
         }
       } else if (wasVoid && !isVoid) {
         await this.accountsService.updateBalance(newAccountId, newAmount);
       } else if (!wasVoid && isVoid) {
-        await this.accountsService.updateBalance(oldAccountId, -oldAmount);
+        await this.accountsService.updateBalance(
+          oldLockedAccountId,
+          -oldAmount,
+        );
       } else if (!wasVoid && !isVoid) {
-        if (newAccountId !== oldAccountId) {
-          await this.accountsService.updateBalance(oldAccountId, -oldAmount);
+        if (newAccountId !== oldLockedAccountId) {
+          await this.accountsService.updateBalance(
+            oldLockedAccountId,
+            -oldAmount,
+          );
           await this.accountsService.updateBalance(newAccountId, newAmount);
         } else if (newAmount !== oldAmount) {
           const balanceChange = newAmount - oldAmount;
           await this.accountsService.updateBalance(newAccountId, balanceChange);
+        } else if (oldTransactionDate !== savedTransaction.transactionDate) {
+          // Same account, same amount, both dates in the past (anyFuture is
+          // handled above): current_balance is unchanged, so no balance write
+          // runs and nothing bumps accounts.updated_at. But moving the row
+          // between past months changes monthly_account_balances, and
+          // NetWorthService.sweepStaleSnapshots finds a stale snapshot only by
+          // accounts.updated_at outrunning its computed_at. Touch the account so
+          // that crash-recovery backstop still fires if the in-memory debounce
+          // is lost (audit DR-04-03).
+          await this.accountsService.touchAccount(userId, newAccountId);
         }
       }
     });
@@ -2212,39 +2270,80 @@ export class TransactionsService {
   async remove(userId: string, id: string): Promise<void> {
     const transaction = await this.findOne(userId, id);
     const beforeSnapshot = this.snapshotTransaction(transaction);
-    const accountId = transaction.accountId;
+    // The account the debounced net-worth recalc must fire on. Seeded from the
+    // pre-lock snapshot, then replaced by the locked row's account below: a
+    // concurrent edit could have moved the row, and the balance reversal already
+    // uses locked.accountId, so the debounce has to as well or it recomputes the
+    // wrong account's snapshots (or none).
+    let affectedAccountId = transaction.accountId;
 
     // One transaction: split side effects, linked/parent cleanup, the delete
     // itself, and the balance adjustment commit or roll back together.
     await withScopedDb(this.dataSource, async (m) => {
-      if (transaction.isSplit) {
-        await this.splitService.deleteSplitSideEffects(id, userId);
-      }
-
+      // Parent-before-leg (audit RV4-005). If this row is a leg of a split
+      // parent, lock the parent *before* the leg -- the same order
+      // TransactionSplitService.removeSplit takes, which cannot know a leg id
+      // before reading the split and so necessarily locks parent then leg. Two
+      // delete paths taking the same rows in opposite orders is a reachable
+      // deadlock; ordering by role (parent first) removes it. The lookup is an
+      // unlocked read, and lockTransactionRow is re-entrant within the
+      // transaction, so removeParentTransaction re-locking the parent below is a
+      // no-op that inherits this order.
       const parentSplit = await m.findOne(TransactionSplit, {
         where: { linkedTransactionId: id },
       });
+      if (parentSplit) {
+        await lockTransactionRow(m, parentSplit.transactionId, userId);
+      }
+
+      // Lock the row and re-read the amount to reverse. `m.remove(entity)`
+      // deletes by primary key and reports nothing when it hits no row, so two
+      // concurrent deletes each reversed the same amount and only one row went
+      // away: opening 100.00, one -10.00 row removed twice, stored balance
+      // 110.00 against an authoritative 100.00 (audit P4-003).
+      const locked = await lockTransactionRow(m, id, userId);
+      if (!locked) {
+        throw new NotFoundException(
+          tr(
+            "errors.transactions.notFoundById",
+            `Transaction with ID ${id} not found`,
+            { id },
+          ),
+        );
+      }
+      affectedAccountId = locked.accountId;
+
+      if (locked.isSplit) {
+        await this.splitService.deleteSplitSideEffects(id, userId);
+      }
 
       if (parentSplit) {
         await this.removeParentTransaction(m, parentSplit, id, userId);
       }
 
-      if (transaction.status !== TransactionStatus.VOID) {
-        if (isTransactionInFuture(transaction.transactionDate)) {
-          await m.remove(transaction);
-          await this.accountsService.recalculateCurrentBalance(accountId);
+      const deleted = await m.delete(Transaction, { id, userId });
+      if ((deleted.affected ?? 0) === 0) {
+        // The row was removed by the parent cleanup above (a split counterpart
+        // cascade). Reversing its amount again would double-count.
+        return;
+      }
+
+      if (locked.status !== TransactionStatus.VOID) {
+        if (isTransactionInFuture(locked.transactionDate)) {
+          await this.accountsService.recalculateCurrentBalance(
+            userId,
+            locked.accountId,
+          );
           return;
         }
         await this.accountsService.updateBalance(
-          accountId,
-          -Number(transaction.amount),
+          locked.accountId,
+          -locked.amount,
         );
       }
-
-      await m.remove(transaction);
     });
 
-    this.netWorthService.triggerDebouncedRecalc(accountId, userId);
+    this.netWorthService.triggerDebouncedRecalc(affectedAccountId, userId);
     this.recordTransactionAction(
       userId,
       { ...transaction, ...beforeSnapshot } as Transaction,
@@ -2260,9 +2359,12 @@ export class TransactionsService {
     userId: string,
   ): Promise<void> {
     const parentTransactionId = parentSplit.transactionId;
-    const parentTransaction = await m.findOne(Transaction, {
-      where: { id: parentTransactionId, userId },
-    });
+    // Locked, like every other read whose amount becomes a balance delta.
+    const parentTransaction = await lockTransactionRow(
+      m,
+      parentTransactionId,
+      userId,
+    );
 
     if (parentTransaction) {
       const allSplits = await m.find(TransactionSplit, {
@@ -2281,59 +2383,73 @@ export class TransactionsService {
       ];
 
       if (linkedIds.length > 0) {
-        const linkedTxs = await m.find(Transaction, {
-          where: { id: In(linkedIds), userId },
-        });
+        // Locked in ascending id order: these amounts become balance deltas,
+        // and an unlocked read can be stale by the time the delete lands.
+        const linkedTxs = await lockTransactionRows(m, linkedIds, userId);
 
-        for (const linkedTx of linkedTxs) {
+        for (const linkedTx of [...linkedTxs.values()]) {
           const linkedAccId = linkedTx.accountId;
           const linkedIsFuture = isTransactionInFuture(
             linkedTx.transactionDate,
           );
-          if (!linkedIsFuture) {
+          const removed = await m.delete(Transaction, {
+            id: linkedTx.id,
+            userId,
+          });
+          if ((removed.affected ?? 0) === 0) continue;
+          if (linkedIsFuture) {
+            await this.accountsService.recalculateCurrentBalance(
+              userId,
+              linkedAccId,
+            );
+          } else if (linkedTx.status !== TransactionStatus.VOID) {
             await this.accountsService.updateBalance(
               linkedAccId,
-              -Number(linkedTx.amount),
+              -linkedTx.amount,
             );
-          }
-          await m.remove(linkedTx);
-          if (linkedIsFuture) {
-            await this.accountsService.recalculateCurrentBalance(linkedAccId);
           }
         }
       }
 
       await m.remove(allSplits);
 
+      const parentRemoved = await m.delete(Transaction, {
+        id: parentTransaction.id,
+        userId,
+      });
+      if ((parentRemoved.affected ?? 0) === 0) return;
+
       if (parentTransaction.status !== TransactionStatus.VOID) {
         if (isTransactionInFuture(parentTransaction.transactionDate)) {
-          await m.remove(parentTransaction);
           await this.accountsService.recalculateCurrentBalance(
+            userId,
             parentTransaction.accountId,
           );
           return;
         }
         await this.accountsService.updateBalance(
           parentTransaction.accountId,
-          -Number(parentTransaction.amount),
+          -parentTransaction.amount,
         );
       }
-      await m.remove(parentTransaction);
     }
   }
 
   // Delegated methods
 
+  // These four pass the transaction *id*, not a loaded entity: the status a
+  // guard refuses on and the status a balance delta is derived from are the
+  // same value, and it has to be read under the write's own lock. See
+  // `applyStatusTransition`.
   async updateStatus(
     userId: string,
     id: string,
     status: TransactionStatus,
   ): Promise<Transaction> {
-    const transaction = await this.findOne(userId, id);
     return this.reconciliationService.updateStatus(
-      transaction,
-      status,
       userId,
+      id,
+      status,
       (accountId: string, userId: string) =>
         this.netWorthService.triggerDebouncedRecalc(accountId, userId),
       this.findOne.bind(this),
@@ -2345,11 +2461,10 @@ export class TransactionsService {
     id: string,
     isCleared: boolean,
   ): Promise<Transaction> {
-    const transaction = await this.findOne(userId, id);
     return this.reconciliationService.markCleared(
-      transaction,
-      isCleared,
       userId,
+      id,
+      isCleared,
       (accountId: string, userId: string) =>
         this.netWorthService.triggerDebouncedRecalc(accountId, userId),
       this.findOne.bind(this),
@@ -2357,10 +2472,9 @@ export class TransactionsService {
   }
 
   async reconcile(userId: string, id: string): Promise<Transaction> {
-    const transaction = await this.findOne(userId, id);
     return this.reconciliationService.reconcile(
-      transaction,
       userId,
+      id,
       (accountId: string, userId: string) =>
         this.netWorthService.triggerDebouncedRecalc(accountId, userId),
       this.findOne.bind(this),
@@ -2368,10 +2482,9 @@ export class TransactionsService {
   }
 
   async unreconcile(userId: string, id: string): Promise<Transaction> {
-    const transaction = await this.findOne(userId, id);
     return this.reconciliationService.unreconcile(
-      transaction,
       userId,
+      id,
       this.findOne.bind(this),
     );
   }
