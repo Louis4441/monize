@@ -3668,6 +3668,43 @@ describe('TransactionForm', () => {
       );
     });
 
+    it('does not re-derive the rate when the converted total is blurred untouched', async () => {
+      // The converted total is shown to the cent, so re-deriving a rate from it
+      // loses the digits the server sent: 54.61 / 40 is 1.365250, not 1.365234.
+      // Tabbing through the field is not an override, and treating it as one
+      // also pinned the rate against the date, so later dates never refetched.
+      mockGetRateForDate.mockResolvedValue(1.365234);
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+        />,
+      );
+      await waitFor(() => expect(mockAccountsGetAll).toHaveBeenCalled());
+      await pickEuro();
+      await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+      const amountInput = screen.getAllByPlaceholderText('0.00')[0];
+      await act(async () => {
+        fireEvent.change(amountInput, { target: { value: '40' } });
+        fireEvent.blur(amountInput);
+      });
+      await waitFor(() =>
+        expect(screen.getByText(/1 EUR = 1\.365234 CAD/)).toBeInTheDocument(),
+      );
+
+      const convertedTotal = screen.getAllByPlaceholderText('0.00')[1];
+      expect((convertedTotal as HTMLInputElement).value).toBe('54.61');
+      await act(async () => {
+        fireEvent.focus(convertedTotal);
+        fireEvent.blur(convertedTotal);
+      });
+
+      expect(screen.getByText(/1 EUR = 1\.365234 CAD/)).toBeInTheDocument();
+      expect(screen.queryByText(/1\.365250/)).not.toBeInTheDocument();
+    });
+
     it('folds the bank fee into the amount without creating a split', async () => {
       // acc-1 configured with a 2.5% foreign-transaction fee.
       const feeAccount = { ...mockAccounts[0], fxFeePercent: 2.5 };

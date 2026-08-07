@@ -868,6 +868,12 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   // round-trips, mark the rate overridden, and recompute.
   const handleConvertedTotalOverride = (total: number | undefined) => {
     if (total === undefined || !foreignAmount) return;
+    // A total equal to the one the fetched rate already produces is the field
+    // handing back what it was displaying, not an override. Deriving from it
+    // would replace the fetched 10dp rate with one reverse-engineered from a
+    // cents-rounded total and pin it against the date. Mirrors the same guard
+    // in PostTransactionDialog's `handleConvertedTotalChange`.
+    if (fxTotal !== undefined && total === fxTotal) return;
     const feePercent = selectedAccount?.fxFeePercent;
     let base = total;
     if (feePercent && feePercent > 0) {

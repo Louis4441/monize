@@ -38,8 +38,26 @@ describe("GemStrategyHeader", () => {
     daysUntilNextEvaluation: 28,
   };
 
-  it("shows the way back, title, cadence and days remaining", () => {
-    render(<GemStrategyHeader {...baseProps} onEditSettings={vi.fn()} />);
+  /**
+   * `ReportSwitcher` beside the title loads the user's saved reports on mount,
+   * so every render here has async work behind it -- even the tests that only
+   * assert on static copy. Rendering outside act leaves those state updates
+   * unwrapped.
+   */
+  const renderHeader = async (props: Record<string, unknown> = {}) => {
+    await act(async () => {
+      render(
+        <GemStrategyHeader
+          {...baseProps}
+          onEditSettings={vi.fn()}
+          {...props}
+        />,
+      );
+    });
+  };
+
+  it("shows the way back, title, cadence and days remaining", async () => {
+    await renderHeader();
 
     // The same back link the other report pages carry, above the title.
     expect(
@@ -65,14 +83,8 @@ describe("GemStrategyHeader", () => {
    * Minimal mutation: hardcode 12 in the `explainer` catalog string.
    * Test that fails under it: this one.
    */
-  it("explains the strategy with the window it is actually run on", () => {
-    render(
-      <GemStrategyHeader
-        {...baseProps}
-        lookbackMonths={6}
-        onEditSettings={vi.fn()}
-      />,
-    );
+  it("explains the strategy with the window it is actually run on", async () => {
+    await renderHeader({ lookbackMonths: 6 });
 
     // The tooltip's text is on the trigger, so it is readable without hover.
     const explainer = screen.getByLabelText(/Global Equities Momentum/);
@@ -84,26 +96,14 @@ describe("GemStrategyHeader", () => {
     );
   });
 
-  it("omits the day count when it is unknown", () => {
-    render(
-      <GemStrategyHeader
-        {...baseProps}
-        daysUntilNextEvaluation={null}
-        onEditSettings={vi.fn()}
-      />,
-    );
+  it("omits the day count when it is unknown", async () => {
+    await renderHeader({ daysUntilNextEvaluation: null });
     expect(screen.getByText(/Next evaluation:/)).toBeInTheDocument();
     expect(screen.queryByText(/in 28 days/)).not.toBeInTheDocument();
   });
 
-  it("says the evaluation is unscheduled without a date", () => {
-    render(
-      <GemStrategyHeader
-        {...baseProps}
-        nextEvaluationOn={null}
-        onEditSettings={vi.fn()}
-      />,
-    );
+  it("says the evaluation is unscheduled without a date", async () => {
+    await renderHeader({ nextEvaluationOn: null });
     expect(
       screen.getByText("Next evaluation not scheduled"),
     ).toBeInTheDocument();
@@ -123,9 +123,7 @@ describe("GemStrategyHeader", () => {
     ];
 
     it("switches reports from the caret beside the title", async () => {
-      await act(async () => {
-        render(<GemStrategyHeader {...baseProps} onEditSettings={vi.fn()} />);
-      });
+      await renderHeader();
       await act(async () => {
         fireEvent.click(
           screen.getByRole("button", { name: "Switch to another report" }),
@@ -140,9 +138,7 @@ describe("GemStrategyHeader", () => {
     });
 
     it("does not offer this report as a destination", async () => {
-      await act(async () => {
-        render(<GemStrategyHeader {...baseProps} onEditSettings={vi.fn()} />);
-      });
+      await renderHeader();
       await act(async () => {
         fireEvent.click(
           screen.getByRole("button", { name: "Switch to another report" }),
@@ -153,16 +149,7 @@ describe("GemStrategyHeader", () => {
 
     it("names the scenario control, so the second caret is not a mystery", async () => {
       const onSelectScenario = vi.fn();
-      await act(async () => {
-        render(
-          <GemStrategyHeader
-            {...baseProps}
-            scenarios={twoScenarios}
-            onSelectScenario={onSelectScenario}
-            onEditSettings={vi.fn()}
-          />,
-        );
-      });
+      await renderHeader({ scenarios: twoScenarios, onSelectScenario });
       const scenarioTrigger = screen.getByRole("button", {
         name: "Switch scenario",
       });
@@ -175,11 +162,9 @@ describe("GemStrategyHeader", () => {
     });
   });
 
-  it("reports the settings request", () => {
+  it("reports the settings request", async () => {
     const onEditSettings = vi.fn();
-    render(
-      <GemStrategyHeader {...baseProps} onEditSettings={onEditSettings} />,
-    );
+    await renderHeader({ onEditSettings });
     fireEvent.click(screen.getByRole("button", { name: /Edit settings/ }));
     expect(onEditSettings).toHaveBeenCalledOnce();
   });

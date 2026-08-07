@@ -43,15 +43,24 @@ console.info = (...args: unknown[]) => {
   originalConsoleInfo(...args);
 };
 
-// Mock next/navigation
+// Mock next/navigation.
+//
+// One router object for the whole run, because that is what the real hook
+// returns. A fresh object per call gives every `useCallback([router])` a new
+// identity on every render, and any effect depending on such a callback then
+// re-runs on every render -- which, when the effect also sets state, is an
+// endless loop. The Transactions page did exactly that: 83 `transactions.getAll`
+// calls in 300ms, and act warnings from the updates still landing after the test
+// had ended. Nothing in production behaves that way; only the mock did.
+const routerMock = {
+  push: vi.fn(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+};
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
-    prefetch: vi.fn(),
-    refresh: vi.fn(),
-  }),
+  useRouter: () => routerMock,
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
 }));

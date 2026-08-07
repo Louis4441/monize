@@ -77,12 +77,15 @@ describe('AutoBackupSection', () => {
     expect(screen.getByLabelText('Backup Frequency')).toHaveValue('daily');
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     (backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>).mockReturnValue(
       new Promise(() => {}),
     );
 
-    render(<AutoBackupSection />);
+    // Rendered inside act even though the assertion is about the first paint:
+    // the capability probe beside the settings load *does* resolve, and a bare
+    // render leaves its state update outside act.
+    await renderAutoBackupSection();
 
     expect(screen.getByText('Loading...')).toBeInTheDocument();
   });

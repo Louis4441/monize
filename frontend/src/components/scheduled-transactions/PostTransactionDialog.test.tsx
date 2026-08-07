@@ -1896,17 +1896,29 @@ describe('PostTransactionDialog - editing the converted total', () => {
     });
   };
 
+  /**
+   * `renderDialog` only waits for the lookup to be *called*, so every test
+   * after it starts with the rate either applied or still in flight -- and a
+   * test that types into the total behaves differently in each. Wait for the
+   * fetched rate to reach the field, so the state under test is the one the
+   * user sees rather than whichever the scheduler happened to produce.
+   */
+  const awaitFetchedRate = async () => {
+    await waitFor(() =>
+      expect((screen.getByLabelText('Total in CAD') as HTMLInputElement).value).toContain('56'),
+    );
+  };
+
   it('shows both the foreign amount and the account-currency total', async () => {
     await renderDialog();
     expect(screen.getByLabelText('Amount in USD')).toBeInTheDocument();
     // The lookup is debounced, so the total fills in once it resolves.
-    await waitFor(() =>
-      expect((screen.getByLabelText('Total in CAD') as HTMLInputElement).value).toContain('56'),
-    );
+    await awaitFetchedRate();
   });
 
   it('re-derives the total when the foreign amount changes', async () => {
     await renderDialog();
+    await awaitFetchedRate();
     const amountInput = screen.getByLabelText('Amount in USD');
     await act(async () => {
       fireEvent.change(amountInput, { target: { value: '-50' } });
@@ -1918,6 +1930,7 @@ describe('PostTransactionDialog - editing the converted total', () => {
 
   it('derives the rate when the converted total is edited directly', async () => {
     await renderDialog();
+    await awaitFetchedRate();
     const total = screen.getByLabelText('Total in CAD');
     await act(async () => {
       fireEvent.change(total, { target: { value: '-60' } });
@@ -1930,6 +1943,55 @@ describe('PostTransactionDialog - editing the converted total', () => {
     expect(mockPostApi).toHaveBeenCalledWith(
       's-fx2',
       expect.objectContaining({ originalAmount: -40, exchangeRate: 1.5 }),
+    );
+  });
+
+  it('does not treat a blur that changed nothing as an override', async () => {
+    // Tabbing through the total field hands its own displayed figure back. The
+    // field reports it, the dialog derived a rate from it -- one
+    // reverse-engineered from a cents-rounded number rather than the 10dp rate
+    // the server gave -- and marked it user-overridden, which also stops the
+    // date effect re-fetching. Merely looking at the field must post the
+    // schedule exactly as an untouched one does.
+    mockGetRateForDate.mockResolvedValue(1.365234);
+    await renderDialog();
+    const total = screen.getByLabelText('Total in CAD') as HTMLInputElement;
+    // -40 x 1.365234 = -54.6094, shown to the cent as -54.61.
+    await waitFor(() => expect(total.value).toContain('54.61'));
+
+    await act(async () => {
+      fireEvent.focus(total);
+      fireEvent.blur(total);
+    });
+    await post();
+
+    await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
+    // No override, so no rate is sent and the backend resolves the real one for
+    // the posting date -- rather than 54.61 / 40 = 1.36525, which is not it.
+    expect(mockPostApi.mock.calls[0][1].exchangeRate).toBeUndefined();
+  });
+
+  it('keeps re-fetching for a new date after a blur that changed nothing', async () => {
+    // The other half of the same defect: a spurious override latches, so every
+    // later date kept the rate reverse-engineered from the first one.
+    mockGetRateForDate.mockResolvedValue(1.365234);
+    await renderDialog();
+    const total = screen.getByLabelText('Total in CAD') as HTMLInputElement;
+    await waitFor(() => expect(total.value).toContain('54.61'));
+
+    await act(async () => {
+      fireEvent.focus(total);
+      fireEvent.blur(total);
+    });
+
+    mockGetRateForDate.mockClear();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Transaction Date'), {
+        target: { value: '2026-03-15' },
+      });
+    });
+    await waitFor(() =>
+      expect(mockGetRateForDate).toHaveBeenCalledWith('USD', 'CAD', '2026-03-15'),
     );
   });
 
@@ -1993,6 +2055,7 @@ describe('PostTransactionDialog - editing the converted total', () => {
 
   it('keeps a hand-typed rate when the posting date moves', async () => {
     await renderDialog();
+    await awaitFetchedRate();
     const total = screen.getByLabelText('Total in CAD');
     await act(async () => {
       fireEvent.change(total, { target: { value: '-60' } });
@@ -2017,17 +2080,20 @@ describe('PostTransactionDialog - editing the converted total', () => {
       accounts: [{ id: 'a1', name: 'Checking', currentBalance: 5000, fxFeePercent: 2.5 }],
     });
     const total = screen.getByLabelText('Total in CAD');
+    // -40 x 1.4 = -56.00 base, plus the 2.5% fee, is -57.40 on screen. Type a
+    // different figure: handing the field its own total back is not an edit.
+    await waitFor(() => expect((total as HTMLInputElement).value).toBe('-57.4'));
     await act(async () => {
-      fireEvent.change(total, { target: { value: '-57.4' } });
+      fireEvent.change(total, { target: { value: '-71.75' } });
       fireEvent.blur(total);
     });
     await post();
 
     await waitFor(() => expect(mockPostApi).toHaveBeenCalled());
-    // -57.40 total with a 2.5% fee is a -56.00 base, so the rate is 1.4 --
-    // not -57.40 / -40 = 1.435, which would double-count the fee when the
+    // -71.75 total with a 2.5% fee is a -70.00 base, so the rate is 1.75 --
+    // not -71.75 / -40 = 1.794, which would double-count the fee when the
     // backend reapplies it.
-    expect(mockPostApi.mock.calls[0][1].exchangeRate).toBeCloseTo(1.4, 6);
+    expect(mockPostApi.mock.calls[0][1].exchangeRate).toBeCloseTo(1.75, 6);
   });
 });
 

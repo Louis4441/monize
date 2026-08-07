@@ -272,6 +272,12 @@ export function PostTransactionDialog({
   // backend re-deriving the fee lands on the same total the user typed.
   const handleConvertedTotalChange = (total: number | undefined) => {
     if (total === undefined || !foreignAmount) return;
+    // A total that already equals the one the fetched rate produces is not an
+    // override -- it is the field handing back what it was displaying. Deriving
+    // from it would replace the fetched 10dp rate with one reverse-engineered
+    // from a cents-rounded total and stop the date effect re-fetching, so the
+    // posted row would carry a rate the user never chose.
+    if (foreignConversion && total === foreignConversion.total) return;
     let base = total;
     if (postFxFeePercent && postFxFeePercent > 0) {
       // total = base - |base| * p; solve for base by its (matching) sign.
