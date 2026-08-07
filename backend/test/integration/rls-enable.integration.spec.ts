@@ -31,6 +31,11 @@ describe("RLS enable migration (M3, migration 123)", () => {
   const EXEMPT = [
     "currencies",
     "exchange_rates",
+    // Global market reference data with no owner column, written only by the
+    // scheduled refresh under system context. Same rationale as exchange_rates;
+    // the schema.sql exemption note carries the long form.
+    "market_index_prices",
+    "market_index_sync",
     "oauth_payloads",
     "schema_migrations",
   ];

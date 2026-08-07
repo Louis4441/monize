@@ -106,7 +106,7 @@
       "security-type-allocation": "Lihat alokasi portofolio berdasarkan tipe aset (saham, ETF, reksadana, obligasi) dengan penelusuran ke kepemilikan.",
       "geographic-allocation": "Analisis eksposur geografis portofolio berdasarkan bursa dan wilayah untuk wawasan diversifikasi.",
       "dividend-yield-growth": "Lacak imbal hasil dividen, imbal hasil per keamanan dokumen, pertumbuhan tahun ke tahun, dan analisis frekuensi pembayaran.",
-      "security-performance": "Penyelaman mendalam ke riwayat harga, transaksi, dan imbal hasil suatu efek, atau bandingkan kinerja beberapa efek dalam satu grafik.",
+      "security-performance": "Telaah mendalam riwayat harga, transaksi, dan imbal hasil sebuah efek, atau bandingkan beberapa efek dan indeks pasar dalam satu grafik.",
       "currency-exposure": "Pahami risiko mata uang dengan alokasi portofolio berdasarkan mata uang dan detail kurs.",
       "monte-carlo-simulation": "Proyeksikan hasil portofolio masa depan dengan ribuan jalur imbal hasil yang diacak dan pustaka skenario yang disimpan.",
       "gem-strategy": "Pantau sinyal Global Equities Momentum, alasan perubahannya, dan apakah portofolio Anda sesuai.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% dari Portofolio"
   },
   "securityPerformance": {
-    "selectPrompt": "Pilih satu atau beberapa efek di atas untuk melihat kinerjanya. Pilih dua atau lebih untuk membandingkannya dalam satu grafik.",
+    "selectPrompt": "Pilih satu atau beberapa efek di atas untuk melihat kinerjanya, dan tambahkan indeks pasar sebagai pembanding.",
     "selectSecuritiesPlaceholder": "Pilih efek...",
     "comparisonTitle": "Perbandingan Kinerja",
-    "comparisonSubtitle": "Imbal hasil kumulatif setiap efek yang dipilih, disesuaikan ke 0% pada harga pertama yang tersedia agar dapat dibandingkan dalam satu skala tanpa memandang harga atau mata uang.",
-    "comparisonNoData": "Tidak ada riwayat harga yang tersedia untuk efek yang dipilih.",
+    "comparisonSubtitle": "Imbal hasil kumulatif setiap instrumen yang dipilih, disetel ulang ke 0% pada awal rentang yang dipilih sehingga dapat dibandingkan pada satu skala terlepas dari harga atau mata uang. Indeks pasar digambar dengan garis putus-putus.",
+    "comparisonNoData": "Tidak ada instrumen terpilih yang dapat dihargai pada rentang ini.",
     "comparisonError": "Tidak dapat memuat riwayat harga. Silakan coba lagi.",
     "viewPriceChart": "Grafik Harga",
     "viewTransactions": "Transaksi",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Saham",
     "pdfColPrice": "Harga",
     "pdfColTotal": "Total",
-    "pdfTotalDividends": "Total Dividen"
+    "pdfTotalDividends": "Total Dividen",
+    "selectIndexesPlaceholder": "Tambahkan indeks pasar…",
+    "timeframeChartOnlyNote": "Rentang waktu berlaku untuk grafik. Angka di atas dan tabel di bawah mencakup seluruh kepemilikan.",
+    "comparisonExcludedTitle": "Tidak ditampilkan pada grafik ini",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "tidak ada riwayat harga yang tersimpan",
+      "NO_PRICE_AT_WINDOW_START": "tidak ada harga yang cukup dekat dengan awal rentang ini, sehingga imbal hasilnya tidak diketahui",
+      "NON_POSITIVE_BASE": "harga pada awal rentang ini bukan angka yang dapat dipakai",
+      "SINGLE_OBSERVATION": "hanya satu harga pada rentang ini, yang tidak mengukur perubahan apa pun"
+    },
+    "comparisonIncomplete": "Sebagian grafik ini tidak dapat diukur: garis terputus menandai bagian tanpa harga, dan garis yang berakhir lebih awal tidak memiliki data setelah titik itu.",
+    "comparisonIndexLegend": "{name} (indeks)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Amerika Utara",
+      "EUROPE": "Eropa",
+      "ASIA_PACIFIC": "Asia-Pasifik"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Tidak ada kepemilikan investasi ditemukan. Tambah keamanan dokumen untuk melihat rincian tipe aset.",

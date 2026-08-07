@@ -106,7 +106,7 @@
       "security-type-allocation": "Xem phân bổ danh mục theo loại tài sản (cổ phiếu, ETFs, quỹ tương hỗ, trái phiếu) với phân tích sâu vào vị thế.",
       "geographic-allocation": "Phân tích mức độ phơi nhiễm địa lý của danh mục theo sàn giao dịch và khu vực để đa dạng hóa.",
       "dividend-yield-growth": "Theo dõi lợi suất cổ tức, lợi suất theo từng chứng khoán, tăng trưởng năm sau so với năm trước và phân tích tần suất thanh toán.",
-      "security-performance": "Phân tích sâu về lịch sử giá, giao dịch và lợi nhuận của một chứng khoán, hoặc so sánh hiệu suất của nhiều chứng khoán trên cùng một biểu đồ.",
+      "security-performance": "Xem chi tiết lịch sử giá, giao dịch và lợi suất của một chứng khoán, hoặc so sánh nhiều chứng khoán và chỉ số thị trường trên cùng một biểu đồ.",
       "currency-exposure": "Hiểu rủi ro tiền tệ với phân bổ danh mục theo tiền tệ và chi tiết tỷ giá hối đoái.",
       "monte-carlo-simulation": "Dự báo kết quả danh mục tương lai với hàng nghìn đường lợi nhuận ngẫu nhiên và thư viện kịch bản đã lưu.",
       "gem-strategy": "Theo dõi tín hiệu Global Equities Momentum, lý do nó thay đổi và danh mục của bạn có khớp hay không.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% Danh mục"
   },
   "securityPerformance": {
-    "selectPrompt": "Chọn một hoặc nhiều chứng khoán ở trên để xem hiệu suất của chúng. Chọn từ hai chứng khoán trở lên để so sánh chúng trên cùng một biểu đồ.",
+    "selectPrompt": "Chọn một hoặc nhiều chứng khoán ở trên để xem hiệu suất, và thêm một chỉ số thị trường để so sánh.",
     "selectSecuritiesPlaceholder": "Chọn chứng khoán...",
     "comparisonTitle": "So sánh hiệu suất",
-    "comparisonSubtitle": "Lợi suất tích lũy của từng chứng khoán đã chọn, được quy về 0% tại mức giá khả dụng đầu tiên để so sánh trên cùng một thang đo bất kể giá hay đơn vị tiền tệ.",
-    "comparisonNoData": "Không có lịch sử giá cho các chứng khoán đã chọn.",
+    "comparisonSubtitle": "Lợi suất tích lũy của từng công cụ đã chọn, quy về 0% tại đầu khoảng thời gian đã chọn để so sánh trên cùng một thang bất kể giá hay đơn vị tiền tệ. Chỉ số thị trường được vẽ bằng nét đứt.",
+    "comparisonNoData": "Không định giá được công cụ nào đã chọn trong khoảng thời gian này.",
     "comparisonError": "Không thể tải lịch sử giá. Vui lòng thử lại.",
     "viewPriceChart": "Biểu đồ giá",
     "viewTransactions": "Giao tác",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Cổ phiếu",
     "pdfColPrice": "Giá",
     "pdfColTotal": "Tổng",
-    "pdfTotalDividends": "Tổng cổ tức"
+    "pdfTotalDividends": "Tổng cổ tức",
+    "selectIndexesPlaceholder": "Thêm chỉ số thị trường…",
+    "timeframeChartOnlyNote": "Khoảng thời gian áp dụng cho biểu đồ. Các số liệu ở trên và bảng ở dưới bao trùm toàn bộ khoản nắm giữ.",
+    "comparisonExcludedTitle": "Không hiển thị trên biểu đồ này",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "không có lịch sử giá được lưu",
+      "NO_PRICE_AT_WINDOW_START": "không có giá nào đủ gần đầu khoảng thời gian này, nên lợi suất của kỳ là không xác định",
+      "NON_POSITIVE_BASE": "giá tại đầu khoảng thời gian này không phải là một con số dùng được",
+      "SINGLE_OBSERVATION": "chỉ có một mức giá trong khoảng này, không đo được thay đổi nào"
+    },
+    "comparisonIncomplete": "Một phần biểu đồ này không đo được: đường đứt quãng đánh dấu đoạn không có giá, và đường kết thúc sớm nghĩa là không còn dữ liệu sau điểm đó.",
+    "comparisonIndexLegend": "{name} (chỉ số)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Bắc Mỹ",
+      "EUROPE": "Châu Âu",
+      "ASIA_PACIFIC": "Châu Á - Thái Bình Dương"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Không tìm thấy vị thế đầu tư. Thêm chứng khoán để xem phân tích theo loại tài sản.",

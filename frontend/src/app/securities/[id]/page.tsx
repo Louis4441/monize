@@ -173,7 +173,7 @@ function SecurityDetailContent() {
       const detailData = await investmentsApi.getSecurityDetail(requestedId);
       const [priceData, historyData] = await Promise.all([
         investmentsApi
-          .getSecurityPrices(requestedId, SECURITY_PRICE_HISTORY_LIMIT)
+          .getSecurityPrices(requestedId, { limit: SECURITY_PRICE_HISTORY_LIMIT })
           .catch(() => []),
         investmentsApi
           .getSecurityTransactionHistory(requestedId)
@@ -202,7 +202,7 @@ function SecurityDetailContent() {
       const [detailData, priceData] = await Promise.all([
         investmentsApi.getSecurityDetail(requestedId),
         investmentsApi
-          .getSecurityPrices(requestedId, SECURITY_PRICE_HISTORY_LIMIT)
+          .getSecurityPrices(requestedId, { limit: SECURITY_PRICE_HISTORY_LIMIT })
           .catch(() => null),
       ]);
       // Same guard as loadData: a refresh that resolves after the reader moved

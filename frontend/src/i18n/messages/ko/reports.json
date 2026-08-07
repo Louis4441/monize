@@ -106,7 +106,7 @@
       "security-type-allocation": "보유 항목 상세 보기와 함께 자산 유형(주식, ETF, 뮤추얼 펀드, 채권)별 포트폴리오 배분을 확인하세요.",
       "geographic-allocation": "분산 투자 인사이트를 위해 거래소와 지역별로 포트폴리오 지역 노출을 분석하세요.",
       "dividend-yield-growth": "배당 수익률, 유가증권별 수익률, 전년 대비 성장률 및 지급 빈도 분석을 추적하세요.",
-      "security-performance": "유가증권의 가격 이력, 거래, 수익률을 자세히 분석하거나 여러 유가증권의 성과를 하나의 차트에서 비교하세요.",
+      "security-performance": "증권의 가격 이력, 거래, 수익률을 자세히 살펴보거나 여러 증권과 시장 지수를 하나의 차트에서 비교합니다.",
       "currency-exposure": "통화별 포트폴리오 배분과 환율 세부 정보로 통화 위험을 이해하세요.",
       "monte-carlo-simulation": "수천 가지 무작위 수익률 경로와 저장된 시나리오 라이브러리로 미래 포트폴리오 결과를 예측하세요.",
       "gem-strategy": "Global Equities Momentum 시그널과 변경 이유, 그리고 내 포트폴리오가 이에 맞는지 확인합니다.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "포트폴리오 비율"
   },
   "securityPerformance": {
-    "selectPrompt": "위에서 하나 이상의 유가증권을 선택하면 성과를 확인할 수 있습니다. 두 개 이상을 선택하면 하나의 차트에서 비교할 수 있습니다.",
+    "selectPrompt": "위에서 하나 이상의 증권을 선택해 성과를 확인하고, 비교 기준이 될 시장 지수를 추가하세요.",
     "selectSecuritiesPlaceholder": "유가증권 선택...",
     "comparisonTitle": "성과 비교",
-    "comparisonSubtitle": "선택한 각 유가증권의 누적 수익률을 최초 이용 가능 가격에서 0%로 재기준화하여 가격이나 통화와 관계없이 동일한 척도로 비교합니다.",
-    "comparisonNoData": "선택한 유가증권의 가격 기록이 없습니다.",
+    "comparisonSubtitle": "선택한 각 상품의 누적 수익률입니다. 선택한 기간의 시작 시점에서 0%로 재설정되므로 가격이나 통화와 관계없이 하나의 척도로 비교할 수 있습니다. 시장 지수는 점선으로 표시됩니다.",
+    "comparisonNoData": "선택한 상품 중 이 기간에 가격을 산출할 수 있는 것이 없습니다.",
     "comparisonError": "가격 기록을 불러올 수 없습니다. 다시 시도해 주세요.",
     "viewPriceChart": "가격 차트",
     "viewTransactions": "거래",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "수량",
     "pdfColPrice": "가격",
     "pdfColTotal": "합계",
-    "pdfTotalDividends": "총 배당금"
+    "pdfTotalDividends": "총 배당금",
+    "selectIndexesPlaceholder": "시장 지수 추가…",
+    "timeframeChartOnlyNote": "기간은 차트에만 적용됩니다. 위의 수치와 아래 표는 보유 전체를 대상으로 합니다.",
+    "comparisonExcludedTitle": "이 차트에 표시되지 않음",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "저장된 가격 이력이 없습니다",
+      "NO_PRICE_AT_WINDOW_START": "이 기간 시작에 충분히 가까운 가격이 없어 기간 수익률을 알 수 없습니다",
+      "NON_POSITIVE_BASE": "이 기간 시작 시점의 가격이 사용할 수 있는 값이 아닙니다",
+      "SINGLE_OBSERVATION": "이 기간에 가격이 하나뿐이라 변화를 측정할 수 없습니다"
+    },
+    "comparisonIncomplete": "이 차트의 일부는 측정할 수 없었습니다. 끊긴 선은 가격이 없는 구간을 뜻하고, 일찍 끝나는 선은 그 이후 데이터가 없다는 뜻입니다.",
+    "comparisonIndexLegend": "{name} (지수)",
+    "indexRegions": {
+      "NORTH_AMERICA": "북미",
+      "EUROPE": "유럽",
+      "ASIA_PACIFIC": "아시아 태평양"
+    }
   },
   "securityTypeAllocation": {
     "noData": "투자 보유 항목을 찾을 수 없습니다. 자산 유형 분류를 보려면 유가증권을 추가하세요.",

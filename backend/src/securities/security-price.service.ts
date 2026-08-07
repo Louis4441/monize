@@ -23,6 +23,10 @@ import { getTradingDateFromQuote } from "./providers/trading-date.util";
 import { getMarketSessionFromQuote } from "./providers/market-session.util";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
+import {
+  DEFAULT_PRICE_HISTORY_ROWS,
+  MAX_PRICE_HISTORY_ROWS,
+} from "./dto/price-history-query.dto";
 import { formatDateYMD } from "../common/date-utils";
 import { mapWithConcurrency } from "../common/concurrency.util";
 
@@ -760,19 +764,46 @@ export class SecurityPriceService {
     );
   }
 
+  /**
+   * Stored closes for one security, newest first.
+   *
+   * **`limit` truncates the oldest end, so a window is not a limit.** The rows
+   * are ordered descending and `take(n)` keeps the first `n` of them, which
+   * means a cap shorter than the history silently drops the beginning of it --
+   * the opposite of what a caller asking for "the last five years" wants, and
+   * invisible in the response because the array it gets back is a perfectly
+   * well-formed shorter one. So a request that names a window gets the whole
+   * window: `limit` defaults to `MAX_PRICE_HISTORY_ROWS` rather than to 365
+   * whenever `startDate` is supplied, and the cap is then a memory bound rather
+   * than a filter.
+   *
+   * A caller that supplies neither keeps the historical default.
+   *
+   * **Either bound counts as a window.** Keying this on `startDate` alone left
+   * the trap open in the direction that matters most: "all time" is a request
+   * with no start date, so a chart asking for the whole history sent only an
+   * `endDate` and got the newest 365 rows back -- about one year, presented as
+   * everything there is.
+   */
   async getPriceHistory(
     securityId: string,
-    startDate?: Date,
-    endDate?: Date,
-    limit: number = 365,
+    startDate?: Date | string,
+    endDate?: Date | string,
+    limit?: number,
   ): Promise<SecurityPrice[]> {
+    const effectiveLimit =
+      limit ??
+      (startDate || endDate
+        ? MAX_PRICE_HISTORY_ROWS
+        : DEFAULT_PRICE_HISTORY_ROWS);
+
     return withScopedDb(this.dataSource, (m) => {
       const query = m
         .getRepository(SecurityPrice)
         .createQueryBuilder("sp")
         .where("sp.securityId = :securityId", { securityId })
         .orderBy("sp.priceDate", "DESC")
-        .take(limit);
+        .take(effectiveLimit);
 
       if (startDate) {
         query.andWhere("sp.priceDate >= :startDate", { startDate });

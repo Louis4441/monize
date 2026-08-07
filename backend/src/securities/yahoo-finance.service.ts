@@ -835,6 +835,11 @@ export class YahooFinanceService implements QuoteProvider {
   getAlternateSymbols(symbol: string): string[] {
     const alternates: string[] = [];
 
+    // A caret ticker is an index (^GSPC, ^FTSE), not a listing. Yahoo's exchange
+    // suffixes are meaningless on one, so trying `^GSPC.TO` costs three extra
+    // round trips per miss and can only ever fail.
+    if (symbol.startsWith("^")) return alternates;
+
     if (!symbol.includes(".")) {
       alternates.push(`${symbol}.TO`);
       alternates.push(`${symbol}.V`);

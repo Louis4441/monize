@@ -18,6 +18,8 @@ import {
   CountryWeightingResult,
   AssetClassWeightingResult,
   SecurityPrice,
+  MarketIndex,
+  PerformanceComparison,
   SecurityDocument,
   CreateSecurityDocumentData,
   SecurityNewsResult,
@@ -645,14 +647,74 @@ export const investmentsApi = {
     await apiClient.delete(`/securities/${securityId}/documents/${documentId}`);
   },
 
-  getSecurityPrices: async (securityId: string, limit = 365): Promise<SecurityPrice[]> => {
-    const cacheKey = `investments:prices:${securityId}:${limit}`;
+  /**
+   * Stored closes for a security.
+   *
+   * Prefer a date window over a `limit`. The rows come back newest-first, so a
+   * limit shorter than the history silently drops its oldest end -- which is
+   * the opposite of what a chart asking for "the last five years" wants, and
+   * invisible in the response. A windowed request returns the whole window.
+   *
+   * The window is part of the cache key: two different windows are two
+   * different answers, and sharing an entry between them would serve one for
+   * the other.
+   */
+  getSecurityPrices: async (
+    securityId: string,
+    options: { startDate?: string; endDate?: string; limit?: number } = {},
+  ): Promise<SecurityPrice[]> => {
+    const { startDate = '', endDate = '', limit } = options;
+    const cacheKey = `investments:prices:${securityId}:${startDate}:${endDate}:${limit ?? ''}`;
     const cached = getCached<SecurityPrice[]>(cacheKey);
     if (cached) return cached;
     const response = await apiClient.get<SecurityPrice[]>(`/securities/${securityId}/prices`, {
-      params: { limit },
+      params: {
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      },
     });
     setCache(cacheKey, response.data, 60_000);
+    return response.data;
+  },
+
+  /**
+   * The benchmark catalog, with the history actually stored for each entry so
+   * the picker can grey out an index that cannot yet be drawn.
+   */
+  getMarketIndexes: async (): Promise<MarketIndex[]> => {
+    const cacheKey = 'investments:market-indexes';
+    const cached = getCached<MarketIndex[]>(cacheKey);
+    if (cached) return cached;
+    const response = await apiClient.get<MarketIndex[]>('/investments/performance/indexes');
+    setCache(cacheKey, response.data, 300_000);
+    return response.data;
+  },
+
+  /**
+   * Cumulative percent return for securities and indexes over one window.
+   *
+   * Deliberately uncached: the response carries `excluded` and `status`, which
+   * change as the provider backfills an index, and serving a stale "we could
+   * not price this" is worse than a round trip.
+   */
+  getPerformanceComparison: async (params: {
+    securityIds?: string[];
+    indexCodes?: string[];
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PerformanceComparison> => {
+    const response = await apiClient.get<PerformanceComparison>(
+      '/investments/performance/comparison',
+      {
+        params: {
+          ...(params.securityIds?.length ? { securityIds: params.securityIds.join(',') } : {}),
+          ...(params.indexCodes?.length ? { indexCodes: params.indexCodes.join(',') } : {}),
+          ...(params.startDate ? { startDate: params.startDate } : {}),
+          ...(params.endDate ? { endDate: params.endDate } : {}),
+        },
+      },
+    );
     return response.data;
   },
 

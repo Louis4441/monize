@@ -342,12 +342,60 @@ describe('investmentsApi', () => {
     expect(result.msn.ready).toBe(false);
   });
 
-  it('getSecurityPrices fetches security prices with default limit', async () => {
+  it('getSecurityPrices sends no limit by default, so the server picks it', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     await investmentsApi.getSecurityPrices('s-1');
     expect(apiClient.get).toHaveBeenCalledWith('/securities/s-1/prices', {
-      params: { limit: 365 },
+      params: {},
     });
+  });
+
+  it('getSecurityPrices sends a date window without a limit', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    await investmentsApi.getSecurityPrices('s-1', {
+      startDate: '2020-01-01',
+      endDate: '2025-12-31',
+    });
+    // A limit alongside a window would truncate the window's oldest end, which
+    // is the defect this signature exists to prevent.
+    expect(apiClient.get).toHaveBeenCalledWith('/securities/s-1/prices', {
+      params: { startDate: '2020-01-01', endDate: '2025-12-31' },
+    });
+  });
+
+  it('getSecurityPrices keys its cache on the window, not just the security', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 1 }] });
+    await investmentsApi.getSecurityPrices('s-1', { startDate: '2020-01-01' });
+    await investmentsApi.getSecurityPrices('s-1', { startDate: '2024-01-01' });
+    // Two windows are two answers; sharing an entry would serve one for the
+    // other.
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('getMarketIndexes fetches the benchmark catalog', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    await investmentsApi.getMarketIndexes();
+    expect(apiClient.get).toHaveBeenCalledWith('/investments/performance/indexes');
+  });
+
+  it('getPerformanceComparison joins its selections and omits blanks', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { series: [] } });
+    await investmentsApi.getPerformanceComparison({
+      securityIds: ['a', 'b'],
+      indexCodes: ['SP500'],
+      startDate: '',
+      endDate: '2025-12-31',
+    });
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/investments/performance/comparison',
+      {
+        params: {
+          securityIds: 'a,b',
+          indexCodes: 'SP500',
+          endDate: '2025-12-31',
+        },
+      },
+    );
   });
 
   it('createSecurityPrice posts to /securities/:id/prices', async () => {

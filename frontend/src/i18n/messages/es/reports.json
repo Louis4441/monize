@@ -106,7 +106,7 @@
       "security-type-allocation": "Visualiza la asignación de la cartera por tipo de activo (acciones, ETFs, fondos de inversión, bonos) con desglose de posiciones.",
       "geographic-allocation": "Analiza la exposición geográfica de la cartera por bolsa y región para obtener información sobre diversificación.",
       "dividend-yield-growth": "Rastrea el rendimiento de dividendos, rendimientos por valor, crecimiento año a año y análisis de frecuencia de pagos.",
-      "security-performance": "Analiza en profundidad el historial de precios, las transacciones y los retornos de un valor, o compara el rendimiento de varios valores en un mismo gráfico.",
+      "security-performance": "Análisis detallado del historial de precios, las transacciones y las rentabilidades de un valor, o comparación de varios valores e índices de mercado en un solo gráfico.",
       "currency-exposure": "Comprende el riesgo cambiario con la asignación de la cartera por divisa y detalles de tipos de cambio.",
       "monte-carlo-simulation": "Proyecta resultados futuros de la cartera con miles de trayectorias de retorno aleatorias y una biblioteca de escenarios guardados.",
       "gem-strategy": "Sigue la señal de Global Equities Momentum, por qué cambió y si tu cartera coincide con ella.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% de la cartera"
   },
   "securityPerformance": {
-    "selectPrompt": "Selecciona uno o varios valores arriba para ver su rendimiento. Elige dos o más para compararlos en un mismo gráfico.",
+    "selectPrompt": "Seleccione uno o varios valores arriba para ver su rendimiento y añada un índice de mercado con el que compararlos.",
     "selectSecuritiesPlaceholder": "Seleccionar valores...",
     "comparisonTitle": "Comparación de rentabilidad",
-    "comparisonSubtitle": "Rentabilidad acumulada de cada valor seleccionado, reajustada al 0 % en su primer precio disponible para compararlos en una misma escala, sin importar el precio ni la moneda.",
-    "comparisonNoData": "No hay historial de precios disponible para los valores seleccionados.",
+    "comparisonSubtitle": "Rentabilidad acumulada de cada instrumento seleccionado, rebasada a 0 % al inicio del periodo elegido para que se comparen en una sola escala con independencia del precio o la moneda. Los índices de mercado se dibujan con línea discontinua.",
+    "comparisonNoData": "No se pudo valorar ninguno de los instrumentos seleccionados en este periodo.",
     "comparisonError": "No se pudo cargar el historial de precios. Inténtalo de nuevo.",
     "viewPriceChart": "Gráfico de precios",
     "viewTransactions": "Transacciones",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Acciones",
     "pdfColPrice": "Precio",
     "pdfColTotal": "Total",
-    "pdfTotalDividends": "Total de dividendos"
+    "pdfTotalDividends": "Total de dividendos",
+    "selectIndexesPlaceholder": "Añadir un índice de mercado…",
+    "timeframeChartOnlyNote": "El periodo se aplica al gráfico. Las cifras de arriba y las tablas de abajo cubren toda la posición.",
+    "comparisonExcludedTitle": "No incluido en este gráfico",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "no hay historial de precios almacenado",
+      "NO_PRICE_AT_WINDOW_START": "no hay ningún precio lo bastante cercano al inicio de este periodo, por lo que su rentabilidad es desconocida",
+      "NON_POSITIVE_BASE": "su precio al inicio de este periodo no es una cifra utilizable",
+      "SINGLE_OBSERVATION": "solo un precio en este periodo, lo que no mide ningún cambio"
+    },
+    "comparisonIncomplete": "Parte de este gráfico no se pudo medir: una línea interrumpida marca un tramo sin precios, y una línea que termina antes no tiene datos a partir de ese punto.",
+    "comparisonIndexLegend": "{name} (índice)",
+    "indexRegions": {
+      "NORTH_AMERICA": "América del Norte",
+      "EUROPE": "Europa",
+      "ASIA_PACIFIC": "Asia-Pacífico"
+    }
   },
   "securityTypeAllocation": {
     "noData": "No se encontraron posiciones de inversión. Agrega valores para ver el desglose por tipo de activo.",

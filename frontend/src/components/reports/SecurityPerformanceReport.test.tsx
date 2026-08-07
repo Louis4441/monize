@@ -77,6 +77,8 @@ const mockGetPortfolioSummary = vi.fn();
 const mockGetSecurityPrices = vi.fn();
 const mockGetTransactions = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
+const mockGetMarketIndexes = vi.fn();
+const mockGetPerformanceComparison = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -85,8 +87,33 @@ vi.mock('@/lib/investments', () => ({
     getSecurityPrices: (...args: any[]) => mockGetSecurityPrices(...args),
     getTransactions: (...args: any[]) => mockGetTransactions(...args),
     getInvestmentAccounts: (...args: any[]) => mockGetInvestmentAccounts(...args),
+    getMarketIndexes: (...args: any[]) => mockGetMarketIndexes(...args),
+    getPerformanceComparison: (...args: any[]) =>
+      mockGetPerformanceComparison(...args),
   },
 }));
+
+const mockMarketIndexes = [
+  {
+    code: 'SP500',
+    yahooSymbol: '^GSPC',
+    defaultName: 'S&P 500',
+    currencyCode: 'USD',
+    region: 'NORTH_AMERICA',
+    exchanges: ['NYSE', 'NASDAQ'],
+    coverage: { earliestDate: '2000-01-03', latestDate: '2026-08-05' },
+  },
+  {
+    // No stored history: offering it could only produce an excluded row.
+    code: 'FTSE_100',
+    yahooSymbol: '^FTSE',
+    defaultName: 'FTSE 100',
+    currencyCode: 'GBP',
+    region: 'EUROPE',
+    exchanges: ['LSE'],
+    coverage: { earliestDate: null, latestDate: null },
+  },
+];
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -156,12 +183,24 @@ describe('SecurityPerformanceReport', () => {
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'Brokerage 1', currencyCode: 'USD' },
     ]);
+    mockGetMarketIndexes.mockResolvedValue(mockMarketIndexes);
+    mockGetPerformanceComparison.mockResolvedValue({
+      window: { start: '2024-01-01', end: '2024-12-31' },
+      sampling: 'day',
+      series: [],
+      points: [],
+      totals: {},
+      gaps: [],
+      excluded: [],
+      status: 'complete',
+    });
   });
 
   it('shows loading state initially', async () => {
     mockGetSecurities.mockReturnValue(new Promise(() => {}));
     mockGetPortfolioSummary.mockReturnValue(new Promise(() => {}));
     mockGetInvestmentAccounts.mockReturnValue(new Promise(() => {}));
+    mockGetMarketIndexes.mockReturnValue(new Promise(() => {}));
     render(<SecurityPerformanceReport />);
     expect(document.querySelector('.animate-pulse')).toBeTruthy();
     // Flush the secondary detail-fetch resolution so its state update is
@@ -1018,14 +1057,47 @@ describe('SecurityPerformanceReport', () => {
     }
   });
 
+  /** Two securities and one index, as the comparison endpoint returns them. */
+  function comparisonPayload() {
+    return {
+      window: { start: '2024-01-01', end: '2024-12-31' },
+      sampling: 'day' as const,
+      series: [
+        {
+          key: 'sec:s-1',
+          kind: 'SECURITY' as const,
+          id: 's-1',
+          label: 'AAPL',
+          name: 'Apple Inc.',
+          currencyCode: 'USD',
+          basis: 'ADJUSTED' as const,
+        },
+        {
+          key: 'sec:s-2',
+          kind: 'SECURITY' as const,
+          id: 's-2',
+          label: 'VTI',
+          name: 'Vanguard Total Stock',
+          currencyCode: 'USD',
+          basis: 'ADJUSTED' as const,
+        },
+      ],
+      points: [
+        { date: '2024-01-01', values: { 'sec:s-1': 0, 'sec:s-2': 0 } },
+        { date: '2024-02-01', values: { 'sec:s-1': 10, 'sec:s-2': 5 } },
+      ],
+      totals: { 'sec:s-1': 10, 'sec:s-2': 5 },
+      gaps: [],
+      excluded: [],
+      status: 'complete' as const,
+    };
+  }
+
   it('shows the comparison chart and hides per-security tabs when 2+ are selected', async () => {
     mockGetSecurities.mockResolvedValue(mockSecurities);
     mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
-    mockGetSecurityPrices.mockResolvedValue([
-      { id: 1, priceDate: '2024-01-01', closePrice: 100, createdAt: '' },
-      { id: 2, priceDate: '2024-02-01', closePrice: 110, createdAt: '' },
-    ]);
     mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetPerformanceComparison.mockResolvedValue(comparisonPayload());
 
     render(<SecurityPerformanceReport />);
     await waitFor(() => {
@@ -1050,11 +1122,8 @@ describe('SecurityPerformanceReport', () => {
     (exportToPdf as any).mockClear();
     mockGetSecurities.mockResolvedValue(mockSecurities);
     mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
-    mockGetSecurityPrices.mockResolvedValue([
-      { id: 1, priceDate: '2024-01-01', closePrice: 100, createdAt: '' },
-      { id: 2, priceDate: '2024-02-01', closePrice: 110, createdAt: '' },
-    ]);
     mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetPerformanceComparison.mockResolvedValue(comparisonPayload());
 
     render(<SecurityPerformanceReport />);
     await waitFor(() => {
@@ -1077,5 +1146,181 @@ describe('SecurityPerformanceReport', () => {
     expect(call.subtitle).toBe('AAPL, VTI');
     expect(call.filename).toBe('security-performance-comparison');
     expect(call.chartLegend).toHaveLength(2);
+  });
+
+  // --- timeframe -----------------------------------------------------------
+
+  it('offers a timeframe selector and fetches prices for the chosen window', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetSecurityPrices.mockResolvedValue([]);
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: SELECT_PLACEHOLDER })).toBeInTheDocument();
+    });
+    await selectSecurity('AAPL - Apple Inc.');
+
+    await waitFor(() => expect(mockGetSecurityPrices).toHaveBeenCalled());
+    const [, options] = mockGetSecurityPrices.mock.calls[0];
+    // A window, not a row cap: a limit shorter than the history would drop its
+    // oldest end, which is the wrong half for a chart asking for a year.
+    expect(options).toEqual(
+      expect.objectContaining({ startDate: expect.any(String) }),
+    );
+    expect(options).not.toHaveProperty('limit');
+  });
+
+  /**
+   * "All time" resolves to no start date, and the request must say so rather
+   * than fall back to a row cap -- the server reads an absent start as "from
+   * the beginning" only when nothing else caps the read.
+   */
+  it('asks for an open-ended window on All Time, and never a row cap', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetSecurityPrices.mockResolvedValue([]);
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: SELECT_PLACEHOLDER })).toBeInTheDocument();
+    });
+    await selectSecurity('AAPL - Apple Inc.');
+    await waitFor(() => expect(mockGetSecurityPrices).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'All Time' }));
+    });
+
+    await waitFor(() => {
+      const last = mockGetSecurityPrices.mock.calls.at(-1)![1];
+      expect(last.startDate).toBeUndefined();
+      expect(last).not.toHaveProperty('limit');
+    });
+  });
+
+  it('refetches when the timeframe changes', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetSecurityPrices.mockResolvedValue([]);
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: SELECT_PLACEHOLDER })).toBeInTheDocument();
+    });
+    await selectSecurity('AAPL - Apple Inc.');
+    await waitFor(() => expect(mockGetSecurityPrices).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '1M' }));
+    });
+
+    await waitFor(() => expect(mockGetSecurityPrices).toHaveBeenCalledTimes(2));
+    const first = mockGetSecurityPrices.mock.calls[0][1].startDate;
+    const second = mockGetSecurityPrices.mock.calls[1][1].startDate;
+    expect(second > first).toBe(true);
+  });
+
+  it('says the timeframe governs the chart alone', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/The timeframe applies to the chart/i),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  // --- index overlay -------------------------------------------------------
+
+  /**
+   * The regression test for an empty picker. An index's history is fetched when
+   * it is first selected, so filtering the options down to what we already hold
+   * was a deadlock: a fresh deployment stores nothing, every option was hidden,
+   * and nothing could ever fill the table. An unpriced benchmark is answered by
+   * the comparison's exclusion list, not by hiding it.
+   */
+  it('offers every catalog index, including one with no stored history yet', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add a market index...' }),
+      ).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add a market index...' }));
+    });
+
+    expect(screen.getByText('S&P 500')).toBeInTheDocument();
+    // Coverage is null on this one; it is still selectable, which is what makes
+    // its first fetch possible.
+    expect(screen.getByText('FTSE 100')).toBeInTheDocument();
+  });
+
+  it('is not empty when nothing has been fetched for any index', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetMarketIndexes.mockResolvedValue(
+      mockMarketIndexes.map((index) => ({
+        ...index,
+        coverage: { earliestDate: null, latestDate: null },
+      })),
+    );
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add a market index...' }),
+      ).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add a market index...' }));
+    });
+
+    expect(screen.getByText('S&P 500')).toBeInTheDocument();
+    expect(screen.getByText('FTSE 100')).toBeInTheDocument();
+  });
+
+  it('switches to the comparison view when an index is added to one security', async () => {
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetSecurityPrices.mockResolvedValue([]);
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetPerformanceComparison.mockResolvedValue(comparisonPayload());
+
+    render(<SecurityPerformanceReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: SELECT_PLACEHOLDER })).toBeInTheDocument();
+    });
+    await selectSecurity('AAPL - Apple Inc.');
+    // One security alone keeps the price chart with its buy/sell markers.
+    await waitFor(() => expect(screen.getByText('Price Chart')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add a market index...' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('S&P 500'));
+    });
+
+    // An index level and a share price cannot share a currency axis, so the
+    // chart becomes the percent-return comparison.
+    await waitFor(() =>
+      expect(screen.getByText('Performance Comparison')).toBeInTheDocument(),
+    );
+    expect(screen.queryByText('Price Chart')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockGetPerformanceComparison).toHaveBeenCalledWith(
+        expect.objectContaining({ indexCodes: ['SP500'] }),
+      ),
+    );
   });
 });

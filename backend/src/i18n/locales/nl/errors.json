@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "De toewijzingspercentages tellen op tot meer dan 100%.",
     "invalidTagKey": "Een tagsleutel (1-100 tekens) is vereist",
     "assetOptionNameRequired": "Een naam voor de beleggingscategorie is verplicht.",
-    "documentNotFound": "Document niet gevonden"
+    "documentNotFound": "Document niet gevonden",
+    "selectionNotFound": "Een of meer van de geselecteerde effecten zijn niet gevonden",
+    "comparisonSelectionEmpty": "Selecteer minstens één effect of marktindex om te vergelijken"
   },
   "tags": {
     "notFound": "Label met ID {{ id }} niet gevonden",

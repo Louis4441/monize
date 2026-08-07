@@ -105,6 +105,8 @@ const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "ai_insights", // regenerable AI cache
   "ai_usage_logs", // usage telemetry, not user content
   "exchange_rates", // global shared reference data, not per-user
+  "market_index_prices", // global market reference data, refetched from the provider
+  "market_index_sync", // provider fetch bookkeeping for the above
   "account_delegates", // cross-user sharing relationship
   "account_delegate_grants", // cross-user sharing relationship
   "delegate_account_favourites", // cross-user sharing state

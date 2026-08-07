@@ -438,7 +438,9 @@
     "symbolLength": "[XX-Symbol must be between 1 and 20 characters-XX]",
     "symbolCharacters": "[XX-Symbol must contain only letters, digits, dots, or dashes-XX]",
     "noUpdateFields": "[XX-Provide at least one field to change.-XX]",
-    "documentNotFound": "[XX-Document not found-XX]"
+    "documentNotFound": "[XX-Document not found-XX]",
+    "selectionNotFound": "[XX-One or more of the selected securities could not be found-XX]",
+    "comparisonSelectionEmpty": "[XX-Select at least one security or market index to compare-XX]"
   },
   "tags": {
     "notFound": "[XX-Tag with ID {{ id }} not found-XX]",

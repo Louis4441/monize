@@ -4,6 +4,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
 import { BOUNDARY_LAG_DAYS, PricePoint } from "./gem-momentum.util";
+import { loadPriceSeries } from "../common/time-series/price-series.util";
 import { GemRange } from "./gem-report.types";
 
 /** How far back each chart range reaches, in months. `null` means "all history". */
@@ -39,14 +40,10 @@ const RANGE_SAMPLING: Record<GemRange, "day" | "week" | "month"> = {
  * lookup can only search backwards. Loading less than the rule accepts would
  * discard prices the rule would have used.
  */
-export const PRICE_WINDOW_LEAD_DAYS = BOUNDARY_LAG_DAYS;
-
-/** ISO date `days` before `date`. */
-export function withLeadDays(date: string, days: number): string {
-  const shifted = new Date(`${date}T00:00:00Z`);
-  shifted.setUTCDate(shifted.getUTCDate() - days);
-  return shifted.toISOString().slice(0, 10);
-}
+export {
+  PRICE_WINDOW_LEAD_DAYS,
+  withLeadDays,
+} from "../common/time-series/price-boundary.util";
 
 /** A security's close prices, oldest first. */
 export type PriceSeries = PricePoint[];
@@ -118,69 +115,20 @@ export class GemPriceService {
     const series = new Map<string, PriceSeries>();
     if (securityIds.length === 0) return series;
 
-    // `scoped` is the window; `basis` decides, per security, whether that
-    // window has any adjusted data at all; `chosen` keeps one basis throughout.
-    const oneBasis = `
-      WITH scoped AS (
-        SELECT security_id, price_date, close_price, adjusted_close
-          FROM security_prices
-         WHERE security_id = ANY($1::uuid[])
-           AND price_date >= $2::date
-           AND close_price IS NOT NULL
-      ),
-      basis AS (
-        SELECT security_id, bool_or(adjusted_close IS NOT NULL) AS has_adjusted
-          FROM scoped
-         GROUP BY security_id
-      ),
-      chosen AS (
-        SELECT s.security_id,
-               s.price_date,
-               CASE WHEN b.has_adjusted THEN s.adjusted_close
-                    ELSE s.close_price END AS close_price
-          FROM scoped s
-          JOIN basis b ON b.security_id = s.security_id
-         WHERE b.has_adjusted = false OR s.adjusted_close IS NOT NULL
-      )`;
+    const load = (m: EntityManager) =>
+      loadPriceSeries(m, {
+        table: "security_prices",
+        ids: securityIds,
+        fromDate,
+        sampling,
+      });
 
-    const sql =
-      sampling === "day"
-        ? `${oneBasis}
-           SELECT security_id, price_date::text AS price_date, close_price
-             FROM chosen
-            ORDER BY security_id, price_date`
-        : `${oneBasis}
-           SELECT DISTINCT ON (security_id, bucket)
-                  security_id, price_date::text AS price_date, close_price
-             FROM (
-               SELECT security_id, price_date, close_price,
-                      date_trunc($3, price_date) AS bucket
-                 FROM chosen
-             ) sampled
-            ORDER BY security_id, bucket, price_date DESC`;
+    const loaded = manager
+      ? await load(manager)
+      : await withScopedDb(this.dataSource, load);
 
-    const params: unknown[] =
-      sampling === "day"
-        ? [securityIds, fromDate]
-        : [securityIds, fromDate, sampling];
-
-    const rows: Array<{
-      security_id: string;
-      price_date: string;
-      close_price: string;
-    }> = manager
-      ? await manager.query(sql, params)
-      : await withScopedDb(this.dataSource, (m) => m.query(sql, params));
-
-    for (const row of rows) {
-      const points = series.get(row.security_id) ?? [];
-      points.push({ date: row.price_date, close: Number(row.close_price) });
-      series.set(row.security_id, points);
-    }
-    // DISTINCT ON returns descending dates within a bucket group; normalise so
-    // every consumer can assume oldest-first (priceAsOf binary-searches on it).
-    for (const points of series.values()) {
-      points.sort((a, b) => a.date.localeCompare(b.date));
+    for (const [securityId, { points }] of loaded) {
+      series.set(securityId, points);
     }
     return series;
   }

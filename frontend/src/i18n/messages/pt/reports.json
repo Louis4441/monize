@@ -106,7 +106,7 @@
       "security-type-allocation": "Veja a alocação do portefólio por tipo de ativo (ações, ETFs, fundos de investimento, obrigações) com detalhe das posições.",
       "geographic-allocation": "Analise a exposição geográfica do portefólio por bolsa e região para obter informações sobre diversificação.",
       "dividend-yield-growth": "Acompanhe o rendimento de dividendos, rendimentos por título, crescimento anual e análise da frequência de pagamentos.",
-      "security-performance": "Análise aprofundada do histórico de preços, das transações e das rentabilidades de um título, ou comparação do desempenho de vários títulos num único gráfico.",
+      "security-performance": "Análise detalhada do histórico de preços, transações e rentabilidades de um título, ou comparação de vários títulos e índices de mercado num só gráfico.",
       "currency-exposure": "Compreenda o risco cambial com a alocação do portefólio por moeda e detalhes das taxas de câmbio.",
       "monte-carlo-simulation": "Projete resultados futuros do portefólio com milhares de trajetórias de rentabilidade aleatórias e uma biblioteca de cenários guardados.",
       "gem-strategy": "Acompanhe o sinal Global Equities Momentum, porque mudou e se a sua carteira corresponde a ele.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% do Portefólio"
   },
   "securityPerformance": {
-    "selectPrompt": "Selecione acima um ou mais títulos para ver o seu desempenho. Escolha dois ou mais para os comparar num único gráfico.",
+    "selectPrompt": "Selecione um ou mais títulos acima para ver o seu desempenho e adicione um índice de mercado com o qual os comparar.",
     "selectSecuritiesPlaceholder": "Selecionar títulos...",
     "comparisonTitle": "Comparação de desempenho",
-    "comparisonSubtitle": "Rentabilidade acumulada de cada título selecionado, redefinida para 0% no seu primeiro preço disponível, para serem comparados numa só escala, independentemente do preço ou da moeda.",
-    "comparisonNoData": "Não há histórico de preços disponível para os títulos selecionados.",
+    "comparisonSubtitle": "Rentabilidade acumulada de cada instrumento selecionado, reposta a 0 % no início do período escolhido para que se comparem numa só escala, independentemente do preço ou da moeda. Os índices de mercado são traçados a tracejado.",
+    "comparisonNoData": "Nenhum dos instrumentos selecionados pôde ser avaliado neste período.",
     "comparisonError": "Não foi possível carregar o histórico de preços. Tente novamente.",
     "viewPriceChart": "Gráfico de Preços",
     "viewTransactions": "Transações",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Ações",
     "pdfColPrice": "Preço",
     "pdfColTotal": "Total",
-    "pdfTotalDividends": "Total de Dividendos"
+    "pdfTotalDividends": "Total de Dividendos",
+    "selectIndexesPlaceholder": "Adicionar um índice de mercado…",
+    "timeframeChartOnlyNote": "O período aplica-se ao gráfico. Os valores acima e as tabelas abaixo abrangem a posição completa.",
+    "comparisonExcludedTitle": "Não apresentado neste gráfico",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "não há histórico de preços guardado",
+      "NO_PRICE_AT_WINDOW_START": "não há preço suficientemente próximo do início deste período, pelo que a rentabilidade do período é desconhecida",
+      "NON_POSITIVE_BASE": "o preço no início deste período não é um valor utilizável",
+      "SINGLE_OBSERVATION": "apenas um preço neste período, o que não mede qualquer variação"
+    },
+    "comparisonIncomplete": "Parte deste gráfico não pôde ser medida: uma linha interrompida assinala um troço sem preços, e uma linha que termina cedo não tem dados a partir daí.",
+    "comparisonIndexLegend": "{name} (índice)",
+    "indexRegions": {
+      "NORTH_AMERICA": "América do Norte",
+      "EUROPE": "Europa",
+      "ASIA_PACIFIC": "Ásia-Pacífico"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Nenhuma posição de investimento encontrada. Adicione títulos para ver a análise por tipo de ativo.",

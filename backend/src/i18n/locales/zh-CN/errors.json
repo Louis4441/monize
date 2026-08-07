@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "配置百分比总和超过 100%。",
     "invalidTagKey": "需要标签键（1-100 个字符）",
     "assetOptionNameRequired": "需要填写资产类别名称。",
-    "documentNotFound": "未找到该文档"
+    "documentNotFound": "未找到该文档",
+    "selectionNotFound": "未找到所选证券中的一个或多个",
+    "comparisonSelectionEmpty": "请至少选择一只证券或一个市场指数进行比较"
   },
   "tags": {
     "notFound": "未找到 ID 为 {{ id }} 的标签",

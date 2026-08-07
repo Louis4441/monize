@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "배분 비율의 합계가 100%를 초과합니다.",
     "invalidTagKey": "태그 키(1~100자)가 필요합니다",
     "assetOptionNameRequired": "자산군 이름이 필요합니다.",
-    "documentNotFound": "문서를 찾을 수 없습니다"
+    "documentNotFound": "문서를 찾을 수 없습니다",
+    "selectionNotFound": "선택한 증권 중 하나 이상을 찾을 수 없습니다",
+    "comparisonSelectionEmpty": "비교할 증권 또는 시장 지수를 하나 이상 선택하세요"
   },
   "tags": {
     "notFound": "ID가 {{ id }}인 태그를 찾을 수 없습니다",

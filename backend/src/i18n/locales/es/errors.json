@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "Los porcentajes de asignación suman más del 100 %.",
     "invalidTagKey": "Se requiere una clave de etiqueta (1-100 caracteres)",
     "assetOptionNameRequired": "Se requiere un nombre de clase de activo.",
-    "documentNotFound": "Documento no encontrado"
+    "documentNotFound": "Documento no encontrado",
+    "selectionNotFound": "No se encontraron uno o varios de los valores seleccionados",
+    "comparisonSelectionEmpty": "Seleccione al menos un valor o índice de mercado para comparar"
   },
   "tags": {
     "notFound": "Etiqueta con ID {{ id }} no encontrada",

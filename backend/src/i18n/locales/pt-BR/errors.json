@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "As porcentagens de alocação somam mais de 100%.",
     "invalidTagKey": "É necessária uma chave de tag (1-100 caracteres)",
     "assetOptionNameRequired": "É necessário informar um nome de classe de ativos.",
-    "documentNotFound": "Documento não encontrado"
+    "documentNotFound": "Documento não encontrado",
+    "selectionNotFound": "Um ou mais dos ativos selecionados não foram encontrados",
+    "comparisonSelectionEmpty": "Selecione pelo menos um ativo ou índice de mercado para comparar"
   },
   "tags": {
     "notFound": "Etiqueta com ID {{ id }} não encontrada",

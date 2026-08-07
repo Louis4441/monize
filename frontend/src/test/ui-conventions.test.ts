@@ -408,3 +408,60 @@ describe("nothing interactive is nested inside a button", () => {
     expect(/<InfoTooltip[\s/>]/.test(body)).toBe(true);
   });
 });
+
+describe("an unknown value is not drawn as measured data", () => {
+  /**
+   * `connectNulls` draws a straight segment across a gap. It is
+   * indistinguishable from measured data, and a tooltip saying "unknown" under
+   * the cursor does not undo it -- so the server's careful `null` is thrown away
+   * in the last hundred pixels (`frontend/CLAUDE.md`,
+   * `docs/time-series-contract.md` rule 3).
+   *
+   * The rule is `connectNulls={false}`. This scan is what tells you which files
+   * broke it: the Security Performance comparison chart carried a bare
+   * `connectNulls` for its whole life and nothing said so.
+   *
+   * The baseline is **shrink-only**. Each entry is a chart that predates the
+   * guard, with the reason it is tolerated; fixing one means deleting its line.
+   */
+  const BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
+    {
+      file: "/src/components/accounts/loan-detail/PayoffComparisonChart.tsx",
+      reason:
+        "Amortization curves are computed, not observed: every point exists by " +
+        "construction, so a null there is a series that has ended rather than a " +
+        "month nobody measured.",
+    },
+  ];
+
+  /** A `connectNulls` with no `={false}` beside it. */
+  const BARE_CONNECT_NULLS = /connectNulls(?!\s*=\s*\{\s*false\s*\})/;
+
+  it("has no bare connectNulls outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE.map((entry) => entry.file));
+    const offenders = productionSources()
+      .filter(([, content]) => content.includes("recharts"))
+      .filter(([, content]) =>
+        content
+          .split("\n")
+          .some((line) => BARE_CONNECT_NULLS.test(line)),
+      )
+      .map(([path]) => path)
+      .filter((path) => !allowed.has(path));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(
+      productionSources()
+        .filter(([, content]) =>
+          content.split("\n").some((line) => BARE_CONNECT_NULLS.test(line)),
+        )
+        .map(([path]) => path),
+    );
+    expect(
+      BASELINE.map((entry) => entry.file).filter((file) => !offending.has(file)),
+    ).toEqual([]);
+  });
+});

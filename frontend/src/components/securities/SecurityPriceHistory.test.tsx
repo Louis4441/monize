@@ -243,7 +243,9 @@ describe('SecurityPriceHistory', () => {
 
   it('loads prices on mount with the 9999 limit', async () => {
     await renderComponent();
-    expect(investmentsApi.getSecurityPrices).toHaveBeenCalledWith('sec-1', 9999);
+    expect(investmentsApi.getSecurityPrices).toHaveBeenCalledWith('sec-1', {
+      limit: 9999,
+    });
   });
 
   it('shows the loading spinner before prices resolve', () => {
