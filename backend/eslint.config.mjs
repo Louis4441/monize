@@ -27,7 +27,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/auth/strategies/jwt.strategy.ts",
   "src/auth/token.service.ts",
   "src/backup/auto-backup.service.ts",
-  "src/backup/backup.service.ts",
+  // `withPreserveTimestamps` (identity inherited, never granted) around the
+  // restore's single transaction, so the GUC-aware `updated_at` trigger keeps
+  // the backup's own timestamps. It moved here from `backup.service.ts` when
+  // issue #1092 split the restore out; the facade no longer touches the module.
+  "src/backup/backup-restore.service.ts",
   "src/budgets/budget-alert.service.ts",
   "src/budgets/budget-period-cron.service.ts",
   "src/common/interceptors/request-context.interceptor.ts",

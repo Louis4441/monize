@@ -141,6 +141,50 @@ describe("BackupController", () => {
         password,
       );
     });
+
+    /**
+     * CodeQL `js/polynomial-redos`.
+     *
+     * The padding was stripped with `/=+$/`, applied to the raw header. The
+     * engine restarts the `=+` scan at every start position, so `"=".repeat(n)`
+     * followed by one non-`=` character costs O(n^2) -- and the header is
+     * attacker-supplied, unauthenticated at this point in the request, and
+     * evaluated on the event loop, so a single request stalls every other one in
+     * the process.
+     *
+     * A time budget rather than a shape assertion, because the defect was the
+     * cost and not the syntax. 200k characters is ~4*10^10 backtracking steps
+     * under the old expression -- minutes, well past any jest timeout -- against
+     * a linear walk that finishes in single-digit milliseconds. The two-second
+     * budget is three orders of magnitude clear of the fixed path, so this fails
+     * on the regression without being a benchmark.
+     */
+    it.each(["x-export-password", "x-restore-password", "x-backup-password"])(
+      "strips %s padding in linear time (ReDoS guard)",
+      async (header) => {
+        // Trailing non-`=` character: this is the shape that backtracks. A string
+        // of pure `=` matches at the first position and never re-scans.
+        const hostile = `${"=".repeat(200_000)}a`;
+        const req = {
+          ...mockReq,
+          body: Buffer.from("gz"),
+          headers: { [header]: hostile },
+        };
+        const mockRes = { setHeader: jest.fn() };
+
+        const started = process.hrtime.bigint();
+        // Every one of these headers is rejected -- `hostile` is not the base64
+        // of its own decoding -- so the assertion is only about how fast.
+        await expect(
+          header === "x-export-password"
+            ? controller.exportBackup(req, mockRes as any)
+            : controller.restoreBackup(req),
+        ).rejects.toThrow(/base64/i);
+        const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
+
+        expect(elapsedMs).toBeLessThan(2000);
+      },
+    );
   });
 
   describe("supportExport", () => {

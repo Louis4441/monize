@@ -4,6 +4,10 @@ import { ConfigModule } from "@nestjs/config";
 import { DataSource } from "typeorm";
 import { randomUUID } from "crypto";
 import { BackupService } from "@/backup/backup.service";
+import { BackupExportService } from "@/backup/backup-export.service";
+import { BackupRestoreService } from "@/backup/backup-restore.service";
+import { BackupAttachmentTransferService } from "@/backup/backup-attachment-transfer.service";
+import { BackupRestoreDatabaseService } from "@/backup/backup-restore-database.service";
 import { SupportBackupService } from "@/backup/support-backup/support-backup.service";
 import {
   ALWAYS_EXCLUDED_TABLES,
@@ -47,6 +51,13 @@ describe("Support backup (integration)", () => {
       ],
       providers: [
         BackupService,
+        // The four components issue #1092 split BackupService into. Real, like
+        // everything else here: the point of an integration suite is that the
+        // wiring is the thing under test.
+        BackupExportService,
+        BackupRestoreService,
+        BackupAttachmentTransferService,
+        BackupRestoreDatabaseService,
         SupportBackupService,
         // Real, for the reason the sibling suite gives: a mocked step-up would
         // keep this suite green through the removal of the check it gates.

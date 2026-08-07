@@ -1125,8 +1125,10 @@ grantee-side audit result in the PR description.
   still throws and the restore keeps running as the requesting user (no system bypass).
   - The wrapper-usage unit test asserts the user lookup runs unflagged, the restore transaction
     flagged, and the deferred UPDATE runs with **no trigger DDL**; a source-scan guard test fails if
-    `DISABLE TRIGGER`/`ENABLE TRIGGER` ever reappear in `backup.service.ts` (the
-    `ui-conventions.test.ts` pattern).
+    `DISABLE TRIGGER`/`ENABLE TRIGGER` ever reappear anywhere in `backend/src/backup/` (the
+    `ui-conventions.test.ts` pattern). It scanned only `backup.service.ts` until issue #1092 moved
+    the restore's SQL to `backup-restore-database.service.ts`, which would have left it passing over
+    a file that no longer held the code.
   - `backup-restore.integration.spec.ts` previously **recreated the pre-M1 trigger function by
     hand**, which would have made every timestamp assertion test a function that no longer ships. It
     now applies the real RLS migrations via T1's `applyRlsPolicies`, and the round-trip asserts a

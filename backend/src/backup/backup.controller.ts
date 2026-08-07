@@ -28,6 +28,22 @@ import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
 import { tr } from "../i18n/translate";
 import { releaseRestoreReservation } from "./restore-upload-admission";
 
+/**
+ * Drop trailing `=` padding without a regular expression.
+ *
+ * `/=+$/` over an attacker-supplied header is a polynomial ReDoS
+ * (CodeQL `js/polynomial-redos`): the engine restarts the `=+` scan at every
+ * position, so a header of n `=` characters costs O(n^2). A single backwards
+ * walk is O(n) and answers the same question.
+ */
+function stripBase64Padding(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x3d /* '=' */) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 // Password header values are base64-encoded by the client so leading/trailing
 // whitespace (and non-ASCII characters) survive HTTP header transport, which
 // otherwise strips surrounding whitespace per RFC 7230. Decode them back to the
@@ -48,7 +64,7 @@ function decodePasswordHeader(
   if (value === undefined) return undefined;
   const decoded = Buffer.from(value, "base64");
   if (
-    decoded.toString("base64").replace(/=+$/, "") !== value.replace(/=+$/, "")
+    stripBase64Padding(decoded.toString("base64")) !== stripBase64Padding(value)
   ) {
     throw new BadRequestException(
       tr(

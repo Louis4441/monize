@@ -15,6 +15,27 @@ the ones deliberately left open -- see the issues those findings were filed as
 branch-qualified on purpose: it is not a claim about this tree, and the doc-path
 guard reads it as such.
 
+## 0. Where the code lives
+
+`BackupService` is a facade, not the implementation. Issue #1092 split the
+original 2,600-line class into four components, each of which owns one of the
+concerns this document describes:
+
+| File | Owns |
+|---|---|
+| `backend/src/backup/backup.service.ts` | The facade the controller, the auto-backup cron and the support export call. One delegation per method, no decisions. |
+| `backend/src/backup/backup-export.service.ts` | §1 and §4's export half: the `REPEATABLE READ` snapshot, the streamed and buffered assemblies, the carried attachment bytes, the completeness report. |
+| `backend/src/backup/backup-restore.service.ts` | §3 and §6: the processing gate, decryption, decompression, format validation, re-authentication ordering, id remapping, and the one transaction the rest runs inside. |
+| `backend/src/backup/backup-attachment-transfer.service.ts` | §4's restore half: staging carried bytes, the legacy ownership proof, and both object-store cleanup paths. |
+| `backend/src/backup/backup-restore-database.service.ts` | The restore's SQL: teardown, currency preparation, row inserts, deferred-FK repair. |
+| `backend/src/backup/backup-format.ts` | The file format itself -- version, `BackupData`, the two result types -- shared by all four. |
+| `backend/src/backup/export-table-queries.ts` | §2's other half: what is read, in what order, and what is deliberately not read. |
+| `backend/src/backup/restore-plan.ts` | §2: insertion order and deferred foreign keys, as data. |
+
+The split is why §4's ordering rule is reviewable at all: the object store is
+touched from exactly one of these files, and the transaction is opened in exactly
+one other.
+
 ## 1. What travels in a backup
 
 Everything the export produces, in one gzipped JSON document with a
@@ -141,11 +162,12 @@ later complete backup resumes normal promotion and retention. This is the invari
 that a backup shown as successful is one that restores in full.
 
 **A `sha256` and a `byte_size` are checked against the carried bytes**, at both
-ends. At export, the store is compared against the database (`storedBytesMatchMetadata`),
-so a source object that was truncated or replaced is caught before it is packaged.
-At restore, the carried bytes are compared against their own metadata
-(`carriedBytesMatchMetadata`) — same file both sides, so that proves consistency
-rather than authority, catching a corrupt or truncated artifact.
+ends. One comparison, `attachmentBytesConsistent` (`attachment-integrity.util.ts`),
+used from both ends with different provenance. At export, the store is compared
+against the database, so a source object that was truncated or replaced is caught
+before it is packaged. At restore, the carried bytes are compared against their own
+metadata — same file both sides, so that proves consistency rather than authority,
+catching a corrupt or truncated artifact.
 
 ### The legacy path, and why it is still ownership-gated
 

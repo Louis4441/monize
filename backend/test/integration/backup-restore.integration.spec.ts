@@ -9,6 +9,10 @@ import {
   BackupPasswordRequiredError,
   RESTORABLE_TABLES,
 } from "@/backup/backup.service";
+import { BackupExportService } from "@/backup/backup-export.service";
+import { BackupRestoreService } from "@/backup/backup-restore.service";
+import { BackupAttachmentTransferService } from "@/backup/backup-attachment-transfer.service";
+import { BackupRestoreDatabaseService } from "@/backup/backup-restore-database.service";
 import { User } from "@/users/entities/user.entity";
 import { OidcReauthService } from "@/auth/oidc/oidc-reauth.service";
 import { AiEncryptionService } from "@/ai/ai-encryption.service";
@@ -80,6 +84,13 @@ describe("Backup export/restore round-trip (integration)", () => {
       ],
       providers: [
         BackupService,
+        // The four components issue #1092 split BackupService into. Real, like
+        // everything else here: the point of an integration suite is that the
+        // wiring is the thing under test.
+        BackupExportService,
+        BackupRestoreService,
+        BackupAttachmentTransferService,
+        BackupRestoreDatabaseService,
         // The REAL re-authentication service, not a double: it is the thing that
         // refuses a restore without a valid artifact, and a mock here would let a
         // future change remove that check with this suite still green. Local-auth
@@ -804,7 +815,7 @@ describe("Backup export/restore round-trip (integration)", () => {
       );
 
       // If this fails, a new table was added without deciding whether it belongs
-      // in a backup. Add it to getTableQueries()/RESTORABLE_TABLES (and the
+      // in a backup. Add it to buildExportTableQueries()/RESTORABLE_TABLES (and the
       // restore inserts) to back it up, or to INTENTIONALLY_EXCLUDED_TABLES with
       // a reason if it should never be exported.
       expect(unclassified).toEqual([]);

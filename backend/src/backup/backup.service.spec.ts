@@ -14,6 +14,11 @@ import * as path from "path";
 import { getRequestContext } from "../common/request-context";
 import { OidcReauthService } from "../auth/oidc/oidc-reauth.service";
 import { BackupService, RestoreBackupInput } from "./backup.service";
+import { BackupExportService } from "./backup-export.service";
+import { BackupRestoreService } from "./backup-restore.service";
+import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
+import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
+import { buildExportTableQueries } from "./export-table-queries";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
@@ -51,6 +56,40 @@ function responseDouble(): {
     getHeader: (name: string) => headers[name],
   }) as unknown as import("express").Response;
   return { res, chunks, headers };
+}
+
+/**
+ * Every non-test source file in the backup module, for the source guards below.
+ *
+ * A guard that reads one filename is only a guard while that filename holds the
+ * code -- issue #1092 moved the restore's SQL and both attachment readers out of
+ * `backup.service.ts`, and a scan still pointed there would have kept passing
+ * with nothing left to find. Scanning the directory means the next split cannot
+ * disarm them either.
+ */
+function backupModuleSources(): Array<{ file: string; text: string }> {
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return entry.name.endsWith(".ts") && !entry.name.endsWith(".spec.ts")
+        ? [full]
+        : [];
+    });
+  return walk(__dirname).map((full) => ({
+    file: path.relative(__dirname, full),
+    text: fs.readFileSync(full, "utf8"),
+  }));
+}
+
+/** One module source by its path relative to this directory. */
+function sourceOf(
+  sources: Array<{ file: string; text: string }>,
+  file: string,
+): string {
+  const found = sources.find((source) => source.file === file);
+  if (!found) throw new Error(`${file} is not in the backup module any more`);
+  return found.text;
 }
 
 jest.mock("../common/db/scoped-db", () =>
@@ -547,7 +586,15 @@ describe("BackupService", () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        // Real components, not doubles. `BackupService` is a facade over the
+        // four issue #1092 split it into, and a double for any of them would
+        // make every assertion below an assertion about the double. What is
+        // mocked stays what it always was: the DataSource and the object store.
         BackupService,
+        BackupExportService,
+        BackupRestoreService,
+        BackupAttachmentTransferService,
+        BackupRestoreDatabaseService,
         {
           provide: DataSource,
           useValue: mockDataSource,
@@ -638,13 +685,11 @@ describe("BackupService", () => {
    */
   describe("currency export selection", () => {
     it("selects by what the user's data references, not by who created it", () => {
-      const sql = (
-        service as unknown as {
-          getTableQueries(): Array<{ key: string; sql: string }>;
-        }
-      )
-        .getTableQueries()
-        .find((q) => q.key === "currencies")!.sql;
+      // The list is module-level data now (issue #1092), so this reads it
+      // directly instead of reaching through a cast into a private method.
+      const sql = buildExportTableQueries(async (rows) => rows).find(
+        (q) => q.key === "currencies",
+      )!.sql;
 
       expect(sql).toContain("currency_codes_referenced_by_user($1)");
       // Rows the user created are still exported even when nothing references
@@ -2057,47 +2102,73 @@ describe("BackupService", () => {
          * it appears, and makes whoever adds a third one say which kind it is.
          */
         it("opens an external object in exactly two places, and the restore's is ownership-gated (source guard)", () => {
-          const source = fs.readFileSync(
-            path.join(__dirname, "backup.service.ts"),
-            "utf8",
+          // Scans the whole module, not one file. Issue #1092 split the two
+          // readers into two classes, and a guard that had stayed pointed at
+          // `backup.service.ts` would have gone on passing while counting zero
+          // readers -- a scan that can only see one file is a scan a refactor
+          // silently disarms.
+          const sources = backupModuleSources();
+          const reads = sources.flatMap(({ file, text }) =>
+            [...text.matchAll(/this\.attachmentStorage\.load\(/g)].map(
+              (match) => ({ file, at: match.index as number }),
+            ),
           );
-          const reads = [
-            ...source.matchAll(/this\.attachmentStorage\.load\(/g),
-          ].map((match) => match.index as number);
           expect(reads).toHaveLength(2);
 
-          /** The slice from a method's signature to the start of the next one. */
-          const methodBody = (signature: string) => {
-            const start = source.indexOf(signature);
+          /** The slice from a method's signature to the start of the next member. */
+          const methodBody = (file: string, signature: string) => {
+            const text = sourceOf(sources, file);
+            const start = text.indexOf(signature);
             expect(start).toBeGreaterThan(-1);
-            const next = source.indexOf("\n  private ", start + 1);
-            return { start, end: next === -1 ? source.length : next };
+            const rest = text.slice(start + 1);
+            const next = rest.search(/\n {2}(private |async |get |\/\*\*)/);
+            return {
+              text,
+              start,
+              end: next === -1 ? text.length : start + 1 + next,
+            };
           };
 
           const exporting = methodBody(
+            "backup-export.service.ts",
             "private async appendExternalAttachmentBytes(",
           );
-          const staging = methodBody("private async stageAttachmentObjects(");
+          const staging = methodBody(
+            "backup-attachment-transfer.service.ts",
+            "async stageAttachmentObjects(",
+          );
 
           const inExport = reads.filter(
-            (at) => at > exporting.start && at < exporting.end,
+            (read) =>
+              read.file === "backup-export.service.ts" &&
+              read.at > exporting.start &&
+              read.at < exporting.end,
           );
           const inStaging = reads.filter(
-            (at) => at > staging.start && at < staging.end,
+            (read) =>
+              read.file === "backup-attachment-transfer.service.ts" &&
+              read.at > staging.start &&
+              read.at < staging.end,
           );
-          // One each, so a new reader anywhere else fails this.
+          // One each, so a new reader anywhere else in the module fails this.
           expect(inExport).toHaveLength(1);
           expect(inStaging).toHaveLength(1);
 
           // The restore's read is preceded by loading and consulting the
           // database's ownership record.
-          const beforeRestoreRead = source.slice(staging.start, inStaging[0]);
+          const beforeRestoreRead = staging.text.slice(
+            staging.start,
+            inStaging[0].at,
+          );
           expect(beforeRestoreRead).toContain("loadOwnedAttachmentSources(");
           expect(beforeRestoreRead).toContain("ownedSources.get(");
 
           // The export's read is preceded by the server's own scoped query, and
           // the export never sees an uploaded document at all.
-          const exportBody = source.slice(exporting.start, exporting.end);
+          const exportBody = exporting.text.slice(
+            exporting.start,
+            exporting.end,
+          );
           expect(exportBody).toContain("WHERE user_id = $1");
           expect(exportBody).not.toContain("BackupData");
         });
@@ -3959,13 +4030,14 @@ describe("BackupService", () => {
     it("keeps trigger DDL out of the restore path (source guard)", () => {
       // Regression guard for task C5: the mechanism for preserving restored
       // timestamps is the app.preserve_timestamps GUC, never ALTER TABLE
-      // trigger DDL -- any reappearance is a bug wherever it is.
-      const source = fs.readFileSync(
-        path.join(__dirname, "backup.service.ts"),
-        "utf8",
-      );
-      expect(source).not.toMatch(/DISABLE TRIGGER/);
-      expect(source).not.toMatch(/ENABLE TRIGGER/);
+      // trigger DDL -- any reappearance is a bug wherever it is. Scanned across
+      // the module rather than one file, because after issue #1092 the restore's
+      // SQL lives in `backup-restore-database.service.ts` and a guard aimed only
+      // at `backup.service.ts` would assert nothing.
+      for (const { file, text } of backupModuleSources()) {
+        expect(`${file}: ${text}`).not.toMatch(/DISABLE TRIGGER/);
+        expect(`${file}: ${text}`).not.toMatch(/ENABLE TRIGGER/);
+      }
     });
 
     it("accepts the session-confirmed sentinel for OIDC users (soft re-auth)", async () => {
