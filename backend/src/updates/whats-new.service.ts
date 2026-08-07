@@ -1,8 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { buildDefaultPreferences } from "../users/user-preference.factory";
-import { currentRequestLocale } from "../i18n/request-locale";
+import { patchUserPreferences } from "../users/user-preference-writer";
 import { DemoModeService } from "../common/demo-mode.service";
 import { withScopedDb } from "../common/db/scoped-db";
 import { ReleaseNotesService } from "./release-notes.service";
@@ -83,18 +82,15 @@ export class WhatsNewService {
   async markSeen(userId: string): Promise<{ seen: boolean; version: string }> {
     const currentVersion = this.releaseNotesService.currentVersion;
 
-    await withScopedDb(this.dataSource, async (manager) => {
-      const repo = manager.getRepository(UserPreference);
-      const prefs = await repo.findOne({ where: { userId } });
-      if (prefs) {
-        prefs.lastSeenVersion = currentVersion;
-        await repo.save(prefs);
-      } else {
-        const created = buildDefaultPreferences(userId, currentRequestLocale());
-        created.lastSeenVersion = currentVersion;
-        await repo.save(created);
-      }
-    });
+    // Write only the last_seen_version column through the shared writer, which
+    // materializes the row from the shared defaults when none exists yet. Never
+    // a whole-entity save: a preference another request changed must not be
+    // reverted (maintainer review PR #1097, finding 3).
+    await withScopedDb(this.dataSource, (manager) =>
+      patchUserPreferences(manager, userId, {
+        lastSeenVersion: currentVersion,
+      }),
+    );
 
     return { seen: true, version: currentVersion };
   }
@@ -111,20 +107,16 @@ export class WhatsNewService {
    * would never arrive.
    */
   async remindNextLogin(userId: string): Promise<{ reminded: boolean }> {
-    await withScopedDb(this.dataSource, async (manager) => {
-      const repo = manager.getRepository(UserPreference);
-      const prefs = await repo.findOne({ where: { userId } });
-      if (prefs) {
-        if (prefs.lastSeenVersion !== null) {
-          prefs.lastSeenVersion = null;
-          await repo.save(prefs);
-        }
-      } else {
-        const created = buildDefaultPreferences(userId, currentRequestLocale());
-        created.lastSeenVersion = null;
-        await repo.save(created);
-      }
-    });
+    // Write only the last_seen_version column (to null) through the shared
+    // writer, which materializes the row when none exists -- a missing row reads
+    // as a first login and would suppress the very reminder the user asked for.
+    // Unconditional: setting an already-null column to null is a harmless
+    // idempotent write, and this replaces the whole-entity save that reverted a
+    // concurrent change to another preference (maintainer review PR #1097,
+    // finding 3).
+    await withScopedDb(this.dataSource, (manager) =>
+      patchUserPreferences(manager, userId, { lastSeenVersion: null }),
+    );
 
     return { reminded: true };
   }

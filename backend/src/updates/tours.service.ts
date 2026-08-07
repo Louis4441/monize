@@ -6,6 +6,7 @@ import {
   UserPreference,
 } from "../users/entities/user-preference.entity";
 import { buildDefaultPreferences } from "../users/user-preference.factory";
+import { patchUserPreferences } from "../users/user-preference-writer";
 import { currentRequestLocale } from "../i18n/request-locale";
 import { withScopedDb } from "../common/db/scoped-db";
 import { ReleaseNotesService } from "./release-notes.service";
@@ -82,7 +83,10 @@ export class ToursService {
       }
 
       // Best-effort cap: prune the oldest entries when the map grows unbounded.
-      // Rare enough (200+ tours completed) that a read-modify-write here is fine.
+      // Rare enough (200+ tours completed) that reading the map to prune it is
+      // fine -- but write back only the tour_progress column via the shared
+      // writer, never `save(prefs)` on the whole entity, so a preference another
+      // request changed between this read and the write is not reverted.
       const prefs = await repo.findOne({ where: { userId } });
       const map = prefs?.tourProgress ?? {};
       const keys = Object.keys(map);
@@ -94,8 +98,7 @@ export class ToursService {
         for (const key of kept) {
           pruned[key] = map[key];
         }
-        prefs.tourProgress = pruned;
-        await repo.save(prefs);
+        await patchUserPreferences(manager, userId, { tourProgress: pruned });
       }
     });
 

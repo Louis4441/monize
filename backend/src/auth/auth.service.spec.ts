@@ -8,7 +8,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
-import { DataSource } from "typeorm";
+import { DataSource, In } from "typeorm";
 import bcrypt from "bcryptjs";
 import * as otplib from "otplib";
 import * as QRCode from "qrcode";
@@ -28,6 +28,10 @@ import { PasswordBreachService } from "./password-breach.service";
 import { EmailService } from "../notifications/email.service";
 import { getRequestContext } from "../common/request-context";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import {
+  createUserPreferenceRepoMock,
+  type UserPreferenceRepoMock,
+} from "../test-helpers/user-preference-testing";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -53,8 +57,10 @@ jest.mock("qrcode", () => ({
 describe("AuthService", () => {
   let service: AuthService;
   let scopedManager: Record<string, jest.Mock>;
+  let stageOneTokenFamily: () => void;
   let usersRepository: Record<string, jest.Mock>;
   let preferencesRepository: Record<string, jest.Mock>;
+  let preferencesRow: UserPreferenceRepoMock;
   let trustedDevicesRepository: Record<string, jest.Mock>;
   let refreshTokensRepository: Record<string, jest.Mock>;
   let jwtService: Partial<JwtService>;
@@ -95,14 +101,24 @@ describe("AuthService", () => {
       create: jest.fn(),
       save: jest.fn(),
       count: jest.fn(),
-      createQueryBuilder: jest.fn(),
+      // The login path no longer uses a query builder: the failed-attempt
+      // increment/lockout and the success reset are both raw guarded SQL on the
+      // scoped manager now (findings 1/2/6). The delegated resetPassword
+      // (AuthEmailService) and verify2FA lockout (TwoFactorService) paths still
+      // build their UPDATEs, and those describe blocks override this mock.
+      createQueryBuilder: jest.fn(() => ({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      })),
     };
 
-    preferencesRepository = {
-      findOne: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
-    };
+    // Behaves like the row: the 2FA flag is now written as a targeted patch,
+    // materializing the row when absent.
+    preferencesRow = createUserPreferenceRepoMock(null);
+    preferencesRepository = preferencesRow.repo;
 
     trustedDevicesRepository = {
       create: jest.fn(),
@@ -138,6 +154,30 @@ describe("AuthService", () => {
       [RefreshToken, refreshTokensRepository as never],
     ]);
     scopedManager = scoped.manager;
+    // Two statements now reach the manager directly on ordinary paths: the SQL
+    // failed-attempt increment and the family-discovery SELECT in
+    // revokeAllUserRefreshTokens. Both are happy with an empty result unless a
+    // spec says otherwise.
+    scopedManager.query.mockResolvedValue([]);
+
+    /**
+     * `revokeAllUserRefreshTokens` discovers the user's families, locks them in
+     * ascending order, revokes, and repeats until a pass revokes nothing -- one
+     * bulk UPDATE cannot see a replacement a concurrent rotation inserted after
+     * its statement snapshot (audit P4-011). So a spec that expects the revoke to
+     * happen has to give it a family to find.
+     */
+    stageOneTokenFamily = () => {
+      let pass = 0;
+      scopedManager.query.mockImplementation(async (sql: string) => {
+        if (String(sql).includes("pg_advisory_xact_lock")) return [];
+        if (!String(sql).includes("DISTINCT family_id")) return [];
+        return pass++ === 0 ? [{ family_id: "family-1" }] : [];
+      });
+      refreshTokensRepository.update
+        .mockResolvedValueOnce({ affected: 1 })
+        .mockResolvedValue({ affected: 0 });
+    };
     dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     passwordBreachService = {
@@ -242,6 +282,9 @@ describe("AuthService", () => {
   }
 
   function installTransactionMock(txManager: Record<string, any>) {
+    // The family advisory lock goes through the manager, and it is taken before
+    // any row lock so rotation and revocation cannot deadlock (audit P4-011).
+    txManager.query ??= jest.fn().mockResolvedValue([]);
     txManager.getRepository ??= jest.fn((entity: unknown) => {
       if (entity === User) return usersRepository;
       if (entity === UserPreference) return preferencesRepository;
@@ -607,15 +650,57 @@ describe("AuthService", () => {
   });
 
   describe("login", () => {
-    function mockLoginQueryBuilder() {
-      const builder = {
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 1 }),
-      };
-      usersRepository.createQueryBuilder.mockReturnValue(builder);
-      return builder;
+    /**
+     * Stage what the single guarded failed-attempt CTE UPDATE committed.
+     *
+     * `recordFailedAttempt` runs ONE statement that increments the counter and,
+     * in the same UPDATE, applies the lockout when the increment crosses the
+     * threshold (findings 1 and 2) -- there is no second lockout write. It
+     * returns, in the driver's `[rows, rowCount]` tuple, the post-update count
+     * plus the pre- and post-update `locked_until`, and the service derives
+     * `justLocked` from old-vs-new: true only for the write that moved the row
+     * from not-locked to locked, so the lockout email fires once per transition
+     * rather than once per attempt above the threshold (finding 6).
+     *
+     * Matched on `failed_login_attempts` + `RETURNING`, which distinguishes the
+     * CTE increment from the success reset (`SET failed_login_attempts = 0`, no
+     * RETURNING). The old count arithmetic (`user.failedLoginAttempts + 1`)
+     * across a ~100ms bcrypt comparison let parallel attempts all write `1` and
+     * never lock (audit P4-012); the count now comes from the database.
+     */
+    function stageFailedAttempt(opts: {
+      attempts: number;
+      oldLockedUntil?: Date | null;
+      newLockedUntil?: Date | null;
+    }) {
+      scopedManager.query.mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        if (
+          text.includes("failed_login_attempts") &&
+          text.includes("RETURNING")
+        ) {
+          return [
+            [
+              {
+                attempts: opts.attempts,
+                new_locked_until: opts.newLockedUntil ?? null,
+                old_locked_until: opts.oldLockedUntil ?? null,
+              },
+            ],
+            1,
+          ];
+        }
+        return [];
+      });
+    }
+
+    /** The single failed-attempt CTE UPDATE the login emitted, if any. */
+    function failedAttemptCall() {
+      return scopedManager.query.mock.calls.find(
+        (c) =>
+          String(c[0]).includes("failed_login_attempts") &&
+          String(c[0]).includes("RETURNING"),
+      );
     }
 
     it("returns token pair for valid credentials", async () => {
@@ -684,7 +769,6 @@ describe("AuthService", () => {
 
     it("captures nothing when the password is wrong", async () => {
       const hashedPassword = await bcrypt.hash("CorrectPass", 10);
-      mockLoginQueryBuilder();
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
@@ -729,7 +813,6 @@ describe("AuthService", () => {
 
     it("throws for wrong password", async () => {
       const hashedPassword = await bcrypt.hash("CorrectPass", 10);
-      mockLoginQueryBuilder();
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
@@ -799,7 +882,6 @@ describe("AuthService", () => {
 
     it("allows login when lock has expired", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
-      mockLoginQueryBuilder();
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
@@ -818,9 +900,13 @@ describe("AuthService", () => {
       expect(result.accessToken).toBeDefined();
     });
 
-    it("increments failed attempts on wrong password", async () => {
+    it("increments failed attempts in one guarded SQL statement on wrong password", async () => {
       const hashedPassword = await bcrypt.hash("CorrectPass", 10);
-      const builder = mockLoginQueryBuilder();
+      stageFailedAttempt({
+        attempts: 3,
+        oldLockedUntil: null,
+        newLockedUntil: null,
+      });
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
@@ -831,14 +917,60 @@ describe("AuthService", () => {
         service.login({ email: "test@example.com", password: "WrongPass" }),
       ).rejects.toThrow(UnauthorizedException);
 
-      expect(builder.set).toHaveBeenCalledWith(
-        expect.objectContaining({ failedLoginAttempts: 3 }),
-      );
+      // The counter is incremented by the database in a single statement, not by
+      // writing an absolute value derived from the pre-bcrypt read. Its params
+      // carry the id, the threshold, and the base lockout window.
+      const increment = failedAttemptCall();
+      expect(increment).toBeDefined();
+      expect(increment![1]).toEqual([mockUser.id, 5, 30 * 60 * 1000]);
+      // The lockout is folded into that same UPDATE (a CASE on the threshold),
+      // so no separate query-builder lockout write remains in the login path.
+      expect(usersRepository.createQueryBuilder).not.toHaveBeenCalled();
+      // Below the threshold, so no lockout email.
+      expect(emailService.sendMail).not.toHaveBeenCalled();
     });
 
-    it("locks account at 5 failed attempts and sends email", async () => {
+    it("locks out on the count the database committed, not the one it read", async () => {
+      // The regression guard for P4-012. The entity says 0 attempts; four other
+      // parallel requests have since committed theirs, so the increment returns
+      // 5 and the same statement writes a future locked_until. Deriving the
+      // decision from the snapshot would read 1 and never lock -- exactly how a
+      // parallel guessing attack stayed unblocked.
       const hashedPassword = await bcrypt.hash("CorrectPass", 10);
-      const builder = mockLoginQueryBuilder();
+      stageFailedAttempt({
+        attempts: 5,
+        oldLockedUntil: null,
+        newLockedUntil: new Date(Date.now() + 60 * 60 * 1000),
+      });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHash: hashedPassword,
+        failedLoginAttempts: 0,
+      });
+
+      await expect(
+        service.login({ email: "test@example.com", password: "WrongPass" }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      // The lockout transition (and its email) fire off the committed count of
+      // 5, not the snapshot's 0 -- and via one guarded statement, never a
+      // snapshot-derived absolute write.
+      expect(emailService.sendMail).toHaveBeenCalledWith(
+        "test@example.com",
+        "Account Temporarily Locked",
+        expect.stringContaining("temporarily locked"),
+      );
+      expect(failedAttemptCall()).toBeDefined();
+      expect(usersRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it("locks the account and emails on the not-locked -> locked transition", async () => {
+      const hashedPassword = await bcrypt.hash("CorrectPass", 10);
+      stageFailedAttempt({
+        attempts: 5,
+        oldLockedUntil: null,
+        newLockedUntil: new Date(Date.now() + 60 * 60 * 1000),
+      });
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
@@ -849,22 +981,106 @@ describe("AuthService", () => {
         service.login({ email: "test@example.com", password: "WrongPass" }),
       ).rejects.toThrow(UnauthorizedException);
 
-      expect(builder.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          failedLoginAttempts: 5,
-          lockedUntil: expect.any(Date),
-        }),
-      );
+      // A fresh lock (old locked_until null -> future) is a transition, so the
+      // lockout email fires exactly once for it (finding 6).
       expect(emailService.sendMail).toHaveBeenCalledWith(
         "test@example.com",
         "Account Temporarily Locked",
         expect.stringContaining("temporarily locked"),
       );
+      expect(emailService.sendMail).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not email again when the account was already locked (finding 6)", async () => {
+      // A later failure that commits a count still >= MAX but finds the row
+      // already locked (old locked_until already in the future) is not a
+      // transition. The old per-attempt model mailed the victim on every failure
+      // above the threshold; only the crossing may.
+      const hashedPassword = await bcrypt.hash("CorrectPass", 10);
+      const future = new Date(Date.now() + 60 * 60 * 1000);
+      stageFailedAttempt({
+        attempts: 6,
+        oldLockedUntil: future,
+        newLockedUntil: future,
+      });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHash: hashedPassword,
+        failedLoginAttempts: 5,
+      });
+
+      await expect(
+        service.login({ email: "test@example.com", password: "WrongPass" }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(emailService.sendMail).not.toHaveBeenCalled();
+    });
+
+    it("emails only the failure that crosses into locked, not both concurrent ones (finding 6)", async () => {
+      // Two parallel failures both commit a count >= MAX. The old per-attempt
+      // model mailed the victim twice for one lockout. Now the CTE returns
+      // old/new locked_until and only the write that moved not-locked -> locked
+      // reports justLocked: a transitioning row on the first failure, an
+      // already-locked row on the second.
+      const hashedPassword = await bcrypt.hash("CorrectPass", 10);
+      const future = new Date(Date.now() + 60 * 60 * 1000);
+      let call = 0;
+      scopedManager.query.mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        if (
+          text.includes("failed_login_attempts") &&
+          text.includes("RETURNING")
+        ) {
+          call += 1;
+          return call === 1
+            ? [
+                [
+                  {
+                    attempts: 5,
+                    old_locked_until: null,
+                    new_locked_until: future,
+                  },
+                ],
+                1,
+              ]
+            : [
+                [
+                  {
+                    attempts: 6,
+                    old_locked_until: future,
+                    new_locked_until: future,
+                  },
+                ],
+                1,
+              ];
+        }
+        return [];
+      });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHash: hashedPassword,
+        failedLoginAttempts: 4,
+      });
+
+      await expect(
+        service.login({ email: "test@example.com", password: "WrongPass" }),
+      ).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.login({ email: "test@example.com", password: "WrongPass" }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      // One lockout, one email.
+      expect(emailService.sendMail).toHaveBeenCalledTimes(1);
     });
 
     it("does not send lockout email for users without email", async () => {
       const hashedPassword = await bcrypt.hash("CorrectPass", 10);
-      mockLoginQueryBuilder();
+      // A genuine transition, but no address to send to.
+      stageFailedAttempt({
+        attempts: 5,
+        oldLockedUntil: null,
+        newLockedUntil: new Date(Date.now() + 60 * 60 * 1000),
+      });
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         email: null,
@@ -881,7 +1097,6 @@ describe("AuthService", () => {
 
     it("resets failed attempts on successful login", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
-      const builder = mockLoginQueryBuilder();
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
@@ -895,35 +1110,57 @@ describe("AuthService", () => {
         password: "ValidPass123!",
       });
 
-      expect(builder.set).toHaveBeenCalledWith({
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-      });
+      // Unconditional raw SQL, guarded by a WHERE rather than by the snapshot: a
+      // failure that committed between the read and here would otherwise leave
+      // the counter standing after a proven-correct password, and the predicate
+      // keeps it a no-op when there is nothing to clear.
+      const reset = scopedManager.query.mock.calls.find((c) =>
+        String(c[0]).includes("SET failed_login_attempts = 0"),
+      );
+      expect(reset).toBeDefined();
+      expect(String(reset![0])).toContain("locked_until = NULL");
+      expect(String(reset![0])).toContain(
+        "(failed_login_attempts <> 0 OR locked_until IS NOT NULL)",
+      );
+      expect(reset![1]).toEqual([mockUser.id]);
     });
 
-    it("applies progressive lockout duration", async () => {
+    it("emits the exponential-backoff lockout shape in the failed-attempt SQL", async () => {
+      // The progressive duration (BASE * 2^(floor(attempts / MAX) - 1)) is now
+      // computed by Postgres inside the guarded UPDATE, so it matches the count
+      // the same statement committed. A mocked-query unit test cannot observe the
+      // interval a real database would compute, so assert the statement carries
+      // the backoff shape; a live DB exercises the actual duration.
       const hashedPassword = await bcrypt.hash("CorrectPass", 10);
-      const builder = mockLoginQueryBuilder();
+      stageFailedAttempt({
+        attempts: 10, // 2nd lockout tier
+        oldLockedUntil: null,
+        newLockedUntil: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      });
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
-        failedLoginAttempts: 9, // Will become 10, 2nd lockout
+        failedLoginAttempts: 9,
       });
 
       await expect(
         service.login({ email: "test@example.com", password: "WrongPass" }),
       ).rejects.toThrow(UnauthorizedException);
 
-      const setArg = builder.set.mock.calls[0][0];
-      // 2nd lockout: 30min * 2^1 = 60min
-      const lockDuration = setArg.lockedUntil.getTime() - Date.now();
-      expect(lockDuration).toBeGreaterThan(55 * 60 * 1000);
-      expect(lockDuration).toBeLessThan(65 * 60 * 1000);
+      const increment = failedAttemptCall();
+      expect(increment).toBeDefined();
+      const sql = String(increment![0]);
+      // The backoff shape: an exponent via power(2, ...) over a tier via
+      // floor(attempts / MAX). (The SQL wraps arguments across lines, so match
+      // the function names, not `power(2,` verbatim.)
+      expect(sql).toContain("power(");
+      expect(sql).toContain("floor(");
+      // The window is added to CURRENT_TIMESTAMP inside the same statement.
+      expect(sql).toContain("CURRENT_TIMESTAMP");
     });
 
     it("blocks login (no tokens) when the email is not verified", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
-      mockLoginQueryBuilder();
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         passwordHash: hashedPassword,
@@ -1121,10 +1358,11 @@ describe("AuthService", () => {
       mockQueryBuilder({ affected: 1, raw: [{ id: mockUser.id }] });
       refreshTokensRepository.update.mockResolvedValue({ affected: 1 });
 
+      stageOneTokenFamily();
       await service.resetPassword("valid-token", "NewPass123!");
 
       expect(refreshTokensRepository.update).toHaveBeenCalledWith(
-        { userId: mockUser.id, isRevoked: false },
+        { userId: mockUser.id, familyId: In(["family-1"]), isRevoked: false },
         { isRevoked: true },
       );
     });
@@ -1163,10 +1401,11 @@ describe("AuthService", () => {
     it("revokes all non-revoked tokens for user", async () => {
       refreshTokensRepository.update.mockResolvedValue({ affected: 3 });
 
+      stageOneTokenFamily();
       await service.revokeAllUserRefreshTokens("user-1");
 
       expect(refreshTokensRepository.update).toHaveBeenCalledWith(
-        { userId: "user-1", isRevoked: false },
+        { userId: "user-1", familyId: In(["family-1"]), isRevoked: false },
         { isRevoked: true },
       );
     });
@@ -1273,11 +1512,7 @@ describe("AuthService", () => {
       });
       (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
       usersRepository.save.mockImplementation((u) => u);
-      preferencesRepository.findOne.mockResolvedValue({
-        userId: "user-1",
-        twoFactorEnabled: false,
-      });
-      preferencesRepository.save.mockImplementation((p) => p);
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: false });
 
       const result = await service.confirmSetup2FA("user-1", "123456");
 
@@ -1289,8 +1524,7 @@ describe("AuthService", () => {
       const savedUser = usersRepository.save.mock.calls[0][0];
       expect(savedUser.twoFactorSecret).toBe(encryptedSecret);
       expect(savedUser.pendingTwoFactorSecret).toBeNull();
-      const savedPrefs = preferencesRepository.save.mock.calls[0][0];
-      expect(savedPrefs.twoFactorEnabled).toBe(true);
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(true);
     });
 
     it("creates preferences if they do not exist yet", async () => {
@@ -1301,20 +1535,14 @@ describe("AuthService", () => {
       });
       (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
       usersRepository.save.mockImplementation((u) => u);
-      preferencesRepository.findOne.mockResolvedValue(null);
-      preferencesRepository.create.mockImplementation((data) => ({
-        ...data,
-        twoFactorEnabled: false,
-      }));
-      preferencesRepository.save.mockImplementation((p) => p);
+      preferencesRow.seed(null);
 
       await service.confirmSetup2FA("user-1", "123456");
 
-      expect(preferencesRepository.create).toHaveBeenCalledWith(
+      expect(preferencesRow.insertAttempts()[0]).toEqual(
         expect.objectContaining({ userId: "user-1" }),
       );
-      const savedPrefs = preferencesRepository.save.mock.calls[0][0];
-      expect(savedPrefs.twoFactorEnabled).toBe(true);
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(true);
     });
 
     it("throws for invalid verification code", async () => {
@@ -1366,11 +1594,7 @@ describe("AuthService", () => {
       });
       (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
       usersRepository.save.mockImplementation((u) => u);
-      preferencesRepository.findOne.mockResolvedValue({
-        userId: "user-1",
-        twoFactorEnabled: true,
-      });
-      preferencesRepository.save.mockImplementation((p) => p);
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: true });
       trustedDevicesRepository.delete.mockResolvedValue({ affected: 2 });
 
       const result = await service.disable2FA("user-1", "123456");
@@ -1382,8 +1606,7 @@ describe("AuthService", () => {
       expect(savedUser.twoFactorSecret).toBeNull();
 
       // Preferences should be disabled
-      const savedPrefs = preferencesRepository.save.mock.calls[0][0];
-      expect(savedPrefs.twoFactorEnabled).toBe(false);
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
 
       // Trusted devices should be revoked
       expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
@@ -1444,7 +1667,7 @@ describe("AuthService", () => {
       );
     });
 
-    it("handles case where preferences do not exist", async () => {
+    it("clears the flag even when no preferences row exists yet", async () => {
       const encryptedSecret = encrypt("TESTSECRET", TEST_TOTP_KEY);
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
@@ -1452,13 +1675,15 @@ describe("AuthService", () => {
       });
       (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
       usersRepository.save.mockImplementation((u) => u);
-      preferencesRepository.findOne.mockResolvedValue(null);
+      preferencesRow.seed(null);
       trustedDevicesRepository.delete.mockResolvedValue({ affected: 0 });
 
       const result = await service.disable2FA("user-1", "123456");
 
       expect(result.message).toContain("disabled successfully");
-      expect(preferencesRepository.save).not.toHaveBeenCalled();
+      // Previously the write was skipped entirely when no row existed, so a user
+      // whose preferences had never materialized stayed flagged as 2FA-enabled.
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
     });
   });
 
@@ -2150,7 +2375,10 @@ describe("AuthService", () => {
       };
       const manager = setupTransactionMock();
       manager.findOne
-        .mockResolvedValueOnce(existingToken) // RefreshToken lookup
+        // Two token reads: the unlocked probe that learns the family id,
+        // then the locked re-read once the family lock is held (P4-011).
+        .mockResolvedValueOnce(existingToken)
+        .mockResolvedValueOnce(existingToken)
         .mockResolvedValueOnce({ ...mockUser }); // User lookup
 
       const result = await service.refreshTokens("raw-refresh-token");
@@ -2198,7 +2426,11 @@ describe("AuthService", () => {
         expiresAt: new Date(Date.now() + 3600000),
       };
       const manager = setupTransactionMock();
-      manager.findOne.mockResolvedValueOnce(revokedToken);
+      // Two token reads: the unlocked probe that learns the family id,
+      // then the locked re-read once the family lock is held (P4-011).
+      manager.findOne
+        .mockResolvedValueOnce(revokedToken)
+        .mockResolvedValueOnce(revokedToken);
 
       await expect(
         service.refreshTokens("reused-refresh-token"),
@@ -2221,7 +2453,11 @@ describe("AuthService", () => {
         expiresAt: new Date(Date.now() - 1000), // expired
       };
       const manager = setupTransactionMock();
-      manager.findOne.mockResolvedValueOnce(expiredToken);
+      // Two token reads: the unlocked probe that learns the family id,
+      // then the locked re-read once the family lock is held (P4-011).
+      manager.findOne
+        .mockResolvedValueOnce(expiredToken)
+        .mockResolvedValueOnce(expiredToken);
 
       await expect(
         service.refreshTokens("expired-refresh-token"),
@@ -2243,6 +2479,9 @@ describe("AuthService", () => {
       };
       const manager = setupTransactionMock();
       manager.findOne
+        // Two token reads: the unlocked probe that learns the family id,
+        // then the locked re-read once the family lock is held (P4-011).
+        .mockResolvedValueOnce(validToken)
         .mockResolvedValueOnce(validToken)
         .mockResolvedValueOnce({ ...mockUser, isActive: false });
 
@@ -2259,7 +2498,9 @@ describe("AuthService", () => {
 
     it("throws for unknown refresh token", async () => {
       const manager = setupTransactionMock();
-      manager.findOne.mockResolvedValueOnce(null);
+      // Two token reads: the unlocked probe that learns the family id,
+      // then the locked re-read once the family lock is held (P4-011).
+      manager.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
       await expect(
         service.refreshTokens("unknown-refresh-token"),
@@ -2277,6 +2518,9 @@ describe("AuthService", () => {
       };
       const manager = setupTransactionMock();
       manager.findOne
+        // Two token reads: the unlocked probe that learns the family id,
+        // then the locked re-read once the family lock is held (P4-011).
+        .mockResolvedValueOnce(validToken)
         .mockResolvedValueOnce(validToken)
         .mockResolvedValueOnce(null); // user not found
 
@@ -2303,6 +2547,9 @@ describe("AuthService", () => {
       };
       const manager = setupTransactionMock();
       manager.findOne
+        // Two token reads: the unlocked probe that learns the family id,
+        // then the locked re-read once the family lock is held (P4-011).
+        .mockResolvedValueOnce(existingToken)
         .mockResolvedValueOnce(existingToken)
         .mockResolvedValueOnce({ ...mockUser });
 
@@ -2402,6 +2649,7 @@ describe("AuthService", () => {
   describe("resetPassword - success path", () => {
     it("updates password hash, clears token, revokes all refresh tokens", async () => {
       const rawToken = "test-reset-token-hex-value";
+      stageOneTokenFamily();
 
       const mockExecute = jest.fn().mockResolvedValue({
         affected: 1,
@@ -2440,7 +2688,7 @@ describe("AuthService", () => {
 
       // All refresh tokens should be revoked using the userId from the result
       expect(refreshTokensRepository.update).toHaveBeenCalledWith(
-        { userId: mockUser.id, isRevoked: false },
+        { userId: mockUser.id, familyId: In(["family-1"]), isRevoked: false },
         { isRevoked: true },
       );
     });

@@ -1,4 +1,4 @@
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import {
   TourProgressMap,
   UserPreference,
@@ -6,6 +6,10 @@ import {
 import { ReleaseNotesService } from "./release-notes.service";
 import { ToursService } from "./tours.service";
 import { withScopedDb } from "../common/db/scoped-db";
+import {
+  createUserPreferenceRepoMock,
+  type UserPreferenceRepoMock,
+} from "../test-helpers/user-preference-testing";
 
 jest.mock("../common/db/scoped-db");
 const mockedTenantTx = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
@@ -13,19 +17,20 @@ const mockedTenantTx = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
 const CURRENT_VERSION = "1.13.0";
 
 describe("ToursService", () => {
-  let repo: jest.Mocked<Pick<Repository<UserPreference>, "findOne" | "save">>;
+  let prefsMock: UserPreferenceRepoMock;
+  let repo: Record<string, jest.Mock>;
   let query: jest.Mock;
   let manager: EntityManager;
   let service: ToursService;
 
   beforeEach(() => {
-    repo = {
-      findOne: jest.fn(),
-      save: jest.fn((entity) => Promise.resolve(entity)),
-    } as unknown as jest.Mocked<
-      Pick<Repository<UserPreference>, "findOne" | "save">
-    >;
-    // Default: UPDATE affects a row.
+    // The row-modelling double: the prune path writes through the column-scoped
+    // writer (insert-if-absent + UPDATE of only the named columns), so a mock
+    // that recorded `save` calls could not tell a whole-row save from a scoped
+    // patch -- and the whole point of the change is that it is the latter.
+    prefsMock = createUserPreferenceRepoMock(null);
+    repo = prefsMock.repo;
+    // Default: the atomic-merge UPDATE affects a row.
     query = jest.fn().mockResolvedValue([{ user_id: "user-1" }]);
 
     manager = {
@@ -116,7 +121,7 @@ describe("ToursService", () => {
       });
     });
 
-    it("prunes the oldest entries when the map exceeds the cap", async () => {
+    it("prunes the oldest entries when the map exceeds the cap, writing only tour_progress", async () => {
       const bloated: TourProgressMap = {};
       for (let i = 0; i < 205; i++) {
         bloated[`tour-${i}`] = {
@@ -128,12 +133,16 @@ describe("ToursService", () => {
 
       await service.saveProgress("user-1", "tour-999", "completed");
 
-      expect(repo.save).toHaveBeenCalledTimes(1);
-      const saved = repo.save.mock.calls[0][0] as UserPreference;
-      expect(Object.keys(saved.tourProgress)).toHaveLength(200);
+      // The prune writes through the column-scoped writer, never a whole-entity
+      // save that would revert a concurrent change to another preference
+      // (finding 3). Exactly one column is touched: tour_progress.
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(prefsMock.patches()).toHaveLength(1);
+      const patched = prefsMock.patches()[0].tourProgress as TourProgressMap;
+      expect(Object.keys(patched)).toHaveLength(200);
       // Oldest (tour-0) pruned, newest kept.
-      expect(saved.tourProgress["tour-0"]).toBeUndefined();
-      expect(saved.tourProgress["tour-204"]).toBeDefined();
+      expect(patched["tour-0"]).toBeUndefined();
+      expect(patched["tour-204"]).toBeDefined();
     });
 
     it("does not prune when under the cap", async () => {

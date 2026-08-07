@@ -40,6 +40,7 @@ import { DelegationService } from "../delegation/delegation.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { withSystemContext } from "../common/db/with-context";
 import { withScopedDb } from "../common/db/scoped-db";
+import { returnedRows } from "../common/db/query-result";
 import { tr } from "../i18n/translate";
 import { currentRequestLocale } from "../i18n/request-locale";
 import { I18nService } from "nestjs-i18n";
@@ -116,6 +117,91 @@ export class AuthService {
         `Could not store the backup password for user ${userId}: ${err.message}`,
       );
     }
+  }
+
+  /**
+   * Record one failed login in a single guarded statement: increment the
+   * counter, and in the *same* UPDATE lock the account when that increment
+   * crosses the threshold. Returns what the database committed, plus whether
+   * this write is the one that moved the row from not-locked to locked.
+   *
+   * Two things this fixes, both from the maintainer review of PR #1097:
+   *
+   * 1. **The increment and the lock were two transactions.** The counter grew
+   *    in one committed statement and `locked_until` was written by a second,
+   *    so a concurrent attempt could interleave between them -- a legitimate
+   *    user locked out on a stale count, or the lockout window written from a
+   *    count that a parallel failure had already moved past. Folding the
+   *    threshold `CASE` into the increment makes the decision atomic with the
+   *    value it is decided from.
+   * 2. **The lockout email fired per failed attempt above the threshold, not
+   *    per transition.** Every committed count `>= MAX` looked lockable, so two
+   *    parallel failures both mailed the victim for one lockout. Only the write
+   *    that actually crossed from not-locked to locked reports `justLocked`, by
+   *    comparing the pre-update `locked_until` (returned from a CTE, since
+   *    `RETURNING` sees only the post-update row) against the new one.
+   *
+   * The lockout window keeps the exponential backoff the application code used
+   * (`BASE_LOCKOUT_MS * 2^(floor(attempts / MAX) - 1)`), computed in SQL from
+   * the committed count so it matches the value the same statement wrote.
+   *
+   * Returns `attempts: 0` / `justLocked: false` when no row matched, so a caller
+   * cannot mistake a missing user for a first failed attempt.
+   */
+  private async recordFailedAttempt(userId: string): Promise<{
+    attempts: number;
+    justLocked: boolean;
+    lockedUntil: Date | null;
+  }> {
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `WITH prev AS (
+           SELECT id, locked_until FROM users WHERE id = $1
+         )
+         UPDATE users u
+            SET failed_login_attempts = u.failed_login_attempts + 1,
+                locked_until = CASE
+                  WHEN u.failed_login_attempts + 1 >= $2
+                    THEN CURRENT_TIMESTAMP + (
+                      ROUND(
+                        $3::numeric
+                        * power(
+                            2,
+                            floor((u.failed_login_attempts + 1)::numeric / $2) - 1
+                          )
+                      )::text || ' milliseconds'
+                    )::interval
+                  ELSE u.locked_until
+                END
+           FROM prev
+          WHERE u.id = prev.id
+          RETURNING u.failed_login_attempts AS attempts,
+                    u.locked_until AS new_locked_until,
+                    prev.locked_until AS old_locked_until`,
+        [userId, this.MAX_FAILED_ATTEMPTS, this.BASE_LOCKOUT_MS],
+      ),
+    );
+    const updated = returnedRows<{
+      attempts: number | string;
+      new_locked_until: Date | string | null;
+      old_locked_until: Date | string | null;
+    }>(rows);
+    if (updated.length === 0) {
+      return { attempts: 0, justLocked: false, lockedUntil: null };
+    }
+    const row = updated[0];
+    const toDate = (value: Date | string | null): Date | null =>
+      value == null ? null : value instanceof Date ? value : new Date(value);
+    const now = Date.now();
+    const newLockedUntil = toDate(row.new_locked_until);
+    const oldLockedUntil = toDate(row.old_locked_until);
+    const wasLocked = oldLockedUntil != null && oldLockedUntil.getTime() > now;
+    const isLocked = newLockedUntil != null && newLockedUntil.getTime() > now;
+    return {
+      attempts: Number(row.attempts),
+      justLocked: !wasLocked && isLocked,
+      lockedUntil: newLockedUntil,
+    };
   }
 
   // RLS: register/login/refresh/verify/OIDC lookups are public, pre-identity
@@ -385,20 +471,18 @@ export class AuthService {
 
     if (!isPasswordValid) {
       this.logger.warn(`Login failed: invalid password for user ${user.id}`);
-      // Atomically increment failed attempts
-      const newAttempts = user.failedLoginAttempts + 1;
-      const updateFields: Record<string, unknown> = {
-        failedLoginAttempts: newAttempts,
-      };
-      if (newAttempts >= this.MAX_FAILED_ATTEMPTS) {
-        const lockoutMultiplier = Math.pow(
-          2,
-          Math.floor(newAttempts / this.MAX_FAILED_ATTEMPTS) - 1,
-        );
-        const lockoutDuration = this.BASE_LOCKOUT_MS * lockoutMultiplier;
-        updateFields.lockedUntil = new Date(Date.now() + lockoutDuration);
+      // Increment the counter and apply the lockout in one guarded statement,
+      // deriving both from what the database committed rather than from the
+      // entity read before bcrypt ran. `user.failedLoginAttempts + 1` computed
+      // in application code was a read-modify-write across a ~100ms bcrypt
+      // comparison, and the lock was a second transaction after it (audit
+      // P4-012; maintainer review PR #1097). `justLocked` is true only for the
+      // write that actually crossed from not-locked to locked, so the email
+      // fires once per lockout transition and not once per failed attempt.
+      const { attempts, justLocked } = await this.recordFailedAttempt(user.id);
+      if (justLocked) {
         this.logger.warn(
-          `Account locked for user ${user.id} after ${newAttempts} failed attempts`,
+          `Account locked for user ${user.id} after ${attempts} failed attempts`,
         );
         // Fire-and-forget lockout email
         if (user.email) {
@@ -420,14 +504,6 @@ export class AuthService {
             );
         }
       }
-      await this.scoped(User, (repo) =>
-        repo
-          .createQueryBuilder()
-          .update(User)
-          .set(updateFields)
-          .where("id = :id", { id: user.id })
-          .execute(),
-      );
       throw new UnauthorizedException(
         tr("errors.auth.invalidCredentials", "Invalid credentials"),
       );
@@ -447,17 +523,22 @@ export class AuthService {
     // cannot decrypt.
     await this.rememberBackupPassword(user.id, password);
 
-    // Reset failed attempts on successful login
-    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-      await this.scoped(User, (repo) =>
-        repo
-          .createQueryBuilder()
-          .update(User)
-          .set({ failedLoginAttempts: 0, lockedUntil: null })
-          .where("id = :id", { id: user.id })
-          .execute(),
-      );
-    }
+    // Reset failed attempts on successful login.
+    //
+    // Unconditional in SQL rather than gated on the entity snapshot: a failure
+    // that committed between the read and here would otherwise leave the counter
+    // standing after a proven-correct password, and the old `if` could also skip
+    // the reset entirely because the snapshot said there was nothing to clear.
+    // A correct password is authoritative about the attempts before it.
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `UPDATE users
+            SET failed_login_attempts = 0, locked_until = NULL
+          WHERE id = $1
+            AND (failed_login_attempts <> 0 OR locked_until IS NOT NULL)`,
+        [user.id],
+      ),
+    );
 
     // Hard email-verification gate: a local account that self-registered while
     // SMTP was enabled must confirm its email before it can sign in. The
