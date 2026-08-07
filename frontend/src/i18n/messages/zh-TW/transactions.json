@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "轉帳交易的連結對應交易也將一併更新。",
-        "split": "分割交易的類別更改將被跳過。"
+        "split": "分割交易：新類別將套用至其分割項目（類別篩選啟用時，僅套用至符合篩選條件的分割項目）。轉帳與投資分割項目維持不變。"
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# 筆交易已更新} other {# 筆交易已更新}}",
+      "skipped": "{count, plural, one {# 筆交易已跳過} other {# 筆交易已跳過}}",
+      "splitLines": "{count, plural, one {# 個分割項目已重新分類} other {# 個分割項目已重新分類}}"
     }
   },
   "form": {

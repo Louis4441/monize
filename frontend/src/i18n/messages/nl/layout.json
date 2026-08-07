@@ -109,6 +109,7 @@
       "createdTransaction": "Transactie {payee} {amount} aangemaakt",
       "updatedTransaction": "Transactie {payee} {amount} bijgewerkt",
       "deletedTransaction": "Transactie {payee} {amount} verwijderd",
+      "bulkUpdatedTransactions": "{count, plural, one {# transactie} other {# transacties}} in bulk bijgewerkt",
       "createdTransfer": "Overboeking {amount} van {from} naar {to} aangemaakt",
       "createdInvestmentTransaction": "{action}-transactie aangemaakt",
       "updatedInvestmentTransaction": "{action}-transactie bijgewerkt",

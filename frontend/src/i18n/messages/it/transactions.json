@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Anche la controparte collegata dei trasferimenti verrà aggiornata.",
-        "split": "Le transazioni con suddivisione verranno saltate per le modifiche alla categoria."
+        "split": "Transazioni suddivise: la nuova categoria viene applicata alle loro suddivisioni (solo a quelle corrispondenti al filtro categoria quando è attivo). Le suddivisioni di trasferimento e investimento restano invariate."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transazione aggiornata} other {# transazioni aggiornate}}",
+      "skipped": "{count, plural, one {# transazione saltata} other {# transazioni saltate}}",
+      "splitLines": "{count, plural, one {# suddivisione ricategorizzata} other {# suddivisioni ricategorizzate}}"
     }
   },
   "form": {

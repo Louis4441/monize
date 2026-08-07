@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "As transações de transferência terão também o seu contraponto associado atualizado.",
-        "split": "As transações com parcelas serão ignoradas para alterações de categoria."
+        "split": "Transações com parcelas: a nova categoria é aplicada às suas parcelas (apenas às parcelas que correspondem ao filtro de categoria quando um está ativo). As parcelas de transferência e investimento permanecem inalteradas."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transação atualizada} other {# transações atualizadas}}",
+      "skipped": "{count, plural, one {# transação ignorada} other {# transações ignoradas}}",
+      "splitLines": "{count, plural, one {# parcela recategorizada} other {# parcelas recategorizadas}}"
     }
   },
   "form": {

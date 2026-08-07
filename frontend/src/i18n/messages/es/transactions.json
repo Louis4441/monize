@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Las transacciones de transferencia también actualizarán su contraparte vinculada.",
-        "split": "Las transacciones con desglose serán omitidas para cambios de categoría."
+        "split": "Transacciones con desglose: la nueva categoría se aplica a sus desgloses (solo a los desgloses que coinciden con tu filtro de categoría cuando hay uno activo). Los desgloses de transferencia e inversión no se modifican."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transacción actualizada} other {# transacciones actualizadas}}",
+      "skipped": "{count, plural, one {# transacción omitida} other {# transacciones omitidas}}",
+      "splitLines": "{count, plural, one {# desglose recategorizado} other {# desgloses recategorizados}}"
     }
   },
   "form": {

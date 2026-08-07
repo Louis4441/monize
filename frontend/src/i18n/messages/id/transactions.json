@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Transaksi transfer akan memiliki tandingannya yang terkait diperbarui juga.",
-        "split": "Transaksi terbagi akan dilewati untuk perubahan kategori."
+        "split": "Transaksi terbagi: kategori baru diterapkan ke baris pembagiannya (hanya baris yang cocok dengan filter kategori Anda saat filter aktif). Baris transfer dan investasi tidak berubah."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transaksi diperbarui} other {# transaksi diperbarui}}",
+      "skipped": "{count, plural, one {# transaksi dilewati} other {# transaksi dilewati}}",
+      "splitLines": "{count, plural, one {# baris pembagian dikategorikan ulang} other {# baris pembagian dikategorikan ulang}}"
     }
   },
   "form": {

@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Transfer işlemleri için bağlantılı karşılık da güncellenecektir.",
-        "split": "Bölünmüş işlemler kategori değişiklikleri için atlanacaktır."
+        "split": "Bölünmüş işlemler: yeni kategori bölümlerine uygulanır (bir kategori filtresi etkinken yalnızca filtreyle eşleşen bölümlere). Transfer ve yatırım bölümleri değişmez."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# işlem güncellendi} other {# işlem güncellendi}}",
+      "skipped": "{count, plural, one {# işlem atlandı} other {# işlem atlandı}}",
+      "splitLines": "{count, plural, one {# bölümün kategorisi değiştirildi} other {# bölümün kategorisi değiştirildi}}"
     }
   },
   "form": {

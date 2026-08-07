@@ -109,6 +109,7 @@
       "createdTransaction": "Створено транзакцію {payee} {amount}",
       "updatedTransaction": "Оновлено транзакцію {payee} {amount}",
       "deletedTransaction": "Видалено транзакцію {payee} {amount}",
+      "bulkUpdatedTransactions": "Масово оновлено {count, plural, one {# транзакцію} other {# транзакцій}}",
       "createdTransfer": "Створено переказ {amount} з {from} на {to}",
       "createdInvestmentTransaction": "Створено транзакцію {action}",
       "updatedInvestmentTransaction": "Оновлено транзакцію {action}",
