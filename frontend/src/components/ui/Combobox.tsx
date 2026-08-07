@@ -172,7 +172,7 @@ export function Combobox({
       setSelectedLabel('');
       setInputValue('');
     }
-  }, [value, options, isTyping, allowCustomValue, initialDisplayValue, hasInitialized]);
+  }, [value, options, isTyping, allowCustomValue, valueIsId, initialDisplayValue, hasInitialized]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Lift the current typed text to the parent: snap to an exact option match if
