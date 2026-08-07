@@ -278,10 +278,15 @@ them:
   `INTENTIONALLY_EXCLUDED_TABLES` with a reason, and classified in the support
   backup rules.
 
-And one that no test can catch: the destructive restore's step-up for OIDC users
-accepts any truthy header value. It is an open defect with a written plan, not a
-design choice -- see section 5 of the contract before touching
-`verifyAuthentication`.
+And one thing about `verifyAuthentication` that is easy to undo by accident. An
+OIDC restore is authorized by a single-use `OidcReauthService` artifact, and the
+round trip that mints one loses the user's file selection -- so the restore
+validates everything free (decrypt, decompress, envelope) *before* spending it,
+and a wrong backup password costs no identity-provider round trip. That makes it
+the one refusal in the path that is deliberately not first; it still precedes
+every write. Do not reorder it forward to match section 3's list, and do not
+reorder it backward past a `DELETE FROM`. Section 5 of the contract has the
+reasoning, and `backup.service.spec.ts` pins both edges.
 
 ### `BackupService` is a facade; put new code in the component that owns it
 
