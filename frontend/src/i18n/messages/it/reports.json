@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Griglia heatmap che mostra 12 mesi per tutte le categorie per identificare schemi stagionali di spesa."
     }
   },
+  "detailHeader": {
+    "backToReports": "Torna ai report",
+    "switchReport": "Passa a un altro report",
+    "switchPlaceholder": "Filtra report...",
+    "switchNoMatches": "Nessun report corrisponde"
+  },
   "reportPage": {
     "notFound": "Report non trovato",
     "notFoundDesc": "Il report richiesto non esiste."

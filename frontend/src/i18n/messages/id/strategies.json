@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Ganti skenario",
+      "triggerText": "Skenario",
       "filterPlaceholder": "Saring skenario",
       "noMatches": "Tidak ada skenario yang cocok",
       "create": "Skenario baru",

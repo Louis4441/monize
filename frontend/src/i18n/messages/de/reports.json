@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Heatmap-Raster mit 12 Monaten über alle Kategorien zur Erkennung saisonaler Ausgabenmuster."
     }
   },
+  "detailHeader": {
+    "backToReports": "Zurück zu Berichten",
+    "switchReport": "Zu einem anderen Bericht wechseln",
+    "switchPlaceholder": "Berichte filtern...",
+    "switchNoMatches": "Keine Berichte gefunden"
+  },
   "reportPage": {
     "notFound": "Bericht nicht gefunden",
     "notFoundDesc": "Der angeforderte Bericht existiert nicht."

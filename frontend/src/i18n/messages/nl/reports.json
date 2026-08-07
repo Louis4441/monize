@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Heatmapraster met 12 maanden over alle categorieën om seizoensgebonden uitgavenpatronen te herkennen."
     }
   },
+  "detailHeader": {
+    "backToReports": "Terug naar rapporten",
+    "switchReport": "Naar een ander rapport gaan",
+    "switchPlaceholder": "Rapporten filteren...",
+    "switchNoMatches": "Geen rapporten gevonden"
+  },
   "reportPage": {
     "notFound": "Rapport niet gevonden",
     "notFoundDesc": "Het gevraagde rapport bestaat niet."

@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Đổi kịch bản",
+      "triggerText": "Kịch bản",
       "filterPlaceholder": "Lọc kịch bản",
       "noMatches": "Không có kịch bản nào khớp",
       "create": "Kịch bản mới",

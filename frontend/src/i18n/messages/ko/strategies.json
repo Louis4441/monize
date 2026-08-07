@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "시나리오 전환",
+      "triggerText": "시나리오",
       "filterPlaceholder": "시나리오 필터",
       "noMatches": "일치하는 시나리오 없음",
       "create": "새 시나리오",

@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Grille thermique affichant 12 mois sur toutes les catégories pour identifier les tendances saisonnières des dépenses."
     }
   },
+  "detailHeader": {
+    "backToReports": "Retour aux rapports",
+    "switchReport": "Passer à un autre rapport",
+    "switchPlaceholder": "Filtrer les rapports...",
+    "switchNoMatches": "Aucun rapport ne correspond"
+  },
   "reportPage": {
     "notFound": "Rapport introuvable",
     "notFoundDesc": "Le rapport demandé n'existe pas."

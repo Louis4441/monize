@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "切換方案",
+      "triggerText": "方案",
       "filterPlaceholder": "篩選方案",
       "noMatches": "沒有相符的方案",
       "create": "新增方案",

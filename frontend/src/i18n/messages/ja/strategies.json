@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "シナリオを切り替え",
+      "triggerText": "シナリオ",
       "filterPlaceholder": "シナリオを絞り込む",
       "noMatches": "一致するシナリオがありません",
       "create": "新しいシナリオ",

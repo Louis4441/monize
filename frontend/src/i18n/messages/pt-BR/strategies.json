@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Trocar de cenário",
+      "triggerText": "Cenário",
       "filterPlaceholder": "Filtrar cenários",
       "noMatches": "Nenhum cenário corresponde",
       "create": "Novo cenário",

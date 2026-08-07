@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Kisi peta panas yang menunjukkan 12 bulan di semua kategori untuk mengidentifikasi pola pengeluaran musiman."
     }
   },
+  "detailHeader": {
+    "backToReports": "Kembali ke Laporan",
+    "switchReport": "Pindah ke laporan lain",
+    "switchPlaceholder": "Saring laporan...",
+    "switchNoMatches": "Tidak ada laporan yang cocok"
+  },
   "reportPage": {
     "notFound": "Laporan Tidak Ditemukan",
     "notFoundDesc": "Laporan yang diminta tidak ada."

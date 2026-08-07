@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Senaryo değiştir",
+      "triggerText": "Senaryo",
       "filterPlaceholder": "Senaryoları süz",
       "noMatches": "Eşleşen senaryo yok",
       "create": "Yeni senaryo",

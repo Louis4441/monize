@@ -130,6 +130,12 @@
       "seasonal-spending-map": "मौसमी व्यय पैटर्न की पहचान करने के लिए सभी श्रेणियों में 12 महीने दिखाने वाला हीटमैप ग्रिड।"
     }
   },
+  "detailHeader": {
+    "backToReports": "रिपोर्ट पर वापस जाएँ",
+    "switchReport": "किसी दूसरी रिपोर्ट पर जाएँ",
+    "switchPlaceholder": "रिपोर्ट छाँटें...",
+    "switchNoMatches": "कोई रिपोर्ट मेल नहीं खाती"
+  },
   "reportPage": {
     "notFound": "रिपोर्ट नहीं मिली",
     "notFoundDesc": "अनुरोधित रिपोर्ट मौजूद नहीं है।"

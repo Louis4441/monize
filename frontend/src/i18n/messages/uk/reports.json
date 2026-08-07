@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Теплова карта з 12 місяцями по всіх категоріях для виявлення сезонних патернів витрат."
     }
   },
+  "detailHeader": {
+    "backToReports": "Назад до звітів",
+    "switchReport": "Перейти до іншого звіту",
+    "switchPlaceholder": "Фільтр звітів...",
+    "switchNoMatches": "Немає відповідних звітів"
+  },
   "reportPage": {
     "notFound": "Звіт не знайдено",
     "notFoundDesc": "Запитуваний звіт не існує."

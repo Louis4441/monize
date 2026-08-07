@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Siatka mapy cieplnej przedstawiająca 12 miesięcy dla wszystkich kategorii w celu rozpoznania sezonowych wzorców wydatków."
     }
   },
+  "detailHeader": {
+    "backToReports": "Powrót do raportów",
+    "switchReport": "Przejdź do innego raportu",
+    "switchPlaceholder": "Filtruj raporty...",
+    "switchNoMatches": "Brak dopasowanych raportów"
+  },
   "reportPage": {
     "notFound": "Nie znaleziono raportu",
     "notFoundDesc": "Żądany raport nie istnieje."

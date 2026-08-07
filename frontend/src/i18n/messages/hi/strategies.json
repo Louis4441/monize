@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "परिदृश्य बदलें",
+      "triggerText": "परिदृश्य",
       "filterPlaceholder": "परिदृश्य छानें",
       "noMatches": "कोई परिदृश्य मेल नहीं खाता",
       "create": "नया परिदृश्य",

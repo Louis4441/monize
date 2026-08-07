@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Cuadrícula de mapa de calor que muestra 12 meses en todas las categorías para identificar patrones de gasto estacionales."
     }
   },
+  "detailHeader": {
+    "backToReports": "Volver a informes",
+    "switchReport": "Cambiar a otro informe",
+    "switchPlaceholder": "Filtrar informes...",
+    "switchNoMatches": "Ningún informe coincide"
+  },
   "reportPage": {
     "notFound": "Informe no encontrado",
     "notFoundDesc": "El informe solicitado no existe."

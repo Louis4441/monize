@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Сменить сценарий",
+      "triggerText": "Сценарий",
       "filterPlaceholder": "Фильтр сценариев",
       "noMatches": "Нет подходящих сценариев",
       "create": "Новый сценарий",

@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Grelha de mapa de calor mostrando 12 meses em todas as categorias para identificar padrões de despesas sazonais."
     }
   },
+  "detailHeader": {
+    "backToReports": "Voltar aos Relatórios",
+    "switchReport": "Mudar para outro relatório",
+    "switchPlaceholder": "Filtrar relatórios...",
+    "switchNoMatches": "Nenhum relatório corresponde"
+  },
   "reportPage": {
     "notFound": "Relatório Não Encontrado",
     "notFoundDesc": "O relatório solicitado não existe."

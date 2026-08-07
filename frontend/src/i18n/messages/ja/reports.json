@@ -130,6 +130,12 @@
       "seasonal-spending-map": "季節的支出パターンを特定するために12ヶ月とすべてのカテゴリを示すヒートマップグリッド。"
     }
   },
+  "detailHeader": {
+    "backToReports": "レポートに戻る",
+    "switchReport": "別のレポートに切り替える",
+    "switchPlaceholder": "レポートを絞り込む...",
+    "switchNoMatches": "一致するレポートはありません"
+  },
   "reportPage": {
     "notFound": "レポートが見つかりません",
     "notFoundDesc": "リクエストされたレポートは存在しません。"

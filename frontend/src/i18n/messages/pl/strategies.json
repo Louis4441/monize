@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Przełącz scenariusz",
+      "triggerText": "Scenariusz",
       "filterPlaceholder": "Filtruj scenariusze",
       "noMatches": "Żaden scenariusz nie pasuje",
       "create": "Nowy scenariusz",

@@ -130,6 +130,12 @@
       "seasonal-spending-map": "Lưới bản đồ nhiệt hiển thị 12 tháng trên tất cả danh mục để xác định mô hình chi tiêu theo mùa."
     }
   },
+  "detailHeader": {
+    "backToReports": "Quay lại báo cáo",
+    "switchReport": "Chuyển sang báo cáo khác",
+    "switchPlaceholder": "Lọc báo cáo...",
+    "switchNoMatches": "Không có báo cáo nào khớp"
+  },
   "reportPage": {
     "notFound": "Không tìm thấy báo cáo",
     "notFoundDesc": "Báo cáo được yêu cầu không tồn tại."

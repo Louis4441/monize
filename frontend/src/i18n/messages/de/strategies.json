@@ -19,6 +19,7 @@
     },
     "scenarios": {
       "switch": "Szenario wechseln",
+      "triggerText": "Szenario",
       "filterPlaceholder": "Szenarien filtern",
       "noMatches": "Kein Szenario passt",
       "create": "Neues Szenario",

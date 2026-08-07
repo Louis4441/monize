@@ -130,6 +130,12 @@
       "seasonal-spending-map": "熱圖呈現 12 個月各類別的季節性消費模式。"
     }
   },
+  "detailHeader": {
+    "backToReports": "返回報表",
+    "switchReport": "切換到其他報表",
+    "switchPlaceholder": "篩選報表...",
+    "switchNoMatches": "沒有符合的報表"
+  },
   "reportPage": {
     "notFound": "找不到報表",
     "notFoundDesc": "所請求的報表不存在。"
