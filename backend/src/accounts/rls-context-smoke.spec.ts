@@ -34,11 +34,17 @@ describe("accounts module RLS context smoke (real withScopedDb)", () => {
     const { manager, dataSource } = createScopedDbMocks([
       [Account, accountsRepo],
     ]);
-    // Timezone fan-out (its own withScopedDb) finds one UTC user...
-    // ...whose due-account scan (inside withScopedDb) returns one account to apply.
+    // The per-user body issues five queries in order: the timezone fan-out (its
+    // own withScopedDb) finds one UTC user; then, inside the system-context
+    // withScopedDb, the due-account scan, the FOR UPDATE lock
+    // (lockAccountsForBalanceWrite -- it holds the rows before the ledger read,
+    // audit P4-005), the balance recompute, and the bulk UPDATE. The lock query
+    // sits between the scan and the recompute, so the mock chain has to account
+    // for it or the recompute reads the wrong row.
     manager.query
       .mockResolvedValueOnce([{ user_id: OWNER_ID, timezone: "UTC" }])
       .mockResolvedValueOnce([{ account_id: "a1" }])
+      .mockResolvedValueOnce([{ id: "a1" }])
       .mockResolvedValueOnce([{ account_id: "a1", balance: "150" }])
       .mockResolvedValueOnce(undefined);
 
