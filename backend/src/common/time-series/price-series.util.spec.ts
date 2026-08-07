@@ -121,6 +121,45 @@ describe("loadPriceSeries", () => {
     expect(sql).not.toMatch(/COALESCE\s*\(\s*adjusted_close/i);
   });
 
+  /**
+   * Last-of-bucket is right everywhere except the first one, where it discards
+   * the close a rebasing measures from. A security first priced on 4 January
+   * reduced to a single 29 January sample, so a window opening on its own first
+   * price found nothing at or before that boundary and the instrument was
+   * excluded from its own chart.
+   */
+  it("keeps each series' opening observation alongside the bucket samples", async () => {
+    const { manager, query } = managerReturning([]);
+    await loadPriceSeries(manager, {
+      table: "security_prices",
+      ids: ["sec-a"],
+      fromDate: "2010-01-01",
+      sampling: "month",
+    });
+    const sql = (query.mock.calls[0][0] as string).replace(/\s+/g, " ");
+
+    // The bucket samples...
+    expect(sql).toContain("DISTINCT ON (series_id, bucket)");
+    // ...and the series' own first row, unioned in.
+    expect(sql).toContain("DISTINCT ON (series_id) series_id, price_date");
+    expect(sql).toContain("UNION");
+    // Oldest first, whichever branch a row came from: pointAsOf binary-searches
+    // on that ordering.
+    expect(sql.trimEnd()).toMatch(/ORDER BY series_id, price_date$/);
+  });
+
+  it("leaves daily sampling unbucketed, so there is nothing to preserve", async () => {
+    const { manager, query } = managerReturning([]);
+    await loadPriceSeries(manager, {
+      table: "security_prices",
+      ids: ["sec-a"],
+      fromDate: "2025-01-01",
+    });
+    const sql = query.mock.calls[0][0] as string;
+    expect(sql).not.toContain("DISTINCT ON");
+    expect(sql).not.toContain("UNION");
+  });
+
   it("passes the upper bound as a parameter, never as text", async () => {
     const { manager, query } = managerReturning([]);
     await loadPriceSeries(manager, {

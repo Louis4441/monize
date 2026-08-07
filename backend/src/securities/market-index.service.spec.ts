@@ -105,23 +105,111 @@ describe("MarketIndexService", () => {
     });
 
     /**
-     * Whatever window was asked for. A bounded first fetch would store exactly
-     * that span and then sit behind the cooldown for six hours, so a user who
-     * widened the window straight afterwards would be told the benchmark could
-     * not be priced at the new boundary.
+     * A generous horizon whatever window was asked for. A first fetch bounded to
+     * the request would store exactly that span and then sit behind the cooldown
+     * for six hours, so a user who widened the window straight afterwards would
+     * be told the benchmark could not be priced at the new boundary.
      */
-    it("fetches the whole history the first time an index is asked for", async () => {
+    it("fetches a deep history the first time an index is asked for", async () => {
       // No coverage rows, no sync rows.
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistorical.mockResolvedValue([
+      yahoo.fetchHistoricalWindow.mockResolvedValue([
         bar("2025-01-02", 5900),
         bar("2025-01-03", 5910),
       ]);
 
       await service.ensureHistory(["SP500"], "2025-01-01");
 
-      expect(yahoo.fetchHistorical).toHaveBeenCalledWith("^GSPC");
-      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+      const [symbol, from] = yahoo.fetchHistoricalWindow.mock.calls[0];
+      expect(symbol).toBe("^GSPC");
+      expect(Number(from.toISOString().slice(0, 4))).toBeLessThan(2010);
+      expect(
+        statements().some((sql) =>
+          sql.includes("INSERT INTO market_index_prices"),
+        ),
+      ).toBe(true);
+    });
+
+    /**
+     * `range=max` is the shorthand that drops granularity: asked for its whole
+     * history an index answers with coarser bars, and those were then stored as
+     * if they were the daily series. Nothing here may reach for it.
+     */
+    it("never asks for the provider's whole-history shorthand", async () => {
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2025-01-02", 5900)]);
+
+      await service.ensureHistory(["SP500"], null);
+      await service.ensureHistory(["DAX"], "2025-01-01");
+      await service.refreshAll();
+
+      expect(yahoo.fetchHistorical).not.toHaveBeenCalled();
+    });
+
+    it("refuses a series coarser than daily rather than storing it", async () => {
+      manager.query.mockResolvedValue([]);
+      // Month-end closes: what the whole-history shorthand hands back, and what
+      // drew the benchmark as a row of flat stubs once stored.
+      yahoo.fetchHistoricalWindow.mockResolvedValue([
+        bar("2025-01-31", 5900),
+        bar("2025-02-28", 5950),
+        bar("2025-03-31", 6000),
+        bar("2025-04-30", 6100),
+      ]);
+
+      await service.ensureHistory(["SP500"], "2025-01-01");
+
+      expect(
+        statements().some((sql) =>
+          sql.includes("INSERT INTO market_index_prices"),
+        ),
+      ).toBe(false);
+      // Unpriced, which the comparison reports as an exclusion the user can act
+      // on -- not a sparse series masquerading as a daily one.
+      expect(statements().some((sql) => sql.includes("last_error = $2"))).toBe(
+        true,
+      );
+    });
+
+    it("accepts a daily series despite its weekend and holiday steps", async () => {
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([
+        bar("2025-01-02", 5900),
+        bar("2025-01-03", 5910),
+        // Weekend.
+        bar("2025-01-06", 5920),
+        bar("2025-01-07", 5930),
+        bar("2025-01-08", 5940),
+        // A closure of several days must not make a daily series look weekly.
+        bar("2025-01-15", 5950),
+      ]);
+
+      await service.ensureHistory(["SP500"], "2025-01-01");
+
+      expect(
+        statements().some((sql) =>
+          sql.includes("INSERT INTO market_index_prices"),
+        ),
+      ).toBe(true);
+    });
+
+    it("stores a single-bar top-up, which has no spacing to judge", async () => {
+      manager.query.mockImplementation((sql: string) => {
+        if (sql.includes("MIN(price_date)")) {
+          return Promise.resolve([
+            {
+              index_code: "SP500",
+              earliest: "2001-01-02",
+              latest: "2020-06-01",
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2025-01-02", 5900)]);
+
+      await service.ensureHistory(["SP500"], "2025-01-01");
+
       expect(
         statements().some((sql) =>
           sql.includes("INSERT INTO market_index_prices"),
@@ -179,16 +267,17 @@ describe("MarketIndexService", () => {
       expect(yahoo.fetchHistorical).not.toHaveBeenCalled();
     });
 
-    it("fetches the whole history on an open-ended request with nothing stored", async () => {
+    it("fetches the default horizon on an open-ended request with nothing stored", async () => {
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistorical.mockResolvedValue([bar("2000-01-03", 1400)]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2001-01-03", 1400)]);
 
       await service.ensureHistory(["SP500"], null);
 
-      // A bounded window would be wrong here: there is no start date to bound
-      // it with, and the answer to "all time" is whatever the provider has.
-      expect(yahoo.fetchHistorical).toHaveBeenCalledWith("^GSPC");
-      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+      // Still an explicit window, and a deep one: there is no start date to
+      // bound it with, but asking for everything costs the daily granularity.
+      const [, from, to] = yahoo.fetchHistoricalWindow.mock.calls[0];
+      const years = (to.getTime() - from.getTime()) / (365.25 * 86_400_000);
+      expect(years).toBeGreaterThan(20);
     });
 
     it("does not refetch an index whose stored history already covers the window", async () => {
@@ -238,10 +327,10 @@ describe("MarketIndexService", () => {
         }
         return Promise.resolve([]);
       });
-      yahoo.fetchHistorical.mockResolvedValue([bar("2025-01-02", 5900)]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2025-01-02", 5900)]);
 
       await service.ensureHistory(["SP500"], "2025-01-01");
-      expect(yahoo.fetchHistorical).toHaveBeenCalledTimes(1);
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalledTimes(1);
     });
 
     /**
@@ -284,7 +373,7 @@ describe("MarketIndexService", () => {
     });
 
     it("drops bars the provider could not price, rather than storing a zero", async () => {
-      yahoo.fetchHistorical.mockResolvedValue([
+      yahoo.fetchHistoricalWindow.mockResolvedValue([
         bar("2025-01-02", 5900),
         bar("2025-01-03", 0),
         bar("2025-01-06", Number.NaN),
@@ -301,7 +390,7 @@ describe("MarketIndexService", () => {
     });
 
     it("refuses to erase a stored adjusted close with a null one", async () => {
-      yahoo.fetchHistorical.mockResolvedValue([bar("2025-01-02", 5900)]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2025-01-02", 5900)]);
       await service.ensureHistory(["SP500"], "2025-01-01");
       const insert = manager.query.mock.calls.find((call) =>
         String(call[0]).includes("INSERT INTO market_index_prices"),
@@ -314,7 +403,9 @@ describe("MarketIndexService", () => {
     });
 
     it("keeps an adjusted close the provider did supply", async () => {
-      yahoo.fetchHistorical.mockResolvedValue([bar("2025-01-02", 5900, 5850)]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([
+        bar("2025-01-02", 5900, 5850),
+      ]);
       await service.ensureHistory(["SP500"], "2025-01-01");
       const insert = manager.query.mock.calls.find((call) =>
         String(call[0]).includes("INSERT INTO market_index_prices"),
@@ -333,18 +424,18 @@ describe("MarketIndexService", () => {
      */
     it("warms the store under system context", async () => {
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistorical.mockResolvedValue([bar("2000-01-03", 1400)]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2001-01-03", 1400)]);
 
       service.onApplicationBootstrap();
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(systemContext).toHaveBeenCalledTimes(1);
-      expect(yahoo.fetchHistorical).toHaveBeenCalled();
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalled();
     });
 
     it("returns before the provider does, so start-up is not blocked", () => {
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistorical.mockReturnValue(new Promise(() => {}));
+      yahoo.fetchHistoricalWindow.mockReturnValue(new Promise(() => {}));
       expect(service.onApplicationBootstrap()).toBeUndefined();
     });
 
@@ -385,31 +476,35 @@ describe("MarketIndexService", () => {
       expect(yahoo.fetchHistoricalWindow).toHaveBeenCalledTimes(
         MARKET_INDEXES.length,
       );
-      // The full history is thousands of bars; the daily top-up must not ask
-      // for it.
-      expect(yahoo.fetchHistorical).not.toHaveBeenCalled();
+      // A deep history is thousands of bars; the daily top-up must not ask for
+      // one -- the window it passes is the giveaway.
+      const [, from, to] = yahoo.fetchHistoricalWindow.mock.calls[0];
+      const days = (to.getTime() - from.getTime()) / 86_400_000;
+      expect(days).toBeLessThan(30);
     });
 
-    it("asks for the whole history for an index it holds nothing for", async () => {
+    it("asks for the default horizon for an index it holds nothing for", async () => {
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistorical.mockResolvedValue([bar("2000-01-03", 1400)]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2001-01-03", 1400)]);
 
       await service.refreshAll();
 
-      expect(yahoo.fetchHistorical).toHaveBeenCalledTimes(
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalledTimes(
         MARKET_INDEXES.length,
       );
-      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+      const [, from, to] = yahoo.fetchHistoricalWindow.mock.calls[0];
+      const years = (to.getTime() - from.getTime()) / (365.25 * 86_400_000);
+      expect(years).toBeGreaterThan(20);
     });
 
     it("carries on past an index the provider cannot serve", async () => {
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistorical
+      yahoo.fetchHistoricalWindow
         .mockRejectedValueOnce(new Error("gone"))
-        .mockResolvedValue([bar("2000-01-03", 1400)]);
+        .mockResolvedValue([bar("2001-01-03", 1400)]);
 
       await expect(service.refreshAll()).resolves.toBeUndefined();
-      expect(yahoo.fetchHistorical).toHaveBeenCalledTimes(
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalledTimes(
         MARKET_INDEXES.length,
       );
     });

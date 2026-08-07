@@ -78,6 +78,15 @@ interface SeriesRow {
  * Weekly/monthly sampling keeps the last close of each bucket (`DISTINCT ON`),
  * which is what a period-end comparison wants.
  *
+ * **Each series keeps its own opening observation as well**, whatever bucket it
+ * falls in. Last-of-bucket is right everywhere except the first one, where it
+ * discards the very close a rebasing measures from: a security first priced on
+ * 4 January reduced to a single 29 January sample, so a window opening on its
+ * first price found nothing at or before that boundary and the instrument was
+ * excluded from its own chart. A read with lead days in front of it never sees
+ * this, which is why it stayed latent until a window opened exactly where the
+ * data does.
+ *
  * An instrument with no usable rows in the window is **absent from the map**,
  * which is what tells "nothing to price it with" apart from "priced at zero".
  *
@@ -131,15 +140,30 @@ export async function loadPriceSeries(
          SELECT series_id, price_date::text AS price_date, close_price, has_adjusted
            FROM chosen
           ORDER BY series_id, price_date`
-      : `${oneBasis}
-         SELECT DISTINCT ON (series_id, bucket)
-                series_id, price_date::text AS price_date, close_price, has_adjusted
+      : `${oneBasis},
+         bucketed AS (
+           SELECT DISTINCT ON (series_id, bucket)
+                  series_id, price_date, close_price, has_adjusted
+             FROM (
+               SELECT series_id, price_date, close_price, has_adjusted,
+                      date_trunc($${values.push(sampling)}, price_date) AS bucket
+                 FROM chosen
+             ) sampled
+            ORDER BY series_id, bucket, price_date DESC
+         ),
+         opening AS (
+           SELECT DISTINCT ON (series_id)
+                  series_id, price_date, close_price, has_adjusted
+             FROM chosen
+            ORDER BY series_id, price_date
+         )
+         SELECT series_id, price_date::text AS price_date, close_price, has_adjusted
            FROM (
-             SELECT series_id, price_date, close_price, has_adjusted,
-                    date_trunc($${values.push(sampling)}, price_date) AS bucket
-               FROM chosen
-           ) sampled
-          ORDER BY series_id, bucket, price_date DESC`;
+             SELECT * FROM bucketed
+             UNION
+             SELECT * FROM opening
+           ) kept
+          ORDER BY series_id, price_date`;
 
   const rows: SeriesRow[] = await manager.query(sql, values);
 

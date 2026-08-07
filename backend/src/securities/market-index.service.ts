@@ -60,6 +60,54 @@ const REFRESH_WINDOW_DAYS = 10;
 
 const SOURCE = "yahoo_finance";
 
+/**
+ * How far back a fetch reaches when nothing narrower is asked for.
+ *
+ * Long enough to cover any holding this app is likely to see, short enough that
+ * the provider still serves a daily series: the S&P 500 runs to 1927, and
+ * requesting the whole of it is what makes the response coarser than daily.
+ * A holding older than this widens the window on demand -- the coverage check
+ * sees a stored start later than the boundary and refetches from it.
+ */
+const INDEX_HISTORY_YEARS = 25;
+
+/**
+ * The widest median spacing a response may have and still be a daily series.
+ *
+ * Daily closes sit one day apart with a three-day step over a weekend, so the
+ * median is 1; weekly bars give 7 and monthly about 30. Four separates them
+ * with room to spare.
+ */
+const MAX_DAILY_GAP_DAYS = 4;
+
+/** ISO date `years` from `date`. */
+function withYears(date: string, years: number): string {
+  const shifted = new Date(`${date}T00:00:00Z`);
+  shifted.setUTCFullYear(shifted.getUTCFullYear() + years);
+  return shifted.toISOString().slice(0, 10);
+}
+
+/**
+ * Median whole days between consecutive observations, or null when there are
+ * fewer than two. The median rather than the mean: one long exchange closure
+ * must not make a daily series look weekly.
+ */
+function medianGapDays(dates: readonly Date[]): number | null {
+  if (dates.length < 2) return null;
+  const ordered = [...dates].sort((a, b) => a.getTime() - b.getTime());
+  const gaps: number[] = [];
+  for (let i = 1; i < ordered.length; i += 1) {
+    gaps.push(
+      Math.round(
+        (ordered[i].getTime() - ordered[i - 1].getTime()) / 86_400_000,
+      ),
+    );
+  }
+  gaps.sort((a, b) => a - b);
+  const mid = Math.floor(gaps.length / 2);
+  return gaps.length % 2 === 0 ? (gaps[mid - 1] + gaps[mid]) / 2 : gaps[mid];
+}
+
 interface UpsertRow {
   indexCode: string;
   priceDate: string;
@@ -273,18 +321,38 @@ export class MarketIndexService implements OnApplicationBootstrap {
   ): Promise<void> {
     await this.recordAttempt(index.code);
     try {
-      const prices = from
-        ? await this.yahooFinanceService.fetchHistoricalWindow(
-            index.yahooSymbol,
-            new Date(`${from}T00:00:00Z`),
-            new Date(`${to}T23:59:59Z`),
-          )
-        : await this.yahooFinanceService.fetchHistorical(index.yahooSymbol);
+      // Always an explicit period window, never `range=max`. Asked for its
+      // whole history an index answers with coarser bars -- the shorthand
+      // silently drops granularity when the span is longer than the daily
+      // series it will serve -- and those monthly closes were then stored as if
+      // they were the daily series. The chart drew the benchmark as a row of
+      // flat stubs: one observation carried forward to the staleness bound,
+      // then a gap, over and over.
+      const windowStart = from ?? withYears(to, -INDEX_HISTORY_YEARS);
+      const prices = await this.yahooFinanceService.fetchHistoricalWindow(
+        index.yahooSymbol,
+        new Date(`${windowStart}T00:00:00Z`),
+        new Date(`${to}T23:59:59Z`),
+      );
 
       if (!prices?.length) {
         await this.recordFailure(
           index.code,
           `no history returned for ${index.yahooSymbol}`,
+        );
+        return;
+      }
+
+      // A series coarser than daily is not a sparse daily series, it is a
+      // different series -- and storing it beside the securities' daily closes
+      // produces a benchmark that appears to have no price for most of every
+      // month. Refusing leaves the index unpriced, which the comparison reports
+      // as an exclusion the user can act on.
+      const spacing = medianGapDays(prices.map((price) => price.date));
+      if (spacing !== null && spacing > MAX_DAILY_GAP_DAYS) {
+        await this.recordFailure(
+          index.code,
+          `${index.yahooSymbol} returned bars about ${spacing} day(s) apart; a daily series was requested`,
         );
         return;
       }
