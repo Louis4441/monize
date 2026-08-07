@@ -65,7 +65,21 @@ const WEEKLY_FILE_PATTERN =
 const MONTHLY_FILE_PATTERN =
   /^monize-backup-monthly-(\d{2}-\d{2})\.(json\.gz|mzbe)$/;
 
-const WEEKLY_DAYS = [7, 14, 21, 28];
+/**
+ * Days of the month on which a daily artifact is also promoted to weekly, and
+ * the one on which it is promoted to monthly.
+ *
+ * Exported because they are the suite's calendar as much as the service's. A
+ * test that writes a backup and then counts the files in the folder gets a
+ * different answer on these five days, so `auto-backup.service.spec.ts` pins
+ * its clock to a day that is in neither list and asserts that fact against
+ * these constants. Widening either one without exporting it would silently
+ * make ten assertions depend on the date the suite happened to run.
+ */
+export const WEEKLY_DAYS = [7, 14, 21, 28];
+
+/** The day of the month a daily artifact is also promoted to monthly. */
+export const MONTHLY_DAY = 1;
 
 /**
  * A per-user backup directory name: the user's UUID. Used to keep those
@@ -927,7 +941,7 @@ export class AutoBackupService {
     timezone: string,
   ): Promise<void> {
     const dayOfMonth = this.getLocalDayOfMonth(new Date(), timezone);
-    if (dayOfMonth !== 1) return;
+    if (dayOfMonth !== MONTHLY_DAY) return;
 
     const now = new Date();
     const formatter = new Intl.DateTimeFormat("en-US", {
