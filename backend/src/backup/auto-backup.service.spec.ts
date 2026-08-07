@@ -952,6 +952,19 @@ describe("AutoBackupService", () => {
   });
 
   describe("runManualBackup", () => {
+    // The backup path promotes the daily artifact to a weekly copy on
+    // WEEKLY_DAYS ([7, 14, 21, 28]) and to a monthly copy on the 1st, so a run
+    // on one of those days legitimately leaves more than the daily file. These
+    // tests assert the daily-only outcome, so pin the clock to a plain
+    // day-of-month; the tests that exercise promotion set their own date. Left
+    // on the real clock the suite fails on the 1st/7th/14th/21st/28th.
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date("2026-04-08T12:00:00Z"));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it("should back up under BACKUP_CONTAINER_DIR when no settings exist", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(null);
 
@@ -1129,6 +1142,16 @@ describe("AutoBackupService", () => {
    * replica and two users was enough.
    */
   describe("tenant isolation on a shared root", () => {
+    // Pin to a plain day-of-month: the backup path promotes to weekly on
+    // WEEKLY_DAYS ([7, 14, 21, 28]) and monthly on the 1st, and these tests
+    // assert the daily-only artifact set. See runManualBackup above.
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date("2026-04-08T12:00:00Z"));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it("writes two users' same-day backups to different files", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ folderPath: root }),
@@ -1174,6 +1197,17 @@ describe("AutoBackupService", () => {
   });
 
   describe("handleAutoBackupCron", () => {
+    // Pin to a plain day-of-month: the cron promotes to weekly on WEEKLY_DAYS
+    // ([7, 14, 21, 28]) and monthly on the 1st, and these tests assert the
+    // daily-only artifact set. The promotion behaviour is covered, with its own
+    // pinned dates, in the partial-backup and retention describes below.
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date("2026-04-08T12:00:00Z"));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it("should do nothing if no backups are due", async () => {
       mockSettingsRepo.find.mockResolvedValue([]);
 
