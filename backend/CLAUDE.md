@@ -377,3 +377,27 @@ previous backups are encrypted and silently downgrading is worse than failing).
 Cron jobs use `@Cron()` from `@nestjs/schedule` and run **in the API process** -- `ScheduleModule.forRoot()` is registered in `app.module.ts`; there is no separate scheduler process (on k8s with more than one backend replica, every replica fires every cron). For the full schedule, see `docs/cron-jobs.md` or grep `@Cron(`.
 
 Every `@Cron` handler is an out-of-request entry point, so its body must seed its own RLS context (tasks C2-C4): the cross-user fan-out under `withSystemContext`, each per-user body under `withUserContext(userId)`. A handler that reaches the DB with no ambient context throws `DB access outside request/user/system context` in every `RLS_MODE`, including `off` -- the per-module `rls-context-smoke.spec.ts` specs are the pattern for proving a cron runs clean.
+
+### Cleanup somebody is blocked on belongs on the request path
+
+Before choosing an interval, ask what the stale row *does* while it sits there.
+If it is only untidy, a schedule is the whole answer. If it **refuses the user's
+next request** -- a slot, a lock, a uniqueness guard -- then the interval is a
+lockout the user cannot end, and picking a smaller number only makes the outage
+shorter. Run the cleanup inside the transaction of the request that is about to
+be refused by it, scoped to that caller, and leave the cron as a cross-user
+backstop for whoever never comes back. `MnyImportJobService` is the worked
+example: `reapStaleJobsForUser` runs in `create` and in the poll's `findOne`, so
+a dead import clears itself within one 1.5s poll instead of within ten minutes,
+and `reapStaleJobs` dropped from every five minutes to hourly.
+
+Two things that path has to get right, both of which have a test rather than a
+paragraph. The staleness predicate is **one exported constant** used by the reap
+and negated by the advisory pre-check -- an advisory check that still counts what
+the reap would clear throws the refusal before the request ever reaches the
+transaction that would have cleared it, which reinstates the lockout through the
+back door and looks correct at every individual site. And a per-user cleanup
+whose predicate is a disjunction needs its own parentheses inside the
+`user_id = $n AND (...)`, or the trailing arm escapes the tenant restriction
+entirely; assert the composed clause, not an `"AND ("` prefix, since a condition
+that opens with its own paren satisfies that prefix while ungrouped.

@@ -2304,7 +2304,9 @@ describe('ScheduledTransactionForm', () => {
         target: { value: 'sec-voo' },
       });
       await waitFor(() => {
-        expect(mockGetSecurityPrices).toHaveBeenCalledWith('sec-voo', 1);
+        expect(mockGetSecurityPrices).toHaveBeenCalledWith('sec-voo', {
+          limit: 1,
+        });
       });
       await waitFor(() => {
         const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;

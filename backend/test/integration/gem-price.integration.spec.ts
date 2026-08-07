@@ -156,6 +156,71 @@ describe("GEM prices and signal materialization (integration)", () => {
       ]);
     });
 
+    /**
+     * The other thing a mocked `query` cannot see: which rows a *sampled* read
+     * actually returns.
+     *
+     * Weekly and monthly sampling keep the last close of each bucket, which is
+     * right everywhere except the first one -- there it discards the very close
+     * a rebasing measures from. A security first priced on 4 January reduced to
+     * a single 29 January sample, so a window opening on its own first price
+     * found nothing at or before that boundary, and the Security Performance
+     * comparison excluded the instrument from its own chart. A read with lead
+     * days in front of it never sees this, which is why it stayed latent until
+     * an "all time" window opened exactly where the data does.
+     */
+    it("keeps a series' opening close when sampling monthly", async () => {
+      const vti = await security("VTI");
+      await price(vti, "2010-01-04", 50, null);
+      await price(vti, "2010-01-29", 52, null);
+      await price(vti, "2010-02-26", 54, null);
+
+      const series = await withUserContext(userId, () =>
+        prices.loadSeries([vti], "2010-01-01", "month"),
+      );
+
+      // The opening row, then each bucket's last close. Without the opening the
+      // series starts on 29 January and the 4th is unreachable.
+      expect(series.get(vti)).toEqual([
+        { date: "2010-01-04", close: 50 },
+        { date: "2010-01-29", close: 52 },
+        { date: "2010-02-26", close: 54 },
+      ]);
+    });
+
+    it("does not double-count an opening that is already its bucket's last close", async () => {
+      const vxus = await security("VXUS");
+      await price(vxus, "2010-01-04", 50, null);
+      await price(vxus, "2010-02-26", 54, null);
+
+      const series = await withUserContext(userId, () =>
+        prices.loadSeries([vxus], "2010-01-01", "month"),
+      );
+
+      // The January opening *is* January's last close; the union must collapse
+      // them rather than emit the date twice.
+      expect(series.get(vxus)).toEqual([
+        { date: "2010-01-04", close: 50 },
+        { date: "2010-02-26", close: 54 },
+      ]);
+    });
+
+    it("keeps each instrument's own opening when several are read at once", async () => {
+      const early = await security("EARLY");
+      const late = await security("LATE");
+      await price(early, "2010-01-04", 10, null);
+      await price(early, "2010-01-29", 11, null);
+      await price(late, "2010-02-03", 20, null);
+      await price(late, "2010-02-26", 21, null);
+
+      const series = await withUserContext(userId, () =>
+        prices.loadSeries([early, late], "2010-01-01", "month"),
+      );
+
+      expect(series.get(early)?.[0]).toEqual({ date: "2010-01-04", close: 10 });
+      expect(series.get(late)?.[0]).toEqual({ date: "2010-02-03", close: 20 });
+    });
+
     it("returns the raw closes for an instrument nobody has adjusted", async () => {
       // The only series available for such an instrument, and consistent
       // throughout -- which is the point of deciding per security.
@@ -212,6 +277,12 @@ describe("GEM prices and signal materialization (integration)", () => {
       // `DISTINCT ON` orders descending inside a bucket, so the ascending order
       // every consumer assumes -- `pointAsOf` binary-searches on it -- is
       // restored afterwards. A mocked query cannot show that it needed to be.
+      //
+      // The 5 January row is the series' opening and is kept alongside the
+      // bucket ends: last-of-bucket alone discarded the close a rebasing
+      // measures from, which excluded an instrument from its own chart when the
+      // window opened on its first price. Every *later* bucket is still
+      // represented by its last close only -- 3 February is absent.
       const spy = await security("SPY");
       await price(spy, "2025-01-05", 100, null);
       await price(spy, "2025-01-28", 110, null);
@@ -223,6 +294,7 @@ describe("GEM prices and signal materialization (integration)", () => {
       );
 
       expect(series.get(spy)).toEqual([
+        { date: "2025-01-05", close: 100 },
         { date: "2025-01-28", close: 110 },
         { date: "2025-02-25", close: 130 },
       ]);

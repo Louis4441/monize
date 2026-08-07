@@ -106,7 +106,7 @@
       "security-type-allocation": "Consultez la répartition du portefeuille par type d'actif (actions, ETF, fonds communs, obligations) avec détail des positions.",
       "geographic-allocation": "Analysez l'exposition géographique du portefeuille par bourse et région pour des analyses de diversification.",
       "dividend-yield-growth": "Suivez le rendement des dividendes, les rendements par titre, la croissance d'une année à l'autre et l'analyse de la fréquence de versement.",
-      "security-performance": "Analysez en détail l'historique des cours, les transactions et les rendements d'un titre, ou comparez la performance de plusieurs titres sur un même graphique.",
+      "security-performance": "Analyse détaillée de l’historique des cours, des transactions et des rendements d’un titre, ou comparaison de plusieurs titres et indices de marché sur un même graphique.",
       "currency-exposure": "Comprenez le risque de change avec la répartition du portefeuille par devise et les détails des taux de change.",
       "monte-carlo-simulation": "Projetez les résultats futurs du portefeuille avec des milliers de chemins de rendement aléatoires et une bibliothèque de scénarios sauvegardés.",
       "gem-strategy": "Suivez le signal Global Equities Momentum, la raison de son changement et si votre portefeuille y correspond.",
@@ -1280,11 +1280,11 @@
     "pdfColPortfolioPct": "% du portefeuille"
   },
   "securityPerformance": {
-    "selectPrompt": "Sélectionnez un ou plusieurs titres ci-dessus pour voir leur performance. Choisissez-en au moins deux pour les comparer sur un même graphique.",
+    "selectPrompt": "Sélectionnez un ou plusieurs titres ci-dessus pour voir leur performance, et ajoutez un indice de marché auquel les comparer.",
     "selectSecuritiesPlaceholder": "Sélectionner des titres...",
     "comparisonTitle": "Comparaison des performances",
-    "comparisonSubtitle": "Rendement cumulé de chaque titre sélectionné, ramené à 0 % à son premier cours disponible afin de les comparer sur une même échelle, quels que soient le cours ou la devise.",
-    "comparisonNoData": "Aucun historique de cours n'est disponible pour les titres sélectionnés.",
+    "comparisonSubtitle": "Rendement cumulé de chaque instrument sélectionné, ramené à 0 % au début de la période choisie afin qu’ils se comparent sur une même échelle, quels que soient le cours et la devise. Les indices de marché sont tracés en pointillés.",
+    "comparisonNoData": "Aucun des instruments sélectionnés n’a pu être valorisé sur cette période.",
     "comparisonError": "Impossible de charger l'historique des cours. Veuillez réessayer.",
     "viewPriceChart": "Graphique des cours",
     "viewTransactions": "Transactions",
@@ -1330,7 +1330,24 @@
     "pdfColShares": "Parts",
     "pdfColPrice": "Prix",
     "pdfColTotal": "Total",
-    "pdfTotalDividends": "Total des dividendes"
+    "pdfTotalDividends": "Total des dividendes",
+    "selectIndexesPlaceholder": "Ajouter un indice de marché…",
+    "timeframeChartOnlyNote": "La période s’applique au graphique. Les chiffres ci-dessus et les tableaux ci-dessous couvrent l’ensemble de la position.",
+    "comparisonExcludedTitle": "Non représenté sur ce graphique",
+    "comparisonExcludedRow": "{label} — {reason}",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "aucun historique de cours n’est enregistré",
+      "NO_PRICE_AT_WINDOW_START": "aucun cours assez proche du début de cette période, son rendement sur la période est donc inconnu",
+      "NON_POSITIVE_BASE": "son cours au début de cette période n’est pas une valeur exploitable",
+      "SINGLE_OBSERVATION": "un seul cours sur cette période, ce qui ne mesure aucune variation"
+    },
+    "comparisonIncomplete": "Une partie de ce graphique n’a pas pu être mesurée : une ligne interrompue signale une plage sans cours, et une ligne qui s’arrête tôt n’a plus de données au-delà.",
+    "comparisonIndexLegend": "{name} (indice)",
+    "indexRegions": {
+      "NORTH_AMERICA": "Amérique du Nord",
+      "EUROPE": "Europe",
+      "ASIA_PACIFIC": "Asie-Pacifique"
+    }
   },
   "securityTypeAllocation": {
     "noData": "Aucune position d'investissement trouvée. Ajoutez des titres pour voir la ventilation par type d'actif.",

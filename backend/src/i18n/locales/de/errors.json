@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "Die Aufteilungsprozentsätze ergeben in Summe mehr als 100 %.",
     "invalidTagKey": "Ein Tag-Schlüssel (1–100 Zeichen) ist erforderlich",
     "assetOptionNameRequired": "Ein Name für die Anlageklasse ist erforderlich.",
-    "documentNotFound": "Dokument nicht gefunden"
+    "documentNotFound": "Dokument nicht gefunden",
+    "selectionNotFound": "Eine oder mehrere der ausgewählten Wertpapiere wurden nicht gefunden",
+    "comparisonSelectionEmpty": "Wählen Sie mindestens ein Wertpapier oder einen Marktindex zum Vergleich aus"
   },
   "tags": {
     "notFound": "Etikett mit ID {{ id }} nicht gefunden",

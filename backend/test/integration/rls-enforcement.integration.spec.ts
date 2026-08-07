@@ -43,6 +43,10 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
   const EXEMPT = [
     "currencies",
     "exchange_rates",
+    // Global market reference data with no owner column, written only under
+    // system context. See the exemption note at the foot of database/schema.sql.
+    "market_index_prices",
+    "market_index_sync",
     "oauth_payloads",
     "schema_migrations",
   ];

@@ -1263,7 +1263,9 @@ describe('PostTransactionDialog', () => {
         />,
       );
       await waitFor(() => {
-        expect(mockGetSecurityPrices).toHaveBeenCalledWith('sec1', 1);
+        expect(mockGetSecurityPrices).toHaveBeenCalledWith('sec1', {
+          limit: 1,
+        });
       });
     });
 

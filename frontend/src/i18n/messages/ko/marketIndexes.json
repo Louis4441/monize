@@ -1,0 +1,26 @@
+{
+  "names": {
+    "SP500": "S&P 500",
+    "NASDAQ_COMPOSITE": "나스닥 종합지수",
+    "DOW_JONES": "다우존스 산업평균지수",
+    "RUSSELL_2000": "러셀 2000",
+    "SP_TSX_COMPOSITE": "S&P/TSX 종합지수",
+    "FTSE_100": "FTSE 100",
+    "DAX": "DAX",
+    "CAC_40": "CAC 40",
+    "AEX": "AEX",
+    "FTSE_MIB": "FTSE MIB",
+    "OMXS30": "OMX 스톡홀름 30",
+    "EURO_STOXX_50": "유로 스톡스 50",
+    "NIKKEI_225": "닛케이 225",
+    "HANG_SENG": "항셍지수",
+    "SSE_COMPOSITE": "상하이 종합지수",
+    "SZSE_COMPONENT": "선전 성분지수",
+    "ASX_200": "S&P/ASX 200",
+    "KOSPI": "코스피",
+    "TAIEX": "대만 가권지수",
+    "STI": "스트레이츠 타임스 지수",
+    "SENSEX": "BSE 센섹스",
+    "NIFTY_50": "NIFTY 50"
+  }
+}

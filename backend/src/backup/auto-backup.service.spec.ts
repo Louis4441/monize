@@ -2,12 +2,20 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { BadRequestException } from "@nestjs/common";
-import { promises as fs, mkdtempSync, readdirSync, rmSync } from "fs";
+import {
+  promises as fs,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
   AutoBackupService,
   DEFAULT_BACKUP_CONTAINER_DIR,
+  MONTHLY_DAY,
+  WEEKLY_DAYS,
 } from "./auto-backup.service";
 import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
@@ -34,7 +42,27 @@ jest.mock("stream/promises", () => ({
  * that the code called rename, which was never the question. The mocked version
  * of this suite passed throughout the period when the daily write truncated its
  * own final filename and every user shared one namespace.
+ *
+ * The clock, unlike the filesystem, is pinned. `copyToWeeklyIfNeeded` and
+ * `copyToMonthlyIfNeeded` read `new Date()`, so on the 1st, 7th, 14th, 21st and
+ * 28th a single backup leaves *two* files in the folder -- and every assertion
+ * here that counts artifacts or compares the folder listing exactly was
+ * therefore green on 24 days a month and red on the other five. That is not a
+ * flake to retry: it is the suite reporting the date rather than the code. Ten
+ * tests failed this way on 2026-08-07 with no change to the module behind them.
+ *
+ * So `beforeEach` fixes the system time to an ordinary day, and the tests that
+ * are *about* promotion set their own date, as they always did. Faking the
+ * clock does not weaken the filesystem claims above: the directory, the writes
+ * and the renames stay real.
  */
+
+/**
+ * An ordinary day: late enough to be newer than every seeded fixture, and in
+ * neither promotion list. Guarded by a test below rather than by this comment.
+ */
+const SUITE_CLOCK = new Date("2026-04-15T10:00:00Z");
+
 describe("AutoBackupService", () => {
   let service: AutoBackupService;
   let mockSettingsRepo: Record<string, jest.Mock>;
@@ -60,6 +88,28 @@ describe("AutoBackupService", () => {
       return (await fs.readdir(directory)).sort();
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Runs `fn` with the clock moved to `date`, then puts it back.
+   *
+   * The one way to change the date in this file. Fake timers are installed once
+   * in `beforeEach` with a deliberately narrow `doNotFake` list, so a test that
+   * reinstalls them with a bare `useFakeTimers()` silently takes the default
+   * instead -- which fakes `nextTick` and `queueMicrotask` underneath the real
+   * `fs.promises` calls these specs depend on. Move the date; do not reinstall
+   * the timers.
+   */
+  async function withClockAt(
+    date: string,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    jest.setSystemTime(new Date(date));
+    try {
+      await fn();
+    } finally {
+      jest.setSystemTime(SUITE_CLOCK);
     }
   }
   let isDemo: boolean;
@@ -132,6 +182,24 @@ describe("AutoBackupService", () => {
   let defaultEnv: Record<string, string>;
 
   beforeEach(async () => {
+    // Only `Date` is faked. The timer APIs stay real because the writes below
+    // are real filesystem I/O, and a suite that fakes the event loop under
+    // `fs.promises` deadlocks rather than failing.
+    jest.useFakeTimers({
+      doNotFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "setImmediate",
+        "clearImmediate",
+        "nextTick",
+        "queueMicrotask",
+        "performance",
+      ],
+    });
+    jest.setSystemTime(SUITE_CLOCK);
+
     root = mkdtempSync(join(tmpdir(), "monize-backup-spec-"));
     defaultEnv = { BACKUP_CONTAINER_DIR: root };
 
@@ -185,8 +253,45 @@ describe("AutoBackupService", () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
     rmSync(root, { recursive: true, force: true });
+  });
+
+  /**
+   * The guard for the defect this pinning exists to stop coming back.
+   *
+   * A comment saying "15 is an ordinary day" is true until somebody adds 15 to
+   * `WEEKLY_DAYS`, at which point ten unrelated assertions start counting an
+   * extra file and the failure points at retention or sharding rather than at
+   * the calendar. Deriving the check from the service's own constants means
+   * that change fails here, once, with a message that names the cause.
+   */
+  describe("the suite's own clock", () => {
+    const pinnedDay = SUITE_CLOCK.getUTCDate();
+
+    it("is pinned to a day that promotes neither weekly nor monthly", () => {
+      expect(WEEKLY_DAYS).not.toContain(pinnedDay);
+      expect(pinnedDay).not.toBe(MONTHLY_DAY);
+    });
+
+    it("actually reaches the code under test", () => {
+      // `useFakeTimers` with a `doNotFake` list is easy to over-populate --
+      // adding "Date" to it would leave every assertion below back on the wall
+      // clock, silently, with the pinning still apparently in place.
+      expect(new Date().toISOString()).toBe(SUITE_CLOCK.toISOString());
+    });
+
+    it("is installed in exactly one place", () => {
+      // A second installation is how the narrow `doNotFake` list gets lost: a
+      // new test writes the bare call it finds in every other Jest suite, gets
+      // faked microtasks under real `fs.promises`, and hangs -- or reinstates
+      // the wall clock for whatever runs after it. Use `withClockAt` to move
+      // the date instead.
+      const source = readFileSync(__filename, "utf8");
+      const installs = source.match(/jest\.useFakeTimers\(/g) ?? [];
+      expect(installs).toHaveLength(1);
+    });
   });
 
   describe("getSettings", () => {
@@ -952,19 +1057,10 @@ describe("AutoBackupService", () => {
   });
 
   describe("runManualBackup", () => {
-    // The backup path promotes the daily artifact to a weekly copy on
-    // WEEKLY_DAYS ([7, 14, 21, 28]) and to a monthly copy on the 1st, so a run
-    // on one of those days legitimately leaves more than the daily file. These
-    // tests assert the daily-only outcome, so pin the clock to a plain
-    // day-of-month; the tests that exercise promotion set their own date. Left
-    // on the real clock the suite fails on the 1st/7th/14th/21st/28th.
-    beforeEach(() => {
-      jest.useFakeTimers().setSystemTime(new Date("2026-04-08T12:00:00Z"));
-    });
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
+    // These tests assert the daily-only outcome. The suite-wide clock
+    // (SUITE_CLOCK) is already pinned to a plain day-of-month, so no promotion
+    // to weekly/monthly interferes; the tests that exercise promotion move the
+    // clock with withClockAt.
     it("should back up under BACKUP_CONTAINER_DIR when no settings exist", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(null);
 
@@ -1142,16 +1238,8 @@ describe("AutoBackupService", () => {
    * replica and two users was enough.
    */
   describe("tenant isolation on a shared root", () => {
-    // Pin to a plain day-of-month: the backup path promotes to weekly on
-    // WEEKLY_DAYS ([7, 14, 21, 28]) and monthly on the 1st, and these tests
-    // assert the daily-only artifact set. See runManualBackup above.
-    beforeEach(() => {
-      jest.useFakeTimers().setSystemTime(new Date("2026-04-08T12:00:00Z"));
-    });
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
+    // These tests assert the daily-only artifact set; the suite-wide SUITE_CLOCK
+    // is already a plain day-of-month, so nothing promotes. See runManualBackup.
     it("writes two users' same-day backups to different files", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ folderPath: root }),
@@ -1197,17 +1285,10 @@ describe("AutoBackupService", () => {
   });
 
   describe("handleAutoBackupCron", () => {
-    // Pin to a plain day-of-month: the cron promotes to weekly on WEEKLY_DAYS
-    // ([7, 14, 21, 28]) and monthly on the 1st, and these tests assert the
-    // daily-only artifact set. The promotion behaviour is covered, with its own
-    // pinned dates, in the partial-backup and retention describes below.
-    beforeEach(() => {
-      jest.useFakeTimers().setSystemTime(new Date("2026-04-08T12:00:00Z"));
-    });
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
+    // These tests assert the daily-only artifact set; the suite-wide SUITE_CLOCK
+    // is already a plain day-of-month, so nothing promotes. Promotion behaviour
+    // is covered, with its own dates, in the partial-backup and retention
+    // describes below.
     it("should do nothing if no backups are due", async () => {
       mockSettingsRepo.find.mockResolvedValue([]);
 
@@ -1404,17 +1485,17 @@ describe("AutoBackupService", () => {
 
     it("does not promote a partial to weekly or monthly", async () => {
       // Day 7 would normally trigger a weekly promotion.
-      jest.useFakeTimers().setSystemTime(new Date("2026-04-07T12:00:00Z"));
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      await withClockAt("2026-04-07T12:00:00Z", async () => {
+        mockSettingsRepo.findOne.mockResolvedValue(
+          createSettings({ enabled: true, folderPath: root }),
+        );
 
-      await service.runManualBackup(userId);
+        await service.runManualBackup(userId);
 
-      const remaining = await listBackups(folderFor());
-      expect(remaining.some((n) => n.includes("weekly"))).toBe(false);
-      expect(remaining.some((n) => n.includes("monthly"))).toBe(false);
-      jest.useRealTimers();
+        const remaining = await listBackups(folderFor());
+        expect(remaining.some((n) => n.includes("weekly"))).toBe(false);
+        expect(remaining.some((n) => n.includes("monthly"))).toBe(false);
+      });
     });
 
     it("the cron records partial and preserves complete copies too", async () => {
@@ -1761,19 +1842,14 @@ describe("AutoBackupService", () => {
         createSettings({ enabled: true, folderPath: root }),
       );
 
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date("2026-04-14T10:00:00Z"));
-
-      try {
+      await withClockAt("2026-04-14T10:00:00Z", async () => {
         await service.runManualBackup(userId);
 
         expect(await listBackups(folderFor())).toEqual([
           "monize-backup-daily-2026-04-14.json.gz",
           "monize-backup-weekly-2026-04-14.json.gz",
         ]);
-      } finally {
-        jest.useRealTimers();
-      }
+      });
     });
 
     it("should copy daily to monthly on day 1", async () => {
@@ -1781,19 +1857,14 @@ describe("AutoBackupService", () => {
         createSettings({ enabled: true, folderPath: root }),
       );
 
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date("2026-04-01T10:00:00Z"));
-
-      try {
+      await withClockAt("2026-04-01T10:00:00Z", async () => {
         await service.runManualBackup(userId);
 
         expect(await listBackups(folderFor())).toEqual([
           "monize-backup-daily-2026-04-01.json.gz",
           "monize-backup-monthly-26-04.json.gz",
         ]);
-      } finally {
-        jest.useRealTimers();
-      }
+      });
     });
 
     it("should not delete non-backup files", async () => {

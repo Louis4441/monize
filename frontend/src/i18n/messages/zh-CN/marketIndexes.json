@@ -1,0 +1,26 @@
+{
+  "names": {
+    "SP500": "标普500指数",
+    "NASDAQ_COMPOSITE": "纳斯达克综合指数",
+    "DOW_JONES": "道琼斯工业平均指数",
+    "RUSSELL_2000": "罗素2000指数",
+    "SP_TSX_COMPOSITE": "标普/多伦多证交所综合指数",
+    "FTSE_100": "富时100指数",
+    "DAX": "德国DAX指数",
+    "CAC_40": "法国CAC 40指数",
+    "AEX": "阿姆斯特丹AEX指数",
+    "FTSE_MIB": "富时MIB指数",
+    "OMXS30": "斯德哥尔摩OMX 30指数",
+    "EURO_STOXX_50": "欧洲斯托克50指数",
+    "NIKKEI_225": "日经225指数",
+    "HANG_SENG": "恒生指数",
+    "SSE_COMPOSITE": "上证综合指数",
+    "SZSE_COMPONENT": "深证成份指数",
+    "ASX_200": "标普/澳交所200指数",
+    "KOSPI": "韩国综合股价指数",
+    "TAIEX": "台湾加权指数",
+    "STI": "海峡时报指数",
+    "SENSEX": "孟买SENSEX指数",
+    "NIFTY_50": "NIFTY 50指数"
+  }
+}

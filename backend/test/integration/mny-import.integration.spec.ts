@@ -1344,8 +1344,8 @@ describe("mny writers (integration)", () => {
 
     it("releases the import slot when the wipe is refused", async () => {
       // A rejected start must not leave the user holding a slot for a job that
-      // will never run -- the reaper would take five minutes to clear it, and
-      // every import started in between would be refused.
+      // will never run -- the stale reap only clears it once it has been stale
+      // for JOB_STALE_AFTER_MS, and every import started in between is refused.
       const usersService = module.get(UsersService) as unknown as {
         deleteData: jest.Mock;
       };

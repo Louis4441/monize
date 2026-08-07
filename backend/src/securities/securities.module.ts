@@ -6,6 +6,8 @@ import { Holding } from "./entities/holding.entity";
 import { InvestmentTransaction } from "./entities/investment-transaction.entity";
 import { SecurityPrice } from "./entities/security-price.entity";
 import { SecurityDocument } from "./entities/security-document.entity";
+import { MarketIndexPrice } from "./entities/market-index-price.entity";
+import { MarketIndexSync } from "./entities/market-index-sync.entity";
 import { Account } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Tag } from "../tags/entities/tag.entity";
@@ -24,10 +26,13 @@ import { SecurityDetailService } from "./security-detail.service";
 import { SecurityDocumentsService } from "./security-documents.service";
 import { SecurityNewsService } from "./security-news.service";
 import { SectorWeightingService } from "./sector-weighting.service";
+import { MarketIndexService } from "./market-index.service";
+import { PerformanceComparisonService } from "./performance-comparison.service";
 import { SecuritiesController } from "./securities.controller";
 import { HoldingsController } from "./holdings.controller";
 import { InvestmentTransactionsController } from "./investment-transactions.controller";
 import { PortfolioController } from "./portfolio.controller";
+import { PerformanceComparisonController } from "./performance-comparison.controller";
 import { AccountsModule } from "../accounts/accounts.module";
 import { TransactionsModule } from "../transactions/transactions.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
@@ -44,6 +49,8 @@ import { DelegationModule } from "../delegation/delegation.module";
       InvestmentTransaction,
       SecurityPrice,
       SecurityDocument,
+      MarketIndexPrice,
+      MarketIndexSync,
       Account,
       Transaction,
       Tag,
@@ -71,12 +78,15 @@ import { DelegationModule } from "../delegation/delegation.module";
     SecurityDocumentsService,
     SecurityNewsService,
     SectorWeightingService,
+    MarketIndexService,
+    PerformanceComparisonService,
   ],
   controllers: [
     SecuritiesController,
     HoldingsController,
     InvestmentTransactionsController,
     PortfolioController,
+    PerformanceComparisonController,
   ],
   exports: [
     SecuritiesService,
@@ -96,6 +106,8 @@ import { DelegationModule } from "../delegation/delegation.module";
     SecurityDocumentsService,
     SecurityNewsService,
     SectorWeightingService,
+    MarketIndexService,
+    PerformanceComparisonService,
   ],
 })
 export class SecuritiesModule {}

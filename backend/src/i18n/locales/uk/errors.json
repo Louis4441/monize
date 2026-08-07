@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "Сума відсотків розподілу перевищує 100%.",
     "invalidTagKey": "Потрібен ключ тегу (1–100 символів)",
     "assetOptionNameRequired": "Потрібна назва класу активів.",
-    "documentNotFound": "Документ не знайдено"
+    "documentNotFound": "Документ не знайдено",
+    "selectionNotFound": "Один або кілька вибраних паперів не знайдено",
+    "comparisonSelectionEmpty": "Виберіть щонайменше один папір або ринковий індекс для порівняння"
   },
   "tags": {
     "notFound": "Тег з ідентифікатором {{ id }} не знайдено",

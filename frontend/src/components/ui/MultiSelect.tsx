@@ -25,6 +25,16 @@ interface MultiSelectProps {
   disabled?: boolean;
   onCreateNew?: () => void;
   createNewLabel?: string;
+  /**
+   * Size the trigger to the longest option label at first render and keep it
+   * there. Without this the button is as wide as whatever is currently
+   * selected, so picking a security with a long name visibly stretches the
+   * control and picking a short one shrinks it back -- the toolbar around it
+   * reflows on every selection. The width comes from invisible zero-height
+   * copies of the widest labels rendered inside the button, so it needs no
+   * measurement pass and tracks the real font.
+   */
+  sizeToLongestOption?: boolean;
 }
 
 export function MultiSelect({
@@ -39,6 +49,7 @@ export function MultiSelect({
   disabled = false,
   onCreateNew,
   createNewLabel = 'Create new...',
+  sizeToLongestOption = false,
 }: MultiSelectProps) {
   const t = useTranslations('common');
   const [isOpen, setIsOpen] = useState(false);
@@ -244,6 +255,18 @@ export function MultiSelect({
     }
   }, [isOpen, showSearch]);
 
+  /**
+   * The candidate widest labels, for the trigger's sizer. Character count is a
+   * proxy -- the font is proportional -- so several of the longest are rendered
+   * and the browser takes the true maximum, rather than betting on one.
+   */
+  const sizerLabels = useMemo(() => {
+    if (!sizeToLongestOption) return [];
+    return [...flatOptions.map(o => o.label), placeholder]
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 5);
+  }, [sizeToLongestOption, flatOptions, placeholder]);
+
   // Display text
   const displayText = useMemo(() => {
     if (value.length === 0) return placeholder;
@@ -301,6 +324,24 @@ export function MultiSelect({
             />
           </svg>
         </div>
+        {sizerLabels.length > 0 && (
+          /* Invisible, zero-height copies of the widest labels: they give the
+             button its intrinsic width so the visible row cannot. The text
+             reaches the page through CSS content, not as DOM text -- the
+             browser still measures it in the real font, but it cannot be
+             found by text queries, duplicate what screen readers announce, or
+             be caught by the user's find-in-page. pr-7 stands in for the
+             chevron and its gap. */
+          <div aria-hidden="true" data-testid="multiselect-sizer" className="h-0 overflow-hidden">
+            {sizerLabels.map(sizerLabel => (
+              <div
+                key={sizerLabel}
+                data-sizer={sizerLabel}
+                className="invisible whitespace-nowrap pr-7 after:content-[attr(data-sizer)]"
+              />
+            ))}
+          </div>
+        )}
       </button>
 
       {/* Dropdown (portal-rendered to avoid overflow clipping) */}

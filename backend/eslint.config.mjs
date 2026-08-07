@@ -70,6 +70,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/oauth/oauth-provider.service.ts",
   "src/scheduled-transactions/scheduled-transactions.service.ts",
   "src/securities/holdings.service.ts",
+  // The market-index refresh is a deployment-wide cron with no request behind
+  // it: the rows it writes are global reference data with no owner, exactly like
+  // the exchange-rate refresh above.
+  "src/securities/market-index.service.ts",
   "src/securities/securities.controller.ts",
   "src/securities/security-price.service.ts",
   "src/transactions/transaction-transfer.service.ts",

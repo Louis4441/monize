@@ -8,6 +8,26 @@ import {
   GemSignalState,
 } from "./entities/gem-strategy-signal.entity";
 import { GemCadence } from "./entities/gem-strategy.entity";
+import {
+  BOUNDARY_LAG_DAYS,
+  PricePoint,
+  daysBetween,
+  pointAsOf,
+} from "../common/time-series/price-boundary.util";
+
+// The boundary lookup and its staleness bound are shared with the Security
+// Performance comparison, so they live under `common/time-series/`. Re-exported
+// here so the call sites that already import them from this module keep
+// working: one implementation, two names, which is what
+// `docs/time-series-contract.md` section 2.1 asks for.
+export {
+  BOUNDARY_LAG_DAYS,
+  closeAt,
+  daysBetween,
+  pointAsOf,
+  priceAsOf,
+} from "../common/time-series/price-boundary.util";
+export type { PricePoint } from "../common/time-series/price-boundary.util";
 
 /**
  * Pure GEM (Global Equities Momentum) arithmetic: evaluation calendar, trailing
@@ -25,12 +45,6 @@ import { GemCadence } from "./entities/gem-strategy.entity";
  *      strongest trailing return. While RISK_OFF the ranking is not consulted.
  * The portfolio is always 100% in a single asset.
  */
-
-/** A price point, as stored: an ISO date and its close. */
-export interface PricePoint {
-  date: string;
-  close: number;
-}
 
 /** One evaluation period on the strategy's calendar. */
 export interface GemPeriod {
@@ -124,82 +138,6 @@ export function recentPeriods(
     });
   }
   return periods;
-}
-
-/**
- * Close price on `date`, or the most recent one before it. Prices are expected
- * sorted oldest-first; the lookup is a binary search so a multi-year series can
- * be probed once per period without rescanning.
- *
- * Returns null when the series starts after `date` -- an unknown price, never a
- * substituted zero.
- */
-export function priceAsOf(prices: PricePoint[], date: string): number | null {
-  return pointAsOf(prices, date)?.close ?? null;
-}
-
-/**
- * The observation `priceAsOf` would return, with the date it was struck on.
- *
- * A caller that needs to know *how old* the answer is cannot use the close
- * alone: a security last quoted in March satisfies a lookup for September and
- * one for October with the same number, which reads as a period that opened
- * and closed at the same price rather than as a period nobody priced.
- */
-export function pointAsOf(
-  prices: PricePoint[],
-  date: string,
-): PricePoint | null {
-  let low = 0;
-  let high = prices.length - 1;
-  let found: PricePoint | null = null;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (prices[mid].date <= date) {
-      found = prices[mid];
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-  return found;
-}
-
-/**
- * How stale a close may be and still stand for a boundary date.
- *
- * Every boundary this strategy cares about -- a momentum window's start, a
- * period's first day, its last -- lands on a calendar date the market may well
- * have been shut on, so the close that prices it is a few days earlier. Two
- * weeks covers a weekend plus the longest exchange closures.
- *
- * The limit is the point. Without one, a security last quoted in March answers
- * a lookup for September and one for October with the same number: a momentum
- * of exactly zero, computed from one observation, indistinguishable from a
- * market that went nowhere -- and that figure decides a signal the user is
- * invited to trade on.
- */
-export const BOUNDARY_LAG_DAYS = 14;
-
-/** Whole days between two ISO dates. */
-export function daysBetween(from: string, to: string): number {
-  return (
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
-    86_400_000
-  );
-}
-
-/**
- * The close standing for `date`: the most recent one at or before it, but only
- * when it was struck within `BOUNDARY_LAG_DAYS`. Null otherwise -- an unknown
- * price, never an old one wearing today's date.
- */
-export function closeAt(prices: PricePoint[], date: string): number | null {
-  const point = pointAsOf(prices, date);
-  if (!point) return null;
-  return daysBetween(point.date, date) <= BOUNDARY_LAG_DAYS
-    ? point.close
-    : null;
 }
 
 /**

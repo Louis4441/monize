@@ -57,6 +57,7 @@ import { CreateSecurityDto } from "./dto/create-security.dto";
 import { UpdateSecurityDto } from "./dto/update-security.dto";
 import { RefreshSecurityPricesDto } from "./dto/refresh-security-prices.dto";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
+import { PriceHistoryQueryDto } from "./dto/price-history-query.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
 import { Security } from "./entities/security.entity";
 import { withSystemContext } from "../common/db/with-context";
@@ -716,25 +717,27 @@ export class SecuritiesController {
   }
 
   @Get(":id/prices")
-  @ApiOperation({ summary: "Get price history for a security" })
-  @ApiQuery({
-    name: "limit",
-    required: false,
-    description: "Number of records (default: 365)",
+  @ApiOperation({
+    summary: "Get price history for a security",
+    description:
+      "Supply startDate/endDate for a window. A window is not a row cap: the " +
+      "rows come back newest-first, so a limit shorter than the history drops " +
+      "its oldest end, and a windowed request therefore returns the whole " +
+      "window rather than the newest `limit` rows within it.",
   })
   @ApiResponse({ status: 200, description: "Price history" })
   async getPriceHistory(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
-    @Query("limit", new DefaultValuePipe(365)) limit: number,
+    @Query() query: PriceHistoryQueryDto,
   ) {
     // Verify security belongs to the requesting user
     await this.securitiesService.findOne(req.user.id, id);
     return this.securityPriceService.getPriceHistory(
       id,
-      undefined,
-      undefined,
-      limit,
+      query.startDate || undefined,
+      query.endDate || undefined,
+      query.limit,
     );
   }
 

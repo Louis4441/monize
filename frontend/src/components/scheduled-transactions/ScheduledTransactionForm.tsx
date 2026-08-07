@@ -536,7 +536,7 @@ export function ScheduledTransactionForm({
       return;
     }
     let cancelled = false;
-    investmentsApi.getSecurityPrices(investmentSecurityId, 1)
+    investmentsApi.getSecurityPrices(investmentSecurityId, { limit: 1 })
       .then((prices) => {
         if (cancelled) return;
         const latest = prices[0];

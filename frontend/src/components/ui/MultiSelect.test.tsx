@@ -514,4 +514,89 @@ describe('MultiSelect', () => {
     expect(onChange).toHaveBeenCalledWith(expect.arrayContaining(['a', 'c']));
     expect(onChange).not.toHaveBeenCalledWith(expect.arrayContaining(['b']));
   });
+
+  describe('sizeToLongestOption', () => {
+    /**
+     * The trigger is as wide as whatever is selected unless something wider
+     * anchors it, so picking a long-named security stretched the report's
+     * toolbar and picking a short one shrank it back. The sizer is invisible
+     * zero-height copies of the widest labels inside the button: they set the
+     * intrinsic width once, from the options, and the selection cannot move it.
+     */
+    it('renders an invisible sizer holding the longest option labels', () => {
+      render(
+        <MultiSelect
+          options={[
+            { value: 'a', label: 'AB' },
+            { value: 'b', label: 'A very long security name indeed' },
+            { value: 'c', label: 'Mid-length name' },
+          ]}
+          value={[]}
+          onChange={onChange}
+          placeholder="Pick..."
+          sizeToLongestOption
+        />,
+      );
+
+      const sizer = screen.getByTestId('multiselect-sizer');
+      expect(sizer).toHaveAttribute('aria-hidden', 'true');
+      expect(sizer.className).toContain('h-0');
+      expect(sizer.className).toContain('overflow-hidden');
+      const labels = [...sizer.querySelectorAll('[data-sizer]')].map((node) =>
+        node.getAttribute('data-sizer'),
+      );
+      expect(labels).toContain('A very long security name indeed');
+      // Via CSS content, never as DOM text: text nodes would duplicate every
+      // option label for text queries, find-in-page, and any tooling that
+      // reads textContent -- 37 report tests found that out at once.
+      expect(sizer.textContent).toBe('');
+    });
+
+    it('does not duplicate option labels as queryable text', () => {
+      render(
+        <MultiSelect
+          options={[{ value: 'a', label: 'Unique Option Label' }]}
+          value={[]}
+          onChange={onChange}
+          sizeToLongestOption
+        />,
+      );
+      // Closed dropdown: the label must appear zero times as text.
+      expect(screen.queryByText('Unique Option Label')).not.toBeInTheDocument();
+    });
+
+    it('includes group children in the sizer, since they are options too', () => {
+      render(
+        <MultiSelect
+          options={[
+            {
+              value: 'region',
+              label: 'Region',
+              children: [
+                {
+                  value: 'idx',
+                  label: 'The longest index name in the whole catalog',
+                  parentId: 'region',
+                },
+              ],
+            },
+          ]}
+          value={[]}
+          onChange={onChange}
+          sizeToLongestOption
+        />,
+      );
+      const labels = [
+        ...screen
+          .getByTestId('multiselect-sizer')
+          .querySelectorAll('[data-sizer]'),
+      ].map((node) => node.getAttribute('data-sizer'));
+      expect(labels).toContain('The longest index name in the whole catalog');
+    });
+
+    it('renders no sizer by default, leaving other call sites untouched', () => {
+      render(<MultiSelect options={flatOptions} value={[]} onChange={onChange} />);
+      expect(screen.queryByTestId('multiselect-sizer')).not.toBeInTheDocument();
+    });
+  });
 });

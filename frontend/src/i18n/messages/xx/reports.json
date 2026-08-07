@@ -106,7 +106,7 @@
       "security-type-allocation": "[XX-View portfolio allocation by asset type (stocks, ETFs, mutual funds, bonds) with drill-down into holdings.-XX]",
       "geographic-allocation": "[XX-Analyze portfolio geographic exposure by exchange and region for diversification insights.-XX]",
       "dividend-yield-growth": "[XX-Track dividend yield, per-security yields, year-over-year growth, and payment frequency analysis.-XX]",
-      "security-performance": "[XX-Deep dive into a security's price history, transactions, and returns, or compare several securities' performance on one chart.-XX]",
+      "security-performance": "[XX-Deep dive into a security's price history, transactions, and returns, or compare several securities and market indexes on one chart.-XX]",
       "currency-exposure": "[XX-Understand currency risk with portfolio allocation by currency and exchange rate details.-XX]",
       "monte-carlo-simulation": "[XX-Project future portfolio outcomes with thousands of randomized return paths and a saved-scenario library.-XX]",
       "gem-strategy": "[XX-Track the Global Equities Momentum signal, why it changed, and whether your portfolio matches it.-XX]",
@@ -1277,11 +1277,11 @@
     "pdfColPortfolioPct": "[XX-% of Portfolio-XX]"
   },
   "securityPerformance": {
-    "selectPrompt": "[XX-Select one or more securities above to view their performance. Choose two or more to compare them on one chart.-XX]",
+    "selectPrompt": "[XX-Select one or more securities above to view their performance, and add a market index to measure them against.-XX]",
     "selectSecuritiesPlaceholder": "[XX-Select securities...-XX]",
     "comparisonTitle": "[XX-Performance Comparison-XX]",
-    "comparisonSubtitle": "[XX-Cumulative return of each selected security, rebased to 0% at its first available price so they compare on one scale regardless of price or currency.-XX]",
-    "comparisonNoData": "[XX-No price history is available for the selected securities.-XX]",
+    "comparisonSubtitle": "[XX-Cumulative return of each selected instrument, rebased to 0% at the start of the chosen window so they compare on one scale regardless of price or currency. Market indexes are drawn as dashed lines.-XX]",
+    "comparisonNoData": "[XX-None of the selected instruments could be priced over this window.-XX]",
     "comparisonError": "[XX-Could not load price history. Please try again.-XX]",
     "viewPriceChart": "[XX-Price Chart-XX]",
     "viewTransactions": "[XX-Transactions-XX]",
@@ -1327,7 +1327,24 @@
     "pdfColShares": "[XX-Shares-XX]",
     "pdfColPrice": "[XX-Price-XX]",
     "pdfColTotal": "[XX-Total-XX]",
-    "pdfTotalDividends": "[XX-Total Dividends-XX]"
+    "pdfTotalDividends": "[XX-Total Dividends-XX]",
+    "selectIndexesPlaceholder": "[XX-Add a market index...-XX]",
+    "timeframeChartOnlyNote": "[XX-The timeframe applies to the chart. The figures above and the tables below cover the whole holding.-XX]",
+    "comparisonExcludedTitle": "[XX-Not shown on this chart-XX]",
+    "comparisonExcludedRow": "[XX-{label} — {reason}-XX]",
+    "comparisonExcluded": {
+      "NO_PRICE_HISTORY": "[XX-no price history is stored for it-XX]",
+      "NO_PRICE_AT_WINDOW_START": "[XX-no price close enough to the start of this window, so its return over the window is unknown-XX]",
+      "NON_POSITIVE_BASE": "[XX-its price at the start of this window is not a usable figure-XX]",
+      "SINGLE_OBSERVATION": "[XX-only one price in this window, which measures no change-XX]"
+    },
+    "comparisonIncomplete": "[XX-Part of this chart could not be measured: a broken line marks a stretch with no prices, and a line that stops early has no data after that point.-XX]",
+    "comparisonIndexLegend": "[XX-{name} (index)-XX]",
+    "indexRegions": {
+      "NORTH_AMERICA": "[XX-North America-XX]",
+      "EUROPE": "[XX-Europe-XX]",
+      "ASIA_PACIFIC": "[XX-Asia-Pacific-XX]"
+    }
   },
   "securityTypeAllocation": {
     "noData": "[XX-No investment holdings found. Add securities to see the asset type breakdown.-XX]",

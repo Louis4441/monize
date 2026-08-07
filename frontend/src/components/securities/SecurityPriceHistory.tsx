@@ -93,10 +93,9 @@ export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
   const loadPrices = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await investmentsApi.getSecurityPrices(
-        security.id,
-        SECURITY_PRICE_HISTORY_LIMIT,
-      );
+      const data = await investmentsApi.getSecurityPrices(security.id, {
+        limit: SECURITY_PRICE_HISTORY_LIMIT,
+      });
       setPrices(data);
       // Open the newest year and month so recent prices need no click.
       setOpenGroups(

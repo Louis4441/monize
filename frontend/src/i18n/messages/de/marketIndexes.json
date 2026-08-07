@@ -1,0 +1,26 @@
+{
+  "names": {
+    "SP500": "S&P 500",
+    "NASDAQ_COMPOSITE": "NASDAQ Composite",
+    "DOW_JONES": "Dow Jones Industrial Average",
+    "RUSSELL_2000": "Russell 2000",
+    "SP_TSX_COMPOSITE": "S&P/TSX Composite",
+    "FTSE_100": "FTSE 100",
+    "DAX": "DAX",
+    "CAC_40": "CAC 40",
+    "AEX": "AEX",
+    "FTSE_MIB": "FTSE MIB",
+    "OMXS30": "OMX Stockholm 30",
+    "EURO_STOXX_50": "EURO STOXX 50",
+    "NIKKEI_225": "Nikkei 225",
+    "HANG_SENG": "Hang Seng",
+    "SSE_COMPOSITE": "SSE Composite",
+    "SZSE_COMPONENT": "SZSE Component",
+    "ASX_200": "S&P/ASX 200",
+    "KOSPI": "KOSPI",
+    "TAIEX": "TAIEX",
+    "STI": "Straits Times Index",
+    "SENSEX": "BSE SENSEX",
+    "NIFTY_50": "NIFTY 50"
+  }
+}

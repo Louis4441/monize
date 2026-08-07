@@ -182,7 +182,7 @@ export function OverrideEditorDialog({
     if (!securityId) return;
     let cancelled = false;
     investmentsApi
-      .getSecurityPrices(securityId, 1)
+      .getSecurityPrices(securityId, { limit: 1 })
       .then((prices) => {
         if (cancelled) return;
         const latest = prices[0];

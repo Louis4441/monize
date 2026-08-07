@@ -430,7 +430,9 @@
     "allocationExceedsTotal": "Tahsis yüzdeleri toplamı %100'ü aşıyor.",
     "invalidTagKey": "Bir etiket anahtarı (1-100 karakter) gereklidir",
     "assetOptionNameRequired": "Varlık sınıfı adı gerekli.",
-    "documentNotFound": "Belge bulunamadı"
+    "documentNotFound": "Belge bulunamadı",
+    "selectionNotFound": "Seçilen menkul kıymetlerden biri veya birkaçı bulunamadı",
+    "comparisonSelectionEmpty": "Karşılaştırmak için en az bir menkul kıymet veya piyasa endeksi seçin"
   },
   "tags": {
     "notFound": "{{ id }} kimliğine sahip etiket bulunamadı",
