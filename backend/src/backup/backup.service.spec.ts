@@ -9,6 +9,7 @@ import {
 import { gzipSync, gunzipSync } from "zlib";
 import { PassThrough } from "stream";
 import { createHash, randomUUID } from "crypto";
+import * as jwt from "jsonwebtoken";
 import * as fs from "fs";
 import * as path from "path";
 import { getRequestContext } from "../common/request-context";
@@ -530,9 +531,10 @@ describe("BackupService", () => {
   // Signing key for the re-authentication artifacts below. The service reads it
   // fresh from the environment, so a spec that mints one has to supply it.
   const ORIGINAL_JWT_SECRET = process.env.JWT_SECRET;
+  const SPEC_JWT_SECRET = "spec-jwt-secret-of-at-least-32-characters";
 
   beforeAll(() => {
-    process.env.JWT_SECRET = "spec-jwt-secret-of-at-least-32-characters";
+    process.env.JWT_SECRET = SPEC_JWT_SECRET;
   });
 
   afterAll(() => {
@@ -2743,6 +2745,16 @@ describe("BackupService", () => {
       await expect(
         service.restoreData(userId, makeInput({ password: "wrong-password" })),
       ).rejects.toThrow(UnauthorizedException);
+
+      // Same obligation the OIDC forgery table carries: the backup file itself is
+      // valid, so the refusal is the only thing between this request and an
+      // erased account. The local path is where re-authentication has always
+      // worked, which is exactly why a reordering would be noticed here last.
+      const deletes = mockQueryRunner.query.mock.calls.filter(
+        ([sql]: [unknown]) =>
+          typeof sql === "string" && sql.includes("DELETE FROM"),
+      );
+      expect(deletes).toEqual([]);
     });
 
     it("should throw UnauthorizedException if OIDC token is missing for OIDC user", async () => {
@@ -4040,10 +4052,11 @@ describe("BackupService", () => {
       }
     });
 
-    it("accepts the session-confirmed sentinel for OIDC users (soft re-auth)", async () => {
-      // OIDC restore mirrors account deletion: the live JWT session is the
-      // re-authentication, so any present confirmation token is accepted -- the
-      // frontend sends a non-JWT sentinel it cannot cryptographically sign.
+    it("accepts a genuine re-authentication artifact for OIDC users", async () => {
+      // The one shape that may restore an OIDC account: signed with JWT_SECRET,
+      // minted for this user and for "restore-backup", unspent, unexpired. Every
+      // rejection below is a near miss of this, so this case is what proves they
+      // fail for the reason claimed rather than because the path is broken.
       const oidcModule = {
         ...mockUser,
         authProvider: "oidc",
@@ -4060,26 +4073,117 @@ describe("BackupService", () => {
       expect(result.message).toBe("Backup restored successfully");
     });
 
-    // P2-005. Restore is the most destructive action in the product: it deletes
-    // everything the user has and writes the file's contents in its place. Each
-    // of these used to be accepted, because the check was only whether the field
-    // was non-empty.
-    it.each([
-      ["the sentinel the client used to send", "oidc-session-confirmed"],
-      ["any non-empty string", "x"],
-      ["an unsigned JWT-shaped value", "a.b.c"],
-    ])("refuses %s as re-authentication for restore", async (_label, token) => {
-      mockUserRepo.findOne.mockResolvedValue({
-        ...mockUser,
-        authProvider: "oidc",
-        passwordHash: null,
-        oidcSubject: "sub-1",
-      });
+    // P2-005 / F3RB-007. Restore is the most destructive action in the product:
+    // it deletes everything the user has and writes the file's contents in its
+    // place. Every one of these used to be accepted, because the check was only
+    // whether the field was non-empty -- and the first entry is the exact string
+    // the shipped frontend sent, so it is the one a regression reaches first.
+    //
+    // Each case is a *near miss* of the artifact the test above accepts: one
+    // property wrong and nothing else. That is what makes them evidence about
+    // the individual checks rather than about the path being broken.
+    //
+    // Minted lazily. Signing at table-construction time would run before the
+    // beforeAll that installs JWT_SECRET.
+    const REAUTH_FORGERIES: ReadonlyArray<readonly [string, () => string]> = [
+      ["the sentinel the client used to send", () => "oidc-session-confirmed"],
+      ["any non-empty string", () => "x"],
+      ["an unsigned JWT-shaped value", () => "a.b.c"],
+      [
+        "an alg=none token carrying every correct claim",
+        () =>
+          jwt.sign(
+            {
+              sub: userId,
+              type: "oidc_reauth",
+              purpose: "restore-backup",
+              jti: randomUUID(),
+            },
+            "",
+            { algorithm: "none" },
+          ),
+      ],
+      [
+        "a correct payload signed with a foreign key",
+        () =>
+          jwt.sign(
+            {
+              sub: userId,
+              type: "oidc_reauth",
+              purpose: "restore-backup",
+              jti: randomUUID(),
+            },
+            "a-different-secret-of-at-least-32-characters",
+            { algorithm: "HS256", expiresIn: 300 },
+          ),
+      ],
+      [
+        "an artifact that has expired",
+        () =>
+          jwt.sign(
+            {
+              sub: userId,
+              type: "oidc_reauth",
+              purpose: "restore-backup",
+              jti: randomUUID(),
+            },
+            SPEC_JWT_SECRET,
+            { algorithm: "HS256", expiresIn: -10 },
+          ),
+      ],
+      [
+        // A session token is the factor the artifact exists to be independent
+        // of. Accepting one collapses the second proof into the first, which is
+        // precisely the defect.
+        "an ordinary access token for the same user",
+        () =>
+          jwt.sign({ sub: userId, type: "access" }, SPEC_JWT_SECRET, {
+            algorithm: "HS256",
+            expiresIn: 900,
+          }),
+      ],
+      [
+        // Signed by us, bound to this user and this purpose -- but minted by the
+        // step-up service, which for an OIDC account issues on the strength of a
+        // re-auth artifact. Spending one here would let a single round trip be
+        // laundered into a second authorization.
+        "a step-up token for the same user and purpose",
+        () =>
+          jwt.sign(
+            { sub: userId, type: "step_up", purpose: "restore-backup" },
+            SPEC_JWT_SECRET,
+            { algorithm: "HS256", expiresIn: 300 },
+          ),
+      ],
+    ];
 
-      await expect(
-        service.restoreData(userId, makeInput({ oidcIdToken: token })),
-      ).rejects.toThrow(UnauthorizedException);
-    });
+    it.each(REAUTH_FORGERIES)(
+      "refuses %s as re-authentication for restore",
+      async (_label, mint) => {
+        mockUserRepo.findOne.mockResolvedValue({
+          ...mockUser,
+          authProvider: "oidc",
+          passwordHash: null,
+          oidcSubject: "sub-1",
+        });
+
+        await expect(
+          service.restoreData(userId, makeInput({ oidcIdToken: mint() })),
+        ).rejects.toThrow(UnauthorizedException);
+
+        // The half that matters more than the status code. The file here is a
+        // perfectly valid backup, so everything ahead of the check succeeds and
+        // the only thing standing between this request and an erased account is
+        // `verifyAuthentication`. A 401 the client sees cannot un-delete a row,
+        // so assert the database was never touched -- not merely that the call
+        // threw. (A transaction *is* open by this point; the user lookup runs in
+        // one. The claim is that no data was destroyed.)
+        const deletes = mockQueryRunner.query.mock.calls.filter(
+          ([sql]) => typeof sql === "string" && sql.includes("DELETE FROM"),
+        );
+        expect(deletes).toEqual([]);
+      },
+    );
 
     it("refuses an artifact minted to delete data rather than restore", async () => {
       mockUserRepo.findOne.mockResolvedValue({
