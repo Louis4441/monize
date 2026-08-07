@@ -36,6 +36,25 @@ describe("RLS enable migration (M3, migration 123)", () => {
    */
   const EXEMPT = rlsExemptTableNames();
 
+  /**
+   * Exempt tables this harness never creates.
+   *
+   * `rls-setup` builds the schema with TypeORM `synchronize: true` from entity
+   * metadata and then applies only the RLS-carrying migrations -- it does not
+   * run `database/schema.sql` wholesale. A table with no entity behind it
+   * therefore does not exist here. `schema_migrations` is created by
+   * `db-migrate`'s own bootstrap and is mapped by no entity, so it is absent by
+   * construction rather than missing.
+   *
+   * Named rather than tolerated: the assertion below is exact, so an exempt
+   * table that stops existing for any *other* reason still fails. This list may
+   * only shrink.
+   */
+  const NOT_CREATED_BY_HARNESS = ["schema_migrations"];
+  const EXPECTED_PRESENT = EXEMPT.filter(
+    (table) => !NOT_CREATED_BY_HARNESS.includes(table),
+  );
+
   const USER_A = "11111111-1111-4111-8111-111111111111";
   const USER_B = "22222222-2222-4222-8222-222222222222";
 
@@ -186,16 +205,30 @@ describe("RLS enable migration (M3, migration 123)", () => {
           WHERE ns.nspname = 'public' AND c.relname = ANY($1)`,
         [EXEMPT],
       );
-      // Exactly the list, not merely a non-empty subset of it: the count is
-      // derived so it cannot go stale the way the old hardcoded "four" did
-      // while the list held six, and an exempt table that no longer exists
-      // fails here instead of quietly dropping out of the check.
+      // Exactly the list the harness creates, not merely a non-empty subset of
+      // it: derived from RLS_EXEMPT_TABLES so it cannot go stale the way the
+      // old hardcoded "four" did while the list held six, and an exempt table
+      // that stops existing fails here instead of quietly dropping out of the
+      // check -- which is what the old `toBeGreaterThan(0)` allowed.
       expect(rows.map((r: { relname: string }) => r.relname).sort()).toEqual(
-        EXEMPT,
+        EXPECTED_PRESENT,
       );
       for (const row of rows) {
         expect(row.relrowsecurity).toBe(false);
       }
+    });
+
+    it("keeps the harness-absence list honest", () => {
+      // Two ways this list rots, both of which would weaken the assertion above
+      // without failing it: an entry that is no longer exempt at all, and an
+      // entry the harness has since learned to create. Neither is a table this
+      // suite may quietly stop checking.
+      expect(
+        NOT_CREATED_BY_HARNESS.filter((table) => !EXEMPT.includes(table)),
+      ).toEqual([]);
+      expect(EXPECTED_PRESENT.length).toBe(
+        EXEMPT.length - NOT_CREATED_BY_HARNESS.length,
+      );
     });
 
     it("is idempotent -- re-applying enables nothing new and errors on nothing", async () => {
