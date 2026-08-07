@@ -784,6 +784,36 @@ describe("OAuthProviderService", () => {
       await expect(svc.revokeAllForUser(ACCOUNT_ID)).resolves.toBe(0);
     });
 
+    it("binds the subject as a parameter, never into the SQL", async () => {
+      // This is the one direct-DataSource query on oauth_payloads keyed by an
+      // application user id (docs/row-level-security-contract.md section 3).
+      // The table is RLS-exempt, so there is no policy underneath to contain a
+      // predicate that got away -- the binding is the whole control. A subject
+      // full of SQL metacharacters must reach the driver as a bound value and
+      // leave the clause text untouched.
+      const hostile = "' OR 1=1 --";
+      const ds = makeDataSource(0);
+      const svc = new OAuthProviderService(
+        makeConfigService({
+          PUBLIC_APP_URL: "https://app.test",
+          JWT_SECRET: VALID_JWT,
+        }),
+        ds.dataSource,
+        makeAuthService({
+          id: "u",
+          isActive: true,
+          mustChangePassword: false,
+        }),
+      );
+
+      await svc.revokeAllForUser(hostile);
+
+      const [clause, params] = ds.where.mock.calls[0];
+      expect(clause).toBe("payload ->> 'accountId' = :userId");
+      expect(clause).not.toContain(hostile);
+      expect(params).toEqual({ userId: hostile });
+    });
+
     it("treats null/undefined affected as zero", async () => {
       const ds = makeDataSource();
       ds.execute.mockResolvedValue({ affected: undefined });

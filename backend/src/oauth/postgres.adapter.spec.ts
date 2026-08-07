@@ -1,4 +1,4 @@
-import { PostgresAdapter } from "./postgres.adapter";
+import { PostgresAdapter, makeAdapterFactory } from "./postgres.adapter";
 
 describe("PostgresAdapter", () => {
   function makeAdapter(model = "AccessToken") {
@@ -109,5 +109,78 @@ describe("PostgresAdapter", () => {
       { id: "code-1", model: "AuthorizationCode" },
       expect.objectContaining({ consumedAt: expect.any(Date) }),
     );
+  });
+
+  /**
+   * The two lookups that were never covered. Both matter to the RLS exemption
+   * argument in `docs/row-level-security-contract.md` section 3, which rests on
+   * every adapter query being keyed by an opaque provider identifier: a lookup
+   * that forgot to scope by `model` would read one artifact class's row while
+   * claiming to serve another.
+   */
+  describe("secondary lookups stay scoped to their model", () => {
+    it("findByUserCode keys on (userCode, model)", async () => {
+      const { adapter, repo } = makeAdapter("DeviceCode");
+      repo.findOne.mockResolvedValue({
+        id: "dev-1",
+        model: "DeviceCode",
+        payload: { foo: "bar" },
+        expiresAt: new Date(Date.now() + 60_000),
+        consumedAt: null,
+      });
+
+      await expect(adapter.findByUserCode("WDJB-MJHT")).resolves.toMatchObject({
+        foo: "bar",
+      });
+      expect(repo.findOne).toHaveBeenCalledWith({
+        where: { userCode: "WDJB-MJHT", model: "DeviceCode" },
+      });
+    });
+
+    it("findByUid keys on (uid, model)", async () => {
+      const { adapter, repo } = makeAdapter("Session");
+      repo.findOne.mockResolvedValue({
+        id: "sess-1",
+        model: "Session",
+        payload: { foo: "bar" },
+        expiresAt: new Date(Date.now() + 60_000),
+        consumedAt: null,
+      });
+
+      await expect(adapter.findByUid("uid-1")).resolves.toMatchObject({
+        foo: "bar",
+      });
+      expect(repo.findOne).toHaveBeenCalledWith({
+        where: { uid: "uid-1", model: "Session" },
+      });
+    });
+
+    it("returns undefined rather than a payload when the row is missing", async () => {
+      // "Not found" and "found but expired" are the same answer to the caller,
+      // and neither may be an empty payload object -- oidc-provider treats a
+      // returned object as a live artifact.
+      const { adapter, repo } = makeAdapter("Session");
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(adapter.findByUid("nope")).resolves.toBeUndefined();
+      await expect(adapter.findByUserCode("nope")).resolves.toBeUndefined();
+    });
+  });
+
+  it("makeAdapterFactory builds one adapter per model over a shared DataSource", () => {
+    // The provider calls the factory once per artifact class; each instance must
+    // carry its own model or `destroy`/`consume` would cross artifact classes.
+    const dataSource = { getRepository: jest.fn() } as any;
+    const factory = makeAdapterFactory(dataSource);
+
+    const accessToken = factory("AccessToken");
+    const session = factory("Session");
+
+    expect(accessToken).toBeInstanceOf(PostgresAdapter);
+    expect(session).toBeInstanceOf(PostgresAdapter);
+    expect(accessToken).not.toBe(session);
+    expect((accessToken as any).model).toBe("AccessToken");
+    expect((session as any).model).toBe("Session");
+    expect((accessToken as any).dataSource).toBe(dataSource);
   });
 });

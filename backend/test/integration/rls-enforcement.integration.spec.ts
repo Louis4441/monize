@@ -15,6 +15,7 @@ import {
 } from "../helpers/rls-catalog";
 import { withScopedDb } from "@/common/db/scoped-db";
 import { withUserContext } from "@/common/db/with-context";
+import { rlsExemptTableNames } from "@/common/db/rls-exempt-tables";
 
 /**
  * RLS task T2: the catalog-driven enforcement spec.
@@ -39,17 +40,15 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
   let catalog: TableCatalog;
   let seeder: RlsRowSeeder;
 
-  /** Tables deliberately not policied -- must match 114's documented list. */
-  const EXEMPT = [
-    "currencies",
-    "exchange_rates",
-    // Global market reference data with no owner column, written only under
-    // system context. See the exemption note at the foot of database/schema.sql.
-    "market_index_prices",
-    "market_index_sync",
-    "oauth_payloads",
-    "schema_migrations",
-  ];
+  /**
+   * Tables deliberately not policied. The list lives in
+   * `backend/src/common/db/rls-exempt-tables.ts` and is checked against the
+   * marker block in `database/schema.sql` by a no-database guard, because this
+   * spec needs a live PostgreSQL and so never ran in `npm run test:unit` --
+   * which is how four hand-maintained copies of this list drifted apart.
+   * Rationale per table: `docs/row-level-security-contract.md`.
+   */
+  const EXEMPT = rlsExemptTableNames();
 
   /** Bespoke owner columns (the special policies, migration 114). */
   const OWNER_COLUMN_MAP: Record<string, string[]> = {

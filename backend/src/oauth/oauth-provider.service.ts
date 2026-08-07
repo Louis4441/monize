@@ -419,6 +419,22 @@ export class OAuthProviderService implements OnModuleInit {
    * Implementation: a single SQL DELETE on the payload store, keyed on the
    * subject embedded in the JSON payload. Covers every grantable model
    * because oidc-provider stores `accountId` in the payload of each.
+   *
+   * This is the **second** sanctioned direct-`DataSource` path to
+   * `oauth_payloads`, and the only one keyed by an application user id -- the
+   * exemption's original rationale claimed the table was "never queried per
+   * end-user", which was untrue from the moment this method was written. It is
+   * a bounded exception, not a defect: the only caller is `AdminService` behind
+   * `@Roles("admin")`, `userId` is server-derived and never request-supplied,
+   * and the predicate deletes only rows whose own payload already names that
+   * subject.
+   *
+   * Deliberately not wrapped in `withSystemContext`: the table is RLS-exempt,
+   * so a bypass GUC would change nothing about what this query can reach. It
+   * would buy the appearance of a control rather than a control. See
+   * `docs/row-level-security-contract.md` section 3, which also lists the
+   * triggers that would invalidate the exception -- a query keyed by
+   * *request-supplied* user input being the first of them.
    */
   async revokeAllForUser(userId: string): Promise<number> {
     const result = await this.dataSource
