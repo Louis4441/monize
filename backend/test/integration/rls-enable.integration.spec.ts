@@ -4,6 +4,7 @@ import * as path from "path";
 
 import { INTEGRATION_TYPEORM_OPTIONS } from "../helpers/integration-setup";
 import { applyRlsPolicies, TEST_APP_ROLE } from "../helpers/rls-setup";
+import { rlsExemptTableNames } from "@/common/db/rls-exempt-tables";
 
 /**
  * Acceptance coverage for RLS task M3 -- `database/migrations/123_rls_enable.sql`,
@@ -28,17 +29,12 @@ describe("RLS enable migration (M3, migration 123)", () => {
     "../../../database/migrations/123_rls_enable.sql",
   );
 
-  const EXEMPT = [
-    "currencies",
-    "exchange_rates",
-    // Global market reference data with no owner column, written only by the
-    // scheduled refresh under system context. Same rationale as exchange_rates;
-    // the schema.sql exemption note carries the long form.
-    "market_index_prices",
-    "market_index_sync",
-    "oauth_payloads",
-    "schema_migrations",
-  ];
+  /**
+   * The exemption list lives in `backend/src/common/db/rls-exempt-tables.ts`,
+   * not here. It used to be spelled out in this file and three others, and they
+   * had already drifted -- see that module's header.
+   */
+  const EXEMPT = rlsExemptTableNames();
 
   const USER_A = "11111111-1111-4111-8111-111111111111";
   const USER_B = "22222222-2222-4222-8222-222222222222";
@@ -183,14 +179,20 @@ describe("RLS enable migration (M3, migration 123)", () => {
       expect(rows.map((r: { relname: string }) => r.relname)).toEqual([]);
     });
 
-    it("leaves the four exempt tables untouched", async () => {
+    it("leaves every exempt table untouched", async () => {
       const rows = await dataSource.query(
         `SELECT c.relname, c.relrowsecurity FROM pg_class c
            JOIN pg_namespace ns ON ns.oid = c.relnamespace
           WHERE ns.nspname = 'public' AND c.relname = ANY($1)`,
         [EXEMPT],
       );
-      expect(rows.length).toBeGreaterThan(0);
+      // Exactly the list, not merely a non-empty subset of it: the count is
+      // derived so it cannot go stale the way the old hardcoded "four" did
+      // while the list held six, and an exempt table that no longer exists
+      // fails here instead of quietly dropping out of the check.
+      expect(rows.map((r: { relname: string }) => r.relname).sort()).toEqual(
+        EXEMPT,
+      );
       for (const row of rows) {
         expect(row.relrowsecurity).toBe(false);
       }
