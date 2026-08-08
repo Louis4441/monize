@@ -1836,6 +1836,47 @@ describe('TransactionsPage', () => {
         );
       });
     });
+
+    it('carries the active category filter as categoryFilterIds on a hand-picked (ids mode) selection', async () => {
+      // Regression (user-reported): rows checked by hand under an active
+      // category filter go up as mode "ids", and without the filter riding
+      // along the server recategorized ALL of a split's lines instead of the
+      // filtered one. The active filter must reach the server in both modes.
+      mockBulkUpdate.mockResolvedValue({ updated: 1, skipped: 0, skippedReasons: [] });
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('set-category-filter')).toBeInTheDocument();
+      });
+      // Filter first: changing it afterwards would clear the selection.
+      fireEvent.click(screen.getByTestId('set-category-filter'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('select-tx-1')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('select-tx-1'));
+
+      // Deliberately NOT clicking select-all-matching: this is the ids path.
+      fireEvent.click(screen.getByTestId('bulk-update-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('bulk-modal-submit')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('bulk-modal-submit'));
+      });
+
+      await waitFor(() => {
+        expect(mockBulkUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            mode: 'ids',
+            transactionIds: ['tx-1'],
+            categoryFilterIds: ['cat-1'],
+            categoryId: 'cat-1',
+          }),
+        );
+      });
+    });
   });
 
   describe('Stale filter cleanup', () => {

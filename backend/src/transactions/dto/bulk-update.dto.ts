@@ -153,6 +153,22 @@ export class BulkUpdateDto {
   @IsArray()
   @IsUUID("4", { each: true })
   tagIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      "Category filter active in the UI when the bulk update was issued. " +
+      "Restricts split-line recategorization to lines currently in these " +
+      "categories (descendant-expanded), regardless of selection mode; does " +
+      "not affect which transactions are selected. May include the " +
+      '"uncategorized"/"transfer" pseudo-ids, which are ignored.',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  categoryFilterIds?: string[];
 }
 
 export class BulkDeleteDto {

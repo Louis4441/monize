@@ -89,3 +89,33 @@ describe("BulkUpdateDto filter fields", () => {
     expect(constraintNames(errors)).toContain("isNumber");
   });
 });
+
+describe("BulkUpdateDto categoryFilterIds", () => {
+  it("accepts categoryFilterIds in ids mode, pseudo-ids included", async () => {
+    // The active category filter rides along in BOTH selection modes; the
+    // pseudo-ids are legal here and stripped server-side.
+    const dto = buildDto({
+      mode: "ids",
+      transactionIds: [uuid],
+      categoryFilterIds: [uuid, "uncategorized", "transfer"],
+      categoryId: uuid,
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it("rejects more than 100 categoryFilterIds", async () => {
+    const dto = buildDto({
+      mode: "ids",
+      transactionIds: [uuid],
+      categoryFilterIds: Array.from({ length: 101 }, () => uuid),
+      categoryId: uuid,
+    });
+
+    const errors = await validate(dto);
+
+    expect(constraintNames(errors)).toContain("arrayMaxSize");
+  });
+});

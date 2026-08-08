@@ -604,8 +604,14 @@ export class TransactionBulkUpdateService {
     userId: string,
     dto: BulkUpdateDto,
   ): Promise<string[] | undefined> {
-    if (dto.mode !== "filter") return undefined;
-    const categoryIds = dto.filters?.categoryIds;
+    // The restriction keys off the category filter that was ACTIVE in the UI,
+    // not off the selection mode: hand-picked rows arrive as mode "ids" and
+    // must still honor the filter the user was looking through, so the client
+    // sends it explicitly as categoryFilterIds in both modes. Filter-mode
+    // filters.categoryIds remains a fallback for payloads without the field.
+    const categoryIds =
+      dto.categoryFilterIds ??
+      (dto.mode === "filter" ? dto.filters?.categoryIds : undefined);
     if (!categoryIds || categoryIds.length === 0) return undefined;
     const expanded = await this.expandRealCategoryIds(m, userId, categoryIds);
     return expanded.length > 0 ? expanded : undefined;

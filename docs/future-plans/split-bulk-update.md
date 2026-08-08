@@ -40,14 +40,19 @@ Assistant and MCP, which share `backend/src/transactions/transaction-tool-prep.s
 
 ## Truth table A — bulk update, selection includes split parent P
 
-`F` = filter-mode `filters.categoryIds` after stripping the `"uncategorized"` /
-`"transfer"` pseudo-ids and expanding descendants, matching selection semantics
-in `applyCategoryFilters` (`backend/src/transactions/transaction-bulk-update.service.ts`).
+`F` = the category filter ACTIVE in the UI when the update was issued, after
+stripping the `"uncategorized"` / `"transfer"` pseudo-ids and expanding
+descendants (same expansion the selection uses). The client carries it on the
+command as `categoryFilterIds` in BOTH selection modes — the restriction keys
+off the filter itself, never off the selection mode, because hand-picked rows
+arrive as mode `ids` and must still honor the filter the user was looking
+through. Filter-mode `filters.categoryIds` remains a fallback source for
+payloads without the field.
 
-| dto sets | Mode | Lines changed | Result for P |
+| dto sets | Active filter | Lines changed | Result for P |
 |---|---|---|---|
-| `categoryId=X` only | ids, or filter with F empty | all category-kind lines → X | updated; lines counted in `splitLinesUpdated` |
-| `categoryId=X` only | filter, F non-empty | lines with category in F → X | updated if at least one line changed, else skipped with reason |
+| `categoryId=X` only | F empty (no category filter) | all category-kind lines → X | updated; lines counted in `splitLinesUpdated` |
+| `categoryId=X` only | F non-empty (either selection mode) | lines with category in F → X | updated if at least one line changed, else skipped with reason |
 | `categoryId=X` only, P has only transfer/investment lines | any | none | skipped with reason |
 | `categoryId=X` plus any parent field | any | as above | always updated (parent fields applied); no skip reason |
 | parent fields only, no `categoryId` | any | none | unchanged from previous behavior |

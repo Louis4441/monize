@@ -721,6 +721,91 @@ describe("TransactionBulkUpdateService", () => {
       );
     });
 
+    it("honors the active category filter in ids mode via categoryFilterIds", async () => {
+      // Regression (user-reported): rows hand-picked under an active category
+      // filter arrive as mode "ids", and the restriction must key off the
+      // filter itself -- carried as categoryFilterIds -- never off the
+      // selection mode. Without it, an unrelated split line was recategorized.
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      categoriesRepository.findOne.mockResolvedValue({ id: "cat-1", userId });
+      categoriesRepository.find.mockResolvedValue([
+        { id: "cat-1", parentId: null },
+        { id: "cat-1-child", parentId: "cat-1" },
+      ]);
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([
+        {
+          splitId: "split-1",
+          transactionId: "tx-2",
+          previousCategoryId: "cat-1-child",
+        },
+      ]);
+
+      await service.bulkUpdate(userId, {
+        mode: "ids",
+        transactionIds: ["tx-2"],
+        categoryFilterIds: ["cat-1"],
+        categoryId: "cat-1",
+      });
+
+      expect(splitService.bulkRecategorizeCategorySplits).toHaveBeenCalledWith(
+        userId,
+        ["tx-2"],
+        "cat-1",
+        ["cat-1", "cat-1-child"],
+      );
+    });
+
+    it("prefers categoryFilterIds over the selection filters in filter mode", async () => {
+      const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
+
+      categoriesRepository.findOne.mockResolvedValue({ id: "cat-1", userId });
+      categoriesRepository.find.mockResolvedValue([
+        { id: "cat-a", parentId: null },
+        { id: "cat-b", parentId: null },
+      ]);
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx2]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb);
+
+      splitService.bulkRecategorizeCategorySplits.mockResolvedValue([
+        { splitId: "split-1", transactionId: "tx-2", previousCategoryId: null },
+      ]);
+
+      await service.bulkUpdate(userId, {
+        mode: "filter",
+        filters: { categoryIds: ["cat-b"] },
+        categoryFilterIds: ["cat-a"],
+        categoryId: "cat-1",
+      });
+
+      // One source for the restriction: the explicit categoryFilterIds field.
+      expect(splitService.bulkRecategorizeCategorySplits).toHaveBeenCalledWith(
+        userId,
+        ["tx-2"],
+        "cat-1",
+        ["cat-a"],
+      );
+    });
+
     it("records the bulk_update undo snapshot with split lines and no parent categoryId on split parents", async () => {
       const tx1 = makeTransaction({ id: "tx-1" });
       const tx2 = makeTransaction({ id: "tx-2", isSplit: true });
