@@ -18,6 +18,7 @@ import {
 import { randomUUID } from "crypto";
 import { longRunningFetch } from "./long-running-fetch";
 import { validateUrlBasicSafety } from "../validators/safe-url.validator";
+import { toolsField } from "./tools-field.util";
 
 /**
  * How often to emit a progress log line during a long-running stream so
@@ -400,7 +401,7 @@ export class OllamaProvider implements AiProvider {
       request.systemPrompt,
     );
 
-    const ollamaTools = tools.map((tool) => ({
+    const ollamaTools = toolsField(tools, (tool) => ({
       type: "function" as const,
       function: {
         name: tool.name,
@@ -418,14 +419,14 @@ export class OllamaProvider implements AiProvider {
     const requestBody = JSON.stringify({
       model: this.modelId,
       messages,
-      tools: ollamaTools,
+      ...ollamaTools,
       stream: true,
       ...(request.temperature !== undefined && {
         options: { temperature: request.temperature },
       }),
     });
     this.logger.log(
-      `streamWithTools request url=${url} model=${this.modelId} messages=${messages.length} tools=${ollamaTools.length} bodyBytes=${requestBody.length} temperature=${request.temperature ?? "default"}`,
+      `streamWithTools request url=${url} model=${this.modelId} messages=${messages.length} tools=${ollamaTools.tools?.length ?? 0} bodyBytes=${requestBody.length} temperature=${request.temperature ?? "default"}`,
     );
 
     try {

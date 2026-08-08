@@ -145,6 +145,47 @@ describe("OpenAiProvider", () => {
   });
 
   describe("completeWithTools()", () => {
+    it("omits the tools field entirely when handed no tools", async () => {
+      // OpenAI rejects `tools: []` outright ("Invalid 'tools': empty array"),
+      // so the AI Assistant's tool-free synthesis pass would 400 rather than
+      // answer if the field were sent empty.
+      await provider.completeWithTools(
+        {
+          systemPrompt: "sys",
+          messages: [{ role: "user", content: "summarize" }],
+        },
+        [],
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty("tools");
+    });
+
+    it("sends the tools field when there are tools", async () => {
+      await provider.completeWithTools(
+        { systemPrompt: "sys", messages: [{ role: "user", content: "hi" }] },
+        [
+          {
+            name: "get_account_balances",
+            description: "balances",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.tools).toEqual([
+        {
+          type: "function",
+          function: {
+            name: "get_account_balances",
+            description: "balances",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ]);
+    });
+
     it("returns tool calls from response", async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [

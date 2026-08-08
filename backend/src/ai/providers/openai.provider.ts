@@ -17,6 +17,7 @@ import {
   unsupportedAttachmentNote,
 } from "./content-blocks.util";
 import { longRunningFetch } from "./long-running-fetch";
+import { toolsField } from "./tools-field.util";
 
 export class OpenAiProvider implements AiProvider {
   readonly name: string = "openai";
@@ -197,7 +198,7 @@ export class OpenAiProvider implements AiProvider {
       model: this.modelId,
       messages,
       max_tokens: request.maxTokens || 4096,
-      tools: tools.map((tool) => ({
+      ...toolsField(tools, (tool) => ({
         type: "function" as const,
         function: {
           name: tool.name,
@@ -264,7 +265,7 @@ export class OpenAiProvider implements AiProvider {
       max_tokens: request.maxTokens || 4096,
       stream: true,
       stream_options: { include_usage: true },
-      tools: tools.map((tool) => ({
+      ...toolsField(tools, (tool) => ({
         type: "function" as const,
         function: {
           name: tool.name,

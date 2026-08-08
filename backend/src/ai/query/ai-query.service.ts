@@ -17,6 +17,7 @@ import {
   AiImageBlock,
   AiProvider,
   AiToolCall,
+  AiToolDefinition,
 } from "../providers/ai-provider.interface";
 import {
   OllamaModelDoesNotSupportToolsError,
@@ -31,6 +32,58 @@ import { validateAttachments } from "./attachment-validation";
 import { tr } from "../../i18n/translate";
 import { PendingAiAction } from "../actions/ai-action.types";
 import { QueryBudgets, resolveQueryBudgets } from "./query-budgets";
+
+/** Which per-query budget stopped the tool-calling loop. */
+export type QueryCutoffReason =
+  | "iterations"
+  | "toolCalls"
+  | "tokens"
+  | "timeout";
+
+/**
+ * The note prefixed to a synthesized answer, one per budget. Each says which
+ * limit was hit and that the answer is built from partial data -- a user
+ * comparing two runs of the same question needs to know why they differ.
+ */
+const CUTOFF_NOTES: Record<QueryCutoffReason, { key: string; text: string }> = {
+  iterations: {
+    key: "common.aiQuery.cutoff.iterations",
+    text: "I reached the maximum number of analysis steps for this question, so this answer is based on the data I gathered before stopping.",
+  },
+  toolCalls: {
+    key: "common.aiQuery.cutoff.toolCalls",
+    text: "I reached the maximum number of data lookups for this question, so this answer is based on the data I gathered before stopping.",
+  },
+  tokens: {
+    key: "common.aiQuery.cutoff.tokens",
+    text: "I reached the maximum analysis budget for this question, so this answer is based on the data I gathered before stopping.",
+  },
+  timeout: {
+    key: "common.aiQuery.cutoff.timeout",
+    text: "This question took longer than the time available, so this answer is based on the data I gathered before stopping.",
+  },
+};
+
+const cutoffNote = (reason: QueryCutoffReason): string =>
+  tr(CUTOFF_NOTES[reason].key, CUTOFF_NOTES[reason].text);
+
+/**
+ * Appended as a final user turn before the tool-free synthesis pass. The model
+ * has the tool results in its context but no tools left to call, so it needs
+ * telling that gathering is over and an answer is now due.
+ */
+const FINAL_SYNTHESIS_INSTRUCTION =
+  "The data-gathering phase for this question is over and no further tools are available. " +
+  "Answer now using only the tool results already in this conversation. " +
+  "State plainly which parts of the question you could not answer from that data instead of guessing or estimating.";
+
+/** What the final tool-free pass produced. */
+interface FinalSynthesis {
+  text: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}
 
 export interface QueryResult {
   answer: string;
@@ -248,6 +301,11 @@ export class AiQueryService {
     // call is allowed per response so the model can't queue up independent
     // proposals across tool calls.
     let proposingToolResults = 0;
+    // Which budget stopped the loop. Set by whichever guard breaks out; stays
+    // at the iteration default when the loop simply runs out of passes. The
+    // guards record it rather than answering, because the answer is written
+    // once below -- by the model, from the data it managed to gather.
+    let cutoff: QueryCutoffReason = "iterations";
 
     for (
       let iteration = 0;
@@ -262,10 +320,7 @@ export class AiQueryService {
         this.logger.warn(
           `Query timeout reached for user ${userId} after ${iteration} iterations`,
         );
-        yield {
-          type: "content",
-          text: "Your query took too long to process. Here is what I found so far.",
-        };
+        cutoff = "timeout";
         break;
       }
 
@@ -274,10 +329,7 @@ export class AiQueryService {
         this.logger.warn(
           `Tool call budget exhausted for user ${userId} (${totalToolCalls} calls)`,
         );
-        yield {
-          type: "content",
-          text: "I've reached the maximum number of data lookups for this query. Here is what I found so far.",
-        };
+        cutoff = "toolCalls";
         break;
       }
 
@@ -286,10 +338,7 @@ export class AiQueryService {
         this.logger.warn(
           `Token budget exhausted for user ${userId} (${totalInputTokens} input tokens)`,
         );
-        yield {
-          type: "content",
-          text: "This query has consumed the maximum analysis budget. Here is what I found so far.",
-        };
+        cutoff = "tokens";
         break;
       }
 
@@ -570,13 +619,39 @@ export class AiQueryService {
       }
     }
 
-    // Max iterations reached - request a final answer without tools
+    // A budget stopped the loop mid-investigation. The tool results gathered
+    // so far are still the only material an answer could be built from, and
+    // they are all sitting in `messages` -- so hand them back to the model
+    // with the tools withdrawn and let it write the answer, rather than
+    // discarding the work and apologising. Withdrawing the tools is what makes
+    // this terminate: the model has nothing left to call, so it must reply
+    // with text.
     this.logger.warn(
-      `Max iterations reached user=${userId} provider=${provider.name} totalToolCalls=${totalToolCalls} totalInputTokens=${totalInputTokens}`,
+      `Budget reached user=${userId} provider=${provider.name} cutoff=${cutoff} totalToolCalls=${totalToolCalls} totalInputTokens=${totalInputTokens}`,
     );
+
+    const synthesis = yield* this.streamFinalSynthesis(
+      userId,
+      provider,
+      systemPrompt,
+      messages,
+    );
+    if (synthesis) {
+      totalInputTokens += synthesis.inputTokens;
+      totalOutputTokens += synthesis.outputTokens;
+    }
+
+    // The note comes first: the user has to know the answer was built from a
+    // truncated investigation before they read it, not after.
+    const answer = synthesis?.text.trim();
     yield {
       type: "content",
-      text: "I've gathered the data but reached the maximum number of analysis steps. Here's what I found based on the data collected so far.",
+      text: answer
+        ? `${cutoffNote(cutoff)}\n\n${answer}`
+        : tr(
+            "common.aiQuery.synthesisFailed",
+            "I gathered data for this question but couldn't complete the analysis, so I don't have a reliable answer. Try asking something narrower.",
+          ),
     };
 
     if (allSources.length > 0) {
@@ -585,12 +660,12 @@ export class AiQueryService {
 
     const durationMs = Date.now() - startTime;
     this.logger.log(
-      `Query incomplete user=${userId} provider=${provider.name} totalMs=${durationMs} totalInputTokens=${totalInputTokens} totalOutputTokens=${totalOutputTokens} totalToolCalls=${totalToolCalls}`,
+      `Query incomplete user=${userId} provider=${provider.name} cutoff=${cutoff} synthesized=${!!answer} totalMs=${durationMs} totalInputTokens=${totalInputTokens} totalOutputTokens=${totalOutputTokens} totalToolCalls=${totalToolCalls}`,
     );
     await this.logUsage(
       userId,
       provider.name,
-      "unknown",
+      synthesis?.model ?? "unknown",
       totalInputTokens,
       totalOutputTokens,
       durationMs,
@@ -604,6 +679,91 @@ export class AiQueryService {
         toolCalls: totalToolCalls,
       },
     };
+  }
+
+  /**
+   * Ask the model for a final answer with the tools withdrawn, from the tool
+   * results already in `messages`.
+   *
+   * Yields `assistant_text` deltas so the UI keeps streaming, and returns the
+   * assembled text plus its usage -- or `null` when the provider cannot answer,
+   * which the caller reports honestly rather than dressing up as an answer.
+   *
+   * The tool list is empty rather than absent-by-omission at the call site:
+   * `toolsField` drops the field from the provider request, which is why this
+   * cannot simply use `provider.complete()`. That path maps messages through
+   * `toSimpleMessages`, which filters `role: "tool"` out entirely -- it would
+   * send a conversation stripped of every tool result and get back a confident
+   * summary of nothing.
+   */
+  private async *streamFinalSynthesis(
+    userId: string,
+    provider: AiProvider,
+    systemPrompt: string,
+    messages: AiMessage[],
+  ): AsyncGenerator<StreamEvent, FinalSynthesis | null> {
+    const request = {
+      systemPrompt,
+      messages: [
+        ...messages,
+        { role: "user" as const, content: FINAL_SYNTHESIS_INSTRUCTION },
+      ],
+      maxTokens: 4096,
+      temperature: 0.1,
+    };
+    const noTools: AiToolDefinition[] = [];
+    const startedAt = Date.now();
+
+    let streamed = "";
+    let content = "";
+    let model = "unknown";
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    try {
+      if (provider.streamWithTools) {
+        for await (const chunk of provider.streamWithTools(request, noTools)) {
+          if (chunk.type === "text") {
+            streamed += chunk.text;
+            yield { type: "assistant_text", text: chunk.text };
+          } else {
+            content = chunk.content;
+            model = chunk.model;
+            inputTokens = chunk.usage.inputTokens;
+            outputTokens = chunk.usage.outputTokens;
+          }
+        }
+      } else if (provider.completeWithTools) {
+        const response = await provider.completeWithTools(request, noTools);
+        content = response.content;
+        model = response.model;
+        inputTokens = response.usage.inputTokens;
+        outputTokens = response.usage.outputTokens;
+        if (content) {
+          yield { type: "assistant_text", text: content };
+        }
+      } else {
+        return null;
+      }
+    } catch (error) {
+      // A failed synthesis is not a failed query: the budget guard already
+      // decided this response is partial, so degrade to the honest message
+      // rather than replacing a partial answer with an error.
+      this.logger.warn(
+        `Final synthesis failed user=${userId} provider=${provider.name} after=${Date.now() - startedAt}ms: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+
+    // Prefer the assembled content from the terminating chunk; fall back to
+    // the concatenated deltas for a provider that only reports them there.
+    const text = content || streamed;
+    this.logger.log(
+      `Final synthesis done user=${userId} provider=${provider.name} model=${model} ms=${Date.now() - startedAt} chars=${text.length} inputTokens=${inputTokens} outputTokens=${outputTokens}`,
+    );
+    return { text, model, inputTokens, outputTokens };
   }
 
   /**

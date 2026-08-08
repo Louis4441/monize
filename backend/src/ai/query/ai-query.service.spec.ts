@@ -123,22 +123,55 @@ describe("AiQueryService", () => {
     return module.get<AiQueryService>(AiQueryService);
   }
 
-  /** A provider that never stops asking for another tool call. */
+  /** Text the stubbed provider returns from the tool-free synthesis pass. */
+  const SYNTHESIZED = "You spent $3,000 across 45 transactions.";
+
+  /**
+   * A provider that never stops asking for another tool call -- until it is
+   * handed no tools, at which point it answers in text.
+   *
+   * That second half is not a convenience: a provider given an empty tool list
+   * *cannot* return tool calls, so a mock that ignored the argument would make
+   * the synthesis pass untestable and let a broken one look fine.
+   */
   function alwaysCallsTools(): void {
-    (mockProvider.completeWithTools as jest.Mock).mockResolvedValue({
-      content: "",
-      toolCalls: [
-        {
-          id: "tc-x",
-          name: "query_transactions",
-          input: { startDate: "2026-01-01", endDate: "2026-01-31" },
-        },
-      ],
-      usage: { inputTokens: 50, outputTokens: 20 },
-      model: "claude-sonnet-4-20250514",
-      provider: "anthropic",
-      stopReason: "tool_use",
-    });
+    (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+      (_request: unknown, tools: unknown[]) =>
+        Promise.resolve(
+          tools.length === 0
+            ? {
+                content: SYNTHESIZED,
+                toolCalls: [],
+                usage: { inputTokens: 70, outputTokens: 40 },
+                model: "claude-sonnet-4-20250514",
+                provider: "anthropic",
+                stopReason: "end_turn",
+              }
+            : {
+                content: "",
+                toolCalls: [
+                  {
+                    id: "tc-x",
+                    name: "query_transactions",
+                    input: { startDate: "2026-01-01", endDate: "2026-01-31" },
+                  },
+                ],
+                usage: { inputTokens: 50, outputTokens: 20 },
+                model: "claude-sonnet-4-20250514",
+                provider: "anthropic",
+                stopReason: "tool_use",
+              },
+        ),
+    );
+  }
+
+  /** The provider request for the final, tool-free synthesis pass. */
+  function synthesisCall(): [
+    { messages: Array<Record<string, unknown>> },
+    unknown[],
+  ] {
+    const calls = (mockProvider.completeWithTools as jest.Mock).mock.calls;
+    return calls[calls.length - 1];
   }
 
   describe("attachments", () => {
@@ -562,13 +595,15 @@ describe("AiQueryService", () => {
 
       // Derived from the spec table rather than restated, so raising the
       // default cannot leave this assertion quietly describing the old one.
+      // One call per analysis step, plus the final tool-free synthesis pass.
       expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
-        QUERY_BUDGET_SPECS.maxIterations.default,
+        QUERY_BUDGET_SPECS.maxIterations.default + 1,
       );
 
-      // Should have a content event with the fallback message
+      // The user gets the note AND the answer built from the gathered data.
       const contentEvent = events.find((e) => e.type === "content");
       expect(contentEvent!.text).toContain("maximum number of analysis steps");
+      expect(contentEvent!.text).toContain(SYNTHESIZED);
 
       // Should still emit done
       const doneEvent = events.find((e) => e.type === "done");
@@ -585,7 +620,9 @@ describe("AiQueryService", () => {
         });
         await collectEventsFrom(svc, userId, "Deep question");
 
-        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(raised);
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
+          raised + 1,
+        );
       });
 
       it("runs fewer analysis steps when AI_QUERY_MAX_ITERATIONS is lowered", async () => {
@@ -594,7 +631,7 @@ describe("AiQueryService", () => {
         const svc = await serviceWithEnv({ AI_QUERY_MAX_ITERATIONS: "2" });
         const events = await collectEventsFrom(svc, userId, "Deep question");
 
-        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2 + 1);
         expect(
           events.find((e) => e.type === "content")!.text as string,
         ).toContain("maximum number of analysis steps");
@@ -607,7 +644,7 @@ describe("AiQueryService", () => {
         await collectEventsFrom(svc, userId, "Deep question");
 
         expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
-          QUERY_BUDGET_SPECS.maxIterations.default,
+          QUERY_BUDGET_SPECS.maxIterations.default + 1,
         );
       });
 
@@ -619,7 +656,7 @@ describe("AiQueryService", () => {
         const svc = await serviceWithEnv({ AI_QUERY_MAX_TOOL_CALLS: "2" });
         const events = await collectEventsFrom(svc, userId, "Deep question");
 
-        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2 + 1);
         expect(
           events.find((e) => e.type === "content")!.text as string,
         ).toContain("maximum number of data lookups");
@@ -631,7 +668,7 @@ describe("AiQueryService", () => {
         const svc = await serviceWithEnv({ AI_QUERY_MAX_INPUT_TOKENS: "10" });
         const events = await collectEventsFrom(svc, userId, "Deep question");
 
-        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(1);
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(1 + 1);
         expect(
           events.find((e) => e.type === "content")!.text as string,
         ).toContain("maximum analysis budget");
@@ -643,37 +680,255 @@ describe("AiQueryService", () => {
         // milliseconds instead would cut the query off before the first.
         let now = 0;
         const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => now);
-        (mockProvider.completeWithTools as jest.Mock).mockImplementation(() => {
-          now += 60_000;
-          return Promise.resolve({
-            content: "",
-            toolCalls: [
-              {
-                id: "tc-x",
-                name: "query_transactions",
-                input: { startDate: "2026-01-01", endDate: "2026-01-31" },
-              },
-            ],
-            usage: { inputTokens: 50, outputTokens: 20 },
-            model: "claude-sonnet-4-20250514",
-            provider: "anthropic",
-            stopReason: "tool_use",
-          });
-        });
+        alwaysCallsTools();
+        const withTools = (
+          mockProvider.completeWithTools as jest.Mock
+        ).getMockImplementation()!;
+        (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+          (request: unknown, tools: unknown[]) => {
+            now += 60_000;
+            return withTools(request, tools);
+          },
+        );
 
         try {
           const svc = await serviceWithEnv({ AI_QUERY_TIMEOUT_MINUTES: "2" });
           const events = await collectEventsFrom(svc, userId, "Slow question");
 
-          expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(3);
-          expect(
-            events.find((e) => e.type === "content")!.text as string,
-          ).toContain("took too long");
+          // Three analysis steps before the clock runs out, then synthesis --
+          // which is not itself subject to the budget that just fired.
+          expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(3 + 1);
+          const text = events.find((e) => e.type === "content")!.text as string;
+          expect(text).toContain("longer than the time available");
+          expect(text).toContain(SYNTHESIZED);
         } finally {
           nowSpy.mockRestore();
         }
       });
 
+      it("leaves the synthesis pass outside the budget that just fired", async () => {
+        // The budgets bound data gathering. Applying them to the synthesis
+        // pass too would refuse the one call that turns the gathered data
+        // into an answer, which is the whole point of stopping.
+        alwaysCallsTools();
+
+        const svc = await serviceWithEnv({ AI_QUERY_MAX_TOOL_CALLS: "1" });
+        const events = await collectEventsFrom(svc, userId, "Deep question");
+
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain(SYNTHESIZED);
+      });
+    });
+
+    describe("final synthesis pass", () => {
+      it("asks the provider for an answer with no tools", async () => {
+        alwaysCallsTools();
+
+        await collectEvents(userId, "Deep question");
+
+        const [, tools] = synthesisCall();
+        expect(tools).toEqual([]);
+      });
+
+      it("hands the model the tool results it already gathered", async () => {
+        alwaysCallsTools();
+
+        await collectEvents(userId, "Deep question");
+
+        const [request] = synthesisCall();
+        const toolResults = request.messages.filter((m) => m.role === "tool");
+        // Every lookup the loop managed before being cut off is still there.
+        expect(toolResults.length).toBe(
+          QUERY_BUDGET_SPECS.maxIterations.default,
+        );
+        expect(toolResults[0].content).toContain("totalExpenses");
+      });
+
+      it("tells the model gathering is over and an answer is due", async () => {
+        alwaysCallsTools();
+
+        await collectEvents(userId, "Deep question");
+
+        const [request] = synthesisCall();
+        const last = request.messages[request.messages.length - 1];
+        expect(last.role).toBe("user");
+        expect(last.content).toContain("no further tools are available");
+      });
+
+      it("streams the synthesized answer as assistant_text", async () => {
+        alwaysCallsTools();
+
+        const events = await collectEvents(userId, "Deep question");
+
+        const streamed = events
+          .filter((e) => e.type === "assistant_text")
+          .map((e) => e.text as string);
+        expect(streamed).toContain(SYNTHESIZED);
+      });
+
+      it("puts the cut-off note before the answer, not after", async () => {
+        alwaysCallsTools();
+
+        const events = await collectEvents(userId, "Deep question");
+
+        const text = events.find((e) => e.type === "content")!.text as string;
+        expect(text.indexOf("maximum number of analysis steps")).toBeLessThan(
+          text.indexOf(SYNTHESIZED),
+        );
+      });
+
+      it("emits exactly one content event", async () => {
+        // The budget guards used to yield their own content event and then
+        // fall through to a second one, so a cut-off query sent the client
+        // two answers to join.
+        alwaysCallsTools();
+
+        const events = await collectEvents(userId, "Deep question");
+
+        expect(events.filter((e) => e.type === "content")).toHaveLength(1);
+      });
+
+      it("counts the synthesis pass in the reported usage", async () => {
+        alwaysCallsTools();
+
+        const events = await collectEvents(userId, "Deep question");
+
+        const usage = events.find((e) => e.type === "done")!.usage as Record<
+          string,
+          number
+        >;
+        const steps = QUERY_BUDGET_SPECS.maxIterations.default;
+        // Five steps at 50/20, then the synthesis pass at 70/40. Dropping it
+        // would under-report what the query actually cost.
+        expect(usage.inputTokens).toBe(steps * 50 + 70);
+        expect(usage.outputTokens).toBe(steps * 20 + 40);
+      });
+
+      it("logs usage against the model that produced the answer", async () => {
+        alwaysCallsTools();
+
+        await collectEvents(userId, "Deep question");
+
+        expect(mockUsageService.logUsage).toHaveBeenCalledWith(
+          expect.objectContaining({ model: "claude-sonnet-4-20250514" }),
+        );
+      });
+
+      it("still emits sources gathered before the cut-off", async () => {
+        alwaysCallsTools();
+
+        const events = await collectEvents(userId, "Deep question");
+
+        const sources = events.find((e) => e.type === "sources");
+        expect(sources).toBeDefined();
+      });
+
+      it("says so honestly when the synthesis call fails", async () => {
+        (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+          (_request: unknown, tools: unknown[]) =>
+            tools.length === 0
+              ? Promise.reject(new Error("provider exploded"))
+              : Promise.resolve({
+                  content: "",
+                  toolCalls: [
+                    { id: "tc-x", name: "get_account_balances", input: {} },
+                  ],
+                  usage: { inputTokens: 50, outputTokens: 20 },
+                  model: "claude-sonnet-4-20250514",
+                  provider: "anthropic",
+                  stopReason: "tool_use",
+                }),
+        );
+
+        const events = await collectEvents(userId, "Deep question");
+
+        const text = events.find((e) => e.type === "content")!.text as string;
+        // No answer exists, so none is claimed -- and it is not reported as a
+        // query error either, because the data gathering did happen.
+        expect(text).toContain("couldn't complete the analysis");
+        expect(events.find((e) => e.type === "error")).toBeUndefined();
+        expect(events.find((e) => e.type === "done")).toBeDefined();
+      });
+
+      it("says so honestly when the synthesis call returns nothing", async () => {
+        (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+          (_request: unknown, tools: unknown[]) =>
+            Promise.resolve({
+              content: tools.length === 0 ? "   " : "",
+              toolCalls:
+                tools.length === 0
+                  ? []
+                  : [{ id: "tc-x", name: "get_account_balances", input: {} }],
+              usage: { inputTokens: 50, outputTokens: 20 },
+              model: "claude-sonnet-4-20250514",
+              provider: "anthropic",
+              stopReason: tools.length === 0 ? "end_turn" : "tool_use",
+            }),
+        );
+
+        const events = await collectEvents(userId, "Deep question");
+
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("couldn't complete the analysis");
+      });
+
+      it("does not run when the model finished on its own", async () => {
+        // beforeEach's provider ends its turn immediately, so there is nothing
+        // to synthesize -- one call, and the model's own answer reaches the user.
+        const events = await collectEvents(userId, "Simple question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(1);
+        const text = events.find((e) => e.type === "content")!.text as string;
+        expect(text).toBe("Here is your financial summary.");
+        expect(text).not.toContain("maximum number of analysis steps");
+      });
+
+      it("streams synthesis deltas on a streaming provider", async () => {
+        mockProvider.streamWithTools = jest.fn(async function* (
+          _request: unknown,
+          tools: unknown[],
+        ) {
+          if (tools.length === 0) {
+            yield { type: "text", text: "You spent " };
+            yield { type: "text", text: "$3,000." };
+            yield {
+              type: "done",
+              content: "You spent $3,000.",
+              toolCalls: [],
+              usage: { inputTokens: 70, outputTokens: 40 },
+              model: "claude-sonnet-4-20250514",
+              stopReason: "end_turn",
+            };
+            return;
+          }
+          yield {
+            type: "done",
+            content: "",
+            toolCalls: [
+              { id: "tc-x", name: "get_account_balances", input: {} },
+            ],
+            usage: { inputTokens: 50, outputTokens: 20 },
+            model: "claude-sonnet-4-20250514",
+            stopReason: "tool_use",
+          };
+        });
+
+        const svc = await serviceWithEnv({ AI_QUERY_MAX_ITERATIONS: "2" });
+        const events = await collectEventsFrom(svc, userId, "Deep question");
+
+        const streamed = events
+          .filter((e) => e.type === "assistant_text")
+          .map((e) => e.text as string);
+        expect(streamed).toEqual(["You spent ", "$3,000."]);
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("You spent $3,000.");
+      });
+    });
+
+    describe("more env-configured budgets", () => {
       it("truncates a tool result at AI_QUERY_MAX_TOOL_RESULT_CHARS", async () => {
         alwaysCallsTools();
 
@@ -896,33 +1151,49 @@ describe("AiQueryService", () => {
     });
 
     it("stops when tool call budget is exhausted (LLM04-F1)", async () => {
-      // Each call returns 4 tool calls to exhaust budget of 15 quickly
-      (mockProvider.completeWithTools as jest.Mock).mockResolvedValue({
-        content: "",
-        toolCalls: [
-          {
-            id: "tc-1",
-            name: "query_transactions",
-            input: { startDate: "2026-01-01", endDate: "2026-01-31" },
-          },
-          { id: "tc-2", name: "get_account_balances", input: {} },
-          {
-            id: "tc-3",
-            name: "query_transactions",
-            input: { startDate: "2026-02-01", endDate: "2026-02-28" },
-          },
-          { id: "tc-4", name: "get_account_balances", input: {} },
-        ],
-        usage: { inputTokens: 50, outputTokens: 20 },
-        model: "claude-sonnet-4-20250514",
-        provider: "anthropic",
-        stopReason: "tool_use",
-      });
+      // Each call returns 4 tool calls to exhaust budget of 15 quickly, and
+      // answers in text once the synthesis pass withdraws the tools.
+      (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+        (_request: unknown, tools: unknown[]) =>
+          Promise.resolve(
+            tools.length === 0
+              ? {
+                  content: SYNTHESIZED,
+                  toolCalls: [],
+                  usage: { inputTokens: 70, outputTokens: 40 },
+                  model: "claude-sonnet-4-20250514",
+                  provider: "anthropic",
+                  stopReason: "end_turn",
+                }
+              : {
+                  content: "",
+                  toolCalls: [
+                    {
+                      id: "tc-1",
+                      name: "query_transactions",
+                      input: { startDate: "2026-01-01", endDate: "2026-01-31" },
+                    },
+                    { id: "tc-2", name: "get_account_balances", input: {} },
+                    {
+                      id: "tc-3",
+                      name: "query_transactions",
+                      input: { startDate: "2026-02-01", endDate: "2026-02-28" },
+                    },
+                    { id: "tc-4", name: "get_account_balances", input: {} },
+                  ],
+                  usage: { inputTokens: 50, outputTokens: 20 },
+                  model: "claude-sonnet-4-20250514",
+                  provider: "anthropic",
+                  stopReason: "tool_use",
+                },
+          ),
+      );
 
       const events = await collectEvents(userId, "Compare all my spending");
 
       const contentEvent = events.find((e) => e.type === "content");
       expect(contentEvent!.text).toContain("maximum number of data lookups");
+      expect(contentEvent!.text).toContain(SYNTHESIZED);
 
       const doneEvent = events.find((e) => e.type === "done");
       expect(doneEvent).toBeDefined();
@@ -930,20 +1201,37 @@ describe("AiQueryService", () => {
 
     it("stops when input token budget is exhausted (LLM04-F3)", async () => {
       // Return large token counts to exhaust the 200k limit
-      (mockProvider.completeWithTools as jest.Mock).mockResolvedValue({
-        content: "",
-        toolCalls: [{ id: "tc-1", name: "get_account_balances", input: {} }],
-        usage: { inputTokens: 210000, outputTokens: 20 },
-        model: "claude-sonnet-4-20250514",
-        provider: "anthropic",
-        stopReason: "tool_use",
-      });
+      (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+        (_request: unknown, tools: unknown[]) =>
+          Promise.resolve(
+            tools.length === 0
+              ? {
+                  content: SYNTHESIZED,
+                  toolCalls: [],
+                  usage: { inputTokens: 70, outputTokens: 40 },
+                  model: "claude-sonnet-4-20250514",
+                  provider: "anthropic",
+                  stopReason: "end_turn",
+                }
+              : {
+                  content: "",
+                  toolCalls: [
+                    { id: "tc-1", name: "get_account_balances", input: {} },
+                  ],
+                  usage: { inputTokens: 210000, outputTokens: 20 },
+                  model: "claude-sonnet-4-20250514",
+                  provider: "anthropic",
+                  stopReason: "tool_use",
+                },
+          ),
+      );
 
       const events = await collectEvents(userId, "Analyze everything");
 
       // First iteration runs, second is blocked by token budget check
       const contentEvent = events.find((e) => e.type === "content");
       expect(contentEvent!.text).toContain("maximum analysis budget");
+      expect(contentEvent!.text).toContain(SYNTHESIZED);
 
       const doneEvent = events.find((e) => e.type === "done");
       expect(doneEvent).toBeDefined();

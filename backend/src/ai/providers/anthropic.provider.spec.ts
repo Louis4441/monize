@@ -168,6 +168,43 @@ describe("AnthropicProvider", () => {
   });
 
   describe("completeWithTools()", () => {
+    it("omits the tools field entirely when handed no tools", async () => {
+      // The AI Assistant's final synthesis pass withdraws the tools to force
+      // a text answer. An empty array is not the same request as no field.
+      await provider.completeWithTools(
+        {
+          systemPrompt: "sys",
+          messages: [{ role: "user", content: "summarize" }],
+        },
+        [],
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty("tools");
+    });
+
+    it("sends the tools field when there are tools", async () => {
+      await provider.completeWithTools(
+        { systemPrompt: "sys", messages: [{ role: "user", content: "hi" }] },
+        [
+          {
+            name: "get_account_balances",
+            description: "balances",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.tools).toEqual([
+        {
+          name: "get_account_balances",
+          description: "balances",
+          input_schema: { type: "object", properties: {} },
+        },
+      ]);
+    });
+
     it("returns text content and tool calls", async () => {
       mockCreate.mockResolvedValueOnce({
         content: [

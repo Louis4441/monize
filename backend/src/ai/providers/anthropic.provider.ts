@@ -14,6 +14,7 @@ import {
 } from "./ai-provider.interface";
 import { contentToPlainText, isContentBlocks } from "./content-blocks.util";
 import { longRunningFetch } from "./long-running-fetch";
+import { toolsField } from "./tools-field.util";
 
 export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
@@ -230,7 +231,7 @@ export class AnthropicProvider implements AiProvider {
       max_tokens: request.maxTokens || 4096,
       system: this.toCachedSystem(request.systemPrompt),
       messages: this.toAnthropicMessages(request.messages),
-      tools: tools.map((tool) => ({
+      ...toolsField(tools, (tool) => ({
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema as Anthropic.Tool.InputSchema,
@@ -292,7 +293,7 @@ export class AnthropicProvider implements AiProvider {
         max_tokens: request.maxTokens || 4096,
         system: this.toCachedSystem(request.systemPrompt),
         messages: this.toAnthropicMessages(request.messages),
-        tools: tools.map((tool) => ({
+        ...toolsField(tools, (tool) => ({
           name: tool.name,
           description: tool.description,
           input_schema: tool.inputSchema as Anthropic.Tool.InputSchema,
