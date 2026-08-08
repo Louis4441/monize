@@ -1,6 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 import { AiQueryService, StreamEvent } from "./ai-query.service";
+import { QUERY_BUDGET_SPECS } from "./query-budgets";
 import { AiService } from "../ai.service";
 import { AiUsageService } from "../ai-usage.service";
 import { FinancialContextBuilder } from "../context/financial-context.builder";
@@ -82,11 +84,61 @@ describe("AiQueryService", () => {
     userId: string,
     query: string,
   ): Promise<StreamEvent[]> {
+    return collectEventsFrom(service, userId, query);
+  }
+
+  async function collectEventsFrom(
+    target: AiQueryService,
+    userId: string,
+    query: string,
+  ): Promise<StreamEvent[]> {
     const events: StreamEvent[] = [];
-    for await (const event of service.executeQueryStream(userId, query)) {
+    for await (const event of target.executeQueryStream(userId, query)) {
       events.push(event);
     }
     return events;
+  }
+
+  /**
+   * Build a second instance whose budgets come from an explicit env map,
+   * reusing the mocks from beforeEach. Goes through a real ConfigService so
+   * the values travel the same string-typed path a deployment uses, rather
+   * than being poked onto the instance.
+   */
+  async function serviceWithEnv(
+    env: Record<string, string>,
+  ): Promise<AiQueryService> {
+    const module: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({ load: [() => env], ignoreEnvFile: true }),
+      ],
+      providers: [
+        AiQueryService,
+        { provide: AiService, useValue: mockAiService },
+        { provide: AiUsageService, useValue: mockUsageService },
+        { provide: FinancialContextBuilder, useValue: mockContextBuilder },
+        { provide: ToolExecutorService, useValue: mockToolExecutor },
+      ],
+    }).compile();
+    return module.get<AiQueryService>(AiQueryService);
+  }
+
+  /** A provider that never stops asking for another tool call. */
+  function alwaysCallsTools(): void {
+    (mockProvider.completeWithTools as jest.Mock).mockResolvedValue({
+      content: "",
+      toolCalls: [
+        {
+          id: "tc-x",
+          name: "query_transactions",
+          input: { startDate: "2026-01-01", endDate: "2026-01-31" },
+        },
+      ],
+      usage: { inputTokens: 50, outputTokens: 20 },
+      model: "claude-sonnet-4-20250514",
+      provider: "anthropic",
+      stopReason: "tool_use",
+    });
   }
 
   describe("attachments", () => {
@@ -503,27 +555,16 @@ describe("AiQueryService", () => {
       expect(usage.toolCalls).toBe(2);
     });
 
-    it("stops after MAX_ITERATIONS (5)", async () => {
-      // Always return tool_use to hit max iterations
-      (mockProvider.completeWithTools as jest.Mock).mockResolvedValue({
-        content: "",
-        toolCalls: [
-          {
-            id: "tc-x",
-            name: "query_transactions",
-            input: { startDate: "2026-01-01", endDate: "2026-01-31" },
-          },
-        ],
-        usage: { inputTokens: 50, outputTokens: 20 },
-        model: "claude-sonnet-4-20250514",
-        provider: "anthropic",
-        stopReason: "tool_use",
-      });
+    it("stops after the default iteration budget when nothing is configured", async () => {
+      alwaysCallsTools();
 
       const events = await collectEvents(userId, "Infinite loop query");
 
-      // Should be called exactly 5 times
-      expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(5);
+      // Derived from the spec table rather than restated, so raising the
+      // default cannot leave this assertion quietly describing the old one.
+      expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
+        QUERY_BUDGET_SPECS.maxIterations.default,
+      );
 
       // Should have a content event with the fallback message
       const contentEvent = events.find((e) => e.type === "content");
@@ -532,6 +573,137 @@ describe("AiQueryService", () => {
       // Should still emit done
       const doneEvent = events.find((e) => e.type === "done");
       expect(doneEvent).toBeDefined();
+    });
+
+    describe("env-configured budgets", () => {
+      it("runs more analysis steps when AI_QUERY_MAX_ITERATIONS is raised", async () => {
+        alwaysCallsTools();
+        const raised = QUERY_BUDGET_SPECS.maxIterations.default + 3;
+
+        const svc = await serviceWithEnv({
+          AI_QUERY_MAX_ITERATIONS: String(raised),
+        });
+        await collectEventsFrom(svc, userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(raised);
+      });
+
+      it("runs fewer analysis steps when AI_QUERY_MAX_ITERATIONS is lowered", async () => {
+        alwaysCallsTools();
+
+        const svc = await serviceWithEnv({ AI_QUERY_MAX_ITERATIONS: "2" });
+        const events = await collectEventsFrom(svc, userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("maximum number of analysis steps");
+      });
+
+      it("falls back to the default when the override is not a positive integer", async () => {
+        alwaysCallsTools();
+
+        const svc = await serviceWithEnv({ AI_QUERY_MAX_ITERATIONS: "lots" });
+        await collectEventsFrom(svc, userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
+          QUERY_BUDGET_SPECS.maxIterations.default,
+        );
+      });
+
+      it("stops on AI_QUERY_MAX_TOOL_CALLS before the iteration budget", async () => {
+        alwaysCallsTools();
+
+        // One tool call per turn, so a budget of 2 is reached on the third
+        // pass -- before the 5 iterations the default would have allowed.
+        const svc = await serviceWithEnv({ AI_QUERY_MAX_TOOL_CALLS: "2" });
+        const events = await collectEventsFrom(svc, userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("maximum number of data lookups");
+      });
+
+      it("stops on AI_QUERY_MAX_INPUT_TOKENS", async () => {
+        alwaysCallsTools(); // reports 50 input tokens per call
+
+        const svc = await serviceWithEnv({ AI_QUERY_MAX_INPUT_TOKENS: "10" });
+        const events = await collectEventsFrom(svc, userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(1);
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("maximum analysis budget");
+      });
+
+      it("stops on AI_QUERY_TIMEOUT_MINUTES, reading the value as minutes", async () => {
+        // Pin the clock and advance it one minute per provider call, so a
+        // 2-minute budget is exceeded on the third pass. A value read as
+        // milliseconds instead would cut the query off before the first.
+        let now = 0;
+        const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => now);
+        (mockProvider.completeWithTools as jest.Mock).mockImplementation(() => {
+          now += 60_000;
+          return Promise.resolve({
+            content: "",
+            toolCalls: [
+              {
+                id: "tc-x",
+                name: "query_transactions",
+                input: { startDate: "2026-01-01", endDate: "2026-01-31" },
+              },
+            ],
+            usage: { inputTokens: 50, outputTokens: 20 },
+            model: "claude-sonnet-4-20250514",
+            provider: "anthropic",
+            stopReason: "tool_use",
+          });
+        });
+
+        try {
+          const svc = await serviceWithEnv({ AI_QUERY_TIMEOUT_MINUTES: "2" });
+          const events = await collectEventsFrom(svc, userId, "Slow question");
+
+          expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(3);
+          expect(
+            events.find((e) => e.type === "content")!.text as string,
+          ).toContain("took too long");
+        } finally {
+          nowSpy.mockRestore();
+        }
+      });
+
+      it("truncates a tool result at AI_QUERY_MAX_TOOL_RESULT_CHARS", async () => {
+        alwaysCallsTools();
+
+        const svc = await serviceWithEnv({
+          AI_QUERY_MAX_TOOL_RESULT_CHARS: "12",
+          AI_QUERY_MAX_ITERATIONS: "2",
+        });
+        await collectEventsFrom(svc, userId, "Big result question");
+
+        const secondCall = (mockProvider.completeWithTools as jest.Mock).mock
+          .calls[1][0] as { messages: Array<Record<string, unknown>> };
+        const toolMessage = secondCall.messages.find((m) => m.role === "tool");
+        expect(toolMessage!.content).toContain("[truncated, data too large]");
+        // 12 characters of payload plus the truncation marker.
+        expect((toolMessage!.content as string).startsWith('{"totalExpe')).toBe(
+          true,
+        );
+      });
+
+      it("leaves a tool result intact under the default budget", async () => {
+        alwaysCallsTools();
+
+        const svc = await serviceWithEnv({ AI_QUERY_MAX_ITERATIONS: "2" });
+        await collectEventsFrom(svc, userId, "Small result question");
+
+        const secondCall = (mockProvider.completeWithTools as jest.Mock).mock
+          .calls[1][0] as { messages: Array<Record<string, unknown>> };
+        const toolMessage = secondCall.messages.find((m) => m.role === "tool");
+        expect(toolMessage!.content).not.toContain("truncated");
+      });
     });
 
     it("yields error when context builder fails", async () => {

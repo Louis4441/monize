@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  Optional,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { AiService } from "../ai.service";
 import { AiUsageService } from "../ai-usage.service";
 import { FinancialContextBuilder } from "../context/financial-context.builder";
@@ -24,29 +30,7 @@ import { MAX_HISTORY_MESSAGES, AttachmentDto } from "./dto/ai-query.dto";
 import { validateAttachments } from "./attachment-validation";
 import { tr } from "../../i18n/translate";
 import { PendingAiAction } from "../actions/ai-action.types";
-
-const MAX_ITERATIONS = 5;
-
-/** LLM04-F1: Maximum total tool calls per query across all iterations. */
-const MAX_TOOL_CALLS = 15;
-
-/**
- * LLM04-F2: Overall query timeout in milliseconds.
- * This is independent of the per-provider timeout (e.g., Ollama's 15-min
- * timeout). The Ollama provider timeout remains untouched so scheduled tasks
- * (insights/forecasts) that call the provider directly can still use the
- * full provider timeout window.
- *
- * Bumped from 5 min to 20 min so slow CPU-only Ollama inference can finish
- * a multi-step query.
- */
-const QUERY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
-
-/** LLM04-F3: Maximum cumulative input tokens before aborting the query. */
-const MAX_INPUT_TOKENS = 200_000;
-
-/** LLM08-F2: Maximum size of a single tool result message in characters. */
-const MAX_TOOL_RESULT_CHARS = 50_000;
+import { QueryBudgets, resolveQueryBudgets } from "./query-budgets";
 
 export interface QueryResult {
   answer: string;
@@ -74,12 +58,22 @@ export interface StreamEvent {
 export class AiQueryService {
   private readonly logger = new Logger(AiQueryService.name);
 
+  /**
+   * Per-query resource budgets, resolved once at construction from the
+   * environment. Read from `this.budgets` rather than module constants so a
+   * deployment can size the loop for the provider it actually runs.
+   */
+  private readonly budgets: QueryBudgets;
+
   constructor(
     private readonly aiService: AiService,
     private readonly usageService: AiUsageService,
     private readonly contextBuilder: FinancialContextBuilder,
     private readonly toolExecutor: ToolExecutorService,
-  ) {}
+    @Optional() configService?: ConfigService,
+  ) {
+    this.budgets = resolveQueryBudgets(configService, this.logger);
+  }
 
   async executeQuery(
     userId: string,
@@ -255,12 +249,16 @@ export class AiQueryService {
     // proposals across tool calls.
     let proposingToolResults = 0;
 
-    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    for (
+      let iteration = 0;
+      iteration < this.budgets.maxIterations;
+      iteration++
+    ) {
       this.logger.log(
         `Iteration ${iteration} start user=${userId} provider=${provider.name} messages=${messages.length} inputTokensSoFar=${totalInputTokens} toolCallsSoFar=${totalToolCalls}`,
       );
       // LLM04-F2: Enforce overall query timeout
-      if (Date.now() - startTime > QUERY_TIMEOUT_MS) {
+      if (Date.now() - startTime > this.budgets.queryTimeoutMs) {
         this.logger.warn(
           `Query timeout reached for user ${userId} after ${iteration} iterations`,
         );
@@ -272,7 +270,7 @@ export class AiQueryService {
       }
 
       // LLM04-F1: Enforce per-query tool call budget
-      if (totalToolCalls >= MAX_TOOL_CALLS) {
+      if (totalToolCalls >= this.budgets.maxToolCalls) {
         this.logger.warn(
           `Tool call budget exhausted for user ${userId} (${totalToolCalls} calls)`,
         );
@@ -284,7 +282,7 @@ export class AiQueryService {
       }
 
       // LLM04-F3: Enforce token budget
-      if (totalInputTokens >= MAX_INPUT_TOKENS) {
+      if (totalInputTokens >= this.budgets.maxInputTokens) {
         this.logger.warn(
           `Token budget exhausted for user ${userId} (${totalInputTokens} input tokens)`,
         );
@@ -557,9 +555,9 @@ export class AiQueryService {
         const sanitizedData = sanitizeToolResultStrings(llmFacingData);
         // LLM08-F2: Truncate oversized tool results to prevent context bloat
         let toolResultContent = JSON.stringify(sanitizedData);
-        if (toolResultContent.length > MAX_TOOL_RESULT_CHARS) {
+        if (toolResultContent.length > this.budgets.maxToolResultChars) {
           toolResultContent =
-            toolResultContent.substring(0, MAX_TOOL_RESULT_CHARS) +
+            toolResultContent.substring(0, this.budgets.maxToolResultChars) +
             '... [truncated, data too large]"';
         }
         const toolResultMessage: AiMessage = {
