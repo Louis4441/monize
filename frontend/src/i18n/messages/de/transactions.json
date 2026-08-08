@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Bei Überweisungsbuchungen wird auch die verknüpfte Gegenbuchung aktualisiert.",
-        "split": "Buchungen mit Buchungsteilen werden bei Kategorieänderungen übersprungen."
+        "split": "Splitbuchungen: die neue Kategorie wird auf ihre Buchungsteile angewendet (bei aktivem Kategoriefilter nur auf die Teile, die dem Filter entsprechen). Überweisungs- und Investitionsteile bleiben unverändert."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# Buchung aktualisiert} other {# Buchungen aktualisiert}}",
+      "skipped": "{count, plural, one {# Buchung übersprungen} other {# Buchungen übersprungen}}",
+      "splitLines": "{count, plural, one {# Buchungsteil neu kategorisiert} other {# Buchungsteile neu kategorisiert}}"
     }
   },
   "form": {

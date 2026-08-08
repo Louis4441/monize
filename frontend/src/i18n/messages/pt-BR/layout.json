@@ -109,6 +109,7 @@
       "createdTransaction": "Transação {payee} {amount} criada",
       "updatedTransaction": "Transação {payee} {amount} atualizada",
       "deletedTransaction": "Transação {payee} {amount} excluída",
+      "bulkUpdatedTransactions": "Atualização em massa de {count, plural, one {# transação} other {# transações}}",
       "createdTransfer": "Transferência {amount} de {from} para {to} criada",
       "createdInvestmentTransaction": "Transação {action} criada",
       "updatedInvestmentTransaction": "Transação {action} atualizada",

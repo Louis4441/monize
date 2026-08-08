@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Giao tác chuyển khoản cũng sẽ có giao tác liên kết được cập nhật.",
-        "split": "Giao tác chia sẽ bị bỏ qua cho các thay đổi danh mục."
+        "split": "Giao tác chia: danh mục mới được áp dụng cho các phần chia của chúng (chỉ những phần khớp với bộ lọc danh mục khi bộ lọc đang hoạt động). Các phần chuyển khoản và đầu tư không thay đổi."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {Đã cập nhật # giao tác} other {Đã cập nhật # giao tác}}",
+      "skipped": "{count, plural, one {Đã bỏ qua # giao tác} other {Đã bỏ qua # giao tác}}",
+      "splitLines": "{count, plural, one {Đã đổi danh mục # phần chia} other {Đã đổi danh mục # phần chia}}"
     }
   },
   "form": {

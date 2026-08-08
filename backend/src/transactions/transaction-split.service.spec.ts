@@ -2071,4 +2071,179 @@ describe("TransactionSplitService", () => {
       expect(investmentService.createEmbeddedForSplit).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe("bulkRecategorizeCategorySplits", () => {
+    const selectRows = [
+      { id: "split-1", transaction_id: "tx-1", category_id: "cat-old" },
+      { id: "split-2", transaction_id: "tx-1", category_id: null },
+    ];
+
+    /** Route manager.query by SQL: the FOR UPDATE pre-read returns `rows`. */
+    function stageSplitRows(rows: unknown[]): void {
+      mockQueryRunner.manager.query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          typeof sql === "string" && sql.includes("FOR UPDATE OF s")
+            ? rows
+            : [],
+        ),
+      );
+    }
+
+    function findSelectCall(): any[] | undefined {
+      return mockQueryRunner.manager.query.mock.calls.find((call: any[]) =>
+        String(call[0]).includes("FOR UPDATE OF s"),
+      );
+    }
+
+    it("recategorizes the proven lines and returns each line's previous category", async () => {
+      stageSplitRows(selectRows);
+
+      const result = await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        ["tx-1"],
+        "cat-new",
+      );
+
+      // The pre-read's category_id comes back per line, null included -- the
+      // caller records it as the undo snapshot.
+      expect(result).toEqual([
+        {
+          splitId: "split-1",
+          transactionId: "tx-1",
+          previousCategoryId: "cat-old",
+        },
+        { splitId: "split-2", transactionId: "tx-1", previousCategoryId: null },
+      ]);
+
+      // One UPDATE over exactly the ids the locked pre-read proved.
+      const updateCall = mockQueryRunner.manager.query.mock.calls.find(
+        (call: any[]) => String(call[0]).includes("UPDATE transaction_splits"),
+      );
+      expect(updateCall).toBeDefined();
+      expect(String(updateCall![0])).toContain(
+        "SET category_id = $1 WHERE id = ANY($2)",
+      );
+      expect(updateCall![1]).toEqual(["cat-new", ["split-1", "split-2"]]);
+    });
+
+    it("scopes the pre-read to the user's transactions and category-kind lines only", async () => {
+      stageSplitRows(selectRows);
+
+      await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        ["tx-1"],
+        "cat-new",
+      );
+
+      const selectCall = findSelectCall();
+      expect(selectCall).toBeDefined();
+      const sql = String(selectCall![0]);
+      // I3: transaction_splits has no user_id; the read joins back to
+      // transactions on user_id, parameterized as $1.
+      expect(sql).toContain("JOIN transactions t ON t.id = s.transaction_id");
+      expect(sql).toContain("t.user_id = $1");
+      // I2: only category-kind lines; transfer and investment lines are
+      // never selected, so they can never be written.
+      expect(sql).toContain("s.kind = 'category'");
+      expect(selectCall![1]).toEqual(["user-1", ["tx-1"]]);
+    });
+
+    it("appends the category restriction as a third parameter when given", async () => {
+      stageSplitRows([selectRows[0]]);
+
+      await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        ["tx-1"],
+        "cat-new",
+        ["cat-a", "cat-b"],
+      );
+
+      const selectCall = findSelectCall();
+      expect(String(selectCall![0])).toContain("AND s.category_id = ANY($3)");
+      expect(selectCall![1]).toEqual(["user-1", ["tx-1"], ["cat-a", "cat-b"]]);
+    });
+
+    it("emits no category restriction when unrestricted", async () => {
+      stageSplitRows(selectRows);
+
+      await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        ["tx-1"],
+        "cat-new",
+      );
+
+      const selectCall = findSelectCall();
+      expect(String(selectCall![0])).not.toContain("s.category_id = ANY($3)");
+      expect(selectCall![1]).toEqual(["user-1", ["tx-1"]]);
+    });
+
+    it("locks the parent rows before reading the split lines (I6)", async () => {
+      stageSplitRows(selectRows);
+
+      await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        ["tx-1"],
+        "cat-new",
+      );
+
+      // The same lock updateSplits/addSplit take, so split-set writers
+      // serialize on the parent row.
+      expect(lockTransactionRows).toHaveBeenCalledWith(
+        mockQueryRunner.manager,
+        ["tx-1"],
+        "user-1",
+      );
+      const lockOrder = (lockTransactionRows as jest.Mock).mock
+        .invocationCallOrder[0];
+      const firstQueryOrder =
+        mockQueryRunner.manager.query.mock.invocationCallOrder[0];
+      expect(lockOrder).toBeLessThan(firstQueryOrder);
+    });
+
+    it("returns [] for empty parentIds without opening a transaction", async () => {
+      const result = await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        [],
+        "cat-new",
+      );
+
+      expect(result).toEqual([]);
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(lockTransactionRows).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.query).not.toHaveBeenCalled();
+    });
+
+    it("returns [] for an explicitly empty restriction without opening a transaction", async () => {
+      // An empty restriction set means "no line can match" -- distinct from
+      // undefined ("all category lines"), and answered without touching the DB.
+      const result = await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        ["tx-1"],
+        "cat-new",
+        [],
+      );
+
+      expect(result).toEqual([]);
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(lockTransactionRows).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.query).not.toHaveBeenCalled();
+    });
+
+    it("issues no UPDATE when no lines match", async () => {
+      stageSplitRows([]);
+
+      const result = await service.bulkRecategorizeCategorySplits(
+        "user-1",
+        ["tx-1"],
+        "cat-new",
+        ["cat-nobody-uses"],
+      );
+
+      expect(result).toEqual([]);
+      const updateCalls = mockQueryRunner.manager.query.mock.calls.filter(
+        (call: any[]) => String(call[0]).includes("UPDATE transaction_splits"),
+      );
+      expect(updateCalls).toHaveLength(0);
+    });
+  });
 });

@@ -7172,14 +7172,84 @@ describe("TransactionsService", () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it("rejects editing a split transaction", async () => {
-      transactionsRepository.findOne.mockResolvedValueOnce({
+    // Truth table B (docs/future-plans/split-bulk-update.md): a split parent's
+    // categories live on its lines and its amount must equal their sum, so a
+    // category or amount change is refused unless a complete replacement
+    // splits array accompanies the edit; parent fields change freely.
+    describe("split transactions (Truth table B)", () => {
+      const splitTx = {
         ...baseTx,
         isSplit: true,
+        categoryId: null,
+        category: null,
+      };
+
+      it("rejects an amount change without an accompanying splits array", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({ ...splitTx });
+        await expect(
+          service.previewUpdate("user-1", "tx-1", { amount: -5 }),
+        ).rejects.toThrow(/sum of its split lines/);
       });
-      await expect(
-        service.previewUpdate("user-1", "tx-1", { amount: -5 }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+
+      it("rejects a category change without an accompanying splits array", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({ ...splitTx });
+        await expect(
+          service.previewUpdate("user-1", "tx-1", { categoryId: "cat-1" }),
+        ).rejects.toThrow(/categories live on its split lines/);
+      });
+
+      it("gives the category guidance when both category and amount change without splits", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({ ...splitTx });
+        await expect(
+          service.previewUpdate("user-1", "tx-1", {
+            categoryId: "cat-1",
+            amount: -5,
+          }),
+        ).rejects.toThrow(/categories live on its split lines/);
+      });
+
+      it("allows an amount change when a splits array accompanies the edit", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({ ...splitTx });
+        const preview = await service.previewUpdate("user-1", "tx-1", {
+          amount: -50,
+          splitsAccompany: true,
+        });
+        expect(preview.amount).toBe(-50);
+        expect(preview.categoryId).toBeNull();
+      });
+
+      it("treats a splits-only replacement as a change (hasChange gate)", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({ ...splitTx });
+        const preview = await service.previewUpdate("user-1", "tx-1", {
+          splitsAccompany: true,
+        });
+        // No scalar field changed: the preview is the stored state.
+        expect(preview.amount).toBe(-12.5);
+        expect(preview.transactionDate).toBe("2026-01-15");
+      });
+
+      it("allows parent-field edits (payee, date, description) without splits", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({ ...splitTx });
+        payeesService.resolveByName.mockResolvedValueOnce(null);
+        const preview = await service.previewUpdate("user-1", "tx-1", {
+          payeeName: "New Vendor",
+          transactionDate: "2026-03-01",
+          description: "updated",
+        });
+        expect(preview.payeeName).toBe("New Vendor");
+        expect(preview.transactionDate).toBe("2026-03-01");
+        expect(preview.description).toBe("updated");
+        // The parent stays a split: amount and (null) category unchanged.
+        expect(preview.amount).toBe(-12.5);
+        expect(preview.categoryId).toBeNull();
+      });
+
+      it("still rejects a split edit that provides no fields", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({ ...splitTx });
+        await expect(
+          service.previewUpdate("user-1", "tx-1", {}),
+        ).rejects.toThrow(/at least one field/);
+      });
     });
 
     it("rejects when no field is provided", async () => {

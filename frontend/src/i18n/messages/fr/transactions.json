@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Les transactions de virement auront également leur contrepartie liée mise à jour.",
-        "split": "Les transactions réparties seront ignorées pour les modifications de catégorie."
+        "split": "Transactions réparties : la nouvelle catégorie est appliquée à leurs répartitions (uniquement celles correspondant à votre filtre de catégorie lorsqu'il est actif). Les répartitions de virement et d'investissement restent inchangées."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transaction mise à jour} other {# transactions mises à jour}}",
+      "skipped": "{count, plural, one {# transaction ignorée} other {# transactions ignorées}}",
+      "splitLines": "{count, plural, one {# répartition recatégorisée} other {# répartitions recatégorisées}}"
     }
   },
   "form": {

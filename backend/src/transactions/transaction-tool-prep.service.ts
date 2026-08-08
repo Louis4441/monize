@@ -542,6 +542,10 @@ export class TransactionToolPrepService {
         categoryId,
         description: item.description,
         createPayeeIfMissing: createPayee,
+        // A complete replacement splits array accompanies this edit; on an
+        // existing split transaction this is what permits a category or
+        // amount change (Truth table B).
+        splitsAccompany: item.splits !== undefined,
       },
     );
     // Validate splits against the effective amount the edit will leave on the
@@ -631,6 +635,12 @@ export class TransactionToolPrepService {
           continue;
         }
         const preview = result.preview;
+        // Batch rows deliberately carry no `splits`: both adapters (AI
+        // executor and MCP tool) reject a multi-row batch containing a split
+        // row before prep runs, so a split parent inside a batch can only
+        // receive parent-field edits -- its preview arrives here with
+        // categoryId null and the amount unchanged, and previewUpdate has
+        // already refused a category/amount change without splits.
         okRows.push({
           transactionId: preview.transactionId,
           accountId: preview.accountId,

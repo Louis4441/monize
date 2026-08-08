@@ -760,16 +760,29 @@ function TransactionsContent() {
 
   const handleBulkUpdate = useCallback(async (updateFields: Partial<Pick<BulkUpdateData, 'payeeId' | 'payeeName' | 'categoryId' | 'description' | 'status' | 'tagIds'>>) => {
     const payload = selection.buildSelectionPayload();
-    const result = await transactionsApi.bulkUpdate({ ...payload, ...updateFields } as BulkUpdateData);
+    // The active category filter rides along in BOTH selection modes: split
+    // lines are only recategorized when they match it, and a hand-picked
+    // selection (mode "ids") must honor the filter the user was looking
+    // through just like select-all-matching does.
+    const categoryFilterIds =
+      bulkUpdateFilters.categoryIds && bulkUpdateFilters.categoryIds.length > 0
+        ? { categoryFilterIds: bulkUpdateFilters.categoryIds }
+        : {};
+    const result = await transactionsApi.bulkUpdate({ ...payload, ...categoryFilterIds, ...updateFields } as BulkUpdateData);
 
-    const parts = [`${result.updated} transaction${result.updated !== 1 ? 's' : ''} updated`];
-    if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+    const parts = [t('bulk.toasts.updated', { count: result.updated })];
+    if (result.skipped > 0) parts.push(t('bulk.toasts.skipped', { count: result.skipped }));
+    const splitLinesUpdated = result.splitLinesUpdated ?? 0;
+    if (splitLinesUpdated > 0) {
+      parts.push(t('bulk.toasts.splitLines', { count: splitLinesUpdated }));
+    }
     if (result.updated > 0) {
       toast.success(parts.join(', '));
     } else if (result.skipped > 0) {
       toast.error(parts.join(', '));
     }
     if (result.skippedReasons.length > 0) {
+      // Server-localized strings; rendered verbatim.
       result.skippedReasons.forEach(reason => toast(reason, { icon: 'ℹ️', duration: 6000 }));
     }
 
@@ -778,7 +791,7 @@ function TransactionsContent() {
     selection.clearSelection();
     loadAllData();
     return result;
-  }, [selection, loadAllData]);
+  }, [selection, loadAllData, t, bulkUpdateFilters.categoryIds]);
 
   const handleBulkDelete = useCallback(async () => {
     const payload = selection.buildSelectionPayload();

@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "As transações de transferência terão também o seu contraponto associado atualizado.",
-        "split": "As transações com divisões serão ignoradas para alterações de categoria."
+        "split": "Transações com divisões: a nova categoria é aplicada às suas divisões (apenas às divisões que correspondem ao seu filtro de categoria quando um está ativo). As divisões de transferência e investimento permanecem inalteradas."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transação atualizada} other {# transações atualizadas}}",
+      "skipped": "{count, plural, one {# transação ignorada} other {# transações ignoradas}}",
+      "splitLines": "{count, plural, one {# divisão recategorizada} other {# divisões recategorizadas}}"
     }
   },
   "form": {

@@ -265,12 +265,21 @@ export interface BulkUpdateData {
   description?: string | null;
   tagIds?: string[];
   status?: TransactionStatus;
+  /**
+   * Category filter active in the UI when the update was issued, sent in BOTH
+   * selection modes: it restricts split-line recategorization to lines
+   * currently in these categories, and hand-picked rows (mode "ids") must
+   * honor the filter the user was looking through just like select-all does.
+   */
+  categoryFilterIds?: string[];
 }
 
 export interface BulkUpdateResult {
   updated: number;
   skipped: number;
   skippedReasons: string[];
+  /** Split lines recategorized across split parents; present only when > 0. */
+  splitLinesUpdated?: number;
 }
 
 export interface BulkDeleteData {

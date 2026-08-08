@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Transakcje przelewu spowodują również aktualizację powiązanego przeciwstawnego wpisu.",
-        "split": "Transakcje podzielone zostaną pominięte przy zmianach kategorii."
+        "split": "Transakcje podzielone: nowa kategoria jest stosowana do ich pozycji podziału (przy aktywnym filtrze kategorii tylko do pozycji pasujących do filtra). Pozycje przelewów i inwestycji pozostają bez zmian."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {Zaktualizowano # transakcję} few {Zaktualizowano # transakcje} many {Zaktualizowano # transakcji} other {Zaktualizowano # transakcji}}",
+      "skipped": "{count, plural, one {Pominięto # transakcję} few {Pominięto # transakcje} many {Pominięto # transakcji} other {Pominięto # transakcji}}",
+      "splitLines": "{count, plural, one {Zmieniono kategorię # pozycji podziału} few {Zmieniono kategorię # pozycji podziału} many {Zmieniono kategorię # pozycji podziału} other {Zmieniono kategorię # pozycji podziału}}"
     }
   },
   "form": {

@@ -1604,6 +1604,102 @@ describe("ActionHistoryService", () => {
         expect.stringContaining("INSERT INTO transaction_tags"),
         ["tx-1", "tag-1"],
       );
+      // Backward compat: rows recorded before split snapshots existed carry no
+      // `splits` key, and must not produce any transaction_splits write.
+      const splitCalls = mockQueryRunner.query.mock.calls.filter(
+        (call: any[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("UPDATE transaction_splits"),
+      );
+      expect(splitCalls).toHaveLength(0);
+    });
+
+    it("should restore split-line categories through the user-scoped parent join", async () => {
+      const bulkAction = {
+        ...mockAction,
+        entityType: "bulk_transaction",
+        action: "bulk_update",
+        entityId: null,
+        beforeData: {
+          transactions: [
+            {
+              id: "tx-2",
+              accountId: "acc-1",
+              splits: [
+                { id: "split-1", categoryId: "cat-old" },
+                // A null before-category must restore NULL, not a default.
+                { id: "split-2", categoryId: null },
+              ],
+            },
+          ],
+        },
+      };
+      mockRepository.findOne.mockResolvedValue(bulkAction);
+      mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+      mockQueryRunner.query.mockResolvedValue([
+        { opening_balance: "0", tx_sum: "0" },
+      ]);
+
+      const result = await service.undo(userId);
+
+      expect(result.description).toContain("Undone");
+      const splitCalls = mockQueryRunner.query.mock.calls.filter(
+        (call: any[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("UPDATE transaction_splits"),
+      );
+      expect(splitCalls).toHaveLength(2);
+      // I3: transaction_splits has no user_id, so the write is scoped through
+      // its parent transaction with the acting user parameterized.
+      expect(splitCalls[0][0]).toContain("EXISTS");
+      expect(splitCalls[0][0]).toContain("t.user_id = $3");
+      expect(splitCalls[0][1]).toEqual(["cat-old", "split-1", userId]);
+      expect(splitCalls[1][1]).toEqual([null, "split-2", userId]);
+    });
+
+    it("should redo a bulk update by applying the after side's split categories", async () => {
+      // executeRedo swaps before/after, so redo replays afterData's splits.
+      const bulkAction = {
+        ...mockAction,
+        entityType: "bulk_transaction",
+        action: "bulk_update",
+        entityId: null,
+        isUndone: true,
+        beforeData: {
+          transactions: [
+            {
+              id: "tx-2",
+              accountId: "acc-1",
+              splits: [{ id: "split-1", categoryId: "cat-old" }],
+            },
+          ],
+        },
+        afterData: {
+          transactions: [
+            {
+              id: "tx-2",
+              accountId: "acc-1",
+              splits: [{ id: "split-1", categoryId: "cat-new" }],
+            },
+          ],
+        },
+      };
+      mockRepository.findOne.mockResolvedValue(bulkAction);
+      mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+      mockQueryRunner.query.mockResolvedValue([
+        { opening_balance: "0", tx_sum: "0" },
+      ]);
+
+      const result = await service.redo(userId);
+
+      expect(result.description).toContain("Redone");
+      const splitCalls = mockQueryRunner.query.mock.calls.filter(
+        (call: any[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("UPDATE transaction_splits"),
+      );
+      expect(splitCalls).toHaveLength(1);
+      expect(splitCalls[0][1]).toEqual(["cat-new", "split-1", userId]);
     });
 
     it("should throw ConflictException for unsupported bulk action", async () => {

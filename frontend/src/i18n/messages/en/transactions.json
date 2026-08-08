@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Transfer transactions will have their linked counterpart updated as well.",
-        "split": "Split transactions will be skipped for category changes."
+        "split": "Split transactions: the new category is applied to their split lines (only lines matching your category filter when one is active). Transfer and investment lines are unchanged."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transaction updated} other {# transactions updated}}",
+      "skipped": "{count, plural, one {# transaction skipped} other {# transactions skipped}}",
+      "splitLines": "{count, plural, one {# split line recategorized} other {# split lines recategorized}}"
     }
   },
   "form": {

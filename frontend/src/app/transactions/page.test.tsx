@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@/test/render';
+import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import TransactionsPage from './page';
 
 // The global setup mock builds a fresh router per call, so pushes cannot be
@@ -47,7 +47,19 @@ vi.mock('next/dynamic', () => ({
         return <div data-testid="dynamic-payee-form">PayeeForm</div>;
       }
       if (props.selectionCount !== undefined) {
-        return <div data-testid="dynamic-bulk-update-modal">BulkUpdateModal</div>;
+        return (
+          <div data-testid="dynamic-bulk-update-modal">
+            BulkUpdateModal
+            {props.isOpen && (
+              <button
+                data-testid="bulk-modal-submit"
+                onClick={() => props.onSubmit({ categoryId: 'cat-1' })}
+              >
+                Submit Bulk Update
+              </button>
+            )}
+          </div>
+        );
       }
       // Chart components all receive `data` + `isLoading`; distinguish by their
       // unique click handlers / currency code prop.
@@ -253,6 +265,11 @@ vi.mock('@/components/transactions/TransactionList', () => ({
       <span data-testid="single-account">{props.isSingleAccountView ? 'single' : 'multi'}</span>
       <span data-testid="starting-balance">{props.startingBalance ?? 'none'}</span>
       <span data-testid="selection-mode">{props.selectionMode ? 'on' : 'off'}</span>
+      {props.onToggleSelection && (
+        <button data-testid="select-tx-1" onClick={() => props.onToggleSelection('tx-1')}>
+          Select tx-1
+        </button>
+      )}
       {props.onExport && (
         <button data-testid="export-btn" onClick={props.onExport} disabled={props.isExporting}>
           {props.isExporting ? 'Exporting...' : 'Export'}
@@ -300,6 +317,13 @@ vi.mock('@/components/transactions/TransactionFilterPanel', () => ({
       <button data-testid="set-search" onClick={() => {
         props.handleSearchChange('test search');
       }}>Set Search</button>
+      <button data-testid="set-amount-filter" onClick={() => {
+        props.handleFilterChange(props.setFilterAmountFrom, '10');
+        props.handleFilterChange(props.setFilterAmountTo, '100');
+      }}>Set Amount Filter</button>
+      <button data-testid="set-tag-filter" onClick={() => {
+        props.handleArrayFilterChange(props.setFilterTagIds, ['tag-1']);
+      }}>Set Tag Filter</button>
       <span data-testid="active-filter-count">{props.activeFilterCount}</span>
       <span data-testid="filters-expanded">{props.filtersExpanded ? 'expanded' : 'collapsed'}</span>
       <span data-testid="search-input">{props.searchInput}</span>
@@ -1685,6 +1709,172 @@ describe('TransactionsPage', () => {
       await waitFor(() => {
         expect(screen.getByTestId('bulk-select-mode')).toBeInTheDocument();
         expect(screen.getByTestId('toggle-bulk-select')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Bulk Update', () => {
+    beforeEach(() => {
+      mockGetAll.mockResolvedValue({
+        data: mockTransactions,
+        pagination: { page: 1, totalPages: 1, total: 3 },
+      });
+      mockGetSummary.mockResolvedValue({ totalIncome: 0, totalExpenses: 0, netCashFlow: 0, transactionCount: 0 });
+    });
+
+    // Select tx-1 via the list mock (shows the banner), open the modal, and
+    // submit it (the dynamic modal mock submits { categoryId: 'cat-1' }).
+    async function selectAndSubmitBulkUpdate() {
+      await waitFor(() => {
+        expect(screen.getByTestId('select-tx-1')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('select-tx-1'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bulk-update-btn')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('bulk-update-btn'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bulk-modal-submit')).toBeInTheDocument();
+      });
+      // The submit handler awaits the API call, so state updates land in a
+      // later microtask; the click must be act-wrapped (see frontend CLAUDE.md).
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('bulk-modal-submit'));
+      });
+    }
+
+    it('shows the success toast from the catalog, without a split-lines part when splitLinesUpdated is omitted', async () => {
+      mockBulkUpdate.mockResolvedValue({ updated: 2, skipped: 0, skippedReasons: [] });
+      const toast = await import('react-hot-toast');
+
+      render(<TransactionsPage />);
+      await selectAndSubmitBulkUpdate();
+
+      // Exact match: no skipped part and no split-lines part.
+      await waitFor(() => {
+        expect(toast.default.success).toHaveBeenCalledWith('2 transactions updated');
+      });
+    });
+
+    it('appends the split-lines toast part when the API reports splitLinesUpdated', async () => {
+      mockBulkUpdate.mockResolvedValue({ updated: 2, skipped: 0, skippedReasons: [], splitLinesUpdated: 3 });
+      const toast = await import('react-hot-toast');
+
+      render(<TransactionsPage />);
+      await selectAndSubmitBulkUpdate();
+
+      await waitFor(() => {
+        expect(toast.default.success).toHaveBeenCalledWith('2 transactions updated, 3 split lines recategorized');
+      });
+    });
+
+    it('shows skipped counts from the catalog and renders server-localized skip reasons verbatim', async () => {
+      // A non-English reason proves the string is passed through untranslated.
+      mockBulkUpdate.mockResolvedValue({
+        updated: 1,
+        skipped: 2,
+        skippedReasons: ['2 Splitbuchungen ohne passende Zeilen übersprungen'],
+      });
+      const toast = await import('react-hot-toast');
+
+      render(<TransactionsPage />);
+      await selectAndSubmitBulkUpdate();
+
+      await waitFor(() => {
+        expect(toast.default.success).toHaveBeenCalledWith('1 transaction updated, 2 transactions skipped');
+        expect(toast.default).toHaveBeenCalledWith(
+          '2 Splitbuchungen ohne passende Zeilen übersprungen',
+          expect.objectContaining({ duration: 6000 }),
+        );
+      });
+    });
+
+    it('includes amountFrom/amountTo/tagIds filters in the select-all-matching payload', async () => {
+      mockBulkUpdate.mockResolvedValue({ updated: 3, skipped: 0, skippedReasons: [] });
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('set-amount-filter')).toBeInTheDocument();
+      });
+
+      // Filters first: changing them afterwards would clear the selection.
+      fireEvent.click(screen.getByTestId('set-amount-filter'));
+      fireEvent.click(screen.getByTestId('set-tag-filter'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('select-tx-1')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('select-tx-1'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('select-all-matching')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('select-all-matching'));
+
+      fireEvent.click(screen.getByTestId('bulk-update-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('bulk-modal-submit')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('bulk-modal-submit'));
+      });
+
+      await waitFor(() => {
+        expect(mockBulkUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            mode: 'filter',
+            categoryId: 'cat-1',
+            filters: expect.objectContaining({
+              amountFrom: 10,
+              amountTo: 100,
+              tagIds: ['tag-1'],
+            }),
+          }),
+        );
+      });
+    });
+
+    it('carries the active category filter as categoryFilterIds on a hand-picked (ids mode) selection', async () => {
+      // Regression (user-reported): rows checked by hand under an active
+      // category filter go up as mode "ids", and without the filter riding
+      // along the server recategorized ALL of a split's lines instead of the
+      // filtered one. The active filter must reach the server in both modes.
+      mockBulkUpdate.mockResolvedValue({ updated: 1, skipped: 0, skippedReasons: [] });
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('set-category-filter')).toBeInTheDocument();
+      });
+      // Filter first: changing it afterwards would clear the selection.
+      fireEvent.click(screen.getByTestId('set-category-filter'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('select-tx-1')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('select-tx-1'));
+
+      // Deliberately NOT clicking select-all-matching: this is the ids path.
+      fireEvent.click(screen.getByTestId('bulk-update-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('bulk-modal-submit')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('bulk-modal-submit'));
+      });
+
+      await waitFor(() => {
+        expect(mockBulkUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            mode: 'ids',
+            transactionIds: ['tx-1'],
+            categoryFilterIds: ['cat-1'],
+            categoryId: 'cat-1',
+          }),
+        );
       });
     });
   });

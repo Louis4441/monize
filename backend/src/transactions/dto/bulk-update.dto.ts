@@ -1,11 +1,15 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsDateString,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
   ValidateIf,
 } from "class-validator";
@@ -48,6 +52,27 @@ export class BulkUpdateFilterDto {
   @IsString()
   @MaxLength(200)
   search?: string;
+
+  @ApiPropertyOptional({ description: "Minimum amount (inclusive)" })
+  @IsOptional()
+  @IsNumber()
+  @Min(-999999999999)
+  @Max(999999999999)
+  amountFrom?: number;
+
+  @ApiPropertyOptional({ description: "Maximum amount (inclusive)" })
+  @IsOptional()
+  @IsNumber()
+  @Min(-999999999999)
+  @Max(999999999999)
+  amountTo?: number;
+
+  @ApiPropertyOptional({ description: "Filter by tag IDs" })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID("4", { each: true })
+  tagIds?: string[];
 }
 
 export class BulkUpdateDto {
@@ -128,6 +153,22 @@ export class BulkUpdateDto {
   @IsArray()
   @IsUUID("4", { each: true })
   tagIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      "Category filter active in the UI when the bulk update was issued. " +
+      "Restricts split-line recategorization to lines currently in these " +
+      "categories (descendant-expanded), regardless of selection mode; does " +
+      "not affect which transactions are selected. May include the " +
+      '"uncategorized"/"transfer" pseudo-ids, which are ignored.',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  categoryFilterIds?: string[];
 }
 
 export class BulkDeleteDto {

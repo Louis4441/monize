@@ -21,6 +21,8 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { TagsService } from "../tags/tags.service";
+import { TransactionSplitService } from "./transaction-split.service";
+import { ActionHistoryService } from "../action-history/action-history.service";
 import {
   BulkUpdateDto,
   BulkDeleteDto,
@@ -51,7 +53,39 @@ export interface BulkUpdateResult {
   updated: number;
   skipped: number;
   skippedReasons: string[];
+  /**
+   * Split lines recategorized across the batch's split parents. A sibling
+   * count, never folded into `updated` (invariant I5,
+   * docs/future-plans/split-bulk-update.md). Omitted when zero.
+   */
+  splitLinesUpdated?: number;
 }
+
+/** One changed split line, as returned by bulkRecategorizeCategorySplits. */
+interface ChangedSplitLine {
+  splitId: string;
+  transactionId: string;
+  previousCategoryId: string | null;
+}
+
+/** Per-transaction snapshot rows for the Action History bulk_update record. */
+interface BulkUpdateSnapshot {
+  before: Record<string, unknown>[];
+  after: Record<string, unknown>[];
+}
+
+/**
+ * The columns the WP1b undo snapshot can capture, keyed by the updateFields
+ * property they mirror. Keys come from extractUpdateFields' whitelist; the
+ * values are literal column names, never request input.
+ */
+const SNAPSHOT_COLUMNS: Record<string, string> = {
+  payeeId: "payee_id",
+  payeeName: "payee_name",
+  categoryId: "category_id",
+  description: "description",
+  status: "status",
+};
 
 @Injectable()
 export class TransactionBulkUpdateService {
@@ -63,6 +97,8 @@ export class TransactionBulkUpdateService {
     @Inject(forwardRef(() => NetWorthService))
     private netWorthService: NetWorthService,
     private tagsService: TagsService,
+    private splitService: TransactionSplitService,
+    private actionHistoryService: ActionHistoryService,
     private dataSource: DataSource,
   ) {}
 
@@ -129,7 +165,6 @@ export class TransactionBulkUpdateService {
       }
     }
 
-    const isUpdatingPayee = "payeeId" in dto || "payeeName" in dto;
     const isUpdatingCategory = "categoryId" in dto;
     const isUpdatingStatus = "status" in dto;
 
@@ -139,17 +174,21 @@ export class TransactionBulkUpdateService {
       return { updated: 0, skipped: 0, skippedReasons: [] };
     }
 
-    // Step 2: Apply exclusions and compute skip counts
-    const { eligibleIds, skipped, skippedReasons } = await this.applyExclusions(
+    // Step 2: Classify targets. Split parents stay in the batch (parent-level
+    // fields apply to them); when the run sets a category their lines are
+    // recategorized instead of the parent (invariant I1).
+    const { eligibleIds, splitParentIds } = await this.classifyTargets(
       userId,
       allIds,
-      isUpdatingPayee,
-      isUpdatingCategory,
     );
 
     if (eligibleIds.length === 0) {
-      return { updated: 0, skipped, skippedReasons };
+      return { updated: 0, skipped: 0, skippedReasons: [] };
     }
+
+    const splitParentIdSet = new Set(splitParentIds);
+    let changedLines: ChangedSplitLine[] = [];
+    let snapshot: BulkUpdateSnapshot = { before: [], after: [] };
 
     // Balance changes and the batch update commit in a single transaction.
     await withScopedDb(this.dataSource, async (m) => {
@@ -173,15 +212,47 @@ export class TransactionBulkUpdateService {
         );
       }
 
-      // Step 4: Execute batch update for column fields
+      // WP1b: read the pre-write values of exactly the fields this run changes,
+      // before any UPDATE runs. The split-line half of the snapshot comes from
+      // bulkRecategorizeCategorySplits' own pre-read below.
+      const parentSnapshot = await this.readParentSnapshot(
+        m,
+        userId,
+        eligibleIds,
+        updateFields,
+        isUpdatingTags,
+      );
+
+      // Step 4: Execute batch update for column fields. When the run sets a
+      // category, split parents must not receive it (their category_id stays
+      // NULL -- invariant I1), so their UPDATE drops categoryId.
       if (Object.keys(updateFields).length > 0) {
-        await m
-          .createQueryBuilder()
-          .update(Transaction)
-          .set(updateFields)
-          .where("id IN (:...ids)", { ids: eligibleIds })
-          .andWhere("userId = :userId", { userId })
-          .execute();
+        const fullFieldIds = isUpdatingCategory
+          ? eligibleIds.filter((id) => !splitParentIdSet.has(id))
+          : eligibleIds;
+        if (fullFieldIds.length > 0) {
+          await m
+            .createQueryBuilder()
+            .update(Transaction)
+            .set(updateFields)
+            .where("id IN (:...ids)", { ids: fullFieldIds })
+            .andWhere("userId = :userId", { userId })
+            .execute();
+        }
+
+        if (isUpdatingCategory && splitParentIds.length > 0) {
+          const splitParentFields = { ...updateFields };
+          delete (splitParentFields as Record<string, unknown>).categoryId;
+          if (Object.keys(splitParentFields).length > 0) {
+            await m
+              .createQueryBuilder()
+              .update(Transaction)
+              .set(splitParentFields)
+              .where("id IN (:...ids)", { ids: splitParentIds })
+              .andWhere("userId = :userId", { userId })
+              .execute();
+          }
+        }
 
         // Step 4b: Sync payee/description to linked transfer transactions
         await this.syncLinkedTransfers(m, userId, eligibleIds, updateFields);
@@ -202,6 +273,34 @@ export class TransactionBulkUpdateService {
         // mirror leg; split-transfer legs mirror tags onto the owning split.
         await this.syncTransferTags(m, userId, eligibleIds, dto.tagIds ?? []);
       }
+
+      // Step 4d: Recategorize the split parents' category-kind lines, joined
+      // to this transaction. The restriction set is computed with the same
+      // expansion the selection uses, so update and selection cannot drift.
+      if (isUpdatingCategory && splitParentIds.length > 0) {
+        const restriction = await this.resolveCategoryRestriction(
+          m,
+          userId,
+          dto,
+        );
+        changedLines = await this.splitService.bulkRecategorizeCategorySplits(
+          userId,
+          splitParentIds,
+          dto.categoryId ?? null,
+          restriction,
+        );
+      }
+
+      snapshot = this.buildSnapshots(
+        parentSnapshot,
+        updateFields,
+        isUpdatingCategory,
+        splitParentIdSet,
+        isUpdatingTags,
+        dto.tagIds,
+        changedLines,
+        dto.categoryId ?? null,
+      );
     });
 
     // Step 5: Trigger net worth recalc for affected accounts (after commit)
@@ -209,11 +308,66 @@ export class TransactionBulkUpdateService {
       await this.triggerNetWorthRecalcForTransactions(userId, eligibleIds);
     }
 
-    return {
-      updated: eligibleIds.length,
-      skipped,
+    // Result (invariant I5): a parent counts as updated only when it received
+    // at least one write. With a category-only run, a split parent none of
+    // whose lines changed received nothing and is skipped with a reason.
+    const parentLevelChangesApply =
+      Object.keys(updateFields).some((k) => k !== "categoryId") ||
+      isUpdatingTags;
+    const changedParentIds = new Set(changedLines.map((l) => l.transactionId));
+    const skippedSplitParents =
+      isUpdatingCategory && !parentLevelChangesApply
+        ? splitParentIds.filter((id) => !changedParentIds.has(id))
+        : [];
+    const updated = eligibleIds.length - skippedSplitParents.length;
+
+    const skippedReasons: string[] = [];
+    if (skippedSplitParents.length === 1) {
+      skippedReasons.push(
+        tr(
+          "errors.transactions.bulkSplitNoMatchingLinesOne",
+          "1 split transaction was skipped because none of its split lines matched the category update",
+        ),
+      );
+    } else if (skippedSplitParents.length > 1) {
+      skippedReasons.push(
+        tr(
+          "errors.transactions.bulkSplitNoMatchingLinesMany",
+          `${skippedSplitParents.length} split transactions were skipped because none of their split lines matched the category update`,
+          { count: skippedSplitParents.length },
+        ),
+      );
+    }
+
+    // WP1b: record the undo entry AFTER the transaction committed (record
+    // swallows its own failures, which is only safe outside a transaction --
+    // see derived-state-writers.guard.spec.ts). Skipped parents received no
+    // write, so they are excluded from the snapshot.
+    if (updated > 0) {
+      const skippedSet = new Set(skippedSplitParents);
+      const keep = (row: Record<string, unknown>) =>
+        !skippedSet.has(row.id as string);
+      void this.actionHistoryService.record(userId, {
+        entityType: "bulk_transaction",
+        entityId: null,
+        action: "bulk_update",
+        beforeData: { transactions: snapshot.before.filter(keep) },
+        afterData: { transactions: snapshot.after.filter(keep) },
+        description: `Bulk updated ${updated} transaction${updated === 1 ? "" : "s"}`,
+        descriptionKey: "bulkUpdatedTransactions",
+        descriptionParams: { count: updated },
+      });
+    }
+
+    const result: BulkUpdateResult = {
+      updated,
+      skipped: skippedSplitParents.length,
       skippedReasons,
     };
+    if (changedLines.length > 0) {
+      result.splitLinesUpdated = changedLines.length;
+    }
+    return result;
   }
 
   async bulkDelete(
@@ -406,17 +560,18 @@ export class TransactionBulkUpdateService {
     return transactions.map((t) => t.id);
   }
 
-  private async applyExclusions(
+  /**
+   * Classify the batch: every owned row is eligible (split parents included),
+   * and the split parents are named so a category update can route their
+   * change to the split lines instead of the parent row.
+   */
+  private async classifyTargets(
     userId: string,
     allIds: string[],
-    _isUpdatingPayee: boolean,
-    isUpdatingCategory: boolean,
   ): Promise<{
     eligibleIds: string[];
-    skipped: number;
-    skippedReasons: string[];
+    splitParentIds: string[];
   }> {
-    // Fetch transaction details needed for exclusion logic
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Transaction)
@@ -431,31 +586,162 @@ export class TransactionBulkUpdateService {
         .getMany(),
     );
 
-    const skippedReasons: string[] = [];
-    let splitCount = 0;
+    return {
+      eligibleIds: transactions.map((t) => t.id),
+      splitParentIds: transactions.filter((t) => t.isSplit).map((t) => t.id),
+    };
+  }
 
-    const eligibleIds = transactions
-      .filter((t) => {
-        if (isUpdatingCategory && t.isSplit) {
-          splitCount++;
-          return false;
-        }
-        return true;
-      })
-      .map((t) => t.id);
+  /**
+   * The restriction set for split-line recategorization: filter mode with real
+   * category UUIDs in the filter yields the descendant-expanded set (matching
+   * the selection's own expansion); everything else -- ids mode, no category
+   * filter, pseudo-ids only -- is unrestricted (`undefined` = all category
+   * lines), per Truth table A in docs/future-plans/split-bulk-update.md.
+   */
+  private async resolveCategoryRestriction(
+    m: EntityManager,
+    userId: string,
+    dto: BulkUpdateDto,
+  ): Promise<string[] | undefined> {
+    // The restriction keys off the category filter that was ACTIVE in the UI,
+    // not off the selection mode: hand-picked rows arrive as mode "ids" and
+    // must still honor the filter the user was looking through, so the client
+    // sends it explicitly as categoryFilterIds in both modes. Filter-mode
+    // filters.categoryIds remains a fallback for payloads without the field.
+    const categoryIds =
+      dto.categoryFilterIds ??
+      (dto.mode === "filter" ? dto.filters?.categoryIds : undefined);
+    if (!categoryIds || categoryIds.length === 0) return undefined;
+    const expanded = await this.expandRealCategoryIds(m, userId, categoryIds);
+    return expanded.length > 0 ? expanded : undefined;
+  }
 
-    if (splitCount > 0) {
-      const plural = splitCount !== 1 ? "s" : "";
-      skippedReasons.push(
-        `${splitCount} split transaction${plural} skipped (split categories must be updated individually)`,
-      );
+  /**
+   * Pre-write values of exactly the fields this run changes, camel-cased to the
+   * shape ActionHistoryService.undoBulkUpdate restores. Raw SQL on purpose: no
+   * DATE/decimal columns are captured, and the column list comes from the
+   * SNAPSHOT_COLUMNS whitelist, never from request input.
+   */
+  private async readParentSnapshot(
+    m: EntityManager,
+    userId: string,
+    eligibleIds: string[],
+    updateFields: Partial<Transaction>,
+    isUpdatingTags: boolean,
+  ): Promise<{
+    rows: Record<string, unknown>[];
+    tagsByTransaction: Map<string, string[]>;
+  }> {
+    const fieldKeys = Object.keys(updateFields).filter(
+      (k) => k in SNAPSHOT_COLUMNS,
+    );
+    const columns = [
+      "id",
+      "account_id",
+      ...fieldKeys.map((k) => SNAPSHOT_COLUMNS[k]),
+    ];
+    const rawRows: Record<string, unknown>[] =
+      (await m.query(
+        `SELECT ${columns.join(", ")} FROM transactions WHERE user_id = $1 AND id = ANY($2)`,
+        [userId, eligibleIds],
+      )) ?? [];
+
+    const rows = rawRows.map((raw) => {
+      const row: Record<string, unknown> = {
+        id: raw.id,
+        accountId: raw.account_id,
+      };
+      for (const key of fieldKeys) {
+        row[key] = raw[SNAPSHOT_COLUMNS[key]] ?? null;
+      }
+      return row;
+    });
+
+    const tagsByTransaction = new Map<string, string[]>();
+    if (isUpdatingTags) {
+      const tagRows: { transaction_id: string; tag_id: string }[] =
+        (await m.query(
+          `SELECT tt.transaction_id, tt.tag_id
+             FROM transaction_tags tt
+             JOIN transactions t ON t.id = tt.transaction_id
+            WHERE t.user_id = $1 AND tt.transaction_id = ANY($2)`,
+          [userId, eligibleIds],
+        )) ?? [];
+      for (const tagRow of tagRows) {
+        const list = tagsByTransaction.get(tagRow.transaction_id) ?? [];
+        tagsByTransaction.set(tagRow.transaction_id, [...list, tagRow.tag_id]);
+      }
     }
 
-    return {
-      eligibleIds,
-      skipped: splitCount,
-      skippedReasons,
-    };
+    return { rows, tagsByTransaction };
+  }
+
+  /**
+   * Assemble the before/after snapshots for the Action History record. Split
+   * parents never carry `categoryId` in either side (undo/redo must not write a
+   * parent category onto a split -- invariant I1); their changed lines ride
+   * along as `splits: [{ id, categoryId }]`.
+   */
+  private buildSnapshots(
+    parentSnapshot: {
+      rows: Record<string, unknown>[];
+      tagsByTransaction: Map<string, string[]>;
+    },
+    updateFields: Partial<Transaction>,
+    isUpdatingCategory: boolean,
+    splitParentIdSet: Set<string>,
+    isUpdatingTags: boolean,
+    newTagIds: string[] | undefined,
+    changedLines: ChangedSplitLine[],
+    newCategoryId: string | null,
+  ): BulkUpdateSnapshot {
+    const linesByParent = new Map<string, ChangedSplitLine[]>();
+    for (const line of changedLines) {
+      const list = linesByParent.get(line.transactionId) ?? [];
+      linesByParent.set(line.transactionId, [...list, line]);
+    }
+
+    const before: Record<string, unknown>[] = [];
+    const after: Record<string, unknown>[] = [];
+
+    for (const row of parentSnapshot.rows) {
+      const id = row.id as string;
+      const isSplitParent = splitParentIdSet.has(id);
+
+      const beforeRow: Record<string, unknown> = { ...row };
+      const afterRow: Record<string, unknown> = {
+        id,
+        accountId: row.accountId,
+        ...updateFields,
+      };
+      if (isUpdatingCategory && isSplitParent) {
+        delete beforeRow.categoryId;
+        delete afterRow.categoryId;
+      }
+
+      if (isUpdatingTags) {
+        beforeRow.tagIds = parentSnapshot.tagsByTransaction.get(id) ?? [];
+        afterRow.tagIds = newTagIds ?? [];
+      }
+
+      const lines = linesByParent.get(id);
+      if (lines && lines.length > 0) {
+        beforeRow.splits = lines.map((l) => ({
+          id: l.splitId,
+          categoryId: l.previousCategoryId,
+        }));
+        afterRow.splits = lines.map((l) => ({
+          id: l.splitId,
+          categoryId: newCategoryId,
+        }));
+      }
+
+      before.push(beforeRow);
+      after.push(afterRow);
+    }
+
+    return { before, after };
   }
 
   /**
@@ -731,6 +1017,58 @@ export class TransactionBulkUpdateService {
         );
       }
     }
+
+    if (filters.amountFrom !== undefined) {
+      queryBuilder.andWhere("transaction.amount >= :amountFrom", {
+        amountFrom: filters.amountFrom,
+      });
+    }
+
+    if (filters.amountTo !== undefined) {
+      queryBuilder.andWhere("transaction.amount <= :amountTo", {
+        amountTo: filters.amountTo,
+      });
+    }
+
+    if (filters.tagIds && filters.tagIds.length > 0) {
+      // Split-aware, mirroring findAll: a tag on the parent or on any split
+      // line matches. A dedicated splits alias avoids depending on the joins
+      // the category/search branches may or may not have added.
+      queryBuilder.leftJoin("transaction.tags", "filterTags");
+      queryBuilder.leftJoin("transaction.splits", "tagSplits");
+      queryBuilder.leftJoin("tagSplits.tags", "filterSplitTags");
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where("filterTags.id IN (:...filterTagIds)", {
+            filterTagIds: filters.tagIds,
+          }).orWhere("filterSplitTags.id IN (:...filterTagIds)", {
+            filterTagIds: filters.tagIds,
+          });
+        }),
+      );
+    }
+  }
+
+  /**
+   * The real (non-pseudo) category ids of a filter, descendant-expanded.
+   * Written once so the selection predicate (applyCategoryFilters) and the
+   * split-line recategorization restriction (resolveCategoryRestriction)
+   * cannot drift apart. Returns [] when the filter holds only pseudo-ids.
+   */
+  private async expandRealCategoryIds(
+    m: EntityManager,
+    userId: string,
+    categoryIds: string[],
+  ): Promise<string[]> {
+    const regularCategoryIds = categoryIds.filter(
+      (id) => id !== "uncategorized" && id !== "transfer",
+    );
+    if (regularCategoryIds.length === 0) return [];
+    return getAllCategoryIdsWithChildren(
+      m.getRepository(Category),
+      userId,
+      regularCategoryIds,
+    );
   }
 
   private async applyCategoryFilters(
@@ -741,25 +1079,21 @@ export class TransactionBulkUpdateService {
   ): Promise<void> {
     const hasUncategorized = categoryIds.includes("uncategorized");
     const hasTransfer = categoryIds.includes("transfer");
-    const regularCategoryIds = categoryIds.filter(
-      (id) => id !== "uncategorized" && id !== "transfer",
-    );
 
     let hasCondition = false;
 
-    if (hasUncategorized || hasTransfer || regularCategoryIds.length > 0) {
+    // Expansion always contains its seed ids, so a non-empty real-id filter
+    // yields a non-empty expansion and the outer condition is unchanged.
+    const uniqueCategoryIds = await this.expandRealCategoryIds(
+      m,
+      userId,
+      categoryIds,
+    );
+
+    if (hasUncategorized || hasTransfer || uniqueCategoryIds.length > 0) {
       if (hasUncategorized) {
         queryBuilder.leftJoin("transaction.account", "filterAccount");
       }
-
-      const uniqueCategoryIds =
-        regularCategoryIds.length > 0
-          ? await getAllCategoryIdsWithChildren(
-              m.getRepository(Category),
-              userId,
-              regularCategoryIds,
-            )
-          : [];
 
       if (uniqueCategoryIds.length > 0) {
         queryBuilder.leftJoin("transaction.splits", "filterSplits");

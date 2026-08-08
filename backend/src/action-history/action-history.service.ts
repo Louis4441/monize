@@ -1194,6 +1194,24 @@ export class ActionHistoryService {
         }
       }
 
+      // Restore split-line categories if captured (bulk recategorization).
+      // transaction_splits has no user_id, so the write is scoped through its
+      // parent transaction (invariant I3, docs/future-plans/split-bulk-update.md).
+      if (Array.isArray(txData.splits)) {
+        for (const split of txData.splits) {
+          await manager.query(
+            `UPDATE transaction_splits SET category_id = $1
+              WHERE id = $2
+                AND EXISTS (
+                  SELECT 1 FROM transactions t
+                   WHERE t.id = transaction_splits.transaction_id
+                     AND t.user_id = $3
+                )`,
+            [split.categoryId ?? null, split.id, action.userId],
+          );
+        }
+      }
+
       accountIds.add(txData.accountId);
     }
 

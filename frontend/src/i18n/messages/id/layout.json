@@ -109,6 +109,7 @@
       "createdTransaction": "Transaksi {payee} {amount} dibuat",
       "updatedTransaction": "Transaksi {payee} {amount} diperbarui",
       "deletedTransaction": "Transaksi {payee} {amount} dihapus",
+      "bulkUpdatedTransactions": "{count, plural, one {# transaksi} other {# transaksi}} diperbarui secara massal",
       "createdTransfer": "Transfer {amount} dari {from} ke {to} dibuat",
       "createdInvestmentTransaction": "Transaksi {action} dibuat",
       "updatedInvestmentTransaction": "Transaksi {action} diperbarui",

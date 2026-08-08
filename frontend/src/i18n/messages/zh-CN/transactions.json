@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "转账交易的关联对应项也将被更新。",
-        "split": "拆分交易将跳过分类更改。"
+        "split": "拆分交易：新分类将应用于其拆分项（分类筛选启用时，仅应用于与筛选匹配的拆分项）。转账和投资拆分项保持不变。"
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {已更新 # 笔交易} other {已更新 # 笔交易}}",
+      "skipped": "{count, plural, one {已跳过 # 笔交易} other {已跳过 # 笔交易}}",
+      "splitLines": "{count, plural, one {已重新分类 # 个拆分项} other {已重新分类 # 个拆分项}}"
     }
   },
   "form": {

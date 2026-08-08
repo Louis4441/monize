@@ -109,6 +109,7 @@
       "createdTransaction": "Buchung {payee} {amount} erstellt",
       "updatedTransaction": "Buchung {payee} {amount} aktualisiert",
       "deletedTransaction": "Buchung {payee} {amount} gelöscht",
+      "bulkUpdatedTransactions": "{count, plural, one {# Buchung} other {# Buchungen}} massenweise aktualisiert",
       "createdTransfer": "Überweisung {amount} von {from} nach {to} erstellt",
       "createdInvestmentTransaction": "{action}-Transaktion erstellt",
       "updatedInvestmentTransaction": "{action}-Transaktion aktualisiert",

@@ -387,6 +387,23 @@ describe("FINANCIAL_TOOLS", () => {
     });
   });
 
+  describe("manage_transactions", () => {
+    it("documents the existing-split update contract in the description", () => {
+      const tool = FINANCIAL_TOOLS.find(
+        (t) => t.name === "manage_transactions",
+      )!;
+      // Parent fields work without splits; category/amount changes require
+      // resending the complete set; read tools expose one row per line.
+      expect(tool.description).toContain("EXISTING split transaction");
+      expect(tool.description).toContain("COMPLETE splits array");
+      expect(tool.description).toContain("splitId");
+      // The one-at-a-time batch rule stays.
+      expect(tool.description).toContain(
+        "Send split transactions one at a time",
+      );
+    });
+  });
+
   describe("manage_investment_transactions", () => {
     it("requires operation and items", () => {
       const tool = FINANCIAL_TOOLS.find(

@@ -223,7 +223,7 @@ describe("AiActionsService", () => {
     expect(result).toEqual({ type: "create_transaction", id: "tx-new" });
   });
 
-  it("replaces the split set on an update_transaction with splits", async () => {
+  it("replaces the split set inside the update DTO, in one update() call", async () => {
     const descriptor: AiActionDescriptor = {
       type: "update_transaction",
       userId: USER,
@@ -246,12 +246,66 @@ describe("AiActionsService", () => {
     };
     const result = await service.confirm(USER, dtoFor(descriptor));
 
-    expect(transactions.update).toHaveBeenCalled();
-    expect(transactions.updateSplits).toHaveBeenCalledWith(USER, TX, [
-      { categoryId: CAT, amount: -8, memo: undefined },
-      { categoryId: PAYEE, amount: -4.5, memo: undefined },
-    ]);
+    // The splits ride inside the same DTO so update() rebuilds the set in the
+    // same transaction under the same row lock as the scalar fields; a
+    // follow-up updateSplits call would commit separately and a failure
+    // between the two would strand the parent amount against the old lines.
+    expect(transactions.update).toHaveBeenCalledWith(
+      USER,
+      TX,
+      expect.objectContaining({
+        splits: [
+          { categoryId: CAT, amount: -8, memo: undefined },
+          { categoryId: PAYEE, amount: -4.5, memo: undefined },
+        ],
+      }),
+      { createPayeeIfMissing: false },
+    );
+    expect(transactions.updateSplits).not.toHaveBeenCalled();
     expect(result).toEqual({ type: "update_transaction", id: TX });
+  });
+
+  it("confirms an amount change on an existing split with the new amount and splits in one DTO", async () => {
+    const descriptor: AiActionDescriptor = {
+      type: "update_transaction",
+      userId: USER,
+      actionId: "act-update-split-amount",
+      expiresAt: Date.now() + 60_000,
+      transactionId: TX,
+      accountId: ACC,
+      amount: -50,
+      transactionDate: "2026-01-15",
+      payeeId: null,
+      payeeName: null,
+      createPayee: false,
+      categoryId: null,
+      description: null,
+      currencyCode: "USD",
+      splits: [
+        { categoryId: CAT, amount: -30, memo: null },
+        { categoryId: PAYEE, amount: -20, memo: null },
+      ],
+    };
+    await service.confirm(USER, dtoFor(descriptor));
+
+    expect(transactions.update).toHaveBeenCalledWith(
+      USER,
+      TX,
+      expect.objectContaining({
+        amount: -50,
+        // The parent keeps no single category when the set is replaced.
+        splits: [
+          { categoryId: CAT, amount: -30, memo: undefined },
+          { categoryId: PAYEE, amount: -20, memo: undefined },
+        ],
+      }),
+      { createPayeeIfMissing: false },
+    );
+    const dto = transactions.update.mock.calls[0][2] as {
+      categoryId?: string;
+    };
+    expect(dto.categoryId).toBeUndefined();
+    expect(transactions.updateSplits).not.toHaveBeenCalled();
   });
 
   describe("attachments on create/update", () => {
@@ -1189,6 +1243,42 @@ describe("AiActionsService", () => {
       const result = await service.confirm(USER, dtoFor(descriptor));
       expect(transactions.update).toHaveBeenCalled();
       expect(result).toMatchObject({ type: "batch_actions", count: 1 });
+    });
+
+    it("keeps categoryId out of the DTO for a split parent's batch row (I1 pin)", async () => {
+      // A split parent's batch row carries categoryId null (its categories
+      // live on the split lines); the executed DTO must not set a category on
+      // the parent, and batch rows never carry splits.
+      const descriptor: import("./ai-action.types").BatchActionsDescriptor = {
+        type: "batch_actions",
+        userId: USER,
+        actionId: "act-batch-upd-split",
+        expiresAt: Date.now() + 60_000,
+        operation: "update",
+        rows: [
+          {
+            transactionId: TX,
+            accountId: ACC,
+            amount: -100,
+            transactionDate: "2026-01-15",
+            payeeId: null,
+            payeeName: "New Payee",
+            createPayee: false,
+            categoryId: null,
+            description: null,
+            currencyCode: "USD",
+          },
+        ],
+      };
+      await service.confirm(USER, dtoFor(descriptor));
+      expect(transactions.update).toHaveBeenCalledTimes(1);
+      const dto = transactions.update.mock.calls[0][2] as {
+        categoryId?: string;
+        splits?: unknown;
+      };
+      expect(dto.categoryId).toBeUndefined();
+      expect(dto.splits).toBeUndefined();
+      expect(transactions.updateSplits).not.toHaveBeenCalled();
     });
 
     it("executes batch_actions(create) for each row", async () => {

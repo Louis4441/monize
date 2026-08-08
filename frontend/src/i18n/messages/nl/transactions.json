@@ -322,8 +322,13 @@
       },
       "notes": {
         "transfer": "Overboekingstransacties worden samen met hun gekoppelde partij bijgewerkt.",
-        "split": "Gesplitste transacties worden overgeslagen bij categoriewijzigingen."
+        "split": "Gesplitste transacties: de nieuwe categorie wordt toegepast op hun splitsingen (alleen splitsingen die overeenkomen met je categoriefilter wanneer er een actief is). Overboekings- en beleggingssplitsingen blijven ongewijzigd."
       }
+    },
+    "toasts": {
+      "updated": "{count, plural, one {# transactie bijgewerkt} other {# transacties bijgewerkt}}",
+      "skipped": "{count, plural, one {# transactie overgeslagen} other {# transacties overgeslagen}}",
+      "splitLines": "{count, plural, one {# splitsing opnieuw gecategoriseerd} other {# splitsingen opnieuw gecategoriseerd}}"
     }
   },
   "form": {
