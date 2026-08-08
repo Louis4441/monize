@@ -496,6 +496,20 @@ describe("BackupService", () => {
       "created_at",
     ],
     attachment_blobs: ["attachment_id", "data"],
+    ai_provider_configs: [
+      "id",
+      "user_id",
+      "provider",
+      "display_name",
+      "is_active",
+      "priority",
+      "model",
+      "api_key_enc",
+      "base_url",
+      "config",
+      "created_at",
+      "updated_at",
+    ],
   };
 
   function mockQueryHandler(sql: string, params?: unknown[]) {
@@ -624,8 +638,24 @@ describe("BackupService", () => {
           useValue: {
             isConfigured: jest.fn().mockReturnValue(true),
             encrypt: jest.fn((s: string) => `enc:${s}`),
-            decrypt: jest.fn((s: string) =>
-              s.startsWith("enc:") ? s.slice(4) : s,
+            // Throws on anything this instance did not encrypt, because the
+            // real one does: AES-GCM authenticates, so a wrong key raises
+            // rather than returning plausible bytes. A passthrough here made
+            // "ciphertext from another instance" indistinguishable from
+            // plaintext, which is the exact case the export has to get right.
+            decrypt: jest.fn((s: string) => {
+              if (!s.startsWith("enc:")) {
+                throw new Error(
+                  "Unsupported state or unable to authenticate data",
+                );
+              }
+              return s.slice(4);
+            }),
+            // Mirrors the real service's answer: a ciphertext this instance
+            // produced reads back, anything else does not. A blanket `true`
+            // would make the restore's undecryptable-key report untestable.
+            canDecrypt: jest.fn(
+              (s: unknown) => typeof s === "string" && s.startsWith("enc:"),
             ),
           },
         },
@@ -1303,6 +1333,83 @@ describe("BackupService", () => {
     });
   });
 
+  /**
+   * `AI_ENCRYPTION_KEY` is server configuration and never travels in a backup,
+   * so exporting `api_key_enc` verbatim produced a row that restores onto any
+   * other instance populated and unreadable. The key is therefore decrypted on
+   * the way out and re-encrypted on the way in. The cost is that the artifact
+   * holds the key in plaintext, which is why these tests assert what is in the
+   * file rather than only that a round trip works.
+   */
+  describe("AI provider keys in the artifact", () => {
+    const CONFIG_ROW = {
+      id: "cfg-1",
+      user_id: userId,
+      provider: "anthropic",
+      priority: 0,
+      api_key_enc: "enc:sk-ant-live",
+    };
+
+    function providerRowsInExport(row: Record<string, unknown>) {
+      mockDataSource.query.mockImplementation(
+        (sql: string, params?: unknown[]) => {
+          if (String(sql).includes("FROM ai_provider_configs")) {
+            return Promise.resolve([row]);
+          }
+          return mockQueryHandler(sql, params);
+        },
+      );
+    }
+
+    it("writes the key decrypted, and leaves no ciphertext beside it", async () => {
+      providerRowsInExport(CONFIG_ROW);
+
+      const { buffer } = await service.exportToBuffer(userId);
+      const artifact = JSON.parse(gunzipSync(buffer).toString("utf-8"));
+
+      expect(artifact.ai_provider_configs).toEqual([
+        {
+          ...CONFIG_ROW,
+          // Nulled: two representations of one secret is one more than the
+          // restore can be asked to choose between, and the stale one would be
+          // unreadable on the target anyway.
+          api_key_enc: null,
+          api_key_plaintext: "sk-ant-live",
+        },
+      ]);
+    });
+
+    it("carries a key it cannot decrypt as-is rather than dropping it", async () => {
+      // Already restored from elsewhere, or encrypted before the variable was
+      // rotated. Blanking it would destroy the one thing that still works: a
+      // restore back onto the instance that produced it.
+      providerRowsInExport({
+        ...CONFIG_ROW,
+        api_key_enc: "foreign-instance-ciphertext",
+      });
+
+      const { buffer } = await service.exportToBuffer(userId);
+      const artifact = JSON.parse(gunzipSync(buffer).toString("utf-8"));
+
+      expect(artifact.ai_provider_configs).toEqual([
+        { ...CONFIG_ROW, api_key_enc: "foreign-instance-ciphertext" },
+      ]);
+    });
+
+    it("applies the same transform to the raw export the support backup reads", async () => {
+      // The two paths must not describe the same table differently. (The support
+      // backup then discards this table entirely -- support-backup-rules.ts --
+      // which is what keeps plaintext keys out of a de-identified artifact.)
+      providerRowsInExport(CONFIG_ROW);
+
+      const raw = await service.collectRawExport(userId);
+
+      expect(raw.tables.ai_provider_configs).toEqual([
+        { ...CONFIG_ROW, api_key_enc: null, api_key_plaintext: "sk-ant-live" },
+      ]);
+    });
+  });
+
   describe("streamExport", () => {
     async function collectGzipOutput(
       mockRes: PassThrough,
@@ -1849,6 +1956,150 @@ describe("BackupService", () => {
         const { res, chunks } = responseDouble();
         await service.streamExport(userId, res, "secret");
         expect(Buffer.concat(chunks).length).toBeGreaterThan(1024);
+      });
+    });
+
+    /**
+     * A backup carries `ai_provider_configs.api_key_enc`; it does not carry
+     * `AI_ENCRYPTION_KEY`, and must not. So a restore onto another instance --
+     * or onto the same one after that variable was rotated -- writes rows whose
+     * key column is populated and unreadable. Every "is a key configured?" check
+     * then says yes, the provider row shows a mask, and the only symptom is that
+     * AI calls fail.
+     *
+     * The restore has to say so, and the count has to stay out of `restored`,
+     * whose values the client sums into a row total: these rows *were* written.
+     */
+    describe("AI provider keys arriving from another instance", () => {
+      const PROVIDER_ID = "33333333-3333-4333-8333-333333333333";
+
+      function backupWithProviderRow(row: Record<string, unknown>) {
+        return {
+          ...validBackupData,
+          ai_provider_configs: [
+            {
+              id: PROVIDER_ID,
+              user_id: userId,
+              provider: "anthropic",
+              priority: 0,
+              ...row,
+            },
+          ],
+        };
+      }
+
+      /** What the INSERT actually wrote into `api_key_enc`. */
+      function insertedApiKey(): unknown {
+        const call = mockQueryRunner.query.mock.calls.find(([sql]) =>
+          String(sql).includes('INSERT INTO "ai_provider_configs"'),
+        );
+        const [sql, params] = call as [string, unknown[]];
+        const columns = /\(([^)]*)\) VALUES/.exec(sql)?.[1] ?? "";
+        const index = columns
+          .split(",")
+          .map((c) => c.trim().replace(/"/g, ""))
+          .indexOf("api_key_enc");
+        return index === -1 ? undefined : params[index];
+      }
+
+      beforeEach(() => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      });
+
+      it("re-encrypts a plaintext key under this instance's key", async () => {
+        // The point of the whole transport: a key configured on the instance
+        // that made the backup is usable here without the user re-entering it.
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: backupWithProviderRow({
+              api_key_enc: null,
+              api_key_plaintext: "sk-ant-live",
+            }),
+          }),
+        );
+
+        expect(insertedApiKey()).toBe("enc:sk-ant-live");
+        expect(result.restored.aiProviderConfigs).toBe(1);
+        // Omitted rather than zero, so "no field" and "nothing wrong" agree.
+        expect(result.unusableAiProviderKeys).toBeUndefined();
+      });
+
+      it("never lets the plaintext reach the insert", async () => {
+        await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: backupWithProviderRow({
+              api_key_enc: null,
+              api_key_plaintext: "sk-ant-live",
+            }),
+          }),
+        );
+
+        // The generic insert strips unknown columns anyway; this asserts the
+        // restore does not *rely* on that stripping to keep a bare secret out of
+        // the database, which would break the day someone adds the column.
+        const insertParams = mockQueryRunner.query.mock.calls
+          .filter(([sql]) =>
+            String(sql).includes('INSERT INTO "ai_provider_configs"'),
+          )
+          .flatMap(([, params]) => (params as unknown[]) ?? []);
+        expect(insertParams).not.toContain("sk-ant-live");
+      });
+
+      it("restores an older artifact's ciphertext and reports it", async () => {
+        // Written before keys travelled decrypted. It only works on the instance
+        // that produced it; here the column is populated and unreadable, which
+        // is the failure this field exists to stop being silent.
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: backupWithProviderRow({
+              api_key_enc: "foreign-instance-ciphertext",
+            }),
+          }),
+        );
+
+        expect(insertedApiKey()).toBe("foreign-instance-ciphertext");
+        expect(result.unusableAiProviderKeys).toBe(1);
+        // The row is still restored -- the provider, model, costs and priority
+        // all came back. Only the key inside it is unreadable.
+        expect(result.restored.aiProviderConfigs).toBe(1);
+        // And the count stays out of the total the client adds up.
+        expect(
+          Object.keys(result.restored).includes("unusableAiProviderKeys"),
+        ).toBe(false);
+      });
+
+      it("says nothing about an older artifact this instance can still read", async () => {
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: backupWithProviderRow({ api_key_enc: "enc:sk-ant-live" }),
+          }),
+        );
+
+        expect(result.unusableAiProviderKeys).toBeUndefined();
+      });
+
+      it("does not count a provider that stores no key at all", async () => {
+        // Ollama and the MCP relay have no credential. Nothing was lost, so
+        // nothing is reported -- counting them would send the user hunting for
+        // a key that never existed.
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: backupWithProviderRow({ api_key_enc: null }),
+          }),
+        );
+
+        expect(result.unusableAiProviderKeys).toBeUndefined();
       });
     });
 

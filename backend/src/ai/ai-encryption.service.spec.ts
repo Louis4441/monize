@@ -102,6 +102,59 @@ describe("AiEncryptionService", () => {
     });
   });
 
+  describe("canDecrypt()", () => {
+    /** A service holding a different master key, as another instance would. */
+    async function serviceWithKey(key: string): Promise<AiEncryptionService> {
+      const module = await Test.createTestingModule({
+        providers: [
+          AiEncryptionService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest
+                .fn()
+                .mockImplementation((name: string, fallback?: string) =>
+                  name === "AI_ENCRYPTION_KEY" ? key : fallback,
+                ),
+            },
+          },
+        ],
+      }).compile();
+      return module.get<AiEncryptionService>(AiEncryptionService);
+    }
+
+    it("reads back what it encrypted", () => {
+      expect(service.canDecrypt(service.encrypt("sk-ant-live"))).toBe(true);
+    });
+
+    it("refuses a ciphertext produced under a different key", async () => {
+      // This is the restore case: the row travels in the backup, the master key
+      // does not. Without the AES-GCM auth tag this would return plausible
+      // garbage instead of failing, and nothing downstream could tell.
+      const other = await serviceWithKey("b".repeat(32));
+      expect(service.canDecrypt(other.encrypt("sk-ant-live"))).toBe(false);
+    });
+
+    it("refuses a value that is not a ciphertext at all", () => {
+      expect(service.canDecrypt("plain-text-key")).toBe(false);
+    });
+
+    it("distinguishes no key from an unreadable one", () => {
+      // Both are falsy answers here, but they are different facts, and the
+      // caller separates them by testing the column first -- so this asserts the
+      // contract "empty in, false out" rather than letting an empty string throw.
+      expect(service.canDecrypt(null)).toBe(false);
+      expect(service.canDecrypt(undefined)).toBe(false);
+      expect(service.canDecrypt("")).toBe(false);
+    });
+
+    it("returns false rather than throwing when no key is configured", async () => {
+      const unconfigured = await serviceWithKey("");
+      const ciphertext = service.encrypt("sk-ant-live");
+      expect(unconfigured.canDecrypt(ciphertext)).toBe(false);
+    });
+  });
+
   describe("maskApiKey()", () => {
     it("returns null for null input", () => {
       expect(service.maskApiKey(null)).toBeNull();

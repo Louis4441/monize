@@ -262,6 +262,7 @@ export function DangerZoneSection({ user }: DangerZoneSectionProps) {
                 <>
                   <Input
                     type="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={t('deleteData.passwordPlaceholder')}
@@ -333,6 +334,7 @@ export function DangerZoneSection({ user }: DangerZoneSectionProps) {
                 </p>
                 <Input
                   type="password"
+                  autoComplete="current-password"
                   value={deleteAccountPassword}
                   onChange={(e) => setDeleteAccountPassword(e.target.value)}
                   placeholder={t('deleteAccount.enterPasswordPlaceholder')}

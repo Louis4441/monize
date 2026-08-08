@@ -180,6 +180,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
           <Input
             label={t('currentPasswordLabel')}
             type="password"
+            autoComplete="current-password"
             {...register('currentPassword')}
             error={errors.currentPassword?.message}
             placeholder={t('currentPasswordPlaceholder')}
@@ -188,6 +189,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
             <Input
               label={t('newPasswordLabel')}
               type="password"
+              autoComplete="new-password"
               {...register('newPassword')}
               error={errors.newPassword?.message}
               placeholder={t('newPasswordPlaceholder')}
@@ -201,6 +203,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
           <Input
             label={t('confirmPasswordLabel')}
             type="password"
+            autoComplete="new-password"
             {...register('confirmPassword')}
             error={errors.confirmPassword?.message}
             placeholder={t('confirmPasswordPlaceholder')}

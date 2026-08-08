@@ -81,6 +81,7 @@
     "providerConfigNotFound": "[XX-AI provider configuration not found-XX]",
     "maxProvidersExceeded": "[XX-Maximum of {{ maxProvidersPerUser }} AI provider configurations per user-XX]",
     "encryptionKeyNotConfigured": "[XX-AI_ENCRYPTION_KEY is not configured. Cannot store API keys securely.-XX]",
+    "apiKeyUndecryptable": "[XX-The stored API key cannot be read by this server. This happens when a backup is restored onto a different instance, or after AI_ENCRYPTION_KEY changes. Enter the API key again to fix it.-XX]",
     "noActiveProviders": "[XX-No active AI providers configured. Please configure a provider in AI Settings.-XX]",
     "allProvidersFailed": "[XX-All AI providers failed. Please check your provider configuration and try again.-XX]",
     "noToolUseProvider": "[XX-No AI provider with tool use support configured. Natural language queries require Anthropic, OpenAI, or Ollama. Please configure one in AI Settings.-XX]",

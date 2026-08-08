@@ -197,6 +197,23 @@ worked examples.
 from the content being cut. Never use it on a vertical list: hiding a bar you need
 is worse than a plain one.
 
+### A password field declares what may be autofilled into it
+
+Every `<Input type="password">` carries an `autoComplete`, and which value is a
+judgement about the field: `current-password` when it really is this account's
+password (a re-auth prompt, a confirm-before-delete box), `new-password` when one
+is being set here, `off` when it is not a credential of this site at all.
+
+Omitting it is not neutral. A browser or password manager fills a bare password
+box with the saved credential for the origin, and the form then submits it as
+though the user typed it -- so the AI provider's API key field, whose edit form
+sends `apiKey` whenever the box is non-empty, silently replaced the stored
+provider key on the next save: "Saved" on screen, provider dead, and no way to
+tell from the UI because the row shows `****` either way. The backup export
+password is the same shape and worse, since the artifact is then encrypted under
+a password nobody knows. `ui-conventions.test.ts` fails the build on a password
+input with no `autoComplete`, and on a value outside those three.
+
 ### A view that graduates to its own page -- delete the modal, do not flag it
 
 Remove the modal mode instead of keeping it behind a prop: an `onClose?` nobody

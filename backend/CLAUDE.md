@@ -313,6 +313,23 @@ every write. Do not reorder it forward to match section 3's list, and do not
 reorder it backward past a `DELETE FROM`. Section 5 of the contract has the
 reasoning, and `backup.service.spec.ts` pins both edges.
 
+**A value encrypted with server configuration cannot travel in a document.**
+`ai_provider_configs.api_key_enc` is ciphertext under `AI_ENCRYPTION_KEY`, and
+that variable is not in the backup and must not be -- shipping the master key
+beside the ciphertext would make encrypting the column pointless. Exported
+verbatim it restored onto any other instance *populated and unreadable*, which is
+the worst shape a failure can have: the column is non-null, so every "is a key
+configured?" check said yes, the row drew a masked key, and the only symptom was
+that AI calls failed. So the key is decrypted on the way out and re-encrypted on
+the way in (`ai-provider-key-transport.ts`), and both directions live in one file
+because the field name and the fallbacks are one contract -- an export writing a
+field the restore does not read loses the secret silently. The cost is that the
+artifact holds the credential in plaintext, which is stated in
+`docs/backup-restore-contract.md` §1, logged by the export, and the reason the
+support backup drops the table outright. Anything else stored under server-side
+configuration and put in a user-facing document has the same problem; solve it
+the same way, or exclude it.
+
 ### `BackupService` is a facade; put new code in the component that owns it
 
 Issue #1092 split the 2,600-line original into `BackupExportService`,

@@ -111,6 +111,105 @@ describe('numeric entry goes through NumericInput or CurrencyInput', () => {
   });
 });
 
+describe('every password field says what may be autofilled into it', () => {
+  /**
+   * A `type="password"` box with no `autoComplete` is an open invitation to the
+   * browser's saved credential for this origin, and the field is not always
+   * asking for that credential. The AI provider's API key is the case that bit:
+   * the edit form sends `apiKey` whenever the box is non-empty, so a manager
+   * filling it silently replaced the stored provider key on the next save -- the
+   * user sees "saved" and the provider stops working. The backup export password
+   * is the same shape and worse, because the artifact is then encrypted under a
+   * password nobody knows.
+   *
+   * So every password input declares its intent. Three answers, and which one is
+   * right is a judgement about the field, not something a scan can decide:
+   *
+   *   - `current-password` -- it really is this account's password (a re-auth
+   *     prompt, the confirm-before-delete box). Autofill is correct and helpful.
+   *   - `new-password`     -- a password being set or changed here.
+   *   - `off`              -- not a credential of this site at all: an API key,
+   *     a backup artifact's password.
+   *
+   * The scan only insists that the decision was made and written down.
+   */
+  const PASSWORD_TYPE = /type=["']password["']/g;
+
+  /** Values that answer the question. Anything else is a typo or a guess. */
+  const DECLARED = new Set(['off', 'new-password', 'current-password']);
+
+  /**
+   * The source of the JSX element an attribute at `index` belongs to.
+   *
+   * Walks back to the element's `<` and forward to the `>` that closes its
+   * opening tag, skipping any `>` inside a `{...}` expression (an arrow function
+   * in an `onKeyDown` handler is the common one, and `owningTag` above stops at
+   * the tag name so it cannot be reused here). Returns null when the tag cannot
+   * be delimited, which the paired test below proves does not happen silently.
+   */
+  function owningElement(content: string, index: number): string | null {
+    const open = content.lastIndexOf('<', index);
+    if (open === -1) return null;
+    let depth = 0;
+    for (let i = open; i < content.length; i += 1) {
+      const ch = content[i];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') depth -= 1;
+      else if (ch === '>' && depth === 0) return content.slice(open, i + 1);
+    }
+    return null;
+  }
+
+  const passwordElements = (): { path: string; element: string }[] => {
+    const found: { path: string; element: string }[] = [];
+    for (const [path, content] of productionSources()) {
+      for (const match of content.matchAll(PASSWORD_TYPE)) {
+        const element = owningElement(content, match.index);
+        found.push({ path, element: element ?? '' });
+      }
+    }
+    return found;
+  };
+
+  it('declares an autoComplete on every password input', () => {
+    const offenders = passwordElements()
+      .filter(({ element }) => !/\bautoComplete\s*=/.test(element))
+      .map(({ path }) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('uses only the three values that answer the question', () => {
+    const offenders: string[] = [];
+    for (const { path, element } of passwordElements()) {
+      const value = /\bautoComplete\s*=\s*["']([^"']*)["']/.exec(element)?.[1];
+      if (value !== undefined && !DECLARED.has(value)) {
+        offenders.push(`${path}: autoComplete="${value}"`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('finds the password fields, so the rule cannot pass over an empty set', () => {
+    // Were the shared `Input` to stop taking `type="password"`, or were the
+    // regex to rot, both checks above would trivially pass. The app has a
+    // login, a change-password form and a re-auth modal at minimum.
+    expect(passwordElements().length).toBeGreaterThan(5);
+    expect(passwordElements().every(({ element }) => element !== '')).toBe(true);
+  });
+
+  it('delimits an element whose props contain a `>` inside an expression', () => {
+    // The restore and export boxes both carry an `onKeyDown` arrow function, so
+    // a naive "first `>` after the `<`" would cut the element short and report a
+    // false offender. Assert the walker handles it.
+    const sample =
+      '<Input type="password" onKeyDown={(e) => run(e)} autoComplete="off" />';
+    const element = owningElement(sample, sample.indexOf('type='));
+    expect(element).toBe(sample);
+    expect(/\bautoComplete\s*=/.test(element ?? '')).toBe(true);
+  });
+});
+
 describe("a scrollbar you need is not hidden", () => {
   /**
    * `scrollbar-hide` is for a horizontal strip of chips, where the content being

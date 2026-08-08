@@ -111,8 +111,11 @@ export async function* exportJsonChunks(
   for (const entry of tables) {
     yield* emit(`,"${entry.key}":[`, entry.key);
     let written = 0;
+    // The transform runs here, one row at a time, so a rewritten table costs the
+    // same resident bytes as an untouched one.
     const separated = (row: Record<string, unknown>): string =>
-      (written === 0 ? "" : ",") + JSON.stringify(row);
+      (written === 0 ? "" : ",") +
+      JSON.stringify(entry.transformRow ? entry.transformRow(row) : row);
 
     for await (const batch of reader.rows(
       entry.sql,
@@ -173,7 +176,12 @@ export async function collectExportTables(
         batches.push([row]);
       }
     }
-    collected[entry.key] = batches.flat();
+    const rows = batches.flat();
+    // Same transform as the streamed path, or the support backup and the
+    // download would describe different data for the same table.
+    collected[entry.key] = entry.transformRow
+      ? rows.map(entry.transformRow)
+      : rows;
   }
   return collected;
 }

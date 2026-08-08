@@ -47,6 +47,18 @@ export interface ExportTableQuery {
   sql: string;
   batchRows?: number;
   trailingRows?: ExportRowSource;
+  /**
+   * Rewrites one row on its way into the document, row at a time so the memory
+   * ceiling is unchanged. There is exactly one: `ai_provider_configs` swaps its
+   * instance-key ciphertext for the plaintext key
+   * (`ai-provider-key-transport.ts`), because `AI_ENCRYPTION_KEY` is server
+   * configuration and never travels in the file.
+   *
+   * Applied by both `exportJsonChunks` and `collectExportTables`, so the
+   * streamed artifact and the support backup's in-memory map cannot disagree
+   * about what a backup contains.
+   */
+  transformRow?: (row: Record<string, unknown>) => Record<string, unknown>;
 }
 
 /**
@@ -84,6 +96,15 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
 
 export function buildExportTableQueries(
   externalAttachmentRows: ExportRowSource,
+  /**
+   * Supplied by `BackupExportService`, which owns the encryption service. Left
+   * optional so a spec exercising the SQL alone does not have to build one; the
+   * row then travels exactly as the database returned it, which is the
+   * pre-transport behaviour.
+   */
+  aiProviderKeyTransform?: (
+    row: Record<string, unknown>,
+  ) => Record<string, unknown>,
 ): ExportTableQuery[] {
   return [
     {
@@ -309,6 +330,12 @@ export function buildExportTableQueries(
     {
       key: "ai_provider_configs",
       sql: "SELECT * FROM ai_provider_configs WHERE user_id = $1",
+      // `api_key_enc` is ciphertext under this instance's AI_ENCRYPTION_KEY,
+      // which is not in the backup. Exported verbatim it restores onto another
+      // instance populated and unreadable, so the key is decrypted here and
+      // re-encrypted by the restore. See ai-provider-key-transport.ts for the
+      // contract, including what the artifact then contains in plaintext.
+      transformRow: aiProviderKeyTransform,
     },
     {
       key: "monte_carlo_scenarios",

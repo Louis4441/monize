@@ -576,6 +576,7 @@
       "description": "[XX-Your data has been restored successfully. Here is a summary of what was restored:-XX]",
       "totalRecords": "[XX-Total records-XX]",
       "skippedAttachments": "[XX-{count, plural, one {# attachment was not restored} other {# attachments were not restored}}: the backup did not carry usable bytes for them — they were missing or failed their checksum when it was exported, or the file predates self-contained backups. Export a fresh backup once attachment storage is healthy to capture them.-XX]",
+      "unusableAiProviderKeys": "[XX-{count, plural, one {# AI provider was restored without a usable API key} other {# AI providers were restored without usable API keys}}: the backup was written before provider keys travelled with it, so the stored key belongs to the instance that made the file, or this server has no encryption key configured to store one. Open Settings → AI Providers and enter the API key again.-XX]",
       "doneButton": "[XX-Done-XX]"
     }
   },

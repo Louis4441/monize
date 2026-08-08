@@ -306,6 +306,10 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
             <Input
               label={t('apiKeyLabel')}
               type="password"
+              // Not a credential of ours: a password manager offering the
+              // account password here silently overwrites the stored provider
+              // key on save, because a non-empty value is sent as `apiKey`.
+              autoComplete="off"
               {...register('apiKey')}
               error={errors.apiKey?.message}
               placeholder={editConfig?.apiKeyMasked || t('apiKeyPlaceholder')}

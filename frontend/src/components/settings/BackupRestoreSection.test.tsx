@@ -454,6 +454,50 @@ describe('BackupRestoreSection', () => {
       expect(screen.queryByText(/were not restored/)).not.toBeInTheDocument();
       expect(screen.queryByText(/was not restored/)).not.toBeInTheDocument();
     });
+
+    it('warns when a provider came back without a usable API key', async () => {
+      // The rows restored; the key inside them did not. Nothing else on the
+      // screen says so -- the provider list shows a masked key either way -- so
+      // a silent success leaves AI features failing for no visible reason.
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 4 },
+        unusableAiProviderKeys: 2,
+      });
+
+      expect(
+        screen.getByText(/2 AI providers were restored without usable API keys/),
+      ).toBeInTheDocument();
+      // Same rule as skipped attachments: the count is not part of the total.
+      expect(screen.getAllByText('4').length).toBeGreaterThan(0);
+      expect(screen.queryByText('6')).not.toBeInTheDocument();
+    });
+
+    it('uses the singular form for one provider', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+        unusableAiProviderKeys: 1,
+      });
+
+      expect(
+        screen.getByText(/1 AI provider was restored without a usable API key/),
+      ).toBeInTheDocument();
+    });
+
+    it('says nothing when every provider key came back', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+      });
+
+      expect(
+        screen.queryByText(/without a usable API key/),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/without usable API keys/),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('shows error toast on restore failure', async () => {
