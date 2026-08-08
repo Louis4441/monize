@@ -73,6 +73,7 @@
     "providerConfigNotFound": "Nie znaleziono konfiguracji dostawcy AI",
     "maxProvidersExceeded": "Maksymalnie {{ maxProvidersPerUser }} konfiguracji dostawców AI na użytkownika",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY nie jest skonfigurowany. Nie można bezpiecznie przechowywać kluczy API.",
+    "apiKeyUndecryptable": "Ten serwer nie może odczytać zapisanego klucza API. Dzieje się tak, gdy kopia zapasowa zostanie przywrócona na innej instancji albo po zmianie AI_ENCRYPTION_KEY. Wprowadź klucz API ponownie, aby to naprawić.",
     "noActiveProviders": "Nie skonfigurowano żadnych aktywnych dostawców AI. Skonfiguruj dostawcę w Ustawieniach AI.",
     "allProvidersFailed": "Wszyscy dostawcy AI zawiedli. Sprawdź konfigurację dostawcy i spróbuj ponownie.",
     "noToolUseProvider": "Nie skonfigurowano dostawcy AI z obsługą narzędzi. Zapytania w języku naturalnym wymagają Anthropic, OpenAI lub Ollama. Skonfiguruj jednego w Ustawieniach AI.",

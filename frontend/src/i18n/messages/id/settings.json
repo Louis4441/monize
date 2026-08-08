@@ -576,7 +576,8 @@
       "description": "Data Anda telah berhasil dipulihkan. Berikut ringkasan apa yang dipulihkan:",
       "totalRecords": "Total rekaman",
       "doneButton": "Selesai",
-      "skippedAttachments": "{count, plural, other {# lampiran tidak dipulihkan}}: backup tidak memuat byte yang dapat digunakan untuk lampiran tersebut — saat diekspor lampiran hilang atau gagal checksum, atau berkas dibuat sebelum backup mandiri. Ekspor backup baru setelah penyimpanan lampiran sehat."
+      "skippedAttachments": "{count, plural, other {# lampiran tidak dipulihkan}}: backup tidak memuat byte yang dapat digunakan untuk lampiran tersebut — saat diekspor lampiran hilang atau gagal checksum, atau berkas dibuat sebelum backup mandiri. Ekspor backup baru setelah penyimpanan lampiran sehat.",
+      "unusableAiProviderKeys": "{count, plural, other {# penyedia AI dipulihkan tanpa kunci API yang dapat digunakan}}: cadangan ini dibuat sebelum kunci penyedia ikut disertakan, jadi kunci yang tersimpan milik server yang membuat berkasnya, atau server ini tidak punya kunci enkripsi untuk menyimpannya. Buka Pengaturan → Penyedia AI lalu masukkan kembali kunci API."
     }
   },
   "sharedAccess": {

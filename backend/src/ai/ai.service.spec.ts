@@ -71,6 +71,7 @@ describe("AiService", () => {
     mockEncryptionService = {
       encrypt: jest.fn().mockReturnValue("encrypted-value"),
       decrypt: jest.fn().mockReturnValue("sk-decrypted-key"),
+      canDecrypt: jest.fn().mockReturnValue(true),
       isConfigured: jest.fn().mockReturnValue(true),
       maskApiKey: jest.fn().mockReturnValue("****dkey"),
     };
@@ -405,6 +406,40 @@ describe("AiService", () => {
       const result = await service.testConnection(userId, "config-1");
       expect(result.available).toBe(true);
       expect(result.modelAvailable).toBeUndefined();
+    });
+
+    it("names the undecryptable stored key instead of blaming the settings", async () => {
+      const config = makeConfig();
+      mockConfigRepository.findOne.mockResolvedValue(config);
+      mockEncryptionService.canDecrypt!.mockReturnValue(false);
+
+      const result = await service.testConnection(userId, "config-1");
+
+      // The generic branch below would say "Check your provider settings",
+      // which is wrong here: the settings are fine and the key is unreadable.
+      // This is what a backup restored onto another instance looks like.
+      expect(result.available).toBe(false);
+      expect(result.error).toMatch(/cannot be read by this server/);
+      expect(result.error).toMatch(/Enter the API key again/);
+      // And it must refuse before building a provider, or the factory's own
+      // decrypt throws first and the message is lost.
+      expect(mockProviderFactory.createProvider).not.toHaveBeenCalled();
+    });
+
+    it("does not run the decryptable check on a config that stores no key", async () => {
+      const config = makeConfig({ provider: "ollama", apiKeyEnc: null });
+      mockConfigRepository.findOne.mockResolvedValue(config);
+      mockProviderFactory.createProvider!.mockReturnValue({
+        isAvailable: jest.fn().mockResolvedValue(true),
+      });
+
+      const result = await service.testConnection(userId, "config-1");
+
+      // Ollama has no key by design. Asking whether the absent key decrypts
+      // would fail it for a reason that does not apply, and pay a scrypt
+      // derivation to do so.
+      expect(result.available).toBe(true);
+      expect(mockEncryptionService.canDecrypt).not.toHaveBeenCalled();
     });
   });
 

@@ -14,6 +14,7 @@ import {
 } from "../attachments/storage/attachment-storage.interface";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { emulatePgCursors } from "../test-helpers/pg-cursor-mock";
+import { AiEncryptionService } from "../ai/ai-encryption.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -105,6 +106,21 @@ describe("export streaming", () => {
         BackupExportService,
         { provide: DataSource, useValue: scoped.dataSource },
         { provide: ATTACHMENT_STORAGE_PROVIDER, useValue: storage },
+        {
+          // The export decrypts AI provider keys so they can be re-encrypted on
+          // the way back in (ai-provider-key-transport.ts). These tests are
+          // about ordering and memory, so the double just has to be present and
+          // behave consistently.
+          provide: AiEncryptionService,
+          useValue: {
+            isConfigured: () => true,
+            encrypt: (s: string) => `enc:${s}`,
+            decrypt: (s: string) => {
+              if (!s.startsWith("enc:")) throw new Error("wrong key");
+              return s.slice(4);
+            },
+          },
+        },
       ],
     }).compile();
     service = module.get(BackupExportService);

@@ -29,6 +29,8 @@ import {
   ExportTableQuery,
   INTENTIONALLY_EXCLUDED_TABLES,
 } from "./export-table-queries";
+import { AiEncryptionService } from "../ai/ai-encryption.service";
+import { exportAiProviderKey } from "./ai-provider-key-transport";
 import { tr } from "../i18n/translate";
 
 /**
@@ -69,6 +71,7 @@ export class BackupExportService {
     private readonly dataSource: DataSource,
     @Inject(ATTACHMENT_STORAGE_PROVIDER)
     private readonly attachmentStorage: AttachmentStorageProvider,
+    private readonly aiEncryption: AiEncryptionService,
   ) {}
 
   /** Ceiling on the artifact a buffered export may accumulate. */
@@ -88,6 +91,45 @@ export class BackupExportService {
    * support export, which assembles in memory and reports no completeness) each
    * object is verified as it is read, which is what the export always did.
    */
+  /**
+   * Swaps each AI provider row's instance-key ciphertext for the plaintext key,
+   * so the artifact is self-contained the way the rest of the file already is
+   * (`ai-provider-key-transport.ts`).
+   *
+   * The warning is not decoration. This puts third-party credentials in the
+   * document, and whether that document is protected is decided elsewhere -- an
+   * OIDC account with no backup password downloads plaintext, and an unencrypted
+   * automatic backup sits on disk. The operator should be able to find out from
+   * the log that a given artifact carries keys.
+   */
+  private aiProviderKeyTransform(): (
+    row: Record<string, unknown>,
+  ) => Record<string, unknown> {
+    let decrypted = 0;
+    let leftEncrypted = 0;
+    return (row) => {
+      const result = exportAiProviderKey(row, this.aiEncryption);
+      if (result.outcome === "decrypted") {
+        decrypted += 1;
+        if (decrypted === 1) {
+          this.logger.log(
+            "Backup export is writing AI provider API keys in plaintext so they " +
+              "survive a restore onto another instance. Keep the artifact " +
+              "encrypted, or treat it as holding those credentials.",
+          );
+        }
+      } else if (result.outcome === "left-encrypted") {
+        leftEncrypted += 1;
+        this.logger.warn(
+          `Backup export could not decrypt a stored AI provider API key (${leftEncrypted} so far); ` +
+            "it travels as ciphertext and will only restore onto an instance " +
+            "holding the AI_ENCRYPTION_KEY that produced it.",
+        );
+      }
+      return result.row;
+    };
+  }
+
   private getTableQueries(audit?: AttachmentAudit): ExportTableQuery[] {
     return buildExportTableQueries(
       externalAttachmentRows(
@@ -104,6 +146,7 @@ export class BackupExportService {
             ),
         },
       ),
+      this.aiProviderKeyTransform(),
     );
   }
 

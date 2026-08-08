@@ -27,6 +27,7 @@ import { installOidcProviderLogBridge } from "./oauth/oidc-provider-log-bridge";
 import { DataSource } from "typeorm";
 import { parseRlsMode } from "./common/db/rls-config";
 import { assertRuntimeRoleSafe } from "./common/db/runtime-role-check";
+import { assertRequiredDbFunctions } from "./common/db/required-db-functions";
 
 // node-oidc-provider writes its notices straight to console.info/console.warn,
 // which would otherwise be the only unformatted lines in the log. Installed
@@ -114,6 +115,27 @@ async function assertRuntimeRoleOrExit(dataSource: DataSource): Promise<void> {
   }
 }
 
+/**
+ * Verify the database has every SQL function this build calls, and exit if not.
+ *
+ * Same reasoning as the role check above, and the same shape: the answer comes
+ * from the connection requests will actually be served on, and a wrong answer
+ * refuses the boot rather than surfacing later as a 500 from whichever query
+ * reached the gap first. See `common/db/required-db-functions.ts` for why the
+ * gap is reachable at all.
+ */
+async function assertRequiredDbFunctionsOrExit(
+  dataSource: DataSource,
+): Promise<void> {
+  const logger = new Logger("DbSchemaCheck");
+  try {
+    await assertRequiredDbFunctions(dataSource);
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
 async function bootstrap() {
   logger.log("Starting application");
 
@@ -130,6 +152,13 @@ async function bootstrap() {
   // because the alternative is serving cross-tenant reads while believing the
   // database is filtering them.
   await assertRuntimeRoleOrExit(app.get(DataSource));
+
+  // And that the schema this build's SQL is written against is actually there.
+  // db-migrate is a separate process that runs only at container start, so an
+  // image whose code calls a function a migration has not created yet is a real
+  // state -- and the request that discovers it is the one that gets a generic
+  // "Database error". Refuse here instead.
+  await assertRequiredDbFunctionsOrExit(app.get(DataSource));
 
   // Trust first proxy (Docker/nginx) so req.ip reflects the real client IP
   app.getHttpAdapter().getInstance().set("trust proxy", 1);

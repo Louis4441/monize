@@ -425,6 +425,9 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
                 <Input
                   id="backup-password-input"
                   type="password"
+                  // The artifact's own password, not a credential of this site:
+                  // an autofilled login password here just fails to decrypt.
+                  autoComplete="off"
                   value={restoreBackupPassword}
                   onChange={(e) => setRestoreBackupPassword(e.target.value)}
                   placeholder={t('restore.backupPasswordPlaceholder')}
@@ -458,6 +461,7 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
                 <>
                   <Input
                     type="password"
+                    autoComplete="current-password"
                     value={restorePassword}
                     onChange={(e) => setRestorePassword(e.target.value)}
                     placeholder={t('restore.passwordPlaceholder')}
@@ -501,6 +505,7 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
           </p>
           <Input
             type="password"
+            autoComplete="new-password"
             value={setupPassword}
             onChange={(e) => setSetupPassword(e.target.value)}
             placeholder={t('encryption.setupModal.placeholderOidc')}
@@ -541,6 +546,9 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
           </p>
           <Input
             type="password"
+            // Encrypts the file being produced; a manager filling this with the
+            // site login would encrypt the backup under a password nobody knows.
+            autoComplete="off"
             value={exportPassword}
             onChange={(e) => setExportPassword(e.target.value)}
             placeholder={isOidc ? t('export.exportPasswordModal.placeholderOidc') : t('export.exportPasswordModal.placeholderLocal')}
@@ -625,6 +633,20 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
               <p className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
                 {t('restoreResult.skippedAttachments', {
                   count: restoreResult.skippedAttachments,
+                })}
+              </p>
+            )}
+
+            {/* The provider rows came back; the API keys inside them did not,
+                because the key that encrypts them is server configuration and
+                never travels in a backup. Nothing else says so -- the provider
+                list shows a masked key either way -- so a silent success here
+                leaves the user with AI features that fail for no visible
+                reason. */}
+            {!!restoreResult.unusableAiProviderKeys && (
+              <p className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                {t('restoreResult.unusableAiProviderKeys', {
+                  count: restoreResult.unusableAiProviderKeys,
                 })}
               </p>
             )}

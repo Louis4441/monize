@@ -73,6 +73,7 @@
     "providerConfigNotFound": "Configuration du fournisseur IA introuvable",
     "maxProvidersExceeded": "Maximum de {{ maxProvidersPerUser }} configurations de fournisseurs IA par utilisateur",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY n'est pas configuré. Impossible de stocker les clés API de manière sécurisée.",
+    "apiKeyUndecryptable": "Ce serveur ne peut pas lire la clé d'API enregistrée. Cela se produit lorsqu'une sauvegarde est restaurée sur une autre instance ou après une modification de AI_ENCRYPTION_KEY. Saisissez à nouveau la clé d'API pour corriger le problème.",
     "noActiveProviders": "Aucun fournisseur IA actif configuré. Veuillez configurer un fournisseur dans les Paramètres IA.",
     "allProvidersFailed": "Tous les fournisseurs IA ont échoué. Vérifiez votre configuration de fournisseur et réessayez.",
     "noToolUseProvider": "Aucun fournisseur IA avec prise en charge des outils configuré. Les requêtes en langage naturel nécessitent Anthropic, OpenAI ou Ollama. Veuillez en configurer un dans les Paramètres IA.",

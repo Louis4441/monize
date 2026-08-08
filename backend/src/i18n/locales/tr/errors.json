@@ -73,6 +73,7 @@
     "providerConfigNotFound": "Yapay zeka sağlayıcısı yapılandırması bulunamadı",
     "maxProvidersExceeded": "Kullanıcı başına en fazla {{ maxProvidersPerUser }} yapay zeka sağlayıcısı yapılandırması",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY yapılandırılmamış. API anahtarları güvenli şekilde saklanamıyor.",
+    "apiKeyUndecryptable": "Kayıtlı API anahtarı bu sunucu tarafından okunamıyor. Bu, bir yedek başka bir örneğe geri yüklendiğinde veya AI_ENCRYPTION_KEY değiştiğinde olur. Sorunu gidermek için API anahtarını yeniden girin.",
     "noActiveProviders": "Yapılandırılmış etkin yapay zeka sağlayıcısı yok. Lütfen Yapay Zeka Ayarları'nda bir sağlayıcı yapılandırın.",
     "allProvidersFailed": "Tüm yapay zeka sağlayıcıları başarısız oldu. Lütfen sağlayıcı yapılandırmanızı kontrol edip tekrar deneyin.",
     "noToolUseProvider": "Araç kullanım desteğine sahip yapay zeka sağlayıcısı yapılandırılmamış. Doğal dil sorguları Anthropic, OpenAI veya Ollama gerektirir. Lütfen Yapay Zeka Ayarları'nda birini yapılandırın.",

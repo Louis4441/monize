@@ -73,6 +73,7 @@
     "providerConfigNotFound": "KI-Anbieterkonfiguration nicht gefunden",
     "maxProvidersExceeded": "Maximal {{ maxProvidersPerUser }} KI-Anbieterkonfigurationen pro Benutzer",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY ist nicht konfiguriert. API-Schlüssel können nicht sicher gespeichert werden.",
+    "apiKeyUndecryptable": "Der gespeicherte API-Schlüssel kann von diesem Server nicht gelesen werden. Das passiert, wenn eine Sicherung auf einer anderen Instanz wiederhergestellt wird oder nachdem sich AI_ENCRYPTION_KEY geändert hat. Geben Sie den API-Schlüssel erneut ein, um das zu beheben.",
     "noActiveProviders": "Keine aktiven KI-Anbieter konfiguriert. Konfigurieren Sie einen Anbieter in den KI-Einstellungen.",
     "allProvidersFailed": "Alle KI-Anbieter sind fehlgeschlagen. Überprüfen Sie Ihre Anbieterkonfiguration und versuchen Sie es erneut.",
     "noToolUseProvider": "Kein KI-Anbieter mit Tool-Unterstützung konfiguriert. Anfragen in natürlicher Sprache erfordern Anthropic, OpenAI oder Ollama. Konfigurieren Sie einen in den KI-Einstellungen.",

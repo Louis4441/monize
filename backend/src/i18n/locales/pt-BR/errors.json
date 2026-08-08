@@ -73,6 +73,7 @@
     "providerConfigNotFound": "Configuração do provedor de IA não encontrada",
     "maxProvidersExceeded": "Máximo de {{ maxProvidersPerUser }} configurações de provedor de IA por usuário",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY não está configurado. Não é possível armazenar chaves de API de forma segura.",
+    "apiKeyUndecryptable": "Este servidor não consegue ler a chave de API armazenada. Isso acontece quando um backup é restaurado em outra instância ou depois que a AI_ENCRYPTION_KEY muda. Digite a chave de API novamente para resolver.",
     "noActiveProviders": "Não há provedores de IA ativos configurados. Configure um provedor nas Configurações de IA.",
     "allProvidersFailed": "Todos os provedores de IA falharam. Verifique a configuração do seu provedor e tente novamente.",
     "noToolUseProvider": "Nenhum provedor de IA com suporte a ferramentas configurado. As consultas em linguagem natural requerem Anthropic, OpenAI ou Ollama. Configure um nas Configurações de IA.",

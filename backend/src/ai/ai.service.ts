@@ -328,6 +328,31 @@ export class AiService {
     if (config.provider === "mcp_relay") {
       return { available: true };
     }
+
+    // A stored key this instance cannot decrypt is its own diagnosis, and it is
+    // one the generic message below actively hides. It happens when a backup is
+    // restored onto an instance with a different AI_ENCRYPTION_KEY, or after
+    // that variable is rotated: the column is populated, so the provider row
+    // shows a masked key and every "is a key configured?" check says yes, while
+    // `createProvider` throws an AES-GCM authentication failure that reads as
+    // "check your provider settings" -- settings that are, in fact, correct.
+    // Say what is actually wrong and what fixes it.
+    if (
+      config.apiKeyEnc &&
+      !this.encryptionService.canDecrypt(config.apiKeyEnc)
+    ) {
+      this.logger.warn(
+        `Stored API key for ${logLabel} cannot be decrypted with this instance's AI_ENCRYPTION_KEY`,
+      );
+      return {
+        available: false,
+        error: tr(
+          "errors.ai.apiKeyUndecryptable",
+          "The stored API key cannot be read by this server. This happens when a backup is restored onto a different instance, or after AI_ENCRYPTION_KEY changes. Enter the API key again to fix it.",
+        ),
+      };
+    }
+
     let provider;
     try {
       provider = this.providerFactory.createProvider(config);

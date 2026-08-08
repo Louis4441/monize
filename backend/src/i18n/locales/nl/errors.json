@@ -73,6 +73,7 @@
     "providerConfigNotFound": "AI-providerconfiguratie niet gevonden",
     "maxProvidersExceeded": "Maximaal {{ maxProvidersPerUser }} AI-providerconfiguraties per gebruiker",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY is niet geconfigureerd. Kan API-sleutels niet veilig opslaan.",
+    "apiKeyUndecryptable": "De opgeslagen API-sleutel kan niet door deze server worden gelezen. Dit gebeurt wanneer een back-up op een andere instantie wordt teruggezet of nadat AI_ENCRYPTION_KEY is gewijzigd. Voer de API-sleutel opnieuw in om dit op te lossen.",
     "noActiveProviders": "Geen actieve AI-providers geconfigureerd. Configureer een provider in AI-instellingen.",
     "allProvidersFailed": "Alle AI-providers zijn mislukt. Controleer je providerconfiguratie en probeer het opnieuw.",
     "noToolUseProvider": "Geen AI-provider met ondersteuning voor toolgebruik geconfigureerd. Zoekopdrachten in gewone taal vereisen Anthropic, OpenAI of Ollama. Configureer er een in AI-instellingen.",

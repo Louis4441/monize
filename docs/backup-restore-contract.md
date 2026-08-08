@@ -59,6 +59,25 @@ every live table is either exported or named in
 - Every currency definition the user's data references, whoever created it —
   not just the ones they created. Currencies are shared, and a code without its
   definition means the restore invents a name, symbol and decimal places.
+- AI provider API keys, **decrypted**, in `api_key_plaintext`
+  (`backend/src/backup/ai-provider-key-transport.ts`). `api_key_enc` is
+  ciphertext under `AI_ENCRYPTION_KEY`, which is server configuration and cannot
+  travel — shipping the master key beside the ciphertext would make encrypting
+  the column pointless — so the key is decrypted on the way out and re-encrypted
+  on the way in under whichever key the receiving instance holds. The exported
+  row's `api_key_enc` is nulled: one secret, one representation.
+
+  **The artifact therefore holds third-party credentials in the clear.** A backup
+  encrypted with the user's password is fine; an unencrypted export (an OIDC
+  account that has set no backup password) and an unencrypted automatic backup on
+  disk are not, and `BackupExportService` logs when it writes one. The support
+  (de-identified) backup drops `ai_provider_configs` outright
+  (`support-backup-rules.ts`) and must keep doing so.
+
+  A key the exporting instance cannot itself decrypt travels as ciphertext,
+  unchanged — that is the pre-transport behaviour, so an artifact is never worse
+  than the one this replaced, and a restore back onto the instance that wrote it
+  still works.
 
 **Deliberately excluded**, each for a stated reason in
 `INTENTIONALLY_EXCLUDED_TABLES`: the `users` row itself, credentials and sessions,
@@ -683,10 +702,29 @@ Known and unresolved; none of these is a bug report waiting to be filed:
   backwards across that boundary means an unencrypted export, or restoring on a
   build at least as new as the one that produced the file. The reverse direction
   is fine: every version reads v1.
-- **`ai_provider_configs.api_key_enc` is instance-key ciphertext.** It is exported
-  and restored verbatim, so a restore onto an instance with a different
-  `AI_ENCRYPTION_KEY` leaves provider configs present and unusable. Re-entering
-  the key is the only recovery.
+- **AI provider keys written by an older build do not cross instances.** Keys now
+  travel decrypted and are re-encrypted on arrival (§1), so a current artifact is
+  portable. One made before that carries `api_key_enc` under the exporting
+  instance's `AI_ENCRYPTION_KEY`, and restores onto any other instance populated
+  and unreadable; so does any key the exporting instance could not decrypt
+  itself. Re-entering the key is the only recovery.
+
+  What *was* a defect is that this happened silently. The column is non-null, so
+  every check that asks "is a key configured?" answered yes and the provider row
+  drew a masked key; the only symptom was that AI calls failed. The restore now
+  counts those rows — plus any it could not re-encrypt because this server has no
+  `AI_ENCRYPTION_KEY` — and reports `unusableAiProviderKeys` beside `restored`:
+  beside, never inside, for the same reason as `skippedAttachments` (§4), since
+  the client sums `restored` into a row total and these rows *were* written. It
+  is the key inside them that did not survive. `AiService.testConnection` says
+  the same thing on demand, in place of the generic "check your provider
+  settings", which is advice about settings that are in fact correct.
+
+  Both the re-encryption and the count run before the restore's transaction:
+  `AiEncryptionService`'s derivation is `scryptSync`, tens of milliseconds per
+  key, which does not belong inside the transaction holding every one of the
+  user's rows — and does not belong on a list endpoint at all, which is why
+  `getConfigs` still reports only whether the column is populated.
 - **Delegation is reset.** `account_delegates`, `account_delegate_grants` and
   `delegate_account_favourites` are excluded by design, and cascade away when
   accounts are deleted. A restore therefore removes existing grants and

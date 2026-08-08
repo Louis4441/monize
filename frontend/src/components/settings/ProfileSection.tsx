@@ -132,6 +132,7 @@ export function ProfileSection({ user, onUserUpdated }: ProfileSectionProps) {
             <Input
               label={t('currentPasswordLabel')}
               type="password"
+              autoComplete="current-password"
               {...register('currentPassword')}
               error={errors.currentPassword?.message}
               placeholder={t('currentPasswordPlaceholder')}

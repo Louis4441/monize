@@ -38,6 +38,7 @@ import {
   RestoreBackupInput,
   RestoreResult,
 } from "./backup-format";
+import { restoreAiProviderKey } from "./ai-provider-key-transport";
 import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
 
@@ -173,6 +174,14 @@ export class BackupRestoreService {
       const displacedKeys =
         await this.attachments.collectExternalAttachmentKeys(userId);
 
+      // Re-encrypt every AI provider key the artifact carries in plaintext under
+      // *this* instance's AI_ENCRYPTION_KEY, before the transaction: the work is
+      // scrypt-bound (tens of milliseconds per key) and does not belong inside
+      // the transaction that holds every one of this user's rows. Rows an older
+      // artifact carries as foreign ciphertext are left alone and counted, which
+      // is the pre-transport behaviour and the only case still reportable.
+      const unusableAiProviderKeys = this.restoreAiProviderKeys(userId, data);
+
       const restored: Record<string, number> = {};
 
       // One transaction for the whole restore, exactly as the QueryRunner block
@@ -211,17 +220,18 @@ export class BackupRestoreService {
           await this.db.restoreDeferredFkColumns(manager, data);
 
           this.logger.log(`Backup restore completed for user ${userId}`);
-          // `skippedAttachments` is reported beside `restored`, never inside it:
-          // the client sums `restored`'s values to show a row total, and a count
-          // of rows that were deliberately not written does not belong in that
-          // sum.
-          return skippedAttachments > 0
-            ? {
-                message: "Backup restored successfully",
-                restored,
-                skippedAttachments,
-              }
-            : { message: "Backup restored successfully", restored };
+          // `skippedAttachments` and `unusableAiProviderKeys` are reported
+          // beside `restored`, never inside it: the client sums `restored`'s
+          // values to show a row total, and neither a count of rows that were
+          // deliberately not written nor a count of rows whose contents did not
+          // survive belongs in that sum. Both are omitted at zero so "no field"
+          // and "nothing to report" are the same answer.
+          return {
+            message: "Backup restored successfully",
+            restored,
+            ...(skippedAttachments > 0 ? { skippedAttachments } : {}),
+            ...(unusableAiProviderKeys > 0 ? { unusableAiProviderKeys } : {}),
+          };
         }),
       )
         .then(async (result) => {
@@ -429,6 +439,55 @@ export class BackupRestoreService {
         `${completeness.expectedAttachments} total. Those attachments cannot come back ` +
         `from this file.`,
     );
+  }
+
+  /**
+   * Re-key every AI provider row in the artifact, and report the ones that could
+   * not be re-keyed.
+   *
+   * `ai-provider-key-transport.ts` owns the four outcomes; this counts the two
+   * that leave the user without a working key, because those are what
+   * `RestoreResult.unusableAiProviderKeys` is for -- the rows *are* restored, so
+   * a silent success would leave provider entries that look configured and fail
+   * on every call.
+   *
+   * The rows are replaced rather than mutated in place. The artifact has already
+   * been copied once by `remapBackupIds`, so this is not about protecting the
+   * caller's object; it is about the plaintext field never surviving into
+   * anything the insert path can see.
+   */
+  private restoreAiProviderKeys(userId: string, data: BackupData): number {
+    const tables = backupTables(data);
+    const rows = tables.ai_provider_configs;
+    if (!rows || rows.length === 0) return 0;
+
+    let unusable = 0;
+    tables.ai_provider_configs = rows.map((row) => {
+      const result = restoreAiProviderKey(row, this.aiEncryption);
+      if (result.outcome === "dropped-unencryptable") {
+        unusable += 1;
+      } else if (
+        result.outcome === "kept-foreign-ciphertext" &&
+        !this.aiEncryption.canDecrypt(result.row.api_key_enc as string)
+      ) {
+        // An older artifact, written before keys travelled in plaintext. It only
+        // restores onto the instance that produced it; anywhere else the column
+        // is populated and unreadable, which is exactly the failure this field
+        // exists to stop being silent.
+        unusable += 1;
+      }
+      return result.row;
+    });
+
+    if (unusable > 0) {
+      this.logger.warn(
+        `Restoring ${unusable} AI provider configuration(s) for user ${userId} without a ` +
+          "usable API key: the artifact carried instance-key ciphertext this server " +
+          "cannot read, or AI_ENCRYPTION_KEY is unset here. The rows are restored; " +
+          "the keys must be re-entered.",
+      );
+    }
+    return unusable;
   }
 
   private validateBackupFormat(data: BackupData): void {

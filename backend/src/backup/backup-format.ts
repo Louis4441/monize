@@ -34,6 +34,26 @@ export interface RestoreResult {
    * Omitted when nothing was skipped, so "no field" and "zero" agree.
    */
   skippedAttachments?: number;
+  /**
+   * AI provider configurations restored without a usable API key.
+   *
+   * Keys travel decrypted and are re-encrypted under the receiving instance's
+   * `AI_ENCRYPTION_KEY` (`ai-provider-key-transport.ts`), so the ordinary
+   * cross-instance restore has nothing to report. Two cases remain: an artifact
+   * written before keys travelled that way, carrying ciphertext under an
+   * `AI_ENCRYPTION_KEY` this server does not hold, and a server with no
+   * `AI_ENCRYPTION_KEY` configured, which has nothing to store a key under.
+   *
+   * Both leave a provider row that looks configured and fails on every call --
+   * the column is either populated-and-unreadable or empty, and nothing else on
+   * screen says which -- so the restore has to say so.
+   *
+   * Counted beside `restored` rather than deducted from it, for the same reason
+   * `skippedAttachments` is: these rows *were* written. It is the key inside
+   * them that did not survive, and the user has to be told so they can re-enter
+   * it. Omitted when zero.
+   */
+  unusableAiProviderKeys?: number;
 }
 
 export class BackupPasswordRequiredError extends BadRequestException {

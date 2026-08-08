@@ -4,6 +4,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { applyAppRoleGrants } from "./common/db/app-role";
 import { acquireDbLifecycleLock } from "./common/db/advisory-locks";
+import {
+  formatMissingDbFunctions,
+  missingDbFunctions,
+} from "./common/db/required-db-functions";
 
 const MIGRATIONS_DIRNAME = "migrations";
 
@@ -396,6 +400,19 @@ export async function runMigrations() {
     await applyAppRoleGrants(client, {
       appUser: process.env.DATABASE_APP_USER,
     });
+
+    // Then prove the run achieved what the code needs. "Every pending migration
+    // applied" and "the schema this build calls is present" are different
+    // claims: a ledger row for a migration whose object was later dropped, a
+    // database restored under an image newer than it, or a filename that never
+    // reached this directory all satisfy the first and not the second. Reporting
+    // it here names the migration while the operator is still reading migration
+    // output, rather than leaving main.ts to refuse a boot ten lines later.
+    const missing = await missingDbFunctions(client);
+    if (missing.length > 0) {
+      logger.error(formatMissingDbFunctions(missing));
+      process.exit(1);
+    }
   } catch (error) {
     logger.error(formatRunnerFailure(error));
     process.exit(1);
