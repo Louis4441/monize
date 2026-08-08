@@ -73,6 +73,7 @@
     "providerConfigNotFound": "找不到 AI 提供者設定",
     "maxProvidersExceeded": "每位使用者最多 {{ maxProvidersPerUser }} 個 AI 提供者設定",
     "encryptionKeyNotConfigured": "未設定 AI_ENCRYPTION_KEY。無法安全儲存 API 金鑰。",
+    "apiKeyUndecryptable": "此伺服器無法讀取已儲存的 API 金鑰。將備份還原到其他執行個體後，或 AI_ENCRYPTION_KEY 變更後，都會發生這種情況。請重新輸入 API 金鑰以解決。",
     "noActiveProviders": "未設定任何已啟用的 AI 提供者。請在 AI 設定中設定提供者。",
     "allProvidersFailed": "所有 AI 提供者均失敗。請檢查您的提供者設定後再試。",
     "noToolUseProvider": "未設定支援工具使用的 AI 提供者。自然語言查詢需要 Anthropic、OpenAI 或 Ollama。請在 AI 設定中設定一個。",

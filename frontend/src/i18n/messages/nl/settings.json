@@ -576,7 +576,8 @@
       "description": "Jouw gegevens zijn succesvol hersteld. Hier is een overzicht van wat is hersteld:",
       "totalRecords": "Totaal records",
       "doneButton": "Gereed",
-      "skippedAttachments": "{count, plural, one {# bijlage is niet teruggezet} other {# bijlagen zijn niet teruggezet}}: de back-up bevatte er geen bruikbare bytes voor — ze ontbraken of kwamen niet door hun checksum bij het exporteren, of het bestand is van vóór zelfstandige back-ups. Maak een nieuwe back-up zodra de bijlageopslag in orde is."
+      "skippedAttachments": "{count, plural, one {# bijlage is niet teruggezet} other {# bijlagen zijn niet teruggezet}}: de back-up bevatte er geen bruikbare bytes voor — ze ontbraken of kwamen niet door hun checksum bij het exporteren, of het bestand is van vóór zelfstandige back-ups. Maak een nieuwe back-up zodra de bijlageopslag in orde is.",
+      "unusableAiProviderKeys": "{count, plural, one {# AI-provider is teruggezet zonder bruikbare API-sleutel} other {# AI-providers zijn teruggezet zonder bruikbare API-sleutels}}: de back-up is gemaakt voordat providersleutels erin werden meegenomen, dus de opgeslagen sleutel hoort bij de server die het bestand maakte, of deze server heeft geen versleutelingssleutel ingesteld om er een op te slaan. Open Instellingen → AI-providers en voer de API-sleutel opnieuw in."
     }
   },
   "sharedAccess": {

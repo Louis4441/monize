@@ -73,6 +73,7 @@
     "providerConfigNotFound": "AIプロバイダーの設定が見つかりません",
     "maxProvidersExceeded": "ユーザーあたり最大 {{ maxProvidersPerUser }} 件のAIプロバイダー設定",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY が設定されていません。APIキーを安全に保存できません。",
+    "apiKeyUndecryptable": "保存されている API キーをこのサーバーでは読み取れません。バックアップを別のインスタンスに復元した場合や、AI_ENCRYPTION_KEY が変更された場合に発生します。API キーを入力し直すと解消します。",
     "noActiveProviders": "有効なAIプロバイダーが設定されていません。AI設定でプロバイダーを設定してください。",
     "allProvidersFailed": "すべてのAIプロバイダーが失敗しました。プロバイダーの設定を確認して再試行してください。",
     "noToolUseProvider": "ツール使用をサポートするAIプロバイダーが設定されていません。自然言語クエリにはAnthropic、OpenAI、またはOllamaが必要です。AI設定で設定してください。",

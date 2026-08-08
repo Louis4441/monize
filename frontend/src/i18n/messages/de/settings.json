@@ -576,7 +576,8 @@
       "description": "Ihre Daten wurden erfolgreich wiederhergestellt. Hier eine Zusammenfassung der wiederhergestellten Daten:",
       "totalRecords": "Datensätze gesamt",
       "doneButton": "Fertig",
-      "skippedAttachments": "{count, plural, one {# Anhang wurde nicht wiederhergestellt} other {# Anhänge wurden nicht wiederhergestellt}}: Das Backup enthielt keine verwendbaren Bytes dafür — sie fehlten beim Export oder scheiterten an ihrer Prüfsumme, oder die Datei stammt aus der Zeit vor eigenständigen Backups. Erstelle ein neues Backup, sobald der Anhangsspeicher in Ordnung ist."
+      "skippedAttachments": "{count, plural, one {# Anhang wurde nicht wiederhergestellt} other {# Anhänge wurden nicht wiederhergestellt}}: Das Backup enthielt keine verwendbaren Bytes dafür — sie fehlten beim Export oder scheiterten an ihrer Prüfsumme, oder die Datei stammt aus der Zeit vor eigenständigen Backups. Erstelle ein neues Backup, sobald der Anhangsspeicher in Ordnung ist.",
+      "unusableAiProviderKeys": "{count, plural, one {# KI-Anbieter wurde ohne nutzbaren API-Schlüssel wiederhergestellt} other {# KI-Anbieter wurden ohne nutzbare API-Schlüssel wiederhergestellt}}: Die Sicherung entstand, bevor Anbieterschlüssel mitgeführt wurden — der gespeicherte Schlüssel gehört also zu dem Server, der die Datei erstellt hat, oder auf diesem Server ist kein Verschlüsselungsschlüssel eingerichtet, unter dem einer abgelegt werden könnte. Öffnen Sie Einstellungen → KI-Anbieter und geben Sie den API-Schlüssel erneut ein."
     }
   },
   "sharedAccess": {

@@ -576,7 +576,8 @@
       "description": "Twoje dane zostały pomyślnie przywrócone. Oto podsumowanie tego, co przywrócono:",
       "totalRecords": "Łączna liczba rekordów",
       "doneButton": "Gotowe",
-      "skippedAttachments": "{count, plural, one {# załącznik nie został przywrócony} few {# załączniki nie zostały przywrócone} many {# załączników nie zostało przywróconych} other {# załącznika nie zostało przywróconych}}: kopia nie zawierała dla nich użytecznych bajtów — w chwili eksportu brakowało ich albo nie przeszły kontroli sumy, albo plik pochodzi z czasów przed samowystarczalnymi kopiami. Wyeksportuj nową kopię, gdy magazyn załączników będzie sprawny."
+      "skippedAttachments": "{count, plural, one {# załącznik nie został przywrócony} few {# załączniki nie zostały przywrócone} many {# załączników nie zostało przywróconych} other {# załącznika nie zostało przywróconych}}: kopia nie zawierała dla nich użytecznych bajtów — w chwili eksportu brakowało ich albo nie przeszły kontroli sumy, albo plik pochodzi z czasów przed samowystarczalnymi kopiami. Wyeksportuj nową kopię, gdy magazyn załączników będzie sprawny.",
+      "unusableAiProviderKeys": "{count, plural, one {# dostawca AI został przywrócony bez działającego klucza API} few {# dostawców AI zostało przywróconych bez działających kluczy API} many {# dostawców AI zostało przywróconych bez działających kluczy API} other {# dostawcy AI zostało przywróconych bez działających kluczy API}}: kopia zapasowa powstała, zanim klucze dostawców zaczęły w niej podróżować, więc zapisany klucz należy do serwera, który utworzył plik, albo ten serwer nie ma skonfigurowanego klucza szyfrującego, pod którym mógłby go zapisać. Otwórz Ustawienia → Dostawcy AI i wprowadź klucz API ponownie."
     }
   },
   "sharedAccess": {

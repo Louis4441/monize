@@ -73,6 +73,7 @@
     "providerConfigNotFound": "Konfigurasi penyedia AI tidak ditemukan",
     "maxProvidersExceeded": "Maksimum {{ maxProvidersPerUser }} konfigurasi penyedia AI per pengguna",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY belum dikonfigurasi. Tidak dapat menyimpan kunci API dengan aman.",
+    "apiKeyUndecryptable": "Kunci API yang tersimpan tidak dapat dibaca oleh server ini. Hal ini terjadi ketika cadangan dipulihkan ke instans lain, atau setelah AI_ENCRYPTION_KEY berubah. Masukkan kembali kunci API untuk memperbaikinya.",
     "noActiveProviders": "Tidak ada penyedia AI aktif yang dikonfigurasi. Harap konfigurasikan penyedia di Pengaturan AI.",
     "allProvidersFailed": "Semua penyedia AI gagal. Periksa konfigurasi penyedia Anda dan coba lagi.",
     "noToolUseProvider": "Tidak ada penyedia AI dengan dukungan penggunaan alat yang dikonfigurasi. Kueri bahasa alami memerlukan Anthropic, OpenAI, atau Ollama. Harap konfigurasikan salah satunya di Pengaturan AI.",

@@ -73,6 +73,7 @@
     "providerConfigNotFound": "AI 공급자 구성을 찾을 수 없습니다",
     "maxProvidersExceeded": "사용자당 최대 {{ maxProvidersPerUser }}개의 AI 공급자 구성을 설정할 수 있습니다",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY가 구성되지 않았습니다. API 키를 안전하게 저장할 수 없습니다.",
+    "apiKeyUndecryptable": "저장된 API 키를 이 서버에서 읽을 수 없습니다. 백업을 다른 인스턴스에 복원했거나 AI_ENCRYPTION_KEY가 변경된 경우에 발생합니다. API 키를 다시 입력하면 해결됩니다.",
     "noActiveProviders": "활성화된 AI 공급자가 구성되어 있지 않습니다. AI 설정에서 공급자를 구성하세요.",
     "allProvidersFailed": "모든 AI 공급자가 실패했습니다. 공급자 구성을 확인한 후 다시 시도하세요.",
     "noToolUseProvider": "도구 사용을 지원하는 AI 공급자가 구성되어 있지 않습니다. 자연어 쿼리에는 Anthropic, OpenAI 또는 Ollama가 필요합니다. AI 설정에서 하나를 구성하세요.",
