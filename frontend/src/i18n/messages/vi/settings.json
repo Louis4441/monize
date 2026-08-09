@@ -872,7 +872,8 @@
       "heading": "Nhà cung cấp AI mặc định của hệ thống có sẵn",
       "description": "Một nhà cung cấp AI trung tâm đã được quản trị viên cấu hình",
       "usedAutomatically": "Nó sẽ được sử dụng tự động vì bạn không có nhà cung cấp cá nhân nào được cấu hình.",
-      "personalPriority": "Các nhà cung cấp cá nhân của bạn được ưu tiên hơn mặc định của hệ thống."
+      "personalPriority": "Các nhà cung cấp cá nhân của bạn được ưu tiên hơn mặc định của hệ thống.",
+      "limitsManaged": "Các thiết lập của nó, bao gồm mức công việc dành cho một câu hỏi, do quản trị viên của bạn quản lý. Hãy thêm nhà cung cấp của riêng bạn để tự kiểm soát."
     },
     "noProviders": {
       "withSystemDefault": "Không có nhà cung cấp AI cá nhân nào được cấu hình. Nhà cung cấp mặc định của hệ thống sẽ được sử dụng.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Tên hiển thị phải có tối đa 100 ký tự",
         "mustBeNumber": "Phải là số",
-        "currencyCode": "Phải là mã tiền tệ 3 chữ cái"
+        "currencyCode": "Phải là mã tiền tệ 3 chữ cái",
+        "budgetRange": "Phải nằm trong khoảng từ {min} đến {max}"
+      },
+      "queryBudgets": {
+        "heading": "Giới hạn truy vấn (tùy chọn)",
+        "help": "Mức công việc nhà cung cấp này được phép thực hiện để trả lời một câu hỏi. Để trống một trường để dùng giá trị mặc định được hiển thị. Hãy tăng số bước phân tích trước nếu trợ lý thường dừng lại trước khi tra cứu xong.",
+        "defaultPlaceholder": "Mặc định: {value}",
+        "maxIterationsLabel": "Bước phân tích",
+        "maxIterationsHelp": "Số vòng lặp gọi công cụ. Mô hình cục bộ nhỏ thường dùng một bước cho mỗi lần tra cứu.",
+        "maxToolCallsLabel": "Lượt tra cứu dữ liệu",
+        "maxToolCallsHelp": "Tổng số lượt tra cứu trợ lý được thực hiện khi trả lời một câu hỏi.",
+        "timeoutMinutesLabel": "Giới hạn thời gian (phút)",
+        "timeoutMinutesHelp": "Thời gian dành cho một câu hỏi. Hãy tăng lên nếu suy luận cục bộ chậm.",
+        "maxInputTokensLabel": "Token đầu vào",
+        "maxInputTokensHelp": "Tổng số token đầu vào qua tất cả các bước. Cách kiểm soát chi phí chính với nhà cung cấp trả phí.",
+        "maxToolResultCharsLabel": "Kích thước kết quả (ký tự)",
+        "maxToolResultCharsHelp": "Phần kết quả của một lượt tra cứu mà mô hình đọc được trước khi bị cắt bớt."
       }
     },
     "testButton": {

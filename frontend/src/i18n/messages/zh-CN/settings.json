@@ -872,7 +872,8 @@
       "heading": "系统默认 AI 提供商可用",
       "description": "您的管理员已配置中央 AI 提供商",
       "usedAutomatically": "由于您没有配置个人提供商，它将自动使用。",
-      "personalPriority": "您的个人提供商优先于系统默认提供商。"
+      "personalPriority": "您的个人提供商优先于系统默认提供商。",
+      "limitsManaged": "它的设置由您的管理员管理，包括回答一个问题可以做多少工作。添加您自己的提供商即可自行控制这些设置。"
     },
     "noProviders": {
       "withSystemDefault": "未配置个人 AI 提供商。将使用系统默认提供商。",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "显示名称不能超过 100 个字符",
         "mustBeNumber": "必须为数字",
-        "currencyCode": "必须是 3 位货币代码"
+        "currencyCode": "必须是 3 位货币代码",
+        "budgetRange": "必须介于 {min} 和 {max} 之间"
+      },
+      "queryBudgets": {
+        "heading": "查询限制（可选）",
+        "help": "此提供商回答一个问题时可以做多少工作。留空则使用显示的默认值。如果助手经常在查完之前就停止，请先提高分析步数。",
+        "defaultPlaceholder": "默认：{value}",
+        "maxIterationsLabel": "分析步数",
+        "maxIterationsHelp": "工具调用循环的轮次。较小的本地模型通常每次查询消耗一步。",
+        "maxToolCallsLabel": "数据查询次数",
+        "maxToolCallsHelp": "助手回答一个问题时可以执行的查询总次数。",
+        "timeoutMinutesLabel": "时间限制（分钟）",
+        "timeoutMinutesHelp": "一个问题可用的实际时间。本地推理较慢时请调高。",
+        "maxInputTokensLabel": "输入 Token",
+        "maxInputTokensHelp": "所有步骤的输入 Token 总数。付费提供商的主要成本控制项。",
+        "maxToolResultCharsLabel": "结果大小（字符）",
+        "maxToolResultCharsHelp": "单次查询结果中，模型在被截断前能看到的部分。"
       }
     },
     "testButton": {

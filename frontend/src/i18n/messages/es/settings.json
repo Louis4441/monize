@@ -872,7 +872,8 @@
       "heading": "Proveedor de IA predeterminado del sistema disponible",
       "description": "Tu administrador ha configurado un proveedor de IA central",
       "usedAutomatically": "Se usará automáticamente ya que no tienes proveedores personales configurados.",
-      "personalPriority": "Tus proveedores personales tienen prioridad sobre el predeterminado del sistema."
+      "personalPriority": "Tus proveedores personales tienen prioridad sobre el predeterminado del sistema.",
+      "limitsManaged": "Su configuración, incluido cuánto trabajo puede hacer para responder una pregunta, la gestiona tu administrador. Añade tu propio proveedor para controlarla tú."
     },
     "noProviders": {
       "withSystemDefault": "No hay proveedores de IA personales configurados. Se usará el proveedor predeterminado del sistema.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "El nombre para mostrar debe tener 100 caracteres o menos",
         "mustBeNumber": "Debe ser un número",
-        "currencyCode": "Debe ser un código de moneda de 3 letras"
+        "currencyCode": "Debe ser un código de moneda de 3 letras",
+        "budgetRange": "Debe estar entre {min} y {max}"
+      },
+      "queryBudgets": {
+        "heading": "Límites de consulta (opcional)",
+        "help": "Cuánto trabajo puede hacer este proveedor para responder una pregunta. Deja un campo en blanco para usar el valor predeterminado que se muestra. Aumenta primero los pasos de análisis si el asistente se detiene a menudo antes de terminar de buscar.",
+        "defaultPlaceholder": "Predeterminado: {value}",
+        "maxIterationsLabel": "Pasos de análisis",
+        "maxIterationsHelp": "Vueltas por el bucle de llamadas a herramientas. Un modelo local pequeño suele usar un paso por consulta.",
+        "maxToolCallsLabel": "Consultas de datos",
+        "maxToolCallsHelp": "Total de consultas que el asistente puede hacer al responder una pregunta.",
+        "timeoutMinutesLabel": "Límite de tiempo (minutos)",
+        "timeoutMinutesHelp": "Tiempo disponible para una pregunta. Auméntalo si la inferencia local es lenta.",
+        "maxInputTokensLabel": "Tokens de entrada",
+        "maxInputTokensHelp": "Total de tokens de entrada en todos los pasos. El principal control de costo para un proveedor de pago.",
+        "maxToolResultCharsLabel": "Tamaño del resultado (caracteres)",
+        "maxToolResultCharsHelp": "Qué parte del resultado de una sola consulta ve el modelo antes de que se recorte."
       }
     },
     "testButton": {

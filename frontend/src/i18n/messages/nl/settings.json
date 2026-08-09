@@ -872,7 +872,8 @@
       "heading": "Standaard AI-provider beschikbaar",
       "description": "Een centrale AI-provider is geconfigureerd door jouw beheerder",
       "usedAutomatically": "Deze wordt automatisch gebruikt omdat je geen persoonlijke providers hebt geconfigureerd.",
-      "personalPriority": "Jouw persoonlijke providers hebben prioriteit boven de standaard systeemprovider."
+      "personalPriority": "Jouw persoonlijke providers hebben prioriteit boven de standaard systeemprovider.",
+      "limitsManaged": "De instellingen ervan, inclusief hoeveel werk er aan één vraag mag worden besteed, worden beheerd door jouw beheerder. Voeg je eigen provider toe om ze zelf te bepalen."
     },
     "noProviders": {
       "withSystemDefault": "Geen persoonlijke AI-providers geconfigureerd. De standaard systeemprovider wordt gebruikt.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Weergavenaam mag maximaal 100 tekens bevatten",
         "mustBeNumber": "Moet een getal zijn",
-        "currencyCode": "Moet een valutacode van 3 letters zijn"
+        "currencyCode": "Moet een valutacode van 3 letters zijn",
+        "budgetRange": "Moet tussen {min} en {max} liggen"
+      },
+      "queryBudgets": {
+        "heading": "Querylimieten (optioneel)",
+        "help": "Hoeveel werk deze provider mag doen om één vraag te beantwoorden. Laat een veld leeg om de getoonde standaardwaarde te gebruiken. Verhoog eerst de analysestappen als de assistent vaak stopt voordat hij klaar is met zoeken.",
+        "defaultPlaceholder": "Standaard: {value}",
+        "maxIterationsLabel": "Analysestappen",
+        "maxIterationsHelp": "Rondes door de tool-aanroeplus. Een klein lokaal model gebruikt meestal één stap per opzoeking.",
+        "maxToolCallsLabel": "Gegevensopzoekingen",
+        "maxToolCallsHelp": "Totaal aantal opzoekingen dat de assistent mag doen bij het beantwoorden van één vraag.",
+        "timeoutMinutesLabel": "Tijdslimiet (minuten)",
+        "timeoutMinutesHelp": "Beschikbare tijd voor één vraag. Verhoog dit bij trage lokale inferentie.",
+        "maxInputTokensLabel": "Invoertokens",
+        "maxInputTokensHelp": "Totaal aantal invoertokens over alle stappen. De belangrijkste kostenbeheersing bij een betaalde provider.",
+        "maxToolResultCharsLabel": "Resultaatgrootte (tekens)",
+        "maxToolResultCharsHelp": "Hoeveel van het resultaat van één opzoeking het model ziet voordat het wordt ingekort."
       }
     },
     "testButton": {

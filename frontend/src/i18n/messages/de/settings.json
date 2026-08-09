@@ -872,7 +872,8 @@
       "heading": "System-Standard-KI-Anbieter verfügbar",
       "description": "Ein zentraler KI-Anbieter wurde von Ihrem Administrator konfiguriert",
       "usedAutomatically": "Er wird automatisch verwendet, da Sie keine persönlichen Anbieter konfiguriert haben.",
-      "personalPriority": "Ihre persönlichen Anbieter haben Vorrang vor dem Systemstandard."
+      "personalPriority": "Ihre persönlichen Anbieter haben Vorrang vor dem Systemstandard.",
+      "limitsManaged": "Seine Einstellungen, einschließlich der Arbeitsmenge für die Beantwortung einer Frage, werden von Ihrem Administrator verwaltet. Fügen Sie einen eigenen Anbieter hinzu, um diese selbst zu steuern."
     },
     "noProviders": {
       "withSystemDefault": "Keine persönlichen KI-Anbieter konfiguriert. Der System-Standard-Anbieter wird verwendet.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Der Anzeigename darf höchstens 100 Zeichen lang sein",
         "mustBeNumber": "Muss eine Zahl sein",
-        "currencyCode": "Muss ein 3-buchstabiger Währungscode sein"
+        "currencyCode": "Muss ein 3-buchstabiger Währungscode sein",
+        "budgetRange": "Muss zwischen {min} und {max} liegen"
+      },
+      "queryBudgets": {
+        "heading": "Abfragelimits (optional)",
+        "help": "Wie viel Arbeit dieser Anbieter für die Beantwortung einer Frage aufwenden darf. Lassen Sie ein Feld leer, um den angezeigten Standardwert zu verwenden. Erhöhen Sie zuerst die Analyseschritte, wenn der Assistent häufig aufhört, bevor er fertig gesucht hat.",
+        "defaultPlaceholder": "Standard: {value}",
+        "maxIterationsLabel": "Analyseschritte",
+        "maxIterationsHelp": "Durchläufe der Werkzeugaufruf-Schleife. Ein kleineres lokales Modell benötigt meist einen Schritt pro Abfrage.",
+        "maxToolCallsLabel": "Datenabfragen",
+        "maxToolCallsHelp": "Gesamtzahl der Abfragen, die der Assistent zur Beantwortung einer Frage durchführen darf.",
+        "timeoutMinutesLabel": "Zeitlimit (Minuten)",
+        "timeoutMinutesHelp": "Zeitbudget für eine Frage. Erhöhen Sie es für langsame lokale Inferenz.",
+        "maxInputTokensLabel": "Eingabe-Token",
+        "maxInputTokensHelp": "Gesamtzahl der Eingabe-Token über alle Schritte. Die wichtigste Kostenkontrolle für einen kostenpflichtigen Anbieter.",
+        "maxToolResultCharsLabel": "Ergebnisgröße (Zeichen)",
+        "maxToolResultCharsHelp": "Wie viel vom Ergebnis einer einzelnen Abfrage das Modell sieht, bevor es gekürzt wird."
       }
     },
     "testButton": {

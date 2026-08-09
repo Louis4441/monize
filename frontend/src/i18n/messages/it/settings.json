@@ -872,7 +872,8 @@
       "heading": "Provider AI predefinito di sistema disponibile",
       "description": "Un provider AI centrale è stato configurato dal tuo amministratore",
       "usedAutomatically": "Verrà usato automaticamente poiché non hai provider personali configurati.",
-      "personalPriority": "I tuoi provider personali hanno la priorità sul provider predefinito di sistema."
+      "personalPriority": "I tuoi provider personali hanno la priorità sul provider predefinito di sistema.",
+      "limitsManaged": "Le sue impostazioni, incluso quanto lavoro può svolgere per rispondere a una domanda, sono gestite dal tuo amministratore. Aggiungi un tuo provider per controllarle direttamente."
     },
     "noProviders": {
       "withSystemDefault": "Nessun provider AI personale configurato. Verrà usato il provider predefinito di sistema.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Il nome visualizzato non può superare 100 caratteri",
         "mustBeNumber": "Deve essere un numero",
-        "currencyCode": "Deve essere un codice valuta di 3 lettere"
+        "currencyCode": "Deve essere un codice valuta di 3 lettere",
+        "budgetRange": "Deve essere compreso tra {min} e {max}"
+      },
+      "queryBudgets": {
+        "heading": "Limiti delle richieste (facoltativo)",
+        "help": "Quanto lavoro può svolgere questo provider per rispondere a una domanda. Lascia un campo vuoto per usare il valore predefinito mostrato. Aumenta prima i passaggi di analisi se l'assistente si ferma spesso prima di aver finito di cercare.",
+        "defaultPlaceholder": "Predefinito: {value}",
+        "maxIterationsLabel": "Passaggi di analisi",
+        "maxIterationsHelp": "Giri nel ciclo di chiamata degli strumenti. Un modello locale piccolo di solito usa un passaggio per ricerca.",
+        "maxToolCallsLabel": "Ricerche di dati",
+        "maxToolCallsHelp": "Numero totale di ricerche che l'assistente può fare per rispondere a una domanda.",
+        "timeoutMinutesLabel": "Limite di tempo (minuti)",
+        "timeoutMinutesHelp": "Tempo disponibile per una domanda. Aumentalo se l'inferenza locale è lenta.",
+        "maxInputTokensLabel": "Token di input",
+        "maxInputTokensHelp": "Totale dei token di input su tutti i passaggi. Il principale controllo dei costi per un provider a pagamento.",
+        "maxToolResultCharsLabel": "Dimensione del risultato (caratteri)",
+        "maxToolResultCharsHelp": "Quanta parte del risultato di una singola ricerca vede il modello prima del troncamento."
       }
     },
     "testButton": {

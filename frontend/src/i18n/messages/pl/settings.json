@@ -872,7 +872,8 @@
       "heading": "Dostępny domyślny systemowy dostawca AI",
       "description": "Administrator skonfigurował centralnego dostawcę AI",
       "usedAutomatically": "Zostanie użyty automatycznie, ponieważ nie masz skonfigurowanych własnych dostawców.",
-      "personalPriority": "Twoi osobiści dostawcy mają priorytet nad domyślnym dostawcą systemowym."
+      "personalPriority": "Twoi osobiści dostawcy mają priorytet nad domyślnym dostawcą systemowym.",
+      "limitsManaged": "Jego ustawieniami, w tym tym, ile pracy może wykonać przy jednym pytaniu, zarządza administrator. Dodaj własnego dostawcę, aby sterować nimi samodzielnie."
     },
     "noProviders": {
       "withSystemDefault": "Brak skonfigurowanych osobistych dostawców AI. Zostanie użyty domyślny dostawca systemowy.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Nazwa wyświetlana może mieć maksymalnie 100 znaków",
         "mustBeNumber": "Musi być liczbą",
-        "currencyCode": "Musi być 3-literowym kodem waluty"
+        "currencyCode": "Musi być 3-literowym kodem waluty",
+        "budgetRange": "Musi mieścić się między {min} a {max}"
+      },
+      "queryBudgets": {
+        "heading": "Limity zapytań (opcjonalnie)",
+        "help": "Ile pracy ten dostawca może wykonać, aby odpowiedzieć na jedno pytanie. Pozostaw pole puste, aby użyć pokazanej wartości domyślnej. Najpierw zwiększ liczbę kroków analizy, jeśli asystent często kończy przed zakończeniem wyszukiwania.",
+        "defaultPlaceholder": "Domyślnie: {value}",
+        "maxIterationsLabel": "Kroki analizy",
+        "maxIterationsHelp": "Przebiegi pętli wywołań narzędzi. Mniejszy model lokalny zwykle zużywa jeden krok na wyszukanie.",
+        "maxToolCallsLabel": "Wyszukiwania danych",
+        "maxToolCallsHelp": "Łączna liczba wyszukiwań, jakie asystent może wykonać, odpowiadając na jedno pytanie.",
+        "timeoutMinutesLabel": "Limit czasu (minuty)",
+        "timeoutMinutesHelp": "Czas dostępny na jedno pytanie. Zwiększ go przy wolnym wnioskowaniu lokalnym.",
+        "maxInputTokensLabel": "Tokeny wejściowe",
+        "maxInputTokensHelp": "Łączna liczba tokenów wejściowych we wszystkich krokach. Główna kontrola kosztów u płatnego dostawcy.",
+        "maxToolResultCharsLabel": "Rozmiar wyniku (znaki)",
+        "maxToolResultCharsHelp": "Jaka część wyniku pojedynczego wyszukiwania trafia do modelu, zanim zostanie skrócona."
       }
     },
     "testButton": {

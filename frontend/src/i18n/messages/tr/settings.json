@@ -872,7 +872,8 @@
       "heading": "Sistem Varsayılan AI Sağlayıcısı Mevcut",
       "description": "Yöneticiniz tarafından merkezi bir AI sağlayıcısı yapılandırıldı",
       "usedAutomatically": "Kişisel sağlayıcı yapılandırmadığınızdan otomatik olarak kullanılacak.",
-      "personalPriority": "Kişisel sağlayıcılarınız sistem varsayılanına göre önceliklidir."
+      "personalPriority": "Kişisel sağlayıcılarınız sistem varsayılanına göre önceliklidir.",
+      "limitsManaged": "Tek bir soru için ne kadar çalışabileceği dahil olmak üzere ayarları yöneticiniz tarafından yönetilir. Bunları kendiniz denetlemek için kendi sağlayıcınızı ekleyin."
     },
     "noProviders": {
       "withSystemDefault": "Kişisel AI sağlayıcısı yapılandırılmadı. Sistem varsayılan sağlayıcısı kullanılacak.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Görünen ad 100 karakter veya daha az olmalıdır",
         "mustBeNumber": "Sayı olmalıdır",
-        "currencyCode": "3 harfli para birimi kodu olmalıdır"
+        "currencyCode": "3 harfli para birimi kodu olmalıdır",
+        "budgetRange": "{min} ile {max} arasında olmalıdır"
+      },
+      "queryBudgets": {
+        "heading": "Sorgu sınırları (isteğe bağlı)",
+        "help": "Bu sağlayıcının tek bir soruyu yanıtlamak için ne kadar çalışabileceği. Gösterilen varsayılan değeri kullanmak için alanı boş bırakın. Asistan aramasını bitirmeden sık sık duruyorsa önce analiz adımlarını artırın.",
+        "defaultPlaceholder": "Varsayılan: {value}",
+        "maxIterationsLabel": "Analiz adımları",
+        "maxIterationsHelp": "Araç çağırma döngüsündeki tur sayısı. Küçük bir yerel model genellikle her sorgu için bir adım harcar.",
+        "maxToolCallsLabel": "Veri sorguları",
+        "maxToolCallsHelp": "Asistanın tek bir soruyu yanıtlarken yapabileceği toplam sorgu sayısı.",
+        "timeoutMinutesLabel": "Süre sınırı (dakika)",
+        "timeoutMinutesHelp": "Tek bir soru için ayrılan süre. Yavaş yerel çıkarım için artırın.",
+        "maxInputTokensLabel": "Giriş token'ları",
+        "maxInputTokensHelp": "Tüm adımlardaki toplam giriş token'ı. Ücretli bir sağlayıcıda başlıca maliyet denetimi.",
+        "maxToolResultCharsLabel": "Sonuç boyutu (karakter)",
+        "maxToolResultCharsHelp": "Tek bir sorgunun sonucunun ne kadarını modelin kısaltılmadan önce gördüğü."
       }
     },
     "testButton": {
