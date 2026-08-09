@@ -11,6 +11,16 @@ export interface AiProviderConfigResponse {
   inputCostPer1M: number | null;
   outputCostPer1M: number | null;
   costCurrency: string;
+  /**
+   * Per-query budgets for the AI Assistant's tool-calling loop. `null` means
+   * the provider runs on the built-in default; the `AI_QUERY_*` environment
+   * variables size the centrally managed provider only and never appear here.
+   */
+  queryMaxIterations: number | null;
+  queryMaxToolCalls: number | null;
+  queryTimeoutMinutes: number | null;
+  queryMaxInputTokens: number | null;
+  queryMaxToolResultChars: number | null;
   createdAt: string;
   updatedAt: string;
 }

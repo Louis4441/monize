@@ -872,7 +872,8 @@
       "heading": "Fournisseur d'IA par défaut du système disponible",
       "description": "Un fournisseur d'IA central a été configuré par votre administrateur",
       "usedAutomatically": "Il sera utilisé automatiquement puisque vous n'avez aucun fournisseur personnel configuré.",
-      "personalPriority": "Vos fournisseurs personnels ont la priorité sur le fournisseur par défaut du système."
+      "personalPriority": "Vos fournisseurs personnels ont la priorité sur le fournisseur par défaut du système.",
+      "limitsManaged": "Ses paramètres, y compris la quantité de travail qu'il peut effectuer pour répondre à une question, sont gérés par votre administrateur. Ajoutez votre propre fournisseur pour les contrôler vous-même."
     },
     "noProviders": {
       "withSystemDefault": "Aucun fournisseur d'IA personnel configuré. Le fournisseur par défaut du système sera utilisé.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Le nom d'affichage doit contenir 100 caractères ou moins",
         "mustBeNumber": "Doit être un nombre",
-        "currencyCode": "Doit être un code devise à 3 lettres"
+        "currencyCode": "Doit être un code devise à 3 lettres",
+        "budgetRange": "Doit être compris entre {min} et {max}"
+      },
+      "queryBudgets": {
+        "heading": "Limites de requête (facultatif)",
+        "help": "Quantité de travail que ce fournisseur peut effectuer pour répondre à une question. Laissez un champ vide pour utiliser la valeur par défaut affichée. Augmentez d'abord les étapes d'analyse si l'assistant s'arrête souvent avant d'avoir terminé ses recherches.",
+        "defaultPlaceholder": "Par défaut : {value}",
+        "maxIterationsLabel": "Étapes d'analyse",
+        "maxIterationsHelp": "Passages dans la boucle d'appel d'outils. Un petit modèle local utilise généralement une étape par recherche.",
+        "maxToolCallsLabel": "Recherches de données",
+        "maxToolCallsHelp": "Nombre total de recherches que l'assistant peut effectuer pour répondre à une question.",
+        "timeoutMinutesLabel": "Limite de temps (minutes)",
+        "timeoutMinutesHelp": "Temps alloué à une question. Augmentez-le si l'inférence locale est lente.",
+        "maxInputTokensLabel": "Jetons d'entrée",
+        "maxInputTokensHelp": "Total des jetons d'entrée sur toutes les étapes. Le principal contrôle des coûts pour un fournisseur payant.",
+        "maxToolResultCharsLabel": "Taille du résultat (caractères)",
+        "maxToolResultCharsHelp": "Quelle part du résultat d'une seule recherche le modèle voit avant troncature."
       }
     },
     "testButton": {

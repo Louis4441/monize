@@ -159,6 +159,24 @@ describe("AiService", () => {
       expect(result[0].apiKeyMasked).toBeNull();
     });
 
+    it("returns the per-query budgets so the form can show what is set", async () => {
+      // The form has to tell "12" from "blank, so the default applies", which
+      // it cannot do if the response omits the fields.
+      const config = makeConfig({
+        queryMaxIterations: 12,
+        queryMaxToolCalls: null,
+      });
+      mockConfigRepository.find.mockResolvedValue([config]);
+
+      const result = await service.getConfigs(userId);
+
+      expect(result[0].queryMaxIterations).toBe(12);
+      expect(result[0].queryMaxToolCalls).toBeNull();
+      expect(result[0].queryTimeoutMinutes).toBeNull();
+      expect(result[0].queryMaxInputTokens).toBeNull();
+      expect(result[0].queryMaxToolResultChars).toBeNull();
+    });
+
     it("returns **** when decryption fails", async () => {
       const config = makeConfig();
       mockConfigRepository.find.mockResolvedValue([config]);
@@ -271,6 +289,42 @@ describe("AiService", () => {
         mockConfigRepository.count.mock.invocationCallOrder[0],
       );
     });
+
+    it("stores the per-query budgets the user set on this provider", async () => {
+      await service.createConfig(userId, {
+        provider: "ollama",
+        baseUrl: "http://localhost:11434",
+        queryMaxIterations: 12,
+        queryMaxToolCalls: 40,
+        queryTimeoutMinutes: 45,
+        queryMaxInputTokens: 90_000,
+        queryMaxToolResultChars: 20_000,
+      });
+
+      expect(mockConfigRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryMaxIterations: 12,
+          queryMaxToolCalls: 40,
+          queryTimeoutMinutes: 45,
+          queryMaxInputTokens: 90_000,
+          queryMaxToolResultChars: 20_000,
+        }),
+      );
+    });
+
+    it("stores an unset budget as null, which is how 'use the default' is spelled", async () => {
+      await service.createConfig(userId, { provider: "ollama" });
+
+      expect(mockConfigRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryMaxIterations: null,
+          queryMaxToolCalls: null,
+          queryTimeoutMinutes: null,
+          queryMaxInputTokens: null,
+          queryMaxToolResultChars: null,
+        }),
+      );
+    });
   });
 
   describe("updateConfig()", () => {
@@ -312,6 +366,45 @@ describe("AiService", () => {
 
       expect(mockConfigRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ apiKeyEnc: null }),
+      );
+    });
+
+    it("updates a per-query budget", async () => {
+      const config = makeConfig({ queryMaxIterations: 4 });
+      mockConfigRepository.findOne.mockResolvedValue(config);
+
+      await service.updateConfig(userId, "config-1", {
+        queryMaxIterations: 12,
+      });
+
+      expect(mockConfigRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ queryMaxIterations: 12 }),
+      );
+    });
+
+    it("clears a per-query budget back to the default when null is sent", async () => {
+      const config = makeConfig({ queryMaxToolCalls: 40 });
+      mockConfigRepository.findOne.mockResolvedValue(config);
+
+      await service.updateConfig(userId, "config-1", {
+        queryMaxToolCalls: null,
+      });
+
+      expect(mockConfigRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ queryMaxToolCalls: null }),
+      );
+    });
+
+    it("leaves an omitted budget alone", async () => {
+      // Omitted and null are different answers: one is "don't touch this",
+      // the other is "put it back on the default".
+      const config = makeConfig({ queryMaxIterations: 7 });
+      mockConfigRepository.findOne.mockResolvedValue(config);
+
+      await service.updateConfig(userId, "config-1", { displayName: "New" });
+
+      expect(mockConfigRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ queryMaxIterations: 7 }),
       );
     });
   });
@@ -940,6 +1033,51 @@ describe("AiService", () => {
     it("delegates to usage service", async () => {
       await service.getUsageSummary(userId, 30);
       expect(mockUsageService.getUsageSummary).toHaveBeenCalledWith(userId, 30);
+    });
+  });
+
+  describe("resolveToolUseProvider()", () => {
+    it("hands back the configuration the provider was built from", async () => {
+      // The caller needs the row, not just the provider: the per-query budgets
+      // live on it, and only the row can say whose provider this is.
+      const config = makeConfig({
+        provider: "anthropic",
+        queryMaxIterations: 12,
+      });
+      mockConfigRepository.find.mockResolvedValue([config]);
+      mockProviderFactory.createProvider!.mockReturnValue({
+        name: "anthropic",
+        supportsToolUse: true,
+        completeWithTools: jest.fn(),
+      });
+
+      const resolved = await service.resolveToolUseProvider(userId);
+
+      expect(resolved.provider.name).toBe("anthropic");
+      expect(resolved.config).toBe(config);
+      expect(resolved.config.queryMaxIterations).toBe(12);
+      expect(resolved.config.isSystemDefault).toBeFalsy();
+    });
+
+    it("marks the centrally managed provider as the system default", async () => {
+      // Which is what tells the assistant to size it from AI_QUERY_* rather
+      // than from a row nobody can edit.
+      mockConfigRepository.find.mockResolvedValue([]);
+      mockConfigService.get!.mockImplementation((key: string) => {
+        if (key === "AI_DEFAULT_PROVIDER") return "anthropic";
+        if (key === "AI_DEFAULT_MODEL") return "claude-sonnet-4-20250514";
+        return undefined;
+      });
+      mockProviderFactory.createProvider!.mockReturnValue({
+        name: "anthropic",
+        supportsToolUse: true,
+        completeWithTools: jest.fn(),
+      });
+
+      const resolved = await service.resolveToolUseProvider(userId);
+
+      expect(resolved.config.isSystemDefault).toBe(true);
+      expect(resolved.config.queryMaxIterations).toBeNull();
     });
   });
 

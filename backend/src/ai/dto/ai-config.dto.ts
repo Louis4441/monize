@@ -20,8 +20,83 @@ import {
   AI_PROVIDERS,
   AiProviderType,
 } from "../entities/ai-provider-config.entity";
+import { QUERY_BUDGET_SPECS } from "../query/query-budgets";
 
-export class CreateAiConfigDto {
+const BUDGETS = QUERY_BUDGET_SPECS;
+
+/**
+ * Per-query budget overrides for a provider the user configured themselves.
+ * Every field is optional, and `null` clears it back to the built-in default.
+ * The bounds come from `QUERY_BUDGET_SPECS`, so widening a range is one edit
+ * in the table rather than three that have to agree.
+ *
+ * These deliberately do not exist for the centrally managed provider: it is
+ * the operator's, it has no row to edit, and it is sized by the `AI_QUERY_*`
+ * environment variables instead.
+ */
+export class QueryBudgetFieldsDto {
+  @ApiPropertyOptional({
+    example: BUDGETS.maxIterations.default,
+    description: `Maximum ${BUDGETS.maxIterations.description}. Null uses the default (${BUDGETS.maxIterations.default}).`,
+    minimum: BUDGETS.maxIterations.min,
+    maximum: BUDGETS.maxIterations.max,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(BUDGETS.maxIterations.min)
+  @Max(BUDGETS.maxIterations.max)
+  queryMaxIterations?: number | null;
+
+  @ApiPropertyOptional({
+    example: BUDGETS.maxToolCalls.default,
+    description: `Maximum ${BUDGETS.maxToolCalls.description}. Null uses the default (${BUDGETS.maxToolCalls.default}).`,
+    minimum: BUDGETS.maxToolCalls.min,
+    maximum: BUDGETS.maxToolCalls.max,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(BUDGETS.maxToolCalls.min)
+  @Max(BUDGETS.maxToolCalls.max)
+  queryMaxToolCalls?: number | null;
+
+  @ApiPropertyOptional({
+    example: BUDGETS.timeoutMinutes.default,
+    description: `Maximum ${BUDGETS.timeoutMinutes.description}. Null uses the default (${BUDGETS.timeoutMinutes.default}).`,
+    minimum: BUDGETS.timeoutMinutes.min,
+    maximum: BUDGETS.timeoutMinutes.max,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(BUDGETS.timeoutMinutes.min)
+  @Max(BUDGETS.timeoutMinutes.max)
+  queryTimeoutMinutes?: number | null;
+
+  @ApiPropertyOptional({
+    example: BUDGETS.maxInputTokens.default,
+    description: `Maximum ${BUDGETS.maxInputTokens.description}. Null uses the default (${BUDGETS.maxInputTokens.default}).`,
+    minimum: BUDGETS.maxInputTokens.min,
+    maximum: BUDGETS.maxInputTokens.max,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(BUDGETS.maxInputTokens.min)
+  @Max(BUDGETS.maxInputTokens.max)
+  queryMaxInputTokens?: number | null;
+
+  @ApiPropertyOptional({
+    example: BUDGETS.maxToolResultChars.default,
+    description: `Maximum ${BUDGETS.maxToolResultChars.description}. Null uses the default (${BUDGETS.maxToolResultChars.default}).`,
+    minimum: BUDGETS.maxToolResultChars.min,
+    maximum: BUDGETS.maxToolResultChars.max,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(BUDGETS.maxToolResultChars.min)
+  @Max(BUDGETS.maxToolResultChars.max)
+  queryMaxToolResultChars?: number | null;
+}
+
+export class CreateAiConfigDto extends QueryBudgetFieldsDto {
   @ApiProperty({
     example: "anthropic",
     description: "AI provider type",
@@ -124,7 +199,7 @@ export class CreateAiConfigDto {
   costCurrency?: string;
 }
 
-export class UpdateAiConfigDto {
+export class UpdateAiConfigDto extends QueryBudgetFieldsDto {
   @ApiPropertyOptional({
     example: "My Claude API",
     description: "User-friendly display name",

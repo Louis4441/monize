@@ -4,7 +4,9 @@ import { Logger } from "@nestjs/common";
 import {
   QUERY_BUDGET_SPECS,
   QueryBudgetKey,
+  QueryBudgetSource,
   resolveQueryBudgets,
+  resolveQueryBudgetsForConfig,
 } from "./query-budgets";
 
 const budgetKeys = Object.keys(QUERY_BUDGET_SPECS) as QueryBudgetKey[];
@@ -178,6 +180,181 @@ describe("resolveQueryBudgets", () => {
   });
 });
 
+describe("resolveQueryBudgetsForConfig", () => {
+  /** Budgets nothing in the environment or on a row could produce by accident. */
+  const CENTRAL: ReturnType<typeof resolveQueryBudgets> = {
+    maxIterations: 41,
+    maxToolCalls: 42,
+    queryTimeoutMs: 43 * 60 * 1000,
+    maxInputTokens: 44_000,
+    maxToolResultChars: 45_000,
+  };
+
+  const defaults = resolveQueryBudgets();
+
+  it("gives the centrally managed provider the environment's budgets", () => {
+    expect(
+      resolveQueryBudgetsForConfig({ isSystemDefault: true }, CENTRAL),
+    ).toEqual(CENTRAL);
+  });
+
+  // The whole point of the split: an operator's ceiling for the model they
+  // host must not silently reshape a provider the user configured and can see.
+  it("ignores the environment entirely for a user-configured provider", () => {
+    expect(resolveQueryBudgetsForConfig({}, CENTRAL)).toEqual(defaults);
+  });
+
+  it("keeps the environment away from every individual budget", () => {
+    const resolved = resolveQueryBudgetsForConfig(
+      {},
+      CENTRAL,
+    ) as unknown as Record<string, number>;
+    for (const [key, value] of Object.entries(
+      CENTRAL as unknown as Record<string, number>,
+    )) {
+      expect({ key, value: resolved[key] }).not.toEqual({ key, value });
+    }
+  });
+
+  it("applies every stored override", () => {
+    const source: QueryBudgetSource = {
+      queryMaxIterations: 9,
+      queryMaxToolCalls: 30,
+      queryTimeoutMinutes: 7,
+      queryMaxInputTokens: 90_000,
+      queryMaxToolResultChars: 20_000,
+    };
+
+    expect(resolveQueryBudgetsForConfig(source, CENTRAL)).toEqual({
+      maxIterations: 9,
+      maxToolCalls: 30,
+      queryTimeoutMs: 7 * 60 * 1000,
+      maxInputTokens: 90_000,
+      maxToolResultChars: 20_000,
+    });
+  });
+
+  it("falls back per budget, so one override does not move the others", () => {
+    for (const key of budgetKeys) {
+      const spec = QUERY_BUDGET_SPECS[key];
+      const budgets = resolveQueryBudgetsForConfig(
+        { [spec.field]: spec.default + 1 } as QueryBudgetSource,
+        CENTRAL,
+      );
+      for (const other of budgetKeys.filter((k) => k !== key)) {
+        const otherSpec = QUERY_BUDGET_SPECS[other];
+        const value =
+          other === "timeoutMinutes"
+            ? budgets.queryTimeoutMs / 60_000
+            : (budgets as unknown as Record<string, number>)[other];
+        expect({ key, other, value }).toEqual({
+          key,
+          other,
+          value: otherSpec.default,
+        });
+      }
+    }
+  });
+
+  it.each([
+    ["null", null],
+    ["undefined", undefined],
+  ])("treats %s as unset without complaining", (_label, stored) => {
+    const logger = makeLogger();
+    const budgets = resolveQueryBudgetsForConfig(
+      { queryMaxIterations: stored },
+      CENTRAL,
+      logger,
+    );
+
+    expect(budgets.maxIterations).toBe(
+      QUERY_BUDGET_SPECS.maxIterations.default,
+    );
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  // A row can only hold one of these through a hand edit or a restored
+  // artifact -- the DTO refuses them on the way in -- and the documented
+  // default is a better answer than a number nobody chose.
+  describe("a stored value outside the accepted range", () => {
+    it.each([
+      ["zero", 0],
+      ["a negative number", -1],
+      ["a fraction", 2.5],
+      ["a non-numeric value", "lots" as unknown as number],
+      ["above the maximum", QUERY_BUDGET_SPECS.maxIterations.max + 1],
+    ])("falls back to the default for %s", (_label, stored) => {
+      const logger = makeLogger();
+
+      const budgets = resolveQueryBudgetsForConfig(
+        { queryMaxIterations: stored },
+        CENTRAL,
+        logger,
+      );
+
+      expect(budgets.maxIterations).toBe(
+        QUERY_BUDGET_SPECS.maxIterations.default,
+      );
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("queryMaxIterations"),
+      );
+    });
+
+    it("falls back to the default below a budget's own minimum", () => {
+      // Not every floor is 1: the token and character budgets are useless at
+      // single digits, so their minimum is the one the spec table declares.
+      const logger = makeLogger();
+      const spec = QUERY_BUDGET_SPECS.maxInputTokens;
+
+      const budgets = resolveQueryBudgetsForConfig(
+        { queryMaxInputTokens: spec.min - 1 },
+        CENTRAL,
+        logger,
+      );
+
+      expect(budgets.maxInputTokens).toBe(spec.default);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("queryMaxInputTokens"),
+      );
+    });
+  });
+
+  it("accepts a value exactly on each bound", () => {
+    for (const key of budgetKeys) {
+      const spec = QUERY_BUDGET_SPECS[key];
+      for (const bound of [spec.min, spec.max]) {
+        const budgets = resolveQueryBudgetsForConfig(
+          { [spec.field]: bound } as QueryBudgetSource,
+          CENTRAL,
+        );
+        const value =
+          key === "timeoutMinutes"
+            ? budgets.queryTimeoutMs / 60_000
+            : (budgets as unknown as Record<string, number>)[key];
+        expect({ key, bound, value }).toEqual({ key, bound, value: bound });
+      }
+    }
+  });
+
+  it("converts a stored timeout from minutes to milliseconds", () => {
+    expect(
+      resolveQueryBudgetsForConfig({ queryTimeoutMinutes: 3 }, CENTRAL)
+        .queryTimeoutMs,
+    ).toBe(3 * 60 * 1000);
+  });
+
+  it("prefers the environment over a stored value on the system default", () => {
+    // A row can never be both, but if one ever carried stray budgets the
+    // operator's environment is the answer for the provider they own.
+    expect(
+      resolveQueryBudgetsForConfig(
+        { isSystemDefault: true, queryMaxIterations: 3 },
+        CENTRAL,
+      ),
+    ).toEqual(CENTRAL);
+  });
+});
+
 describe("QUERY_BUDGET_SPECS", () => {
   it("gives every budget a distinct AI_QUERY_-prefixed variable", () => {
     const names = budgetKeys.map((k) => QUERY_BUDGET_SPECS[k].envVar);
@@ -192,6 +369,44 @@ describe("QUERY_BUDGET_SPECS", () => {
       const spec = QUERY_BUDGET_SPECS[key];
       expect(Number.isInteger(spec.default) && spec.default > 0).toBe(true);
       expect(spec.description.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("gives every budget a range its default sits inside", () => {
+    for (const key of budgetKeys) {
+      const spec = QUERY_BUDGET_SPECS[key];
+      expect({
+        key,
+        ok:
+          Number.isInteger(spec.min) &&
+          Number.isInteger(spec.max) &&
+          spec.min > 0 &&
+          spec.min <= spec.default &&
+          spec.default <= spec.max,
+      }).toEqual({ key, ok: true });
+    }
+  });
+
+  // One spec object copied from its neighbour is the mistake these catch: two
+  // budgets sharing a field would overwrite each other on save, and two
+  // sharing a column would not compile a migration.
+  it("gives every budget a distinct field and column, named after its key", () => {
+    const fields = budgetKeys.map((k) => QUERY_BUDGET_SPECS[k].field);
+    const columns = budgetKeys.map((k) => QUERY_BUDGET_SPECS[k].column);
+    expect(new Set(fields).size).toBe(fields.length);
+    expect(new Set(columns).size).toBe(columns.length);
+
+    for (const key of budgetKeys) {
+      const spec = QUERY_BUDGET_SPECS[key];
+      const expectedField = `query${key[0].toUpperCase()}${key.slice(1)}`;
+      const expectedColumn = expectedField
+        .replace(/([A-Z])/g, "_$1")
+        .toLowerCase();
+      expect({ key, field: spec.field, column: spec.column }).toEqual({
+        key,
+        field: expectedField,
+        column: expectedColumn,
+      });
     }
   });
 
@@ -216,6 +431,42 @@ describe("QUERY_BUDGET_SPECS", () => {
       ].map((m) => m[1]);
       const known = budgetKeys.map((k) => QUERY_BUDGET_SPECS[k].envVar);
       expect([...new Set(documented)].sort()).toEqual([...known].sort());
+    });
+
+    it("says the variables cover the centrally managed provider only", () => {
+      // The scope is the whole point of the split. An operator reading only
+      // this file must not come away believing these bound every user's AI.
+      expect(envExample).toMatch(
+        /AI Assistant per-query budgets \(centrally managed provider only\)/,
+      );
+    });
+  });
+
+  // A per-provider budget with no column is a setting the UI can accept and
+  // the database silently drops. The migration is replayed on top of
+  // schema.sql, so schema.sql is the file that has to carry every column.
+  describe("database/schema.sql parity", () => {
+    const schema = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "database", "schema.sql"),
+      "utf8",
+    );
+    const tableDdl = (() => {
+      const match = schema.match(
+        /CREATE TABLE ai_provider_configs \(([\s\S]*?)\n\);/,
+      );
+      if (!match) {
+        throw new Error(
+          "ai_provider_configs table not found in database/schema.sql -- this guard has lost its subject",
+        );
+      }
+      return match[1];
+    })();
+
+    it.each(budgetKeys)("declares an integer column for %s", (key) => {
+      const spec = QUERY_BUDGET_SPECS[key];
+      expect(tableDdl).toMatch(
+        new RegExp(`^\\s*${spec.column}\\s+INTEGER\\b`, "mi"),
+      );
     });
   });
 });

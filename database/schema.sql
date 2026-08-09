@@ -1106,6 +1106,15 @@ CREATE TABLE ai_provider_configs (
     input_cost_per_1m NUMERIC(12, 4),    -- User-defined input cost per 1M tokens (for usage cost estimation)
     output_cost_per_1m NUMERIC(12, 4),   -- User-defined output cost per 1M tokens (for usage cost estimation)
     cost_currency VARCHAR(3) NOT NULL DEFAULT 'USD', -- ISO 4217 currency of the cost rates
+    -- Per-query budgets for the AI Assistant's tool-calling loop, owned by the
+    -- user who owns this provider. NULL = use the built-in default; the
+    -- AI_QUERY_* environment variables size the centrally managed provider
+    -- (AI_DEFAULT_PROVIDER) only. See backend/src/ai/query/query-budgets.ts.
+    query_max_iterations INTEGER,        -- Analysis steps (loop iterations) per query
+    query_max_tool_calls INTEGER,        -- Data lookups (tool calls) per query
+    query_timeout_minutes INTEGER,       -- Wall-clock minutes before a query is cut short
+    query_max_input_tokens INTEGER,      -- Cumulative input tokens per query
+    query_max_tool_result_chars INTEGER, -- Characters kept from a single tool result
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, provider, priority)

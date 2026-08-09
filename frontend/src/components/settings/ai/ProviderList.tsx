@@ -143,6 +143,14 @@ export function ProviderList({ configs, encryptionAvailable, onConfigsChanged, h
                   ? t('systemDefault.usedAutomatically')
                   : t('systemDefault.personalPriority')}
               </p>
+              {/*
+                The central provider has no row to edit, so its query limits
+                come from the deployment's environment. Saying so is what stops
+                the per-provider limits below reading as missing here.
+              */}
+              <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                {t('systemDefault.limitsManaged')}
+              </p>
             </div>
           </div>
         </div>

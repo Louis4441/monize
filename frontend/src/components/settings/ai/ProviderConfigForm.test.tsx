@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@/test/render';
 import { ProviderConfigForm } from './ProviderConfigForm';
 import type { AiProviderConfig } from '@/types/ai';
+import { AI_QUERY_BUDGETS, AI_QUERY_BUDGET_FIELDS } from '@/lib/ai-query-budgets';
 
 const mockTestDraft = vi.fn();
 const mockCreateConfig = vi.fn();
@@ -51,6 +52,11 @@ const existingConfig: AiProviderConfig = {
   inputCostPer1M: null,
   outputCostPer1M: null,
   costCurrency: 'USD',
+  queryMaxIterations: null,
+  queryMaxToolCalls: null,
+  queryTimeoutMinutes: null,
+  queryMaxInputTokens: null,
+  queryMaxToolResultChars: null,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
 };
@@ -588,6 +594,11 @@ describe('ProviderConfigForm — form submission', () => {
       inputCostPer1M: 3,
       outputCostPer1M: 15,
       costCurrency: 'USD',
+      queryMaxIterations: null,
+      queryMaxToolCalls: null,
+      queryTimeoutMinutes: null,
+      queryMaxInputTokens: null,
+      queryMaxToolResultChars: null,
     };
     const onSubmit = vi.fn().mockResolvedValueOnce(undefined);
     const { container } = render(
@@ -653,5 +664,171 @@ describe('ProviderConfigForm — form submission', () => {
       />,
     );
     expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Per-query budgets belong to the provider the user configured, so the form is
+ * where they are set. The AI_QUERY_* environment variables size the centrally
+ * managed provider only, and there is nothing in this form for them to reach.
+ */
+describe('ProviderConfigForm — per-query budgets', () => {
+  const noop = async () => undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const budgetInput = (container: HTMLElement, name: string) =>
+    container.querySelector(`input[name="${name}"]`) as HTMLInputElement;
+
+  it('renders a field for every budget', () => {
+    const { container } = render(
+      <ProviderConfigForm isOpen={true} onClose={noop} onSubmit={noop} />,
+    );
+
+    for (const field of AI_QUERY_BUDGET_FIELDS) {
+      expect(budgetInput(container, field.name)).toBeInTheDocument();
+    }
+  });
+
+  it('shows each default as the placeholder, so blank is readable as "default"', () => {
+    const { container } = render(
+      <ProviderConfigForm isOpen={true} onClose={noop} onSubmit={noop} />,
+    );
+
+    for (const field of AI_QUERY_BUDGET_FIELDS) {
+      expect(budgetInput(container, field.name).placeholder).toBe(
+        `Default: ${field.default}`,
+      );
+    }
+  });
+
+  it('leaves the fields blank when the provider carries no overrides', () => {
+    const { container } = render(
+      <ProviderConfigForm
+        isOpen={true}
+        onClose={noop}
+        onSubmit={noop}
+        editConfig={existingConfig}
+      />,
+    );
+
+    for (const field of AI_QUERY_BUDGET_FIELDS) {
+      expect(budgetInput(container, field.name).value).toBe('');
+    }
+  });
+
+  it('shows the stored value when the provider has one', () => {
+    const { container } = render(
+      <ProviderConfigForm
+        isOpen={true}
+        onClose={noop}
+        onSubmit={noop}
+        editConfig={{ ...existingConfig, queryMaxIterations: 12 }}
+      />,
+    );
+
+    expect(budgetInput(container, 'queryMaxIterations').value).toBe('12');
+  });
+
+  it('sends a typed budget on create and omits the ones left blank', async () => {
+    const onSubmit = vi.fn().mockResolvedValueOnce(undefined);
+    const { container } = render(
+      <ProviderConfigForm isOpen={true} onClose={noop} onSubmit={onSubmit} />,
+    );
+
+    fireEvent.change(budgetInput(container, 'queryMaxIterations'), {
+      target: { value: '12' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add provider/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const payload = onSubmit.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.queryMaxIterations).toBe(12);
+    expect(payload).not.toHaveProperty('queryMaxToolCalls');
+  });
+
+  it('sends a changed budget on update', async () => {
+    const onSubmit = vi.fn().mockResolvedValueOnce(undefined);
+    const { container } = render(
+      <ProviderConfigForm
+        isOpen={true}
+        onClose={noop}
+        onSubmit={onSubmit}
+        editConfig={{ ...existingConfig, queryMaxToolCalls: 20 }}
+      />,
+    );
+
+    fireEvent.change(budgetInput(container, 'queryMaxToolCalls'), {
+      target: { value: '40' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(
+      (onSubmit.mock.calls[0][0] as Record<string, unknown>).queryMaxToolCalls,
+    ).toBe(40);
+  });
+
+  it('sends null when a stored budget is cleared, not an omitted field', async () => {
+    // Omitting it would leave the old ceiling in place, so the field would
+    // look cleared and behave exactly as before.
+    const onSubmit = vi.fn().mockResolvedValueOnce(undefined);
+    const { container } = render(
+      <ProviderConfigForm
+        isOpen={true}
+        onClose={noop}
+        onSubmit={onSubmit}
+        editConfig={{ ...existingConfig, queryTimeoutMinutes: 45 }}
+      />,
+    );
+
+    fireEvent.change(budgetInput(container, 'queryTimeoutMinutes'), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const payload = onSubmit.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).toHaveProperty('queryTimeoutMinutes', null);
+  });
+
+  it('leaves an untouched budget out of the update payload', async () => {
+    const onSubmit = vi.fn().mockResolvedValueOnce(undefined);
+    render(
+      <ProviderConfigForm
+        isOpen={true}
+        onClose={noop}
+        onSubmit={onSubmit}
+        editConfig={{ ...existingConfig, queryMaxIterations: 12 }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('queryMaxIterations');
+  });
+
+  it('refuses a value below the budget minimum rather than sending it', async () => {
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <ProviderConfigForm isOpen={true} onClose={noop} onSubmit={onSubmit} />,
+    );
+
+    fireEvent.change(budgetInput(container, 'queryMaxInputTokens'), {
+      target: { value: '10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /add provider/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          `Must be between ${AI_QUERY_BUDGETS.queryMaxInputTokens.min} and ${AI_QUERY_BUDGETS.queryMaxInputTokens.max}`,
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

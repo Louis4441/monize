@@ -77,6 +77,25 @@ export class AiProviderConfig {
   @Column({ type: "jsonb", default: {} })
   config: Record<string, unknown>;
 
+  // Per-query budgets for the AI Assistant's tool-calling loop, owned by
+  // whoever owns this provider. NULL means "use the built-in default" --
+  // never the AI_QUERY_* environment, which sizes the centrally managed
+  // provider only. See src/ai/query/query-budgets.ts.
+  @Column({ type: "int", name: "query_max_iterations", nullable: true })
+  queryMaxIterations: number | null;
+
+  @Column({ type: "int", name: "query_max_tool_calls", nullable: true })
+  queryMaxToolCalls: number | null;
+
+  @Column({ type: "int", name: "query_timeout_minutes", nullable: true })
+  queryTimeoutMinutes: number | null;
+
+  @Column({ type: "int", name: "query_max_input_tokens", nullable: true })
+  queryMaxInputTokens: number | null;
+
+  @Column({ type: "int", name: "query_max_tool_result_chars", nullable: true })
+  queryMaxToolResultChars: number | null;
+
   @Column({
     type: "numeric",
     precision: 12,
@@ -110,4 +129,13 @@ export class AiProviderConfig {
 
   @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
+
+  /**
+   * Not a column: set only on the transient configuration built from
+   * `AI_DEFAULT_*` for a user who has configured no provider of their own.
+   * It is what tells the assistant that this provider is the operator's, so
+   * its per-query budgets come from the environment rather than from a row
+   * nobody can edit. A persisted row never carries it.
+   */
+  isSystemDefault?: boolean;
 }

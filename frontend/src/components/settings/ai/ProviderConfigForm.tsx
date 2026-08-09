@@ -12,8 +12,15 @@ import { Input } from '@/components/ui/Input';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
-import type { AiProviderConfig, AiProviderType, CreateAiProviderConfig, UpdateAiProviderConfig } from '@/types/ai';
+import type {
+  AiProviderConfig,
+  AiProviderQueryBudgets,
+  AiProviderType,
+  CreateAiProviderConfig,
+  UpdateAiProviderConfig,
+} from '@/types/ai';
 import { AI_PROVIDER_LABELS, AI_PROVIDER_DEFAULT_MODELS } from '@/types/ai';
+import { AI_QUERY_BUDGETS, AI_QUERY_BUDGET_FIELDS } from '@/lib/ai-query-budgets';
 import { aiApi } from '@/lib/ai';
 import { getErrorMessage } from '@/lib/errors';
 import { RelayConnectInstructions } from '@/components/ai/RelayConnectInstructions';
@@ -47,7 +54,27 @@ const COST_CURRENCY_OPTIONS = [
   { value: 'INR', labelKey: 'costCurrencies.INR' },
 ];
 
-const buildProviderConfigSchema = (t: (key: string) => string) => z.object({
+/**
+ * A per-query budget: blank means "use the default", anything else must be a
+ * whole number inside the range the server accepts. Held as a string like the
+ * other numeric fields on this form, so a cleared field is distinguishable
+ * from a zero.
+ */
+const budgetField = (
+  t: (key: string, values?: Record<string, string | number>) => string,
+  { min, max }: { min: number; max: number },
+) =>
+  z
+    .string()
+    .regex(/^\d*$/, t('validation.mustBeNumber'))
+    .refine(
+      (value) => value === '' || (Number(value) >= min && Number(value) <= max),
+      { message: t('validation.budgetRange', { min, max }) },
+    );
+
+const buildProviderConfigSchema = (
+  t: (key: string, values?: Record<string, string | number>) => string,
+) => z.object({
   provider: z.enum(AI_PROVIDER_TYPES),
   displayName: z.string().max(100, t('validation.displayNameMax')).optional().or(z.literal('')),
   model: z.string().max(200).optional().or(z.literal('')),
@@ -57,9 +84,33 @@ const buildProviderConfigSchema = (t: (key: string) => string) => z.object({
   inputCostPer1M: costField,
   outputCostPer1M: costField,
   costCurrency: z.string().regex(/^[A-Z]{3}$/, t('validation.currencyCode')),
+  queryMaxIterations: budgetField(t, AI_QUERY_BUDGETS.queryMaxIterations),
+  queryMaxToolCalls: budgetField(t, AI_QUERY_BUDGETS.queryMaxToolCalls),
+  queryTimeoutMinutes: budgetField(t, AI_QUERY_BUDGETS.queryTimeoutMinutes),
+  queryMaxInputTokens: budgetField(t, AI_QUERY_BUDGETS.queryMaxInputTokens),
+  queryMaxToolResultChars: budgetField(
+    t,
+    AI_QUERY_BUDGETS.queryMaxToolResultChars,
+  ),
 });
 
 type ProviderConfigFormData = z.infer<ReturnType<typeof buildProviderConfigSchema>>;
+
+/** A stored budget as form text; blank when the provider runs on the default. */
+const budgetDefaultValue = (
+  config: AiProviderConfig | null | undefined,
+  name: keyof AiProviderQueryBudgets,
+): string => {
+  const stored = config?.[name];
+  return stored == null ? '' : String(stored);
+};
+
+/** Form text back to a stored budget: blank clears it back to the default. */
+const parseBudget = (value: string | undefined): number | null => {
+  if (value === undefined || value === '') return null;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 interface ProviderConfigFormProps {
   isOpen: boolean;
@@ -101,6 +152,11 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
       inputCostPer1M: editConfig?.inputCostPer1M != null ? String(editConfig.inputCostPer1M) : '',
       outputCostPer1M: editConfig?.outputCostPer1M != null ? String(editConfig.outputCostPer1M) : '',
       costCurrency: editConfig?.costCurrency || 'USD',
+      queryMaxIterations: budgetDefaultValue(editConfig, 'queryMaxIterations'),
+      queryMaxToolCalls: budgetDefaultValue(editConfig, 'queryMaxToolCalls'),
+      queryTimeoutMinutes: budgetDefaultValue(editConfig, 'queryTimeoutMinutes'),
+      queryMaxInputTokens: budgetDefaultValue(editConfig, 'queryMaxInputTokens'),
+      queryMaxToolResultChars: budgetDefaultValue(editConfig, 'queryMaxToolResultChars'),
     },
   });
 
@@ -183,6 +239,12 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
         if (newInputCost !== editConfig.inputCostPer1M) data.inputCostPer1M = newInputCost;
         if (newOutputCost !== editConfig.outputCostPer1M) data.outputCostPer1M = newOutputCost;
         if (formData.costCurrency !== editConfig.costCurrency) data.costCurrency = formData.costCurrency;
+        // A cleared budget is sent as null -- "put this back on the default" --
+        // which an omitted field would not say.
+        for (const field of AI_QUERY_BUDGET_FIELDS) {
+          const next = parseBudget(formData[field.name]);
+          if (next !== editConfig[field.name]) data[field.name] = next;
+        }
         await onSubmit(data);
       } else {
         const data: CreateAiProviderConfig = {
@@ -196,6 +258,10 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
           ...(newOutputCost !== null && { outputCostPer1M: newOutputCost }),
           costCurrency: formData.costCurrency,
         };
+        for (const field of AI_QUERY_BUDGET_FIELDS) {
+          const value = parseBudget(formData[field.name]);
+          if (value !== null) data[field.name] = value;
+        }
         await onSubmit(data);
       }
       onClose();
@@ -403,6 +469,52 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {t('rateCurrencyHelp')}
               </p>
+            </div>
+          </div>
+          )}
+
+          {/*
+            Per-query budgets. These belong to this provider: a hosted frontier
+            model plans several lookups per turn and finishes inside the
+            defaults, while a small local model spends one analysis step per
+            lookup and runs out mid-investigation. Blank keeps the default.
+          */}
+          {!isRelay && (
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('queryBudgets.heading')}
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              {t('queryBudgets.help')}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {AI_QUERY_BUDGET_FIELDS.map((budget) => (
+                <div key={budget.name}>
+                  <Controller
+                    name={budget.name}
+                    control={control}
+                    render={({ field }) => (
+                      <NumericInput
+                        id={`input-${budget.name}`}
+                        label={t(`queryBudgets.${budget.labelKey}Label`)}
+                        decimalPlaces={0}
+                        max={budget.max}
+                        error={errors[budget.name]?.message}
+                        placeholder={t('queryBudgets.defaultPlaceholder', {
+                          value: budget.default,
+                        })}
+                        value={field.value === '' ? undefined : Number(field.value)}
+                        onChange={(value) => field.onChange(value === undefined ? '' : String(value))}
+                        name={field.name}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {t(`queryBudgets.${budget.labelKey}Help`)}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
           )}

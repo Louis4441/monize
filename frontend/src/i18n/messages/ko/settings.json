@@ -872,7 +872,8 @@
       "heading": "시스템 기본 AI 제공자 사용 가능",
       "description": "관리자가 중앙 AI 제공자를 구성했습니다",
       "usedAutomatically": "개인 제공자가 구성되지 않았으므로 자동으로 사용됩니다.",
-      "personalPriority": "개인 제공자가 시스템 기본값보다 우선합니다."
+      "personalPriority": "개인 제공자가 시스템 기본값보다 우선합니다.",
+      "limitsManaged": "질문 하나에 사용할 작업량을 포함한 이 제공자의 설정은 관리자가 관리합니다. 직접 제어하려면 본인 제공자를 추가하세요."
     },
     "noProviders": {
       "withSystemDefault": "개인 AI 제공자가 구성되지 않았습니다. 시스템 기본 제공자가 사용됩니다.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "표시 이름은 100자 이하여야 합니다",
         "mustBeNumber": "숫자여야 합니다",
-        "currencyCode": "3자리 통화 코드여야 합니다"
+        "currencyCode": "3자리 통화 코드여야 합니다",
+        "budgetRange": "{min}에서 {max} 사이여야 합니다"
+      },
+      "queryBudgets": {
+        "heading": "쿼리 제한 (선택사항)",
+        "help": "이 제공자가 질문 하나에 답하기 위해 사용할 수 있는 작업량입니다. 표시된 기본값을 사용하려면 비워 두세요. 어시스턴트가 조사를 마치기 전에 자주 멈춘다면 분석 단계를 먼저 늘리세요.",
+        "defaultPlaceholder": "기본값: {value}",
+        "maxIterationsLabel": "분석 단계",
+        "maxIterationsHelp": "도구 호출 루프 반복 횟수. 작은 로컬 모델은 보통 조회 한 번에 한 단계를 사용합니다.",
+        "maxToolCallsLabel": "데이터 조회",
+        "maxToolCallsHelp": "질문 하나에 답하는 동안 어시스턴트가 수행할 수 있는 총 조회 횟수입니다.",
+        "timeoutMinutesLabel": "시간 제한 (분)",
+        "timeoutMinutesHelp": "질문 하나에 사용할 수 있는 실제 시간입니다. 로컬 추론이 느리면 늘리세요.",
+        "maxInputTokensLabel": "입력 토큰",
+        "maxInputTokensHelp": "모든 단계의 입력 토큰 합계입니다. 유료 제공자의 주요 비용 관리 항목입니다.",
+        "maxToolResultCharsLabel": "결과 크기 (문자)",
+        "maxToolResultCharsHelp": "조회 결과 하나에서 잘리기 전에 모델이 볼 수 있는 분량입니다."
       }
     },
     "testButton": {

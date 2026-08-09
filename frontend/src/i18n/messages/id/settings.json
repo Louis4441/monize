@@ -872,7 +872,8 @@
       "heading": "Penyedia AI Bawaan Sistem Tersedia",
       "description": "Penyedia AI pusat telah dikonfigurasi oleh administrator Anda",
       "usedAutomatically": "Ini akan digunakan secara otomatis karena Anda tidak memiliki penyedia pribadi yang dikonfigurasi.",
-      "personalPriority": "Penyedia pribadi Anda diprioritaskan di atas bawaan sistem."
+      "personalPriority": "Penyedia pribadi Anda diprioritaskan di atas bawaan sistem.",
+      "limitsManaged": "Pengaturannya, termasuk seberapa banyak pekerjaan untuk menjawab satu pertanyaan, dikelola oleh administrator Anda. Tambahkan penyedia Anda sendiri untuk mengaturnya sendiri."
     },
     "noProviders": {
       "withSystemDefault": "Tidak ada penyedia AI pribadi yang dikonfigurasi. Penyedia bawaan sistem akan digunakan.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Nama tampilan harus 100 karakter atau kurang",
         "mustBeNumber": "Harus berupa angka",
-        "currencyCode": "Harus berupa kode mata uang 3 huruf"
+        "currencyCode": "Harus berupa kode mata uang 3 huruf",
+        "budgetRange": "Harus antara {min} dan {max}"
+      },
+      "queryBudgets": {
+        "heading": "Batas kueri (opsional)",
+        "help": "Seberapa banyak pekerjaan yang boleh dilakukan penyedia ini untuk menjawab satu pertanyaan. Biarkan kosong untuk memakai nilai bawaan yang ditampilkan. Naikkan langkah analisis terlebih dahulu jika asisten sering berhenti sebelum selesai mencari.",
+        "defaultPlaceholder": "Bawaan: {value}",
+        "maxIterationsLabel": "Langkah analisis",
+        "maxIterationsHelp": "Putaran melalui loop pemanggilan alat. Model lokal yang kecil biasanya memakai satu langkah per pencarian.",
+        "maxToolCallsLabel": "Pencarian data",
+        "maxToolCallsHelp": "Total pencarian yang boleh dilakukan asisten saat menjawab satu pertanyaan.",
+        "timeoutMinutesLabel": "Batas waktu (menit)",
+        "timeoutMinutesHelp": "Waktu yang tersedia untuk satu pertanyaan. Naikkan untuk inferensi lokal yang lambat.",
+        "maxInputTokensLabel": "Token masukan",
+        "maxInputTokensHelp": "Total token masukan di seluruh langkah. Kendali biaya utama untuk penyedia berbayar.",
+        "maxToolResultCharsLabel": "Ukuran hasil (karakter)",
+        "maxToolResultCharsHelp": "Seberapa banyak hasil satu pencarian yang dilihat model sebelum dipotong."
       }
     },
     "testButton": {

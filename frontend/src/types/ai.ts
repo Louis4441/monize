@@ -2,6 +2,18 @@ import type { InvestmentAction } from './investment';
 
 export type AiProviderType = 'anthropic' | 'openai' | 'ollama' | 'ollama-cloud' | 'openai-compatible' | 'mcp_relay';
 
+/**
+ * Per-query budget overrides sent when creating or updating a provider.
+ * Omitted leaves a budget as it is; `null` clears it back to the default.
+ */
+export interface AiProviderQueryBudgets {
+  queryMaxIterations?: number | null;
+  queryMaxToolCalls?: number | null;
+  queryTimeoutMinutes?: number | null;
+  queryMaxInputTokens?: number | null;
+  queryMaxToolResultChars?: number | null;
+}
+
 export interface AiProviderConfig {
   id: string;
   provider: AiProviderType;
@@ -15,11 +27,22 @@ export interface AiProviderConfig {
   inputCostPer1M: number | null;
   outputCostPer1M: number | null;
   costCurrency: string;
+  /**
+   * Per-query budgets for the AI Assistant's tool-calling loop, owned by this
+   * provider. `null` means the built-in default applies -- the AI_QUERY_*
+   * environment variables size the centrally managed provider only and are
+   * never reflected here.
+   */
+  queryMaxIterations: number | null;
+  queryMaxToolCalls: number | null;
+  queryTimeoutMinutes: number | null;
+  queryMaxInputTokens: number | null;
+  queryMaxToolResultChars: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateAiProviderConfig {
+export interface CreateAiProviderConfig extends AiProviderQueryBudgets {
   provider: AiProviderType;
   displayName?: string;
   model?: string;
@@ -32,7 +55,7 @@ export interface CreateAiProviderConfig {
   costCurrency?: string;
 }
 
-export interface UpdateAiProviderConfig {
+export interface UpdateAiProviderConfig extends AiProviderQueryBudgets {
   displayName?: string;
   model?: string;
   apiKey?: string;

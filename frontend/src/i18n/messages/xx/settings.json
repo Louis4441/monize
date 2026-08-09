@@ -872,7 +872,8 @@
       "heading": "[XX-System Default AI Provider Available-XX]",
       "description": "[XX-A central AI provider has been configured by your administrator-XX]",
       "usedAutomatically": "[XX-It will be used automatically since you have no personal providers configured.-XX]",
-      "personalPriority": "[XX-Your personal providers take priority over the system default.-XX]"
+      "personalPriority": "[XX-Your personal providers take priority over the system default.-XX]",
+      "limitsManaged": "[XX-Its settings, including how much work it may do to answer one question, are managed by your administrator. Add your own provider to control those yourself.-XX]"
     },
     "noProviders": {
       "withSystemDefault": "[XX-No personal AI providers configured. The system default provider will be used.-XX]",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "[XX-Display name must be 100 characters or less-XX]",
         "mustBeNumber": "[XX-Must be a number-XX]",
-        "currencyCode": "[XX-Must be a 3-letter currency code-XX]"
+        "currencyCode": "[XX-Must be a 3-letter currency code-XX]",
+        "budgetRange": "[XX-Must be between {min} and {max}-XX]"
+      },
+      "queryBudgets": {
+        "heading": "[XX-Query limits (optional)-XX]",
+        "help": "[XX-How much work this provider may do to answer one question. Leave a field blank to use the default shown. Raise the analysis steps first if the assistant often stops before it has finished looking.-XX]",
+        "defaultPlaceholder": "[XX-Default: {value}-XX]",
+        "maxIterationsLabel": "[XX-Analysis steps-XX]",
+        "maxIterationsHelp": "[XX-Trips through the tool-calling loop. A smaller local model usually spends one step per lookup.-XX]",
+        "maxToolCallsLabel": "[XX-Data lookups-XX]",
+        "maxToolCallsHelp": "[XX-Total lookups the assistant may make while answering one question.-XX]",
+        "timeoutMinutesLabel": "[XX-Time limit (minutes)-XX]",
+        "timeoutMinutesHelp": "[XX-Wall-clock budget for one question. Raise it for slow local inference.-XX]",
+        "maxInputTokensLabel": "[XX-Input tokens-XX]",
+        "maxInputTokensHelp": "[XX-Total input tokens across all steps. The main cost control for a paid provider.-XX]",
+        "maxToolResultCharsLabel": "[XX-Result size (characters)-XX]",
+        "maxToolResultCharsHelp": "[XX-How much of a single lookup's result the model sees before it is truncated.-XX]"
       }
     },
     "testButton": {

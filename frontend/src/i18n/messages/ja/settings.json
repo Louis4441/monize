@@ -872,7 +872,8 @@
       "heading": "システムデフォルトAIプロバイダーが利用可能",
       "description": "管理者が中央AIプロバイダーを設定しました",
       "usedAutomatically": "個人プロバイダーが設定されていないため、自動的に使用されます。",
-      "personalPriority": "個人プロバイダーはシステムデフォルトより優先されます。"
+      "personalPriority": "個人プロバイダーはシステムデフォルトより優先されます。",
+      "limitsManaged": "このプロバイダーの設定は、1つの質問に費やせる作業量も含めて管理者が管理しています。自分で調整するには、独自のプロバイダーを追加してください。"
     },
     "noProviders": {
       "withSystemDefault": "個人のAIプロバイダーが設定されていません。システムデフォルトプロバイダーが使用されます。",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "表示名は100文字以内で入力してください",
         "mustBeNumber": "数値を入力してください",
-        "currencyCode": "3文字の通貨コードを入力してください"
+        "currencyCode": "3文字の通貨コードを入力してください",
+        "budgetRange": "{min} から {max} の間で入力してください"
+      },
+      "queryBudgets": {
+        "heading": "クエリ制限（任意）",
+        "help": "このプロバイダーが1つの質問に答えるために費やせる作業量です。表示されているデフォルト値を使う場合は空欄のままにしてください。アシスタントが調査を終える前に頻繁に停止する場合は、まず分析ステップを増やしてください。",
+        "defaultPlaceholder": "デフォルト: {value}",
+        "maxIterationsLabel": "分析ステップ",
+        "maxIterationsHelp": "ツール呼び出しループの反復回数。小さなローカルモデルは通常、1回の照会につき1ステップを使います。",
+        "maxToolCallsLabel": "データ照会",
+        "maxToolCallsHelp": "1つの質問に答える間にアシスタントが実行できる照会の合計数。",
+        "timeoutMinutesLabel": "制限時間（分）",
+        "timeoutMinutesHelp": "1つの質問に使える実時間。遅いローカル推論では増やしてください。",
+        "maxInputTokensLabel": "入力トークン",
+        "maxInputTokensHelp": "全ステップ合計の入力トークン数。有料プロバイダーでの主要なコスト管理項目です。",
+        "maxToolResultCharsLabel": "結果サイズ（文字数）",
+        "maxToolResultCharsHelp": "1回の照会結果のうち、切り詰められる前にモデルが読める分量。"
       }
     },
     "testButton": {
