@@ -7,5 +7,14 @@
   },
   "import": {
     "voidedTransactionNote": "Annullata nell'origine; l'importo originale è stato omesso dall'esportazione e importato come zero."
+  },
+  "aiQuery": {
+    "cutoff": {
+      "iterations": "Ho raggiunto il numero massimo di passaggi di analisi per questa domanda, quindi questa risposta si basa sui dati raccolti prima di fermarmi.",
+      "toolCalls": "Ho raggiunto il numero massimo di ricerche di dati per questa domanda, quindi questa risposta si basa sui dati raccolti prima di fermarmi.",
+      "tokens": "Ho raggiunto il budget massimo di analisi per questa domanda, quindi questa risposta si basa sui dati raccolti prima di fermarmi.",
+      "timeout": "Questa domanda ha richiesto più tempo di quello disponibile, quindi questa risposta si basa sui dati raccolti prima di fermarmi."
+    },
+    "synthesisFailed": "Ho raccolto dati per questa domanda, ma non sono riuscito a completare l'analisi, quindi non ho una risposta affidabile. Prova a chiedere qualcosa di più circoscritto."
   }
 }

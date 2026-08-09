@@ -10,6 +10,8 @@
  * the existing MCP limiter, not a hard security boundary.
  */
 
+import { resolvePositiveInt } from "./env-number.util";
+
 export interface WriteOperation {
   userId: string;
   tool: string;
@@ -19,12 +21,12 @@ export interface WriteOperation {
 /**
  * Resolve a daily write limit from a (possibly string) environment value,
  * falling back to `fallback` when the value is missing or not a positive
- * integer. Env vars arrive as strings, so coerce explicitly rather than
- * relying on the value already being numeric.
+ * integer. Thin wrapper over `resolvePositiveInt` so the coercion rules for
+ * numeric env vars live in one place; callers that want to log a bad value
+ * should use `resolvePositiveInt` directly.
  */
 export function resolveDailyWriteLimit(raw: unknown, fallback: number): number {
-  const parsed = typeof raw === "number" ? raw : Number(raw);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  return resolvePositiveInt(raw, fallback).value;
 }
 
 export class DailyWriteLimiter {

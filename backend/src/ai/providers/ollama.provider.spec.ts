@@ -580,6 +580,27 @@ describe("OllamaProvider", () => {
       expect(bodyArg).toContain('"get_account_balances"');
     });
 
+    it("omits the tools field entirely when handed no tools", async () => {
+      // The AI Assistant's final synthesis pass asks for an answer with the
+      // tools withdrawn. `"tools":[]` is a different request from no tools.
+      global.fetch = mockStreamingFetch([
+        '{"message":{"content":"done"},"done":true}\n',
+      ]);
+
+      const gen = provider.streamWithTools(
+        { systemPrompt: "test", messages: [{ role: "user", content: "hi" }] },
+        [],
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _chunk of gen) {
+        // consume
+      }
+
+      const bodyArg = (global.fetch as jest.Mock).mock.calls[0][1].body;
+      expect(bodyArg).not.toContain('"tools"');
+      expect(JSON.parse(bodyArg)).not.toHaveProperty("tools");
+    });
+
     it("calls longRunningFetch (not raw global fetch) so undici timeouts are disabled", async () => {
       // Regression: Node fetch (undici) defaults bodyTimeout to 5 minutes,
       // which kills slow CPU inference. The Ollama provider must call

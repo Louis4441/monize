@@ -131,6 +131,44 @@ This class of bug is invisible to unit tests, which construct payloads by hand a
 
 Every `@IsArray()` DTO property carries `@ArrayMaxSize(n)` beside it -- an unbounded array turns any per-element work downstream (one UPDATE per id inside a transaction) into a denial-of-service lever, and CodeQL flags the loop as `js/loop-bound-injection` (CWE-834). `src/common/array-bound-dto.spec.ts` sweeps validator metadata and fails on a new unbounded property; properties older than the guard are grandfathered there, and that list may only shrink. Relatedly, never use a request value's `.length` as a loop bound inside a `withScopedDb` callback: CodeQL cannot track an outer `Array.isArray` guard through the closure, so iterate `for (const [i, v] of xs.entries())` instead of `for (let i = 0; i < xs.length; i++)`.
 
+## `complete()` is not `completeWithTools()` with the tools left off
+
+The two take the same `AiCompletionRequest`, which makes them look
+interchangeable, and they are not: `complete()` maps messages through
+`toSimpleMessages`, which **filters `role: "tool"` out entirely**. Reach for it
+to summarise a tool-use conversation and you send a transcript stripped of
+every tool result and get back a confident summary of nothing -- no error, no
+empty response, just an answer about no data.
+
+A tool-free turn over a tool-use transcript therefore goes through
+`completeWithTools`/`streamWithTools` with an empty tool list, and every
+provider builds the field with `toolsField` (`src/ai/providers/tools-field.util.ts`)
+so it is **omitted** rather than sent as `[]` -- OpenAI rejects `tools: []`
+outright. `tools-field.util.spec.ts` scans every `*.provider.ts` and fails on a
+bare `tools:` key, so a sixth provider cannot reintroduce it; the per-provider
+specs assert the request body in both directions.
+
+The one caller is `AiQueryService.streamFinalSynthesis`, the pass that turns a
+budget-truncated investigation into an answer instead of an apology.
+
+## A numeric env knob is declared as data, next to its documentation
+
+Coerce every numeric environment variable through `resolvePositiveInt`
+(`src/common/env-number.util.ts`) rather than a bare `Number(...)`: env values
+arrive as strings, and `Number` is willing enough to turn `true` into 1 and
+`[5]` into 5. It separates *absent* from *invalid* so the caller can log the
+second -- a typo that silently runs on the default is an afternoon lost to
+wondering why the setting did nothing.
+
+Where a feature has more than one knob, declare the set as one table of
+`{ envVar, default, description }` and resolve from it in a loop --
+`src/ai/query/query-budgets.ts` is the pattern -- so a new knob cannot be added
+without a name, and a copied spec object that reads a neighbour's variable
+fails a test rather than moving two budgets together. A knob nobody can find is
+not configurable, so `query-budgets.spec.ts` checks `.env.example` in both
+directions: every declared budget is documented with its current default, and
+no `AI_QUERY_*` line documents a variable the code does not read.
+
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock when concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.

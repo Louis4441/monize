@@ -7,5 +7,14 @@
   },
   "import": {
     "voidedTransactionNote": "Kaynakta geçersiz kılındı; orijinal tutar dışa aktarmada yer almadığı için sıfır olarak içe aktarıldı."
+  },
+  "aiQuery": {
+    "cutoff": {
+      "iterations": "Bu soru için en fazla analiz adımı sayısına ulaştım, bu nedenle bu yanıt durmadan önce topladığım verilere dayanıyor.",
+      "toolCalls": "Bu soru için en fazla veri sorgusu sayısına ulaştım, bu nedenle bu yanıt durmadan önce topladığım verilere dayanıyor.",
+      "tokens": "Bu soru için en yüksek analiz bütçesine ulaştım, bu nedenle bu yanıt durmadan önce topladığım verilere dayanıyor.",
+      "timeout": "Bu soru mevcut süreden daha uzun sürdü, bu nedenle bu yanıt durmadan önce topladığım verilere dayanıyor."
+    },
+    "synthesisFailed": "Bu soru için veri topladım ancak analizi tamamlayamadım, bu nedenle güvenilir bir yanıtım yok. Daha dar kapsamlı bir soru sormayı deneyin."
   }
 }
