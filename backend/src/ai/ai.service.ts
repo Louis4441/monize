@@ -188,6 +188,11 @@ export class AiService {
         inputCostPer1M: dto.inputCostPer1M ?? null,
         outputCostPer1M: dto.outputCostPer1M ?? null,
         costCurrency: dto.costCurrency || "USD",
+        queryMaxIterations: dto.queryMaxIterations ?? null,
+        queryMaxToolCalls: dto.queryMaxToolCalls ?? null,
+        queryTimeoutMinutes: dto.queryTimeoutMinutes ?? null,
+        queryMaxInputTokens: dto.queryMaxInputTokens ?? null,
+        queryMaxToolResultChars: dto.queryMaxToolResultChars ?? null,
         isActive: true,
       });
 
@@ -233,6 +238,18 @@ export class AiService {
     if (dto.outputCostPer1M !== undefined)
       config.outputCostPer1M = dto.outputCostPer1M;
     if (dto.costCurrency !== undefined) config.costCurrency = dto.costCurrency;
+    // A budget the user cleared is sent as null and stored as null, which is
+    // what "use the default" is spelled as; only an omitted field is left alone.
+    if (dto.queryMaxIterations !== undefined)
+      config.queryMaxIterations = dto.queryMaxIterations;
+    if (dto.queryMaxToolCalls !== undefined)
+      config.queryMaxToolCalls = dto.queryMaxToolCalls;
+    if (dto.queryTimeoutMinutes !== undefined)
+      config.queryTimeoutMinutes = dto.queryTimeoutMinutes;
+    if (dto.queryMaxInputTokens !== undefined)
+      config.queryMaxInputTokens = dto.queryMaxInputTokens;
+    if (dto.queryMaxToolResultChars !== undefined)
+      config.queryMaxToolResultChars = dto.queryMaxToolResultChars;
 
     if (dto.apiKey !== undefined) {
       if (dto.apiKey) {
@@ -619,6 +636,21 @@ export class AiService {
   }
 
   async getToolUseProvider(userId: string): Promise<AiProvider> {
+    return (await this.resolveToolUseProvider(userId)).provider;
+  }
+
+  /**
+   * The provider that will answer a tool-using query, together with the
+   * configuration it was built from.
+   *
+   * Callers need the configuration as well as the provider because settings
+   * that belong to *this* provider -- the per-query budgets -- live on the
+   * row, and the transient system-default config is marked so those callers
+   * can tell the operator's provider from one the user owns.
+   */
+  async resolveToolUseProvider(
+    userId: string,
+  ): Promise<{ provider: AiProvider; config: AiProviderConfig }> {
     const configs = await this.getActiveConfigs(userId);
 
     for (const config of configs) {
@@ -628,7 +660,7 @@ export class AiService {
       }
       const provider = this.providerFactory.createProvider(config);
       if (provider.supportsToolUse) {
-        return provider;
+        return { provider, config };
       }
     }
 
@@ -670,6 +702,15 @@ export class AiService {
     config.priority = 0;
     config.config = {};
     config.displayName = "System Default";
+    // Marks the operator's provider: it has no row, cannot be edited in AI
+    // Settings, and takes its per-query budgets from the AI_QUERY_* variables
+    // rather than from the per-provider fields below.
+    config.isSystemDefault = true;
+    config.queryMaxIterations = null;
+    config.queryMaxToolCalls = null;
+    config.queryTimeoutMinutes = null;
+    config.queryMaxInputTokens = null;
+    config.queryMaxToolResultChars = null;
 
     const defaultApiKey = this.configService.get<string>("AI_DEFAULT_API_KEY");
     if (defaultApiKey && this.encryptionService.isConfigured()) {
@@ -725,6 +766,11 @@ export class AiService {
       inputCostPer1M: config.inputCostPer1M,
       outputCostPer1M: config.outputCostPer1M,
       costCurrency: config.costCurrency ?? "USD",
+      queryMaxIterations: config.queryMaxIterations ?? null,
+      queryMaxToolCalls: config.queryMaxToolCalls ?? null,
+      queryTimeoutMinutes: config.queryTimeoutMinutes ?? null,
+      queryMaxInputTokens: config.queryMaxInputTokens ?? null,
+      queryMaxToolResultChars: config.queryMaxToolResultChars ?? null,
       createdAt: config.createdAt.toISOString(),
       updatedAt: config.updatedAt.toISOString(),
     };

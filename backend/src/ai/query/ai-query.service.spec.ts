@@ -12,6 +12,28 @@ import {
   OllamaModelDoesNotSupportImagesError,
 } from "../providers/ollama.provider";
 
+/**
+ * The transient configuration `AiService` builds from `AI_DEFAULT_*` for a user
+ * who has configured no provider of their own. Its budgets come from the
+ * environment, which is what `isSystemDefault` says.
+ */
+const systemDefaultConfig = () => ({
+  provider: "anthropic",
+  displayName: "System Default",
+  isSystemDefault: true,
+});
+
+/** A provider row the user owns, optionally carrying its own budgets. */
+const userProviderConfig = (
+  budgets: Partial<Record<string, number | null>> = {},
+) => ({
+  id: "config-1",
+  provider: "ollama",
+  displayName: "My Ollama",
+  isSystemDefault: undefined,
+  ...budgets,
+});
+
 describe("AiQueryService", () => {
   let service: AiQueryService;
   let mockAiService: Record<string, jest.Mock>;
@@ -37,7 +59,12 @@ describe("AiQueryService", () => {
     };
 
     mockAiService = {
-      getToolUseProvider: jest.fn().mockResolvedValue(mockProvider),
+      // The default subject is the centrally managed provider, so the
+      // AI_QUERY_* tests below exercise the surface those variables govern.
+      resolveToolUseProvider: jest.fn().mockResolvedValue({
+        provider: mockProvider,
+        config: systemDefaultConfig(),
+      }),
     };
 
     mockUsageService = {
@@ -407,7 +434,7 @@ describe("AiQueryService", () => {
     it("gets a tool-use provider", async () => {
       await collectEvents(userId, "How much did I spend?");
 
-      expect(mockAiService.getToolUseProvider).toHaveBeenCalledWith(userId);
+      expect(mockAiService.resolveToolUseProvider).toHaveBeenCalledWith(userId);
     });
 
     it("passes messages with safety reminder and system prompt to provider", async () => {
@@ -721,6 +748,161 @@ describe("AiQueryService", () => {
       });
     });
 
+    // The budgets belong to whoever owns the provider. AI_QUERY_* sizes the
+    // centrally managed one; a provider the user configured carries its own on
+    // its row and otherwise runs on the built-in defaults.
+    describe("per-provider budgets (a provider the user configured)", () => {
+      const useUserProvider = (
+        budgets: Partial<Record<string, number | null>> = {},
+      ) => {
+        mockAiService.resolveToolUseProvider.mockResolvedValue({
+          provider: mockProvider,
+          config: userProviderConfig(budgets),
+        });
+      };
+
+      it("gives the same environment two answers, one per owner", async () => {
+        // The rule in a single test: one AI_QUERY_MAX_ITERATIONS, two
+        // providers, and only the operator's own is sized by it.
+        alwaysCallsTools();
+        const raised = QUERY_BUDGET_SPECS.maxIterations.default + 3;
+        const svc = await serviceWithEnv({
+          AI_QUERY_MAX_ITERATIONS: String(raised),
+        });
+
+        await collectEventsFrom(svc, userId, "Central question");
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
+          raised + 1,
+        );
+
+        (mockProvider.completeWithTools as jest.Mock).mockClear();
+        useUserProvider();
+        await collectEventsFrom(svc, userId, "My own provider's question");
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
+          QUERY_BUDGET_SPECS.maxIterations.default + 1,
+        );
+      });
+
+      it("runs more analysis steps when the provider raises its own budget", async () => {
+        alwaysCallsTools();
+        const raised = QUERY_BUDGET_SPECS.maxIterations.default + 3;
+        useUserProvider({ queryMaxIterations: raised });
+
+        await collectEvents(userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
+          raised + 1,
+        );
+      });
+
+      it("runs fewer analysis steps when the provider lowers its own budget", async () => {
+        alwaysCallsTools();
+        useUserProvider({ queryMaxIterations: 2 });
+
+        const events = await collectEvents(userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2 + 1);
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("maximum number of analysis steps");
+      });
+
+      it("stops on the provider's own tool-call budget", async () => {
+        alwaysCallsTools();
+        useUserProvider({ queryMaxToolCalls: 2 });
+
+        const events = await collectEvents(userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2 + 1);
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("maximum number of data lookups");
+      });
+
+      it("stops on the provider's own token budget", async () => {
+        alwaysCallsTools(); // reports 50 input tokens per gathering call
+        // The iteration and tool-call budgets are raised out of the way so
+        // the token budget is the one that fires.
+        useUserProvider({
+          queryMaxInputTokens: QUERY_BUDGET_SPECS.maxInputTokens.min,
+          queryMaxIterations: QUERY_BUDGET_SPECS.maxIterations.max,
+          queryMaxToolCalls: QUERY_BUDGET_SPECS.maxToolCalls.max,
+        });
+
+        const events = await collectEvents(userId, "Deep question");
+
+        const steps = QUERY_BUDGET_SPECS.maxInputTokens.min / 50;
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(steps + 1);
+        expect(
+          events.find((e) => e.type === "content")!.text as string,
+        ).toContain("maximum analysis budget");
+      });
+
+      it("stops on the provider's own timeout, reading the value as minutes", async () => {
+        let now = 0;
+        const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => now);
+        alwaysCallsTools();
+        const withTools = (
+          mockProvider.completeWithTools as jest.Mock
+        ).getMockImplementation()!;
+        (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+          (request: unknown, tools: unknown[]) => {
+            now += 60_000;
+            return withTools(request, tools);
+          },
+        );
+        useUserProvider({ queryTimeoutMinutes: 2 });
+
+        try {
+          const events = await collectEvents(userId, "Slow question");
+
+          expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(3 + 1);
+          expect(
+            events.find((e) => e.type === "content")!.text as string,
+          ).toContain("longer than the time available");
+        } finally {
+          nowSpy.mockRestore();
+        }
+      });
+
+      it("truncates a tool result at the provider's own character budget", async () => {
+        alwaysCallsTools();
+        const chars = QUERY_BUDGET_SPECS.maxToolResultChars.min;
+        mockToolExecutor.execute.mockResolvedValue({
+          data: { blob: "x".repeat(chars * 3) },
+          summary: "A very large result",
+          sources: [],
+        });
+        useUserProvider({
+          queryMaxToolResultChars: chars,
+          queryMaxIterations: 2,
+        });
+
+        await collectEvents(userId, "Big result question");
+
+        const secondCall = (mockProvider.completeWithTools as jest.Mock).mock
+          .calls[1][0] as { messages: Array<Record<string, unknown>> };
+        const toolMessage = secondCall.messages.find((m) => m.role === "tool");
+        expect(toolMessage!.content).toContain("[truncated, data too large]");
+        expect((toolMessage!.content as string).length).toBeLessThan(chars * 3);
+      });
+
+      it("falls back to the default when a stored budget is out of range", async () => {
+        // Only a hand-edited row or a restored artifact can hold one, and the
+        // documented default is a better answer than a number nobody chose.
+        alwaysCallsTools();
+        useUserProvider({
+          queryMaxIterations: QUERY_BUDGET_SPECS.maxIterations.max + 1,
+        });
+
+        await collectEvents(userId, "Deep question");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(
+          QUERY_BUDGET_SPECS.maxIterations.default + 1,
+        );
+      });
+    });
+
     describe("final synthesis pass", () => {
       it("asks the provider for an answer with no tools", async () => {
         alwaysCallsTools();
@@ -974,7 +1156,7 @@ describe("AiQueryService", () => {
     });
 
     it("yields error when no AI provider is available", async () => {
-      mockAiService.getToolUseProvider.mockRejectedValueOnce(
+      mockAiService.resolveToolUseProvider.mockRejectedValueOnce(
         new BadRequestException("No AI provider with tool use support"),
       );
 
@@ -1477,7 +1659,10 @@ describe("AiQueryService", () => {
           },
         ],
       ]);
-      mockAiService.getToolUseProvider.mockResolvedValueOnce(streamingProvider);
+      mockAiService.resolveToolUseProvider.mockResolvedValueOnce({
+        provider: streamingProvider,
+        config: systemDefaultConfig(),
+      });
 
       const events = await collectEvents(userId, "What are my balances?");
 
@@ -1527,7 +1712,10 @@ describe("AiQueryService", () => {
           },
         ],
       ]);
-      mockAiService.getToolUseProvider.mockResolvedValueOnce(streamingProvider);
+      mockAiService.resolveToolUseProvider.mockResolvedValueOnce({
+        provider: streamingProvider,
+        config: systemDefaultConfig(),
+      });
 
       const events = await collectEvents(userId, "What's my balance?");
 
@@ -1573,7 +1761,10 @@ describe("AiQueryService", () => {
           }),
         }),
       };
-      mockAiService.getToolUseProvider.mockResolvedValueOnce(streamingProvider);
+      mockAiService.resolveToolUseProvider.mockResolvedValueOnce({
+        provider: streamingProvider,
+        config: systemDefaultConfig(),
+      });
 
       const events = await collectEvents(userId, "What's up?");
 
@@ -1611,9 +1802,9 @@ describe("AiQueryService", () => {
     });
 
     it("yields error when provider has neither streamWithTools nor completeWithTools", async () => {
-      mockAiService.getToolUseProvider.mockResolvedValueOnce({
-        name: "broken",
-        supportsToolUse: true,
+      mockAiService.resolveToolUseProvider.mockResolvedValueOnce({
+        provider: { name: "broken", supportsToolUse: true },
+        config: systemDefaultConfig(),
       });
 
       const events = await collectEvents(userId, "ping");
@@ -1627,32 +1818,35 @@ describe("AiQueryService", () => {
   // ==========================================================================
   describe("executeQuery() with streaming provider", () => {
     it("joins assistant_text deltas via the final content event", async () => {
-      mockAiService.getToolUseProvider.mockResolvedValueOnce({
-        name: "ollama",
-        supportsToolUse: true,
-        streamWithTools: jest.fn().mockReturnValue({
-          [Symbol.asyncIterator]: () => {
-            const chunks = [
-              { type: "text", text: "Hello " },
-              { type: "text", text: "world." },
-              {
-                type: "done",
-                content: "Hello world.",
-                toolCalls: [],
-                usage: { inputTokens: 5, outputTokens: 3 },
-                model: "llama3",
-                stopReason: "end_turn",
-              },
-            ];
-            let i = 0;
-            return {
-              next: () =>
-                i < chunks.length
-                  ? Promise.resolve({ value: chunks[i++], done: false })
-                  : Promise.resolve({ value: undefined, done: true }),
-            };
-          },
-        }),
+      mockAiService.resolveToolUseProvider.mockResolvedValueOnce({
+        config: systemDefaultConfig(),
+        provider: {
+          name: "ollama",
+          supportsToolUse: true,
+          streamWithTools: jest.fn().mockReturnValue({
+            [Symbol.asyncIterator]: () => {
+              const chunks = [
+                { type: "text", text: "Hello " },
+                { type: "text", text: "world." },
+                {
+                  type: "done",
+                  content: "Hello world.",
+                  toolCalls: [],
+                  usage: { inputTokens: 5, outputTokens: 3 },
+                  model: "llama3",
+                  stopReason: "end_turn",
+                },
+              ];
+              let i = 0;
+              return {
+                next: () =>
+                  i < chunks.length
+                    ? Promise.resolve({ value: chunks[i++], done: false })
+                    : Promise.resolve({ value: undefined, done: true }),
+              };
+            },
+          }),
+        },
       });
 
       const result = await service.executeQuery(userId, "ping");

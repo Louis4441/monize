@@ -28,6 +28,11 @@ const relayConfig: AiProviderConfig = {
   inputCostPer1M: null,
   outputCostPer1M: null,
   costCurrency: 'USD',
+  queryMaxIterations: null,
+  queryMaxToolCalls: null,
+  queryTimeoutMinutes: null,
+  queryMaxInputTokens: null,
+  queryMaxToolResultChars: null,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
 };

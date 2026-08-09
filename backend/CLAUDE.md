@@ -169,6 +169,39 @@ not configurable, so `query-budgets.spec.ts` checks `.env.example` in both
 directions: every declared budget is documented with its current default, and
 no `AI_QUERY_*` line documents a variable the code does not read.
 
+## An environment variable configures the deployment's own resource, not somebody else's
+
+The AI provider is the worked example, and it has two owners. `AI_DEFAULT_*`
+builds the **centrally managed** provider -- the operator's, used for anyone who
+has configured none of their own, editable nowhere in the UI. Everything else in
+`ai_provider_configs` is a row a *user* created, pointed at their own key or
+their own Ollama box, and can see and edit.
+
+A setting about how hard the assistant may work belongs to whichever of those
+two owns the provider. So `AI_QUERY_*` sizes the central provider only, and a
+user's provider carries the same five budgets as nullable columns on its row,
+set per provider in Settings -> AI and defaulting to the built-in numbers --
+never to the environment. `resolveQueryBudgetsForConfig` is the single place
+that decision is made; `AiService.resolveToolUseProvider` hands the caller the
+configuration alongside the provider so it can be made at all, and the transient
+system-default config is marked `isSystemDefault` because that is the only thing
+distinguishing it from a row.
+
+Before adding an env var for anything a user can also configure, ask which
+resource it describes. An operator's ceiling for the model they host says
+nothing about the model somebody else is paying for, and a global limit quietly
+reshaping a configuration the user is looking at reads as a broken form rather
+than as a policy. The reverse mistake is worse: a per-user knob for something
+the operator is paying for hands out their budget.
+
+`query-budgets.spec.ts` holds the split from both sides -- the environment must
+not reach a user's provider, and a stored value outside the declared range falls
+back to the documented default rather than being clamped to a number nobody
+chose. The bounds live in the same spec table as the defaults, so the DTO
+(`QueryBudgetFieldsDto`), the migration and the frontend form all derive from
+one place; the form's copy of the numbers is checked against it by
+`frontend/src/lib/ai-query-budgets.contract.test.ts`.
+
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock when concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.

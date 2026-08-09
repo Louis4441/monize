@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@/test/render';
 import { ProviderConfigForm } from './ProviderConfigForm';
+import { AI_QUERY_BUDGET_FIELDS } from '@/lib/ai-query-budgets';
 
 const mockGetRelayStatus = vi.fn();
 
@@ -38,6 +39,18 @@ describe('ProviderConfigForm — MCP Relay provider type', () => {
       fireEvent.change(select, { target: { value: 'mcp_relay' } });
     });
   }
+
+  it('hides the per-query budgets, which the relay never runs a loop for', async () => {
+    // The relay is not an LLM of ours: the prompt goes to the user's own
+    // agent, so there is no tool-calling loop here to put a ceiling on.
+    await selectRelay();
+
+    for (const field of AI_QUERY_BUDGET_FIELDS) {
+      expect(
+        document.querySelector(`input[name="${field.name}"]`),
+      ).toBeNull();
+    }
+  });
 
   it('swaps LLM fields for the connect instructions and live status', async () => {
     await selectRelay();

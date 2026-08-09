@@ -872,7 +872,8 @@
       "heading": "System Default AI Provider Available",
       "description": "A central AI provider has been configured by your administrator",
       "usedAutomatically": "It will be used automatically since you have no personal providers configured.",
-      "personalPriority": "Your personal providers take priority over the system default."
+      "personalPriority": "Your personal providers take priority over the system default.",
+      "limitsManaged": "Its settings, including how much work it may do to answer one question, are managed by your administrator. Add your own provider to control those yourself."
     },
     "noProviders": {
       "withSystemDefault": "No personal AI providers configured. The system default provider will be used.",
@@ -938,7 +939,23 @@
       "validation": {
         "displayNameMax": "Display name must be 100 characters or less",
         "mustBeNumber": "Must be a number",
-        "currencyCode": "Must be a 3-letter currency code"
+        "currencyCode": "Must be a 3-letter currency code",
+        "budgetRange": "Must be between {min} and {max}"
+      },
+      "queryBudgets": {
+        "heading": "Query limits (optional)",
+        "help": "How much work this provider may do to answer one question. Leave a field blank to use the default shown. Raise the analysis steps first if the assistant often stops before it has finished looking.",
+        "defaultPlaceholder": "Default: {value}",
+        "maxIterationsLabel": "Analysis steps",
+        "maxIterationsHelp": "Trips through the tool-calling loop. A smaller local model usually spends one step per lookup.",
+        "maxToolCallsLabel": "Data lookups",
+        "maxToolCallsHelp": "Total lookups the assistant may make while answering one question.",
+        "timeoutMinutesLabel": "Time limit (minutes)",
+        "timeoutMinutesHelp": "Wall-clock budget for one question. Raise it for slow local inference.",
+        "maxInputTokensLabel": "Input tokens",
+        "maxInputTokensHelp": "Total input tokens across all steps. The main cost control for a paid provider.",
+        "maxToolResultCharsLabel": "Result size (characters)",
+        "maxToolResultCharsHelp": "How much of a single lookup's result the model sees before it is truncated."
       }
     },
     "testButton": {

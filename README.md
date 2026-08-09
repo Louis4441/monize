@@ -349,10 +349,15 @@ npm run dev
 | `SMTP_PASSWORD` | SMTP password | - |
 | `EMAIL_FROM` | Email sender address | - |
 | `AI_ENCRYPTION_KEY` | Encryption key for AI API keys (`openssl rand -hex 32`) | - |
-| `AI_DEFAULT_PROVIDER` | System-level default AI provider | - |
+| `AI_DEFAULT_PROVIDER` | System-level default AI provider (the centrally managed AI) | - |
 | `AI_DEFAULT_MODEL` | Default model for the provider | - |
 | `AI_DEFAULT_API_KEY` | System-wide AI API key | - |
 | `AI_DEFAULT_BASE_URL` | Base URL for Ollama or compatible endpoints | - |
+| `AI_QUERY_MAX_ITERATIONS` | Analysis steps per AI Assistant question, centrally managed provider only | `5` |
+| `AI_QUERY_MAX_TOOL_CALLS` | Data lookups per question, centrally managed provider only | `15` |
+| `AI_QUERY_TIMEOUT_MINUTES` | Wall-clock minutes per question, centrally managed provider only | `20` |
+| `AI_QUERY_MAX_INPUT_TOKENS` | Cumulative input tokens per question, centrally managed provider only | `200000` |
+| `AI_QUERY_MAX_TOOL_RESULT_CHARS` | Characters kept from one tool result, centrally managed provider only | `50000` |
 | `JWT_EXPIRATION` | JWT token expiration time | `15m` |
 | `REMEMBER_ME_DAYS` | Duration for "Remember Me" sessions (days) | `30` |
 | `DISABLE_HTTPS_HEADERS` | Disable HSTS and COOP headers for plain HTTP | `false` |
@@ -362,6 +367,12 @@ npm run dev
 | `ATTACHMENT_CONTAINER_DIR` | Container folder local attachments are written to (was `ATTACHMENT_LOCAL_DIR`) | `/data/attachments` |
 | `ATTACHMENT_HOST_DIR` | Host folder mapped to `ATTACHMENT_CONTAINER_DIR` by docker-compose | `./monize/attachments` |
 | `SMTP_SECURE` | Use TLS for SMTP | `false` |
+
+The `AI_DEFAULT_*` and `AI_QUERY_*` variables configure the **centrally managed
+AI** -- the provider used for any user who has not configured one of their own.
+A user who adds their own provider in Settings -> AI owns its settings
+completely, per-provider query limits included, and the environment does not
+reach them.
 
 
 ## Deployment

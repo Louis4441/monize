@@ -53,6 +53,11 @@ const mockConfig: AiProviderConfig = {
   inputCostPer1M: null,
   outputCostPer1M: null,
   costCurrency: 'USD',
+  queryMaxIterations: null,
+  queryMaxToolCalls: null,
+  queryTimeoutMinutes: null,
+  queryMaxInputTokens: null,
+  queryMaxToolResultChars: null,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
 };
@@ -237,6 +242,11 @@ describe('ProviderList', () => {
       inputCostPer1M: 3.0,
       outputCostPer1M: 15.0,
       costCurrency: 'USD',
+      queryMaxIterations: null,
+      queryMaxToolCalls: null,
+      queryTimeoutMinutes: null,
+      queryMaxInputTokens: null,
+      queryMaxToolResultChars: null,
     };
 
     render(
@@ -569,5 +579,39 @@ describe('ProviderList', () => {
         ),
       ).toBe(false);
     });
+  });
+});
+
+describe('ProviderList — the centrally managed provider', () => {
+  it('says its limits are the administrator\'s, so the per-provider ones do not read as missing', () => {
+    render(
+      <ProviderList
+        configs={[]}
+        encryptionAvailable={true}
+        onConfigsChanged={vi.fn()}
+        hasSystemDefault={true}
+        systemDefaultProvider="anthropic"
+        systemDefaultModel="claude-sonnet-4-20250514"
+      />,
+    );
+
+    expect(
+      screen.getByText(/managed by your administrator/i),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing about administrator-managed limits when there is no system default', () => {
+    render(
+      <ProviderList
+        configs={[]}
+        encryptionAvailable={true}
+        onConfigsChanged={vi.fn()}
+        hasSystemDefault={false}
+      />,
+    );
+
+    expect(
+      screen.queryByText(/managed by your administrator/i),
+    ).not.toBeInTheDocument();
   });
 });

@@ -31,7 +31,11 @@ import { MAX_HISTORY_MESSAGES, AttachmentDto } from "./dto/ai-query.dto";
 import { validateAttachments } from "./attachment-validation";
 import { tr } from "../../i18n/translate";
 import { PendingAiAction } from "../actions/ai-action.types";
-import { QueryBudgets, resolveQueryBudgets } from "./query-budgets";
+import {
+  QueryBudgets,
+  resolveQueryBudgets,
+  resolveQueryBudgetsForConfig,
+} from "./query-budgets";
 
 /** Which per-query budget stopped the tool-calling loop. */
 export type QueryCutoffReason =
@@ -112,11 +116,13 @@ export class AiQueryService {
   private readonly logger = new Logger(AiQueryService.name);
 
   /**
-   * Per-query resource budgets, resolved once at construction from the
-   * environment. Read from `this.budgets` rather than module constants so a
-   * deployment can size the loop for the provider it actually runs.
+   * Per-query resource budgets for the **centrally managed** provider,
+   * resolved once at construction from the `AI_QUERY_*` environment. A query
+   * answered by a provider the user configured themselves runs on that row's
+   * own budgets instead -- resolved per query, because which provider answers
+   * is not known until one is selected.
    */
-  private readonly budgets: QueryBudgets;
+  private readonly centralBudgets: QueryBudgets;
 
   constructor(
     private readonly aiService: AiService,
@@ -125,7 +131,7 @@ export class AiQueryService {
     private readonly toolExecutor: ToolExecutorService,
     @Optional() configService?: ConfigService,
   ) {
-    this.budgets = resolveQueryBudgets(configService, this.logger);
+    this.centralBudgets = resolveQueryBudgets(configService, this.logger);
   }
 
   async executeQuery(
@@ -236,10 +242,23 @@ export class AiQueryService {
     }
 
     let provider: AiProvider;
+    // The budgets belong to whichever provider answers: the operator's
+    // environment for the centrally managed one, the user's own row for a
+    // provider they configured. Resolved here, once the provider is known.
+    let budgets: QueryBudgets;
     try {
-      provider = await this.aiService.getToolUseProvider(userId);
+      const resolved = await this.aiService.resolveToolUseProvider(userId);
+      provider = resolved.provider;
+      budgets = resolveQueryBudgetsForConfig(
+        resolved.config,
+        this.centralBudgets,
+        this.logger,
+      );
       this.logger.log(
-        `Provider selected user=${userId} provider=${provider.name} streaming=${!!provider.streamWithTools}`,
+        `Provider selected user=${userId} provider=${provider.name} streaming=${!!provider.streamWithTools} ` +
+          `systemDefault=${!!resolved.config.isSystemDefault} maxIterations=${budgets.maxIterations} ` +
+          `maxToolCalls=${budgets.maxToolCalls} maxInputTokens=${budgets.maxInputTokens} ` +
+          `timeoutMs=${budgets.queryTimeoutMs} maxToolResultChars=${budgets.maxToolResultChars}`,
       );
     } catch (error) {
       const message =
@@ -307,16 +326,12 @@ export class AiQueryService {
     // once below -- by the model, from the data it managed to gather.
     let cutoff: QueryCutoffReason = "iterations";
 
-    for (
-      let iteration = 0;
-      iteration < this.budgets.maxIterations;
-      iteration++
-    ) {
+    for (let iteration = 0; iteration < budgets.maxIterations; iteration++) {
       this.logger.log(
         `Iteration ${iteration} start user=${userId} provider=${provider.name} messages=${messages.length} inputTokensSoFar=${totalInputTokens} toolCallsSoFar=${totalToolCalls}`,
       );
       // LLM04-F2: Enforce overall query timeout
-      if (Date.now() - startTime > this.budgets.queryTimeoutMs) {
+      if (Date.now() - startTime > budgets.queryTimeoutMs) {
         this.logger.warn(
           `Query timeout reached for user ${userId} after ${iteration} iterations`,
         );
@@ -325,7 +340,7 @@ export class AiQueryService {
       }
 
       // LLM04-F1: Enforce per-query tool call budget
-      if (totalToolCalls >= this.budgets.maxToolCalls) {
+      if (totalToolCalls >= budgets.maxToolCalls) {
         this.logger.warn(
           `Tool call budget exhausted for user ${userId} (${totalToolCalls} calls)`,
         );
@@ -334,7 +349,7 @@ export class AiQueryService {
       }
 
       // LLM04-F3: Enforce token budget
-      if (totalInputTokens >= this.budgets.maxInputTokens) {
+      if (totalInputTokens >= budgets.maxInputTokens) {
         this.logger.warn(
           `Token budget exhausted for user ${userId} (${totalInputTokens} input tokens)`,
         );
@@ -604,9 +619,9 @@ export class AiQueryService {
         const sanitizedData = sanitizeToolResultStrings(llmFacingData);
         // LLM08-F2: Truncate oversized tool results to prevent context bloat
         let toolResultContent = JSON.stringify(sanitizedData);
-        if (toolResultContent.length > this.budgets.maxToolResultChars) {
+        if (toolResultContent.length > budgets.maxToolResultChars) {
           toolResultContent =
-            toolResultContent.substring(0, this.budgets.maxToolResultChars) +
+            toolResultContent.substring(0, budgets.maxToolResultChars) +
             '... [truncated, data too large]"';
         }
         const toolResultMessage: AiMessage = {
