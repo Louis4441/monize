@@ -668,8 +668,15 @@ export class MnyImportJobService {
         reportProgress: (progress) =>
           this.reportProgress(jobId, attemptToken, progress),
       });
-      await this.complete(jobId, attemptToken, result);
-      this.logger.log(`Import job ${jobId} completed`);
+      // Gated on the compare-and-set, not on reaching this line. `complete`
+      // refuses when the reaper already failed this job, and the whole point of
+      // that refusal is that the run did *not* finish supervised -- so logging
+      // "completed" beside `complete`'s own warning would put the operator's
+      // only two lines about this job in direct contradiction, with the false
+      // one the more visible.
+      if (await this.complete(jobId, attemptToken, result)) {
+        this.logger.log(`Import job ${jobId} completed`);
+      }
     } catch (error) {
       const isParseFailure = error instanceof MnyImportError;
       const detail = error instanceof Error ? error.message : String(error);

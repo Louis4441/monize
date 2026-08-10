@@ -617,6 +617,41 @@ describe("MnyImportJobService", () => {
       expect(sql(lastCall())).toContain("SET status = 'completed'");
     });
 
+    it("does not log a completion the compare-and-set refused", async () => {
+      // The reaper failed this job while the worker was finishing, so
+      // `complete`'s `status = 'running' AND attempt_token = $2` matches nothing
+      // and the terminal state it already wrote stands. Logging "completed"
+      // anyway put the operator's only two lines about this job in direct
+      // contradiction -- and the false one is the one that reads as an outcome.
+      const log = jest.spyOn(service["logger"], "log");
+      const warn = jest.spyOn(service["logger"], "warn");
+      query.mockImplementation((statement: string) =>
+        /SET status = 'completed'/.test(statement)
+          ? Promise.resolve([[], 0])
+          : Promise.resolve([[{ id: "job-1" }], 1]),
+      );
+      const body = jest.fn().mockResolvedValue({ accountsCreated: 1 });
+
+      expect(await service.runClaimed("user-1", "job-1", body)).toBe(true);
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("no longer running"),
+      );
+      expect(log).not.toHaveBeenCalledWith(
+        expect.stringContaining("completed"),
+      );
+    });
+
+    it("logs the completion when the compare-and-set took", async () => {
+      // The other half, so the guard above cannot pass by never logging at all.
+      const log = jest.spyOn(service["logger"], "log");
+      const body = jest.fn().mockResolvedValue({ accountsCreated: 1 });
+
+      await service.runClaimed("user-1", "job-1", body);
+
+      expect(log).toHaveBeenCalledWith("Import job job-1 completed");
+    });
+
     it("gives the body a progress channel wired to this job", async () => {
       const body = jest.fn(async (context) => {
         await context.reportProgress({
@@ -760,7 +795,12 @@ describe("MnyImportJobService", () => {
       await service.reapStaleJobs();
 
       const statement = sql(query.mock.calls[0]);
-      expect(statement).toContain("WHEN data_committed THEN $3");
+      // Interpolated rather than bound, because `reapStatement` is shared by the
+      // cron sweep and the per-user reap and they must not be able to pass
+      // different keys.
+      expect(statement).toContain(
+        `WHEN data_committed THEN '${JOB_COMMITTED_STALLED_ERROR_KEY}'`,
+      );
       expect(statement).toContain("not safe to repeat");
     });
 
