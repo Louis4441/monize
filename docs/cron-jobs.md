@@ -34,6 +34,7 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 | `holdings.service` | `30 * * * *` | Hourly at :30 | Apply matured fixed-term investment holdings |
 | `emergency-access-monitor.service` | `0 09 * * *` | Daily 9 AM | Advance emergency-access requests past their waiting period and notify |
 | `updates.service` | `0 0-23/12 * * *` | Every 12 hours | Refresh the cached latest-release metadata for the What's New digest |
+| `attachment-orphan-sweeper.service` | `0 0-23/1 * * *` | Hourly | Delete attachment bytes whose metadata is gone, and objects left by an abandoned upload; retains a swept upload intent for its late-write quarantine (no-op for the `database` provider) |
 
 Every row above is checked against the source by `backend/src/common/cron-doc.spec.ts`, and
 not for membership only: the Cron column is compared verbatim -- timezone included -- against

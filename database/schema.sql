@@ -406,11 +406,10 @@ CREATE TABLE attachment_blob_tombstones (
     last_error TEXT
 );
 
--- The sweeper's candidate predicate: rows with no live upload lease, plus the
--- quarantined rows it has to come back to.
-CREATE INDEX idx_abt_quarantined
-    ON attachment_blob_tombstones(storage_provider, late_write_quarantine_until)
-    WHERE late_write_quarantine_until IS NOT NULL;
+-- The sweeper's candidate predicate: rows with no live upload lease. A quarantined
+-- row is found again through this same arm, because the claim that quarantined it
+-- also cleared the lease -- which is why `late_write_quarantine_until` carries no
+-- index of its own (migration 145): nothing selects on it.
 CREATE INDEX idx_abt_sweepable
     ON attachment_blob_tombstones(storage_provider, deleted_at)
     WHERE upload_lease_expires_at IS NULL;
@@ -447,9 +446,11 @@ CREATE TRIGGER trg_attachment_blob_tombstone
 
 -- Late-write quarantine enforcement (migration 148). The sweeper's claim settles
 -- what metadata may commit, not what bytes exist: a put stalled past its lease can
--- land after the key was deleted. These two triggers make the quarantine hold
--- across a rolling deployment, where a previous-release sweeper would otherwise
--- claim, delete the object, and unconditionally drop the tombstone.
+-- land after the key was deleted. The quarantine is a rule spread across the claim,
+-- the retire and the uploader's compensating clear, and these two triggers are what
+-- make a forgotten predicate in any of them fail loudly rather than silently drop a
+-- row whose key may still be written. Covers DELETE only -- TRUNCATE fires no
+-- row-level trigger.
 CREATE OR REPLACE FUNCTION stamp_attachment_quarantine() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -462,9 +463,9 @@ BEGIN
 END;
 $$;
 
--- On any sweeper's claim (swept_at NULL -> non-NULL) of a row that was an upload
--- intent (it had a lease), stamp the quarantine if unset. Covers the previous
--- binary's claim, which does not know the column exists.
+-- On any claim (swept_at NULL -> non-NULL) of a row that was an upload intent (it
+-- had a lease), stamp the quarantine if unset. Covers a writer that does not know
+-- the column exists; COALESCE lets the application's own value win.
 CREATE TRIGGER trg_abt_stamp_quarantine
     BEFORE UPDATE ON attachment_blob_tombstones
     FOR EACH ROW
@@ -485,9 +486,9 @@ BEGIN
 END;
 $$;
 
--- Reject deletion of a still-quarantined row. Refuses the previous binary's
--- unconditional post-sweep DELETE; the new sweeper's retire() and the uploader's
--- intent-clear both target only rows this excludes, so neither trips it.
+-- Reject deletion of a still-quarantined row. retire()/retireKey() exclude such
+-- rows by the quarantine and both uploader clears exclude them by `swept_at IS
+-- NULL`, so no application path should ever trip this.
 CREATE TRIGGER trg_abt_reject_quarantined_delete
     BEFORE DELETE ON attachment_blob_tombstones
     FOR EACH ROW

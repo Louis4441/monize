@@ -536,7 +536,8 @@
     "empty": "O arquivo enviado está vazio",
     "fileTooLarge": "O arquivo excede o tamanho máximo de {{ max }} bytes",
     "unsupportedType": "Tipo de arquivo não suportado. Tipos permitidos: {{ types }}",
-    "tooMany": "Esta transação já tem o máximo de {{ max }} anexos"
+    "tooMany": "Esta transação já tem o máximo de {{ max }} anexos",
+    "swept": "O upload demorou demais e seu armazenamento foi liberado. Tente novamente."
   },
   "strategies": {
     "accountNotFound": "Conta não encontrada",

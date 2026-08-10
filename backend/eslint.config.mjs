@@ -22,8 +22,9 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/ai/ai-usage.service.ts",
   "src/ai/insights/ai-insights.service.ts",
   // Blob-tombstone sweep: a cron fan-out that reclaims orphaned attachment
-  // bytes across every user's sharded folder, with no request to inherit an
-  // identity from -- system context by construction.
+  // bytes across every user, and past them -- a tombstone outlives its owner
+  // and its user_id is then NULL, so no user context can see it. No request to
+  // inherit an identity from either; system context by construction.
   "src/attachments/attachment-orphan-sweeper.service.ts",
   "src/auth/auth.controller.ts",
   "src/auth/auth.service.ts",

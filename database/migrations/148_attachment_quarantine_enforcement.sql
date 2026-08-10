@@ -1,41 +1,44 @@
--- 148: enforce the attachment late-write quarantine in the database, so a
--- previous-release sweeper cannot bypass it during a rolling deployment.
+-- 148: enforce the attachment late-write quarantine in the database, so that
+-- deleting a tombstone early takes a deliberate act rather than an omission.
 --
--- Migration 143 added `late_write_quarantine_until` and the new sweeper retains a
--- swept upload intent until it passes, re-deleting the key each hour. That closed
--- the process-death window for the *new* code. It did nothing for a previous-release
--- pod, whose sweeper is (audit V4R3-003):
+-- Migration 147 added `late_write_quarantine_until` and the sweeper retains a swept
+-- upload intent until it passes, re-deleting the key each hour (audit V4R3-003).
+-- That is a rule spread across three statements in two files -- the claim that
+-- stamps the window, the retire that respects it, and the uploader's compensating
+-- clear -- and each of them is one forgotten predicate away from dropping a row
+-- while bytes may still be written at its key.
 --
---     1. claim:  UPDATE ... SET swept_at = now(), upload_lease_expires_at = NULL ...
---     2. delete the object
---     3. DELETE FROM attachment_blob_tombstones WHERE storage_provider=.. AND storage_key=..
+-- Not hypothetical: `AttachmentsService.clearCommittedUploadIntent` was written
+-- without the predicate and deleted the row unconditionally in the `catch` of
+-- `create`, which is the one place a stalled put is most likely to be outstanding.
+-- It is fenced now. The trigger is what makes the next one fail loudly instead of
+-- silently reintroducing RRV4-002.
 --
--- Step 3 is unconditional. During a rollout the old pod can therefore claim a row,
--- delete the object, and drop the tombstone -- and a put that stalled past its lease
--- can still land afterwards, leaving bytes nothing references and no row names. The
--- new column alone does not stop that, exactly as migration 142's nullable column
--- did not stop the old MNY checkpoint; the fix has to live where both binaries meet.
+-- Two triggers:
 --
--- Two triggers do that:
+--   * BEFORE UPDATE: when a claim turns a row that *was* an upload intent (it had
+--     a lease) into a swept row, stamp `late_write_quarantine_until` if it is not
+--     already set. `COALESCE` means the application's own value wins and a re-claim
+--     never pushes the deadline forward. A writer that does not know the column
+--     exists -- an older binary during a rollback, a psql session -- still stamps it.
 --
---   * BEFORE UPDATE: when any sweeper's claim turns a row that *was* an upload
---     intent (it had a lease) into a swept row, stamp `late_write_quarantine_until`
---     if it is not already set. The old sweeper's claim in step 1 fires this, so the
---     old pod stamps the quarantine it does not know about. `COALESCE` means the new
---     code's own value wins and a re-claim never pushes the deadline forward.
+--   * BEFORE DELETE: reject deletion of a row whose quarantine has not passed, so
+--     the tombstone survives and the next sweep re-deletes the key before retiring
+--     the row. Every application path is written to exclude such rows already --
+--     `retire()`/`retireKey()` by the quarantine, both uploader clears by
+--     `swept_at IS NULL` -- so nothing in this release should ever trip it.
 --
---   * BEFORE DELETE: reject deletion of a row whose quarantine has not passed. The
---     old sweeper's unconditional step-3 DELETE is refused, its transaction aborts,
---     and the tombstone survives -- so the next sweep (old or new) re-deletes the key
---     and only retires the row once nothing can still be written at it. The new
---     sweeper's `retire()` already deletes only past-quarantine rows, so it never
---     trips this; the uploader's intent-clear deletes only un-swept rows
---     (quarantine still NULL), so it does not either.
+-- What this does NOT cover: `TRUNCATE` fires no row-level BEFORE DELETE trigger.
+-- The test helpers truncate `users` CASCADE, which reaches this table. Enforcement
+-- is over `DELETE`, which is every path production has.
 --
 -- The wall-clock window remains a latency choice, not the correctness mechanism:
 -- correctness is that the record outlives the writer and the key is re-deleted every
--- pass. See `LATE_WRITE_QUARANTINE_MS` and the storage provider's request timeout,
--- which is set below the window so a put cannot ordinarily complete after it.
+-- pass. See `LATE_WRITE_QUARANTINE_MS` -- pinned to the interval below by
+-- `attachment-orphan-sweeper.service.spec.ts` -- and the S3 provider's
+-- `S3_REQUEST_TIMEOUT_MS`, set well below the window so a put cannot ordinarily
+-- complete after it. `LocalStorageProvider` has no equivalent bound and needs none:
+-- a local write does not stall for hours.
 --
 -- Idempotent: CREATE OR REPLACE FUNCTION, triggers dropped first.
 

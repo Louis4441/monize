@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -8,7 +9,7 @@ import {
   UnsupportedMediaTypeException,
 } from "@nestjs/common";
 import { createHash, randomUUID } from "crypto";
-import { DataSource, EntityManager } from "typeorm";
+import { DataSource, EntityManager, IsNull } from "typeorm";
 import {
   runOutsideActiveScopedManager,
   withScopedDb,
@@ -45,11 +46,20 @@ export const UPLOAD_INTENT_LEASE_MS = 15 * 60 * 1000;
  * Thrown inside that transaction, so it rolls back -- the alternative is a
  * committed attachment row whose bytes have been deleted, which a successful 201
  * makes invisible until someone tries to download their receipt.
+ *
+ * A `ConflictException`, because a lost race is what happened and retrying is what
+ * the client should do. As a bare `Error` this escaped `create` as a 500 carrying
+ * an untranslated internal message -- neither of which is true of it. The storage
+ * key stays a property rather than going in the message: it is a diagnostic, and
+ * the client has no use for it.
  */
-export class AttachmentObjectSweptError extends Error {
-  constructor(storageKey: string) {
+export class AttachmentObjectSweptError extends ConflictException {
+  constructor(readonly storageKey: string) {
     super(
-      `Attachment object ${storageKey} was swept as an orphan before its metadata committed`,
+      tr(
+        "errors.attachments.swept",
+        "The upload took too long and its storage was reclaimed. Please try again.",
+      ),
     );
     this.name = "AttachmentObjectSweptError";
   }
@@ -259,9 +269,12 @@ export class AttachmentsService {
    *
    * A tombstone means "these bytes may exist and nothing references them", which
    * is exactly true of an upload in flight -- so the intent and the deletion
-   * record are the same row shape and the same sweeper handles both. The sweeper
-   * skips rows younger than its grace period, which is what stops it deleting an
-   * upload that is still in progress.
+   * record are the same row shape and the same sweeper handles both. What keeps
+   * the sweeper off an upload still in progress is the lease this row carries
+   * (`UPLOAD_INTENT_LEASE_MS`), not its age: nothing bounds an upload to a window,
+   * so an age check deletes the bytes of any upload that outlives the guess. The
+   * lease is a latency mechanism all the same -- correctness is the fence in
+   * `clearUploadIntent` (audit RV4-002).
    *
    * `runOutsideActiveScopedManager` because `create` may itself be called inside
    * a caller's transaction: joining it would make the intent roll back with the
@@ -334,7 +347,23 @@ export class AttachmentsService {
     }
   }
 
-  /** Drop the intent in its own transaction, when there is no work to bind it to. */
+  /**
+   * Drop the intent in its own transaction, when there is no work to bind it to.
+   *
+   * Fenced on `swept_at` for the same reason `clearUploadIntent` is, and it is not
+   * the same reason. That one protects *metadata*; this one protects the *record*.
+   * A claimed row may be inside its late-write quarantine -- the sweeper deleted a
+   * key where a stalled put had not yet landed, and keeps the row so the next pass
+   * re-deletes it (audit RRV4-002). This method runs in the `catch` of `create`,
+   * including the arm where `storage.save` threw: an aborted put destroys the
+   * socket but cannot prove the endpoint discarded a body it had already received.
+   * Dropping the row there would throw away the only thing that can enumerate
+   * those bytes, which is exactly the failure the quarantine exists for.
+   *
+   * So this deletes a row the sweeper has not claimed, and leaves one it has. The
+   * database refuses a quarantined delete too (migration 148), but a backstop that
+   * every caller relies on is not a backstop.
+   */
   private async clearCommittedUploadIntent(storageKey: string): Promise<void> {
     if (this.storage.name === "database") return;
     await runOutsideActiveScopedManager(() =>
@@ -342,6 +371,7 @@ export class AttachmentsService {
         m.getRepository(AttachmentBlobTombstone).delete({
           storageProvider: this.storage.name,
           storageKey,
+          sweptAt: IsNull(),
         }),
       ),
     ).catch((error: unknown) =>

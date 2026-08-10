@@ -1,6 +1,6 @@
 -- 147: a swept upload intent is kept until a late put can no longer land.
 --
--- Migration 142 gave the sweeper a claim (`swept_at`) that the uploader's "clear
+-- Migration 146 gave the sweeper a claim (`swept_at`) that the uploader's "clear
 -- the intent" step is fenced against, so metadata can never commit for bytes that
 -- have been deleted. That is a statement about *metadata*, and RRV4-002 is about
 -- *bytes*:
@@ -45,10 +45,11 @@
 ALTER TABLE attachment_blob_tombstones
     ADD COLUMN IF NOT EXISTS late_write_quarantine_until TIMESTAMP;
 
--- The sweeper's candidate read has to keep finding a quarantined row so it can be
--- re-deleted and retired, and `swept_at` alone does not order that work. The
--- existing `idx_abt_sweepable` covers the un-swept arm (no live lease); this covers
--- the quarantined one.
-CREATE INDEX IF NOT EXISTS idx_abt_quarantined
-    ON attachment_blob_tombstones(storage_provider, late_write_quarantine_until)
-    WHERE late_write_quarantine_until IS NOT NULL;
+-- No index on the new column, deliberately. Nothing selects on it: the sweeper's
+-- candidate read filters on `storage_provider` + `upload_lease_expires_at` only,
+-- and `retire()`/`retireKey()` address a row by primary key or by the unique
+-- (storage_provider, storage_key) index and carry the quarantine as a
+-- non-selective AND. A quarantined row is found again because its claim cleared
+-- the lease, which puts it back in `idx_abt_sweepable`'s arm -- so an index here
+-- would be one nothing plans against, on a table written on every attachment
+-- delete.

@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { DataSource, IsNull, LessThan } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import {
@@ -353,6 +355,56 @@ describe("AttachmentOrphanSweeper", () => {
       tombstoneRepo.find.mockRejectedValue(new Error("db down"));
 
       await expect(sweeper.sweepOrphanedObjects()).resolves.toBeUndefined();
+    });
+  });
+
+  /**
+   * `stamp_attachment_quarantine()` writes the window as a literal `INTERVAL`,
+   * because a trigger body cannot take the parameter every other duration in this
+   * codebase is passed as. So the two spellings of one number can drift, and the
+   * drift is silent: the app's own claim supplies its value and COALESCE keeps it,
+   * so the trigger's copy only shows up on a claim the app did not make -- an older
+   * binary, a psql session -- which is exactly the case nobody is watching.
+   */
+  describe("the trigger's quarantine window", () => {
+    const REPO_ROOT = join(__dirname, "../../..");
+    const STAMP_FUNCTION =
+      "CREATE OR REPLACE FUNCTION stamp_attachment_quarantine";
+
+    /** The function body, or a thrown error -- never a vacuous pass. */
+    const stampFunctionBody = (file: string): string => {
+      const sql = readFileSync(join(REPO_ROOT, file), "utf8");
+      const start = sql.indexOf(STAMP_FUNCTION);
+      if (start === -1) {
+        throw new Error(
+          `${file} no longer defines stamp_attachment_quarantine; this guard has lost its subject`,
+        );
+      }
+      const end = sql.indexOf("$$;", start);
+      if (end === -1) {
+        throw new Error(
+          `${file}: unterminated stamp_attachment_quarantine body`,
+        );
+      }
+      return sql.slice(start, end);
+    };
+
+    it.each([
+      ["database/migrations/148_attachment_quarantine_enforcement.sql"],
+      ["database/schema.sql"],
+    ])("spells the window in %s the way the sweeper does", (file) => {
+      const hours = LATE_WRITE_QUARANTINE_MS / (60 * 60 * 1000);
+      expect(Number.isInteger(hours)).toBe(true);
+
+      expect(stampFunctionBody(file)).toContain(`INTERVAL '${hours} hours'`);
+    });
+
+    it("fails when the two disagree", () => {
+      // The guard is only worth having if a different constant breaks it.
+      const otherHours = LATE_WRITE_QUARANTINE_MS / (60 * 60 * 1000) + 1;
+      expect(stampFunctionBody("database/schema.sql")).not.toContain(
+        `INTERVAL '${otherHours} hours'`,
+      );
     });
   });
 });

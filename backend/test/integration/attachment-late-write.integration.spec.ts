@@ -92,6 +92,17 @@ describe("attachment bytes written after their intent was swept", () => {
       ).clearUploadIntent(manager, key),
     );
 
+  /**
+   * The compensating clear from `create`'s catch. Its own transaction, because
+   * there is no longer one to bind it to -- the caller's has rolled back.
+   */
+  const clearCommittedIntent = (key: string): Promise<void> =>
+    (
+      service as unknown as {
+        clearCommittedUploadIntent(key: string): Promise<void>;
+      }
+    ).clearCommittedUploadIntent(key);
+
   /** A short scoped transaction, so the clear runs where `create` would run it. */
   const withScopedDbForTest = async <T>(
     fn: (manager: unknown) => Promise<T>,
@@ -240,6 +251,48 @@ describe("attachment bytes written after their intent was swept", () => {
     expect(await tombstones()).toHaveLength(1);
   });
 
+  it("leaves a claimed row alone when the failure path clears the intent", async () => {
+    // `create`'s catch calls `clearCommittedUploadIntent`, in its own transaction,
+    // in both arms -- including the one where `storage.save` threw. An aborted put
+    // destroys the socket but cannot prove the endpoint discarded a body it had
+    // already received, so the row is the only thing that can enumerate those bytes
+    // and dropping it is RRV4-002 all over again (this deleted unconditionally).
+    // The surviving row alone does not prove the fix: without the predicate the
+    // migration-148 trigger raises and the row survives anyway. What separates the
+    // two is *how* -- a statement that matches nothing, or an aborted transaction
+    // swallowed into a warning. So the warning is the assertion.
+    const warn = jest
+      .spyOn(
+        (service as unknown as { logger: { warn: (m: string) => void } })
+          .logger,
+        "warn",
+      )
+      .mockImplementation(() => undefined);
+
+    await withUserContext(userId, () => recordIntent(KEY));
+    await expireLease(KEY);
+    await sweep();
+
+    await withUserContext(userId, () => clearCommittedIntent(KEY));
+
+    expect(warn).not.toHaveBeenCalled();
+    const rows = await tombstones();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].late_write_quarantine_until).not.toBeNull();
+    warn.mockRestore();
+  });
+
+  it("clears an unclaimed row when the failure path clears the intent", async () => {
+    // The ordinary case the fence must not break: refused before anything was
+    // written, no claim, so the intent goes rather than leaving the sweeper a
+    // no-op delete to find.
+    await withUserContext(userId, () => recordIntent(KEY));
+
+    await withUserContext(userId, () => clearCommittedIntent(KEY));
+
+    expect(await tombstones()).toEqual([]);
+  });
+
   it("clears the intent for an upload that beat the sweeper", async () => {
     await withUserContext(userId, () => recordIntent(KEY));
 
@@ -281,12 +334,15 @@ describe("attachment bytes written after their intent was swept", () => {
     expect(row.swept_at).toBeNull();
   });
 
-  describe("during a rolling deployment", () => {
+  describe("a writer that does not respect the quarantine", () => {
     /**
-     * The previous-release sweeper (audit V4R3-003): it claims the row (setting
-     * swept_at, nulling the lease) and then unconditionally deletes the tombstone.
-     * Executed verbatim, so the migration-148 triggers are what have to stamp the
-     * quarantine on its claim and reject its premature delete.
+     * The claim-then-unconditionally-delete sequence the quarantine exists to
+     * refuse (audit V4R3-003): set swept_at, null the lease, drop the row. No
+     * release ships this -- the sweeper is new in this change and every path it
+     * has excludes a quarantined row -- so what these cases pin is the
+     * migration-148 backstop itself: a writer that skips the predicate, whether
+     * that is an older binary after a rollback, a psql session, or the next
+     * method somebody adds, cannot retire a row whose key may still be written.
      */
     const oldSweeperClaim = (): Promise<unknown> =>
       dataSource.query(
@@ -302,13 +358,13 @@ describe("attachment bytes written after their intent was swept", () => {
         [KEY],
       );
 
-    it("stamps the quarantine on a previous-release sweeper's claim", async () => {
+    it("stamps the quarantine on a claim that omits it", async () => {
       await withUserContext(userId, () => recordIntent(KEY));
       await expireLease(KEY);
 
       await oldSweeperClaim();
 
-      // The old binary does not know the column exists; the trigger filled it.
+      // The writer does not set the column; the trigger filled it.
       const [row] = await tombstones();
       expect(row.late_write_quarantine_until).not.toBeNull();
       expect(row.late_write_quarantine_until!.getTime()).toBeGreaterThan(
@@ -316,13 +372,13 @@ describe("attachment bytes written after their intent was swept", () => {
       );
     });
 
-    it("rejects a previous-release sweeper's unconditional delete while quarantined", async () => {
+    it("rejects an unconditional delete while quarantined", async () => {
       await withUserContext(userId, () => recordIntent(KEY));
       await expireLease(KEY);
       await oldSweeperClaim();
 
-      // The old binary would delete the row here; the trigger refuses, so the
-      // record survives to name a late put.
+      // The row would go here; the trigger refuses, so the record survives to
+      // name a late put.
       await expect(oldSweeperDelete()).rejects.toThrow(/quarantine/i);
       expect(await tombstones()).toHaveLength(1);
 
@@ -332,9 +388,9 @@ describe("attachment bytes written after their intent was swept", () => {
       expect(await tombstones()).toEqual([]);
     });
 
-    it("still lets an ordinary deletion record be removed by either binary", async () => {
-      // A trigger-written tombstone has no lease, so it is not quarantined and the
-      // old sweeper's unconditional delete must still work.
+    it("still lets an ordinary deletion record be removed", async () => {
+      // A trigger-written tombstone has no lease, so it is not quarantined and an
+      // unconditional delete must still work.
       await dataSource.query(
         `INSERT INTO attachment_blob_tombstones (user_id, storage_provider, storage_key)
          VALUES ($1, 's3', $2)`,

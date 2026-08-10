@@ -13,7 +13,9 @@ import {
 /** How many tombstones one sweep pass handles, so a large backlog is paced. */
 export const ORPHAN_SWEEP_BATCH = 200;
 
-/**
+/*
+ * THE CLAIM
+ *
  * The sweeper takes an object by claiming its tombstone first.
  *
  * A tombstone is also written as an **upload intent** before an object is put
@@ -36,7 +38,6 @@ export const ORPHAN_SWEEP_BATCH = 200;
  * keeps the sweeper away from an upload that is probably still running, so the
  * fence above stays a safety net rather than a routine source of failed uploads.
  */
-export const SWEEP_CLAIM_NOTE = "see AttachmentsService.clearUploadIntent";
 
 /**
  * How long a swept upload intent is kept after its object was deleted.
@@ -91,7 +92,8 @@ const quarantineOnClaim = (msParam: number): string =>
  * an upload in flight and of a metadata row that is gone. One row shape, one
  * sweeper (audit FV4-003) -- and, because those two meanings cannot be told apart
  * by age, one conditional claim that the uploader is fenced against
- * (audit RV4-002). See `SWEEP_CLAIM_NOTE` above.
+ * (audit RV4-002). See "THE CLAIM" at the top of this file, and
+ * `AttachmentsService.clearUploadIntent` for the other half of it.
  *
  * A tombstone for another provider is left alone rather than deleted. Its bytes
  * are unreachable through the currently bound provider, so dropping the record
