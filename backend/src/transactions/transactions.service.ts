@@ -2996,13 +2996,27 @@ export class TransactionsService {
     const categoryNames = await withScopedDb(this.dataSource, (m) =>
       loadQualifiedCategoryNames(m, userId),
     );
+
+    // A category filter hydrates ONLY the matching split lines (see
+    // `applyCategoryFilters`). That is deliberate for the register, which
+    // wants a filtered partial total, and wrong here: the reader is a model
+    // that will send the lines back as a complete replacement set, and
+    // `manage_transactions` replaces the set with exactly what it is given.
+    // Shown one line of a three-line split, it either proposes wiping the
+    // other two or -- as happened -- concludes these are not split
+    // transactions at all. So the LLM path reloads the whole set for every
+    // split parent on the page, and the rows below are always complete.
+    const completeSplits = await this.loadCompleteSplits(
+      result.data.filter((t) => t.isSplit).map((t) => t.id),
+    );
     const nameOf = (category?: { id: string; name: string } | null) =>
       category ? (categoryNames.get(category.id) ?? category.name) : undefined;
 
     const transactions = result.data.flatMap((t): LlmTransactionRow[] => {
+      const splits = completeSplits.get(t.id) ?? t.splits;
       const rows: LlmTransactionRow[] =
-        t.isSplit && Array.isArray(t.splits) && t.splits.length > 0
-          ? t.splits.map((s) => ({
+        t.isSplit && Array.isArray(splits) && splits.length > 0
+          ? splits.map((s) => ({
               id: t.id,
               splitId: s.id,
               date: t.transactionDate,
@@ -3051,5 +3065,34 @@ export class TransactionsService {
       total: result.pagination.total,
       hasMore: result.pagination.hasMore,
     };
+  }
+
+  /**
+   * Every split line of the given transactions, keyed by transaction id.
+   *
+   * A separate read rather than a relation on the list query, because the list
+   * query's split hydration is filtered on purpose and the caller here needs
+   * the opposite. Ordered by id so a set read twice comes back in the same
+   * order -- a model resending "the same lines with one changed" should not
+   * have them shuffle underneath it.
+   */
+  private async loadCompleteSplits(
+    transactionIds: string[],
+  ): Promise<Map<string, TransactionSplit[]>> {
+    if (transactionIds.length === 0) return new Map();
+    const splits = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(TransactionSplit).find({
+        where: { transactionId: In(transactionIds) },
+        relations: ["category"],
+        order: { id: "ASC" },
+      }),
+    );
+    const byTransaction = new Map<string, TransactionSplit[]>();
+    for (const split of splits) {
+      const existing = byTransaction.get(split.transactionId);
+      if (existing) existing.push(split);
+      else byTransaction.set(split.transactionId, [split]);
+    }
+    return byTransaction;
   }
 }

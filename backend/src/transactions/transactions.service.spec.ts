@@ -6650,6 +6650,109 @@ describe("TransactionsService", () => {
       expect(plain).not.toHaveProperty("originalAmount");
     });
 
+    it("returns every split line, not only the ones a category filter matched", async () => {
+      // The register hydrates only the matching split lines on a filtered
+      // read, on purpose. The model is not the register: it sends the lines
+      // back as a COMPLETE replacement set, so one line of a three-line split
+      // means either wiping the other two or -- as happened -- deciding these
+      // are not split transactions at all.
+      categoriesRepository.find.mockResolvedValue([
+        { id: "biz", name: "Business", parentId: null },
+        { id: "biz-cell", name: "Cell Phone", parentId: "biz" },
+        { id: "internet", name: "Internet", parentId: null },
+        { id: "tv", name: "TV", parentId: null },
+      ]);
+      // What the filtered list query hydrates: the matching line only.
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-split",
+            transactionDate: "2026-01-15",
+            payeeName: "Rogers",
+            category: null,
+            amount: -134.36,
+            account: { name: "WS Chequing" },
+            description: null,
+            status: "cleared",
+            isSplit: true,
+            splits: [
+              {
+                id: "s2",
+                amount: -50,
+                memo: null,
+                category: { id: "biz-cell", name: "Cell Phone" },
+              },
+            ],
+          },
+        ],
+        pagination: { total: 1, hasMore: false },
+      } as any);
+      // What the transaction actually has.
+      splitsRepository.find.mockResolvedValue([
+        {
+          id: "s1",
+          transactionId: "t-split",
+          amount: -40,
+          memo: null,
+          category: { id: "internet", name: "Internet" },
+        },
+        {
+          id: "s2",
+          transactionId: "t-split",
+          amount: -50,
+          memo: null,
+          category: { id: "biz-cell", name: "Cell Phone" },
+        },
+        {
+          id: "s3",
+          transactionId: "t-split",
+          amount: -44.36,
+          memo: null,
+          category: { id: "tv", name: "TV" },
+        },
+      ]);
+
+      const result = await service.getLlmTransactionRows("user-1", {
+        categoryId: "biz-cell",
+      });
+
+      expect(result.transactions).toHaveLength(3);
+      expect(result.transactions.map((r) => r.categoryName)).toEqual([
+        "Internet",
+        "Business: Cell Phone",
+        "TV",
+      ]);
+      expect(result.transactions.map((r) => r.splitId)).toEqual([
+        "s1",
+        "s2",
+        "s3",
+      ]);
+    });
+
+    it("does not query splits when the page holds no split transactions", async () => {
+      splitsRepository.find.mockClear();
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-plain",
+            transactionDate: "2026-01-14",
+            payeeName: "Coffee",
+            category: null,
+            amount: -5,
+            account: { name: "Checking" },
+            description: null,
+            status: "cleared",
+            isSplit: false,
+          },
+        ],
+        pagination: { total: 1, hasMore: false },
+      } as any);
+
+      await service.getLlmTransactionRows("user-1", {});
+
+      expect(splitsRepository.find).not.toHaveBeenCalled();
+    });
+
     it("qualifies each category so the model cannot guess the parent", async () => {
       // The reported defect: split lines filed under "Business: Cell Phone"
       // reached the assistant as bare "Cell Phone", so it named the parent

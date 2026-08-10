@@ -212,6 +212,24 @@ The general point outlives this feature: when you add a limit, put it in the
 tool description in the same commit. An assistant that says "I can do six of
 these at a time" is working; one that discovers the wall mid-answer stalls.
 
+**A filtered read is not a complete read, and only one of its two readers can
+tell.** `applyCategoryFilters` hydrates *only* the split lines matching the
+filter, which is right for the register (it wants a partial total and refetches
+the whole transaction to edit it) and wrong for anything that will send the
+lines back. `getLlmTransactionRows` reuses that query, so a model asking for
+"transactions in Business: Cell Phone" received one line of a three-line split
+-- and `manage_transactions` replaces a split set with exactly what it is given.
+The observed outcome was a one-line replacement set, refused only by the
+unrelated "a split needs at least 2 lines" rule, with the model then offering to
+convert the transactions to non-split ones. Two lines matching out of three
+would have passed that rule and silently destroyed the third.
+
+So the LLM path reloads the full set per split parent (`loadCompleteSplits`) and
+its rows are always complete. Before reusing a list query in a tool, ask what
+its `where` does to the collections it hydrates: a filter on a joined child
+table silently truncates the parent's children, and the caller cannot tell a
+truncated set from a short one.
+
 **A refusal the caller cannot act on is a refusal that ends the task.** Every
 bulk tool path computes a per-row reason and then used to throw it away,
 answering "None of the transaction edits could be prepared. Check each
