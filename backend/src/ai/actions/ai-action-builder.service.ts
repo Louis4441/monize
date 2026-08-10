@@ -29,8 +29,8 @@ import {
   DeleteInvestmentTransactionDescriptor,
   PendingAiAction,
   ResolvedSplitLine,
-  SplitRowDescriptor,
-  AiActionSplitPreview,
+  toSplitRowDescriptor,
+  toSplitPreview,
   AiActionAttachmentPreview,
   AttachmentRefDescriptor,
 } from "./ai-action.types";
@@ -59,20 +59,6 @@ import {
   UpdateSecurityPreview,
   DeleteSecurityPreview,
 } from "../../securities/securities.service";
-
-/** Strip a resolved split line down to the signed-descriptor shape (ids only). */
-function toSplitRowDescriptor(line: ResolvedSplitLine): SplitRowDescriptor {
-  return { categoryId: line.categoryId, amount: line.amount, memo: line.memo };
-}
-
-/** Map a resolved split line to its display-only confirmation-card shape. */
-function toSplitPreview(line: ResolvedSplitLine): AiActionSplitPreview {
-  return {
-    categoryName: line.categoryName,
-    amount: line.amount,
-    memo: line.memo,
-  };
-}
 
 /** Map an attachment ref to its display-only confirmation-card shape. */
 function toAttachmentPreview(

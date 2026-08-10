@@ -192,13 +192,25 @@ it too.
 
 **A stall is often a dead end the model found and could not name.** Both reported
 stalls were the same request: recategorize one line inside 17 split
-transactions. That cannot be done. A split update must be a single-item call
-(the bulk card rows carry no splits), and `AiQueryService` allows one proposing
-tool call per *query* -- so one split transaction per user request, seventeen
-requests. Nothing told the model that, so it narrated progress towards something
-unreachable. When you add a limit like this, put it in the tool description in
-the same commit: an assistant that says "I can do these one at a time, 16 to go"
-is working; one that discovers the wall mid-answer stalls.
+transactions. It could not be done. A split update had to be a single-item call
+(batch rows dropped the splits), and `AiQueryService` allows one proposing tool
+call per *query* -- so one split transaction per user request, seventeen
+requests, and nothing said so. The model narrated progress towards something
+unreachable instead.
+
+Batch rows now carry `splits` (`BatchUpdateTransactionRow.splits`, applied in
+`executeBatchRow` inside the same `UpdateTransactionDto` as the scalar fields,
+per invariant I1), so one call recategorizes up to 25 split transactions and the
+individual-card path passes `result.splits` through rather than silently
+dropping them. Two rules the tests hold: a row that resends no splits must carry
+none (an empty set would rewrite the lines it was asked to leave), and a row's
+preview shows its lines instead of a category name, because a card reading
+"Groceries" while writing three other lines is a card approved for something
+else.
+
+The general point outlives this feature: when you add a limit, put it in the
+tool description in the same commit. An assistant that says "I can do six of
+these at a time" is working; one that discovers the wall mid-answer stalls.
 
 ## A numeric env knob is declared as data, next to its documentation
 

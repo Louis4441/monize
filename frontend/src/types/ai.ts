@@ -351,6 +351,16 @@ export interface PendingActionPreviewRow {
   payeeWillBeCreated?: boolean;
   categoryName?: string | null;
   description?: string | null;
+  /**
+   * The complete replacement split set for this row, when the edit rewrites a
+   * split transaction's categories. Present means `categoryName` is null: the
+   * categories are these lines, and the row shows them instead.
+   */
+  splits?: Array<{
+    categoryName: string | null;
+    amount: number;
+    memo?: string | null;
+  }>;
   /** True when this bulk update/delete row targets a reconciled transaction. */
   isReconciled?: boolean;
   investmentAction?: InvestmentAction;

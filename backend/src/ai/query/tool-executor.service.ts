@@ -475,15 +475,10 @@ export class ToolExecutorService {
     );
     const single = items.length === 1;
 
-    // Split transactions are the "rich" single unit: the bulk card paths do not
-    // carry splits, so reject a multi-row batch that mixes in a split row rather
-    // than silently dropping the splits.
-    if (!single && items.some((i) => i.splits !== undefined)) {
-      return this.toolError(
-        "Split transactions must be sent one at a time: use a single item with a splits array.",
-      );
-    }
-    // Attachments follow the same rule: only the singular card carries them.
+    // Splits ride in a multi-row batch: each row carries its own complete
+    // replacement set, so several split transactions can be recategorized under
+    // one confirmation. Attachments still cannot -- only the singular card
+    // carries the chat files.
     if (!single && items.some((i) => i.attachments !== undefined)) {
       return this.toolError(
         "Attachments must be sent one at a time: use a single item with an attachments array.",
@@ -873,6 +868,10 @@ export class ToolExecutorService {
               : this.actionBuilder.buildUpdateTransaction(
                   userId,
                   result.preview,
+                  // Without this the resolved lines are dropped and the card
+                  // proposes a parent-only edit -- a silent no-op against what
+                  // the user asked for.
+                  result.splits,
                 ),
           );
         } catch {

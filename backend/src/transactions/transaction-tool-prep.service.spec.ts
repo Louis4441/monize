@@ -662,6 +662,57 @@ describe("TransactionToolPrepService", () => {
       expect(result.skipped).toHaveLength(1);
     });
 
+    it("carries each row's own split set, clearing the parent category", async () => {
+      // The capability this exists for: recategorizing a line inside several
+      // split transactions used to need one request per transaction, because
+      // batch rows dropped the splits and the tool layer refused them.
+      transactions.findOne
+        .mockResolvedValueOnce({ id: "t1", isTransfer: false })
+        .mockResolvedValueOnce({ id: "t2", isTransfer: false });
+
+      const result = await service.prepareUpdateBulk(userId, [
+        {
+          transactionId: "t1",
+          splits: [
+            { categoryName: "Dining", amount: -20 },
+            { categoryName: "Dining", amount: -10 },
+          ],
+        },
+        {
+          transactionId: "t2",
+          splits: [
+            { categoryName: "Dining", amount: -25 },
+            { categoryName: "Dining", amount: -5 },
+          ],
+        },
+      ]);
+
+      expect(result.okRows).toHaveLength(2);
+      for (const row of result.okRows) {
+        expect(row.splits).toHaveLength(2);
+        // Splits and a parent category are mutually exclusive.
+        expect(row.categoryId).toBeNull();
+      }
+      // Each row is validated against its own amount, not the first row's.
+      expect(splitService.validateSplits).toHaveBeenCalledTimes(2);
+      expect(result.previewRows[0].splits).toHaveLength(2);
+      expect(result.previewRows[0].categoryName).toBeNull();
+    });
+
+    it("leaves a parent-field edit without splits alone", async () => {
+      transactions.findOne.mockResolvedValueOnce({
+        id: "t1",
+        isTransfer: false,
+      });
+
+      const result = await service.prepareUpdateBulk(userId, [
+        { transactionId: "t1", date: "2026-03-03" },
+      ]);
+
+      expect(result.okRows[0].splits).toBeUndefined();
+      expect(result.previewRows[0].splits).toBeUndefined();
+    });
+
     it("skips a row whose prepare throws a 4xx, surfacing the date when present", async () => {
       transactions.findOne.mockResolvedValueOnce({
         id: "t1",
@@ -713,8 +764,8 @@ describe("TransactionToolPrepService", () => {
     it("maps a split parent's parent-field edit to a batch row with a null category and unchanged amount", async () => {
       // A split parent's preview carries categoryId null (categories live on
       // the lines) and the stored amount; the batch row must not invent
-      // either. Batch rows deliberately carry no splits -- both adapters
-      // reject a multi-row batch containing a split row before prep runs.
+      // either. This edit resends no splits, so the row carries none and the
+      // existing lines are left exactly as they are.
       transactions.previewUpdate.mockResolvedValueOnce({
         transactionId: "t1",
         accountId: "a1",
@@ -736,7 +787,8 @@ describe("TransactionToolPrepService", () => {
       expect(result.okRows).toHaveLength(1);
       expect(result.okRows[0].categoryId).toBeNull();
       expect(result.okRows[0].amount).toBe(-30);
-      // Batch rows never resend splits.
+      // An edit that did not resend splits must not carry any: a row with an
+      // empty or invented set would rewrite the lines it was asked to leave.
       expect(result.okRows[0]).not.toHaveProperty("splits");
     });
 

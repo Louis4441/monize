@@ -143,6 +143,27 @@ export function toSplitDtoRows(
 }
 
 /**
+ * Strip a resolved split line down to the signed-descriptor shape (ids only).
+ * Lives here beside {@link toSplitDtoRows} rather than in the action builder,
+ * because the shared prep service builds batch rows too and a second copy is
+ * how the two shapes drift apart.
+ */
+export function toSplitRowDescriptor(
+  line: ResolvedSplitLine,
+): SplitRowDescriptor {
+  return { categoryId: line.categoryId, amount: line.amount, memo: line.memo };
+}
+
+/** Map a resolved split line to its display-only confirmation-card shape. */
+export function toSplitPreview(line: ResolvedSplitLine): AiActionSplitPreview {
+  return {
+    categoryName: line.categoryName,
+    amount: line.amount,
+    memo: line.memo,
+  };
+}
+
+/**
  * One chat/MCP-supplied file to persist as a transaction attachment when the
  * action is confirmed. The bytes themselves never travel in the descriptor:
  * they are parked server-side in the RelayAttachmentStore under
@@ -437,6 +458,16 @@ export interface BatchUpdateTransactionRow {
   categoryId: string | null;
   description: string | null;
   currencyCode: string;
+  /**
+   * The COMPLETE replacement split set for this row, when the edit changes a
+   * split transaction's categories. Present means `categoryId` is null and the
+   * categories live here -- the same relationship the singular descriptor has,
+   * carried per row so several split transactions can be edited under one
+   * confirmation.
+   *
+   * Rows without it are ordinary parent-field edits, unchanged.
+   */
+  splits?: SplitRowDescriptor[];
 }
 
 export interface BatchDeleteTransactionRow {
@@ -706,6 +737,14 @@ export interface AiActionPreviewRow {
   payeeWillBeCreated?: boolean;
   categoryName?: string | null;
   description?: string | null;
+  /**
+   * The complete replacement split set for this row, when the edit rewrites a
+   * split transaction's categories. Present means `categoryName` is null: the
+   * categories are these lines, and the card shows them instead -- a row that
+   * says "Groceries" while writing three other lines would be a card the user
+   * approved for something else.
+   */
+  splits?: AiActionSplitPreview[];
   /**
    * True when this bulk update/delete row targets a reconciled transaction, so
    * the card can flag the row before the user approves the batch.
