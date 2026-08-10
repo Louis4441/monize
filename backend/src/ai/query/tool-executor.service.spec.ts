@@ -1461,6 +1461,34 @@ describe("ToolExecutorService", () => {
       }
     });
 
+    it("tells the model why every row was refused, not to check the ids", async () => {
+      // The reported failure: 17 category-only edits on split transactions.
+      // Each row is correctly refused -- a split's categories live on its
+      // lines -- but the tool answered "check each transactionId", which was
+      // the one thing that was right. The model concluded the task was
+      // impossible and gave up instead of reading the lines and resending.
+      transactions.previewUpdate.mockRejectedValue(
+        new BadRequestException(
+          "This is a split transaction: its categories live on its split lines, not on the parent. Read the transaction's current split lines first, then resend the update with the complete splits array.",
+        ),
+      );
+
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: Array.from({ length: 17 }, (_, i) => ({
+          transactionId: `1111111${i % 10}-1111-4111-8111-11111111111${i % 10}`,
+          categoryName: "Automobile: Accessories",
+        })),
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.summary).toContain("All 17 rows failed the same way");
+      expect(result.summary).toContain("split lines");
+      expect(result.summary).toContain("complete splits array");
+      // The misleading advice is gone: the ids were never the problem.
+      expect(result.summary).not.toContain("Check each transactionId");
+    });
+
     it("carries per-row splits into one bulk card at six rows or more", async () => {
       const result = await service.execute(userId, "manage_transactions", {
         operation: "update",

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TransactionsService } from "../../transactions/transactions.service";
@@ -1209,7 +1210,10 @@ export class McpTransactionsTools {
     const okCount = std.okPreviews.length + xfer.okPreviews.length;
     if (okCount === 0) {
       return toolError(
-        "None of the transactions could be prepared. Check the account, category, and date for each row.",
+        `None of the transactions could be prepared.${describeSkippedRows(
+          [...std.skipped, ...xfer.skipped],
+          items.length,
+        )}`,
       );
     }
 
@@ -1556,7 +1560,9 @@ export class McpTransactionsTools {
         }
       }
       if (cards.length === 0)
-        return toolError("None of the transaction edits could be prepared.");
+        return toolError(
+          `None of the transaction edits could be prepared.${describeSkippedRows(skipped, items.length)}`,
+        );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, userId, cards, requestId, skipped);
@@ -1568,7 +1574,9 @@ export class McpTransactionsTools {
       items.map((i) => this.toUpdateRow(i)),
     );
     if (bulk.okRows.length === 0)
-      return toolError("None of the transaction edits could be prepared.");
+      return toolError(
+        `None of the transaction edits could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
+      );
     const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(
@@ -1662,7 +1670,9 @@ export class McpTransactionsTools {
         }
       }
       if (cards.length === 0)
-        return toolError("None of the transactions could be prepared.");
+        return toolError(
+          `None of the transactions could be prepared.${describeSkippedRows(skipped, items.length)}`,
+        );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, userId, cards, requestId, skipped);
@@ -1673,7 +1683,9 @@ export class McpTransactionsTools {
       items.map((i) => i.transactionId as string),
     );
     if (bulk.okRows.length === 0)
-      return toolError("None of the transactions could be prepared.");
+      return toolError(
+        `None of the transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
+      );
     const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(

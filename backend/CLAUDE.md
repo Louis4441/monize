@@ -212,6 +212,24 @@ The general point outlives this feature: when you add a limit, put it in the
 tool description in the same commit. An assistant that says "I can do six of
 these at a time" is working; one that discovers the wall mid-answer stalls.
 
+**A refusal the caller cannot act on is a refusal that ends the task.** Every
+bulk tool path computes a per-row reason and then used to throw it away,
+answering "None of the transaction edits could be prepared. Check each
+transactionId and the fields to change." The next attempt at the 17 splits
+failed exactly there: all 17 rows were refused because a split's categories
+live on its lines and the edit resent none -- the reason said so, in words the
+model could have acted on -- and it was told to check the ids, which were
+correct. It concluded the task was impossible and stopped.
+
+`describeSkippedRows` (`common/bulk-create.types.ts`) is now the only way those
+messages are built: identical reasons collapse to one line with a count,
+distinct ones are listed up to three with a tail count. `bulk-skip-reporting.spec.ts`
+scans all four tool sources and fails on a "None of ... could be prepared"
+message that does not carry its reasons -- and a generic message is worse than
+none when it *guesses*, because a confident wrong diagnosis sends the reader
+away from the fix. Individual-card paths that counted skips (`skipped++`) now
+collect reasons too, for the same reason.
+
 ## A numeric env knob is declared as data, next to its documentation
 
 Coerce every numeric environment variable through `resolvePositiveInt`
