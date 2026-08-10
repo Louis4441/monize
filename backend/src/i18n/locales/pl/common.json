@@ -13,7 +13,8 @@
       "iterations": "Osiągnąłem maksymalną liczbę kroków analizy dla tego pytania, więc ta odpowiedź opiera się na danych zebranych przed zatrzymaniem.",
       "toolCalls": "Osiągnąłem maksymalną liczbę zapytań o dane dla tego pytania, więc ta odpowiedź opiera się na danych zebranych przed zatrzymaniem.",
       "tokens": "Osiągnąłem maksymalny budżet analizy dla tego pytania, więc ta odpowiedź opiera się na danych zebranych przed zatrzymaniem.",
-      "timeout": "To pytanie zajęło więcej czasu, niż było dostępne, więc ta odpowiedź opiera się na danych zebranych przed zatrzymaniem."
+      "timeout": "To pytanie zajęło więcej czasu, niż było dostępne, więc ta odpowiedź opiera się na danych zebranych przed zatrzymaniem.",
+      "stalled": "Wciąż zapowiadałem dalszą pracę zamiast ją zakończyć, więc ta odpowiedź opiera się na danych zebranych przed zatrzymaniem."
     },
     "synthesisFailed": "Zebrałem dane do tego pytania, ale nie udało mi się ukończyć analizy, więc nie mam wiarygodnej odpowiedzi. Spróbuj zapytać o coś węższego."
   }

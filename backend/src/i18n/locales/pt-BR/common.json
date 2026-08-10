@@ -13,7 +13,8 @@
       "iterations": "Atingi o número máximo de etapas de análise para esta pergunta, então esta resposta se baseia nos dados que coletei antes de parar.",
       "toolCalls": "Atingi o número máximo de consultas de dados para esta pergunta, então esta resposta se baseia nos dados que coletei antes de parar.",
       "tokens": "Atingi o orçamento máximo de análise para esta pergunta, então esta resposta se baseia nos dados que coletei antes de parar.",
-      "timeout": "Esta pergunta levou mais tempo do que o disponível, então esta resposta se baseia nos dados que coletei antes de parar."
+      "timeout": "Esta pergunta levou mais tempo do que o disponível, então esta resposta se baseia nos dados que coletei antes de parar.",
+      "stalled": "Continuei dizendo que seguiria trabalhando em vez de concluir, então esta resposta se baseia nos dados que coletei antes de parar."
     },
     "synthesisFailed": "Coletei dados para esta pergunta, mas não consegui concluir a análise, então não tenho uma resposta confiável. Tente perguntar algo mais específico."
   }

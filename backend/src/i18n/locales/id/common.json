@@ -13,7 +13,8 @@
       "iterations": "Saya mencapai jumlah maksimum langkah analisis untuk pertanyaan ini, jadi jawaban ini didasarkan pada data yang saya kumpulkan sebelum berhenti.",
       "toolCalls": "Saya mencapai jumlah maksimum pencarian data untuk pertanyaan ini, jadi jawaban ini didasarkan pada data yang saya kumpulkan sebelum berhenti.",
       "tokens": "Saya mencapai anggaran analisis maksimum untuk pertanyaan ini, jadi jawaban ini didasarkan pada data yang saya kumpulkan sebelum berhenti.",
-      "timeout": "Pertanyaan ini memakan waktu lebih lama dari waktu yang tersedia, jadi jawaban ini didasarkan pada data yang saya kumpulkan sebelum berhenti."
+      "timeout": "Pertanyaan ini memakan waktu lebih lama dari waktu yang tersedia, jadi jawaban ini didasarkan pada data yang saya kumpulkan sebelum berhenti.",
+      "stalled": "Saya terus mengatakan akan melanjutkan alih-alih menyelesaikannya, jadi jawaban ini didasarkan pada data yang saya kumpulkan sebelum berhenti."
     },
     "synthesisFailed": "Saya mengumpulkan data untuk pertanyaan ini, tetapi tidak dapat menyelesaikan analisisnya, jadi saya tidak punya jawaban yang dapat diandalkan. Coba tanyakan sesuatu yang lebih spesifik."
   }
