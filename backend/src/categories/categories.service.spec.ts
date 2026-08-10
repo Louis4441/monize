@@ -659,7 +659,7 @@ describe("CategoriesService", () => {
     it("gives each category the qualified name other tools accept", async () => {
       // `name` alone is ambiguous the moment two parents share a child name,
       // and this list is where the model learns what to type.
-      categoryRepository.find.mockResolvedValue(allCategories);
+      stubFindAll();
 
       const result = await service.getLlmCategories("user-1");
 
