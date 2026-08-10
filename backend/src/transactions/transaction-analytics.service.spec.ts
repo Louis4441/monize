@@ -61,7 +61,19 @@ describe("TransactionAnalyticsService", () => {
     };
 
     categoriesRepository = {
-      find: jest.fn().mockResolvedValue([]),
+      // The default chart of accounts for these specs. It deliberately holds
+      // two categories named "Cell Phone" under different parents, because
+      // that is the shape that broke labelling: every LLM-facing result
+      // resolves its display name from this list, so a fixture without a
+      // collision cannot show whether the right one was named.
+      find: jest.fn().mockResolvedValue([
+        { id: "cat-food", name: "Food", parentId: null },
+        { id: "cat-travel", name: "Travel", parentId: null },
+        { id: "cat-bills", name: "Bills", parentId: null },
+        { id: "cat-bills-cell", name: "Cell Phone", parentId: "cat-bills" },
+        { id: "cat-biz", name: "Business", parentId: null },
+        { id: "cat-biz-cell", name: "Cell Phone", parentId: "cat-biz" },
+      ]),
     };
 
     userPreferenceRepository = {
@@ -1837,7 +1849,9 @@ describe("TransactionAnalyticsService", () => {
     it("suggests the closest valid name for a near-miss", async () => {
       const result = await service.resolveLlmCategoryIds(userId, ["Grocries"]);
       expect(result.unresolved).toEqual(["Grocries"]);
-      expect(result.suggestions).toContain("Groceries");
+      // Qualified, because that is what the model has to send back: a bare
+      // leaf name is only usable when nothing else shares it.
+      expect(result.suggestions).toContain("Food: Groceries");
     });
 
     it("returns no suggestions when every name resolves", async () => {
@@ -2196,14 +2210,44 @@ describe("TransactionAnalyticsService", () => {
 
     it("groups by category and sorts by total descending", async () => {
       const rows = await runWithGroupBy("category", [
-        { label: "Food", categoryId: "cat-food", total: "100", count: "5" },
-        { label: "Travel", categoryId: "cat-travel", total: "300", count: "2" },
+        { categoryId: "cat-food", total: "100", count: "5" },
+        { categoryId: "cat-travel", total: "300", count: "2" },
       ]);
 
       expect(rows[0].category).toBe("Travel");
       expect(rows[0].categoryId).toBe("cat-travel");
       expect(rows[1].category).toBe("Food");
       expect(rows[1].categoryId).toBe("cat-food");
+    });
+
+    it("qualifies each label so two same-named categories stay apart", async () => {
+      // The reported defect: grouping on the leaf name merged "Cell Phone"
+      // under Bills with "Cell Phone" under Business into one row, and the
+      // row's id was an arbitrary one of the two. Whichever parent the answer
+      // then named was a guess.
+      const rows = await runWithGroupBy("category", [
+        { categoryId: "cat-bills-cell", total: "40", count: "2" },
+        { categoryId: "cat-biz-cell", total: "90", count: "3" },
+      ]);
+
+      expect(rows.map((r) => r.category)).toEqual([
+        "Business: Cell Phone",
+        "Bills: Cell Phone",
+      ]);
+      expect(rows.map((r) => r.categoryId)).toEqual([
+        "cat-biz-cell",
+        "cat-bills-cell",
+      ]);
+    });
+
+    it("groups on the category id, not its name", async () => {
+      await runWithGroupBy("category", []);
+
+      const grouped = (mockQueryBuilder.groupBy.mock.calls as any[][]).map(
+        (c) => c[0],
+      );
+      expect(grouped).toContain("COALESCE(ts.categoryId, t.categoryId)::text");
+      expect(grouped.join(" | ")).not.toMatch(/name/);
     });
 
     it("maps a missing category id (Uncategorized bucket) to null", async () => {
@@ -2306,8 +2350,12 @@ describe("TransactionAnalyticsService", () => {
   describe("getLlmPeriodComparison", () => {
     it("compares two periods grouped by category by default", async () => {
       mockQueryBuilder.getRawMany
-        .mockResolvedValueOnce([{ label: "Food", total: "100", count: "5" }])
-        .mockResolvedValueOnce([{ label: "Food", total: "150", count: "8" }]);
+        .mockResolvedValueOnce([
+          { categoryId: "cat-food", total: "100", count: "5" },
+        ])
+        .mockResolvedValueOnce([
+          { categoryId: "cat-food", total: "150", count: "8" },
+        ]);
 
       const result = await service.getLlmPeriodComparison(userId, {
         period1Start: "2026-01-01",
@@ -2327,7 +2375,9 @@ describe("TransactionAnalyticsService", () => {
     it("returns 100% change when period1 is zero but period2 is non-zero", async () => {
       mockQueryBuilder.getRawMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ label: "New", total: "50", count: "3" }]);
+        .mockResolvedValueOnce([
+          { categoryId: "cat-travel", total: "50", count: "3" },
+        ]);
 
       const result = await service.getLlmPeriodComparison(userId, {
         period1Start: "2026-01-01",
@@ -2336,7 +2386,7 @@ describe("TransactionAnalyticsService", () => {
         period2End: "2026-02-28",
       });
 
-      const newRow = result.comparison.find((c) => c.label === "New");
+      const newRow = result.comparison.find((c) => c.label === "Travel");
       expect(newRow?.changePercent).toBe(100);
     });
 

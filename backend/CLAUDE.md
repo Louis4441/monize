@@ -240,6 +240,41 @@ A check capable of refusing a command belongs inside the transaction that perfor
 
 Give the operation the caller's precondition as a parameter -- the expected owner, scenario or revision -- and let it refuse before writing. Return the refusal distinguishably: "no such row", "not yours" and "done" are three answers, and folding two into `null` makes the caller guess. Tests assert the rejected response **and** the stored state; see `docs/financial-calculation-contract.md` section 7.
 
+## A category's leaf name is not its identity
+
+"Cell Phone" under **Bills** and "Cell Phone" under **Business** is an ordinary
+chart of accounts, not an edge case -- so a bare leaf name identifies nothing,
+and every surface that emitted one was guessing on the reader's behalf. The
+analytics breakdown grouped on `splitCat.name`, which merged the two categories
+into a single row carrying `MIN(id)`; the LLM transaction rows sent the model
+`s.category.name`, so a split filed under Business came back as "Cell Phone" and
+was reported under whichever parent the model had seen elsewhere.
+
+Both halves now go through `categories/category-name.util.ts`:
+
+- **Emitting**: `qualifiedCategoryName` / `loadQualifiedCategoryNames` produce
+  `"Business: Cell Phone"`. Analytics groups on `SPLIT_CATEGORY_ID` and resolves
+  the label from the map -- there is deliberately no category-*name* SQL
+  fragment left to reach for, and `transaction-split-query.util.spec.ts` fails if
+  one reappears.
+- **Accepting**: `resolveCategoryNamePaths` matches a name the model sends back,
+  separator- and spacing-insensitive, and **refuses an ambiguous one** with the
+  qualified candidates rather than picking a winner.
+
+The two are one contract, and the test that matters is the round trip: every
+name we emit must resolve back to the category we emitted it for
+(`category-name.util.spec.ts`). Four hand-rolled resolvers had drifted apart
+before this, and the one the tools used accepted `"Business:Cell Phone"` and
+`"Business : Cell Phone"` but **not** `"Business: Cell Phone"` -- the single
+spelling every tool description and error message tells the model to type. That
+miss fell through to a last-segment fallback that returned the *other* "Cell
+Phone", and because results were labelled with the leaf name, nothing in the
+answer could reveal that the wrong category had been read.
+
+Also: `Uncategorized` (the user filed it nowhere) and `Unknown category` (we
+could not resolve the name of the category they did file it under) are different
+facts and have different constants. Do not fold the second into the first.
+
 ## A predicate that decides which row counts is written once
 
 When "is this row the one we mean" takes more than one clause -- current

@@ -44,6 +44,7 @@ import { BulkUpdateDto, BulkDeleteDto } from "./dto/bulk-update.dto";
 import { isTransactionInFuture } from "../common/date-utils";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getAllCategoryIdsWithChildren } from "../common/category-tree.util";
+import { loadQualifiedCategoryNames } from "../categories/category-name.util";
 import { formatCurrency } from "../common/format-currency.util";
 import {
   buildPaginationMeta,
@@ -2986,6 +2987,18 @@ export class TransactionsService {
       maskTransactionsAgainst(readable, result.data);
     }
 
+    // Category names are qualified ("Business: Cell Phone"), because a leaf
+    // name does not identify a category: a chart of accounts with "Cell Phone"
+    // under both "Bills" and "Business" gave the model rows it could only
+    // label by guessing, and it guessed. The map is the same one the tools
+    // resolve an incoming name against, so a name shown here comes back as
+    // this category and no other.
+    const categoryNames = await withScopedDb(this.dataSource, (m) =>
+      loadQualifiedCategoryNames(m, userId),
+    );
+    const nameOf = (category?: { id: string; name: string } | null) =>
+      category ? (categoryNames.get(category.id) ?? category.name) : undefined;
+
     const transactions = result.data.flatMap((t): LlmTransactionRow[] => {
       const rows: LlmTransactionRow[] =
         t.isSplit && Array.isArray(t.splits) && t.splits.length > 0
@@ -2994,7 +3007,7 @@ export class TransactionsService {
               splitId: s.id,
               date: t.transactionDate,
               payeeName: t.payeeName,
-              categoryName: s.category?.name,
+              categoryName: nameOf(s.category),
               amount: Number(s.amount),
               accountName: t.account?.name,
               description: s.memo ?? t.description,
@@ -3006,7 +3019,7 @@ export class TransactionsService {
                 id: t.id,
                 date: t.transactionDate,
                 payeeName: t.payeeName,
-                categoryName: t.category?.name,
+                categoryName: nameOf(t.category),
                 amount: Number(t.amount),
                 accountName: t.account?.name,
                 description: t.description,

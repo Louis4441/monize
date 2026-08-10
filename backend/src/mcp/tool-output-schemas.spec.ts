@@ -378,8 +378,9 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
       categories: [
         {
           id: "c1",
-          name: "Food",
-          parentName: null,
+          name: "Cell Phone",
+          parentName: "Business",
+          qualifiedName: "Business: Cell Phone",
           isIncome: false,
           transactionCount: 3,
         },

@@ -26,6 +26,7 @@ import { getDefaultCategories } from "./country-category-additions";
 import { isSupportedLocale } from "../i18n/config";
 import { ImportDefaultsDto } from "./dto/import-defaults.dto";
 import { withScopedDb } from "../common/db/scoped-db";
+import { qualifiedCategoryName } from "./category-name.util";
 
 @Injectable()
 export class CategoriesService {
@@ -242,6 +243,14 @@ export class CategoriesService {
       id: string;
       name: string;
       parentName: string | null;
+      /**
+       * The name to use when referring to this category anywhere else --
+       * "Business: Cell Phone". A leaf name is not unique (the same chart of
+       * accounts commonly has "Cell Phone" under both "Bills" and "Business"),
+       * so a tool given `name` alone cannot tell which was meant and now
+       * refuses rather than guessing.
+       */
+      qualifiedName: string;
       isIncome: boolean;
       transactionCount: number;
     }>;
@@ -274,13 +283,19 @@ export class CategoriesService {
     }
 
     const categories = filtered
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        parentName: c.parentId ? (byId.get(c.parentId)?.name ?? null) : null,
-        isIncome: c.isIncome,
-        transactionCount: c.transactionCount,
-      }))
+      .map((c) => {
+        const parentName = c.parentId
+          ? (byId.get(c.parentId)?.name ?? null)
+          : null;
+        return {
+          id: c.id,
+          name: c.name,
+          parentName,
+          qualifiedName: qualifiedCategoryName(c.name, parentName),
+          isIncome: c.isIncome,
+          transactionCount: c.transactionCount,
+        };
+      })
       .sort((a, b) => {
         // Parents first, then children, both alphabetized
         const aKey = a.parentName ?? a.name;

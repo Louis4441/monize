@@ -37,7 +37,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
           type: "array",
           items: { type: "string" },
           description:
-            'Filter by category names. Use exact names from the user\'s category list; use "Parent: Child" for a subcategory. If any name cannot be resolved the tool returns an error.',
+            'Filter by category names. Use exact names from the user\'s category list, in the "Parent: Child" form the read tools return. A bare subcategory name that exists under more than one parent (e.g. "Cell Phone" under both Bills and Business) is rejected rather than guessed, and the error lists the qualified names to choose from. If any name cannot be resolved the tool returns an error.',
         },
         payeeNames: {
           type: "array",
@@ -515,7 +515,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
               categoryName: {
                 type: "string",
                 description:
-                  'Optional category (standard create/update, or transfer create/update -- on a transfer it is stored on both legs). Exact name from the user\'s category list ("Parent: Child" for a subcategory).',
+                  'Optional category (standard create/update, or transfer create/update -- on a transfer it is stored on both legs). Exact name from the user\'s category list, qualified as "Parent: Child" -- a bare subcategory name shared by two parents is rejected, not guessed.',
               },
               description: {
                 type: "string",
@@ -547,7 +547,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
                     categoryName: {
                       type: "string",
                       description:
-                        'Category for this split line. Exact name ("Parent: Child" for a subcategory).',
+                        'Category for this split line. Exact name, qualified as "Parent: Child" for a subcategory (required when the subcategory name is shared by more than one parent).',
                     },
                     amount: {
                       type: "number",

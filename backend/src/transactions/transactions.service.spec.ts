@@ -6650,6 +6650,72 @@ describe("TransactionsService", () => {
       expect(plain).not.toHaveProperty("originalAmount");
     });
 
+    it("qualifies each category so the model cannot guess the parent", async () => {
+      // The reported defect: split lines filed under "Business: Cell Phone"
+      // reached the assistant as bare "Cell Phone", so it named the parent
+      // from whatever it had seen elsewhere -- and named the wrong one.
+      categoriesRepository.find.mockResolvedValue([
+        { id: "bills", name: "Bills", parentId: null },
+        { id: "bills-cell", name: "Cell Phone", parentId: "bills" },
+        { id: "biz", name: "Business", parentId: null },
+        { id: "biz-cell", name: "Cell Phone", parentId: "biz" },
+        { id: "groceries", name: "Groceries", parentId: null },
+      ]);
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-split",
+            transactionDate: "2025-01-15",
+            payeeName: "Rogers",
+            category: null,
+            amount: -150,
+            account: { name: "Checking" },
+            description: "Monthly bill",
+            status: "cleared",
+            isSplit: true,
+            splits: [
+              {
+                id: "s1",
+                amount: -100,
+                memo: null,
+                category: { id: "biz-cell", name: "Cell Phone" },
+              },
+              {
+                id: "s2",
+                amount: -50,
+                memo: null,
+                category: { id: "bills-cell", name: "Cell Phone" },
+              },
+            ],
+          },
+          {
+            id: "t-plain",
+            transactionDate: "2025-01-14",
+            payeeName: "Loblaws",
+            category: { id: "groceries", name: "Groceries" },
+            amount: -40,
+            account: { name: "Checking" },
+            description: null,
+            status: "cleared",
+            isSplit: false,
+          },
+        ],
+        pagination: { total: 2, hasMore: false },
+      } as any);
+
+      const result = await service.getLlmTransactionRows("user-1", {});
+
+      const splitRows = result.transactions.filter((r) => r.id === "t-split");
+      expect(splitRows.map((r) => r.categoryName)).toEqual([
+        "Business: Cell Phone",
+        "Bills: Cell Phone",
+      ]);
+      // A top-level category is already unambiguous, so it stays as it is.
+      expect(
+        result.transactions.find((r) => r.id === "t-plain")?.categoryName,
+      ).toBe("Groceries");
+    });
+
     it("expands split transactions into per-split rows with their real category", async () => {
       jest.spyOn(service, "findAll").mockResolvedValue({
         data: [

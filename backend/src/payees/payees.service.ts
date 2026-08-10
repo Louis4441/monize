@@ -12,6 +12,11 @@ import { PayeeAlias } from "./entities/payee-alias.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { Category } from "../categories/entities/category.entity";
+import {
+  loadQualifiedCategoryNames,
+  qualifiedNamesById,
+  resolveCategoryNamePaths,
+} from "../categories/category-name.util";
 import { CreatePayeeDto } from "./dto/create-payee.dto";
 import { UpdatePayeeDto } from "./dto/update-payee.dto";
 import { CreatePayeeAliasDto } from "./dto/create-payee-alias.dto";
@@ -175,7 +180,11 @@ export class PayeesService {
             tr("errors.transactions.categoryNotFound", "Category not found"),
           );
         }
-        defaultCategoryName = cat.name;
+        // Qualified: this name goes on a confirmation card the user approves,
+        // and "Cell Phone" alone does not say which "Cell Phone" they are
+        // about to file every future transaction under.
+        const names = await loadQualifiedCategoryNames(m, userId);
+        defaultCategoryName = names.get(cat.id) ?? cat.name;
       }
 
       return { name, defaultCategoryId, defaultCategoryName };
@@ -192,22 +201,16 @@ export class PayeesService {
     userId: string,
     categoryName: string,
   ): Promise<{ id: string; name: string }> {
-    const trimmed = categoryName.trim();
-    const sep = trimmed.lastIndexOf(":");
-    const childName = sep >= 0 ? trimmed.slice(sep + 1).trim() : trimmed;
-    const parentName = sep >= 0 ? trimmed.slice(0, sep).trim() : null;
-
-    const match = await withScopedDb(this.dataSource, (m) => {
-      const qb = m
-        .getRepository(Category)
-        .createQueryBuilder("category")
-        .leftJoinAndSelect("category.parent", "parent")
-        .where("category.user_id = :userId", { userId })
-        .andWhere("LOWER(category.name) = LOWER(:childName)", { childName });
-      if (parentName) {
-        qb.andWhere("LOWER(parent.name) = LOWER(:parentName)", { parentName });
-      }
-      return qb.orderBy("category.name", "ASC").getOne();
+    const match = await withScopedDb(this.dataSource, async (m) => {
+      const categories = await m.getRepository(Category).find({
+        where: { userId },
+        select: ["id", "name", "parentId"],
+      });
+      const [resolution] = resolveCategoryNamePaths(categories, [categoryName]);
+      const names = qualifiedNamesById(categories);
+      return resolution.id
+        ? { id: resolution.id, name: names.get(resolution.id) ?? categoryName }
+        : null;
     });
     if (!match) {
       throw new NotFoundException(
@@ -218,7 +221,7 @@ export class PayeesService {
         ),
       );
     }
-    return { id: match.id, name: match.name };
+    return match;
   }
 
   /**

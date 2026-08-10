@@ -152,7 +152,7 @@ export class McpTransactionsTools {
             .max(100)
             .optional()
             .describe(
-              'Optional category names to filter to ("Parent: Child" for a subcategory)',
+              'Optional category names to filter to, in the "Parent: Child" form the read tools return. A bare subcategory name shared by two parents is rejected rather than guessed, and the error lists the qualified names.',
             ),
           payeeNames: z
             .array(z.string().max(100))
@@ -434,7 +434,7 @@ export class McpTransactionsTools {
                   .max(100)
                   .optional()
                   .describe(
-                    'Optional category name (standard create/update, or transfer create/update -- on a transfer it is stored on both legs; "Parent: Child" for a subcategory).',
+                    'Optional category name (standard create/update, or transfer create/update -- on a transfer it is stored on both legs), qualified as "Parent: Child" -- a bare subcategory name shared by two parents is rejected, not guessed.',
                   ),
                 description: z
                   .string()
@@ -471,7 +471,7 @@ export class McpTransactionsTools {
                         .min(1)
                         .max(100)
                         .describe(
-                          'Category for this split line ("Parent: Child" for a subcategory).',
+                          'Category for this split line, qualified as "Parent: Child" for a subcategory (required when the subcategory name is shared by more than one parent).',
                         ),
                       amount: z
                         .number()
