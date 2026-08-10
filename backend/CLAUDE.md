@@ -178,10 +178,27 @@ And only the tail of the message is examined: mid-answer narration is followed
 by the answer itself. A false positive costs one extra pass; a false negative is
 the hang this exists to stop.
 
+One of these signals needs no judgement about prose, and it is the strongest:
+`promisesPendingAction` recognises a promise of confirmation cards, and a card
+exists **only** if a write tool call in that same turn produced a pending
+action. Promised cards plus `proposingToolResults === 0` is a broken promise the
+loop can prove. Prefer that shape -- pair a claim in the text against state the
+loop already tracks -- over adding another phrase to a regex list.
+
 The prompt asks for the same thing in `QUERY_SYSTEM_PROMPT` ("FINISH THE TURN YOU
 ARE IN") and the safety reminder, since the cheapest stall is the one that never
 happens -- but a prompt rule is not a guarantee, which is why the loop enforces
 it too.
+
+**A stall is often a dead end the model found and could not name.** Both reported
+stalls were the same request: recategorize one line inside 17 split
+transactions. That cannot be done. A split update must be a single-item call
+(the bulk card rows carry no splits), and `AiQueryService` allows one proposing
+tool call per *query* -- so one split transaction per user request, seventeen
+requests. Nothing told the model that, so it narrated progress towards something
+unreachable. When you add a limit like this, put it in the tool description in
+the same commit: an assistant that says "I can do these one at a time, 16 to go"
+is working; one that discovers the wall mid-answer stalls.
 
 ## A numeric env knob is declared as data, next to its documentation
 

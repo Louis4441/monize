@@ -2,7 +2,22 @@ import {
   CONTINUATION_NUDGE,
   MAX_CONTINUATION_NUDGES,
   isDeferredContinuation,
+  promisesPendingAction,
 } from "./continuation";
+
+/**
+ * The second reported stall, verbatim. It defeated the first version of the
+ * detector twice over: "shortly" was not a wait phrase, and two markdown links
+ * (~60 characters of URL each, none of it visible to the reader) pushed "I am
+ * currently gathering" out of the tail window.
+ */
+const CARD_STALL = [
+  "I've identified 17 split transactions in your [WS Chequing](monize://account/acct-1) account where the category was set to [Business: Cell Phone](monize://category/cat-1).",
+  "",
+  "Because these are split transactions, they must be updated by providing the full set of categories for each transaction. I am currently gathering the remaining split details for these 17 transactions so I can propose the updates to [Automobile: Accessories](monize://category/cat-2) while keeping your other categories unchanged.",
+  "",
+  "Please review and approve the confirmation cards that will appear shortly.",
+].join("\n");
 
 describe("isDeferredContinuation", () => {
   /**
@@ -20,6 +35,16 @@ describe("isDeferredContinuation", () => {
     expect(isDeferredContinuation(REPORTED)).toBe(true);
   });
 
+  it("catches the reported card stall", () => {
+    expect(isDeferredContinuation(CARD_STALL)).toBe(true);
+  });
+
+  it("does not need the whole message to fit in the window", () => {
+    // The stall sentence sits ~340 characters from the end as written, and
+    // inside the window once the link targets are stripped.
+    expect(isDeferredContinuation(CARD_STALL)).toBe(true);
+  });
+
   describe("asking the user to wait", () => {
     const waits = [
       "Working through them now. One moment.",
@@ -32,6 +57,9 @@ describe("isDeferredContinuation", () => {
       "Bear with me, this one has a lot of lines.",
       "Full breakdown coming right up.",
       "I'll get back to you with the rest of the categories.",
+      "The confirmation cards will appear shortly.",
+      "The updated totals will be ready in a few moments.",
+      "I will send the breakdown in my next message.",
     ];
 
     it.each(waits)("defers: %s", (text) => {
@@ -115,12 +143,19 @@ describe("isDeferredContinuation", () => {
 
 describe("CONTINUATION_NUDGE", () => {
   it("offers both exits, so a false positive still produces an answer", () => {
-    expect(CONTINUATION_NUDGE).toMatch(/call the tools/i);
+    expect(CONTINUATION_NUDGE).toMatch(/make the tool calls/i);
     expect(CONTINUATION_NUDGE).toMatch(/final answer/i);
   });
 
   it("tells the model its turn does not resume", () => {
     expect(CONTINUATION_NUDGE).toMatch(/cannot continue/i);
+  });
+
+  it("says where a confirmation card actually comes from", () => {
+    // The stall that motivated this told the user cards would "appear
+    // shortly". Nothing appears; a card exists only if a tool call made one.
+    expect(CONTINUATION_NUDGE).toMatch(/same turn/i);
+    expect(CONTINUATION_NUDGE).toMatch(/confirmation card/i);
   });
 });
 
@@ -128,5 +163,59 @@ describe("MAX_CONTINUATION_NUDGES", () => {
   it("is bounded, so a model that will not comply cannot burn the budget", () => {
     expect(MAX_CONTINUATION_NUDGES).toBeGreaterThanOrEqual(1);
     expect(MAX_CONTINUATION_NUDGES).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("promisesPendingAction", () => {
+  /**
+   * The check that needs no judgement about prose. A confirmation card exists
+   * only if a write tool call in the same turn produced a pending action, so
+   * the caller pairs this with what the turn actually emitted: promised cards
+   * plus zero proposals is a broken promise, provably.
+   */
+  const promises = [
+    "Please review and approve the confirmation cards that will appear shortly.",
+    "I've prepared the changes -- approve the card to apply them.",
+    "Review and approve the two updates below.",
+    "A confirmation card is on its way.",
+  ];
+
+  it.each(promises)("detects: %s", (text) => {
+    expect(promisesPendingAction(text)).toBe(true);
+  });
+
+  it("detects the promise in the reported reply", () => {
+    expect(promisesPendingAction(CARD_STALL)).toBe(true);
+  });
+
+  it("looks past the tail, since the promise can sit mid-message", () => {
+    expect(
+      promisesPendingAction(
+        "Please review and approve the confirmation card.\n\nFor reference, the January total was $3,240.18 across 45 transactions.",
+      ),
+    ).toBe(true);
+  });
+
+  const notPromises = [
+    "You spent $3,240.18 across 45 transactions in January 2026.",
+    "I cannot change transactions without your approval.",
+    "Nothing was changed.",
+  ];
+
+  it.each(notPromises)("ignores: %s", (text) => {
+    expect(promisesPendingAction(text)).toBe(false);
+  });
+
+  it("ignores a question asking whether to propose", () => {
+    // Asking permission is not claiming a card exists.
+    expect(
+      promisesPendingAction(
+        "I can propose those updates for you to review and approve. Shall I?",
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores empty text", () => {
+    expect(promisesPendingAction("")).toBe(false);
   });
 });

@@ -34,9 +34,10 @@ export const MAX_CONTINUATION_NUDGES = 2;
  * the answer costs one pass and the user still gets a proper reply.
  */
 export const CONTINUATION_NUDGE =
-  "[SYSTEM] Your turn ended without a tool call, but your message says you are still working. " +
+  "[SYSTEM] Your turn ended without a tool call, but your message promises work you have not done. " +
   "You cannot continue after your turn ends -- nothing runs in between, and the user sees only the promise. " +
-  "Either call the tools you still need now, in this same turn, or give your complete final answer from the data you already have. " +
+  "A confirmation card exists only if a write tool call in the SAME turn as your message created it; no card 'appears shortly'. " +
+  "Either make the tool calls you still need now, in this same turn, or give your complete final answer from the data you already have. " +
   "Do not say you will continue, do not ask the user to wait, and do not acknowledge this message.";
 
 /**
@@ -53,6 +54,12 @@ const WAIT_PATTERNS: readonly RegExp[] = [
   /\bwait (?:while|until) I\b/i,
   /\bcoming (?:right )?up\b/i,
   /\bget back to you\b/i,
+  // Something is promised to happen on its own, after the turn. It cannot:
+  // nothing runs between turns, so "shortly" never arrives.
+  /\bshortly\b/i,
+  /\bwill (?:appear|follow|be (?:ready|shown|displayed))\b/i,
+  /\bin (?:just )?a (?:few )?(?:moment|moments|seconds|minutes)\b/i,
+  /\bnext (?:message|reply|response)\b/i,
 ];
 
 /**
@@ -89,12 +96,38 @@ const OFFER_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * A promise that the user is about to be shown a confirmation card.
+ *
+ * Unlike everything above, this one can be *checked*: a card exists only if a
+ * write tool call in the same turn produced a pending action. A turn that
+ * promises cards and emitted none has told the user something false, and the
+ * loop knows which it is without weighing any prose. See
+ * {@link promisesPendingAction}.
+ */
+const CARD_PROMISE_PATTERNS: readonly RegExp[] = [
+  /\bconfirmation card/i,
+  /\bapprove the (?:card|change|update|proposal)/i,
+  /\breview and approve\b/i,
+  /\bcards? (?:will|to) (?:appear|show|follow)\b/i,
+];
+
+/**
  * How much of the message tail is examined. Long enough to hold the closing
  * sentence or two where a deferral lives, short enough that a mid-answer
  * mention ("I pulled the details, let me summarize what they show: ...")
  * followed by the actual summary does not trip it.
+ *
+ * Measured after markdown link targets are stripped: a single
+ * `[Automobile: Accessories](monize://category/...)` is ~60 characters of URL
+ * the reader never sees, and two of them pushed the actual stall
+ * ("I am currently gathering the remaining split details") out of the window
+ * on the reply that motivated this.
  */
-const TAIL_CHARS = 240;
+const TAIL_CHARS = 320;
+
+/** Replace `[label](target)` with `label`, so a URL cannot fill the window. */
+const stripLinkTargets = (value: string): string =>
+  value.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
 
 /**
  * Does this tool-free turn promise work instead of delivering it?
@@ -107,12 +140,42 @@ const TAIL_CHARS = 240;
  * looping is worse than the stall this guards against.
  */
 export function isDeferredContinuation(text: string): boolean {
-  const trimmed = (text ?? "").trim();
-  if (trimmed.length === 0) return false;
-  if (trimmed.endsWith("?")) return false;
+  const tail = messageTail(text);
+  if (tail === null) return false;
 
-  const tail = trimmed.slice(-TAIL_CHARS);
   if (WAIT_PATTERNS.some((pattern) => pattern.test(tail))) return true;
   if (OFFER_PATTERNS.some((pattern) => pattern.test(tail))) return false;
   return WORK_PATTERNS.some((pattern) => pattern.test(tail));
+}
+
+/**
+ * Does this turn tell the user a confirmation card is coming?
+ *
+ * The caller pairs it with what the turn actually emitted: promising a card
+ * while proposing no action is a broken promise the loop can prove, rather
+ * than a phrasing it has to judge. It is the reason the reported reply --
+ * "Please review and approve the confirmation cards that will appear shortly",
+ * with no write tool call anywhere in the turn -- is caught for what it is.
+ *
+ * Scoped to the whole message, not the tail: the promise may sit mid-message
+ * with a summary after it, and it is false either way.
+ */
+export function promisesPendingAction(text: string): boolean {
+  const trimmed = stripLinkTargets((text ?? "").trim());
+  if (trimmed.length === 0) return false;
+  // A question is asking permission to propose, not claiming to have done so.
+  if (trimmed.endsWith("?")) return false;
+  return CARD_PROMISE_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+/**
+ * The closing stretch of a message, or null when there is nothing to judge.
+ * Link targets are stripped first so the window holds words rather than URLs.
+ */
+function messageTail(text: string): string | null {
+  const trimmed = stripLinkTargets((text ?? "").trim()).trim();
+  if (trimmed.length === 0) return null;
+  // A trailing question hands the next move to the user deliberately.
+  if (trimmed.endsWith("?")) return null;
+  return trimmed.slice(-TAIL_CHARS);
 }

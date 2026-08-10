@@ -40,6 +40,7 @@ import {
   CONTINUATION_NUDGE,
   MAX_CONTINUATION_NUDGES,
   isDeferredContinuation,
+  promisesPendingAction,
 } from "./continuation";
 
 /**
@@ -520,11 +521,22 @@ export class AiQueryService {
         // read it. Tell the model its turn does not resume and run another
         // pass; the promise stays in the thinking buffer rather than being
         // promoted into the answer bubble.
-        if (isDeferredContinuation(iterationContent)) {
+        //
+        // The second clause is the one that needs no judgement about prose: a
+        // confirmation card exists only if a write tool call produced a
+        // pending action, so a turn that promises cards while `proposedThisQuery`
+        // is still zero has told the user something that is not true.
+        const promisedUnproposedCards =
+          proposingToolResults === 0 && promisesPendingAction(iterationContent);
+        if (
+          isDeferredContinuation(iterationContent) ||
+          promisedUnproposedCards
+        ) {
           if (continuationNudges < MAX_CONTINUATION_NUDGES) {
             continuationNudges++;
             this.logger.warn(
-              `Deferred continuation user=${userId} provider=${provider.name} iteration=${iteration} nudge=${continuationNudges}/${MAX_CONTINUATION_NUDGES}`,
+              `Deferred continuation user=${userId} provider=${provider.name} iteration=${iteration} ` +
+                `nudge=${continuationNudges}/${MAX_CONTINUATION_NUDGES} unproposedCards=${promisedUnproposedCards}`,
             );
             messages.push({ role: "assistant", content: iterationContent });
             messages.push({ role: "user", content: CONTINUATION_NUDGE });

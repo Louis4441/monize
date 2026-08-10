@@ -1264,6 +1264,53 @@ describe("AiQueryService", () => {
         );
       });
 
+      it("runs another pass when cards are promised but none were proposed", async () => {
+        // The second report: the model announced "confirmation cards that will
+        // appear shortly" and made no write tool call, so nothing appeared.
+        // A card exists only if a proposal in this query created one, which
+        // makes this a broken promise the loop can prove rather than judge.
+        const CARD_PROMISE =
+          "I have identified the 17 split transactions. " +
+          "Please review and approve the confirmation cards.";
+        scriptedProvider(reply(CARD_PROMISE), reply(REAL_ANSWER));
+
+        const events = await collectEvents(userId, "Recategorize the splits");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(events.find((e) => e.type === "content")!.text).toBe(
+          REAL_ANSWER,
+        );
+      });
+
+      it("leaves the same wording alone once a card really was proposed", async () => {
+        // Telling the user to approve a card that exists is the documented
+        // behaviour after a write tool call, not a stall.
+        mockToolExecutor.execute.mockResolvedValueOnce({
+          data: { status: "proposed" },
+          summary: "Prepared 1 update",
+          sources: [],
+          pendingAction: { id: "act-1", type: "update_transaction" },
+        });
+        scriptedProvider(
+          reply("", [
+            {
+              id: "tc-1",
+              name: "manage_transactions",
+              input: { operation: "update" },
+            },
+          ]),
+          reply("Please review and approve the confirmation card."),
+        );
+
+        const events = await collectEvents(userId, "Recategorize the splits");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(events.some((e) => e.type === "pending_action")).toBe(true);
+        expect(events.find((e) => e.type === "content")!.text).toBe(
+          "Please review and approve the confirmation card.",
+        );
+      });
+
       it("leaves a finished answer alone", async () => {
         // An answer that ends by offering more work is finished: the next move
         // is the user's, and looping would take it away from them.
