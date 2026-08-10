@@ -672,3 +672,42 @@ whose predicate is a disjunction needs its own parentheses inside the
 `user_id = $n AND (...)`, or the trailing arm escapes the tenant restriction
 entirely; assert the composed clause, not an `"AND ("` prefix, since a condition
 that opens with its own paren satisfies that prefix while ungrouped.
+
+### Deciding a worker is dead does not stop it -- revoke, do not merely record
+
+A reaper reads a heartbeat and concludes a worker is gone. That conclusion can be
+wrong in the one direction that costs money: the heartbeat runs on its own
+connection while the work runs on another, so a worker that is merely *blocked*
+gets written off, wakes up, and finishes. Marking its row `failed` changed
+nothing about what it was about to write -- and because the reap also advertised
+a retry, the file lands twice.
+
+So an attempt gets an identity, not just a status. `import_jobs.attempt_token` is
+minted by `claim()`, required by every write that worker makes, and set to NULL by
+both reaps. The worker's own commit checkpoint (`markDataCommitted`) is a fenced
+compare-and-set on that token and is the **last statement of the transaction that
+wrote the rows**, so a zero-row result throws and rolls all of them back. Position
+is load-bearing: the same check one statement later is a check after the commit,
+which is the rule in "Rejection happens before the write".
+
+Three parts, and each is a separate way to get it wrong:
+
+- **A status check is not a fence.** `WHERE status = 'running'` still passes for a
+  job that was reaped and re-claimed by a *different* attempt. Compare the token.
+- **A fence the other binary does not know about is not a fence.** During a
+  rolling deployment the previous release is still running, and its checkpoint
+  names no token because its code predates the column. That rule has to live in
+  the database -- migration 145's `BEFORE UPDATE` trigger refuses a false -> true
+  `data_committed` on a non-`running` job, which is exactly the reaped case, from
+  either binary. Deliberately not "and has a token": an old worker's normal state
+  is `running` with a NULL token, and refusing that would break every import in
+  flight during the rollout.
+- **Terminal states are monotonic.** `complete()` and `fail()` are compare-and-set
+  on `(status, attempt_token)` and return whether they took, so a woken worker
+  cannot overwrite the terminal state the reaper already wrote. The caller must
+  read that boolean: logging "completed" after a refusal puts the operator's only
+  two lines about the job in contradiction, with the false one the more visible.
+
+The integration suite installs the trigger via `findTriggerMigrations()` in
+`test/helpers/rls-setup.ts` -- `synchronize` creates no triggers, so without that
+step a mixed-version test reports the fence as working while nothing enforces it.

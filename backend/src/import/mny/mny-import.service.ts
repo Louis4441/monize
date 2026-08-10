@@ -67,10 +67,19 @@ import {
  * Runs a `.mny` import: staged bytes in, Monize rows and a verification report
  * out.
  *
- * The whole write is one transaction, so a failure leaves nothing behind and
- * Retry cannot double-import. Progress still reaches the wizard mid-flight
- * because the job service publishes it on its own connection -- see
- * `runOutsideActiveScopedManager`.
+ * The whole **write** is one transaction, so a failure *before it commits*
+ * leaves nothing behind. What that transaction does not cover is everything
+ * after it: post-processing, verification, staged-byte removal and the terminal
+ * status write. A failure there leaves every imported row in place, and the row
+ * used to advertise itself as retryable anyway -- so Retry inserted the file a
+ * second time under fresh UUIDs, because the mapper generates new ids on every
+ * parse and nothing on an imported row identifies its source record (audit
+ * P4-002). `writeAll` therefore sets `import_jobs.data_committed` inside its own
+ * transaction, and `MnyImportJobService.fail` will not call such a run
+ * retryable.
+ *
+ * Progress still reaches the wizard mid-flight because the job service publishes
+ * it on its own connection -- see `runOutsideActiveScopedManager`.
  *
  * The optional "start fresh" wipe happens in `start`, outside the job body, for
  * a security reason as much as an ordering one: `UsersService.deleteData`
@@ -616,19 +625,23 @@ export class MnyImportService {
         ]),
       };
 
-      // Last statement before commit: if this job no longer holds the user's
-      // import slot -- retired by the one-active-job migration on a database that
-      // raced before the index existed, or reaped as stale -- throwing here rolls
-      // every row above back. Checking the status anywhere else, including in
-      // `complete()`, happens after these rows are already committed, which is
-      // how a retired duplicate could still double a user's financial history.
-      await this.jobs.assertStillHoldsSlot(manager, context.jobId);
-
-      // And, in the same transaction, the checkpoint that says these rows are
-      // real. It commits with them, so a rollback leaves it false; past this
-      // point a stalled job must not be offered Retry, because the ledger
-      // already holds this file.
-      await this.jobs.markDataCommitted(manager, context.jobId);
+      // Last statement before commit, and both halves of the fence in one
+      // statement: it refuses unless this job is still `running` under *this*
+      // attempt's token -- retired by the one-active-job migration on a database
+      // that raced before the index existed, or reaped as stale, or handed to
+      // another worker -- and otherwise records that these rows are real.
+      //
+      // Its refusal throws, which rolls every row above back. Checking anywhere
+      // else, including in `complete()`, happens after these rows are already
+      // committed, which is how a reaped worker could still double a user's
+      // financial history. And because the checkpoint commits with the rows it
+      // describes, a rollback leaves it false: past this point a stalled job
+      // must not be offered Retry, because the ledger already holds this file.
+      await this.jobs.markDataCommitted(
+        manager,
+        context.jobId,
+        context.attemptToken,
+      );
 
       return result;
     });
