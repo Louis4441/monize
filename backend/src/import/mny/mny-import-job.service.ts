@@ -7,6 +7,9 @@ import {
   withScopedDb,
 } from "../../common/db/scoped-db";
 import { returnedRows } from "../../common/db/query-result";
+import { acquireAdvisoryLock, LockScope } from "../../common/db/locks";
+import { JobClaimType } from "../../common/jobs/job-claim.service";
+import { USER_MAINTENANCE_CLAIM_KEY } from "../../common/jobs/user-maintenance.service";
 import {
   withSystemContext,
   withUserContext,
@@ -49,6 +52,17 @@ export const JOB_HEARTBEAT_INTERVAL_MS = 60 * 1000;
 
 /** i18n key for a job the reaper gave up on. */
 export const JOB_STALLED_ERROR_KEY = "mnyJobStalled";
+
+/**
+ * i18n key for a stalled job whose rows already reached the ledger.
+ *
+ * A different key because it is a different message *and* a different offer:
+ * `mnyJobStalled` tells the user retrying is safe, which is only true while
+ * nothing was written. Past `data_committed` the rows are there, the import just
+ * did not finish reporting, and retrying would import the file a second time --
+ * so this key's copy says so and the job is retired non-retryable.
+ */
+export const JOB_COMMITTED_STALLED_ERROR_KEY = "mnyJobStalledAfterCommit";
 
 /** i18n key for a failure with no more specific parse error. */
 export const JOB_FAILED_ERROR_KEY = "mnyImportFailed";
@@ -108,17 +122,31 @@ export const STALE_ACTIVE_JOB_CONDITION = `(
  * it is the whole difference between "this user's stale jobs" and "this user's
  * jobs, plus everybody's stale pending ones". `reapStatement` is exported so a
  * test can assert that grouping rather than trusting the reader to see it.
+ *
+ * `retryable` and `error_key` both branch on `data_committed`, and must keep
+ * branching the same way migration 140's preflight does. Retryable is a promise
+ * that re-running costs nothing; once this job's rows reached the ledger it does
+ * not, and offering Retry there imports the file a second time. The committed
+ * case gets its own key because the copy has to say something different -- see
+ * `JOB_COMMITTED_STALLED_ERROR_KEY`.
+ *
+ * Explained here rather than inside the template literal: a `--` comment in SQL
+ * runs to end of line, so one embedded in a string anything might later collapse
+ * to a single line would comment out the rest of the statement.
  */
 export const reapStatement = (scopedToUser: boolean): string => `
     UPDATE import_jobs
         SET status = 'failed',
-            error_key = $2,
+            error_key = CASE
+              WHEN data_committed THEN '${JOB_COMMITTED_STALLED_ERROR_KEY}'
+              ELSE $2
+            END,
             error_detail = CASE
               WHEN status = 'running'
                 THEN 'Import worker stopped reporting progress'
               ELSE 'Import was never picked up by a worker'
             END,
-            retryable = true,
+            retryable = (data_committed = false),
             progress = NULL,
             completed_at = CURRENT_TIMESTAMP
       WHERE ${scopedToUser ? "user_id = $3 AND " : ""}(
@@ -204,6 +232,37 @@ export class MnyImportJobService {
   ): Promise<ImportJob> {
     try {
       return await withScopedDb(this.dataSource, async (manager) => {
+        // The other half of the exclusion, and the same lock
+        // `UserMaintenanceService.withMaintenanceLease` takes.
+        //
+        // The partial unique index already makes two concurrent *imports*
+        // atomic, but a restore or a "delete my data" records its claim in
+        // `job_claims`, not here -- so without a shared object the two protocols
+        // never contend and both can believe they own the dataset. Taking
+        // `LockScope.UserImport` first, and reading the maintenance lease under
+        // it, makes whichever transaction wins the lock decide for both.
+        await acquireAdvisoryLock(manager, LockScope.UserImport, userId);
+
+        const claimed = returnedRows<{ present: boolean }>(
+          await manager.query(
+            `SELECT EXISTS (
+               SELECT 1 FROM job_claims
+                WHERE claim_type = $1 AND user_id = $2 AND claim_key = $3
+                  AND expires_at IS NOT NULL
+                  AND expires_at > CURRENT_TIMESTAMP
+             ) AS present`,
+            [JobClaimType.UserMaintenance, userId, USER_MAINTENANCE_CLAIM_KEY],
+          ),
+        );
+        if (claimed[0]?.present === true) {
+          throw new ConflictException(
+            tr(
+              "errors.maintenance.inProgress",
+              "Another operation is currently replacing this account's data. Wait for it to finish and try again.",
+            ),
+          );
+        }
+
         await this.reapStaleJobsForUser(manager, userId);
         const repo = manager.getRepository(ImportJob);
         return repo.save(
@@ -372,6 +431,28 @@ export class MnyImportJobService {
     if (status !== "running") {
       throw new MnyImportSlotLostError(jobId, status);
     }
+  }
+
+  /**
+   * Record that this job's rows are about to become visible to everyone else.
+   *
+   * Called as the last statement of the import's write transaction, beside
+   * `assertStillHoldsSlot`, so the flag commits with the rows it describes and
+   * cannot claim a commit that rolled back. That is the whole point of the
+   * column: `retryable` is a promise that re-running costs nothing, and once the
+   * ledger holds this job's transactions a retry doubles a user's financial
+   * history instead. The reap and the migration preflight both read it, and
+   * both must agree -- so they share `JOB_COMMITTED_STALLED_ERROR_KEY` rather
+   * than spelling the string out.
+   */
+  async markDataCommitted(
+    manager: EntityManager,
+    jobId: string,
+  ): Promise<void> {
+    await manager.query(
+      `UPDATE import_jobs SET data_committed = true WHERE id = $1`,
+      [jobId],
+    );
   }
 
   /**

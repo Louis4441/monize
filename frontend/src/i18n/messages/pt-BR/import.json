@@ -536,6 +536,7 @@
   "mnyErrors": {
     "mnyImportFailed": "Algo deu errado durante a importação. Nada foi salvo -- você pode tentar novamente.",
     "mnyJobStalled": "A importação parou de responder, provavelmente porque o servidor reiniciou. O arquivo que você enviou continua aqui, então tentar novamente é seguro.",
+    "mnyJobStalledAfterCommit": "A importação parou de responder depois de já ter salvado seus dados, provavelmente porque o servidor reiniciou. Os registros importados estão na sua conta, então importar o mesmo arquivo de novo iria duplicá-los. Confira suas contas antes de importar qualquer outra coisa.",
     "mnyStagedFileMissing": "O arquivo do Money enviado não está mais disponível. Envie-o novamente.",
     "mnyFileTruncated": "Este arquivo do Money parece incompleto. O envio pode ter sido interrompido.",
     "mnyNotAMoneyFile": "Este arquivo não é um arquivo do Microsoft Money (.mny).",

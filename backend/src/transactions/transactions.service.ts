@@ -24,6 +24,7 @@ import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { TransactionSplitService } from "./transaction-split.service";
 import {
+  PreparedTransfer,
   TransactionTransferService,
   TransferActor,
   TransferResult,
@@ -2695,23 +2696,73 @@ export class TransactionsService {
     createTransferDto: CreateTransferDto,
     actor?: TransferActor,
   ): Promise<TransferResult> {
-    const result = await this.transferService.createTransfer(
+    const prepared = await this.prepareTransfer(
       userId,
       createTransferDto,
-      this.findOne.bind(this),
       actor,
     );
+    const { savedFromId, savedToId } =
+      await this.transferService.writeTransferLegs(prepared);
+    return this.completeTransfer(prepared, savedFromId, savedToId);
+  }
 
-    if (createTransferDto.tagIds && createTransferDto.tagIds.length > 0) {
+  /**
+   * Validate and authorize a transfer without writing it. See
+   * `TransactionTransferService.prepareTransfer` -- a caller that already holds
+   * a transaction must decide authorization before opening it, because the
+   * authorization read runs under a system context that cannot join a
+   * user-identity transaction.
+   */
+  prepareTransfer(
+    userId: string,
+    createTransferDto: CreateTransferDto,
+    actor?: TransferActor,
+  ): Promise<PreparedTransfer> {
+    return this.transferService.prepareTransfer(
+      userId,
+      createTransferDto,
+      actor,
+    );
+  }
+
+  /**
+   * Write a prepared transfer's legs, joining `manager` when the caller supplies
+   * one so the write is atomic with the rest of their transaction.
+   */
+  writeTransferLegs(
+    prepared: PreparedTransfer,
+    manager?: EntityManager,
+  ): Promise<{ savedFromId: string; savedToId: string }> {
+    return this.transferService.writeTransferLegs(prepared, manager);
+  }
+
+  /**
+   * Everything a transfer does after its legs commit: derived recalculation,
+   * action history, tags, and the read-back the caller returns. A caller that
+   * wrote the legs inside its own transaction calls this once that transaction
+   * has committed -- never inside it, since the history recorder swallows its
+   * own failures and would either abort the caller or lose the undo entry.
+   */
+  async completeTransfer(
+    prepared: PreparedTransfer,
+    savedFromId: string,
+    savedToId: string,
+  ): Promise<TransferResult> {
+    const userId = prepared.effectiveUserId;
+    const result = await this.transferService.completeTransfer(
+      prepared,
+      savedFromId,
+      savedToId,
+      this.findOne.bind(this),
+    );
+
+    const tagIds = prepared.dto.tagIds;
+    if (tagIds && tagIds.length > 0) {
       // Tags are per-user reference data: never write the effective user's
       // tag ids onto a cross-owner counterpart leg.
       const refresh = async (leg: Transaction) => {
         if (leg.userId !== userId) return leg;
-        await this.tagsService.setTransactionTags(
-          leg.id,
-          createTransferDto.tagIds!,
-          userId,
-        );
+        await this.tagsService.setTransactionTags(leg.id, tagIds, userId);
         return this.findOne(userId, leg.id);
       };
 

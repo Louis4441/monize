@@ -536,6 +536,7 @@
   "mnyErrors": {
     "mnyImportFailed": "Coś poszło nie tak podczas importu. Nic nie zostało zapisane -- możesz spróbować ponownie.",
     "mnyJobStalled": "Import przestał odpowiadać, najprawdopodobniej z powodu restartu serwera. Przesłany plik nadal tu jest, więc ponowna próba jest bezpieczna.",
+    "mnyJobStalledAfterCommit": "Import przestał odpowiadać po zapisaniu Twoich danych, najprawdopodobniej z powodu restartu serwera. Zaimportowane rekordy są na Twoim koncie, więc ponowny import tego samego pliku je zduplikuje. Sprawdź swoje konta, zanim zaimportujesz cokolwiek innego.",
     "mnyStagedFileMissing": "Przesłany plik Money nie jest już dostępny. Prześlij go ponownie.",
     "mnyFileTruncated": "Ten plik Money wygląda na niekompletny. Przesyłanie mogło zostać przerwane.",
     "mnyNotAMoneyFile": "Ten plik nie jest plikiem Microsoft Money (.mny).",

@@ -168,6 +168,17 @@ export class MnyImportService {
           // wizard, not in Settings, so an artifact obtained for one must not drive
           // the other (P2-005).
           "import-wipe",
+          // And its own initiator, which is not the same question.
+          //
+          // `deleteData` defaults to "user-request", which takes the maintenance
+          // lease -- whose active-import check would see the pending job the
+          // line above just created and refuse this wipe with a 409, so
+          // `wipeExistingData` could never start. The import already holds the
+          // exclusion this wipe needs: `MnyImportJobService.create` took
+          // `LockScope.UserImport` and its job row is what refuses a concurrent
+          // restore or delete-my-data. Taking the lease again here would be a
+          // second claim on a slot this request already owns.
+          "mny-import",
         );
       } catch (error) {
         // The request is refused, so the slot it took must go back. The stale
@@ -612,6 +623,12 @@ export class MnyImportService {
       // `complete()`, happens after these rows are already committed, which is
       // how a retired duplicate could still double a user's financial history.
       await this.jobs.assertStillHoldsSlot(manager, context.jobId);
+
+      // And, in the same transaction, the checkpoint that says these rows are
+      // real. It commits with them, so a rollback leaves it false; past this
+      // point a stalled job must not be offered Retry, because the ledger
+      // already holds this file.
+      await this.jobs.markDataCommitted(manager, context.jobId);
 
       return result;
     });

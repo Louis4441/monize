@@ -536,6 +536,7 @@
   "mnyErrors": {
     "mnyImportFailed": "匯入過程中發生問題。沒有儲存任何內容 -- 您可以重試。",
     "mnyJobStalled": "匯入已停止回應，很可能是伺服器重新啟動所致。您上傳的檔案仍在，重試是安全的。",
+    "mnyJobStalledAfterCommit": "匯入在已儲存您的資料之後停止回應，很可能是伺服器重新啟動所致。匯入的記錄已在您的帳戶中，再次匯入同一檔案會造成重複。請先檢查帳戶，再匯入其他檔案。",
     "mnyStagedFileMissing": "上傳的 Money 檔案已無法使用，請重新上傳。",
     "mnyFileTruncated": "這個 Money 檔案似乎不完整，上傳可能被中斷。",
     "mnyNotAMoneyFile": "這個檔案不是 Microsoft Money (.mny) 檔案。",

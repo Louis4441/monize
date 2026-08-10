@@ -1,5 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { ScheduledTransactionsService } from "./scheduled-transactions.service";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
@@ -37,6 +41,8 @@ describe("ScheduledTransactionsService", () => {
   // The withScopedDb manager, exposed under the legacy name so the pre-RLS
   // queryRunner.manager assertions keep reading naturally.
   let mockQueryRunner: Record<string, any>;
+  /** Whether the occurrence-claim insert returns a row this run. */
+  let postingClaimWins: boolean;
   let mockDataSource: DataSourceMock;
   let mockActionHistoryService: Record<string, jest.Mock>;
   let mockExchangeRateService: Record<string, jest.Mock>;
@@ -150,11 +156,27 @@ describe("ScheduledTransactionsService", () => {
       findOne: jest.fn().mockResolvedValue({ id: "acc-1", userId }),
     };
 
+    // The posting path no longer calls `createTransfer`: authorization has to be
+    // decided before the posting transaction opens (a system-identity read
+    // cannot join a user-identity transaction), so the transfer is prepared
+    // above the transaction, written inside it, and completed after the commit.
     transactionsService = {
       create: jest.fn().mockResolvedValue({ id: "tx-1" }),
-      createTransfer: jest
+      prepareTransfer: jest.fn().mockResolvedValue({
+        effectiveUserId: userId,
+        realUserId: userId,
+        dto: {},
+        fromOwnerId: userId,
+        toOwnerId: userId,
+        hasForeignLeg: false,
+      }),
+      writeTransferLegs: jest
         .fn()
-        .mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
+        .mockResolvedValue({ savedFromId: "tx-1", savedToId: "tx-2" }),
+      completeTransfer: jest.fn().mockResolvedValue({
+        fromTransaction: { id: "tx-1" },
+        toTransaction: { id: "tx-2" },
+      }),
     };
 
     investmentTransactionsService = {
@@ -199,12 +221,32 @@ describe("ScheduledTransactionsService", () => {
       execute: jest.fn().mockResolvedValue({ affected: 0 }),
     }));
     mockQueryRunner = { manager: txManager };
+    /**
+     * `post` locks the schedule row and claims the occurrence before it creates
+     * any money.
+     *
+     * The financial transaction used to commit in its own transaction and
+     * `nextDueDate` advance in a second one, so two replicas firing the same
+     * hourly cron -- or a manual post racing it, or a crash between the two
+     * commits -- posted the same bill twice (audit P4-004). The locked read and
+     * the occurrence claim are what the doubles below answer.
+     */
+    postingClaimWins = true;
+    txManager.findOne.mockImplementation((_entity: unknown, options: unknown) =>
+      scheduledRepo.findOne(options as never),
+    );
+
     // Default to a single UTC user so cron logic that buckets by timezone
     // continues to operate against legacy tests that pre-date the cron
     // refactor and assume a one-user world.
-    mockDataSource.query.mockResolvedValue([
-      { user_id: "11111111-1111-1111-1111-111111111111", timezone: "UTC" },
-    ]);
+    mockDataSource.query.mockImplementation(async (sql: string) => {
+      if (String(sql).includes("scheduled_transaction_postings")) {
+        return postingClaimWins ? [[{ id: "posting-1" }], 1] : [[], 0];
+      }
+      return [
+        { user_id: "11111111-1111-1111-1111-111111111111", timezone: "UTC" },
+      ];
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -1090,7 +1132,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should use createTransfer for transfer transactions", async () => {
+    it("should use prepareTransfer for transfer transactions", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1103,7 +1145,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1114,7 +1156,107 @@ describe("ScheduledTransactionsService", () => {
       expect(transactionsService.create).not.toHaveBeenCalled();
     });
 
-    it("forwards the schedule's category to createTransfer (#743)", async () => {
+    it("authorizes the transfer before the posting transaction opens", async () => {
+      // The regression this pins: `createTransfer` was called *inside* the
+      // posting transaction. Its authorization reads a foreign account row
+      // under `withSystemContext`, and a system-identity `withScopedDb` cannot
+      // join a user-identity transaction -- it throws
+      // `IDENTITY_MISMATCH_MESSAGE` -- so every scheduled transfer post failed,
+      // cron and manual alike. Preparing above the transaction is what fixes it,
+      // so the order is the invariant, not an implementation detail.
+      //
+      // Written as "no transaction was open when prepare ran" rather than as a
+      // call-order assertion: the posting path opens more than one transaction,
+      // and only the nesting is the defect.
+      let transactionDepth = 0;
+      let preparedInsideTransaction = false;
+      let wroteInsideTransaction = false;
+
+      mockDataSource.transaction.mockImplementation(async (...args: any[]) => {
+        const fn = args[args.length - 1] as (m: unknown) => unknown;
+        transactionDepth++;
+        try {
+          return await fn(mockQueryRunner.manager);
+        } finally {
+          transactionDepth--;
+        }
+      });
+      transactionsService.prepareTransfer.mockImplementation(async () => {
+        preparedInsideTransaction = transactionDepth > 0;
+        return {
+          effectiveUserId: userId,
+          realUserId: userId,
+          dto: {},
+          fromOwnerId: userId,
+          toOwnerId: userId,
+          hasForeignLeg: false,
+        };
+      });
+      transactionsService.writeTransferLegs.mockImplementation(async () => {
+        wroteInsideTransaction = transactionDepth > 0;
+        return { savedFromId: "tx-1", savedToId: "tx-2" };
+      });
+
+      const scheduled = makeScheduled({
+        isTransfer: true,
+        transferAccountId: "acc-2",
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await service.post(userId, stId);
+
+      expect(transactionsService.prepareTransfer).toHaveBeenCalled();
+      expect(preparedInsideTransaction).toBe(false);
+      // ...and the write still joins it, so the legs, the occurrence claim and
+      // the schedule advancement remain one unit.
+      expect(wroteInsideTransaction).toBe(true);
+    });
+
+    it("completes the transfer only after the posting transaction commits", async () => {
+      // `completeTransfer` records action history, and the recorder swallows its
+      // own failures by design: inside the caller's transaction that is either a
+      // `25P02` abort of the posting or a silently dropped undo entry.
+      let transactionDepth = 0;
+      let completedInsideTransaction = false;
+
+      mockDataSource.transaction.mockImplementation(async (...args: any[]) => {
+        const fn = args[args.length - 1] as (m: unknown) => unknown;
+        transactionDepth++;
+        try {
+          return await fn(mockQueryRunner.manager);
+        } finally {
+          transactionDepth--;
+        }
+      });
+      transactionsService.completeTransfer.mockImplementation(async () => {
+        completedInsideTransaction = transactionDepth > 0;
+        return {
+          fromTransaction: { id: "tx-1" },
+          toTransaction: { id: "tx-2" },
+        };
+      });
+
+      const scheduled = makeScheduled({
+        isTransfer: true,
+        transferAccountId: "acc-2",
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await service.post(userId, stId);
+
+      expect(transactionsService.completeTransfer).toHaveBeenCalled();
+      expect(completedInsideTransaction).toBe(false);
+    });
+
+    it("forwards the schedule's category to prepareTransfer (#743)", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1128,13 +1270,13 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({ categoryId: "cat-ike" }),
       );
     });
 
-    it("should pass payee fields to createTransfer for transfer transactions", async () => {
+    it("should pass payee fields to prepareTransfer for transfer transactions", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1149,7 +1291,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1176,7 +1318,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1187,7 +1329,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should pass tagIds to createTransfer for transfer transactions", async () => {
+    it("should pass tagIds to prepareTransfer for transfer transactions", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1201,7 +1343,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1211,7 +1353,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should not pass tagIds to createTransfer when scheduled transaction has no tags", async () => {
+    it("should not pass tagIds to prepareTransfer when scheduled transaction has no tags", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1225,7 +1367,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           tagIds: undefined,
@@ -1253,7 +1395,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           amount: 750,
@@ -1275,7 +1417,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId, { amount: -500 });
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           amount: 500,
@@ -1297,7 +1439,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           amount: 800,
@@ -1305,7 +1447,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should pass override description to createTransfer", async () => {
+    it("should pass override description to prepareTransfer", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1325,7 +1467,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           description: "override desc",
@@ -1474,6 +1616,70 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
+    it("claims the occurrence before creating any money", async () => {
+      // The regression guard for P4-004. The claim, the money and the schedule
+      // advancement are one transaction keyed on
+      // (scheduled_transaction_id, original_due_date), so two replicas firing the
+      // same hourly cron cannot both post: opening 100.00 with one due -50.00
+      // ended at 0.00 instead of 50.00.
+      const scheduled = makeScheduled({ nextDueDate: "2026-02-01" });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await service.post(userId, stId);
+
+      const claim = mockQueryRunner.manager.query.mock.calls.find(
+        (c: unknown[]) =>
+          String(c[0]).includes("scheduled_transaction_postings"),
+      );
+      expect(claim).toBeDefined();
+      expect(String(claim![0])).toContain("ON CONFLICT");
+      // The occurrence's identity is the due date, not the date it was booked on.
+      expect(claim![1]).toEqual([stId, "2026-02-01", "2026-02-01"]);
+      expect(
+        mockQueryRunner.manager.query.mock.invocationCallOrder[
+          mockQueryRunner.manager.query.mock.calls.indexOf(claim!)
+        ],
+      ).toBeLessThan(transactionsService.create.mock.invocationCallOrder[0]);
+    });
+
+    it("posts nothing when another replica claimed the occurrence", async () => {
+      postingClaimWins = false;
+      const scheduled = makeScheduled({ nextDueDate: "2026-02-01" });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(service.post(userId, stId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(transactionsService.create).not.toHaveBeenCalled();
+      expect(scheduledRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses when the schedule has already been advanced past this occurrence", async () => {
+      // A manual post racing the cron: the caller computed the payload for
+      // 2026-02-01, but the committed row has moved on. Posting anyway would
+      // duplicate the occurrence the winner already booked.
+      const scheduled = makeScheduled({ nextDueDate: "2026-02-01" });
+      scheduledRepo.findOne
+        .mockResolvedValueOnce(scheduled)
+        .mockResolvedValueOnce({ ...scheduled, nextDueDate: "2026-03-01" });
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(service.post(userId, stId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(transactionsService.create).not.toHaveBeenCalled();
+    });
+
     it("should not call findOne after deleting a ONCE (would 404)", async () => {
       const scheduled = makeScheduled({ frequency: "ONCE" });
       stubFindOne(scheduled);
@@ -1485,11 +1691,14 @@ describe("ScheduledTransactionsService", () => {
         .fn()
         .mockResolvedValue({ affected: 1 });
 
-      // findOne is called once at the start of post() to load the entity.
-      // It must NOT be called a second time after the row is deleted.
+      // Twice: once outside the transaction to build the payload, and once
+      // inside it under the row lock -- that second read is what confirms the
+      // occurrence is still the due one before any money is created (P4-004).
+      // What must NOT happen is a read *after* the row is deleted, which would
+      // 404 on a posting that succeeded.
       await service.post(userId, stId);
 
-      expect(scheduledRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(scheduledRepo.findOne).toHaveBeenCalledTimes(2);
     });
 
     it("should advance nextDueDate for recurring frequency", async () => {
@@ -1686,7 +1895,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should pass referenceNumber to createTransfer when provided", async () => {
+    it("should pass referenceNumber to prepareTransfer when provided", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1699,7 +1908,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId, { referenceNumber: "REF-5678" });
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({ referenceNumber: "REF-5678" }),
       );
@@ -1812,7 +2021,7 @@ describe("ScheduledTransactionsService", () => {
       expect(dto.quantity).toBe(1);
       expect(dto.price).toBe(500);
       expect(transactionsService.create).not.toHaveBeenCalled();
-      expect(transactionsService.createTransfer).not.toHaveBeenCalled();
+      expect(transactionsService.prepareTransfer).not.toHaveBeenCalled();
     });
 
     it("post() forwards funding account for contribution+buy", async () => {
@@ -2816,7 +3025,7 @@ describe("ScheduledTransactionsService", () => {
       await service.processAutoPostTransactions();
     });
 
-    it("should auto-post transfer transactions using createTransfer", async () => {
+    it("should auto-post transfer transactions using prepareTransfer", async () => {
       const transfer = makeScheduled({
         id: "st-transfer",
         autoPost: true,
@@ -2833,7 +3042,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.processAutoPostTransactions();
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -2874,7 +3083,7 @@ describe("ScheduledTransactionsService", () => {
       await service.processAutoPostTransactions();
 
       expect(transactionsService.create).toHaveBeenCalled();
-      expect(transactionsService.createTransfer).toHaveBeenCalled();
+      expect(transactionsService.prepareTransfer).toHaveBeenCalled();
     });
 
     it("should pick up transactions with overrides that moved date earlier", async () => {
@@ -2913,7 +3122,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.processAutoPostTransactions();
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -2944,7 +3153,7 @@ describe("ScheduledTransactionsService", () => {
       await service.processAutoPostTransactions();
 
       expect(transactionsService.create).not.toHaveBeenCalled();
-      expect(transactionsService.createTransfer).not.toHaveBeenCalled();
+      expect(transactionsService.prepareTransfer).not.toHaveBeenCalled();
     });
 
     it("uses last_client_timezone when explicit timezone is the 'browser' sentinel", async () => {

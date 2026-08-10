@@ -1801,8 +1801,26 @@ describe("TransactionsService", () => {
     const foreignLeg = { id: "foreign-leg", userId: "owner-2" } as any;
 
     it("createTransfer applies tags to effective-user legs only", async () => {
+      // `createTransfer` is now prepare -> write -> complete, so the seam the
+      // tag gating sits behind is `completeTransfer`.
       jest
-        .spyOn((service as any).transferService, "createTransfer")
+        .spyOn((service as any).transferService, "prepareTransfer")
+        .mockResolvedValue({
+          effectiveUserId: "user-1",
+          realUserId: "user-1",
+          dto: { tagIds: ["tag-1"] },
+          fromOwnerId: "user-1",
+          toOwnerId: "owner-2",
+          hasForeignLeg: true,
+        });
+      jest
+        .spyOn((service as any).transferService, "writeTransferLegs")
+        .mockResolvedValue({
+          savedFromId: "own-leg",
+          savedToId: "foreign-leg",
+        });
+      jest
+        .spyOn((service as any).transferService, "completeTransfer")
         .mockResolvedValue({
           fromTransaction: ownLeg,
           toTransaction: foreignLeg,

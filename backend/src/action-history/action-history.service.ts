@@ -253,6 +253,22 @@ export class ActionHistoryService {
       // Clearing the redo stack and writing the new entry are one unit: a
       // partially applied pair would leave a redo stack that no longer matches
       // the head of the undo stack.
+      //
+      // This joins the caller's transaction when there is one, and that is
+      // deliberate despite the swallow below being dangerous to nest. Escaping
+      // it with `runOutsideActiveScopedManager` was tried and reverted: on its
+      // own connection this cannot see anything the caller has not committed, so
+      // a history row written about a just-created user fails its `user_id`
+      // foreign key. The contract stays "callers record after their own
+      // transaction commits", enforced by the source scan in
+      // `common/db/derived-state-writers.guard.spec.ts`.
+      //
+      // That scan reads one file at a time, so it does not see a caller two
+      // service hops up: `ScheduledTransactionsService` posting a non-transfer
+      // occurrence calls `TransactionsService.create` inside its transaction,
+      // and `create` records history. Closing that needs the money write and the
+      // history split apart in `create`, the way `createTransfer` now is -- not a
+      // change to this method.
       const saved = await withScopedDb(this.dataSource, async (manager) => {
         const repo = manager.getRepository(ActionHistory);
 

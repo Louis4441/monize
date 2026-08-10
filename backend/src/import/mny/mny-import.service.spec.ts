@@ -277,6 +277,7 @@ describe("MnyImportService", () => {
       // holds the slot"; the refusal path is a property of real transactions and
       // is asserted in test/integration/mny-import-job.integration.spec.ts.
       assertStillHoldsSlot: jest.fn().mockResolvedValue(undefined),
+      markDataCommitted: jest.fn().mockResolvedValue(undefined),
     };
     postProcessing = { run: jest.fn().mockResolvedValue(undefined) };
     usersService = { deleteData: jest.fn().mockResolvedValue(undefined) };
@@ -440,6 +441,12 @@ describe("MnyImportService", () => {
         // import wizard, so an artifact obtained for the Settings "delete my
         // data" flow must not drive it (P2-005).
         "import-wipe",
+        // And its own initiator. Left to default to "user-request", the wipe
+        // takes the maintenance lease, whose active-import check sees the
+        // pending job this same request just created -- so `wipeExistingData`
+        // 409'd against itself and could never start. The import already holds
+        // the exclusion, via `LockScope.UserImport` and its job row.
+        "mny-import",
       );
       // The wipe re-authenticates, so its credentials must not reach
       // import_jobs.options.
@@ -694,6 +701,30 @@ describe("MnyImportService", () => {
       await run();
 
       expect(staging.remove).toHaveBeenCalledWith("user-1", "staged-1");
+    });
+
+    it("checkpoints data_committed on the write transaction's own manager", async () => {
+      // The regression this pins: the column, the migration preflight branching
+      // on it and its integration spec all shipped with nothing setting it, so
+      // every superseded or stalled job was retired `retryable = true` -- even
+      // one whose rows were already in the ledger, where Retry imports the file
+      // a second time.
+      //
+      // The manager matters as much as the call. Written on any other connection
+      // the flag would commit independently of the rows it describes, which is
+      // the failure it exists to prevent: it would claim a commit that rolled
+      // back.
+      await run();
+
+      expect(jobs.markDataCommitted).toHaveBeenCalledTimes(1);
+      const [manager, jobId] = jobs.markDataCommitted.mock.calls[0];
+      expect(jobId).toBe("job-1");
+      expect(manager).toBe(jobs.assertStillHoldsSlot.mock.calls[0][0]);
+      // ...and only after the slot check, so a job that lost its slot rolls back
+      // rather than checkpointing first.
+      expect(
+        jobs.assertStillHoldsSlot.mock.invocationCallOrder[0],
+      ).toBeLessThan(jobs.markDataCommitted.mock.invocationCallOrder[0]);
     });
 
     it("reports what was created and skipped", async () => {

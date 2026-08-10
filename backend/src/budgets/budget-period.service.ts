@@ -6,6 +6,7 @@ import {
 import { tr } from "../i18n/translate";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { returnedRows } from "../common/db/query-result";
 import { Budget } from "./entities/budget.entity";
 import { RolloverType } from "./entities/budget-category.entity";
 import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
@@ -68,29 +69,61 @@ export class BudgetPeriodService {
   async closePeriod(userId: string, budgetId: string): Promise<BudgetPeriod> {
     const budget = await this.budgetsService.findOne(userId, budgetId);
 
-    const openPeriod = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetPeriod).findOne({
-        where: { budgetId, status: PeriodStatus.OPEN },
-        relations: ["periodCategories"],
-      }),
-    );
-
-    if (!openPeriod) {
-      throw new BadRequestException(
-        tr("errors.budgets.noOpenPeriod", "No open period to close"),
-      );
-    }
-
-    const actuals = await this.computePeriodActuals(
-      userId,
-      budget,
-      openPeriod.periodStart,
-      openPeriod.periodEnd,
-    );
-
     // M26: the whole period close is one transaction, so a partial failure can
     // never leave a period half-closed.
+    //
+    // And it is one transaction from the *read* onwards, not just from the write.
+    // The open period, the ledger the actuals come from, and the write that
+    // freezes them used to be three separate transactions: a transaction
+    // committing into the period's date range between the second and the third
+    // was left out of the closing figures for good, since a closed period is
+    // never recomputed. The period row is locked first so a second close cannot
+    // interleave -- the monthly cron fires on every replica, and both replicas
+    // find the same OPEN period.
     return withScopedDb(this.dataSource, async (manager) => {
+      const periods = manager.getRepository(BudgetPeriod);
+      // Two queries, not one, and deliberately so: TypeORM turns `relations`
+      // into a LEFT JOIN, and PostgreSQL rejects `FOR UPDATE` over the nullable
+      // side of an outer join ("FOR UPDATE cannot be applied to the nullable
+      // side of an outer join"). Asking for both in a single `findOne` made
+      // every close fail, cron and manual alike. Lock the period row by itself,
+      // then load its categories inside the same transaction -- the lock is
+      // already held, so the second read cannot see a different period.
+      const locked = await periods.findOne({
+        where: { budgetId, status: PeriodStatus.OPEN },
+        lock: { mode: "pessimistic_write" },
+      });
+
+      if (!locked) {
+        // Either there never was one, or another replica closed it while this
+        // call was waiting for the lock. Both are "nothing to do here", and the
+        // caller reports it as a skip rather than an error.
+        throw new BadRequestException(
+          tr("errors.budgets.noOpenPeriod", "No open period to close"),
+        );
+      }
+
+      const openPeriod = await periods.findOne({
+        where: { id: locked.id },
+        relations: ["periodCategories"],
+      });
+      if (!openPeriod) {
+        // The row was locked a statement ago, so this cannot happen without the
+        // period being deleted underneath the lock. Refuse rather than carry on
+        // with the unhydrated copy: `periodCategories` would be undefined and
+        // the close would silently write a period with no category actuals.
+        throw new BadRequestException(
+          tr("errors.budgets.noOpenPeriod", "No open period to close"),
+        );
+      }
+
+      const actuals = await this.computePeriodActuals(
+        userId,
+        budget,
+        openPeriod.periodStart,
+        openPeriod.periodEnd,
+      );
+
       let totalIncome = 0;
       let totalExpenses = 0;
 
@@ -131,18 +164,25 @@ export class BudgetPeriodService {
   ): Promise<BudgetPeriod> {
     const budget = await this.budgetsService.findOne(userId, budgetId);
 
-    const existingOpen = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetPeriod).findOne({
+    // "Find one, and create it if absent" is a check-then-act, and this one is
+    // reached by an ordinary page load: opening the Budgets screen for the first
+    // time this month fires several requests, they all find no open period, and
+    // they all insert. `UNIQUE(budget_id, period_start)` stops the duplicate row,
+    // but the loser used to surface as a 500 on a screen that was simply being
+    // opened. One transaction, and the insert tolerates losing.
+    return withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(BudgetPeriod);
+      const existingOpen = await repo.findOne({
         where: { budgetId, status: PeriodStatus.OPEN },
         relations: ["periodCategories"],
-      }),
-    );
+      });
 
-    if (existingOpen) {
-      return existingOpen;
-    }
+      if (existingOpen) {
+        return existingOpen;
+      }
 
-    return this.createPeriodForBudget(budget);
+      return this.createPeriodForBudget(budget, undefined, manager);
+    });
   }
 
   /**
@@ -168,15 +208,38 @@ export class BudgetPeriodService {
       const periodsRepo = m.getRepository(BudgetPeriod);
       const periodCatsRepo = m.getRepository(BudgetPeriodCategory);
 
-      const period = periodsRepo.create({
-        budgetId: budget.id,
-        periodStart,
-        periodEnd,
-        totalBudgeted,
-        status: PeriodStatus.OPEN,
-      });
+      // `UNIQUE(budget_id, period_start)` decides who creates this month's
+      // period, and the loser must be able to carry on: inside a transaction a
+      // unique violation aborts everything, so a plain insert would turn a lost
+      // race into a failed request rather than into "somebody else made it".
+      const claimed: unknown = await m.query(
+        `INSERT INTO budget_periods
+           (budget_id, period_start, period_end, total_budgeted, status)
+         VALUES ($1, $2::DATE, $3::DATE, $4, $5)
+         ON CONFLICT (budget_id, period_start) DO NOTHING
+         RETURNING id`,
+        [budget.id, periodStart, periodEnd, totalBudgeted, PeriodStatus.OPEN],
+      );
 
-      const savedPeriod = await periodsRepo.save(period);
+      if (returnedRows<{ id: string }>(claimed).length === 0) {
+        // Somebody else created it. Return theirs, categories included, rather
+        // than a period this call believes it made -- and do not write category
+        // rows, which they have already written.
+        const existing = await periodsRepo.findOne({
+          where: { budgetId: budget.id, periodStart },
+          relations: ["periodCategories"],
+        });
+        if (!existing) {
+          throw new Error(
+            `budget_periods insert for budget ${budget.id} conflicted but no row exists for ${periodStart}`,
+          );
+        }
+        return existing;
+      }
+
+      const savedPeriod = await periodsRepo.findOneOrFail({
+        where: { budgetId: budget.id, periodStart },
+      });
 
       const periodCategories = budgetCategories.map((bc) => {
         const rolloverIn = rolloverMap?.get(bc.id) || 0;
