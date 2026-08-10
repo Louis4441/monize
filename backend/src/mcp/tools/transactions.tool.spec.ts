@@ -175,7 +175,9 @@ describe("McpTransactionsTools", () => {
     expect(description).toContain("EXISTING split transaction");
     expect(description).toContain("COMPLETE splits array");
     expect(description).toContain("splitId");
-    expect(description).toContain("one item at a time");
+    expect(description).toContain(
+      "Several split transactions CAN be sent in one call",
+    );
   });
 
   describe("list_transactions", () => {

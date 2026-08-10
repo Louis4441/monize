@@ -397,10 +397,13 @@ describe("FINANCIAL_TOOLS", () => {
       expect(tool.description).toContain("EXISTING split transaction");
       expect(tool.description).toContain("COMPLETE splits array");
       expect(tool.description).toContain("splitId");
-      // The one-at-a-time batch rule stays.
+      // Several split transactions go in ONE call, each item carrying its own
+      // complete set -- the description has to say so, because the model
+      // otherwise splits the work across replies it cannot make.
       expect(tool.description).toContain(
-        "Send split transactions one at a time",
+        "Several split transactions CAN go in one call",
       );
+      expect(tool.description).toContain("its own complete splits array");
     });
   });
 
