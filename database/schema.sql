@@ -1558,6 +1558,8 @@ CREATE INDEX idx_job_claims_claimed_at ON job_claims(claimed_at);
 CREATE OR REPLACE FUNCTION guard_job_claim_lease_ownership() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
+    -- Reached from another trigger: the only such path is the ON DELETE CASCADE
+    -- from `users`. Nothing to own once the owner is gone.
     IF pg_trigger_depth() > 1 THEN
         IF TG_OP = 'DELETE' THEN
             RETURN OLD;
