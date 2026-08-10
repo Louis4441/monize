@@ -127,120 +127,136 @@ export class MortgageReminderService {
     let skipCount = 0;
 
     for (const [userId, mortgages] of mortgagesByUser) {
-      // Claim before sending -- see BillReminderService for the reasoning. Every
-      // replica fires this cron, so without a durable record two healthy pods
-      // both email the same renewal notice (audit P4-018).
-      const claimKey = buildMortgageReminderClaimKey(mortgages);
-      // A **lease**, not a permanent claim, plus a durable delivery record.
-      //
-      // `claimOnce` was taken before the send and was the only record that the
-      // send was owed, so a replica killed in between left a permanent row that
-      // every later run read as "already handled" -- the mortgage reminder was never
-      // sent and nothing could notice, because the row could not tell "I sent
-      // this" from "I intended to" (audit RV4-006). The lease bounds *doing* the
-      // work; `delivered_at`, written after the send and re-read here, is what
-      // says it was done.
-      const claimed = await this.jobClaims.claimLease(
-        JobClaimType.MortgageReminder,
-        userId,
-        claimKey,
-        REMINDER_LEASE_MS,
+      // The whole per-user body runs under this user's identity, claims
+      // included -- see BillReminderService for why the claims cannot sit
+      // outside it. The `withSystemContext` fan-out above covers only the
+      // cross-user read.
+      const sent = await withUserContext(userId, () =>
+        this.deliverForUser(userId, mortgages, appUrl),
       );
-      if (!claimed) {
-        skipCount++;
-        continue;
-      }
-      const leaseToken = claimed;
-      if (
-        await this.jobClaims.wasDelivered(
-          JobClaimType.MortgageReminder,
-          userId,
-          claimKey,
-        )
-      ) {
-        // Already sent, durably. Hand the lease back rather than holding it for
-        // its whole TTL.
-        skipCount++;
-        await this.releaseClaim(userId, claimKey, leaseToken);
-        continue;
-      }
-
-      try {
-        // RLS (task C2): per-user reads run under the user's own context.
-        const prefs = await withUserContext(userId, () =>
-          withScopedDb(this.dataSource, (m) =>
-            m.getRepository(UserPreference).findOne({
-              where: { userId },
-            }),
-          ),
-        );
-        if (prefs && !prefs.notificationEmail) {
-          skipCount++;
-          await this.releaseClaim(userId, claimKey, leaseToken);
-          continue;
-        }
-
-        const user = await withUserContext(userId, () =>
-          withScopedDb(this.dataSource, (m) =>
-            m.getRepository(User).findOne({
-              where: { id: userId },
-            }),
-          ),
-        );
-        if (!user || !user.email) {
-          skipCount++;
-          await this.releaseClaim(userId, claimKey, leaseToken);
-          continue;
-        }
-
-        const mortgageData = mortgages.map((m) => ({
-          name: m.name,
-          termEndDate: formatDateYMD(m.termEndDate!),
-          daysUntilRenewal: this.getDaysUntilDate(m.termEndDate!),
-        }));
-
-        const lang = prefs?.language || DEFAULT_LOCALE;
-        const t = emailTranslator(this.i18n, lang);
-        const html = mortgageReminderTemplate(
-          user.firstName || "",
-          mortgageData,
-          appUrl,
-          t,
-        );
-        const subject =
-          mortgages.length === 1
-            ? t(
-                "emails.mortgageReminder.subject",
-                "Monize: 1 upcoming mortgage renewal",
-              )
-            : t(
-                "emails.mortgageReminder.subjectPlural",
-                `Monize: ${mortgages.length} upcoming mortgage renewals`,
-                { count: mortgages.length },
-              );
-
-        await this.emailService.sendMail(user.email, subject, html);
-        // The delivery record, after the side effect and never before it.
-        await this.jobClaims.markDelivered(
-          JobClaimType.MortgageReminder,
-          userId,
-          claimKey,
-          leaseToken,
-        );
-        sentCount++;
-      } catch (error) {
-        // A transient SMTP failure returns the day rather than consuming it.
-        await this.releaseClaim(userId, claimKey, leaseToken);
-        this.logger.error(
-          `Failed to send mortgage reminder to user ${userId}`,
-          error instanceof Error ? error.stack : error,
-        );
-      }
+      if (sent) sentCount++;
+      else skipCount++;
     }
 
     this.logger.log(
       `Mortgage reminders complete: ${sentCount} sent, ${skipCount} skipped`,
     );
+  }
+
+  /**
+   * Claim, send and record one user's mortgage renewal notice. Returns whether
+   * an email was sent, so the caller can count it.
+   *
+   * Runs inside the caller's `withUserContext`: every database call below, the
+   * job claims included, spends that identity.
+   */
+  private async deliverForUser(
+    userId: string,
+    mortgages: readonly Account[],
+    appUrl: string,
+  ): Promise<boolean> {
+    // Claim before sending -- see BillReminderService for the reasoning. Every
+    // replica fires this cron, so without a durable record two healthy pods
+    // both email the same renewal notice (audit P4-018).
+    const claimKey = buildMortgageReminderClaimKey(mortgages);
+    // A **lease**, not a permanent claim, plus a durable delivery record.
+    //
+    // `claimOnce` was taken before the send and was the only record that the
+    // send was owed, so a replica killed in between left a permanent row that
+    // every later run read as "already handled" -- the mortgage reminder was never
+    // sent and nothing could notice, because the row could not tell "I sent
+    // this" from "I intended to" (audit RV4-006). The lease bounds *doing* the
+    // work; `delivered_at`, written after the send and re-read here, is what
+    // says it was done.
+    const claimed = await this.jobClaims.claimLease(
+      JobClaimType.MortgageReminder,
+      userId,
+      claimKey,
+      REMINDER_LEASE_MS,
+    );
+    if (!claimed) {
+      return false;
+    }
+    const leaseToken = claimed;
+    if (
+      await this.jobClaims.wasDelivered(
+        JobClaimType.MortgageReminder,
+        userId,
+        claimKey,
+      )
+    ) {
+      // Already sent, durably. Hand the lease back rather than holding it for
+      // its whole TTL.
+      await this.releaseClaim(userId, claimKey, leaseToken);
+      return false;
+    }
+
+    try {
+      // RLS (task C2): per-user reads run under the user's own context.
+      const prefs = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(UserPreference).findOne({
+          where: { userId },
+        }),
+      );
+      if (prefs && !prefs.notificationEmail) {
+        await this.releaseClaim(userId, claimKey, leaseToken);
+        return false;
+      }
+
+      const user = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(User).findOne({
+          where: { id: userId },
+        }),
+      );
+      if (!user || !user.email) {
+        await this.releaseClaim(userId, claimKey, leaseToken);
+        return false;
+      }
+
+      const mortgageData = mortgages.map((m) => ({
+        name: m.name,
+        termEndDate: formatDateYMD(m.termEndDate!),
+        daysUntilRenewal: this.getDaysUntilDate(m.termEndDate!),
+      }));
+
+      const lang = prefs?.language || DEFAULT_LOCALE;
+      const t = emailTranslator(this.i18n, lang);
+      const html = mortgageReminderTemplate(
+        user.firstName || "",
+        mortgageData,
+        appUrl,
+        t,
+      );
+      const subject =
+        mortgages.length === 1
+          ? t(
+              "emails.mortgageReminder.subject",
+              "Monize: 1 upcoming mortgage renewal",
+            )
+          : t(
+              "emails.mortgageReminder.subjectPlural",
+              `Monize: ${mortgages.length} upcoming mortgage renewals`,
+              { count: mortgages.length },
+            );
+
+      await this.emailService.sendMail(user.email, subject, html);
+      // The delivery record, after the side effect and never before it.
+      await this.jobClaims.markDelivered(
+        JobClaimType.MortgageReminder,
+        userId,
+        claimKey,
+        leaseToken,
+      );
+      return true;
+    } catch (error) {
+      // A transient SMTP failure returns the day rather than consuming it.
+      await this.releaseClaim(userId, claimKey, leaseToken);
+      this.logger.error(
+        `Failed to send mortgage reminder to user ${userId}`,
+        error instanceof Error ? error.stack : error,
+      );
+      return false;
+    }
   }
 
   /**

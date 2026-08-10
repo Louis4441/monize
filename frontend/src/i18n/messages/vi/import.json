@@ -536,6 +536,7 @@
   "mnyErrors": {
     "mnyImportFailed": "Đã xảy ra lỗi khi nhập. Không có gì được lưu -- bạn có thể thử lại.",
     "mnyJobStalled": "Quá trình nhập đã ngừng phản hồi, rất có thể vì máy chủ khởi động lại. Tệp bạn tải lên vẫn còn, nên thử lại là an toàn.",
+    "mnyJobStalledAfterCommit": "Quá trình nhập đã ngừng phản hồi sau khi đã lưu dữ liệu của bạn, rất có thể vì máy chủ khởi động lại. Các bản ghi đã nhập nằm trong tài khoản của bạn, nên nhập lại cùng tệp đó sẽ khiến chúng bị trùng lặp. Hãy kiểm tra các tài khoản trước khi nhập thứ gì khác.",
     "mnyStagedFileMissing": "Tệp Money đã tải lên không còn khả dụng. Vui lòng tải lên lại.",
     "mnyFileTruncated": "Tệp Money này có vẻ chưa hoàn chỉnh. Quá trình tải lên có thể đã bị ngắt.",
     "mnyNotAMoneyFile": "Tệp đó không phải là tệp Microsoft Money (.mny).",

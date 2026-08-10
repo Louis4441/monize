@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../db/scoped-db";
+import { acquireAdvisoryLock, LockScope } from "../db/locks";
 import { returnedRows } from "../db/query-result";
 import { JobClaimService, JobClaimType } from "./job-claim.service";
 import { tr } from "../../i18n/translate";
@@ -93,20 +94,38 @@ export class UserMaintenanceService {
     operation: string,
     fn: () => Promise<T>,
   ): Promise<T> {
-    // An import in flight is maintenance too, and it has no lease to collide
-    // with, so it is checked separately. This read is not a guarantee against an
-    // import starting a moment later -- that side is guarded by the import's own
-    // slot claim, which this lease makes it lose.
-    if (await this.hasActiveImport(userId)) {
-      throw this.busy();
-    }
-
-    const leased = await this.jobClaims.claimLease(
-      JobClaimType.UserMaintenance,
-      userId,
-      USER_MAINTENANCE_CLAIM_KEY,
-      USER_MAINTENANCE_LEASE_MS,
-    );
+    // Acquisition is ONE transaction holding ONE lock, and both halves of the
+    // decision are inside it.
+    //
+    // An import in flight is maintenance too, but it records that fact in
+    // `import_jobs` while this records it in `job_claims` -- two tables with no
+    // shared key, so "check the first, then write the second" is a check-then-act
+    // across a gap an import can start in:
+    //
+    //   1. maintenance reads import_jobs and sees nothing;
+    //   2. an import inserts its pending row;
+    //   3. maintenance takes its lease;
+    //   4. both sides now believe they own the user's dataset.
+    //
+    // `LockScope.UserImport` is what closes it. `MnyImportJobService.create`
+    // takes the same advisory lock on the same user before it inserts, so the
+    // two protocols contend on one object: whichever transaction gets the lock
+    // completes its check and its write before the other can read. The lock is
+    // transaction-scoped, so it is released at commit -- what excludes for the
+    // *duration* is the lease this takes (and, for the import, its job row).
+    const leased = await withScopedDb(this.dataSource, async (manager) => {
+      await acquireAdvisoryLock(manager, LockScope.UserImport, userId);
+      if (await this.hasActiveImport(userId)) {
+        throw this.busy();
+      }
+      // Joins this transaction, so the claim lands under the same lock.
+      return this.jobClaims.claimLease(
+        JobClaimType.UserMaintenance,
+        userId,
+        USER_MAINTENANCE_CLAIM_KEY,
+        USER_MAINTENANCE_LEASE_MS,
+      );
+    });
     if (!leased) {
       throw this.busy();
     }

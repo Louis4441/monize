@@ -1,4 +1,4 @@
--- 139: Database-enforced guards for the concurrency defects the Phase 4 audit
+-- 140: Database-enforced guards for the concurrency defects the Phase 4 audit
 -- confirmed. Each one replaces an application-level check-then-act that two
 -- replicas, two tabs or a retry could both pass.
 --
@@ -37,7 +37,7 @@
 -- guards is therefore preceded by a documented repair phase that says exactly
 -- which row survives and what happens to the rest. Both repairs are
 -- re-runnable: after the first pass their queries select nothing.
--- `backend/test/integration/migration-139-preflight.integration.spec.ts` seeds
+-- `backend/test/integration/migration-140-preflight.integration.spec.ts` seeds
 -- the legacy states and asserts the migration completes and repairs them.
 
 -- ---------------------------------------------------------------------------
@@ -288,9 +288,19 @@ CREATE INDEX IF NOT EXISTS idx_transaction_attachments_transaction
 --
 -- A tombstone written by a trigger covers every deletion path -- API delete,
 -- parent-transaction cascade, restore wipe, account deletion -- because it is
--- the database that knows a row went away. The sweeper then deletes the object
--- and drops the tombstone, so a crash between the two costs a retry rather than
--- an orphan nobody can find.
+-- the database that knows a row went away.
+--
+-- This migration ships the *record* only. There is no sweeper in this release and
+-- nothing reads the table yet; reclaiming the bytes is manual until one lands.
+-- Stated rather than implied, because a comment describing a component that does
+-- not exist is how the missing half stops being noticed.
+--
+-- Whatever sweeper lands must re-check `transaction_attachments` for a live row
+-- with the same (storage_provider, storage_key) before deleting: the unique index
+-- below keys a tombstone by object, so an object deleted and later re-uploaded
+-- under the same key has one tombstone and one live attachment. It must also
+-- delete the object before dropping the row, so a crash between the two costs a
+-- retry rather than metadata pointing at bytes that are gone.
 --
 -- user_id is ON DELETE SET NULL, not CASCADE: deleting a user is exactly when
 -- their bytes most need removing, so the tombstone must outlive them.

@@ -20,7 +20,10 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { Budget } from "../budgets/entities/budget.entity";
 import { CustomReport } from "../reports/entities/custom-report.entity";
 import { withSystemContext } from "../common/db/with-context";
-import { withScopedDb } from "../common/db/scoped-db";
+import {
+  runOutsideActiveScopedManager,
+  withScopedDb,
+} from "../common/db/scoped-db";
 import {
   lockAccountsForBalanceWrite,
   lockHoldingScope,
@@ -253,33 +256,48 @@ export class ActionHistoryService {
       // Clearing the redo stack and writing the new entry are one unit: a
       // partially applied pair would leave a redo stack that no longer matches
       // the head of the undo stack.
-      const saved = await withScopedDb(this.dataSource, async (manager) => {
-        const repo = manager.getRepository(ActionHistory);
+      //
+      // And that unit is deliberately **its own** transaction, never the
+      // caller's. The swallow below is what makes this dangerous to nest: inside
+      // a caller's transaction a failure here aborts it, and catching the error
+      // hides that from the caller, whose next statement then dies with `25P02`
+      // pointing at nothing. The source scan in
+      // `common/db/derived-state-writers.guard.spec.ts` catches a direct call
+      // placed inside a transaction, but it reads one file at a time and cannot
+      // see a caller two service hops up -- `ScheduledTransactionsService`
+      // posting an occurrence calls `TransactionsService.create`, which calls
+      // this. Escaping the ambient manager is the structural version of the same
+      // rule, so the scan is now defence in depth rather than the only guard.
+      const saved = await runOutsideActiveScopedManager(() =>
+        withScopedDb(this.dataSource, async (manager) => {
+          const repo = manager.getRepository(ActionHistory);
 
-        // Clear redo stack when a new action is recorded
-        await repo.delete({
-          userId,
-          isUndone: true,
-        });
+          // Clear redo stack when a new action is recorded
+          await repo.delete({
+            userId,
+            isUndone: true,
+          });
 
-        const action = repo.create({
-          userId,
-          entityType: params.entityType,
-          entityId: params.entityId,
-          action: params.action,
-          beforeData: params.beforeData ?? null,
-          afterData: params.afterData ?? null,
-          relatedEntities: params.relatedEntities ?? null,
-          description: params.description,
-          descriptionKey: params.descriptionKey ?? null,
-          descriptionParams: params.descriptionParams ?? null,
-        });
+          const action = repo.create({
+            userId,
+            entityType: params.entityType,
+            entityId: params.entityId,
+            action: params.action,
+            beforeData: params.beforeData ?? null,
+            afterData: params.afterData ?? null,
+            relatedEntities: params.relatedEntities ?? null,
+            description: params.description,
+            descriptionKey: params.descriptionKey ?? null,
+            descriptionParams: params.descriptionParams ?? null,
+          });
 
-        return repo.save(action);
-      });
+          return repo.save(action);
+        }),
+      );
 
-      // Prune old records beyond limit
-      await this.pruneUserHistory(userId);
+      // Prune old records beyond limit, on its own transaction for the same
+      // reason as the write above.
+      await runOutsideActiveScopedManager(() => this.pruneUserHistory(userId));
 
       return saved;
     } catch (error) {

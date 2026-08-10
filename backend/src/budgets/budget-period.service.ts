@@ -81,16 +81,37 @@ export class BudgetPeriodService {
     // interleave -- the monthly cron fires on every replica, and both replicas
     // find the same OPEN period.
     return withScopedDb(this.dataSource, async (manager) => {
-      const openPeriod = await manager.getRepository(BudgetPeriod).findOne({
+      const periods = manager.getRepository(BudgetPeriod);
+      // Two queries, not one, and deliberately so: TypeORM turns `relations`
+      // into a LEFT JOIN, and PostgreSQL rejects `FOR UPDATE` over the nullable
+      // side of an outer join ("FOR UPDATE cannot be applied to the nullable
+      // side of an outer join"). Asking for both in a single `findOne` made
+      // every close fail, cron and manual alike. Lock the period row by itself,
+      // then load its categories inside the same transaction -- the lock is
+      // already held, so the second read cannot see a different period.
+      const locked = await periods.findOne({
         where: { budgetId, status: PeriodStatus.OPEN },
-        relations: ["periodCategories"],
         lock: { mode: "pessimistic_write" },
       });
 
-      if (!openPeriod) {
+      if (!locked) {
         // Either there never was one, or another replica closed it while this
         // call was waiting for the lock. Both are "nothing to do here", and the
         // caller reports it as a skip rather than an error.
+        throw new BadRequestException(
+          tr("errors.budgets.noOpenPeriod", "No open period to close"),
+        );
+      }
+
+      const openPeriod = await periods.findOne({
+        where: { id: locked.id },
+        relations: ["periodCategories"],
+      });
+      if (!openPeriod) {
+        // The row was locked a statement ago, so this cannot happen without the
+        // period being deleted underneath the lock. Refuse rather than carry on
+        // with the unhydrated copy: `periodCategories` would be undefined and
+        // the close would silently write a period with no category actuals.
         throw new BadRequestException(
           tr("errors.budgets.noOpenPeriod", "No open period to close"),
         );

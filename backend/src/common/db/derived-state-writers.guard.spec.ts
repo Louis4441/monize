@@ -302,3 +302,54 @@ describe("derived financial state has one set of writers", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("a row lock is not asked for over a join", () => {
+  /**
+   * TypeORM turns `relations` into a LEFT JOIN, and PostgreSQL refuses
+   * `FOR UPDATE` over the nullable side of one:
+   *
+   *   FOR UPDATE cannot be applied to the nullable side of an outer join
+   *
+   * So a `find`/`findOne` asking for both a pessimistic lock and relations does
+   * not lock a joined read -- it fails, every time, at runtime. `closePeriod`
+   * shipped that shape and could never close a budget period, cron or manual;
+   * every spec passed because they mock the repository and never generate SQL.
+   *
+   * That is the reason this is a source scan rather than a behavioural test: the
+   * defect is invisible to a mocked repository, it looks correct by analogy with
+   * every other `pessimistic_write` site in the repo, and the next instance will
+   * be in a file nobody thought to check. Lock the row by itself, then load its
+   * relations in a second read inside the same transaction.
+   */
+  it("never combines a pessimistic lock with relations in one find", () => {
+    /** Balanced-brace bodies of every `find`/`findOne`/`findOneOrFail` options object. */
+    function findOptionObjects(source: string): string[] {
+      const objects: string[] = [];
+      for (const match of source.matchAll(
+        /\.(?:find|findOne|findOneOrFail|findAndCount)\s*\(\s*\{/g,
+      )) {
+        let depth = 0;
+        let i = match.index! + match[0].length - 1;
+        const start = i;
+        while (i < source.length) {
+          if (source[i] === "{") depth++;
+          else if (source[i] === "}" && --depth === 0) break;
+          i++;
+        }
+        objects.push(source.slice(start, i));
+      }
+      return objects;
+    }
+
+    const offenders = sourceFiles()
+      .filter((file) =>
+        findOptionObjects(read(file)).some(
+          (options) =>
+            /\block\s*:\s*\{/.test(options) && /\brelations\s*:/.test(options),
+        ),
+      )
+      .map(relative);
+
+    expect(offenders).toEqual([]);
+  });
+});

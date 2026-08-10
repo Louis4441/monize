@@ -1630,6 +1630,51 @@ export class ScheduledTransactionsService {
       transactionPayload.categoryId = finalCategoryId || undefined;
     }
 
+    // A transfer's authorization is decided here, before the transaction opens.
+    //
+    // `accountAccessFor` loads the account by id under `withSystemContext` --
+    // learning a foreign account's owner is the decision input -- and a
+    // system-identity `withScopedDb` cannot join a user-identity transaction:
+    // it throws `IDENTITY_MISMATCH_MESSAGE` rather than quietly running under
+    // the outer GUCs. Calling `createTransfer` inside the block below therefore
+    // failed every scheduled transfer post, cron and manual alike. Preparing
+    // first is also the standing rule (backend/CLAUDE.md: "Decide authorization
+    // first"), and it puts the transfer's reads in the same place as the FX
+    // lookup -- above the transaction, with everything else that reaches
+    // outside it.
+    const transferCategoryId = hasInlineCategoryId
+      ? postDto.categoryId
+      : storedOverride?.categoryId !== null &&
+          storedOverride?.categoryId !== undefined
+        ? storedOverride.categoryId
+        : scheduled.categoryId || undefined;
+    const preparedTransfer =
+      !scheduled.isInvestment &&
+      scheduled.isTransfer &&
+      scheduled.transferAccountId
+        ? await this.transactionsService.prepareTransfer(userId, {
+            fromAccountId: scheduled.accountId,
+            toAccountId: scheduled.transferAccountId,
+            amount: Math.abs(finalAmount),
+            transactionDate: postDate,
+            fromCurrencyCode: scheduled.currencyCode,
+            description: finalDescription || undefined,
+            referenceNumber: postDto?.referenceNumber || undefined,
+            payeeId: scheduled.payeeId || undefined,
+            payeeName: scheduled.payeeName || undefined,
+            // Carry the schedule's category onto the posted transfer (both
+            // legs), so a categorized scheduled transfer behaves like a one-off
+            // one (#743). Same precedence as the non-transfer branch: inline
+            // override > stored occurrence override > the schedule's own
+            // category.
+            categoryId: transferCategoryId || undefined,
+            tagIds:
+              scheduled.tagIds && scheduled.tagIds.length > 0
+                ? scheduled.tagIds
+                : undefined,
+          })
+        : null;
+
     // ONE transaction from here down: the occurrence claim, the money it
     // creates, the override it consumes and the schedule advancement.
     //
@@ -1643,6 +1688,7 @@ export class ScheduledTransactionsService {
     // Nested service calls join this transaction, so a refusal below rolls the
     // money back with it. Everything that reaches outside PostgreSQL -- the FX
     // rate lookup in particular -- has already run above.
+    let writtenTransfer: { savedFromId: string; savedToId: string } | undefined;
     const removedAfterOnce = await withScopedDb(this.dataSource, async (m) => {
       // Lock the schedule and confirm this occurrence is still the due one. A
       // poster that lost the race finds next_due_date already advanced.
@@ -1697,33 +1743,14 @@ export class ScheduledTransactionsService {
           postDate,
           storedOverride,
         );
-      } else if (scheduled.isTransfer && scheduled.transferAccountId) {
-        // Carry the schedule's category onto the posted transfer (both legs),
-        // so a categorized scheduled transfer behaves like a one-off one
-        // (#743). Same precedence as the non-transfer branch: inline override >
-        // stored occurrence override > the schedule's own category.
-        const transferCategoryId = hasInlineCategoryId
-          ? postDto.categoryId
-          : storedOverride?.categoryId !== null &&
-              storedOverride?.categoryId !== undefined
-            ? storedOverride.categoryId
-            : scheduled.categoryId || undefined;
-        await this.transactionsService.createTransfer(userId, {
-          fromAccountId: scheduled.accountId,
-          toAccountId: scheduled.transferAccountId,
-          amount: Math.abs(finalAmount),
-          transactionDate: postDate,
-          fromCurrencyCode: scheduled.currencyCode,
-          description: finalDescription || undefined,
-          referenceNumber: postDto?.referenceNumber || undefined,
-          payeeId: scheduled.payeeId || undefined,
-          payeeName: scheduled.payeeName || undefined,
-          categoryId: transferCategoryId || undefined,
-          tagIds:
-            scheduled.tagIds && scheduled.tagIds.length > 0
-              ? scheduled.tagIds
-              : undefined,
-        });
+      } else if (preparedTransfer) {
+        // Already validated and authorized above; only the writes join this
+        // transaction, so the legs and their balance updates commit with the
+        // occurrence claim.
+        writtenTransfer = await this.transactionsService.writeTransferLegs(
+          preparedTransfer,
+          m,
+        );
       } else {
         await this.transactionsService.create(userId, transactionPayload);
       }
@@ -1785,6 +1812,18 @@ export class ScheduledTransactionsService {
       await m.update(ScheduledTransaction, id, updateFields);
       return false;
     });
+
+    // The transfer's post-commit half: net-worth recalculation, tags and the
+    // action-history entry. Deliberately after the transaction rather than
+    // inside it -- the history recorder swallows its own failures, so nesting it
+    // would either abort the posting with `25P02` or lose the undo entry.
+    if (preparedTransfer && writtenTransfer) {
+      await this.transactionsService.completeTransfer(
+        preparedTransfer,
+        writtenTransfer.savedFromId,
+        writtenTransfer.savedToId,
+      );
+    }
 
     if (removedAfterOnce) {
       return null;

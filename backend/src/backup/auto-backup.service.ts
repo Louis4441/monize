@@ -809,14 +809,29 @@ export class AutoBackupService {
         now,
       );
 
-      // Never back up a dataset that is mid-replacement. A `.mny` import with
-      // "start fresh" commits its wipe and then writes rows for minutes, so an
-      // hourly backup landing in that window would export the empty dataset,
-      // save it as today's file, and enforce retention -- rotating the last good
-      // backup out to make room for one containing nothing. Skipping without
-      // claiming leaves `next_backup_at` in the past, so the next hour retries
-      // (audit DR-04-02).
-      if (await this.maintenance.isUnderMaintenance(settings.userId)) {
+      // Do not start a backup of a dataset that is already mid-replacement. A
+      // `.mny` import with "start fresh" commits its wipe and then writes rows
+      // for minutes, so an hourly backup landing in that window would export the
+      // empty dataset, save it as today's file, and enforce retention --
+      // rotating the last good backup out to make room for one containing
+      // nothing. Skipping without claiming leaves `next_backup_at` in the past,
+      // so the next hour retries (audit DR-04-02).
+      //
+      // This is a pre-check and only a pre-check: `isUnderMaintenance` is
+      // documented as a hint, and maintenance can still begin between this read
+      // and the export snapshot below. It narrows the window rather than closing
+      // it; closing it needs backup admission and maintenance acquisition to
+      // share one lease, which is the outstanding HIGH item in the PR
+      // description.
+      //
+      // Runs under the user's context like the claim and the outcome write: it
+      // reaches `import_jobs` and `job_claims` through `withScopedDb`, which
+      // throws without an ambient identity. The `withSystemContext` fan-out
+      // above covers only the cross-user settings read.
+      const underMaintenance = await withUserContext(settings.userId, () =>
+        this.maintenance.isUnderMaintenance(settings.userId),
+      );
+      if (underMaintenance) {
         this.logger.log(
           `Auto-backup deferred for user ${settings.userId}: their data is being replaced`,
         );

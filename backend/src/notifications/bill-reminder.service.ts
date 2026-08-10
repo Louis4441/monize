@@ -132,139 +132,163 @@ export class BillReminderService {
     let skipCount = 0;
 
     for (const [userId, bills] of billsByUser) {
-      // Claim this user's reminder for today before doing anything that leaves
-      // the process.
+      // The whole per-user body runs under this user's identity, claims
+      // included.
       //
-      // Every backend replica fires this cron (docs/cron-jobs.md), and nothing
-      // here recorded that a reminder had been sent -- so two healthy replicas
-      // both selected the same due bills and both emailed them. Not a rare race:
-      // the *normal* outcome of running more than one replica (audit P4-018).
-      //
-      // The key is the local date plus a hash of what the email says, so a bill
-      // that becomes due later the same day still produces a reminder while an
-      // identical run does not.
-      const claimKey = buildReminderClaimKey(bills);
-      // A **lease**, not a permanent claim, plus a durable delivery record.
-      //
-      // `claimOnce` was taken before the send and was the only record that the
-      // send was owed, so a replica killed in between left a permanent row that
-      // every later run read as "already handled" -- the bill reminder was never
-      // sent and nothing could notice, because the row could not tell "I sent
-      // this" from "I intended to" (audit RV4-006). The lease bounds *doing* the
-      // work; `delivered_at`, written after the send and re-read here, is what
-      // says it was done.
-      const claimed = await this.jobClaims.claimLease(
-        JobClaimType.BillReminder,
-        userId,
-        claimKey,
-        REMINDER_LEASE_MS,
+      // `JobClaimService` reaches the database through `withScopedDb` like any
+      // other caller, so it needs an ambient context to spend -- and the
+      // `withSystemContext` above covers only the cross-user fan-out read. With
+      // the claims left outside a context, `withScopedDb` threw
+      // `MISSING_CONTEXT_MESSAGE` on the first user with a due bill and, because
+      // the throw was outside the try, took the rest of the run with it: no
+      // reminder was sent to anybody. Wrapping the body is what makes the claim,
+      // the delivery record and the release share one identity with the reads
+      // between them.
+      const sent = await withUserContext(userId, () =>
+        this.deliverForUser(userId, bills, appUrl),
       );
-      if (!claimed) {
-        skipCount++;
-        continue;
-      }
-      const leaseToken = claimed;
-      if (
-        await this.jobClaims.wasDelivered(
-          JobClaimType.BillReminder,
-          userId,
-          claimKey,
-        )
-      ) {
-        // Already sent, durably. Hand the lease back rather than holding it for
-        // its whole TTL.
-        skipCount++;
-        await this.releaseClaim(userId, claimKey, leaseToken);
-        continue;
-      }
-
-      try {
-        // Check if user has email notifications enabled.
-        // RLS (task C2): per-user reads run under the user's own context.
-        const prefs = await withUserContext(userId, () =>
-          withScopedDb(this.dataSource, (manager) =>
-            manager.getRepository(UserPreference).findOne({
-              where: { userId },
-            }),
-          ),
-        );
-        if (prefs && !prefs.notificationEmail) {
-          skipCount++;
-          await this.releaseClaim(userId, claimKey, leaseToken);
-          continue;
-        }
-
-        const user = await withUserContext(userId, () =>
-          withScopedDb(this.dataSource, (manager) =>
-            manager.getRepository(User).findOne({ where: { id: userId } }),
-          ),
-        );
-        if (!user || !user.email) {
-          skipCount++;
-          await this.releaseClaim(userId, claimKey, leaseToken);
-          continue;
-        }
-
-        const billData = bills.map((b) => {
-          const dueDateStr = String(b.nextDueDate).split("T")[0];
-          const ov = b.overrides?.find(
-            (o) => String(o.originalDate).split("T")[0] === dueDateStr,
-          );
-          const rawAmount = Number(ov?.amount ?? b.amount);
-          return {
-            payee: b.payee?.name || b.payeeName || b.name,
-            amount: Math.abs(rawAmount),
-            dueDate: ov ? String(ov.overrideDate).split("T")[0] : dueDateStr,
-            currencyCode: b.currencyCode,
-            isIncome: rawAmount > 0,
-          };
-        });
-
-        const lang = prefs?.language || DEFAULT_LOCALE;
-        const t = emailTranslator(this.i18n, lang);
-        const html = billReminderTemplate(
-          user.firstName || "",
-          billData,
-          appUrl,
-          t,
-        );
-        const subject =
-          bills.length === 1
-            ? t(
-                "emails.billReminder.subjectOne",
-                "Monize: 1 upcoming bill needs attention",
-              )
-            : t(
-                "emails.billReminder.subjectMany",
-                `Monize: ${bills.length} upcoming bills need attention`,
-                { count: bills.length },
-              );
-
-        await this.emailService.sendMail(user.email, subject, html);
-        // The delivery record, after the side effect and never before it.
-        await this.jobClaims.markDelivered(
-          JobClaimType.BillReminder,
-          userId,
-          claimKey,
-          leaseToken,
-        );
-        sentCount++;
-      } catch (error) {
-        // Hand the claim back. Claiming first is what makes the send
-        // exactly-once, but it must not turn a transient SMTP outage into a
-        // silently skipped day -- which is what the pre-claim code got for free
-        // by never recording anything.
-        await this.releaseClaim(userId, claimKey, leaseToken);
-        this.logger.error(
-          `Failed to send bill reminder to user ${userId}`,
-          error instanceof Error ? error.stack : error,
-        );
-      }
+      if (sent) sentCount++;
+      else skipCount++;
     }
 
     this.logger.log(
       `Bill reminders complete: ${sentCount} sent, ${skipCount} skipped`,
     );
+  }
+
+  /**
+   * Claim, send and record one user's bill reminder. Returns whether an email
+   * was sent, so the caller can count it.
+   *
+   * Runs inside the caller's `withUserContext`: every database call below, the
+   * job claims included, spends that identity.
+   */
+  private async deliverForUser(
+    userId: string,
+    bills: readonly ScheduledTransaction[],
+    appUrl: string,
+  ): Promise<boolean> {
+    // Claim this user's reminder for today before doing anything that leaves
+    // the process.
+    //
+    // Every backend replica fires this cron (docs/cron-jobs.md), and nothing
+    // here recorded that a reminder had been sent -- so two healthy replicas
+    // both selected the same due bills and both emailed them. Not a rare race:
+    // the *normal* outcome of running more than one replica (audit P4-018).
+    //
+    // The key is the local date plus a hash of what the email says, so a bill
+    // that becomes due later the same day still produces a reminder while an
+    // identical run does not.
+    const claimKey = buildReminderClaimKey(bills);
+    // A **lease**, not a permanent claim, plus a durable delivery record.
+    //
+    // `claimOnce` was taken before the send and was the only record that the
+    // send was owed, so a replica killed in between left a permanent row that
+    // every later run read as "already handled" -- the bill reminder was never
+    // sent and nothing could notice, because the row could not tell "I sent
+    // this" from "I intended to" (audit RV4-006). The lease bounds *doing* the
+    // work; `delivered_at`, written after the send and re-read here, is what
+    // says it was done.
+    const claimed = await this.jobClaims.claimLease(
+      JobClaimType.BillReminder,
+      userId,
+      claimKey,
+      REMINDER_LEASE_MS,
+    );
+    if (!claimed) {
+      return false;
+    }
+    const leaseToken = claimed;
+    if (
+      await this.jobClaims.wasDelivered(
+        JobClaimType.BillReminder,
+        userId,
+        claimKey,
+      )
+    ) {
+      // Already sent, durably. Hand the lease back rather than holding it for
+      // its whole TTL.
+      await this.releaseClaim(userId, claimKey, leaseToken);
+      return false;
+    }
+
+    try {
+      // Check if user has email notifications enabled.
+      // RLS (task C2): per-user reads run under the user's own context.
+      const prefs = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(UserPreference).findOne({
+          where: { userId },
+        }),
+      );
+      if (prefs && !prefs.notificationEmail) {
+        await this.releaseClaim(userId, claimKey, leaseToken);
+        return false;
+      }
+
+      const user = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(User).findOne({ where: { id: userId } }),
+      );
+      if (!user || !user.email) {
+        await this.releaseClaim(userId, claimKey, leaseToken);
+        return false;
+      }
+
+      const billData = bills.map((b) => {
+        const dueDateStr = String(b.nextDueDate).split("T")[0];
+        const ov = b.overrides?.find(
+          (o) => String(o.originalDate).split("T")[0] === dueDateStr,
+        );
+        const rawAmount = Number(ov?.amount ?? b.amount);
+        return {
+          payee: b.payee?.name || b.payeeName || b.name,
+          amount: Math.abs(rawAmount),
+          dueDate: ov ? String(ov.overrideDate).split("T")[0] : dueDateStr,
+          currencyCode: b.currencyCode,
+          isIncome: rawAmount > 0,
+        };
+      });
+
+      const lang = prefs?.language || DEFAULT_LOCALE;
+      const t = emailTranslator(this.i18n, lang);
+      const html = billReminderTemplate(
+        user.firstName || "",
+        billData,
+        appUrl,
+        t,
+      );
+      const subject =
+        bills.length === 1
+          ? t(
+              "emails.billReminder.subjectOne",
+              "Monize: 1 upcoming bill needs attention",
+            )
+          : t(
+              "emails.billReminder.subjectMany",
+              `Monize: ${bills.length} upcoming bills need attention`,
+              { count: bills.length },
+            );
+
+      await this.emailService.sendMail(user.email, subject, html);
+      // The delivery record, after the side effect and never before it.
+      await this.jobClaims.markDelivered(
+        JobClaimType.BillReminder,
+        userId,
+        claimKey,
+        leaseToken,
+      );
+      return true;
+    } catch (error) {
+      // Hand the claim back. Claiming first is what makes the send
+      // exactly-once, but it must not turn a transient SMTP outage into a
+      // silently skipped day -- which is what the pre-claim code got for free
+      // by never recording anything.
+      await this.releaseClaim(userId, claimKey, leaseToken);
+      this.logger.error(
+        `Failed to send bill reminder to user ${userId}`,
+        error instanceof Error ? error.stack : error,
+      );
+      return false;
+    }
   }
 }
 

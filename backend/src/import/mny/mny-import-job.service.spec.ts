@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ConflictException } from "@nestjs/common";
 import { DataSource, EntityManager, QueryFailedError } from "typeorm";
 import {
@@ -5,12 +7,14 @@ import {
   withScopedDb,
 } from "../../common/db/scoped-db";
 import { ImportJob, ONE_ACTIVE_JOB_INDEX } from "./entities/import-job.entity";
+import { LockScope } from "../../common/db/locks";
 import { MnyNotAMoneyFileError } from "./mny-errors";
 import {
   JOB_FAILED_ERROR_KEY,
   JOB_HEARTBEAT_INTERVAL_MS,
   JOB_STALE_AFTER_MS,
   JOB_STALLED_ERROR_KEY,
+  JOB_COMMITTED_STALLED_ERROR_KEY,
   MnyImportJobService,
   STALE_ACTIVE_JOB_CONDITION,
   isActiveJobConflict,
@@ -126,6 +130,34 @@ describe("reapStatement", () => {
     );
   });
 
+  it("retires a committed job non-retryable, under its own error key", () => {
+    // `retryable` is a promise that re-running costs nothing, and past the
+    // commit it does not: the ledger already holds the file, so a Retry imports
+    // it twice. The reap and migration 140's preflight decide this the same way,
+    // and the key differs because the copy has to say something different.
+    expect(flat(reapStatement(true))).toContain(
+      `error_key = CASE WHEN data_committed THEN '${JOB_COMMITTED_STALLED_ERROR_KEY}' ELSE $2 END`,
+    );
+    expect(flat(reapStatement(true))).toContain(
+      "retryable = (data_committed = false)",
+    );
+  });
+
+  it("spells both stalled keys the same way the migration does", () => {
+    // The migration's preflight writes these literals directly, and its own
+    // comment says a rename here has to change them there. That is a claim a
+    // test can hold rather than a reader.
+    const migration = readFileSync(
+      join(
+        __dirname,
+        "../../../../database/migrations/140_concurrency_integrity_guards.sql",
+      ),
+      "utf8",
+    );
+    expect(migration).toContain(`'${JOB_COMMITTED_STALLED_ERROR_KEY}'`);
+    expect(migration).toContain(`'${JOB_STALLED_ERROR_KEY}'`);
+  });
+
   it("treats a running job with no heartbeat at all as stale", () => {
     // `NULL < timestamp` is NULL, so without this arm such a row matches
     // neither the reap nor `hasActiveJob`'s negation of it -- the one state
@@ -150,6 +182,14 @@ describe("MnyImportJobService", () => {
   const sql = (call: unknown[]): string => flat(String(call[0]));
   const lastCall = (): unknown[] =>
     query.mock.calls[query.mock.calls.length - 1] as unknown[];
+  /** Where the reap landed, so a new statement above it renumbers nothing. */
+  const reapCallIndex = (): number => {
+    const index = query.mock.calls.findIndex((call) =>
+      sql(call as unknown[]).includes("UPDATE import_jobs"),
+    );
+    expect(index).toBeGreaterThanOrEqual(0);
+    return index;
+  };
 
   beforeEach(() => {
     repo = {
@@ -234,12 +274,43 @@ describe("MnyImportJobService", () => {
       // it is `running`.
       await service.create("user-1", "staged-1", DEFAULT_MNY_IMPORT_OPTIONS);
 
-      expect(sql(query.mock.calls[0])).toContain("UPDATE import_jobs");
-      expect(query.mock.calls[0][1]).toEqual([
+      // Located by content, not by position: the transaction now opens with the
+      // shared advisory lock and the maintenance-lease read, and a positional
+      // index would have to be renumbered by whoever adds the next statement.
+      expect(query.mock.calls[reapCallIndex()][1]).toEqual([
         String(JOB_STALE_AFTER_MS),
         JOB_STALLED_ERROR_KEY,
         "user-1",
       ]);
+    });
+
+    it("takes the shared maintenance lock before deciding anything", async () => {
+      // The regression this pins: `import_jobs` and `job_claims` are different
+      // tables, so an import and a restore/delete-my-data never contended and
+      // both could believe they owned the user's dataset. They now take the same
+      // `LockScope.UserImport` advisory lock, and it has to come first -- taken
+      // after the reads it protects, it serializes nothing.
+      await service.create("user-1", "staged-1", DEFAULT_MNY_IMPORT_OPTIONS);
+
+      expect(sql(query.mock.calls[0])).toContain("pg_advisory_xact_lock");
+      expect(query.mock.calls[0][1]).toEqual([LockScope.UserImport, "user-1"]);
+      expect(reapCallIndex()).toBeGreaterThan(0);
+    });
+
+    it("refuses while a maintenance lease is live", async () => {
+      // The other direction of the same exclusion: a restore holding the lease
+      // must make an import lose, not merely the reverse.
+      query.mockImplementation((text: string) =>
+        String(text).includes("job_claims")
+          ? Promise.resolve([{ present: true }])
+          : Promise.resolve([]),
+      );
+
+      await expect(
+        service.create("user-1", "staged-1", DEFAULT_MNY_IMPORT_OPTIONS),
+      ).rejects.toMatchObject({ status: 409 });
+
+      expect(repo.save).not.toHaveBeenCalled();
     });
 
     it("reaps in the same transaction the insert runs in", async () => {
@@ -257,7 +328,7 @@ describe("MnyImportJobService", () => {
     it("reaps only rows belonging to the caller", async () => {
       await service.create("user-1", "staged-1", DEFAULT_MNY_IMPORT_OPTIONS);
 
-      expect(sql(query.mock.calls[0])).toContain(
+      expect(sql(query.mock.calls[reapCallIndex()])).toContain(
         sql([`WHERE user_id = $3 AND (${STALE_ACTIVE_JOB_CONDITION})`]),
       );
     });
@@ -572,13 +643,15 @@ describe("MnyImportJobService", () => {
   });
 
   describe("reapStaleJobs", () => {
-    it("fails running jobs whose heartbeat went stale, and marks them retryable", async () => {
+    it("fails running jobs whose heartbeat went stale, retryable only before the commit", async () => {
       await service.reapStaleJobs();
 
       const statement = sql(query.mock.calls[0]);
       expect(statement).toContain("status = 'running'");
       expect(statement).toContain("heartbeat_at < CURRENT_TIMESTAMP");
-      expect(statement).toContain("retryable = true");
+      // Was an unconditional `retryable = true`, which promised a free retry to
+      // a job whose rows were already in the ledger.
+      expect(statement).toContain("retryable = (data_committed = false)");
       expect(query.mock.calls[0][1]).toEqual([
         String(JOB_STALE_AFTER_MS),
         JOB_STALLED_ERROR_KEY,

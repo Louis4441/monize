@@ -167,7 +167,7 @@ export class JobClaimService {
    * silently bypassing the ownership predicate (stack review, DR-04).
    *
    * The token goes both in the statement's `WHERE` and, via `set_config`, into the
-   * transaction-local `app.job_claim_lease_token` GUC the migration-141 trigger
+   * transaction-local `app.job_claim_lease_token` GUC the migration-143 trigger
    * checks. The `WHERE` protects new code from new code; the GUC is what lets the
    * database refuse a *previous-release* pod's untokenized delete of a live lease
    * this deployment now holds (audit V4R3-004).
@@ -198,7 +198,7 @@ export class JobClaimService {
    *
    * Its own method rather than an optional-token arm of `releaseLease`: a lease
    * caller that forgot its token would otherwise compile, silently skip the
-   * ownership predicate and the GUC the migration-141 trigger checks, and delete
+   * ownership predicate and the GUC the migration-143 trigger checks, and delete
    * whatever attempt currently holds the row. The compiler now refuses that call
    * shape outright. A permanent claim has no attempt to identify -- the trigger
    * leaves NULL-token rows alone -- so this is the only untokenized delete.
@@ -224,7 +224,7 @@ export class JobClaimService {
   /**
    * Announce, for this transaction only, which lease this session is acting on.
    *
-   * The migration-141 trigger compares it against a live tokenized row's own token
+   * The migration-143 trigger compares it against a live tokenized row's own token
    * and rejects a mismatch, so a previous-release binary -- which never sets it --
    * cannot mutate a lease new code holds. `is_local = true` scopes it to the
    * surrounding `withScopedDb` transaction.
@@ -319,12 +319,15 @@ export class JobClaimService {
     try {
       const removed = await withSystemContext(() =>
         withScopedDb(this.dataSource, async (manager) => {
-          const result = await manager.query(
+          const result: unknown = await manager.query(
             `DELETE FROM job_claims
               WHERE claimed_at < CURRENT_TIMESTAMP - ($1::text || ' days')::interval`,
             [String(JOB_CLAIM_RETENTION_DAYS)],
           );
-          return Array.isArray(result) ? (result[1] as number) : 0;
+          // Through the shared reader, not `result[1]`: reading the driver's
+          // tuple by index is the open-coded shape `query-result.ts` exists to
+          // replace, and it is what this file's own guard test forbids.
+          return affectedRowCount(result);
         }),
       );
       if (removed > 0) {

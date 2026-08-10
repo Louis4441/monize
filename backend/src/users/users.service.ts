@@ -275,6 +275,13 @@ export class UsersService {
         // later would depend on that object not having been touched by the
         // update in between.
         const previousDefaultCurrency = before?.defaultCurrency;
+        // The update is written out rather than delegated to
+        // `patchUserPreferences`, which looks like duplication and is not: that
+        // helper materializes the row itself, and this method has to read
+        // `before` *between* the materialization and the write. Routing through
+        // it would either insert twice or read `before` as null and lose the
+        // previous currency for a first-time user, which is what the refresh
+        // decision below turns on.
         if (Object.keys(patch).length > 0) {
           await repo
             .createQueryBuilder()

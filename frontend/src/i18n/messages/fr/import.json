@@ -536,6 +536,7 @@
   "mnyErrors": {
     "mnyImportFailed": "Une erreur est survenue pendant l'import. Rien n'a été enregistré -- vous pouvez réessayer.",
     "mnyJobStalled": "L'import ne répond plus, très probablement parce que le serveur a redémarré. Votre fichier est toujours là : réessayer ne présente aucun risque.",
+    "mnyJobStalledAfterCommit": "L'import ne répond plus après avoir déjà enregistré vos données, très probablement parce que le serveur a redémarré. Les enregistrements importés sont dans votre compte : réimporter le même fichier les dupliquerait. Vérifiez vos comptes avant d'importer autre chose.",
     "mnyStagedFileMissing": "Le fichier Money envoyé n'est plus disponible. Veuillez l'envoyer à nouveau.",
     "mnyFileTruncated": "Ce fichier Money semble incomplet. L'envoi a peut-être été interrompu.",
     "mnyNotAMoneyFile": "Ce fichier n'est pas un fichier Microsoft Money (.mny).",

@@ -156,11 +156,27 @@ describe("ScheduledTransactionsService", () => {
       findOne: jest.fn().mockResolvedValue({ id: "acc-1", userId }),
     };
 
+    // The posting path no longer calls `createTransfer`: authorization has to be
+    // decided before the posting transaction opens (a system-identity read
+    // cannot join a user-identity transaction), so the transfer is prepared
+    // above the transaction, written inside it, and completed after the commit.
     transactionsService = {
       create: jest.fn().mockResolvedValue({ id: "tx-1" }),
-      createTransfer: jest
+      prepareTransfer: jest.fn().mockResolvedValue({
+        effectiveUserId: userId,
+        realUserId: userId,
+        dto: {},
+        fromOwnerId: userId,
+        toOwnerId: userId,
+        hasForeignLeg: false,
+      }),
+      writeTransferLegs: jest
         .fn()
-        .mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
+        .mockResolvedValue({ savedFromId: "tx-1", savedToId: "tx-2" }),
+      completeTransfer: jest.fn().mockResolvedValue({
+        fromTransaction: { id: "tx-1" },
+        toTransaction: { id: "tx-2" },
+      }),
     };
 
     investmentTransactionsService = {
@@ -1116,7 +1132,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should use createTransfer for transfer transactions", async () => {
+    it("should use prepareTransfer for transfer transactions", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1129,7 +1145,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1140,7 +1156,107 @@ describe("ScheduledTransactionsService", () => {
       expect(transactionsService.create).not.toHaveBeenCalled();
     });
 
-    it("forwards the schedule's category to createTransfer (#743)", async () => {
+    it("authorizes the transfer before the posting transaction opens", async () => {
+      // The regression this pins: `createTransfer` was called *inside* the
+      // posting transaction. Its authorization reads a foreign account row
+      // under `withSystemContext`, and a system-identity `withScopedDb` cannot
+      // join a user-identity transaction -- it throws
+      // `IDENTITY_MISMATCH_MESSAGE` -- so every scheduled transfer post failed,
+      // cron and manual alike. Preparing above the transaction is what fixes it,
+      // so the order is the invariant, not an implementation detail.
+      //
+      // Written as "no transaction was open when prepare ran" rather than as a
+      // call-order assertion: the posting path opens more than one transaction,
+      // and only the nesting is the defect.
+      let transactionDepth = 0;
+      let preparedInsideTransaction = false;
+      let wroteInsideTransaction = false;
+
+      mockDataSource.transaction.mockImplementation(async (...args: any[]) => {
+        const fn = args[args.length - 1] as (m: unknown) => unknown;
+        transactionDepth++;
+        try {
+          return await fn(mockQueryRunner.manager);
+        } finally {
+          transactionDepth--;
+        }
+      });
+      transactionsService.prepareTransfer.mockImplementation(async () => {
+        preparedInsideTransaction = transactionDepth > 0;
+        return {
+          effectiveUserId: userId,
+          realUserId: userId,
+          dto: {},
+          fromOwnerId: userId,
+          toOwnerId: userId,
+          hasForeignLeg: false,
+        };
+      });
+      transactionsService.writeTransferLegs.mockImplementation(async () => {
+        wroteInsideTransaction = transactionDepth > 0;
+        return { savedFromId: "tx-1", savedToId: "tx-2" };
+      });
+
+      const scheduled = makeScheduled({
+        isTransfer: true,
+        transferAccountId: "acc-2",
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await service.post(userId, stId);
+
+      expect(transactionsService.prepareTransfer).toHaveBeenCalled();
+      expect(preparedInsideTransaction).toBe(false);
+      // ...and the write still joins it, so the legs, the occurrence claim and
+      // the schedule advancement remain one unit.
+      expect(wroteInsideTransaction).toBe(true);
+    });
+
+    it("completes the transfer only after the posting transaction commits", async () => {
+      // `completeTransfer` records action history, and the recorder swallows its
+      // own failures by design: inside the caller's transaction that is either a
+      // `25P02` abort of the posting or a silently dropped undo entry.
+      let transactionDepth = 0;
+      let completedInsideTransaction = false;
+
+      mockDataSource.transaction.mockImplementation(async (...args: any[]) => {
+        const fn = args[args.length - 1] as (m: unknown) => unknown;
+        transactionDepth++;
+        try {
+          return await fn(mockQueryRunner.manager);
+        } finally {
+          transactionDepth--;
+        }
+      });
+      transactionsService.completeTransfer.mockImplementation(async () => {
+        completedInsideTransaction = transactionDepth > 0;
+        return {
+          fromTransaction: { id: "tx-1" },
+          toTransaction: { id: "tx-2" },
+        };
+      });
+
+      const scheduled = makeScheduled({
+        isTransfer: true,
+        transferAccountId: "acc-2",
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await service.post(userId, stId);
+
+      expect(transactionsService.completeTransfer).toHaveBeenCalled();
+      expect(completedInsideTransaction).toBe(false);
+    });
+
+    it("forwards the schedule's category to prepareTransfer (#743)", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1154,13 +1270,13 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({ categoryId: "cat-ike" }),
       );
     });
 
-    it("should pass payee fields to createTransfer for transfer transactions", async () => {
+    it("should pass payee fields to prepareTransfer for transfer transactions", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1175,7 +1291,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1202,7 +1318,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1213,7 +1329,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should pass tagIds to createTransfer for transfer transactions", async () => {
+    it("should pass tagIds to prepareTransfer for transfer transactions", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1227,7 +1343,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -1237,7 +1353,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should not pass tagIds to createTransfer when scheduled transaction has no tags", async () => {
+    it("should not pass tagIds to prepareTransfer when scheduled transaction has no tags", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1251,7 +1367,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           tagIds: undefined,
@@ -1279,7 +1395,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           amount: 750,
@@ -1301,7 +1417,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId, { amount: -500 });
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           amount: 500,
@@ -1323,7 +1439,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           amount: 800,
@@ -1331,7 +1447,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should pass override description to createTransfer", async () => {
+    it("should pass override description to prepareTransfer", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1351,7 +1467,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId);
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           description: "override desc",
@@ -1779,7 +1895,7 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
-    it("should pass referenceNumber to createTransfer when provided", async () => {
+    it("should pass referenceNumber to prepareTransfer when provided", async () => {
       const scheduled = makeScheduled({
         isTransfer: true,
         transferAccountId: "acc-2",
@@ -1792,7 +1908,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.post(userId, stId, { referenceNumber: "REF-5678" });
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({ referenceNumber: "REF-5678" }),
       );
@@ -1905,7 +2021,7 @@ describe("ScheduledTransactionsService", () => {
       expect(dto.quantity).toBe(1);
       expect(dto.price).toBe(500);
       expect(transactionsService.create).not.toHaveBeenCalled();
-      expect(transactionsService.createTransfer).not.toHaveBeenCalled();
+      expect(transactionsService.prepareTransfer).not.toHaveBeenCalled();
     });
 
     it("post() forwards funding account for contribution+buy", async () => {
@@ -2909,7 +3025,7 @@ describe("ScheduledTransactionsService", () => {
       await service.processAutoPostTransactions();
     });
 
-    it("should auto-post transfer transactions using createTransfer", async () => {
+    it("should auto-post transfer transactions using prepareTransfer", async () => {
       const transfer = makeScheduled({
         id: "st-transfer",
         autoPost: true,
@@ -2926,7 +3042,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.processAutoPostTransactions();
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -2967,7 +3083,7 @@ describe("ScheduledTransactionsService", () => {
       await service.processAutoPostTransactions();
 
       expect(transactionsService.create).toHaveBeenCalled();
-      expect(transactionsService.createTransfer).toHaveBeenCalled();
+      expect(transactionsService.prepareTransfer).toHaveBeenCalled();
     });
 
     it("should pick up transactions with overrides that moved date earlier", async () => {
@@ -3006,7 +3122,7 @@ describe("ScheduledTransactionsService", () => {
 
       await service.processAutoPostTransactions();
 
-      expect(transactionsService.createTransfer).toHaveBeenCalledWith(
+      expect(transactionsService.prepareTransfer).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
           fromAccountId: "acc-1",
@@ -3037,7 +3153,7 @@ describe("ScheduledTransactionsService", () => {
       await service.processAutoPostTransactions();
 
       expect(transactionsService.create).not.toHaveBeenCalled();
-      expect(transactionsService.createTransfer).not.toHaveBeenCalled();
+      expect(transactionsService.prepareTransfer).not.toHaveBeenCalled();
     });
 
     it("uses last_client_timezone when explicit timezone is the 'browser' sentinel", async () => {

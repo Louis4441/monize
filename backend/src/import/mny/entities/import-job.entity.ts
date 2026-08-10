@@ -101,6 +101,16 @@ export class ImportJob {
   @Column({ name: "retryable", default: false })
   retryable: boolean;
 
+  /**
+   * True once this job's rows committed to the ledger.
+   *
+   * Set in the import's own write transaction, so it is never true for a commit
+   * that rolled back. It is what makes `retryable` honest after a stall: before
+   * the commit a retry costs nothing, after it a retry imports the file twice.
+   */
+  @Column({ name: "data_committed", default: false })
+  dataCommitted: boolean;
+
   /** Bumped by the running job; the reaper's liveness signal. */
   @Column({ type: "timestamp", name: "heartbeat_at", nullable: true })
   heartbeatAt: Date | null;

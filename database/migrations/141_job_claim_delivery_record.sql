@@ -1,6 +1,6 @@
--- 139: a job claim can now record that its delivery actually happened.
+-- 141: a job claim can now record that its delivery actually happened.
 --
--- Migration 139 gave the multi-replica reminders a durable claim, which stopped
+-- Migration 140 gave the multi-replica reminders a durable claim, which stopped
 -- two replicas emailing the same user twice. It did not make a claimed-but-unsent
 -- reminder recoverable, because `claimOnce` is taken *before* the send and is the
 -- only record that the send was owed (audit RV4-006).

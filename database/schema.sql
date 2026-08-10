@@ -342,7 +342,7 @@ CREATE TABLE attachment_blobs (
 );
 
 -- Attachment objects whose metadata is gone and whose bytes still need deleting
--- (migration 139).
+-- (migration 140).
 --
 -- Only the database provider keeps bytes where PostgreSQL can roll them back. A
 -- local filesystem write and an S3 put cannot join the transaction, so deleting
@@ -352,8 +352,26 @@ CREATE TABLE attachment_blobs (
 -- those objects were never deleted.
 --
 -- A trigger writes the tombstone, which is why it covers every path the
--- application does not control. AttachmentOrphanSweeper deletes the object and
--- drops the row, so a crash between the two costs a retry.
+-- application does not control.
+--
+-- NOTE: there is no sweeper yet. This half of the protocol -- the durable record
+-- that an external object was orphaned -- ships on its own, and nothing reads the
+-- table. Said plainly here because the previous wording named an
+-- `AttachmentOrphanSweeper` that does not exist, and a comment asserting a
+-- component into being is how the missing half stops being noticed. Until a
+-- consumer lands, these rows accumulate (slowly: the trigger fires only for
+-- providers other than `database`) and reclaiming the bytes is a manual job.
+--
+-- Two things whatever sweeper eventually lands must do, both consequences of the
+-- unique key below:
+--   * re-check `transaction_attachments` for a live row with the same
+--     (storage_provider, storage_key) before deleting anything. A tombstone is
+--     keyed by object, not by attachment, so an object deleted and later
+--     re-uploaded under the same key has one tombstone and one live attachment,
+--     and deleting the bytes would destroy the live one.
+--   * delete the object first and the row second, so a crash between the two
+--     costs a retry rather than a leaked object -- the ordering rule in the root
+--     CLAUDE.md.
 --
 -- user_id is ON DELETE SET NULL, not CASCADE: deleting a user is exactly when
 -- their bytes most need removing, so the record must outlive them.
@@ -623,7 +641,7 @@ CREATE INDEX idx_sched_txn_overrides_sched_txn_id ON scheduled_transaction_overr
 CREATE INDEX idx_sched_txn_overrides_date ON scheduled_transaction_overrides(override_date);
 CREATE INDEX idx_sched_txn_overrides_orig ON scheduled_transaction_overrides(scheduled_transaction_id, original_date);
 
--- Posted occurrences (migration 139). The occurrence -- not the schedule -- is
+-- Posted occurrences (migration 140). The occurrence -- not the schedule -- is
 -- the thing that must happen once, and this unique key is its name. Manual and
 -- automatic posting both insert it inside the same transaction as the money they
 -- create, so the key arbitrates between two replicas, a manual post racing the
@@ -1378,7 +1396,7 @@ CREATE INDEX idx_budget_alerts_user ON budget_alerts(user_id);
 CREATE INDEX idx_budget_alerts_user_unread ON budget_alerts(user_id, is_read) WHERE is_read = false;
 CREATE INDEX idx_budget_alerts_budget_period ON budget_alerts(budget_id, period_start);
 
--- The app's own de-duplication rule as a database key (migration 139).
+-- The app's own de-duplication rule as a database key (migration 140).
 -- deduplicateAlerts() drops a candidate matching an existing (alert_type,
 -- budget_category_id) unless its severity is strictly higher, so severity
 -- belongs in the key and an escalation still inserts. COALESCE because a
@@ -1452,7 +1470,7 @@ CREATE TABLE import_jobs (
     error_detail TEXT,
     retryable BOOLEAN NOT NULL DEFAULT false,
     -- Set inside the import transaction, so it commits with the rows it
-    -- describes (migration 139). Distinguishes "failed before writing anything,
+    -- describes (migration 140). Distinguishes "failed before writing anything,
     -- retry is free" from "the ledger is already written and only the completion
     -- metadata is missing" -- two states the retryable flag used to fold into
     -- one and offer as an ordinary retry, which re-imported the file.
@@ -1472,7 +1490,7 @@ CREATE TABLE import_jobs (
 CREATE INDEX idx_import_jobs_user ON import_jobs(user_id);
 CREATE INDEX idx_import_jobs_staged_file ON import_jobs(staged_file_id);
 CREATE INDEX idx_import_jobs_running_heartbeat ON import_jobs(heartbeat_at) WHERE status = 'running';
--- One active import per user, enforced where it cannot be raced (migration 139).
+-- One active import per user, enforced where it cannot be raced (migration 140).
 -- The key is the user because that is what the product blocks on: hasActiveJob()
 -- asks only whether this user has any pending/running job, and the 409 says "an
 -- import is already running".
@@ -1480,14 +1498,14 @@ CREATE INDEX idx_import_jobs_running_heartbeat ON import_jobs(heartbeat_at) WHER
 -- A fresh database is trivially in this state; an upgraded one need not be, since
 -- more than one active job is exactly what the pre-136 code could produce. The
 -- migration therefore repairs before it constrains -- see its preflight, and
--- backend/test/integration/migration-139-preflight.integration.spec.ts.
+-- backend/test/integration/migration-140-preflight.integration.spec.ts.
 CREATE UNIQUE INDEX idx_import_jobs_one_active_per_user
     ON import_jobs(user_id)
     WHERE status IN ('pending', 'running');
 
 CREATE TRIGGER update_import_jobs_updated_at BEFORE UPDATE ON import_jobs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Durable claims on per-user work that must happen at most once (migration 139).
+-- Durable claims on per-user work that must happen at most once (migration 140).
 --
 -- ScheduleModule lives in the API process, so every backend replica fires every
 -- cron (docs/cron-jobs.md). A guard held in process memory is therefore not a
@@ -1508,12 +1526,12 @@ CREATE TABLE job_claims (
     -- is not. NULL on a legacy permanent claim.
     expires_at TIMESTAMP,
     -- When the side effect this claim coordinates actually happened
-    -- (migration 139). Written *after* the send, and re-read under the lease to
+    -- (migration 140). Written *after* the send, and re-read under the lease to
     -- decide whether the work is still owed: a claim taken before the send says
     -- only that somebody intended to send, and an intention does not survive the
     -- process holding it (audit RV4-006). A delivered row is never retaken.
     delivered_at TIMESTAMP,
-    -- Which attempt owns the current lease (migration 140). The key above
+    -- Which attempt owns the current lease (migration 142). The key above
     -- identifies the *work*; this identifies the holder, so a worker delayed past
     -- its own expiry cannot release a lease another replica has retaken or record a
     -- delivery for a send that replica has not finished (audit DR-RRV4-01). NULL for
@@ -1524,16 +1542,29 @@ CREATE TABLE job_claims (
 CREATE UNIQUE INDEX idx_job_claims_key ON job_claims(claim_type, user_id, claim_key);
 CREATE INDEX idx_job_claims_claimed_at ON job_claims(claimed_at);
 
--- Lease-ownership enforcement (migration 141). A session mutating a *live tokenized*
+-- Lease-ownership enforcement (migration 142). A session mutating a *live tokenized*
 -- lease must own it, proven by the transaction-local `app.job_claim_lease_token`
 -- GUC the new release/markDelivered set. The previous binary never sets it, so it
 -- cannot delete or mark a lease this deployment has retaken. The WHEN clauses
 -- exclude expired rows (retakes, retention sweep), permanent claimOnce rows
 -- (NULL token) and delivered rows (NULL expiry), so only the tokenized writes and
 -- the old binary's untokenized ones ever reach the guard.
+--
+-- The depth check exempts the ON DELETE CASCADE from `users`: a cascade carries no
+-- lease token because it is the owner going away, not an attempt on the lease, and
+-- without the exemption deleting an account raised for as long as the user held any
+-- live tokenized lease. A direct DELETE fires this at depth 1; the cascade runs as a
+-- trigger on `users` and fires it at depth 2.
 CREATE OR REPLACE FUNCTION guard_job_claim_lease_ownership() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
+    IF pg_trigger_depth() > 1 THEN
+        IF TG_OP = 'DELETE' THEN
+            RETURN OLD;
+        END IF;
+        RETURN NEW;
+    END IF;
+
     IF COALESCE(current_setting('app.job_claim_lease_token', true), '')
        IS DISTINCT FROM OLD.lease_token::text THEN
         RAISE EXCEPTION
@@ -2168,7 +2199,7 @@ CREATE POLICY scheduled_transaction_overrides_isolation ON scheduled_transaction
     WHERE st.id = scheduled_transaction_overrides.scheduled_transaction_id
       AND st.user_id = (SELECT app_current_user_id())));
 
--- scheduled_transaction_postings -> scheduled_transactions.user_id (migration 139)
+-- scheduled_transaction_postings -> scheduled_transactions.user_id (migration 140)
 DROP POLICY IF EXISTS scheduled_transaction_postings_isolation ON scheduled_transaction_postings;
 CREATE POLICY scheduled_transaction_postings_isolation ON scheduled_transaction_postings
   USING ((SELECT app_bypass_rls()) OR EXISTS (

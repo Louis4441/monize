@@ -47,6 +47,32 @@ export interface TransferActor {
 }
 
 /**
+ * A transfer that has been validated and fully authorized but not yet written.
+ *
+ * The product of `prepareTransfer`, consumed by `writeTransferLegs` and
+ * `completeTransfer`. It exists so authorization -- which reads foreign account
+ * rows under a system context -- happens before a caller's transaction opens,
+ * rather than nesting an identity that `withScopedDb` will refuse to join.
+ */
+export interface PreparedTransfer {
+  /** The user the transfer is filed under; for a delegate, the owner. */
+  effectiveUserId: string;
+  /** The authenticated user, which differs from the above under delegation. */
+  realUserId: string;
+  dto: CreateTransferDto;
+  fromAccount: Account;
+  toAccount: Account;
+  fromOwnerId: string;
+  toOwnerId: string;
+  /** True when either leg belongs to somebody other than the effective user. */
+  hasForeignLeg: boolean;
+  toAmount: number;
+  destinationCurrency: string;
+  fromPayeeName: string;
+  toPayeeName: string;
+}
+
+/**
  * Resolved, sanitized preview of a transfer the assistant proposes to create.
  * Carries the resulting state of both legs (resolved account ids/names, derived
  * currencies, and the computed destination amount) so the signed descriptor can
@@ -147,21 +173,50 @@ export class TransactionTransferService {
     findOne: (userId: string, id: string) => Promise<Transaction>,
     actor?: TransferActor,
   ): Promise<TransferResult> {
+    const prepared = await this.prepareTransfer(
+      userId,
+      createTransferDto,
+      actor,
+    );
+    const { savedFromId, savedToId } = await this.writeTransferLegs(prepared);
+    return this.completeTransfer(prepared, savedFromId, savedToId, findOne);
+  }
+
+  /**
+   * Validate and authorize a transfer without writing anything.
+   *
+   * Split out of `createTransfer` so a caller that already holds a transaction
+   * can decide authorization *before* opening it. Both halves of that decision
+   * read rows the caller is not guaranteed to own -- `accountAccessFor` loads
+   * the account by id under `withSystemContext` precisely because learning a
+   * foreign account's owner is the decision input -- and a system-identity
+   * `withScopedDb` cannot join a user-identity transaction: it throws
+   * `IDENTITY_MISMATCH_MESSAGE` rather than silently running under the outer
+   * GUCs. Deciding first is also the rule in backend/CLAUDE.md ("Decide
+   * authorization first, under scoped(), and let only the minimum out").
+   *
+   * Everything here is a read or a pure computation, so it is safe to run
+   * outside the caller's transaction: account ownership and delegation grants
+   * are not written by the posting that follows.
+   */
+  async prepareTransfer(
+    userId: string,
+    createTransferDto: CreateTransferDto,
+    actor?: TransferActor,
+  ): Promise<PreparedTransfer> {
     const realUserId = actor?.realUserId ?? userId;
+    // Only the fields this half needs. The rest of the payload is carried on
+    // `PreparedTransfer.dto` and destructured by `writeTransferLegs`, which is
+    // where the columns are actually written.
     const {
       fromAccountId,
       toAccountId,
-      transactionDate,
       amount,
       fromCurrencyCode,
       toCurrencyCode,
       exchangeRate = 1,
       toAmount: explicitToAmount,
-      description,
-      payeeId,
       payeeName: customPayeeName,
-      referenceNumber,
-      status = TransactionStatus.UNRECONCILED,
       categoryId,
     } = createTransferDto;
 
@@ -215,6 +270,61 @@ export class TransactionTransferService {
 
     const fromPayeeName = customPayeeName || `Transfer to ${toAccount.name}`;
     const toPayeeName = customPayeeName || `Transfer from ${fromAccount.name}`;
+
+    return {
+      effectiveUserId: userId,
+      realUserId,
+      dto: createTransferDto,
+      fromAccount,
+      toAccount,
+      fromOwnerId,
+      toOwnerId,
+      hasForeignLeg,
+      toAmount,
+      destinationCurrency,
+      fromPayeeName,
+      toPayeeName,
+    };
+  }
+
+  /**
+   * Write both legs, their linkage and the balance updates.
+   *
+   * `manager` joins the caller's transaction instead of opening one, so a
+   * scheduled posting can make the occurrence claim, the money and the schedule
+   * advancement one unit. A cross-owner transfer cannot be written that way --
+   * the foreign leg fails the owner-only policies and needs the audited system
+   * bypass, which is a different identity and therefore a different transaction
+   * -- so it is refused rather than silently written under the caller's.
+   */
+  async writeTransferLegs(
+    prepared: PreparedTransfer,
+    manager?: EntityManager,
+  ): Promise<{ savedFromId: string; savedToId: string }> {
+    const {
+      effectiveUserId: userId,
+      dto,
+      fromOwnerId,
+      toOwnerId,
+      hasForeignLeg,
+      toAmount,
+      destinationCurrency,
+      fromPayeeName,
+      toPayeeName,
+    } = prepared;
+    const {
+      fromAccountId,
+      toAccountId,
+      transactionDate,
+      amount,
+      fromCurrencyCode,
+      exchangeRate = 1,
+      description,
+      payeeId,
+      referenceNumber,
+      status = TransactionStatus.UNRECONCILED,
+      categoryId,
+    } = dto;
 
     // Both legs, their linkage, and the balance updates commit atomically.
     // Each leg is owned by ITS account's owner; per-user reference data
@@ -285,17 +395,56 @@ export class TransactionTransferService {
       return { savedFromId: fromId, savedToId: toId };
     };
 
-    const { savedFromId, savedToId } = hasForeignLeg
+    if (manager) {
+      if (hasForeignLeg) {
+        throw new BadRequestException(
+          tr(
+            "errors.transactions.transferCrossOwnerNotAtomic",
+            "A transfer involving another owner's account cannot be written inside the caller's transaction",
+          ),
+        );
+      }
+      return writeLegsAtomically(manager);
+    }
+
+    return hasForeignLeg
       ? // Cross-owner: the foreign leg insert and foreign balance update fail
         // the owner-only policies, so the (already fully authorized) atomic
         // block runs under the audited system bypass. No-op at RLS_MODE=off.
-        await withSystemContext(() =>
+        withSystemContext(() =>
           withScopedDb(this.dataSource, writeLegsAtomically),
         )
-      : await withScopedDb(this.dataSource, writeLegsAtomically);
+      : withScopedDb(this.dataSource, writeLegsAtomically);
+  }
 
-    this.triggerNetWorthRecalc(fromAccountId, fromOwnerId);
-    this.triggerNetWorthRecalc(toAccountId, toOwnerId);
+  /**
+   * The post-commit half of a transfer: derived recalculation, the read-back
+   * the caller returns, and the action-history record.
+   *
+   * Deliberately not part of `writeTransferLegs`. `recordCreateTransferHistory`
+   * opens a `withSystemContext` for cross-owner records and the recorder
+   * swallows its own failures by design -- inside the caller's transaction that
+   * is either a `25P02` abort of the posting or a silently dropped undo entry,
+   * so it runs after the commit like every other external side effect.
+   */
+  async completeTransfer(
+    prepared: PreparedTransfer,
+    savedFromId: string,
+    savedToId: string,
+    findOne: (userId: string, id: string) => Promise<Transaction>,
+  ): Promise<TransferResult> {
+    const {
+      effectiveUserId,
+      realUserId,
+      dto,
+      fromAccount,
+      toAccount,
+      fromOwnerId,
+      toOwnerId,
+    } = prepared;
+
+    this.triggerNetWorthRecalc(dto.fromAccountId, fromOwnerId);
+    this.triggerNetWorthRecalc(dto.toAccountId, toOwnerId);
 
     const result = {
       fromTransaction: await findOne(fromOwnerId, savedFromId),
@@ -303,14 +452,14 @@ export class TransactionTransferService {
     };
 
     await this.recordCreateTransferHistory({
-      effectiveUserId: userId,
+      effectiveUserId,
       realUserId,
       savedFromId,
       savedToId,
       fromAccount,
       toAccount,
-      amount,
-      currencyCode: fromCurrencyCode,
+      amount: dto.amount,
+      currencyCode: dto.fromCurrencyCode,
     });
 
     return result;

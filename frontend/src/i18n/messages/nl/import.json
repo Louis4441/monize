@@ -536,6 +536,7 @@
   "mnyErrors": {
     "mnyImportFailed": "Er is iets misgegaan tijdens de import. Er is niets opgeslagen -- u kunt het opnieuw proberen.",
     "mnyJobStalled": "De import reageert niet meer, waarschijnlijk omdat de server opnieuw is opgestart. Uw geüploade bestand is er nog, dus opnieuw proberen is veilig.",
+    "mnyJobStalledAfterCommit": "De import reageert niet meer nadat uw gegevens al waren opgeslagen, waarschijnlijk omdat de server opnieuw is opgestart. De geïmporteerde records staan in uw account, dus hetzelfde bestand nogmaals importeren zou ze dupliceren. Controleer uw rekeningen voordat u iets anders importeert.",
     "mnyStagedFileMissing": "Het geüploade Money-bestand is niet langer beschikbaar. Upload het opnieuw.",
     "mnyFileTruncated": "Dit Money-bestand lijkt onvolledig. De upload is mogelijk onderbroken.",
     "mnyNotAMoneyFile": "Dit bestand is geen Microsoft Money-bestand (.mny).",

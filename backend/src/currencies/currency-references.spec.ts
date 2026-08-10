@@ -294,7 +294,7 @@ describe("currency global liveness", () => {
       "currency_code_in_use_globally",
       // Records an attachment-blob tombstone as the table owner, so the deletion
       // is captured under RLS whichever tenant's DELETE fired the trigger
-      // (migration 139).
+      // (migration 140).
       "record_attachment_blob_tombstone",
     ]);
     // Every definer function pins its search_path: without it, a definer can be

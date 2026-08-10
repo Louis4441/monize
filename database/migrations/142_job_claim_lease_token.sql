@@ -1,4 +1,4 @@
--- 140: a lease needs an owner, so a worker cannot act on a lease it has lost.
+-- 142: a lease needs an owner, so a worker cannot act on a lease it has lost.
 --
 -- `claimLease` returned a boolean and `release`/`markDelivered` addressed the row
 -- by `(claim_type, user_id, claim_key)` alone (audit DR-RRV4-01). That identifies
