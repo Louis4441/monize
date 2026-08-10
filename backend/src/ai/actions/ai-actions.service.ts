@@ -370,8 +370,12 @@ export class AiActionsService {
           currencyCode: r.currencyCode,
           payeeId: r.payeeId ?? undefined,
           payeeName: r.payeeName ?? undefined,
-          categoryId: r.categoryId ?? undefined,
+          // A row replacing a split set carries its categories in `splits`;
+          // the parent holds none. Same rule as the singular descriptor, and
+          // the splits ride in the SAME dto so the row commits once.
+          categoryId: r.splits ? undefined : (r.categoryId ?? undefined),
           description: r.description ?? undefined,
+          splits: r.splits ? toSplitDtoRows(r.splits) : undefined,
         });
         const transaction = await this.transactionsService.update(
           userId,

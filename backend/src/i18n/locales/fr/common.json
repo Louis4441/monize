@@ -13,7 +13,8 @@
       "iterations": "J'ai atteint le nombre maximal d'étapes d'analyse pour cette question ; cette réponse repose donc sur les données recueillies avant l'arrêt.",
       "toolCalls": "J'ai atteint le nombre maximal de consultations de données pour cette question ; cette réponse repose donc sur les données recueillies avant l'arrêt.",
       "tokens": "J'ai atteint le budget d'analyse maximal pour cette question ; cette réponse repose donc sur les données recueillies avant l'arrêt.",
-      "timeout": "Cette question a pris plus de temps que celui disponible ; cette réponse repose donc sur les données recueillies avant l'arrêt."
+      "timeout": "Cette question a pris plus de temps que celui disponible ; cette réponse repose donc sur les données recueillies avant l'arrêt.",
+      "stalled": "J'ai répété que j'allais continuer au lieu de terminer ; cette réponse repose donc sur les données recueillies avant l'arrêt."
     },
     "synthesisFailed": "J'ai recueilli des données pour cette question, mais je n'ai pas pu terminer l'analyse : je n'ai donc pas de réponse fiable. Essayez de poser une question plus précise."
   }

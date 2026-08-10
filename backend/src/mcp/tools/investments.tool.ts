@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PortfolioService } from "../../securities/portfolio.service";
@@ -760,7 +761,7 @@ export class McpInvestmentsTools {
       );
     if (bulk.okPreviews.length === 0) {
       return toolError(
-        "None of the investment transactions could be prepared. Check the account, security, action, and date for each row.",
+        `None of the investment transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
     }
     const budget = this.writeLimiter.reserve(userId, bulk.okPreviews.length);
@@ -907,7 +908,7 @@ export class McpInvestmentsTools {
       }
       if (cards.length === 0)
         return toolError(
-          "None of the investment transaction edits could be prepared.",
+          `None of the investment transaction edits could be prepared.${describeSkippedRows(skipped, items.length)}`,
         );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
@@ -921,7 +922,7 @@ export class McpInvestmentsTools {
       );
     if (bulk.okRows.length === 0)
       return toolError(
-        "None of the investment transaction edits could be prepared.",
+        `None of the investment transaction edits could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
     const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
@@ -1034,7 +1035,7 @@ export class McpInvestmentsTools {
       }
       if (cards.length === 0)
         return toolError(
-          "None of the investment transactions could be prepared.",
+          `None of the investment transactions could be prepared.${describeSkippedRows(skipped, items.length)}`,
         );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
@@ -1048,7 +1049,7 @@ export class McpInvestmentsTools {
       );
     if (bulk.okRows.length === 0)
       return toolError(
-        "None of the investment transactions could be prepared.",
+        `None of the investment transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
     const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
@@ -1364,7 +1365,7 @@ export class McpInvestmentsTools {
     );
     if (prep.okPreviews.length === 0) {
       return toolError(
-        "None of the securities could be prepared. Check the ticker/name for each row.",
+        `None of the securities could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
     const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
@@ -1451,7 +1452,9 @@ export class McpInvestmentsTools {
       items.map((i) => this.toSecUpdateRow(i)),
     );
     if (prep.okPreviews.length === 0) {
-      return toolError("None of the security edits could be prepared.");
+      return toolError(
+        `None of the security edits could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
+      );
     }
     const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
@@ -1533,7 +1536,9 @@ export class McpInvestmentsTools {
       items.map((i) => this.toSecDeleteRow(i)),
     );
     if (prep.okPreviews.length === 0) {
-      return toolError("None of the securities could be prepared.");
+      return toolError(
+        `None of the securities could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
+      );
     }
     const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;

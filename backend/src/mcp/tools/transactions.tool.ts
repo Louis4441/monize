@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TransactionsService } from "../../transactions/transactions.service";
@@ -152,7 +153,7 @@ export class McpTransactionsTools {
             .max(100)
             .optional()
             .describe(
-              'Optional category names to filter to ("Parent: Child" for a subcategory)',
+              'Optional category names to filter to, in the "Parent: Child" form the read tools return. A bare subcategory name shared by two parents is rejected rather than guessed, and the error lists the qualified names.',
             ),
           payeeNames: z
             .array(z.string().max(100))
@@ -376,7 +377,7 @@ export class McpTransactionsTools {
           "create (standard): { accountName, amount, date, payeeName?, categoryName?, description?, createPayeeIfMissing? } (amount positive=income, negative=expense). " +
           "create (transfer): { fromAccountName, toAccountName, amount, date, description?, payeeName?, categoryName?, createPayeeIfMissing?, exchangeRate?, toAmount? } -- an item is a transfer when toAccountName is present; payeeName is an optional custom label matched to an existing payee (or created if missing, like a normal transaction) and applied to both legs (omit to auto-generate 'Transfer to/from <account>'); categoryName is an optional spending category stored on both legs (surfaces the transfer in the monthly category breakdown without counting as income/expense). " +
           "update: { transactionId, amount?, date?, payeeName?, categoryName?, description?, createPayeeIfMissing? } (>=1 field; a category-only change is transactionId + categoryName; transfers auto-detected; categoryName also applies to a transfer -- it is stored on both legs and surfaces the transfer in the monthly category breakdown without making it count as income/expense; payeeName sets the transfer's custom label, matched to an existing payee or created if missing). " +
-          "split transactions (create or update): add a 'splits' array of { categoryName, amount, memo? } (>= 2 lines, category splits only) instead of a single categoryName; split amounts must sum to the transaction amount. Updating an EXISTING split transaction: parent fields (date, payeeName, description) work without splits, but changing its categories or its amount requires resending the COMPLETE splits array (the tool errors with instructions otherwise). Read tools return one row per split line (same transaction id, distinct splitId), so read the current lines first, then resend all lines with your change applied. Send split transactions one item at a time, not mixed into a multi-row batch. " +
+          "split transactions (create or update): add a 'splits' array of { categoryName, amount, memo? } (>= 2 lines, category splits only) instead of a single categoryName; split amounts must sum to the transaction amount. Updating an EXISTING split transaction: parent fields (date, payeeName, description) work without splits, but changing its categories or its amount requires resending the COMPLETE splits array (the tool errors with instructions otherwise). Read tools return one row per split line (same transaction id, distinct splitId), and always the COMPLETE set for each transaction even when you filtered by category -- so read the current lines first, then resend all of them with your change applied. Several split transactions CAN be sent in one call: each item carries its own complete splits array, and every row is previewed and applied with its own set. " +
           "delete: { transactionId } (removes linked transfer legs / split children too). " +
           "attachments (create or update): add an 'attachments' array to save files permanently on the transaction; each entry is EITHER { attachmentUri } referencing a monize-attachment:// chat file relayed from the Monize web chat, OR { fileData, fileName } with inline base64 bytes. Images and PDFs only, max 5 MB each. Single-item calls only; not valid on transfers, delete, or dryRun. An attachments-only update (transactionId + attachments) is a valid edit. " +
           "approvalMode controls the confirmation: by default 6 or more items show one confirmation for the whole batch and 1-5 items show one confirmation per item; pass 'individual' to force one confirmation per item at any count; ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
@@ -434,7 +435,7 @@ export class McpTransactionsTools {
                   .max(100)
                   .optional()
                   .describe(
-                    'Optional category name (standard create/update, or transfer create/update -- on a transfer it is stored on both legs; "Parent: Child" for a subcategory).',
+                    'Optional category name (standard create/update, or transfer create/update -- on a transfer it is stored on both legs), qualified as "Parent: Child" -- a bare subcategory name shared by two parents is rejected, not guessed.',
                   ),
                 description: z
                   .string()
@@ -471,7 +472,7 @@ export class McpTransactionsTools {
                         .min(1)
                         .max(100)
                         .describe(
-                          'Category for this split line ("Parent: Child" for a subcategory).',
+                          'Category for this split line, qualified as "Parent: Child" for a subcategory (required when the subcategory name is shared by more than one parent).',
                         ),
                       amount: z
                         .number()
@@ -488,7 +489,7 @@ export class McpTransactionsTools {
                   .max(50)
                   .optional()
                   .describe(
-                    "Category splits (create/update). >= 2 lines instead of a single categoryName; amounts must sum to the transaction amount. On an EXISTING split transaction, a category or amount change requires resending the complete split set (parent fields work without it); read the current lines first. Send split transactions one item at a time.",
+                    "Category splits (create/update). >= 2 lines instead of a single categoryName; amounts must sum to the transaction amount. On an EXISTING split transaction, a category or amount change requires resending the complete split set (parent fields work without it); read the current lines first. Several items may each carry their own splits array in one call.",
                   ),
                 attachments: z
                   .array(
@@ -1209,7 +1210,10 @@ export class McpTransactionsTools {
     const okCount = std.okPreviews.length + xfer.okPreviews.length;
     if (okCount === 0) {
       return toolError(
-        "None of the transactions could be prepared. Check the account, category, and date for each row.",
+        `None of the transactions could be prepared.${describeSkippedRows(
+          [...std.skipped, ...xfer.skipped],
+          items.length,
+        )}`,
       );
     }
 
@@ -1545,6 +1549,10 @@ export class McpTransactionsTools {
               : this.actionBuilder.buildUpdateTransaction(
                   userId,
                   result.preview,
+                  // Without this the resolved lines are dropped and the card
+                  // proposes a parent-only edit -- a silent no-op against what
+                  // the caller asked for.
+                  result.splits,
                 ),
           );
         } catch (err) {
@@ -1552,7 +1560,9 @@ export class McpTransactionsTools {
         }
       }
       if (cards.length === 0)
-        return toolError("None of the transaction edits could be prepared.");
+        return toolError(
+          `None of the transaction edits could be prepared.${describeSkippedRows(skipped, items.length)}`,
+        );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, userId, cards, requestId, skipped);
@@ -1564,7 +1574,9 @@ export class McpTransactionsTools {
       items.map((i) => this.toUpdateRow(i)),
     );
     if (bulk.okRows.length === 0)
-      return toolError("None of the transaction edits could be prepared.");
+      return toolError(
+        `None of the transaction edits could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
+      );
     const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(
@@ -1658,7 +1670,9 @@ export class McpTransactionsTools {
         }
       }
       if (cards.length === 0)
-        return toolError("None of the transactions could be prepared.");
+        return toolError(
+          `None of the transactions could be prepared.${describeSkippedRows(skipped, items.length)}`,
+        );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, userId, cards, requestId, skipped);
@@ -1669,7 +1683,9 @@ export class McpTransactionsTools {
       items.map((i) => i.transactionId as string),
     );
     if (bulk.okRows.length === 0)
-      return toolError("None of the transactions could be prepared.");
+      return toolError(
+        `None of the transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
+      );
     const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(

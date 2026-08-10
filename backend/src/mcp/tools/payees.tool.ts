@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PayeesService } from "../../payees/payees.service";
@@ -299,7 +300,7 @@ export class McpPayeesTools {
     );
     if (prep.okPreviews.length === 0) {
       return toolError(
-        "None of the payees could be prepared. Check the name and category for each row.",
+        `None of the payees could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
     const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
@@ -382,7 +383,9 @@ export class McpPayeesTools {
       items.map((i) => this.toUpdateRow(i)),
     );
     if (prep.okPreviews.length === 0) {
-      return toolError("None of the payee edits could be prepared.");
+      return toolError(
+        `None of the payee edits could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
+      );
     }
     const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
@@ -461,7 +464,9 @@ export class McpPayeesTools {
       items.map((i) => this.toDeleteRow(i)),
     );
     if (prep.okPreviews.length === 0) {
-      return toolError("None of the payees could be prepared.");
+      return toolError(
+        `None of the payees could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
+      );
     }
     const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;

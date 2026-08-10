@@ -13,7 +13,8 @@
       "iterations": "Ik heb het maximale aantal analysestappen voor deze vraag bereikt, dus dit antwoord is gebaseerd op de gegevens die ik voor het stoppen heb verzameld.",
       "toolCalls": "Ik heb het maximale aantal gegevensopvragingen voor deze vraag bereikt, dus dit antwoord is gebaseerd op de gegevens die ik voor het stoppen heb verzameld.",
       "tokens": "Ik heb het maximale analysebudget voor deze vraag bereikt, dus dit antwoord is gebaseerd op de gegevens die ik voor het stoppen heb verzameld.",
-      "timeout": "Deze vraag duurde langer dan de beschikbare tijd, dus dit antwoord is gebaseerd op de gegevens die ik voor het stoppen heb verzameld."
+      "timeout": "Deze vraag duurde langer dan de beschikbare tijd, dus dit antwoord is gebaseerd op de gegevens die ik voor het stoppen heb verzameld.",
+      "stalled": "Ik bleef zeggen dat ik verder zou werken in plaats van af te ronden, dus dit antwoord is gebaseerd op de gegevens die ik voor het stoppen heb verzameld."
     },
     "synthesisFailed": "Ik heb gegevens voor deze vraag verzameld, maar kon de analyse niet afronden, dus ik heb geen betrouwbaar antwoord. Probeer iets specifiekers te vragen."
   }

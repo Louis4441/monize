@@ -20,6 +20,11 @@ import {
   resolveApprovalMode,
 } from "../actions/ai-action.types";
 import {
+  BulkCreateSkip,
+  bulkSkipReason,
+  describeSkippedRows,
+} from "../../common/bulk-create.types";
+import {
   TransactionToolPrepService,
   CreateRowInput,
   TransferRowInput,
@@ -475,15 +480,10 @@ export class ToolExecutorService {
     );
     const single = items.length === 1;
 
-    // Split transactions are the "rich" single unit: the bulk card paths do not
-    // carry splits, so reject a multi-row batch that mixes in a split row rather
-    // than silently dropping the splits.
-    if (!single && items.some((i) => i.splits !== undefined)) {
-      return this.toolError(
-        "Split transactions must be sent one at a time: use a single item with a splits array.",
-      );
-    }
-    // Attachments follow the same rule: only the singular card carries them.
+    // Splits ride in a multi-row batch: each row carries its own complete
+    // replacement set, so several split transactions can be recategorized under
+    // one confirmation. Attachments still cannot -- only the singular card
+    // carries the chat files.
     if (!single && items.some((i) => i.attachments !== undefined)) {
       return this.toolError(
         "Attachments must be sent one at a time: use a single item with an attachments array.",
@@ -733,7 +733,10 @@ export class ToolExecutorService {
     const okCount = std.okPreviews.length + xfer.okPreviews.length;
     if (okCount === 0) {
       return this.toolError(
-        "None of the transactions could be prepared. Check the account, category, and date for each row and try again.",
+        `None of the transactions could be prepared.${describeSkippedRows(
+          [...std.skipped, ...xfer.skipped],
+          items.length,
+        )}`,
       );
     }
 
@@ -860,8 +863,10 @@ export class ToolExecutorService {
 
     if (approvalMode === "individual") {
       const pendingActions: PendingAiAction[] = [];
-      let skipped = 0;
-      for (const item of items) {
+      // Reasons, not a count: what the row was refused for is the only thing
+      // that lets the model fix the call.
+      const skips: BulkCreateSkip[] = [];
+      for (const [index, item] of items.entries()) {
         try {
           const result = await this.prepService.prepareUpdate(
             userId,
@@ -873,17 +878,25 @@ export class ToolExecutorService {
               : this.actionBuilder.buildUpdateTransaction(
                   userId,
                   result.preview,
+                  // Without this the resolved lines are dropped and the card
+                  // proposes a parent-only edit -- a silent no-op against what
+                  // the user asked for.
+                  result.splits,
                 ),
           );
-        } catch {
-          skipped++;
+        } catch (err) {
+          skips.push({ index, reason: bulkSkipReason(err) });
         }
       }
       if (pendingActions.length === 0) {
         return this.toolError(
-          "None of the transaction edits could be prepared. Check each transactionId and the fields to change.",
+          `None of the transaction edits could be prepared.${describeSkippedRows(
+            skips,
+            items.length,
+          )}`,
         );
       }
+      const skipped = skips.length;
       return {
         data: PENDING_ACTION_TOOL_RESULT,
         summary: `Prepared ${pendingActions.length} individual edit card${pendingActions.length === 1 ? "" : "s"}${skipped ? ` (${skipped} skipped)` : ""}. Awaiting user confirmation.`,
@@ -898,7 +911,10 @@ export class ToolExecutorService {
     );
     if (bulk.okRows.length === 0) {
       return this.toolError(
-        "None of the transaction edits could be prepared. Check each transactionId and the fields to change.",
+        `None of the transaction edits could be prepared.${describeSkippedRows(
+          bulk.skipped,
+          items.length,
+        )}`,
       );
     }
     const pendingAction = this.actionBuilder.buildBatchActions(
@@ -947,8 +963,8 @@ export class ToolExecutorService {
 
     if (approvalMode === "individual") {
       const pendingActions: PendingAiAction[] = [];
-      let skipped = 0;
-      for (const item of items) {
+      const skips: BulkCreateSkip[] = [];
+      for (const [index, item] of items.entries()) {
         try {
           const preview = await this.prepService.prepareDelete(
             userId,
@@ -957,15 +973,19 @@ export class ToolExecutorService {
           pendingActions.push(
             this.actionBuilder.buildDeleteTransaction(userId, preview),
           );
-        } catch {
-          skipped++;
+        } catch (err) {
+          skips.push({ index, reason: bulkSkipReason(err) });
         }
       }
       if (pendingActions.length === 0) {
         return this.toolError(
-          "None of the transactions could be prepared for deletion. Check each transactionId.",
+          `None of the transactions could be prepared for deletion.${describeSkippedRows(
+            skips,
+            items.length,
+          )}`,
         );
       }
+      const skipped = skips.length;
       return {
         data: PENDING_ACTION_TOOL_RESULT,
         summary: `Prepared ${pendingActions.length} individual delete card${pendingActions.length === 1 ? "" : "s"}${skipped ? ` (${skipped} skipped)` : ""}. Awaiting user confirmation.`,
@@ -980,7 +1000,10 @@ export class ToolExecutorService {
     );
     if (bulk.okRows.length === 0) {
       return this.toolError(
-        "None of the transactions could be prepared for deletion. Check each transactionId.",
+        `None of the transactions could be prepared for deletion.${describeSkippedRows(
+          bulk.skipped,
+          items.length,
+        )}`,
       );
     }
     const pendingAction = this.actionBuilder.buildBatchActions(
@@ -1076,7 +1099,7 @@ export class ToolExecutorService {
     );
     if (prep.okPreviews.length === 0) {
       return this.toolError(
-        "None of the payees could be prepared. Check the name and category for each row.",
+        `None of the payees could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
     if (approvalMode === "individual") {
@@ -1133,7 +1156,9 @@ export class ToolExecutorService {
       items.map((i) => this.toPayeeUpdateRow(i)),
     );
     if (prep.okPreviews.length === 0) {
-      return this.toolError("None of the payee edits could be prepared.");
+      return this.toolError(
+        `None of the payee edits could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
+      );
     }
     if (approvalMode === "individual") {
       return {
@@ -1190,7 +1215,7 @@ export class ToolExecutorService {
     );
     if (prep.okPreviews.length === 0) {
       return this.toolError(
-        "None of the payees could be prepared for deletion.",
+        `None of the payees could be prepared for deletion.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
     if (approvalMode === "individual") {
@@ -1313,7 +1338,7 @@ export class ToolExecutorService {
     );
     if (prep.okPreviews.length === 0) {
       return this.toolError(
-        "None of the securities could be prepared. Check the ticker/name for each row.",
+        `None of the securities could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
     if (approvalMode === "individual") {
@@ -1374,7 +1399,9 @@ export class ToolExecutorService {
       items.map((i) => this.toSecurityUpdateRow(i)),
     );
     if (prep.okPreviews.length === 0) {
-      return this.toolError("None of the security edits could be prepared.");
+      return this.toolError(
+        `None of the security edits could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
+      );
     }
     if (approvalMode === "individual") {
       return {
@@ -1435,7 +1462,7 @@ export class ToolExecutorService {
     );
     if (prep.okPreviews.length === 0) {
       return this.toolError(
-        "None of the securities could be prepared for deletion.",
+        `None of the securities could be prepared for deletion.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
     if (approvalMode === "individual") {
@@ -1600,7 +1627,7 @@ export class ToolExecutorService {
       );
     if (bulk.okPreviews.length === 0) {
       return this.toolError(
-        "None of the investment transactions could be prepared. Check the account, security, action, and date for each row and try again.",
+        `None of the investment transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
     }
 
@@ -1670,8 +1697,8 @@ export class ToolExecutorService {
 
     if (approvalMode === "individual") {
       const pendingActions: PendingAiAction[] = [];
-      let skipped = 0;
-      for (const item of items) {
+      const skips: BulkCreateSkip[] = [];
+      for (const [index, item] of items.entries()) {
         const row = this.toInvestmentUpdateRow(item);
         try {
           const preview =
@@ -1694,15 +1721,19 @@ export class ToolExecutorService {
               preview,
             ),
           );
-        } catch {
-          skipped++;
+        } catch (err) {
+          skips.push({ index, reason: bulkSkipReason(err) });
         }
       }
       if (pendingActions.length === 0) {
         return this.toolError(
-          "None of the investment transaction edits could be prepared. Check each transactionId and the fields to change.",
+          `None of the investment transaction edits could be prepared.${describeSkippedRows(
+            skips,
+            items.length,
+          )}`,
         );
       }
+      const skipped = skips.length;
       return {
         data: PENDING_ACTION_TOOL_RESULT,
         summary: `Prepared ${pendingActions.length} individual investment edit card${pendingActions.length === 1 ? "" : "s"}${skipped ? ` (${skipped} skipped)` : ""}. Awaiting user confirmation.`,
@@ -1718,7 +1749,7 @@ export class ToolExecutorService {
       );
     if (bulk.okRows.length === 0) {
       return this.toolError(
-        "None of the investment transaction edits could be prepared. Check each transactionId and the fields to change.",
+        `None of the investment transaction edits could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
     }
     const pendingAction =
@@ -1766,8 +1797,8 @@ export class ToolExecutorService {
 
     if (approvalMode === "individual") {
       const pendingActions: PendingAiAction[] = [];
-      let skipped = 0;
-      for (const item of items) {
+      const skips: BulkCreateSkip[] = [];
+      for (const [index, item] of items.entries()) {
         try {
           const preview =
             await this.investmentTransactionsService.previewDeleteInvestmentTransaction(
@@ -1780,15 +1811,19 @@ export class ToolExecutorService {
               preview,
             ),
           );
-        } catch {
-          skipped++;
+        } catch (err) {
+          skips.push({ index, reason: bulkSkipReason(err) });
         }
       }
       if (pendingActions.length === 0) {
         return this.toolError(
-          "None of the investment transactions could be prepared for deletion. Check each transactionId.",
+          `None of the investment transactions could be prepared for deletion.${describeSkippedRows(
+            skips,
+            items.length,
+          )}`,
         );
       }
+      const skipped = skips.length;
       return {
         data: PENDING_ACTION_TOOL_RESULT,
         summary: `Prepared ${pendingActions.length} individual investment delete card${pendingActions.length === 1 ? "" : "s"}${skipped ? ` (${skipped} skipped)` : ""}. Awaiting user confirmation.`,
@@ -1804,7 +1839,7 @@ export class ToolExecutorService {
       );
     if (bulk.okRows.length === 0) {
       return this.toolError(
-        "None of the investment transactions could be prepared for deletion. Check each transactionId.",
+        `None of the investment transactions could be prepared for deletion.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
     }
     const pendingAction =

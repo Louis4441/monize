@@ -13,7 +13,8 @@
       "iterations": "I reached the maximum number of analysis steps for this question, so this answer is based on the data I gathered before stopping.",
       "toolCalls": "I reached the maximum number of data lookups for this question, so this answer is based on the data I gathered before stopping.",
       "tokens": "I reached the maximum analysis budget for this question, so this answer is based on the data I gathered before stopping.",
-      "timeout": "This question took longer than the time available, so this answer is based on the data I gathered before stopping."
+      "timeout": "This question took longer than the time available, so this answer is based on the data I gathered before stopping.",
+      "stalled": "I kept saying I would keep working instead of finishing, so this answer is based on the data I gathered before stopping."
     },
     "synthesisFailed": "I gathered data for this question but couldn't complete the analysis, so I don't have a reliable answer. Try asking something narrower."
   }

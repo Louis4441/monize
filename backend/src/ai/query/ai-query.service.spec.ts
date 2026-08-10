@@ -1110,6 +1110,225 @@ describe("AiQueryService", () => {
       });
     });
 
+    describe("a turn that promises to keep working", () => {
+      /** The stall this behaviour exists for: no tool call, just a promise. */
+      const STALL =
+        "I've identified the 17 split transactions in that account. " +
+        "I am currently gathering the complete split details so I can propose the correct updates for you. One moment.";
+      const REAL_ANSWER = "The Business: Cell Phone lines total $1,204.55.";
+
+      /** One `completeWithTools` response, tool-free by default. */
+      const reply = (content: string, toolCalls: unknown[] = []) => ({
+        content,
+        toolCalls,
+        usage: { inputTokens: 50, outputTokens: 20 },
+        model: "claude-sonnet-4-20250514",
+        provider: "anthropic",
+        stopReason: toolCalls.length > 0 ? "tool_use" : "end_turn",
+      });
+
+      /** Play a fixed script of responses, one per provider call. */
+      function scriptedProvider(...script: Array<ReturnType<typeof reply>>) {
+        let call = 0;
+        (mockProvider.completeWithTools as jest.Mock).mockImplementation(() =>
+          Promise.resolve(script[Math.min(call++, script.length - 1)]),
+        );
+      }
+
+      /** The messages sent on the nth (0-based) provider call. */
+      function messagesOnCall(n: number): Array<Record<string, unknown>> {
+        const [request] = (mockProvider.completeWithTools as jest.Mock).mock
+          .calls[n] as [{ messages: Array<Record<string, unknown>> }];
+        return request.messages;
+      }
+
+      it("runs another pass instead of handing the promise back to the user", async () => {
+        scriptedProvider(reply(STALL), reply(REAL_ANSWER));
+
+        const events = await collectEvents(userId, "Fix the cell phone splits");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        const text = events.find((e) => e.type === "content")!.text as string;
+        expect(text).toBe(REAL_ANSWER);
+        expect(text).not.toContain("One moment");
+      });
+
+      it("tells the model its turn does not resume", async () => {
+        scriptedProvider(reply(STALL), reply(REAL_ANSWER));
+
+        await collectEvents(userId, "Fix the cell phone splits");
+
+        const second = messagesOnCall(1);
+        // The stalled turn stays in the transcript -- the model has to see
+        // what it is being corrected about -- and the nudge follows it.
+        expect(second[second.length - 2]).toEqual({
+          role: "assistant",
+          content: STALL,
+        });
+        const nudge = second[second.length - 1];
+        expect(nudge.role).toBe("user");
+        expect(nudge.content).toMatch(/cannot continue/i);
+      });
+
+      it("keeps the promise out of the answer bubble", async () => {
+        // It is still streamed, so the user sees the model's reasoning in the
+        // thinking panel; what it must not do is become the answer.
+        scriptedProvider(reply(STALL), reply(REAL_ANSWER));
+
+        const events = await collectEvents(userId, "Fix the cell phone splits");
+
+        expect(
+          events.filter((e) => e.type === "assistant_text").map((e) => e.text),
+        ).toContain(STALL);
+        const content = events.filter((e) => e.type === "content");
+        expect(content).toHaveLength(1);
+        expect(content[0].text).toBe(REAL_ANSWER);
+      });
+
+      it("lets the model make the tool call it promised", async () => {
+        scriptedProvider(
+          reply(STALL),
+          reply("", [
+            { id: "tc-1", name: "list_transactions", input: { limit: 17 } },
+          ]),
+          reply(REAL_ANSWER),
+        );
+
+        const events = await collectEvents(userId, "Fix the cell phone splits");
+
+        expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+          userId,
+          "list_transactions",
+          { limit: 17 },
+          expect.anything(),
+        );
+        expect(events.find((e) => e.type === "content")!.text).toBe(
+          REAL_ANSWER,
+        );
+      });
+
+      it("withdraws the tools when the model will not stop stalling", async () => {
+        // Never volunteers an answer while it has tools; answers once it has
+        // none. Nudged twice and then cut off, so a stubborn model costs two
+        // extra passes rather than the whole iteration budget.
+        (mockProvider.completeWithTools as jest.Mock).mockImplementation(
+          (_request: unknown, tools: unknown[]) =>
+            Promise.resolve(
+              tools.length === 0 ? reply(SYNTHESIZED) : reply(STALL),
+            ),
+        );
+
+        const events = await collectEvents(userId, "Fix the cell phone splits");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(4);
+        expect(
+          (mockProvider.completeWithTools as jest.Mock).mock.calls[3][1],
+        ).toEqual([]);
+        const content = events.filter((e) => e.type === "content");
+        expect(content).toHaveLength(1);
+        const text = content[0].text as string;
+        expect(text).toContain("I kept saying I would keep working");
+        expect(text).toContain(SYNTHESIZED);
+        expect(text.indexOf("I kept saying")).toBeLessThan(
+          text.indexOf(SYNTHESIZED),
+        );
+      });
+
+      it("nudges a streaming provider too", async () => {
+        // The provider users actually run streams, so a fix that only works on
+        // the non-streaming fallback fixes nothing.
+        let call = 0;
+        mockProvider.streamWithTools = jest.fn(async function* () {
+          const content = call++ === 0 ? STALL : REAL_ANSWER;
+          yield { type: "text", text: content };
+          yield {
+            type: "done",
+            content,
+            toolCalls: [],
+            usage: { inputTokens: 50, outputTokens: 20 },
+            model: "claude-sonnet-4-20250514",
+            stopReason: "end_turn",
+          };
+        });
+
+        const events = await collectEvents(userId, "Fix the cell phone splits");
+
+        expect(mockProvider.streamWithTools).toHaveBeenCalledTimes(2);
+        const [request] = (mockProvider.streamWithTools as jest.Mock).mock
+          .calls[1] as [{ messages: Array<Record<string, unknown>> }];
+        expect(request.messages[request.messages.length - 1].content).toMatch(
+          /cannot continue/i,
+        );
+        expect(events.find((e) => e.type === "content")!.text).toBe(
+          REAL_ANSWER,
+        );
+      });
+
+      it("runs another pass when cards are promised but none were proposed", async () => {
+        // The second report: the model announced "confirmation cards that will
+        // appear shortly" and made no write tool call, so nothing appeared.
+        // A card exists only if a proposal in this query created one, which
+        // makes this a broken promise the loop can prove rather than judge.
+        const CARD_PROMISE =
+          "I have identified the 17 split transactions. " +
+          "Please review and approve the confirmation cards.";
+        scriptedProvider(reply(CARD_PROMISE), reply(REAL_ANSWER));
+
+        const events = await collectEvents(userId, "Recategorize the splits");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(events.find((e) => e.type === "content")!.text).toBe(
+          REAL_ANSWER,
+        );
+      });
+
+      it("leaves the same wording alone once a card really was proposed", async () => {
+        // Telling the user to approve a card that exists is the documented
+        // behaviour after a write tool call, not a stall.
+        mockToolExecutor.execute.mockResolvedValueOnce({
+          data: { status: "proposed" },
+          summary: "Prepared 1 update",
+          sources: [],
+          pendingAction: { id: "act-1", type: "update_transaction" },
+        });
+        scriptedProvider(
+          reply("", [
+            {
+              id: "tc-1",
+              name: "manage_transactions",
+              input: { operation: "update" },
+            },
+          ]),
+          reply("Please review and approve the confirmation card."),
+        );
+
+        const events = await collectEvents(userId, "Recategorize the splits");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(2);
+        expect(events.some((e) => e.type === "pending_action")).toBe(true);
+        expect(events.find((e) => e.type === "content")!.text).toBe(
+          "Please review and approve the confirmation card.",
+        );
+      });
+
+      it("leaves a finished answer alone", async () => {
+        // An answer that ends by offering more work is finished: the next move
+        // is the user's, and looping would take it away from them.
+        scriptedProvider(
+          reply(
+            `${REAL_ANSWER} I'll pull the savings account too if you want.`,
+          ),
+        );
+
+        const events = await collectEvents(userId, "Fix the cell phone splits");
+
+        expect(mockProvider.completeWithTools).toHaveBeenCalledTimes(1);
+        expect(events.find((e) => e.type === "content")!.text).toContain(
+          REAL_ANSWER,
+        );
+      });
+    });
+
     describe("more env-configured budgets", () => {
       it("truncates a tool result at AI_QUERY_MAX_TOOL_RESULT_CHARS", async () => {
         alwaysCallsTools();

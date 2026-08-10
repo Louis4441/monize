@@ -209,6 +209,21 @@ export function BulkConfirmationCard({
       parts.push(formatCurrency(row.amount, row.currencyCode));
     }
     if (row.categoryName) parts.push(row.categoryName);
+    // A row that replaces a split set has no single category: show the lines,
+    // because those are what approving the card writes.
+    if (row.splits && row.splits.length > 0) {
+      parts.push(
+        row.splits
+          .map(
+            (split) =>
+              `${split.categoryName ?? t('confirmAction.uncategorized')} ${formatCurrency(
+                split.amount,
+                row.currencyCode,
+              )}`,
+          )
+          .join(' + '),
+      );
+    }
     return { primary, secondary: parts.join(' · ') };
   }
 

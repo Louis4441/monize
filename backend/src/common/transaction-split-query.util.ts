@@ -12,8 +12,19 @@ import { SelectQueryBuilder } from "typeorm";
  */
 export const SPLIT_CATEGORY_ID = "COALESCE(ts.categoryId, t.categoryId)";
 export const SPLIT_AMOUNT = "COALESCE(ts.amount, t.amount)";
-export const SPLIT_CATEGORY_NAME =
-  "COALESCE(splitCat.name, cat.name, 'Uncategorized')";
+
+/**
+ * There is deliberately no category-*name* fragment here.
+ *
+ * A leaf name does not identify a category -- "Cell Phone" lives under both
+ * "Bills" and "Business" in an ordinary chart of accounts -- so selecting or
+ * grouping on `splitCat.name` merges two categories into one row and labels the
+ * result ambiguously. Group on {@link SPLIT_CATEGORY_ID} and resolve the label
+ * through `loadQualifiedCategoryNames` (`categories/category-name.util.ts`),
+ * which is the same definition the tools use to resolve a name the model sends
+ * back. `transaction-split-query.util.spec.ts` fails if a name fragment
+ * reappears here.
+ */
 
 /**
  * LEFT JOIN the splits table and the split's category, then exclude

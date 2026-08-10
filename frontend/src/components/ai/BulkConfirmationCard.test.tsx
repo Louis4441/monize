@@ -164,6 +164,43 @@ describe('BulkConfirmationCard', () => {
       expect(screen.getByText(/1 transaction updated/)).toBeInTheDocument();
     });
 
+    it('shows each row\'s split lines instead of a single category', () => {
+      // A row that rewrites a split set has no single category. Showing one
+      // would describe the card as doing something other than what approving
+      // it writes.
+      render(
+        <BulkConfirmationCard
+          action={makeAction({
+            type: 'batch_actions',
+            descriptor: { type: 'batch_actions', operation: 'update' },
+            preview: {
+              rows: [
+                {
+                  status: 'ok',
+                  accountName: 'WS Chequing',
+                  amount: -100,
+                  currencyCode: 'USD',
+                  transactionDate: '2026-01-15',
+                  payeeName: 'Rogers',
+                  categoryName: null,
+                  splits: [
+                    { categoryName: 'Automobile: Accessories', amount: -60 },
+                    { categoryName: 'Groceries', amount: -40 },
+                  ],
+                },
+              ],
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByText(/Automobile: Accessories.*Groceries/),
+      ).toBeInTheDocument();
+    });
+
     it('flags reconciled rows in an update batch', () => {
       render(
         <BulkConfirmationCard

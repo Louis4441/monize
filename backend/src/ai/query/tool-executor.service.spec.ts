@@ -1422,23 +1422,99 @@ describe("ToolExecutorService", () => {
       expect(result.pendingAction).toBeUndefined();
     });
 
-    it("rejects splits mixed into a multi-row batch", async () => {
+    it("accepts splits on several rows of one update batch", async () => {
+      // Recategorizing one line inside 17 split transactions is the request
+      // this exists for. It used to be refused outright, which left the model
+      // with no way to do what was asked -- and it narrated progress towards
+      // it instead of saying so.
       const result = await service.execute(userId, "manage_transactions", {
-        operation: "create",
+        operation: "update",
         items: [
           {
-            accountName: "Checking",
-            amount: -100,
-            date: "2026-01-15",
+            transactionId: "11111111-1111-4111-8111-111111111111",
             splits: [
-              { categoryName: "Groceries", amount: -60 },
-              { categoryName: "Household", amount: -40 },
+              { categoryName: "Automobile: Accessories", amount: -60 },
+              { categoryName: "Groceries", amount: -40 },
             ],
           },
-          { accountName: "Checking", amount: -20, date: "2026-01-16" },
+          {
+            transactionId: "22222222-2222-4222-8222-222222222222",
+            splits: [
+              { categoryName: "Automobile: Accessories", amount: -30 },
+              { categoryName: "Groceries", amount: -20 },
+            ],
+          },
         ],
       });
+
+      expect(result.isError).toBeUndefined();
+      // Under six rows the default is one card per row; each carries its own
+      // complete set, which the builder used to drop on this path.
+      expect(result.pendingActions).toHaveLength(2);
+      for (const action of result.pendingActions ?? []) {
+        const descriptor = action.descriptor as {
+          categoryId: string | null;
+          splits?: Array<{ categoryId: string; amount: number }>;
+        };
+        expect(descriptor.splits).toHaveLength(2);
+        expect(descriptor.categoryId).toBeNull();
+      }
+    });
+
+    it("tells the model why every row was refused, not to check the ids", async () => {
+      // The reported failure: 17 category-only edits on split transactions.
+      // Each row is correctly refused -- a split's categories live on its
+      // lines -- but the tool answered "check each transactionId", which was
+      // the one thing that was right. The model concluded the task was
+      // impossible and gave up instead of reading the lines and resending.
+      transactions.previewUpdate.mockRejectedValue(
+        new BadRequestException(
+          "This is a split transaction: its categories live on its split lines, not on the parent. Read the transaction's current split lines first, then resend the update with the complete splits array.",
+        ),
+      );
+
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: Array.from({ length: 17 }, (_, i) => ({
+          transactionId: `1111111${i % 10}-1111-4111-8111-11111111111${i % 10}`,
+          categoryName: "Automobile: Accessories",
+        })),
+      });
+
       expect(result.isError).toBe(true);
+      expect(result.summary).toContain("All 17 rows failed the same way");
+      expect(result.summary).toContain("split lines");
+      expect(result.summary).toContain("complete splits array");
+      // The misleading advice is gone: the ids were never the problem.
+      expect(result.summary).not.toContain("Check each transactionId");
+    });
+
+    it("carries per-row splits into one bulk card at six rows or more", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: Array.from({ length: 6 }, (_, i) => ({
+          transactionId: `1111111${i}-1111-4111-8111-111111111111`,
+          splits: [
+            { categoryName: "Automobile: Accessories", amount: -60 },
+            { categoryName: "Groceries", amount: -40 },
+          ],
+        })),
+      });
+
+      expect(result.isError).toBeUndefined();
+      const descriptor = result.pendingAction?.descriptor as {
+        operation: string;
+        rows: Array<{
+          categoryId: string | null;
+          splits?: Array<{ categoryId: string; amount: number }>;
+        }>;
+      };
+      expect(descriptor.operation).toBe("update");
+      expect(descriptor.rows).toHaveLength(6);
+      for (const row of descriptor.rows) {
+        expect(row.splits).toHaveLength(2);
+        expect(row.categoryId).toBeNull();
+      }
     });
 
     it("bulk create (>= 6 items) builds one create_transactions card", async () => {

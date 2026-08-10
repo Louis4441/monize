@@ -148,8 +148,105 @@ outright. `tools-field.util.spec.ts` scans every `*.provider.ts` and fails on a
 bare `tools:` key, so a sixth provider cannot reintroduce it; the per-provider
 specs assert the request body in both directions.
 
-The one caller is `AiQueryService.streamFinalSynthesis`, the pass that turns a
-budget-truncated investigation into an answer instead of an apology.
+The one caller is `AiQueryService.streamFinalSynthesis`, the pass that turns an
+unfinished investigation -- budget-truncated, or stalled per the rule below --
+into an answer instead of an apology.
+
+## A turn that ends on a promise is not an answer
+
+Nothing runs between turns. So a tool-free turn saying "I am gathering the split
+details for those 17 transactions. One moment." ends the query: the loop's exit
+condition is `stopReason !== "tool_use"`, control goes back to the user, and the
+second message they are now waiting for cannot ever arrive. It reads as a hang,
+and the smaller the model the more often it happens -- assistant training data is
+full of transcripts where a human speaks next.
+
+The loop therefore does not treat every tool-free turn as an answer.
+`isDeferredContinuation` (`src/ai/query/continuation.ts`) recognises the promise,
+and the loop replies with `CONTINUATION_NUDGE` in the user's place -- "your turn
+does not resume; call the tool now or answer now" -- for at most
+`MAX_CONTINUATION_NUDGES` passes, after which it breaks to the tool-free
+synthesis pass with `cutoff = "stalled"`, because a model with no tools left
+cannot answer with another promise. The stalled text stays in the thinking
+buffer and never becomes the answer bubble.
+
+Two asymmetries decide the detector's shape, and both are in its spec. A wait
+request ("one moment", "hold on") is decisive; a bare work announcement ("I'll
+pull the rest") is not, because the same words end a finished answer that offers
+more -- so an offer (`let me know`, `if you want`, a trailing `?`) wins over it.
+And only the tail of the message is examined: mid-answer narration is followed
+by the answer itself. A false positive costs one extra pass; a false negative is
+the hang this exists to stop.
+
+One of these signals needs no judgement about prose, and it is the strongest:
+`promisesPendingAction` recognises a promise of confirmation cards, and a card
+exists **only** if a write tool call in that same turn produced a pending
+action. Promised cards plus `proposingToolResults === 0` is a broken promise the
+loop can prove. Prefer that shape -- pair a claim in the text against state the
+loop already tracks -- over adding another phrase to a regex list.
+
+The prompt asks for the same thing in `QUERY_SYSTEM_PROMPT` ("FINISH THE TURN YOU
+ARE IN") and the safety reminder, since the cheapest stall is the one that never
+happens -- but a prompt rule is not a guarantee, which is why the loop enforces
+it too.
+
+**A stall is often a dead end the model found and could not name.** Both reported
+stalls were the same request: recategorize one line inside 17 split
+transactions. It could not be done. A split update had to be a single-item call
+(batch rows dropped the splits), and `AiQueryService` allows one proposing tool
+call per *query* -- so one split transaction per user request, seventeen
+requests, and nothing said so. The model narrated progress towards something
+unreachable instead.
+
+Batch rows now carry `splits` (`BatchUpdateTransactionRow.splits`, applied in
+`executeBatchRow` inside the same `UpdateTransactionDto` as the scalar fields,
+per invariant I1), so one call recategorizes up to 25 split transactions and the
+individual-card path passes `result.splits` through rather than silently
+dropping them. Two rules the tests hold: a row that resends no splits must carry
+none (an empty set would rewrite the lines it was asked to leave), and a row's
+preview shows its lines instead of a category name, because a card reading
+"Groceries" while writing three other lines is a card approved for something
+else.
+
+The general point outlives this feature: when you add a limit, put it in the
+tool description in the same commit. An assistant that says "I can do six of
+these at a time" is working; one that discovers the wall mid-answer stalls.
+
+**A filtered read is not a complete read, and only one of its two readers can
+tell.** `applyCategoryFilters` hydrates *only* the split lines matching the
+filter, which is right for the register (it wants a partial total and refetches
+the whole transaction to edit it) and wrong for anything that will send the
+lines back. `getLlmTransactionRows` reuses that query, so a model asking for
+"transactions in Business: Cell Phone" received one line of a three-line split
+-- and `manage_transactions` replaces a split set with exactly what it is given.
+The observed outcome was a one-line replacement set, refused only by the
+unrelated "a split needs at least 2 lines" rule, with the model then offering to
+convert the transactions to non-split ones. Two lines matching out of three
+would have passed that rule and silently destroyed the third.
+
+So the LLM path reloads the full set per split parent (`loadCompleteSplits`) and
+its rows are always complete. Before reusing a list query in a tool, ask what
+its `where` does to the collections it hydrates: a filter on a joined child
+table silently truncates the parent's children, and the caller cannot tell a
+truncated set from a short one.
+
+**A refusal the caller cannot act on is a refusal that ends the task.** Every
+bulk tool path computes a per-row reason and then used to throw it away,
+answering "None of the transaction edits could be prepared. Check each
+transactionId and the fields to change." The next attempt at the 17 splits
+failed exactly there: all 17 rows were refused because a split's categories
+live on its lines and the edit resent none -- the reason said so, in words the
+model could have acted on -- and it was told to check the ids, which were
+correct. It concluded the task was impossible and stopped.
+
+`describeSkippedRows` (`common/bulk-create.types.ts`) is now the only way those
+messages are built: identical reasons collapse to one line with a count,
+distinct ones are listed up to three with a tail count. `bulk-skip-reporting.spec.ts`
+scans all four tool sources and fails on a "None of ... could be prepared"
+message that does not carry its reasons -- and a generic message is worse than
+none when it *guesses*, because a confident wrong diagnosis sends the reader
+away from the fix. Individual-card paths that counted skips (`skipped++`) now
+collect reasons too, for the same reason.
 
 ## A numeric env knob is declared as data, next to its documentation
 
@@ -207,6 +304,41 @@ one place; the form's copy of the numbers is checked against it by
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock when concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.
 
 Give the operation the caller's precondition as a parameter -- the expected owner, scenario or revision -- and let it refuse before writing. Return the refusal distinguishably: "no such row", "not yours" and "done" are three answers, and folding two into `null` makes the caller guess. Tests assert the rejected response **and** the stored state; see `docs/financial-calculation-contract.md` section 7.
+
+## A category's leaf name is not its identity
+
+"Cell Phone" under **Bills** and "Cell Phone" under **Business** is an ordinary
+chart of accounts, not an edge case -- so a bare leaf name identifies nothing,
+and every surface that emitted one was guessing on the reader's behalf. The
+analytics breakdown grouped on `splitCat.name`, which merged the two categories
+into a single row carrying `MIN(id)`; the LLM transaction rows sent the model
+`s.category.name`, so a split filed under Business came back as "Cell Phone" and
+was reported under whichever parent the model had seen elsewhere.
+
+Both halves now go through `categories/category-name.util.ts`:
+
+- **Emitting**: `qualifiedCategoryName` / `loadQualifiedCategoryNames` produce
+  `"Business: Cell Phone"`. Analytics groups on `SPLIT_CATEGORY_ID` and resolves
+  the label from the map -- there is deliberately no category-*name* SQL
+  fragment left to reach for, and `transaction-split-query.util.spec.ts` fails if
+  one reappears.
+- **Accepting**: `resolveCategoryNamePaths` matches a name the model sends back,
+  separator- and spacing-insensitive, and **refuses an ambiguous one** with the
+  qualified candidates rather than picking a winner.
+
+The two are one contract, and the test that matters is the round trip: every
+name we emit must resolve back to the category we emitted it for
+(`category-name.util.spec.ts`). Four hand-rolled resolvers had drifted apart
+before this, and the one the tools used accepted `"Business:Cell Phone"` and
+`"Business : Cell Phone"` but **not** `"Business: Cell Phone"` -- the single
+spelling every tool description and error message tells the model to type. That
+miss fell through to a last-segment fallback that returned the *other* "Cell
+Phone", and because results were labelled with the leaf name, nothing in the
+answer could reveal that the wrong category had been read.
+
+Also: `Uncategorized` (the user filed it nowhere) and `Unknown category` (we
+could not resolve the name of the category they did file it under) are different
+facts and have different constants. Do not fold the second into the first.
 
 ## A predicate that decides which row counts is written once
 

@@ -30,6 +30,8 @@ const TX = "33333333-3333-4333-8333-333333333333";
 const PAYEE = "44444444-4444-4444-8444-444444444444";
 const SEC = "55555555-5555-4555-8555-555555555555";
 const PAYEE2 = "77777777-7777-4777-8777-777777777777";
+const CAT_2 = "88888888-8888-4888-8888-888888888888";
+const TX_2 = "99999999-9999-4999-8999-999999999999";
 
 describe("AiActionsService", () => {
   let service: AiActionsService;
@@ -1248,7 +1250,8 @@ describe("AiActionsService", () => {
     it("keeps categoryId out of the DTO for a split parent's batch row (I1 pin)", async () => {
       // A split parent's batch row carries categoryId null (its categories
       // live on the split lines); the executed DTO must not set a category on
-      // the parent, and batch rows never carry splits.
+      // the parent. A row that does not rewrite the split set carries no
+      // `splits` either, so nothing replaces the lines.
       const descriptor: import("./ai-action.types").BatchActionsDescriptor = {
         type: "batch_actions",
         userId: USER,
@@ -1278,6 +1281,76 @@ describe("AiActionsService", () => {
       };
       expect(dto.categoryId).toBeUndefined();
       expect(dto.splits).toBeUndefined();
+      expect(transactions.updateSplits).not.toHaveBeenCalled();
+    });
+
+    it("applies each row's own split set in the same DTO (I1 pin)", async () => {
+      // Recategorizing one line across several split transactions arrives as
+      // one envelope with a complete replacement set per row. The splits must
+      // ride in the SAME dto as the scalar fields -- a follow-up updateSplits
+      // call would commit separately, and a failure between the two strands
+      // the parent amount against the old lines.
+      const descriptor: import("./ai-action.types").BatchActionsDescriptor = {
+        type: "batch_actions",
+        userId: USER,
+        actionId: "act-batch-upd-splits",
+        expiresAt: Date.now() + 60_000,
+        operation: "update",
+        rows: [
+          {
+            transactionId: TX,
+            accountId: ACC,
+            amount: -100,
+            transactionDate: "2026-01-15",
+            payeeId: null,
+            payeeName: null,
+            createPayee: false,
+            categoryId: null,
+            description: null,
+            currencyCode: "USD",
+            splits: [
+              { categoryId: CAT, amount: -60, memo: null },
+              { categoryId: CAT_2, amount: -40, memo: "phone" },
+            ],
+          },
+          {
+            transactionId: TX_2,
+            accountId: ACC,
+            amount: -50,
+            transactionDate: "2026-01-16",
+            payeeId: null,
+            payeeName: null,
+            createPayee: false,
+            categoryId: null,
+            description: null,
+            currencyCode: "USD",
+            splits: [
+              { categoryId: CAT, amount: -30, memo: null },
+              { categoryId: CAT_2, amount: -20, memo: null },
+            ],
+          },
+        ],
+      };
+
+      const result = await service.confirm(USER, dtoFor(descriptor));
+
+      expect(result).toMatchObject({ type: "batch_actions", count: 2 });
+      expect(transactions.update).toHaveBeenCalledTimes(2);
+      const first = transactions.update.mock.calls[0][2] as {
+        categoryId?: string;
+        splits?: Array<{ categoryId: string; amount: number }>;
+      };
+      expect(first.categoryId).toBeUndefined();
+      expect(first.splits).toEqual([
+        { categoryId: CAT, amount: -60, memo: undefined },
+        { categoryId: CAT_2, amount: -40, memo: "phone" },
+      ]);
+      const second = transactions.update.mock.calls[1][2] as {
+        splits?: Array<{ categoryId: string; amount: number }>;
+      };
+      // Each row keeps its own lines: one row's set must not leak to the next.
+      expect(second.splits).toHaveLength(2);
+      expect(second.splits?.[0].amount).toBe(-30);
       expect(transactions.updateSplits).not.toHaveBeenCalled();
     });
 

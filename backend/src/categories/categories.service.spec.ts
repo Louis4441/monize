@@ -656,6 +656,19 @@ describe("CategoriesService", () => {
       expect(food?.parentName).toBeNull();
     });
 
+    it("gives each category the qualified name other tools accept", async () => {
+      // `name` alone is ambiguous the moment two parents share a child name,
+      // and this list is where the model learns what to type.
+      stubFindAll();
+
+      const result = await service.getLlmCategories("user-1");
+
+      const groceries = result.categories.find((c) => c.name === "Groceries");
+      expect(groceries?.qualifiedName).toBe("Food: Groceries");
+      const food = result.categories.find((c) => c.name === "Food");
+      expect(food?.qualifiedName).toBe("Food");
+    });
+
     it("filters by expense type", async () => {
       stubFindAll();
 

@@ -10,7 +10,6 @@ import {
   joinSplitsForAnalytics,
   SPLIT_AMOUNT,
   SPLIT_CATEGORY_ID,
-  SPLIT_CATEGORY_NAME,
 } from "../common/transaction-split-query.util";
 import {
   buildTransactionSearchClause,
@@ -21,8 +20,14 @@ import {
   ParsedSearchTerm,
 } from "./transaction-search-parse.util";
 import { RecurringCharge, detectFrequency } from "./recurring-charges.util";
+import {
+  loadQualifiedCategoryNames,
+  resolveCategoryNamePaths,
+  suggestQualifiedCategoryNames,
+  UNCATEGORIZED_LABEL,
+  UNKNOWN_CATEGORY_LABEL,
+} from "../categories/category-name.util";
 import { roundMoney, sumMoney } from "../common/round.util";
-import { suggestClosestNames } from "../common/name-suggestions.util";
 
 export interface FxFeeMonthlySummaryRow {
   /** Calendar month in 'YYYY-MM'. */
@@ -950,22 +955,27 @@ export class TransactionAnalyticsService {
   }
 
   /**
-   * Resolve category names plus their descendants to IDs. Shared helper for
-   * tool adapters that accept names from LLM input.
-   */
-  /**
    * Resolve LLM-supplied category names into the IDs used by the transaction
-   * filters. Handles three input shapes the model often produces:
-   *   - exact name              -> "Dining Out"
-   *   - parent / child notation -> "Food: Dining Out", "Food / Dining Out",
-   *                                "Food > Dining Out", "Food -> Dining Out"
-   *   - extra whitespace        -> "  food   :  dining out  "
+   * filters. The matching itself lives in `resolveCategoryNamePaths`
+   * (`categories/category-name.util.ts`), which is also what qualifies the
+   * names these tools *emit* -- one definition, so a name the model reads back
+   * to us means the category we showed it.
+   *
+   * Accepts a bare name ("Dining Out"), a parent/child path in any separator
+   * and spacing ("Food: Dining Out", "Food/Dining Out", "Food -> Dining Out"),
+   * and forgives a wrong parent when the leaf is unique.
    *
    * Returns the matched category IDs (expanded to include descendants so a
    * filter on "Food" naturally catches its subcategories) plus any names we
    * could not match. Callers should treat any `unresolved` entry as a hard
    * failure rather than silently dropping the filter -- otherwise a mistyped
    * category yields "all transactions" instead of an honest error.
+   *
+   * A name matching several categories -- "Cell Phone" under both "Bills" and
+   * "Business" -- is unresolved too, and `suggestions` carries the qualified
+   * names it could have meant so the model can ask again precisely. Picking one
+   * silently is what this replaces: the answer that comes back is about a
+   * category the user never named, and nothing downstream can tell.
    */
   async resolveLlmCategoryIds(
     userId: string,
@@ -985,58 +995,26 @@ export class TransactionAnalyticsService {
         select: ["id", "name", "parentId"],
       });
 
-      const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
-      const SEPARATORS = [":", "/", ">", "->"];
+      const resolutions = resolveCategoryNamePaths(
+        allCategories,
+        categoryNames,
+      );
+      const matched = resolutions
+        .filter((r) => r.id !== null)
+        .map((r) => r.id as string);
+      const failures = resolutions.filter((r) => r.id === null);
+      const unresolved = failures.map((r) => r.input);
 
-      const byId = new Map(allCategories.map((c) => [c.id, c]));
-      const lookup = new Map<string, string>();
-      for (const cat of allCategories) {
-        const childKey = norm(cat.name);
-        if (!lookup.has(childKey)) lookup.set(childKey, cat.id);
-
-        if (cat.parentId) {
-          const parent = byId.get(cat.parentId);
-          if (parent) {
-            const parentKey = norm(parent.name);
-            for (const sep of SEPARATORS) {
-              lookup.set(`${parentKey}${sep}${childKey}`, cat.id);
-              lookup.set(`${parentKey} ${sep} ${childKey}`, cat.id);
-            }
-          }
-        }
-      }
-
-      const matched: string[] = [];
-      const unresolved: string[] = [];
-      for (const raw of categoryNames) {
-        const normalized = norm(raw);
-        let id = lookup.get(normalized);
-        if (!id) {
-          // Last-segment fallback: "Food: Dining Out" -> try just "Dining Out"
-          for (const sep of SEPARATORS) {
-            if (normalized.includes(sep)) {
-              const lastSeg = norm(normalized.split(sep).pop() ?? "");
-              const candidate = lastSeg ? lookup.get(lastSeg) : undefined;
-              if (candidate) {
-                id = candidate;
-                break;
-              }
-            }
-          }
-        }
-        if (id) matched.push(id);
-        else unresolved.push(raw);
-      }
-
-      // Closest valid category names for the first unmatched input, so callers can
-      // surface a "did you mean?" hint instead of just "call list_categories".
-      const suggestions =
-        unresolved.length > 0
-          ? suggestClosestNames(
-              unresolved[0],
-              allCategories.map((c) => c.name),
-            )
-          : [];
+      // For the first unmatched input: the qualified names it could have meant
+      // when it was ambiguous, otherwise the closest names by edit distance, so
+      // callers can surface a "did you mean?" instead of just "call
+      // list_categories".
+      const first = failures[0];
+      const suggestions = !first
+        ? []
+        : first.candidates.length > 0
+          ? first.candidates
+          : suggestQualifiedCategoryNames(allCategories, first.input);
 
       if (matched.length === 0) {
         return { categoryIds: [], unresolved, suggestions };
@@ -1261,23 +1239,25 @@ export class TransactionAnalyticsService {
 
       switch (groupBy) {
         case "category": {
-          // Grouping stays on the display name so row granularity is unchanged;
-          // MIN() attaches one category id per name for entity deep-links. Two
-          // same-named categories under different parents share a row today, so
-          // the id is an arbitrary member (link filters to a subset). The
-          // "Uncategorized" bucket has no ids and yields null. uuid has no MIN
-          // in PostgreSQL, hence the ::text cast.
-          qb.leftJoin("t.category", "cat")
-            .select(SPLIT_CATEGORY_NAME, "label")
-            .addSelect(`MIN(${SPLIT_CATEGORY_ID}::text)`, "categoryId")
+          // Grouping is on the category id, not the display name: "Cell Phone"
+          // exists under both "Bills" and "Business" for plenty of users, and
+          // grouping by name merged the two into one row whose id was an
+          // arbitrary member -- a total the user cannot reconcile against
+          // either category, deep-linking to one of them. The id is exact now,
+          // and the label carries the parent so two rows named "Cell Phone" can
+          // be told apart. The "Uncategorized" bucket groups on a NULL id.
+          qb.select(`${SPLIT_CATEGORY_ID}::text`, "categoryId")
             .addSelect(`SUM(ABS(${SPLIT_AMOUNT}))`, "total")
             .addSelect("COUNT(*)", "count")
-            .groupBy(SPLIT_CATEGORY_NAME);
+            .groupBy(`${SPLIT_CATEGORY_ID}::text`);
 
           const rows = await qb.getRawMany();
+          const names = await loadQualifiedCategoryNames(m, userId);
           return rows
             .map((r) => ({
-              category: r.label,
+              category: r.categoryId
+                ? (names.get(r.categoryId) ?? UNKNOWN_CATEGORY_LABEL)
+                : UNCATEGORIZED_LABEL,
               categoryId: r.categoryId ?? null,
               total: roundMoney(Number(r.total)),
               count: Number(r.count),
@@ -1473,17 +1453,28 @@ export class TransactionAnalyticsService {
           .groupBy("t.payeeName")
           .orderBy("total", "DESC");
       } else {
-        qb.leftJoin("t.category", "cat")
-          .select(SPLIT_CATEGORY_NAME, "label")
+        // Same rule as the grouped breakdown: identity is the category id, and
+        // the label carries the parent so a comparison never puts two different
+        // "Cell Phone" categories in one row.
+        qb.select(`${SPLIT_CATEGORY_ID}::text`, "categoryId")
           .addSelect(`SUM(ABS(${SPLIT_AMOUNT}))`, "total")
           .addSelect("COUNT(*)", "count")
-          .groupBy(SPLIT_CATEGORY_NAME)
+          .groupBy(`${SPLIT_CATEGORY_ID}::text`)
           .orderBy("total", "DESC");
       }
 
       const rows = await qb.getRawMany();
+      const names =
+        groupBy === "payee"
+          ? new Map<string, string>()
+          : await loadQualifiedCategoryNames(m, userId);
       const items = rows.map((r) => ({
-        label: r.label,
+        label:
+          groupBy === "payee"
+            ? r.label
+            : r.categoryId
+              ? (names.get(r.categoryId) ?? UNKNOWN_CATEGORY_LABEL)
+              : UNCATEGORIZED_LABEL,
         total: roundMoney(Number(r.total)),
         count: Number(r.count),
       }));
@@ -1579,6 +1570,9 @@ export class TransactionAnalyticsService {
       }
 
       const rows = await qb.getRawMany();
+      // Qualified so a recurring charge on "Business: Cell Phone" is not
+      // reported against "Bills: Cell Phone" in an insight or a forecast.
+      const names = await loadQualifiedCategoryNames(m, userId);
 
       return rows
         .map((r) => {
@@ -1598,7 +1592,9 @@ export class TransactionAnalyticsService {
             frequency,
             currentAmount,
             previousAmount,
-            categoryName: r.categoryName,
+            categoryName: r.categoryId
+              ? (names.get(r.categoryId) ?? r.categoryName)
+              : r.categoryName,
             categoryId: r.categoryId || null,
           };
         })

@@ -28,6 +28,8 @@ import {
   BatchDeleteTransactionRow,
   BatchCreateTransferRow,
   ResolvedSplitLine,
+  toSplitRowDescriptor,
+  toSplitPreview,
 } from "../ai/actions/ai-action.types";
 import {
   transactionPreviewRow,
@@ -635,12 +637,11 @@ export class TransactionToolPrepService {
           continue;
         }
         const preview = result.preview;
-        // Batch rows deliberately carry no `splits`: both adapters (AI
-        // executor and MCP tool) reject a multi-row batch containing a split
-        // row before prep runs, so a split parent inside a batch can only
-        // receive parent-field edits -- its preview arrives here with
-        // categoryId null and the amount unchanged, and previewUpdate has
-        // already refused a category/amount change without splits.
+        // A row that replaces a split set carries its resolved lines, so a
+        // batch can recategorize several split transactions under one
+        // confirmation. Splits and a parent `categoryId` are mutually
+        // exclusive, exactly as on the singular descriptor.
+        const splits = result.splits;
         okRows.push({
           transactionId: preview.transactionId,
           accountId: preview.accountId,
@@ -649,9 +650,10 @@ export class TransactionToolPrepService {
           payeeId: preview.payeeId,
           payeeName: preview.payeeName,
           createPayee: preview.payeeWillBeCreated,
-          categoryId: preview.categoryId,
+          categoryId: splits ? null : preview.categoryId,
           description: preview.description,
           currencyCode: preview.currencyCode,
+          ...(splits ? { splits: splits.map(toSplitRowDescriptor) } : {}),
         });
         okIndex.push(i);
         previewRows.push({
@@ -662,9 +664,12 @@ export class TransactionToolPrepService {
           transactionDate: preview.transactionDate,
           payeeName: preview.payeeName,
           payeeWillBeCreated: preview.payeeWillBeCreated,
-          categoryName: preview.categoryName,
+          // The card shows the split lines instead of a single category name,
+          // because that is what the row will write.
+          categoryName: splits ? null : preview.categoryName,
           description: preview.description,
           isReconciled: preview.isReconciled,
+          ...(splits ? { splits: splits.map(toSplitPreview) } : {}),
         });
       } catch (err) {
         const reason = this.skipReason(err);

@@ -210,6 +210,9 @@ export const getCategoriesOutput = {
       id: str,
       name: str,
       parentName: strNull,
+      // The name to pass back to any other tool: "Business: Cell Phone".
+      // `name` alone is ambiguous whenever two parents share a child name.
+      qualifiedName: str,
       isIncome: bool,
       transactionCount: num,
     }),

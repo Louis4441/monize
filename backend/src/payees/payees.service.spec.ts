@@ -2288,10 +2288,9 @@ describe("PayeesService", () => {
   describe("manage payee previews", () => {
     it("previewCreatePayee resolves the category by name", async () => {
       payeesRepository.findOne.mockResolvedValue(null); // no duplicate
-      categoryQueryBuilderMock.getOne.mockResolvedValue({
-        id: "cat-9",
-        name: "Utilities",
-      });
+      categoriesRepository.find.mockResolvedValue([
+        { id: "cat-9", name: "Utilities", parentId: null },
+      ]);
       // previewCreate re-validates the resolved category id by primary key.
       categoriesRepository.findOne.mockResolvedValue({
         id: "cat-9",
@@ -2322,10 +2321,9 @@ describe("PayeesService", () => {
               }
             : null,
       );
-      categoryQueryBuilderMock.getOne.mockResolvedValue({
-        id: "cat-2",
-        name: "Bills",
-      });
+      categoriesRepository.find.mockResolvedValue([
+        { id: "cat-2", name: "Bills", parentId: null },
+      ]);
 
       const preview = await service.previewUpdatePayee(userId, {
         name: "Old",
@@ -2380,13 +2378,53 @@ describe("PayeesService", () => {
 
     it("previewCreatePayee throws when the category name is unknown", async () => {
       payeesRepository.findOne.mockResolvedValue(null);
-      categoryQueryBuilderMock.getOne.mockResolvedValue(null);
+      categoriesRepository.find.mockResolvedValue([]);
       await expect(
         service.previewCreatePayee(userId, {
           name: "Hydro",
           categoryName: "Nonexistent",
         }),
       ).rejects.toThrow();
+    });
+
+    describe("two categories sharing a leaf name", () => {
+      const duplicateLeaf = [
+        { id: "bills", name: "Bills", parentId: null },
+        { id: "bills-cell", name: "Cell Phone", parentId: "bills" },
+        { id: "biz", name: "Business", parentId: null },
+        { id: "biz-cell", name: "Cell Phone", parentId: "biz" },
+      ];
+
+      beforeEach(() => {
+        payeesRepository.findOne.mockResolvedValue(null);
+        categoriesRepository.find.mockResolvedValue(duplicateLeaf);
+      });
+
+      it("resolves the parent the caller named", async () => {
+        categoriesRepository.findOne.mockResolvedValue({
+          id: "biz-cell",
+          name: "Cell Phone",
+        });
+
+        const preview = await service.previewCreatePayee(userId, {
+          name: "Rogers",
+          categoryName: "Business: Cell Phone",
+        });
+
+        // The spelling the tool descriptions ask for used to miss the
+        // qualified lookup and fall through to the other parent's category.
+        expect(preview.defaultCategoryId).toBe("biz-cell");
+        expect(preview.defaultCategoryName).toBe("Business: Cell Phone");
+      });
+
+      it("refuses the bare leaf rather than picking one", async () => {
+        await expect(
+          service.previewCreatePayee(userId, {
+            name: "Rogers",
+            categoryName: "Cell Phone",
+          }),
+        ).rejects.toThrow();
+      });
     });
   });
 });
