@@ -92,6 +92,17 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "refresh_tokens", // auth session tokens -- never exported
   "trusted_devices", // 2FA device registrations -- never exported
   "schema_migrations", // migration bookkeeping (no entity; system table)
+  // Cross-replica coordination state for *this* deployment, not user content.
+  // A lease describes a worker that is running right now, and a delivery record
+  // says an email left this instance's SMTP -- restored elsewhere it would
+  // suppress a reminder that was never sent to that account, which is the one
+  // failure this table exists to prevent.
+  "job_claims",
+  // Reclamation bookkeeping for objects in *this* instance's storage provider,
+  // keyed by (provider, storage_key). Those keys name nothing on the machine a
+  // backup is restored onto, and a future sweeper reading a restored row could
+  // delete a live object whose key happens to collide.
+  "attachment_blob_tombstones",
 ]);
 
 export function buildExportTableQueries(
@@ -237,6 +248,18 @@ export function buildExportTableQueries(
       key: "scheduled_transaction_overrides",
       sql: `SELECT sto.* FROM scheduled_transaction_overrides sto
             JOIN scheduled_transactions st ON sto.scheduled_transaction_id = st.id
+            WHERE st.user_id = $1`,
+    },
+    {
+      // Exported, unlike the other new coordination tables: this one is the
+      // durable record that a given occurrence was posted, and the unique key
+      // on (scheduled_transaction_id, original_due_date) is what stops the same
+      // bill being paid twice. Restored empty, that guard is gone for every
+      // occurrence already in the restored ledger, and a manual post of one of
+      // them would duplicate a financial transaction.
+      key: "scheduled_transaction_postings",
+      sql: `SELECT stp.* FROM scheduled_transaction_postings stp
+            JOIN scheduled_transactions st ON stp.scheduled_transaction_id = st.id
             WHERE st.user_id = $1`,
     },
     {

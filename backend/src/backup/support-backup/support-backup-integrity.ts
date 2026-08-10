@@ -178,6 +178,15 @@ const REFS: Record<string, RefRule[]> = {
     },
     { column: "category_id", refTable: "categories", onMissing: "null" },
   ],
+  scheduled_transaction_postings: [
+    {
+      // `dropRow`, like the overrides above: the posting has no meaning without
+      // the schedule whose occurrence it records, and the column is NOT NULL.
+      column: "scheduled_transaction_id",
+      refTable: "scheduled_transactions",
+      onMissing: "dropRow",
+    },
+  ],
   scheduled_transaction_split_tags: [
     {
       column: "scheduled_transaction_split_id",

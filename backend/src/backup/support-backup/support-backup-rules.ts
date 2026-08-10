@@ -302,6 +302,16 @@ export const RULES: Record<string, TableRules> = {
     created_at: keep,
     updated_at: keep,
   },
+  scheduled_transaction_postings: {
+    // Every column is structure or a date: which occurrence of which schedule
+    // was posted, and when. Nothing here names a payee, an amount or free text,
+    // so there is nothing to mask or drop.
+    id: keep,
+    scheduled_transaction_id: keep,
+    original_due_date: keep,
+    posted_date: keep,
+    created_at: keep,
+  },
   scheduled_transaction_split_tags: {
     scheduled_transaction_split_id: keep,
     tag_id: keep,
@@ -698,6 +708,7 @@ export const SECTION_TABLES: Record<SupportBackupSection, string[]> = {
     "scheduled_transactions",
     "scheduled_transaction_splits",
     "scheduled_transaction_overrides",
+    "scheduled_transaction_postings",
     "scheduled_transaction_split_tags",
   ],
   budgets: [

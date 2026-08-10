@@ -75,6 +75,13 @@ export const RESTORE_PLAN: ReadonlyArray<RestoreStep> = [
     scopeToUser: false,
   },
   {
+    // After `scheduled_transactions`, which it references. No user_id column of
+    // its own -- ownership comes through the schedule, like the two above.
+    table: "scheduled_transaction_postings",
+    countKey: "scheduledTransactionPostings",
+    scopeToUser: false,
+  },
+  {
     table: "scheduled_transaction_split_tags",
     countKey: "scheduledTransactionSplitTags",
     scopeToUser: false,
