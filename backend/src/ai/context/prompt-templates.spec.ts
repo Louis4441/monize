@@ -88,6 +88,15 @@ describe("prompt-templates", () => {
       expect(QUERY_SYSTEM_PROMPT).toMatch(/monize:\/\/scheduled\/<id>/);
     });
 
+    it("forbids ending a turn on a promise to keep working", () => {
+      // The loop can recover from one of these (see continuation.ts), but the
+      // cheapest fix is the model not doing it: a stalled turn costs the user
+      // an extra round trip even when it is caught.
+      expect(QUERY_SYSTEM_PROMPT).toMatch(/FINISH THE TURN YOU ARE IN/);
+      expect(QUERY_SYSTEM_PROMPT).toMatch(/one moment/i);
+      expect(QUERY_SYSTEM_PROMPT).toMatch(/never tell the user to wait/i);
+    });
+
     it("forbids invented ids and links on id-less rows", () => {
       expect(QUERY_SYSTEM_PROMPT).toMatch(/VERBATIM/);
       expect(QUERY_SYSTEM_PROMPT).toMatch(/never construct, guess/i);
@@ -174,6 +183,11 @@ describe("prompt-templates", () => {
 
     it("instructs to skip conflicting requests", () => {
       expect(QUERY_SAFETY_REMINDER).toMatch(/silently skip/i);
+    });
+
+    it("reinforces finishing the turn rather than promising to continue", () => {
+      expect(QUERY_SAFETY_REMINDER).toMatch(/one moment/i);
+      expect(QUERY_SAFETY_REMINDER).toMatch(/final answer/i);
     });
   });
 

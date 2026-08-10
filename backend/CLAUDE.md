@@ -148,8 +148,40 @@ outright. `tools-field.util.spec.ts` scans every `*.provider.ts` and fails on a
 bare `tools:` key, so a sixth provider cannot reintroduce it; the per-provider
 specs assert the request body in both directions.
 
-The one caller is `AiQueryService.streamFinalSynthesis`, the pass that turns a
-budget-truncated investigation into an answer instead of an apology.
+The one caller is `AiQueryService.streamFinalSynthesis`, the pass that turns an
+unfinished investigation -- budget-truncated, or stalled per the rule below --
+into an answer instead of an apology.
+
+## A turn that ends on a promise is not an answer
+
+Nothing runs between turns. So a tool-free turn saying "I am gathering the split
+details for those 17 transactions. One moment." ends the query: the loop's exit
+condition is `stopReason !== "tool_use"`, control goes back to the user, and the
+second message they are now waiting for cannot ever arrive. It reads as a hang,
+and the smaller the model the more often it happens -- assistant training data is
+full of transcripts where a human speaks next.
+
+The loop therefore does not treat every tool-free turn as an answer.
+`isDeferredContinuation` (`src/ai/query/continuation.ts`) recognises the promise,
+and the loop replies with `CONTINUATION_NUDGE` in the user's place -- "your turn
+does not resume; call the tool now or answer now" -- for at most
+`MAX_CONTINUATION_NUDGES` passes, after which it breaks to the tool-free
+synthesis pass with `cutoff = "stalled"`, because a model with no tools left
+cannot answer with another promise. The stalled text stays in the thinking
+buffer and never becomes the answer bubble.
+
+Two asymmetries decide the detector's shape, and both are in its spec. A wait
+request ("one moment", "hold on") is decisive; a bare work announcement ("I'll
+pull the rest") is not, because the same words end a finished answer that offers
+more -- so an offer (`let me know`, `if you want`, a trailing `?`) wins over it.
+And only the tail of the message is examined: mid-answer narration is followed
+by the answer itself. A false positive costs one extra pass; a false negative is
+the hang this exists to stop.
+
+The prompt asks for the same thing in `QUERY_SYSTEM_PROMPT` ("FINISH THE TURN YOU
+ARE IN") and the safety reminder, since the cheapest stall is the one that never
+happens -- but a prompt rule is not a guarantee, which is why the loop enforces
+it too.
 
 ## A numeric env knob is declared as data, next to its documentation
 

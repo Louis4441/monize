@@ -36,13 +36,23 @@ import {
   resolveQueryBudgets,
   resolveQueryBudgetsForConfig,
 } from "./query-budgets";
+import {
+  CONTINUATION_NUDGE,
+  MAX_CONTINUATION_NUDGES,
+  isDeferredContinuation,
+} from "./continuation";
 
-/** Which per-query budget stopped the tool-calling loop. */
+/**
+ * Why the tool-calling loop stopped without the model having answered. Four of
+ * these are budgets; `stalled` is the model itself, ending turn after turn
+ * promising work it cannot do once the turn is over.
+ */
 export type QueryCutoffReason =
   | "iterations"
   | "toolCalls"
   | "tokens"
-  | "timeout";
+  | "timeout"
+  | "stalled";
 
 /**
  * The note prefixed to a synthesized answer, one per budget. Each says which
@@ -65,6 +75,10 @@ const CUTOFF_NOTES: Record<QueryCutoffReason, { key: string; text: string }> = {
   timeout: {
     key: "common.aiQuery.cutoff.timeout",
     text: "This question took longer than the time available, so this answer is based on the data I gathered before stopping.",
+  },
+  stalled: {
+    key: "common.aiQuery.cutoff.stalled",
+    text: "I kept saying I would keep working instead of finishing, so this answer is based on the data I gathered before stopping.",
   },
 };
 
@@ -325,6 +339,10 @@ export class AiQueryService {
     // guards record it rather than answering, because the answer is written
     // once below -- by the model, from the data it managed to gather.
     let cutoff: QueryCutoffReason = "iterations";
+    // How many times this query has had to tell the model that its turn does
+    // not resume. Bounded so a model that will not comply costs two extra
+    // passes rather than the whole iteration budget.
+    let continuationNudges = 0;
 
     for (let iteration = 0; iteration < budgets.maxIterations; iteration++) {
       this.logger.log(
@@ -496,6 +514,34 @@ export class AiQueryService {
         iterationStopReason !== "tool_use" ||
         iterationToolCalls.length === 0
       ) {
+        // A turn that ends promising more work is not an answer. Nothing runs
+        // between turns, so "one moment" is a message the user waits on
+        // forever -- the loop has already handed control back by the time they
+        // read it. Tell the model its turn does not resume and run another
+        // pass; the promise stays in the thinking buffer rather than being
+        // promoted into the answer bubble.
+        if (isDeferredContinuation(iterationContent)) {
+          if (continuationNudges < MAX_CONTINUATION_NUDGES) {
+            continuationNudges++;
+            this.logger.warn(
+              `Deferred continuation user=${userId} provider=${provider.name} iteration=${iteration} nudge=${continuationNudges}/${MAX_CONTINUATION_NUDGES}`,
+            );
+            messages.push({ role: "assistant", content: iterationContent });
+            messages.push({ role: "user", content: CONTINUATION_NUDGE });
+            continue;
+          }
+          // Nudged to the limit and still stalling. Withdrawing the tools is
+          // the one move the model cannot answer with another promise, so fall
+          // through to the synthesis pass rather than shipping the stall text
+          // as the answer.
+          this.logger.warn(
+            `Deferred continuation unresolved user=${userId} provider=${provider.name} iteration=${iteration} nudges=${continuationNudges}`,
+          );
+          messages.push({ role: "assistant", content: iterationContent });
+          cutoff = "stalled";
+          break;
+        }
+
         // Final answer — emit canonical content event so the UI promotes the
         // streamed thinking text into the assistant message bubble.
         yield { type: "content", text: iterationContent };
@@ -634,15 +680,16 @@ export class AiQueryService {
       }
     }
 
-    // A budget stopped the loop mid-investigation. The tool results gathered
-    // so far are still the only material an answer could be built from, and
-    // they are all sitting in `messages` -- so hand them back to the model
-    // with the tools withdrawn and let it write the answer, rather than
-    // discarding the work and apologising. Withdrawing the tools is what makes
-    // this terminate: the model has nothing left to call, so it must reply
-    // with text.
+    // The loop ended mid-investigation -- a budget stopped it, or the model
+    // kept promising work instead of doing it. The tool results gathered so
+    // far are still the only material an answer could be built from, and they
+    // are all sitting in `messages` -- so hand them back to the model with the
+    // tools withdrawn and let it write the answer, rather than discarding the
+    // work and apologising. Withdrawing the tools is what makes this
+    // terminate: the model has nothing left to call, so it must reply with
+    // text.
     this.logger.warn(
-      `Budget reached user=${userId} provider=${provider.name} cutoff=${cutoff} totalToolCalls=${totalToolCalls} totalInputTokens=${totalInputTokens}`,
+      `Loop stopped without an answer user=${userId} provider=${provider.name} cutoff=${cutoff} totalToolCalls=${totalToolCalls} totalInputTokens=${totalInputTokens}`,
     );
 
     const synthesis = yield* this.streamFinalSynthesis(
