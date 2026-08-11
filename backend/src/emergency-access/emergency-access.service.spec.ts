@@ -37,7 +37,11 @@ describe("EmergencyAccessService", () => {
   const userId = "11111111-1111-1111-1111-111111111111";
 
   beforeEach(async () => {
-    settingsRepo = { findOne: jest.fn(), save: jest.fn() };
+    settingsRepo = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+      createQueryBuilder: jest.fn(),
+    };
     contactsRepo = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
@@ -155,6 +159,36 @@ describe("EmergencyAccessService", () => {
       const view = await service.getView(userId);
       expect(view.emailConfigured).toBe(false);
     });
+
+    /**
+     * The two configuration halves fail independently, and the second one fails
+     * *silently* (audit RRV4-003): grant delivery stores each contact's claim token
+     * encrypted so a retry re-sends the same link, and without a key that store
+     * throws for every contact -- no email, one log line per contact, and a
+     * settings page that still reports the safeguard as armed. The view has to
+     * carry both, or the UI cannot say which one is missing.
+     */
+    it("reports credential-encryption readiness separately from SMTP", async () => {
+      settingsRepo.findOne.mockResolvedValue(null);
+      contactsRepo.find.mockResolvedValue([]);
+      usersRepo.findOne.mockResolvedValue({ id: userId, lastActivityAt: null });
+      encryption.isConfigured.mockReturnValue(false);
+
+      const view = await service.getView(userId);
+
+      expect(view.emailConfigured).toBe(true);
+      expect(view.credentialEncryptionConfigured).toBe(false);
+    });
+
+    it("reports credential encryption as ready when the key is present", async () => {
+      settingsRepo.findOne.mockResolvedValue(null);
+      contactsRepo.find.mockResolvedValue([]);
+      usersRepo.findOne.mockResolvedValue({ id: userId, lastActivityAt: null });
+
+      const view = await service.getView(userId);
+
+      expect(view.credentialEncryptionConfigured).toBe(true);
+    });
   });
 
   describe("getMessage", () => {
@@ -266,6 +300,91 @@ describe("EmergencyAccessService", () => {
           reminderAfterDays: 7,
         }),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    /**
+     * `.env.example` presents `AI_ENCRYPTION_KEY` as optional, needed only for
+     * cloud AI providers, so an SMTP-only self-hosted install without it is the
+     * documented configuration rather than an edge case. Grant delivery now
+     * requires it, and the failure is invisible: `credentialFor` throws per
+     * contact, `notifyGrantContacts` reports zero deliveries, the grant is
+     * released for tomorrow, and tomorrow repeats it forever. So enabling has to
+     * be refused where the user can see it (audit RRV4-003).
+     */
+    it("refuses to enable when credential encryption is not configured", async () => {
+      encryption.isConfigured.mockReturnValue(false);
+
+      await expect(
+        service.upsertSettings(userId, {
+          enabled: true,
+          grantAfterDays: 14,
+          reminderAfterDays: 7,
+        }),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      // A refused command must not already have written.
+      expect(queryRunner.manager.save).not.toHaveBeenCalled();
+    });
+
+    it("names the missing key in the refusal", async () => {
+      encryption.isConfigured.mockReturnValue(false);
+
+      await expect(
+        service.upsertSettings(userId, {
+          enabled: true,
+          grantAfterDays: 14,
+          reminderAfterDays: 7,
+        }),
+      ).rejects.toThrow(/AI_ENCRYPTION_KEY/);
+    });
+
+    it("still lets the owner turn the feature off without SMTP", async () => {
+      // Disabling is the one action that must never be blocked by a missing
+      // dependency -- it is how an owner revokes a safeguard after SMTP was removed,
+      // and it voids the outstanding links (audit V4R3-002).
+      emailService.getStatus.mockReturnValue({ configured: false });
+      const stored = {
+        ownerUserId: userId,
+        enabled: true,
+        grantAfterDays: 14,
+        reminderAfterDays: 7,
+        messageCiphertext: null,
+      };
+      queryRunner.manager.findOne.mockResolvedValue(stored);
+      settingsRepo.findOne.mockResolvedValue(stored);
+      usersRepo.findOne.mockResolvedValue({ id: userId, lastActivityAt: null });
+
+      await service.upsertSettings(userId, {
+        enabled: false,
+        grantAfterDays: 14,
+        reminderAfterDays: 7,
+      });
+
+      expect(stored.enabled).toBe(false);
+    });
+
+    it("still lets the owner turn the feature off without the key", async () => {
+      // Otherwise an installation that lost its key could not disable a feature
+      // that no longer works -- the refusal is about arming a safeguard that
+      // cannot fire, not about editing the row.
+      encryption.isConfigured.mockReturnValue(false);
+      const stored = {
+        ownerUserId: userId,
+        enabled: true,
+        grantAfterDays: 14,
+        reminderAfterDays: 7,
+        messageCiphertext: null,
+      };
+      queryRunner.manager.findOne.mockResolvedValue(stored);
+      settingsRepo.findOne.mockResolvedValue(stored);
+      usersRepo.findOne.mockResolvedValue({ id: userId, lastActivityAt: null });
+
+      await service.upsertSettings(userId, {
+        enabled: false,
+        grantAfterDays: 14,
+        reminderAfterDays: 7,
+      });
+
+      expect(stored.enabled).toBe(false);
     });
 
     it("does not touch the existing ciphertext when saving settings", async () => {
@@ -416,6 +535,40 @@ describe("EmergencyAccessService", () => {
 
       expect(contactsRepo.createQueryBuilder).not.toHaveBeenCalled();
       expect(existing.firstName).toBe("Renamed");
+    });
+
+    it("updateContact leaves a renamed contact owed a link for the current cycle", async () => {
+      // The token clear was unconditional while the delivery markers were reset
+      // only when the *email* changed, so correcting a typo in a contact's first
+      // name during an active grant destroyed their working link and left
+      // `notified_grant_generation` still claiming they had been served. They then
+      // dropped out of `contactsAwaitingNotice` for the rest of the cycle: a
+      // contact silently owed a link nobody would ever send, which is the exact
+      // failure the generation exists to prevent. Clearing the hash and clearing
+      // the markers are one decision.
+      const existing = {
+        id: "c1",
+        ownerUserId: userId,
+        firstName: "Old",
+        email: "old@example.com",
+        claimTokenHash: "a-delivered-hash",
+        claimTokenExpiresAt: new Date(),
+        claimTokenCiphertext: "enc(token)",
+        claimNotifiedAt: new Date(),
+        notifiedGrantGeneration: 4,
+      };
+      contactsRepo.findOne.mockResolvedValue(existing);
+      contactsRepo.save.mockImplementation(async (row) => row);
+
+      await service.updateContact(userId, "c1", {
+        firstName: "Corrected",
+        email: "old@example.com",
+      });
+
+      expect(existing.claimTokenHash).toBeNull();
+      expect(existing.claimTokenCiphertext).toBeNull();
+      expect(existing.claimNotifiedAt).toBeNull();
+      expect(existing.notifiedGrantGeneration).toBeNull();
     });
 
     it("updateContact rejects swapping to an email already used by another row", async () => {
@@ -651,17 +804,70 @@ describe("EmergencyAccessService", () => {
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
       };
       contactsRepo.createQueryBuilder.mockReturnValue(updateBuilder);
+      const settingsBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      settingsRepo.createQueryBuilder.mockReturnValue(settingsBuilder);
 
       const view = await service.resetGrantedState(userId);
 
-      expect(stored.grantedAt).toBeNull();
-      expect(stored.lastReminderSentAt).toBeNull();
-      expect(settingsRepo.save).toHaveBeenCalledWith(stored);
+      // A targeted UPDATE of the two markers, not a re-save of the row read above.
+      // The entity carries `grant_generation`, a counter only `claimGrant` may
+      // advance -- and `save` writes back every column whose loaded value differs
+      // from the row TypeORM reloads at persist time, so a bump landing between the
+      // read and the write would be written back *down*.
+      expect(settingsRepo.save).not.toHaveBeenCalled();
+      expect(settingsBuilder.set).toHaveBeenCalledWith({
+        grantedAt: null,
+        lastReminderSentAt: null,
+      });
       expect(updateBuilder.update).toHaveBeenCalledWith(EmergencyAccessContact);
       const setArgs = updateBuilder.set.mock.calls[0][0];
       expect(setArgs.claimTokenUsedAt()).toBe("CURRENT_TIMESTAMP");
       expect(setArgs.claimVoidedReason).toBe("owner_revoked");
       expect(view.grantedAt).toBeNull();
+    });
+
+    it("clears the grant marker and voids the links in one transaction", async () => {
+      // Split across two, a failure on the voiding leaves `granted_at` already
+      // NULL and committed: the page reports the grant cleared, the button says it
+      // worked, and every delivered magic link stays claimable for the rest of its
+      // 30 days. That is the one ordering this method must not have.
+      const stored = {
+        ownerUserId: userId,
+        enabled: true,
+        grantAfterDays: 14,
+        reminderAfterDays: 7,
+        messageCiphertext: null,
+        grantedAt: new Date(),
+        lastReminderSentAt: new Date(),
+      };
+      settingsRepo.findOne.mockResolvedValue(stored);
+      settingsRepo.createQueryBuilder.mockReturnValue({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      contactsRepo.createQueryBuilder.mockReturnValue({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockRejectedValue(new Error("voiding failed")),
+      });
+
+      await expect(service.resetGrantedState(userId)).rejects.toThrow(
+        "voiding failed",
+      );
+
+      // One transaction opened, and it is the one that threw -- so the settings
+      // write rolls back with it rather than standing as a committed lie.
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     });
   });
 });

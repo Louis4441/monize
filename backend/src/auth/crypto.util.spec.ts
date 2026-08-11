@@ -1,8 +1,10 @@
 import {
   encrypt,
   decrypt,
+  hashToken,
   isLegacyEncryption,
   migrateFromLegacy,
+  tokenHashesEqual,
 } from "./crypto.util";
 
 describe("crypto.util", () => {
@@ -168,6 +170,38 @@ describe("crypto.util", () => {
       const newFormat = encrypt(plaintext, jwtSecret);
       const result = migrateFromLegacy(newFormat, jwtSecret);
       expect(result).toBeNull(); // Already new format
+    });
+  });
+
+  describe("tokenHashesEqual", () => {
+    const digest = hashToken("a-token");
+
+    it("accepts a digest against itself", () => {
+      expect(tokenHashesEqual(digest, hashToken("a-token"))).toBe(true);
+    });
+
+    it("rejects a different token's digest", () => {
+      expect(tokenHashesEqual(digest, hashToken("another-token"))).toBe(false);
+    });
+
+    it("rejects a digest that differs only in its last character", () => {
+      const nearMiss = digest.slice(0, -1) + (digest.endsWith("a") ? "b" : "a");
+      expect(tokenHashesEqual(digest, nearMiss)).toBe(false);
+    });
+
+    it("rejects unequal lengths instead of throwing", () => {
+      // `timingSafeEqual` throws on a length mismatch, so the guard has to come
+      // first -- a truncated or malformed stored value must be a `false`, not a
+      // 500 from a cron sweep.
+      expect(() => tokenHashesEqual(digest, digest.slice(0, 32))).not.toThrow();
+      expect(tokenHashesEqual(digest, digest.slice(0, 32))).toBe(false);
+      expect(tokenHashesEqual("", digest)).toBe(false);
+    });
+
+    it("rejects null on either side", () => {
+      expect(tokenHashesEqual(null, digest)).toBe(false);
+      expect(tokenHashesEqual(digest, null)).toBe(false);
+      expect(tokenHashesEqual(null, null)).toBe(false);
     });
   });
 });

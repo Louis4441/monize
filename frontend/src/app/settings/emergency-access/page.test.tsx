@@ -153,6 +153,7 @@ function makeView(
 ): EmergencyAccessView {
   return {
     emailConfigured: true,
+    credentialEncryptionConfigured: true,
     enabled: false,
     grantAfterDays: 14,
     reminderAfterDays: 7,
@@ -213,6 +214,153 @@ describe('EmergencyAccessPage', () => {
         name: /Save settings/i,
       }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+
+  /**
+   * The two configuration halves fail independently, and the second fails
+   * silently: without AI_ENCRYPTION_KEY a grant cannot store the claim link it
+   * would resend, so it delivers nothing, releases itself, and repeats every day
+   * -- while this page reported the safeguard as armed because it only knew about
+   * SMTP (audit RRV4-003).
+   */
+  it('shows the encryption-key notice when only that half is missing', async () => {
+    // Currently enabled, so turning it off must remain possible on an installation
+    // that cannot arm it (audit V4R3-002) -- which is why Save stays live.
+    api.get.mockResolvedValue(
+      makeView({ enabled: true, credentialEncryptionConfigured: false }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByText(/Encryption key required/)).toBeInTheDocument(),
+    );
+    // Not the SMTP notice: naming the wrong missing thing sends the operator to
+    // the wrong variable.
+    expect(screen.queryByText(/Email is not configured/)).toBeNull();
+    expect(
+      (screen.getByRole('button', {
+        name: /Save settings/i,
+      }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it('lets the owner disable an enabled feature even when SMTP is missing', async () => {
+    // Audit V4R3-002: a missing dependency stops arming, never disabling. A feature
+    // already stored as enabled has to stay switch-off-able, or the owner cannot
+    // revoke a safeguard after SMTP was removed.
+    api.get.mockResolvedValue(
+      makeView({ enabled: true, emailConfigured: false }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /Save settings/i }),
+      ).toBeInTheDocument(),
+    );
+    // Save stays usable, so the owner can submit enabled:false.
+    expect(
+      (screen.getByRole('button', {
+        name: /Save settings/i,
+      }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it('keeps the settings controls locked when a disabled feature cannot be armed', async () => {
+    // Disabled and unarmable: there is nothing to turn off, so arming stays blocked.
+    api.get.mockResolvedValue(
+      makeView({ enabled: false, emailConfigured: false }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByText(/Email is not configured/)).toBeInTheDocument(),
+    );
+    expect(
+      (screen.getByRole('button', {
+        name: /Save settings/i,
+      }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it('names both missing dependencies when both are missing', async () => {
+    // Gating the encryption notice on `emailConfigured` made diagnosis
+    // sequential: the operator was told about SMTP, fixed it, reloaded, and only
+    // then learned about the key. The two fail independently, which is the whole
+    // reason this page reports them separately at all.
+    api.get.mockResolvedValue(
+      makeView({ emailConfigured: false, credentialEncryptionConfigured: false }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByText(/Email is not configured/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Encryption key required/)).toBeInTheDocument();
+  });
+
+  it('clamps the enable toggle to off while the feature cannot be armed', async () => {
+    // The clamp is the only thing stopping a degraded install submitting
+    // `enabled: true`, which the server refuses with a 503. Dropping the ternary
+    // leaves every other assertion in this file passing.
+    api.get.mockResolvedValue(
+      makeView({ enabled: true, credentialEncryptionConfigured: false }),
+    );
+    api.updateSettings.mockResolvedValue(makeView({ enabled: false }));
+    await renderPage();
+    await waitFor(() =>
+      screen.getByRole('button', { name: /Save settings/i }),
+    );
+
+    // Try to turn it back *on*; the control must refuse to move.
+    const toggle = screen.getByRole('switch', {
+      name: /Enable emergency access/i,
+    });
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /Save settings/i }),
+      );
+    });
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalled());
+    expect(api.updateSettings.mock.calls[0][0].enabled).toBe(false);
+  });
+
+  it('locks the waiting-period fields while the feature cannot be armed', async () => {
+    // Only disabling is useful on a degraded install, so a live day field invites
+    // a save that can only 503.
+    api.get.mockResolvedValue(
+      makeView({ enabled: true, credentialEncryptionConfigured: false }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      screen.getByRole('button', { name: /Save settings/i }),
+    );
+    expect(
+      (
+        screen.getByLabelText(
+          /Days of inactivity before access is granted/i,
+        ) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByLabelText(
+          /Days of inactivity before reminder emails/i,
+        ) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
+  });
+
+  it('shows no configuration notice when both halves are ready', async () => {
+    api.get.mockResolvedValue(makeView());
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Save settings/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Encryption key required/)).toBeNull();
+    expect(screen.queryByText(/Email is not configured/)).toBeNull();
   });
 
   it('renders metadata for a configured message without the plaintext', async () => {

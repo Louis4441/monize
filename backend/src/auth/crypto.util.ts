@@ -31,6 +31,28 @@ export function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * Compare two `hashToken` digests in constant time.
+ *
+ * `hashToken`'s comparison partner, and it lives beside it so the next caller finds
+ * it rather than reaching for `===`. A digest is a credential-derived value, and
+ * `===` on two strings returns as soon as they differ -- the timing reports the
+ * length of the shared prefix. Whether that is *reachable* depends on the call
+ * site, but deciding case by case makes the property an argument each time;
+ * constant time costs nothing here and makes it a property instead.
+ *
+ * The length mismatch is answered first because `timingSafeEqual` throws on
+ * unequal lengths, and it is not a secret: both sides are SHA-256 hex, so anything
+ * else is malformed input rather than a near miss.
+ */
+export function tokenHashesEqual(a: string | null, b: string | null): boolean {
+  if (a == null || b == null) return false;
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
 function deriveKey(secret: string, salt: Buffer): Buffer {
   return crypto.scryptSync(secret, salt, 32);
 }

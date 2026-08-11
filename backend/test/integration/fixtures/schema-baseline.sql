@@ -1,3 +1,15 @@
+-- Frozen baseline for backend/test/integration/migration-path.integration.spec.ts:
+-- database/schema.sql exactly as of main commit 9ea9cc6ccaafba0a63da29f996e1c72938f24ac3
+-- (max migration 148). This is the schema an install running that release has on
+-- disk, before this branch's migrations 149-151 are applied.
+--
+-- Deliberately frozen, not tracked: the suite's claim is "these migrations apply to
+-- a real released schema", and pinning one keeps that claim stable. Regenerate only
+-- when the branch is rebased or merged onto a newer main, and update the SHA above:
+--   git show <new-main-sha>:database/schema.sql > this file (below this header)
+-- migration-path.integration.spec.ts asserts this file does NOT already contain the
+-- objects under test, so a regeneration that swept them in cannot silently make the
+-- whole suite vacuous.
 -- Monize - Database Schema
 -- PostgreSQL Schema for Microsoft Money replacement
 
@@ -1064,13 +1076,6 @@ CREATE TABLE emergency_access_settings (
     message_ciphertext    TEXT,
     last_reminder_sent_at TIMESTAMP,
     granted_at            TIMESTAMP,
-    -- Which grant cycle this owner is on (migration 150). Advanced by the single
-    -- statement that transitions ungranted -> granted, so a contact's delivery
-    -- state belongs to one cycle instead of to the row: no re-arm path
-    -- (revokeAfterReturn, disable/re-enable, a manual reset) has to remember to
-    -- clear anything, which is what stopped emergency access from ever firing a
-    -- second time (audit RRV4-004).
-    grant_generation      INTEGER NOT NULL DEFAULT 1,
     created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT emergency_access_settings_reminder_lt_grant
@@ -1086,29 +1091,6 @@ CREATE TABLE emergency_access_contacts (
     claim_token_expires_at TIMESTAMP,
     claim_token_used_at    TIMESTAMP,
     claim_voided_reason    VARCHAR(20), -- 'claimed_by_other' | 'owner_revoked' | NULL
-    -- When the notice for `notified_grant_generation` was actually sent
-    -- (migration 149). The delivery record, kept apart from the claim that
-    -- coordinates the send: a claim answers "may I do this now" and cannot also
-    -- answer "has this been done", because the second question has to outlive the
-    -- process that asked the first. That is how the daily check finds a grant a
-    -- killed replica never delivered (audit FV4-004).
-    --
-    -- A timestamp for operators, not a predicate: migration 150 moved "is a link
-    -- still owed" onto the generation below, because this column was never reset
-    -- and therefore made emergency access fire at most once per contact row.
-    claim_notified_at      TIMESTAMP,
-    -- The grant cycle whose notice this contact received (migration 150). Owed a
-    -- link whenever it differs from the owner's `grant_generation`, which is what
-    -- makes a re-armed grant owe every contact again without any reset path having
-    -- to say so (audit RRV4-004). NULL means never notified.
-    notified_grant_generation INTEGER,
-    -- The undelivered credential (migration 149), AES-256-GCM under
-    -- AI_ENCRYPTION_KEY. Written with the hash before the first send, re-read by a
-    -- retry so it re-sends the *same* link rather than minting one that kills the
-    -- link already in the recipient's inbox, and cleared in the statement that
-    -- records delivery. A credential at rest, so it does not outlive the delivery
-    -- it exists for (audit RV4-004).
-    claim_token_ciphertext TEXT,
     created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -1116,58 +1098,9 @@ CREATE TABLE emergency_access_contacts (
 CREATE UNIQUE INDEX idx_emergency_access_contacts_owner_email
     ON emergency_access_contacts(owner_user_id, lower(email));
 
--- "Granted owners with a contact still owed a link", read on every daily sweep
--- (migration 150). Composite rather than partial: the predicate is a disjunction
--- (`notified_grant_generation IS NULL OR notified_grant_generation < $2`) and no
--- partial index can serve the second arm, so both arms read from this one instead.
-CREATE INDEX idx_eac_awaiting_notice
-    ON emergency_access_contacts(owner_user_id, notified_grant_generation);
-
 CREATE INDEX idx_emergency_access_contacts_token_hash
     ON emergency_access_contacts(claim_token_hash)
     WHERE claim_token_hash IS NOT NULL;
-
--- Rolling-deployment fence for the binary that predates the delivery columns
--- (migration 151). The pre-149 release rotates `claim_token_hash` guarded only by
--- a snapshot of `granted_at`, so a stale old pod can overwrite -- and kill -- a
--- link the new protocol has already minted or delivered. The current code never
--- writes a new hash without the matching `claim_token_ciphertext` in the same
--- statement, so a rotation touching neither ciphertext nor generation is
--- legacy-shaped, and it is refused exactly when it would destroy new-protocol
--- state: an undelivered credential in flight, or a live delivered link. Hash
--- clears (revocation, consumption) and rotations over rows with no new-protocol
--- state pass through unchanged.
-CREATE OR REPLACE FUNCTION reject_legacy_emergency_token_rotation() RETURNS TRIGGER
-LANGUAGE plpgsql AS $$
-BEGIN
-    IF OLD.claim_token_ciphertext IS NOT NULL THEN
-        RAISE EXCEPTION
-            'emergency-access contact % has an undelivered credential; a generation-blind token rotation would desync it (a newer release owns this credential cycle)',
-            OLD.id;
-    END IF;
-    IF OLD.notified_grant_generation IS NOT NULL
-       AND OLD.claim_token_hash IS NOT NULL
-       AND OLD.claim_token_used_at IS NULL
-       AND OLD.claim_token_expires_at IS NOT NULL
-       AND OLD.claim_token_expires_at >= CURRENT_TIMESTAMP THEN
-        RAISE EXCEPTION
-            'emergency-access contact % holds a live delivered link; a generation-blind token rotation would kill it (a newer release owns this credential cycle)',
-            OLD.id;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_eac_reject_legacy_token_rotation
-    BEFORE UPDATE ON emergency_access_contacts
-    FOR EACH ROW
-    WHEN (
-      NEW.claim_token_hash IS NOT NULL
-      AND NEW.claim_token_hash IS DISTINCT FROM OLD.claim_token_hash
-      AND NEW.claim_token_ciphertext IS NOT DISTINCT FROM OLD.claim_token_ciphertext
-      AND NEW.notified_grant_generation IS NOT DISTINCT FROM OLD.notified_grant_generation
-    )
-    EXECUTE FUNCTION reject_legacy_emergency_token_rotation();
 
 -- Custom Reports (user-defined configurable reports)
 -- view_type: TABLE, LINE_CHART, BAR_CHART, PIE_CHART

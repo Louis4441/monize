@@ -528,6 +528,21 @@ function EmergencyAccessSection() {
   const enabledNow = settingsForm.watch('enabled');
   const { messageMetadata } = view;
 
+  // Arming needs both dependencies; disabling needs neither. A feature already
+  // enabled must stay switch-off-able even when SMTP or the encryption key is
+  // missing -- that is how an owner revokes it after a dependency was removed
+  // (audit V4R3-002). So the settings controls are live whenever the feature can
+  // be armed OR is currently stored as enabled, and the toggle clamps to "off"
+  // while it cannot be armed.
+  //
+  // The waiting periods are gated on `canArmFeature` rather than on
+  // `canEditSettings`: on a degraded install the only useful thing to submit is
+  // `enabled: false`, and the server refuses anything else with a 503. Leaving them
+  // live invites a save that can only fail.
+  const canArmFeature =
+    view.emailConfigured && view.credentialEncryptionConfigured;
+  const canEditSettings = canArmFeature || view.enabled;
+
   return (
     <PageLayout>
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-12 pt-6 pb-8">
@@ -552,6 +567,23 @@ function EmergencyAccessSection() {
             </h2>
             <p className="text-sm text-amber-700 dark:text-amber-300">
               {t('emailNotConfigured.body')}
+            </p>
+          </div>
+        )}
+
+        {/*
+          Not gated on `emailConfigured`. The two dependencies fail independently,
+          which is the whole argument for showing this notice at all -- so an install
+          missing both has to be told both, rather than being sent to fix SMTP and
+          only then discovering the second one on the next page load.
+        */}
+        {!view.credentialEncryptionConfigured && (
+          <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+              {t('encryptionNotConfigured.heading')}
+            </h2>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              {t('encryptionNotConfigured.body')}
             </p>
           </div>
         )}
@@ -594,9 +626,13 @@ function EmergencyAccessSection() {
               <ToggleSwitch
                 checked={enabledNow}
                 onChange={(v) =>
-                  settingsForm.setValue('enabled', v, { shouldDirty: true })
+                  // Clamp to off while the feature cannot be armed, so the only
+                  // action a degraded install can take here is to disable it.
+                  settingsForm.setValue('enabled', canArmFeature ? v : false, {
+                    shouldDirty: true,
+                  })
                 }
-                disabled={!view.emailConfigured}
+                disabled={!canEditSettings}
                 label={t('settings.enableLabel')}
               />
               <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -613,7 +649,7 @@ function EmergencyAccessSection() {
                     label={t('settings.grantAfterDaysLabel')}
                     decimalPlaces={0}
                     max={365}
-                    disabled={!view.emailConfigured}
+                    disabled={!canArmFeature}
                     error={settingsForm.formState.errors.grantAfterDays?.message}
                     value={field.value}
                     onChange={field.onChange}
@@ -631,7 +667,7 @@ function EmergencyAccessSection() {
                     label={t('settings.reminderAfterDaysLabel')}
                     decimalPlaces={0}
                     max={364}
-                    disabled={!view.emailConfigured}
+                    disabled={!canArmFeature}
                     error={settingsForm.formState.errors.reminderAfterDays?.message}
                     value={field.value}
                     onChange={field.onChange}
@@ -647,7 +683,7 @@ function EmergencyAccessSection() {
               <Button
                 type="submit"
                 isLoading={savingSettings}
-                disabled={!view.emailConfigured}
+                disabled={!canEditSettings}
               >
                 {t('settings.saveButton')}
               </Button>

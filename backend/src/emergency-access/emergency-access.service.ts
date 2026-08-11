@@ -31,6 +31,18 @@ export interface MessageMetadata {
 
 export interface SettingsView {
   emailConfigured: boolean;
+  /**
+   * Whether the credential encryption this feature's delivery path needs is
+   * configured.
+   *
+   * Separate from `emailConfigured` because they can fail independently and the
+   * consequence of the second is silent: a grant issues a claim token, stores it
+   * encrypted so a retry can re-send the same link, and without a key that store
+   * throws for every contact -- so the notice is never delivered and nothing on
+   * screen says why (audit RRV4-003). The feature refuses to be enabled without
+   * it, and this field is what lets the UI say so before the user tries.
+   */
+  credentialEncryptionConfigured: boolean;
   enabled: boolean;
   grantAfterDays: number;
   reminderAfterDays: number;
@@ -122,6 +134,7 @@ export class EmergencyAccessService {
 
     return {
       emailConfigured,
+      credentialEncryptionConfigured: this.encryption.isConfigured(),
       enabled: settings?.enabled ?? false,
       grantAfterDays: settings?.grantAfterDays ?? 14,
       reminderAfterDays: settings?.reminderAfterDays ?? 7,
@@ -153,11 +166,32 @@ export class EmergencyAccessService {
     userId: string,
     dto: UpsertSettingsDto,
   ): Promise<SettingsView> {
-    if (!this.emailService.getStatus().configured) {
+    // Every dependency check is gated on `dto.enabled`, because a missing
+    // dependency may stop the owner *arming* the feature but must never stop them
+    // *disabling* it (audit V4R3-002). Turning it off is the one action that always
+    // has to work -- it is how an owner revokes a safeguard after SMTP was removed
+    // or the encryption key was lost, and the disable branch below voids every
+    // outstanding link. A `dto.enabled === false` request therefore skips both
+    // checks and proceeds straight to the write.
+    if (dto.enabled && !this.emailService.getStatus().configured) {
       throw new ServiceUnavailableException(
         tr(
           "errors.emergencyAccess.smtpNotConfigured",
           "Email is not configured. Emergency access cannot be enabled until SMTP is set up.",
+        ),
+      );
+    }
+    // The grant path stores each contact's claim token encrypted, so a retry
+    // re-sends the same link instead of one that invalidates what is already in
+    // their inbox. Without a key that store throws for every contact, the notice is
+    // never delivered, and the only trace is a per-contact log line -- so a user
+    // could arm a recovery mechanism that can never fire. Refuse instead, visibly
+    // (audit RRV4-003).
+    if (dto.enabled && !this.encryption.isConfigured()) {
+      throw new ServiceUnavailableException(
+        tr(
+          "errors.emergencyAccess.encryptionRequiredToEnable",
+          "Credential encryption is not configured. Emergency access cannot be enabled until AI_ENCRYPTION_KEY is set, because a grant has to store each contact's access link securely.",
         ),
       );
     }
@@ -189,6 +223,10 @@ export class EmergencyAccessService {
         row.grantedAt = null;
         row.lastReminderSentAt = null;
         // Void any outstanding magic links -- the owner has revoked the feature.
+        // The delivery markers are deliberately left alone: a re-enable does not
+        // have to reset them, because the next grant advances the owner's
+        // `grant_generation` past whatever the contacts were notified at
+        // (audit RRV4-004).
         await manager
           .createQueryBuilder()
           .update(EmergencyAccessContact)
@@ -197,6 +235,10 @@ export class EmergencyAccessService {
             claimTokenExpiresAt: null,
             claimTokenUsedAt: () => "CURRENT_TIMESTAMP",
             claimVoidedReason: "owner_revoked",
+            // The credential goes with the hash that made it usable: worthless
+            // without one, but still a recoverable secret under the application
+            // key, and nothing will ever want it again (DR-RRV4-03).
+            claimTokenCiphertext: null,
           })
           .where("owner_user_id = :userId", { userId })
           .andWhere("claim_token_hash IS NOT NULL")
@@ -248,30 +290,34 @@ export class EmergencyAccessService {
     dto: UpsertContactDto,
   ): Promise<ContactView> {
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const existing = await this.scoped(EmergencyAccessContact, (repo) =>
-      repo
+    // One transaction: the duplicate check and the insert it authorizes. Split
+    // across two, a concurrent double-submit passes both checks and the second
+    // insert reaches `idx_emergency_access_contacts_owner_email` -- so the caller
+    // gets a 500 from a QueryFailedError instead of the 409 this check exists to
+    // produce.
+    const contact = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(EmergencyAccessContact);
+      const existing = await repo
         .createQueryBuilder("c")
         .where("c.owner_user_id = :userId", { userId })
         .andWhere("lower(c.email) = :email", { email: normalizedEmail })
-        .getOne(),
-    );
-    if (existing) {
-      throw new ConflictException(
-        tr(
-          "errors.emergencyAccess.contactEmailExists",
-          "An emergency contact with this email already exists.",
-        ),
-      );
-    }
-    const contact = await this.scoped(EmergencyAccessContact, (repo) =>
-      repo.save(
+        .getOne();
+      if (existing) {
+        throw new ConflictException(
+          tr(
+            "errors.emergencyAccess.contactEmailExists",
+            "An emergency contact with this email already exists.",
+          ),
+        );
+      }
+      return repo.save(
         repo.create({
           ownerUserId: userId,
           firstName: dto.firstName.trim(),
           email: dto.email.trim(),
         }),
-      ),
-    );
+      );
+    });
     return this.toContactView(contact);
   }
 
@@ -280,41 +326,59 @@ export class EmergencyAccessService {
     contactId: string,
     dto: UpsertContactDto,
   ): Promise<ContactView> {
-    const contact = await this.scoped(EmergencyAccessContact, (repo) =>
-      repo.findOne({
+    // One transaction, for the same reason as `addContact`: the ownership check,
+    // the duplicate check and the write they authorize are one read-modify-write.
+    const contact = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(EmergencyAccessContact);
+      const row = await repo.findOne({
         where: { id: contactId, ownerUserId: userId },
-      }),
-    );
-    if (!contact) {
-      throw new NotFoundException(
-        tr("errors.emergencyAccess.contactNotFound", "Contact not found"),
-      );
-    }
-    const normalizedEmail = dto.email.trim().toLowerCase();
-    if (normalizedEmail !== contact.email.toLowerCase()) {
-      const dup = await this.scoped(EmergencyAccessContact, (repo) =>
-        repo
+      });
+      if (!row) {
+        throw new NotFoundException(
+          tr("errors.emergencyAccess.contactNotFound", "Contact not found"),
+        );
+      }
+      const normalizedEmail = dto.email.trim().toLowerCase();
+      if (normalizedEmail !== row.email.toLowerCase()) {
+        const dup = await repo
           .createQueryBuilder("c")
           .where("c.owner_user_id = :userId", { userId })
           .andWhere("lower(c.email) = :email", { email: normalizedEmail })
           .andWhere("c.id <> :id", { id: contactId })
-          .getOne(),
-      );
-      if (dup) {
-        throw new ConflictException(
-          tr(
-            "errors.emergencyAccess.contactEmailExists",
-            "An emergency contact with this email already exists.",
-          ),
-        );
+          .getOne();
+        if (dup) {
+          throw new ConflictException(
+            tr(
+              "errors.emergencyAccess.contactEmailExists",
+              "An emergency contact with this email already exists.",
+            ),
+          );
+        }
       }
-    }
-    contact.firstName = dto.firstName.trim();
-    contact.email = dto.email.trim();
-    // Editing email invalidates any in-flight magic link.
-    contact.claimTokenHash = null;
-    contact.claimTokenExpiresAt = null;
-    await this.scoped(EmergencyAccessContact, (repo) => repo.save(contact));
+      row.firstName = dto.firstName.trim();
+      row.email = dto.email.trim();
+      // Any edit invalidates the in-flight magic link, so any edit also clears the
+      // delivery record. These four columns move together or not at all.
+      //
+      // They used to part company: the credential was cleared unconditionally while
+      // the markers were reset only when the *email* changed, so an owner correcting
+      // a typo in a contact's first name during an active grant destroyed that
+      // contact's working link and left `notified_grant_generation` saying they had
+      // been served -- dropping them out of `contactsAwaitingNotice` for the rest of
+      // the cycle. A contact silently owed a link nobody will ever send is the exact
+      // failure the generation exists to prevent (audit RRV4-004).
+      row.claimTokenHash = null;
+      row.claimTokenExpiresAt = null;
+      // And the credential it made usable (DR-RRV4-03).
+      row.claimTokenCiphertext = null;
+      // The one per-contact reset the generation cannot derive: the owner's grant
+      // cycle has not moved, so without it a grant already in flight would consider
+      // this contact already served.
+      row.claimNotifiedAt = null;
+      row.notifiedGrantGeneration = null;
+      await repo.save(row);
+      return row;
+    });
     return this.toContactView(contact);
   }
 
@@ -332,25 +396,47 @@ export class EmergencyAccessService {
     }
   }
 
+  /**
+   * Clear the granted marker and void every outstanding link.
+   *
+   * One transaction, because the two halves are one promise. Split, a failure on
+   * the voiding left `granted_at` already NULL and committed: `getView` reports the
+   * grant cleared, the button says it worked, and every delivered magic link stays
+   * claimable for the rest of its 30 days. `upsertSettings`'s disable branch is the
+   * same operation and already does it this way.
+   *
+   * A targeted UPDATE rather than a re-save of the row read above, for a second
+   * reason: the entity carries `grant_generation`, a counter only the database
+   * should advance. `save` writes back every column whose in-memory value differs
+   * from the row TypeORM reloads at persist time, so a `claimGrant` bump landing
+   * between the read and the write would be written *down* -- and a settings
+   * generation below a contact's turns the pending query into a daily re-issue loop
+   * against that contact.
+   */
   async resetGrantedState(userId: string): Promise<SettingsView> {
-    const settings = await this.scoped(EmergencyAccessSettings, (repo) =>
-      repo.findOne({
+    await withScopedDb(this.dataSource, async (manager) => {
+      const settingsRepo = manager.getRepository(EmergencyAccessSettings);
+      const settings = await settingsRepo.findOne({
         where: { ownerUserId: userId },
-      }),
-    );
-    if (!settings) {
-      throw new NotFoundException(
-        tr(
-          "errors.emergencyAccess.notConfigured",
-          "Emergency access not configured",
-        ),
-      );
-    }
-    settings.grantedAt = null;
-    settings.lastReminderSentAt = null;
-    await this.scoped(EmergencyAccessSettings, (repo) => repo.save(settings));
-    await this.scoped(EmergencyAccessContact, (repo) =>
-      repo
+      });
+      if (!settings) {
+        throw new NotFoundException(
+          tr(
+            "errors.emergencyAccess.notConfigured",
+            "Emergency access not configured",
+          ),
+        );
+      }
+      await settingsRepo
+        .createQueryBuilder()
+        .update(EmergencyAccessSettings)
+        .set({ grantedAt: null, lastReminderSentAt: null })
+        .where("owner_user_id = :userId", { userId })
+        .execute();
+      // As with a disable: the delivery markers stay, because the next grant's
+      // generation is what makes every contact owed a link again (audit RRV4-004).
+      await manager
+        .getRepository(EmergencyAccessContact)
         .createQueryBuilder()
         .update(EmergencyAccessContact)
         .set({
@@ -358,12 +444,14 @@ export class EmergencyAccessService {
           claimTokenExpiresAt: null,
           claimTokenUsedAt: () => "CURRENT_TIMESTAMP",
           claimVoidedReason: "owner_revoked",
+          // The credential goes with the hash that made it usable (DR-RRV4-03).
+          claimTokenCiphertext: null,
         })
         .where("owner_user_id = :userId", { userId })
         .andWhere("claim_token_hash IS NOT NULL")
         .andWhere("claim_token_used_at IS NULL")
-        .execute(),
-    );
+        .execute();
+    });
     return this.getView(userId);
   }
 }
