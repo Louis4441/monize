@@ -80,6 +80,7 @@
       "deleteTitle": "Permanently delete account (no transactions)",
       "closeTitleDisabled": "Account must have zero balance to close",
       "closeTitleEnabled": "Close account",
+      "closeTitleUnknownValue": "This account's total cannot be worked out, so it cannot be confirmed empty",
       "details": "Details"
     },
     "jointBadge": "Joint",
@@ -100,6 +101,7 @@
     "closeConfirmLoading": "Closing...",
     "deleteTitle": "Delete Account",
     "deleteMessage": "Are you sure you want to permanently delete \"{name}\"? This action cannot be undone.",
+    "deletePairMessage": "Are you sure you want to permanently delete \"{name}\"? Both of its ledgers are deleted: \"{brokerageName}\" and \"{cashName}\". This action cannot be undone.",
     "deleteConfirm": "Delete Account",
     "deleteConfirmLoading": "Deleting..."
   },

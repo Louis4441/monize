@@ -7,6 +7,7 @@ import { Account, AccountType } from '@/types/account';
 import { Institution } from '@/types/institution';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { accountsApi } from '@/lib/accounts';
+import { invalidateBalanceCaches } from '@/lib/apiCache';
 import { useAuthStore } from '@/store/authStore';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import toast from 'react-hot-toast';
@@ -252,6 +253,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
     close: tc('actions.close'),
     closeTitleDisabled: t('row.actions.closeTitleDisabled'),
     closeTitleEnabled: t('row.actions.closeTitleEnabled'),
+    closeTitleUnknownValue: t('row.actions.closeTitleUnknownValue'),
     reopen: tc('actions.reopen'),
     delete: tc('actions.delete'),
     includeInNetWorth: t('row.includeInNetWorth'),
@@ -276,6 +278,12 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
       unpricedCounts: unpricedHoldingCounts ?? new Map(),
     });
   }, [accounts, favOverrides, stripAccountName, brokerageMarketValues, unpricedHoldingCounts]);
+
+  // Keyed on the primary id, which is the id every row action carries.
+  const logicalById = useMemo(
+    () => new Map(logicalAccounts.map((l) => [l.id, l])),
+    [logicalAccounts],
+  );
 
   // Filter and sort logical accounts. Filters read the entity's primary row --
   // the two halves of a pair share their type, status and sharing state.
@@ -506,8 +514,10 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
     }
   }, [router]);
 
-  const handleReconcile = useCallback((account: Account) => {
-    router.push(`/reconcile?accountId=${account.id}`);
+  // The caller resolved which ledger to reconcile (a pair reconciles its cash
+  // half), so this only navigates.
+  const handleReconcile = useCallback((accountId: string) => {
+    router.push(`/reconcile?accountId=${accountId}`);
   }, [router]);
 
   const handleDetails = useCallback((account: Account) => {
@@ -529,7 +539,18 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
 
     setIsDeleting(true);
     try {
+      // Both ledgers of a pair go, brokerage first. The server unlinks the
+      // partner rather than cascading, so if the second call fails the
+      // survivor is an ordinary cash account -- the least bad failure shape,
+      // and one every surface already handles.
+      const cashHalf = logicalById.get(accountToDelete.id)?.cash;
       await accountsApi.delete(accountToDelete.id);
+      if (cashHalf) {
+        await accountsApi.delete(cashHalf.id);
+      }
+      // Deleting a brokerage removes its holdings from the portfolio, so the
+      // account list is not the only cached view that just went stale.
+      invalidateBalanceCaches();
       toast.success(t('toast.deleteSuccess'));
       setDeleteDialogOpen(false);
       setAccountToDelete(null);
@@ -905,9 +926,15 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
       {/* Long-press action sheet */}
       <RowActionSheet
         isOpen={!!contextAccount}
-        title={contextAccount?.name ?? ''}
+        title={
+          contextAccount
+            ? (logicalById.get(contextAccount.id)?.displayName ??
+              contextAccount.name)
+            : ''
+        }
         subtitle={contextAccount
-          ? `${contextAccount.accountSubType === 'INVESTMENT_BROKERAGE' ? t('contextMenu.subtypeBrokerage') :
+          ? `${logicalById.get(contextAccount.id)?.cash ? formatAccountType(contextAccount.accountType, tc) :
+              contextAccount.accountSubType === 'INVESTMENT_BROKERAGE' ? t('contextMenu.subtypeBrokerage') :
               contextAccount.accountSubType === 'INVESTMENT_CASH' ? t('contextMenu.subtypeInvCash') :
               formatAccountType(contextAccount.accountType, tc)}${contextAccount.isClosed ? t('contextMenu.closedSuffix') : ''}`
           : undefined}
@@ -921,7 +948,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
               onReopen: handleReopen,
               onDeleteClick: handleDeleteClick,
               onToggleNetWorthExclusion: handleToggleNetWorthExclusion,
-            }, brokerageMarketValues?.get(contextAccount.id))
+            }, logicalById.get(contextAccount.id))
           : []}
         onClose={() => setContextAccount(null)}
       />
@@ -931,7 +958,11 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
         isOpen={closeDialogOpen}
         title={t('confirmDialog.closeTitle')}
         message={accountToClose
-          ? t('confirmDialog.closeMessage', { name: accountToClose.name })
+          ? t('confirmDialog.closeMessage', {
+              name:
+                logicalById.get(accountToClose.id)?.displayName ??
+                accountToClose.name,
+            })
           : ''
         }
         confirmLabel={isClosing ? t('confirmDialog.closeConfirmLoading') : t('confirmDialog.closeConfirm')}
@@ -945,10 +976,19 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
       <ConfirmDialog
         isOpen={deleteDialogOpen}
         title={t('confirmDialog.deleteTitle')}
-        message={accountToDelete
-          ? t('confirmDialog.deleteMessage', { name: accountToDelete.name })
-          : ''
-        }
+        message={(() => {
+          if (!accountToDelete) return '';
+          const logical = logicalById.get(accountToDelete.id);
+          // Deleting one row of a pair deletes both ledgers, so the dialog
+          // names both rather than only the row that was clicked.
+          return logical?.cash
+            ? t('confirmDialog.deletePairMessage', {
+                name: logical.displayName,
+                brokerageName: logical.primary.name,
+                cashName: logical.cash.name,
+              })
+            : t('confirmDialog.deleteMessage', { name: accountToDelete.name });
+        })()}
         confirmLabel={isDeleting ? t('confirmDialog.deleteConfirmLoading') : t('confirmDialog.deleteConfirm')}
         cancelLabel={tc('cancel')}
         variant="danger"

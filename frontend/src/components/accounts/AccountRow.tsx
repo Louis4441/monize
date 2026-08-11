@@ -18,6 +18,8 @@ export interface AccountActionLabels {
   close: string;
   closeTitleDisabled: string;
   closeTitleEnabled: string;
+  /** Why Close is unavailable when the account's total cannot be worked out. */
+  closeTitleUnknownValue?: string;
   reopen: string;
   delete: string;
   includeInNetWorth?: string;
@@ -28,7 +30,11 @@ export interface AccountActionHandlers {
   onViewTransactions?: (account: Account) => void;
   onDetails?: (account: Account) => void;
   onEdit: (account: Account) => void;
-  onReconcile: (account: Account) => void;
+  /**
+   * Takes the id of the ledger to reconcile, which is not always the row's own
+   * account: a linked pair reconciles its cash half.
+   */
+  onReconcile: (accountId: string) => void;
   onCloseClick: (account: Account) => void;
   onReopen: (account: Account) => void;
   onDeleteClick: (account: Account) => void;
@@ -64,15 +70,24 @@ export function buildAccountActions(
   isDeletable: boolean,
   labels: AccountActionLabels,
   handlers: AccountActionHandlers,
-  brokerageMarketValue?: number,
+  logical?: LogicalAccount,
 ): RowAction[] {
-  // Brokerage accounts display their holdings' market value rather than the
-  // cash `currentBalance` (which is usually zero), so a brokerage with
-  // securities must block closure based on that market value instead.
-  const balanceNonZero =
-    account.accountSubType === 'INVESTMENT_BROKERAGE' && brokerageMarketValue !== undefined
-      ? Math.round(brokerageMarketValue * 10000) !== 0
-      : Number(account.currentBalance) !== 0;
+  // Closing empties the whole account, so the test is the entity's combined
+  // value -- a brokerage's own `currentBalance` is always zero and says
+  // nothing about the securities it holds.
+  const balanceNonZero = logical
+    ? logical.combinedValue === null ||
+      Math.round(logical.combinedValue * 10000) !== 0
+    : Number(account.currentBalance) !== 0;
+  // An unknown total is not a zero one: Close stays unavailable, and says why.
+  const valueUnknown = !!logical && logical.combinedValue === null;
+  // Reconciling means comparing a cash ledger against a statement. A pair
+  // reconciles its cash half; a brokerage with no cash half has no such ledger.
+  const reconcileTargetId = logical
+    ? logical.cashRegisterId
+    : account.accountSubType === 'INVESTMENT_BROKERAGE'
+      ? null
+      : account.id;
   // A joint row is another user's account shown natively: the account object
   // itself (edit/close/reopen/delete) and reconciliation stay owner-only. The
   // grantee instead gets their personal net-worth inclusion toggle.
@@ -108,11 +123,9 @@ export function buildAccountActions(
       label: labels.reconcile,
       icon: 'reconcile',
       tone: 'success',
-      onClick: () => handlers.onReconcile(account),
-      hidden:
-        account.isClosed ||
-        account.accountSubType === 'INVESTMENT_BROKERAGE' ||
-        isJoint,
+      onClick: () =>
+        reconcileTargetId && handlers.onReconcile(reconcileTargetId),
+      hidden: account.isClosed || reconcileTargetId === null || isJoint,
     },
     {
       key: 'netWorthExclusion',
@@ -132,7 +145,11 @@ export function buildAccountActions(
       onClick: () => handlers.onCloseClick(account),
       hidden: account.isClosed || isJoint,
       disabled: balanceNonZero,
-      title: balanceNonZero ? labels.closeTitleDisabled : labels.closeTitleEnabled,
+      title: valueUnknown
+        ? (labels.closeTitleUnknownValue ?? labels.closeTitleDisabled)
+        : balanceNonZero
+          ? labels.closeTitleDisabled
+          : labels.closeTitleEnabled,
     },
     {
       key: 'reopen',
@@ -184,7 +201,7 @@ export interface AccountRowProps {
   actionLabels: AccountActionLabels;
   onDetails: (account: Account) => void;
   onEdit: (account: Account) => void;
-  onReconcile: (account: Account) => void;
+  onReconcile: (accountId: string) => void;
   onCloseClick: (account: Account) => void;
   onDeleteClick: (account: Account) => void;
   onReopen: (account: Account) => void;
@@ -256,7 +273,7 @@ export const AccountRow = memo(function AccountRow({
     onReopen,
     onDeleteClick,
     onToggleNetWorthExclusion,
-  }, brokerageMarketValue);
+  }, logical);
   return (
     <tr
       className={`group hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer select-none ${density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'}`}

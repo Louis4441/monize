@@ -824,6 +824,105 @@ describe('AccountList', () => {
     });
   });
 
+  // Deleting one row of a pair has to delete both ledgers, and the confirm
+  // has to say so -- the row the user clicked is only half of what goes.
+  it('deletes both ledgers of a pair, brokerage first, behind one confirm', async () => {
+    const accounts = [
+      createAccount({
+        id: 'broker-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+        canDelete: true,
+      }),
+      createAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'broker-1',
+        canDelete: true,
+      }),
+    ];
+
+    render(
+      <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    fireEvent.click(screen.getByText('Delete'));
+    expect(
+      screen.getByText(/Both of its ledgers are deleted/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/TFSA - Cash/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Account' }));
+
+    await waitFor(() => {
+      expect(accountsApi.delete).toHaveBeenCalledTimes(2);
+    });
+    const deleteMock = accountsApi.delete as ReturnType<typeof vi.fn>;
+    expect(deleteMock.mock.calls[0][0]).toBe('broker-1');
+    expect(deleteMock.mock.calls[1][0]).toBe('cash-1');
+  });
+
+  it('deletes only the account itself when it has no linked ledger', async () => {
+    const account = createAccount({ canDelete: true });
+
+    render(
+      <AccountList accounts={[account]} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    fireEvent.click(screen.getByText('Delete'));
+    expect(
+      screen.queryByText(/Both of its ledgers are deleted/),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Account' }));
+
+    await waitFor(() => {
+      expect(accountsApi.delete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('closes a pair with a single call, letting the server carry the partner', async () => {
+    const accounts = [
+      createAccount({
+        id: 'broker-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+        currentBalance: 0,
+      }),
+      createAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'broker-1',
+        currentBalance: 0,
+      }),
+    ];
+
+    render(
+      <AccountList
+        accounts={accounts}
+        brokerageMarketValues={new Map([['broker-1', 0]])}
+        unpricedHoldingCounts={new Map([['broker-1', 0]])}
+        onEdit={mockOnEdit}
+        defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Close'));
+    fireEvent.click(screen.getByRole('button', { name: 'Close Account' }));
+
+    await waitFor(() => {
+      expect(accountsApi.close).toHaveBeenCalledTimes(1);
+    });
+    expect(accountsApi.close).toHaveBeenCalledWith('broker-1');
+  });
+
   it('cancels delete dialog without deleting', () => {
     const account = createAccount({ canDelete: true });
 
@@ -1422,6 +1521,35 @@ describe('AccountList', () => {
         refresh: vi.fn(),
         prefetch: vi.fn(),
       } as unknown as ReturnType<typeof nextNavigation.useRouter>);
+    });
+
+    // Reconcile compares a cash ledger against a statement. The pair's cash is
+    // in the other half, and a lone brokerage row never offered the action.
+    it('reconciles a pair against its cash half', () => {
+      const accounts = [
+        createAccount({
+          id: 'broker-1',
+          name: 'TFSA - Brokerage',
+          accountType: 'INVESTMENT',
+          accountSubType: 'INVESTMENT_BROKERAGE',
+          linkedAccountId: 'cash-1',
+        }),
+        createAccount({
+          id: 'cash-1',
+          name: 'TFSA - Cash',
+          accountType: 'INVESTMENT',
+          accountSubType: 'INVESTMENT_CASH',
+          linkedAccountId: 'broker-1',
+        }),
+      ];
+
+      render(
+        <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+      );
+
+      fireEvent.click(screen.getByText('Reconcile'));
+
+      expect(mockPush).toHaveBeenCalledWith('/reconcile?accountId=cash-1');
     });
 
     it('navigates to /investments with accountId for brokerage accounts', () => {
