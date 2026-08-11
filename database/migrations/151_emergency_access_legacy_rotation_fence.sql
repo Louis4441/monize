@@ -1,6 +1,6 @@
--- 146: refuse a generation-blind token rotation that would kill a delivered link.
+-- 151: refuse a generation-blind token rotation that would kill a delivered link.
 --
--- Migrations 144 and 145 add the delivery columns and the grant generation, and
+-- Migrations 149 and 150 add the delivery columns and the grant generation, and
 -- both land in the same release as the code that writes them -- so no binary exists
 -- that knows one and not the other, and nothing has to translate between them. The
 -- binary that genuinely differs is the release running in production today, which

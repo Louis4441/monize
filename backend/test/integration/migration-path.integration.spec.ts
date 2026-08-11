@@ -22,10 +22,10 @@ import {
  * top by db-migrate, triggers and all.
  *
  * This suite builds exactly that database: the committed baseline fixture (main's
- * schema.sql at the SHA named in its header, max migration 143) plus the full
+ * schema.sql at the SHA named in its header, max migration 148) plus the full
  * migrations directory in filename order, `synchronize: false` throughout.
  * Replaying the whole directory matches db-migrate's behaviour on such an install
- * -- files <= 143 are no-ops there, 144+ do the real work. Then it runs the real
+ * -- files <= 148 are no-ops there, 149+ do the real work. Then it runs the real
  * services against the result, because "the migrations apply" and "the migrated
  * schema serves the code" are different claims and production needs both.
  */
@@ -51,12 +51,17 @@ describe("production migration path (baseline schema + migrations)", () => {
     // something `pretest:integration` neither grants nor checks. Without the
     // privilege the failure below is a permissions error from `CREATE DATABASE`
     // that reads nothing like its cause, so say the cause here instead.
-    const [{ rolcreatedb }] = (await admin.query(
-      `SELECT rolcreatedb FROM pg_roles WHERE rolname = current_user`,
-    )) as { rolcreatedb: boolean }[];
-    if (!rolcreatedb) {
+    // The role name comes from the database rather than from
+    // `INTEGRATION_TYPEORM_OPTIONS`, which is typed `TypeOrmModuleOptions` and does
+    // not expose `username` -- and `current_user` is the more accurate answer
+    // anyway, since it names the role actually connected.
+    const [role] = (await admin.query(
+      `SELECT current_user AS name, rolcreatedb
+         FROM pg_roles WHERE rolname = current_user`,
+    )) as { name: string; rolcreatedb: boolean }[];
+    if (!role?.rolcreatedb) {
       throw new Error(
-        `the integration database role (${INTEGRATION_TYPEORM_OPTIONS.username}) ` +
+        `the integration database role (${role?.name ?? "unknown"}) ` +
           `lacks CREATEDB, which this suite needs to build a scratch database for ` +
           `the migration replay: ALTER ROLE ... CREATEDB, or run against the ` +
           `superuser the postgres image creates from POSTGRES_USER`,
@@ -287,7 +292,7 @@ describe("production migration path (baseline schema + migrations)", () => {
 
     // Current main's grant-loop rotation, verbatim shape: new hash, blind to the
     // ciphertext and the generation. With an undelivered credential on the row,
-    // migration 146's fence must refuse it.
+    // migration 151's fence must refuse it.
     await expect(
       db.query(
         `UPDATE emergency_access_contacts

@@ -1,4 +1,4 @@
--- 144: separate an emergency-access delivery from the claim that coordinates it.
+-- 149: separate an emergency-access delivery from the claim that coordinates it.
 --
 -- Migration 140 gave the two multi-replica emergency-access jobs a claim each,
 -- which stopped two replicas doing the work twice. It did not make either one
@@ -32,7 +32,7 @@
 -- `claim_notified_at` is NULL is a grant that has not been delivered, and the
 -- daily check re-runs the notification for exactly those contacts. Nothing has
 -- to remember to enqueue anything, which is the point. `docs/cron-jobs.md` has
--- the operator-facing version of this contract and of migration 146's fence.
+-- the operator-facing version of this contract and of migration 151's fence.
 --
 -- The credential is issued once and *reused* until delivery is acknowledged, which
 -- is the other half of making a retry safe. SMTP acceptance and a database write
@@ -90,7 +90,7 @@ UPDATE emergency_access_contacts
    AND claim_token_used_at IS NOT NULL
    AND claim_voided_reason IS NULL;
 
--- No index for `claim_notified_at IS NULL` here on purpose: migration 145 moves
+-- No index for `claim_notified_at IS NULL` here on purpose: migration 150 moves
 -- "is a link still owed" onto the generation two statements later, in the same
 -- release, so building one for a predicate nothing will read is churn an install
 -- with real data pays for nothing.

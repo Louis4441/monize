@@ -512,11 +512,11 @@ describe("emergency access across grant cycles", () => {
 
   describe("during a rolling deployment", () => {
     /**
-     * The binary in production *today* (pre-144) rotates the credential with
+     * The binary in production *today* (pre-149) rotates the credential with
      * exactly this statement -- a TypeORM save of the four columns its entity
      * declares -- guarded only by a snapshot read of `granted_at`. It predates
      * `claim_token_ciphertext` and `notified_grant_generation`, so it can touch
-     * neither (REMAINING-002). Migration 146's fence is what has to decide,
+     * neither (REMAINING-002). Migration 151's fence is what has to decide,
      * per row state, whether this write may land.
      */
     const oldBinaryRotates = (

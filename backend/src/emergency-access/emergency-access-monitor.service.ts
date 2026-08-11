@@ -24,7 +24,7 @@ import {
 } from "../notifications/email-templates";
 import { emailTranslator } from "../i18n/email-translator";
 import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
-import { hashToken } from "../auth/crypto.util";
+import { hashToken, tokenHashesEqual } from "../auth/crypto.util";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { withSystemContext } from "../common/db/with-context";
@@ -574,7 +574,7 @@ export class EmergencyAccessMonitorService {
     ) {
       try {
         const stored = this.encryption.decrypt(contact.claimTokenCiphertext);
-        if (hashToken(stored) === contact.claimTokenHash) {
+        if (tokenHashesEqual(hashToken(stored), contact.claimTokenHash)) {
           // Re-send the same URL, with the expiration the database will enforce.
           // Nothing on the row changes, so a link already delivered keeps working
           // whatever happens to this attempt.

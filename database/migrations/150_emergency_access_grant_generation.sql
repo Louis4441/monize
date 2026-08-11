@@ -1,6 +1,6 @@
--- 145: emergency-access delivery state belongs to one grant cycle, not to the row.
+-- 150: emergency-access delivery state belongs to one grant cycle, not to the row.
 --
--- Migration 144 added `claim_notified_at` so a resumed grant could tell a contact
+-- Migration 149 added `claim_notified_at` so a resumed grant could tell a contact
 -- who already holds a working link from one still owed a notice. That fixed the
 -- resume, and made the marker permanent: `contactsAwaitingNotice` selected
 -- `claim_notified_at IS NULL`, and nothing ever set it back to NULL (audit
@@ -38,17 +38,17 @@
 -- by one query (`contactsAwaitingNotice`), which is what keeps them from drifting.
 --
 -- Backfill: every existing installation is on generation 1 (the column default),
--- so a contact migration 144 could confirm was delivered to belongs to the cycle
+-- so a contact migration 149 could confirm was delivered to belongs to the cycle
 -- that is current now, and `notified_grant_generation = 1` says so. The next grant
 -- advances to 2 and owes them a link again, which is the whole point.
 --
 -- Note what is deliberately *not* inferred: a contact with a token hash but no
--- `claim_notified_at` stays NULL here, for the same reason migration 144 refused to
+-- `claim_notified_at` stays NULL here, for the same reason migration 149 refused to
 -- treat a hash as evidence of delivery. **State the consequence plainly, because it
 -- is a user-visible upgrade effect rather than a no-op:** a contact who was sent a
 -- link under the previous release and has not opened it is still owed one here, so
 -- the first daily sweep after the upgrade issues a fresh link and the one in their
--- inbox stops working. That is the deliberate trade migration 144 argues for -- a
+-- inbox stops working. That is the deliberate trade migration 149 argues for -- a
 -- link that is known to work beats one nobody can confirm -- and it belongs in the
 -- release notes, not only in a migration header.
 
@@ -74,6 +74,6 @@ CREATE INDEX IF NOT EXISTS idx_eac_awaiting_notice
     ON emergency_access_contacts(owner_user_id, notified_grant_generation);
 
 -- Defensive only: no release ever shipped `idx_eac_pending_notify`, because
--- migration 144 no longer creates it. Kept so a database that applied a
+-- migration 149 no longer creates it. Kept so a database that applied a
 -- pre-release build of 144 converges on the same schema as a fresh install.
 DROP INDEX IF EXISTS idx_eac_pending_notify;

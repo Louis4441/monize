@@ -1,11 +1,11 @@
 -- Frozen baseline for backend/test/integration/migration-path.integration.spec.ts:
--- database/schema.sql exactly as of main commit 7470e6501a9aed507a49a79e17d789ddd487586b
--- (max migration 143). This is the schema an install running that release has on
--- disk, before this branch's migrations 144-146 are applied.
+-- database/schema.sql exactly as of main commit 9ea9cc6ccaafba0a63da29f996e1c72938f24ac3
+-- (max migration 148). This is the schema an install running that release has on
+-- disk, before this branch's migrations 149-151 are applied.
 --
 -- Deliberately frozen, not tracked: the suite's claim is "these migrations apply to
 -- a real released schema", and pinning one keeps that claim stable. Regenerate only
--- when the branch is rebased onto a newer main, and update the SHA above:
+-- when the branch is rebased or merged onto a newer main, and update the SHA above:
 --   git show <new-main-sha>:database/schema.sql > this file (below this header)
 -- migration-path.integration.spec.ts asserts this file does NOT already contain the
 -- objects under test, so a regeneration that swept them in cannot silently make the
@@ -393,9 +393,38 @@ CREATE TABLE attachment_blob_tombstones (
     storage_provider VARCHAR(20) NOT NULL,
     storage_key VARCHAR(255) NOT NULL,
     deleted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Non-NULL marks this row as an upload still in flight and says until when
+    -- (migration 146). The sweeper skips a live lease, which is a *latency*
+    -- mechanism: it exists so the sweep does not cause avoidable upload failures.
+    -- NULL means an ordinary deletion record, swept immediately.
+    upload_lease_expires_at TIMESTAMP,
+    -- The sweeper's claim, set by a conditional UPDATE *before* the external
+    -- delete. This is the *correctness* mechanism: the uploader's "clear the
+    -- intent" step requires `swept_at IS NULL` inside the transaction that commits
+    -- the metadata row, so metadata pointing at deleted bytes is impossible
+    -- whichever of the two wins the row (audit RV4-002).
+    swept_at TIMESTAMP,
+    -- How long a swept *upload intent* is kept after its object was deleted
+    -- (migration 147). The fence above is about metadata; this is about bytes. A
+    -- put that stalled past its lease can land after the sweep deleted the key, and
+    -- a process killed before its compensating delete leaves those bytes with no
+    -- tombstone to enumerate them -- unreferenced and undiscoverable (audit
+    -- RRV4-002). Keeping the row until this passes means the next hourly sweep
+    -- re-deletes the key and only then retires the row. NULL on an ordinary
+    -- deletion record, whose metadata is already gone, so nothing can write those
+    -- bytes again.
+    late_write_quarantine_until TIMESTAMP,
     attempts INTEGER NOT NULL DEFAULT 0,
     last_error TEXT
 );
+
+-- The sweeper's candidate predicate: rows with no live upload lease. A quarantined
+-- row is found again through this same arm, because the claim that quarantined it
+-- also cleared the lease -- which is why `late_write_quarantine_until` carries no
+-- index of its own (migration 145): nothing selects on it.
+CREATE INDEX idx_abt_sweepable
+    ON attachment_blob_tombstones(storage_provider, deleted_at)
+    WHERE upload_lease_expires_at IS NULL;
 
 -- Unique, so a tombstone is idempotent: two records for one object describe the
 -- same pending deletion, and the trigger can therefore be a plain
@@ -426,6 +455,60 @@ CREATE TRIGGER trg_attachment_blob_tombstone
     FOR EACH ROW
     WHEN (OLD.storage_provider <> 'database')
     EXECUTE FUNCTION record_attachment_blob_tombstone();
+
+-- Late-write quarantine enforcement (migration 148). The sweeper's claim settles
+-- what metadata may commit, not what bytes exist: a put stalled past its lease can
+-- land after the key was deleted. The quarantine is a rule spread across the claim,
+-- the retire and the uploader's compensating clear, and these two triggers are what
+-- make a forgotten predicate in any of them fail loudly rather than silently drop a
+-- row whose key may still be written. Covers DELETE only -- TRUNCATE fires no
+-- row-level trigger.
+CREATE OR REPLACE FUNCTION stamp_attachment_quarantine() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.late_write_quarantine_until := COALESCE(
+        NEW.late_write_quarantine_until,
+        OLD.late_write_quarantine_until,
+        CURRENT_TIMESTAMP + INTERVAL '6 hours'
+    );
+    RETURN NEW;
+END;
+$$;
+
+-- On any claim (swept_at NULL -> non-NULL) of a row that was an upload intent (it
+-- had a lease), stamp the quarantine if unset. Covers a writer that does not know
+-- the column exists; COALESCE lets the application's own value win.
+CREATE TRIGGER trg_abt_stamp_quarantine
+    BEFORE UPDATE ON attachment_blob_tombstones
+    FOR EACH ROW
+    WHEN (
+      NEW.swept_at IS NOT NULL
+      AND OLD.swept_at IS NULL
+      AND OLD.upload_lease_expires_at IS NOT NULL
+    )
+    EXECUTE FUNCTION stamp_attachment_quarantine();
+
+CREATE OR REPLACE FUNCTION reject_quarantined_tombstone_delete() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+      'attachment tombstone % is under late-write quarantine until %; a stalled upload may still write to this key',
+      OLD.storage_key, OLD.late_write_quarantine_until
+      USING ERRCODE = 'raise_exception';
+END;
+$$;
+
+-- Reject deletion of a still-quarantined row. retire()/retireKey() exclude such
+-- rows by the quarantine and both uploader clears exclude them by `swept_at IS
+-- NULL`, so no application path should ever trip this.
+CREATE TRIGGER trg_abt_reject_quarantined_delete
+    BEFORE DELETE ON attachment_blob_tombstones
+    FOR EACH ROW
+    WHEN (
+      OLD.late_write_quarantine_until IS NOT NULL
+      AND OLD.late_write_quarantine_until > CURRENT_TIMESTAMP
+    )
+    EXECUTE FUNCTION reject_quarantined_tombstone_delete();
 
 -- Tags
 CREATE TABLE tags (
@@ -1487,6 +1570,12 @@ CREATE TABLE import_jobs (
     -- metadata is missing" -- two states the retryable flag used to fold into
     -- one and offer as an ordinary retry, which re-imported the file.
     data_committed BOOLEAN NOT NULL DEFAULT false,
+    -- The current attempt's identity (migration 144), minted by `claim()` and
+    -- required by every write the worker makes. The reaper clears it, which is
+    -- what stops a worker it already gave up on from committing anyway: the
+    -- import transaction's last statement is a fenced compare-and-set on this
+    -- column, and a zero-row result rolls the whole import back (audit RV4-001).
+    attempt_token UUID,
     heartbeat_at TIMESTAMP,
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
@@ -1498,6 +1587,39 @@ CREATE TABLE import_jobs (
     CONSTRAINT import_jobs_status_check
         CHECK (status IN ('pending', 'running', 'completed', 'failed'))
 );
+
+-- `data_committed` may only go false -> true while the job is `running`
+-- (migration 145). The application checkpoint also requires the attempt's token,
+-- but that only binds code that knows the column exists: during a rolling
+-- deployment a previous-version worker runs `UPDATE import_jobs SET
+-- data_committed = true WHERE id = $1`, naming no token, and would otherwise
+-- commit the whole file after the new reaper had already failed the job and
+-- advertised a retry (audit RRV4-001). The reaper's action is `status = 'failed'`,
+-- so this refuses exactly that commit -- to either version -- as a statement error
+-- that aborts the import transaction.
+--
+-- Deliberately not "and has a token": an old worker's normal unreaped state is
+-- `running` with a NULL token, and refusing that would break every import in
+-- flight during the rollout.
+CREATE OR REPLACE FUNCTION reject_unfenced_import_checkpoint() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+      'import job % may not record a data commit while status is %; the attempt was reaped',
+      OLD.id, NEW.status
+      USING ERRCODE = 'raise_exception';
+END;
+$$;
+
+CREATE TRIGGER trg_import_job_fenced_checkpoint
+    BEFORE UPDATE ON import_jobs
+    FOR EACH ROW
+    WHEN (
+      NEW.data_committed
+      AND NOT OLD.data_committed
+      AND NEW.status <> 'running'
+    )
+    EXECUTE FUNCTION reject_unfenced_import_checkpoint();
 
 CREATE INDEX idx_import_jobs_user ON import_jobs(user_id);
 CREATE INDEX idx_import_jobs_staged_file ON import_jobs(staged_file_id);

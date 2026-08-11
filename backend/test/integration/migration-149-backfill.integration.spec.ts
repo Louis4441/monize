@@ -10,7 +10,7 @@ import {
 import { applyRlsPolicies } from "../helpers/rls-setup";
 
 /**
- * Migration 144's backfill, against the states the *previous* implementation
+ * Migration 149's backfill, against the states the *previous* implementation
  * could actually leave behind (audit RV4-003).
  *
  * The point of the fixture is the ordering the old code used: it persisted
@@ -28,24 +28,24 @@ import { applyRlsPolicies } from "../helpers/rls-setup";
  * concludes from production-shaped rows, so the fixture is a real database and the
  * migration is read from disk.
  */
-describe("migration 144 backfill over legacy delivery state", () => {
+describe("migration 149 backfill over legacy delivery state", () => {
   let dataSource: DataSource;
   let owner: string;
 
   const MIGRATION = path.join(
     __dirname,
-    "../../../database/migrations/144_emergency_access_delivery_state.sql",
+    "../../../database/migrations/149_emergency_access_delivery_state.sql",
   );
 
   const applyMigration = () =>
     dataSource.query(fs.readFileSync(MIGRATION, "utf8"));
 
-  /** Undo migration 144, so the fixture starts from a genuinely pre-144 table. */
+  /** Undo migration 149, so the fixture starts from a genuinely pre-149 table. */
   const removeColumns = async () => {
-    // Later migrations depend on the 144 columns: the generation column (145)
-    // and the legacy-rotation fence (146), whose WHEN clause references
+    // Later migrations depend on the 149 columns: the generation column (150)
+    // and the legacy-rotation fence (151), whose WHEN clause references
     // `claim_token_ciphertext`. Both have to come off before the columns to reach
-    // the genuinely pre-144 shape this spec seeds -- a pre-144 database has
+    // the genuinely pre-149 shape this spec seeds -- a pre-149 database has
     // neither.
     await dataSource.query(
       `DROP TRIGGER IF EXISTS trg_eac_reject_legacy_token_rotation ON emergency_access_contacts`,
@@ -88,7 +88,7 @@ describe("migration 144 backfill over legacy delivery state", () => {
 
   beforeAll(async () => {
     if (!fs.existsSync(MIGRATION)) {
-      throw new Error(`Migration 144 not found at ${MIGRATION}`);
+      throw new Error(`Migration 149 not found at ${MIGRATION}`);
     }
     dataSource = new DataSource(INTEGRATION_TYPEORM_OPTIONS as never);
     await dataSource.initialize();

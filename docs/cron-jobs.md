@@ -55,10 +55,10 @@ already in the recipient's inbox.
 
 ### Rolling deployments and rollback
 
-Migration 146 installs a trigger that refuses a *generation-blind* token rotation -- a new
+Migration 151 installs a trigger that refuses a *generation-blind* token rotation -- a new
 `claim_token_hash` written without touching `claim_token_ciphertext` or
 `notified_grant_generation` -- in exactly two states: an undelivered credential in flight,
-or a live delivered link. Only the pre-144 binary writes that shape, so the trigger is what
+or a live delivered link. Only the pre-149 binary writes that shape, so the trigger is what
 stops a stale pod from killing a link the new protocol has already delivered during a
 rolling deploy.
 
@@ -72,7 +72,7 @@ must roll back and clear it, drop the trigger by hand:
 DROP TRIGGER IF EXISTS trg_eac_reject_legacy_token_rotation ON emergency_access_contacts;
 ```
 
-One upgrade effect worth announcing rather than discovering: migration 144 treats only a
+One upgrade effect worth announcing rather than discovering: migration 149 treats only a
 *consumed* token as proof of delivery, so a contact who was sent a link under the previous
 release and has not opened it is still owed one. The first sweep after the upgrade issues a
 fresh link and the one in their inbox stops working. That is deliberate -- a link known to
