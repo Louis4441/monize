@@ -257,6 +257,10 @@ describe("MnyImportService", () => {
   const context: JobRunContext = {
     jobId: "job-1",
     userId: "user-1",
+    // The attempt's fencing token: the commit checkpoint presents it, and a
+    // mismatch rolls the import back rather than committing behind the reaper's
+    // back (audit RV4-001).
+    attemptToken: "9f1b7c2e-0000-4000-8000-abcdefabcdef",
     reportProgress: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -273,10 +277,12 @@ describe("MnyImportService", () => {
       discard: jest.fn().mockResolvedValue(undefined),
       runClaimed: jest.fn().mockResolvedValue(true),
       fail: jest.fn().mockResolvedValue(undefined),
-      // The lease check the write transaction ends with. Resolving means "still
-      // holds the slot"; the refusal path is a property of real transactions and
-      // is asserted in test/integration/mny-import-job.integration.spec.ts.
-      assertStillHoldsSlot: jest.fn().mockResolvedValue(undefined),
+      // Written INSIDE the import transaction, so it commits with the rows it
+      // describes: a failure after that commit must not be offered as a retry
+      // that re-imports the whole file (audit P4-002). The refusal path -- a
+      // fenced checkpoint matching zero rows -- is a property of real
+      // transactions and is asserted in
+      // test/integration/mny-import-job.integration.spec.ts.
       markDataCommitted: jest.fn().mockResolvedValue(undefined),
     };
     postProcessing = { run: jest.fn().mockResolvedValue(undefined) };
@@ -369,7 +375,10 @@ describe("MnyImportService", () => {
       expect(jobs.create).not.toHaveBeenCalled();
     });
 
-    it("refuses a second concurrent import", async () => {
+    it("gives the friendly 409 without a doomed insert when an import is already active", async () => {
+      // The advisory pre-check. It cannot decide anything -- two requests can
+      // both read false here -- but when it does see an active job it saves the
+      // INSERT the unique index would refuse anyway.
       jobs.hasActiveJob.mockResolvedValue(true);
 
       await expect(
@@ -379,9 +388,12 @@ describe("MnyImportService", () => {
     });
 
     it("passes the 409 through when only the insert catches the race", async () => {
-      // The advisory count sees nothing, because the other request has not
-      // committed yet; `create` refuses on the unique index instead. This is
-      // the only path that can distinguish a real concurrent start.
+      // The regression guard for P4-001. `hasActiveJob()` before an
+      // unconditional insert is a check-then-act: two simultaneous starts both
+      // counted zero, and both used to insert -- one file imported twice. The
+      // advisory count sees nothing here, because the other request has not
+      // committed yet; `create` refuses on the partial unique index instead.
+      // This is the only path that can distinguish a real concurrent start.
       jobs.create.mockRejectedValue(importAlreadyRunningException());
 
       await expect(
@@ -597,6 +609,28 @@ describe("MnyImportService", () => {
       await expect(run()).rejects.toBeInstanceOf(MnyStagedFileMissingError);
     });
 
+    it("checkpoints the commit inside the import transaction", async () => {
+      // The regression guard for P4-002. `writeAll` commits, then
+      // post-processing, verification, staged-byte removal and the terminal
+      // status write all happen outside it -- and a failure in any of them used
+      // to leave every imported row in place while the job still advertised
+      // itself as retryable. The mapper generates fresh UUIDs on every parse and
+      // nothing on an imported row identifies its source, so the retry inserted
+      // the file a second time.
+      await run();
+
+      expect(jobs.markDataCommitted).toHaveBeenCalledWith(
+        expect.anything(),
+        "job-1",
+        context.attemptToken,
+      );
+      // Inside the transaction, before it commits -- which is what makes the
+      // checkpoint land with the rows rather than after them.
+      expect(jobs.markDataCommitted.mock.invocationCallOrder[0]).toBeLessThan(
+        postProcessing.run.mock.invocationCallOrder[0],
+      );
+    });
+
     it("re-parses the staged bytes rather than trusting the preview", async () => {
       await run();
 
@@ -703,7 +737,7 @@ describe("MnyImportService", () => {
       expect(staging.remove).toHaveBeenCalledWith("user-1", "staged-1");
     });
 
-    it("checkpoints data_committed on the write transaction's own manager", async () => {
+    it("checkpoints data_committed on the write transaction's own manager, under this attempt's token", async () => {
       // The regression this pins: the column, the migration preflight branching
       // on it and its integration spec all shipped with nothing setting it, so
       // every superseded or stalled job was retired `retryable = true` -- even
@@ -714,17 +748,38 @@ describe("MnyImportService", () => {
       // the flag would commit independently of the rows it describes, which is
       // the failure it exists to prevent: it would claim a commit that rolled
       // back.
+      //
+      // And the token matters as much as the manager: it is the whole fence. An
+      // unconditional checkpoint asks whether the rows are written, never whether
+      // this worker is still the one allowed to write them, so a worker the
+      // reaper already gave up on committed the file anyway -- beside a job row
+      // inviting the retry that imports it a second time (audit RV4-001).
       await run();
 
       expect(jobs.markDataCommitted).toHaveBeenCalledTimes(1);
-      const [manager, jobId] = jobs.markDataCommitted.mock.calls[0];
+      const [manager, jobId, attemptToken] =
+        jobs.markDataCommitted.mock.calls[0];
       expect(jobId).toBe("job-1");
-      expect(manager).toBe(jobs.assertStillHoldsSlot.mock.calls[0][0]);
-      // ...and only after the slot check, so a job that lost its slot rolls back
-      // rather than checkpointing first.
-      expect(
-        jobs.assertStillHoldsSlot.mock.invocationCallOrder[0],
-      ).toBeLessThan(jobs.markDataCommitted.mock.invocationCallOrder[0]);
+      expect(attemptToken).toBe(context.attemptToken);
+      // The manager the write transaction handed the writers, not a fresh one.
+      expect(manager).toBe(mockedWriteAccounts.mock.calls[0][0]);
+    });
+
+    it("checkpoints last, after every writer has run", async () => {
+      // The checkpoint is also the fence, and a fence that refuses has to roll
+      // the import back -- which it can only do while the transaction is still
+      // open. Placed before a writer it would leave that writer's rows outside
+      // what the refusal undoes.
+      await run();
+
+      const checkpoint = jobs.markDataCommitted.mock.invocationCallOrder[0];
+      for (const writer of [
+        mockedWriteAccounts,
+        mockedWriteTransactions,
+        mockedWriteInvestments,
+      ]) {
+        expect(writer.mock.invocationCallOrder[0]).toBeLessThan(checkpoint);
+      }
     });
 
     it("reports what was created and skipped", async () => {

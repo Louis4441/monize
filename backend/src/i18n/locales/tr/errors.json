@@ -536,7 +536,8 @@
     "empty": "Yüklenen dosya boş",
     "fileTooLarge": "Dosya, {{ max }} baytlık maksimum boyutu aşıyor",
     "unsupportedType": "Desteklenmeyen dosya türü. İzin verilen türler: {{ types }}",
-    "tooMany": "Bu işlemde zaten en fazla {{ max }} ek var"
+    "tooMany": "Bu işlemde zaten en fazla {{ max }} ek var",
+    "swept": "Yükleme çok uzun sürdü ve depolama alanı geri alındı. Lütfen tekrar deneyin."
   },
   "strategies": {
     "accountNotFound": "Hesap bulunamadı",

@@ -106,10 +106,24 @@ export class ImportJob {
    *
    * Set in the import's own write transaction, so it is never true for a commit
    * that rolled back. It is what makes `retryable` honest after a stall: before
-   * the commit a retry costs nothing, after it a retry imports the file twice.
+   * the commit a retry costs nothing, after it a retry imports the file twice --
+   * the mapper assigns fresh UUIDs on every parse and nothing on an inserted row
+   * identifies the source record, so nothing deduplicates the second run.
    */
   @Column({ name: "data_committed", default: false })
   dataCommitted: boolean;
+
+  /**
+   * The current attempt's identity, minted by `claim()` (migration 144).
+   *
+   * Every write the worker makes requires it, and the reaper clears it when it
+   * takes the job away -- which is what stops a worker that has already lost the
+   * job from committing anyway. `retryable` cannot express this: it describes what
+   * happened, and the question is whether the write may happen at all
+   * (audit RV4-001).
+   */
+  @Column({ type: "uuid", name: "attempt_token", nullable: true })
+  attemptToken: string | null;
 
   /** Bumped by the running job; the reaper's liveness signal. */
   @Column({ type: "timestamp", name: "heartbeat_at", nullable: true })

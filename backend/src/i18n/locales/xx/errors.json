@@ -5,7 +5,8 @@
     "empty": "[XX-Uploaded file is empty-XX]",
     "fileTooLarge": "[XX-File exceeds the maximum size of {{ max }} bytes-XX]",
     "unsupportedType": "[XX-Unsupported file type. Allowed types: {{ types }}-XX]",
-    "tooMany": "[XX-This transaction already has the maximum of {{ max }} attachments-XX]"
+    "tooMany": "[XX-This transaction already has the maximum of {{ max }} attachments-XX]",
+    "swept": "[XX-The upload took too long and its storage was reclaimed. Please try again.-XX]"
   },
   "accounts": {
     "accountWithIdNotFound": "[XX-Account with ID {{ id }} not found-XX]",

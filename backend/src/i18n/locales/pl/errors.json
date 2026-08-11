@@ -536,7 +536,8 @@
     "empty": "Przesłany plik jest pusty",
     "fileTooLarge": "Plik przekracza maksymalny rozmiar {{ max }} bajtów",
     "unsupportedType": "Nieobsługiwany typ pliku. Dozwolone typy: {{ types }}",
-    "tooMany": "Ta transakcja ma już maksymalną liczbę {{ max }} załączników"
+    "tooMany": "Ta transakcja ma już maksymalną liczbę {{ max }} załączników",
+    "swept": "Przesyłanie trwało zbyt długo i jego miejsce w magazynie zostało zwolnione. Spróbuj ponownie."
   },
   "strategies": {
     "accountNotFound": "Nie znaleziono konta",
