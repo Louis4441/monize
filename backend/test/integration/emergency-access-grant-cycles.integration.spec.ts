@@ -478,29 +478,45 @@ describe("emergency access across grant cycles", () => {
     expect(returnedRows(consumed)).toEqual([]);
   });
 
-  describe("during a rolling deployment", () => {
-    /**
-     * The previous binary's grant acknowledgement (audit V4R3-001): it writes
-     * `claim_notified_at` and clears the ciphertext, and does not know
-     * `notified_grant_generation` exists. Executed verbatim against the migrated
-     * schema, so the compatibility trigger is what has to make it land in the
-     * current cycle.
-     */
-    const oldBinaryAcknowledges = (contactId: string): Promise<unknown> =>
+  it("honours a delivered claim token exactly once", async () => {
+    // The single-use property (audit P4-007) against a real database rather than
+    // by inspecting the statement's text. Two callers race for one live token: the
+    // predicates are re-evaluated after the row lock, so exactly one gets a row
+    // back and every other is refused before a credential is touched. Asserting
+    // that the SQL *contains* `claim_token_used_at IS NULL` cannot tell a working
+    // conditional update from a `findOne` followed by a save.
+    const { token } = await runInactivityGrant();
+    const consume = (): Promise<unknown> =>
       dataSource.query(
         `UPDATE emergency_access_contacts
-            SET claim_notified_at = CURRENT_TIMESTAMP,
-                claim_token_ciphertext = NULL
-          WHERE id = $1`,
-        [contactId],
+            SET claim_token_used_at = CURRENT_TIMESTAMP,
+                claim_token_hash = NULL,
+                claim_token_ciphertext = NULL,
+                claim_voided_reason = NULL
+          WHERE claim_token_hash = $1
+            AND claim_token_used_at IS NULL
+            AND claim_token_expires_at IS NOT NULL
+            AND claim_token_expires_at >= CURRENT_TIMESTAMP
+          RETURNING id, owner_user_id`,
+        [hashToken(token)],
       );
 
+    const winners = (await Promise.all([consume(), consume()])).map(
+      (result) => returnedRows(result).length,
+    );
+
+    expect(winners.filter((count) => count === 1)).toHaveLength(1);
+    expect(winners.filter((count) => count === 0)).toHaveLength(1);
+    expect((await contactRow()).claim_token_used_at).not.toBeNull();
+  });
+
+  describe("during a rolling deployment", () => {
     /**
-     * The binary in production *today* (pre-147) rotates the credential with
+     * The binary in production *today* (pre-144) rotates the credential with
      * exactly this statement -- a TypeORM save of the four columns its entity
      * declares -- guarded only by a snapshot read of `granted_at`. It predates
      * `claim_token_ciphertext` and `notified_grant_generation`, so it can touch
-     * neither (REMAINING-002). Migration 148's fence is what has to decide,
+     * neither (REMAINING-002). Migration 146's fence is what has to decide,
      * per row state, whether this write may land.
      */
     const oldBinaryRotates = (
@@ -518,63 +534,43 @@ describe("emergency access across grant cycles", () => {
         [contactId, hashToken(rawToken)],
       );
 
-    it("translates an old-binary acknowledgement into the current generation", async () => {
-      // A new pod claims the grant and mints token A, but the *old* pod delivers it
-      // and writes the old-style acknowledgement.
-      await lastSeenDaysAgo(30);
-      await monitor.runDailyCheck();
-      const contactId = (await contactRow()).id;
-      const tokenA = (await contactRow()).claim_token_hash;
-      const generation = (await settingsRow()).grant_generation;
-
-      // Undo only the generation-aware half of the record, leaving the row as the
-      // old binary would: notified, ciphertext cleared, generation NULL.
-      await dataSource.query(
-        `UPDATE emergency_access_contacts
-            SET claim_notified_at = NULL, notified_grant_generation = NULL
-          WHERE id = $1`,
-        [contactId],
-      );
-      await oldBinaryAcknowledges(contactId);
-
-      // The trigger must have stamped the current generation, so the contact is not
-      // treated as owed and token A is never rotated.
-      const after = await contactRow();
-      expect(after.notified_grant_generation).toBe(generation);
-      expect(after.claim_token_hash).toBe(tokenA);
-
-      const before = sent.length;
-      await monitor.runDailyCheck();
-      expect(sent.slice(before)).toEqual([]);
-      expect((await contactRow()).claim_token_hash).toBe(tokenA);
-    });
-
-    it("does not let a delayed older-generation acknowledgement re-open a served contact", async () => {
+    it("leaves a contact served by a newer cycle alone when an older one resumes", async () => {
       // Generation N delivered; the owner re-armed and generation N+1 delivered a
-      // fresh link; now generation N's delayed acknowledgement arrives.
+      // fresh link. A resume still working in generation N must treat that contact
+      // as served -- not as owed. Both halves of "is a link owed" have to agree on
+      // direction for that: the read used to ask for inequality while the write was
+      // forward-only, so the older resume selected the contact, minted over the
+      // hash that N+1 had just delivered, and then could not record it.
+      //
+      // Driven through the service rather than by replaying its SQL here: a spec
+      // that transcribes the predicate it is testing passes whatever the service
+      // does with it, which is how the drift survived.
       await runInactivityGrant();
       const first = (await settingsRow()).grant_generation;
       await lastSeenDaysAgo(0);
       await monitor.runDailyCheck(); // revoke + re-arm
       const second = await runInactivityGrant();
       expect(second.generation).toBeGreaterThan(first);
-      const servedGeneration = (await contactRow()).notified_grant_generation;
 
-      // The forward-only markContactNotified predicate, exercised directly: an
-      // update carrying the older generation must not lower the stored one.
+      const served = await contactRow();
+      expect(served.notified_grant_generation).toBe(second.generation);
+
+      // Roll the owner's cycle back to the older generation, which is the state a
+      // resume that read before the re-arm is working in, and re-run the sweep.
       await dataSource.query(
-        `UPDATE emergency_access_contacts
-            SET claim_notified_at = CURRENT_TIMESTAMP,
-                notified_grant_generation = $2
-          WHERE owner_user_id = $1
-            AND (notified_grant_generation IS NULL
-                 OR notified_grant_generation < $2)`,
+        `UPDATE emergency_access_settings SET grant_generation = $2
+          WHERE owner_user_id = $1`,
         [owner, first],
       );
+      const before = sent.length;
+      await monitor.runDailyCheck();
 
-      expect((await contactRow()).notified_grant_generation).toBe(
-        servedGeneration,
+      // The delivered link is the assertion: rotating the hash is what kills it,
+      // and that happens before any send.
+      expect((await contactRow()).claim_token_hash).toBe(
+        served.claim_token_hash,
       );
+      expect(sent.slice(before)).toEqual([]);
     });
 
     it("refuses the pre-delivery-column binary's rotation over a live delivered link", async () => {

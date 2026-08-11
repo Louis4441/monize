@@ -21,17 +21,17 @@ import {
  * current main's schema.sql state with this branch's migration files replayed on
  * top by db-migrate, triggers and all.
  *
- * This suite builds exactly that database: the committed pre-Phase4 fixture
- * (main's schema.sql, max migration 135) plus the full migrations directory in
- * filename order, `synchronize: false` throughout. Replaying the whole directory
- * matches db-migrate's behaviour on such an install -- files <= 135 are no-ops
- * there, 136+ do the real work. Then it runs the real services against the
- * result, because "the migrations apply" and "the migrated schema serves the
- * code" are different claims and production needs both.
+ * This suite builds exactly that database: the committed baseline fixture (main's
+ * schema.sql at the SHA named in its header, max migration 143) plus the full
+ * migrations directory in filename order, `synchronize: false` throughout.
+ * Replaying the whole directory matches db-migrate's behaviour on such an install
+ * -- files <= 143 are no-ops there, 144+ do the real work. Then it runs the real
+ * services against the result, because "the migrations apply" and "the migrated
+ * schema serves the code" are different claims and production needs both.
  */
-describe("production migration path (pre-Phase4 schema + migrations)", () => {
+describe("production migration path (baseline schema + migrations)", () => {
   const SCRATCH_DB = "monize_migration_path_test";
-  const FIXTURE = path.join(__dirname, "fixtures/schema-pre-phase4.sql");
+  const FIXTURE = path.join(__dirname, "fixtures/schema-baseline.sql");
   const MIGRATIONS_DIR = path.join(__dirname, "../../../database/migrations");
 
   let admin: DataSource;
@@ -47,6 +47,21 @@ describe("production migration path (pre-Phase4 schema + migrations)", () => {
       dropSchema: false,
     } as never);
     await admin.initialize();
+    // This suite needs a scratch database of its own, which needs CREATEDB --
+    // something `pretest:integration` neither grants nor checks. Without the
+    // privilege the failure below is a permissions error from `CREATE DATABASE`
+    // that reads nothing like its cause, so say the cause here instead.
+    const [{ rolcreatedb }] = (await admin.query(
+      `SELECT rolcreatedb FROM pg_roles WHERE rolname = current_user`,
+    )) as { rolcreatedb: boolean }[];
+    if (!rolcreatedb) {
+      throw new Error(
+        `the integration database role (${INTEGRATION_TYPEORM_OPTIONS.username}) ` +
+          `lacks CREATEDB, which this suite needs to build a scratch database for ` +
+          `the migration replay: ALTER ROLE ... CREATEDB, or run against the ` +
+          `superuser the postgres image creates from POSTGRES_USER`,
+      );
+    }
     await admin.query(`DROP DATABASE IF EXISTS ${SCRATCH_DB}`);
     await admin.query(`CREATE DATABASE ${SCRATCH_DB}`);
 
@@ -58,7 +73,21 @@ describe("production migration path (pre-Phase4 schema + migrations)", () => {
     } as never);
     await db.initialize();
 
-    await db.query(fs.readFileSync(FIXTURE, "utf8"));
+    const baseline = fs.readFileSync(FIXTURE, "utf8");
+    // The fixture is a frozen copy of a released schema.sql, and the whole suite
+    // is vacuous if it already contains what the migrations under test add: every
+    // assertion below would pass without a migration having done anything.
+    // Regenerating it from a *newer* main is exactly how that happens, and it is
+    // the one mistake its own regeneration instructions invite.
+    for (const object of [
+      "notified_grant_generation",
+      "claim_token_ciphertext",
+      "grant_generation",
+      "reject_legacy_emergency_token_rotation",
+    ]) {
+      expect(baseline).not.toContain(object);
+    }
+    await db.query(baseline);
     const files = fs
       .readdirSync(MIGRATIONS_DIR)
       .filter((f) => f.endsWith(".sql"))
@@ -71,7 +100,7 @@ describe("production migration path (pre-Phase4 schema + migrations)", () => {
         );
       } catch (error) {
         throw new Error(
-          `migration ${file} failed against the pre-Phase4 schema: ${
+          `migration ${file} failed against the baseline schema: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
@@ -140,9 +169,6 @@ describe("production migration path (pre-Phase4 schema + migrations)", () => {
     await expect(triggerExists("trg_job_claims_guard_update")).resolves.toBe(
       true,
     );
-    await expect(
-      triggerExists("trg_eac_backfill_notified_generation"),
-    ).resolves.toBe(true);
     await expect(
       triggerExists("trg_eac_reject_legacy_token_rotation"),
     ).resolves.toBe(true);
@@ -261,7 +287,7 @@ describe("production migration path (pre-Phase4 schema + migrations)", () => {
 
     // Current main's grant-loop rotation, verbatim shape: new hash, blind to the
     // ciphertext and the generation. With an undelivered credential on the row,
-    // migration 150's fence must refuse it.
+    // migration 146's fence must refuse it.
     await expect(
       db.query(
         `UPDATE emergency_access_contacts

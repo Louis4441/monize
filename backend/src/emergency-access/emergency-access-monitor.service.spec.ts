@@ -81,11 +81,20 @@ describe("EmergencyAccessMonitorService", () => {
       row.notifiedGeneration ?? (row.notified ? CURRENT_GENERATION : null);
     contactsRepo.find.mockImplementation(async (opts?: { where?: unknown }) => {
       // The pending query passes an array of two `where` arms (never notified,
-      // or notified for a different cycle); every other read passes an object.
+      // or notified for an earlier cycle); every other read passes an object.
       const arms = Array.isArray(opts?.where)
-        ? (opts?.where as { notifiedGrantGeneration?: { value?: number } }[])
+        ? (opts?.where as {
+            notifiedGrantGeneration?: { value?: number; type?: string };
+          }[])
         : null;
       const wanted = arms?.[1]?.notifiedGrantGeneration?.value;
+      // The comparison the service asks for, honoured rather than assumed. It is
+      // `LessThan`, deliberately: a contact already served by a *newer* cycle is not
+      // owed anything by an older one, and the read used to say `Not(...)` while the
+      // write said `<`. A double that filtered on inequality would keep passing
+      // through that drift, which is how it survived (see the forward-only spec
+      // below).
+      const comparison = arms?.[1]?.notifiedGrantGeneration?.type;
       // The pre-RRV4-004 predicate, honoured too, so a spec about the second
       // cycle fails if the service reverts to it rather than passing silently
       // against a double that ignores the `where` it was handed.
@@ -99,7 +108,18 @@ describe("EmergencyAccessMonitorService", () => {
           if (legacyPending) return generationOf(row) === null;
           if (!arms) return true;
           const gen = generationOf(row);
-          return gen === null || gen !== wanted;
+          if (gen === null) return true;
+          // Whichever comparison the service asked for, applied the way PostgreSQL
+          // would -- not the one this file would prefer it to use. Modelling only
+          // `lessThan` would make the forward-only spec below vacuous: the buggy
+          // `Not` would select nothing here and the assertion "no link was minted"
+          // would pass for the wrong reason.
+          if (comparison === "lessThan") return gen < (wanted ?? 0);
+          if (comparison === "not") return gen !== wanted;
+          throw new Error(
+            `contactsAre does not model the '${comparison}' comparison; ` +
+              `teach it what PostgreSQL does before relying on a spec that uses it`,
+          );
         })
         .map((row) => ({
           id: row.id,
@@ -128,6 +148,56 @@ describe("EmergencyAccessMonitorService", () => {
     return emailService.sendMail.mock.calls
       .map((call) => /token=([0-9a-f]+)/.exec(String(call[2]))?.[1])
       .filter((token): token is string => Boolean(token));
+  }
+
+  /**
+   * The credentials this run minted, in the order they were written.
+   *
+   * The mint is a conditional UPDATE rather than a `repo.save` of the entity the
+   * sweep read, because the loop makes an SMTP round trip per contact and the
+   * snapshot goes stale under it: saving the whole entity asserted "not used, not
+   * voided" over whatever the row had become, so a contact revoked mid-sweep -- or
+   * voided by a sibling completing the takeover -- was handed a working link into an
+   * account somebody else already owned. Reading the emitted statement rather than a
+   * saved object is what keeps the spec able to see that.
+   */
+  interface MintedCredential {
+    contactId?: string;
+    claimTokenHash?: string;
+    claimTokenCiphertext?: string;
+    claimTokenExpiresAt?: Date;
+    /** The row state the mint required to still be there (the compare-and-set). */
+    expected: Record<string, unknown>;
+    order: number;
+  }
+  function mintedCredentials(): MintedCredential[] {
+    return contactsRepo.createQueryBuilder.mock.results.flatMap((result) => {
+      if (result.type !== "return") return [];
+      const builder = result.value as {
+        set: jest.Mock;
+        where: jest.Mock;
+        andWhere: jest.Mock;
+        execute: jest.Mock;
+      };
+      const mint = builder.set.mock.calls.find(
+        (call) => (call[0] as Record<string, unknown>)?.claimTokenHash,
+      )?.[0] as Record<string, unknown> | undefined;
+      if (!mint) return [];
+      const expected: Record<string, unknown> = {};
+      for (const call of builder.andWhere.mock.calls) {
+        Object.assign(expected, (call[1] ?? {}) as Record<string, unknown>);
+      }
+      return [
+        {
+          contactId: (builder.where.mock.calls[0]?.[1] as { id?: string })?.id,
+          claimTokenHash: mint.claimTokenHash as string,
+          claimTokenCiphertext: mint.claimTokenCiphertext as string,
+          claimTokenExpiresAt: mint.claimTokenExpiresAt as Date,
+          expected,
+          order: builder.execute.mock.invocationCallOrder[0],
+        },
+      ];
+    });
   }
 
   /** The contact ids whose delivery record this run stamped. */
@@ -187,6 +257,13 @@ describe("EmergencyAccessMonitorService", () => {
       // pass would reprocess a grant the first one already cleared.
       createQueryBuilder: jest.fn(() => {
         let patch: Record<string, unknown> = {};
+        // The revocation's settings write is a compare-and-set on
+        // `granted_at IS NOT NULL` -- it is what makes exactly one replica send the
+        // owner's notice, since that sweep takes no lease. So the double honours the
+        // predicate rather than reporting `affected: 1` unconditionally, and a
+        // second caller over an already-cleared grant gets zero rows the way
+        // PostgreSQL would.
+        let requireGranted = false;
         const qb = {
           update: jest.fn(() => qb),
           set: jest.fn((p: Record<string, unknown>) => {
@@ -194,19 +271,26 @@ describe("EmergencyAccessMonitorService", () => {
             return qb;
           }),
           where: jest.fn(() => qb),
+          andWhere: jest.fn((clause: string) => {
+            if (/granted_at IS NOT NULL/.test(clause)) requireGranted = true;
+            return qb;
+          }),
           execute: jest.fn(async () => {
+            let affected = 0;
             for (const result of settingsRepo.find.mock.results) {
               if (result.type !== "return") continue;
               const rows = (await result.value) as
                 | Record<string, unknown>[]
                 | undefined;
               for (const row of rows ?? []) {
+                if (requireGranted && row.grantedAt == null) continue;
+                affected += 1;
                 for (const [key, value] of Object.entries(patch)) {
                   row[key] = typeof value === "function" ? new Date() : value;
                 }
               }
             }
-            return { affected: 1 };
+            return { affected: requireGranted ? affected : 1 };
           }),
         };
         return qb;
@@ -483,8 +567,8 @@ describe("EmergencyAccessMonitorService", () => {
     expect(emailService.sendMail).toHaveBeenCalledTimes(2);
     const recipients = emailService.sendMail.mock.calls.map((c) => c[0]);
     expect(recipients).toEqual(["carol@example.com", "dave@example.com"]);
-    expect(contactsRepo.save).toHaveBeenCalledTimes(2);
-    expect(contactsRepo.save.mock.calls[0][0].claimTokenHash).toBeTruthy();
+    expect(mintedCredentials()).toHaveLength(2);
+    expect(mintedCredentials()[0].claimTokenHash).toBeTruthy();
     // grantedAt is set by the conditional claim UPDATE, before any token is
     // generated -- not by saving the entity after the emails went out. That
     // ordering is the fix: two replicas both saw null and both sent, and only
@@ -501,7 +585,7 @@ describe("EmergencyAccessMonitorService", () => {
 
     await service.runDailyCheck();
 
-    expect(contactsRepo.save).not.toHaveBeenCalled();
+    expect(mintedCredentials()).toEqual([]);
     expect(emailService.sendMail).not.toHaveBeenCalled();
   });
 
@@ -561,6 +645,81 @@ describe("EmergencyAccessMonitorService", () => {
       });
     };
 
+    it("leaves a contact served by a newer cycle alone", async () => {
+      // The read and the write of "owed a link" are one predicate spelled twice,
+      // and they disagreed about direction: the write was forward-only (`<`) while
+      // the read asked for inequality (`Not`). So a resume running in cycle N found
+      // a contact already delivered in cycle N+1 -- the owner re-armed and a newer
+      // cycle went out while this one was still working -- treated them as owed,
+      // and `credentialFor` minted a replacement over the hash that newer cycle had
+      // just put in their inbox. `markContactNotified` then refused the
+      // acknowledgement, so the link died and nothing recorded that it had.
+      //
+      // The delivered link is the assertion, not the absence of an email: rotating
+      // the hash is what kills it, and that happens before the send.
+      grantedButUndelivered();
+      contactsAre([
+        {
+          id: "c1",
+          firstName: "Carol",
+          email: "carol@example.com",
+          notifiedGeneration: CURRENT_GENERATION + 1,
+        },
+      ]);
+
+      await service.runDailyCheck();
+
+      expect(mintedCredentials()).toEqual([]);
+      expect(emailService.sendMail).not.toHaveBeenCalled();
+    });
+
+    it("refuses to mint over a contact voided while the sweep was sending", async () => {
+      // `credentialFor` used to `repo.save` the entity the sweep read, which
+      // asserts `claim_token_used_at = NULL, claim_voided_reason = NULL` over
+      // whatever the row has since become. The loop makes an SMTP round trip per
+      // contact, so "since" is a real window: an owner return, a disable, or a
+      // sibling contact completing the takeover all void the row -- and the save
+      // would resurrect it with a working link, in the last case into an account
+      // somebody else now owns. The mint is a compare-and-set on the state the
+      // decision was made from; zero rows means skip, before the send.
+      grantedButUndelivered();
+      contactsAre([
+        { id: "c1", firstName: "Carol", email: "carol@example.com" },
+      ]);
+      contactsRepo.createQueryBuilder.mockReturnValue({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+      });
+
+      await service.runDailyCheck();
+
+      expect(emailService.sendMail).not.toHaveBeenCalled();
+    });
+
+    it("compares against the row state the mint decision was made from", async () => {
+      grantedButUndelivered();
+      contactsAre([
+        {
+          id: "c1",
+          firstName: "Carol",
+          email: "carol@example.com",
+          unrecoverableToken: true,
+        },
+      ]);
+
+      await service.runDailyCheck();
+
+      // The hash it read, so a rotation somewhere else in the window loses.
+      expect(mintedCredentials()[0].expected).toEqual({
+        seenHash: "a-hash-from-an-older-version",
+        seenCiphertext: null,
+        seenVoided: undefined,
+      });
+    });
+
     it("resumes delivery for the contacts still owed a link", async () => {
       grantedButUndelivered();
       contactsAre([
@@ -603,8 +762,8 @@ describe("EmergencyAccessMonitorService", () => {
       expect(emailService.sendMail.mock.calls.map((c) => c[0])).toEqual([
         "dave@example.com",
       ]);
-      expect(contactsRepo.save).toHaveBeenCalledTimes(1);
-      expect(contactsRepo.save.mock.calls[0][0].email).toBe("dave@example.com");
+      expect(mintedCredentials()).toHaveLength(1);
+      expect(mintedCredentials()[0].contactId).toBe("c2");
     });
 
     it("takes a lease, so two replicas do not both resume it", async () => {
@@ -667,7 +826,7 @@ describe("EmergencyAccessMonitorService", () => {
       expect(sentClaimUrls()).toEqual([alreadyIssued]);
       // Nothing on the row changed, so a link already delivered keeps working
       // whatever happens to this attempt.
-      expect(contactsRepo.save).not.toHaveBeenCalled();
+      expect(mintedCredentials()).toEqual([]);
     });
 
     it("leaves the delivered link valid when the retry's own send fails too", async () => {
@@ -687,7 +846,7 @@ describe("EmergencyAccessMonitorService", () => {
 
       // The hash is untouched, so the token in Carol's inbox still verifies, and
       // the notice is still recorded as owed.
-      expect(contactsRepo.save).not.toHaveBeenCalled();
+      expect(mintedCredentials()).toEqual([]);
       expect(notifiedContactIds()).toEqual([]);
     });
 
@@ -738,7 +897,7 @@ describe("EmergencyAccessMonitorService", () => {
 
       await service.runDailyCheck();
 
-      expect(contactsRepo.save).toHaveBeenCalledTimes(1);
+      expect(mintedCredentials()).toHaveLength(1);
       expect(sentClaimUrls()).toHaveLength(1);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("cannot re-send"),
@@ -764,7 +923,7 @@ describe("EmergencyAccessMonitorService", () => {
 
       await service.runDailyCheck();
 
-      expect(contactsRepo.save).toHaveBeenCalledTimes(1);
+      expect(mintedCredentials()).toHaveLength(1);
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining("Could not read the stored"),
       );
@@ -789,7 +948,7 @@ describe("EmergencyAccessMonitorService", () => {
 
       await service.runDailyCheck();
 
-      expect(contactsRepo.save).toHaveBeenCalledTimes(1);
+      expect(mintedCredentials()).toHaveLength(1);
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining("does not match its hash"),
       );
@@ -801,12 +960,12 @@ describe("EmergencyAccessMonitorService", () => {
 
       await service.runDailyCheck();
 
-      const saved = contactsRepo.save.mock.calls[0][0];
+      const saved = mintedCredentials()[0];
       expect(saved.claimTokenCiphertext).toBe(`enc(${sentClaimUrls()[0]})`);
       expect(saved.claimTokenHash).toBe(hashToken(sentClaimUrls()[0]));
       // Committed before the send, since a hash with no recoverable token is
       // exactly the state that forces a rotation later.
-      expect(contactsRepo.save.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(saved.order).toBeLessThan(
         emailService.sendMail.mock.invocationCallOrder[0],
       );
     });
@@ -1014,9 +1173,15 @@ describe("EmergencyAccessMonitorService", () => {
       expect(contactsRepo.count).toHaveBeenCalledWith({
         where: { ownerUserId: userId },
       });
+      // `toContain` compares array members with SameValueZero, so an asymmetric
+      // matcher is never a member and `.not.toContain(expect.stringContaining(...))`
+      // passes whatever the service did. `arrayContaining` is the form that
+      // actually applies the matcher to each element.
       expect(
         scopedManagerQuery.mock.calls.map((c) => String(c[0])),
-      ).not.toContain(expect.stringContaining("grant_generation"));
+      ).not.toEqual(
+        expect.arrayContaining([expect.stringContaining("grant_generation")]),
+      );
       expect(emailService.sendMail).not.toHaveBeenCalled();
     });
   });
@@ -1082,7 +1247,7 @@ describe("EmergencyAccessMonitorService", () => {
       expect(statedExpiry()).toBe(isoDay(daysAgo(-20)));
       expect(statedExpiry()).not.toBe(isoDay(daysAgo(-30)));
       // And the row is untouched, so the link in the inbox keeps working.
-      expect(contactsRepo.save).not.toHaveBeenCalled();
+      expect(mintedCredentials()).toEqual([]);
     });
 
     it("mints a fresh credential when the stored one has expired", async () => {
@@ -1109,10 +1274,10 @@ describe("EmergencyAccessMonitorService", () => {
       // already worth nothing.
       expect(sentClaimUrls()).not.toEqual([dead]);
       expect(sentClaimUrls()).toHaveLength(1);
-      const saved = contactsRepo.save.mock.calls[0][0];
+      const saved = mintedCredentials()[0];
       expect(saved.claimTokenHash).toBe(hashToken(sentClaimUrls()[0]));
       expect(saved.claimTokenCiphertext).toBe(`enc(${sentClaimUrls()[0]})`);
-      expect(saved.claimTokenExpiresAt.getTime()).toBeGreaterThan(Date.now());
+      expect(saved.claimTokenExpiresAt?.getTime()).toBeGreaterThan(Date.now());
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("expired before it could be delivered"),
       );
@@ -1124,7 +1289,7 @@ describe("EmergencyAccessMonitorService", () => {
 
       await service.runDailyCheck();
 
-      const saved = contactsRepo.save.mock.calls[0][0];
+      const saved = mintedCredentials()[0];
       // Same value in the row and in the email: one function decides it.
       expect(statedExpiry()).toBe(isoDay(saved.claimTokenExpiresAt as Date));
     });

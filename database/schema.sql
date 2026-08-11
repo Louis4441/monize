@@ -981,7 +981,7 @@ CREATE TABLE emergency_access_settings (
     message_ciphertext    TEXT,
     last_reminder_sent_at TIMESTAMP,
     granted_at            TIMESTAMP,
-    -- Which grant cycle this owner is on (migration 148). Advanced by the single
+    -- Which grant cycle this owner is on (migration 145). Advanced by the single
     -- statement that transitions ungranted -> granted, so a contact's delivery
     -- state belongs to one cycle instead of to the row: no re-arm path
     -- (revokeAfterReturn, disable/re-enable, a manual reset) has to remember to
@@ -1004,22 +1004,22 @@ CREATE TABLE emergency_access_contacts (
     claim_token_used_at    TIMESTAMP,
     claim_voided_reason    VARCHAR(20), -- 'claimed_by_other' | 'owner_revoked' | NULL
     -- When the notice for `notified_grant_generation` was actually sent
-    -- (migration 147). The delivery record, kept apart from the claim that
+    -- (migration 144). The delivery record, kept apart from the claim that
     -- coordinates the send: a claim answers "may I do this now" and cannot also
     -- answer "has this been done", because the second question has to outlive the
     -- process that asked the first. That is how the daily check finds a grant a
     -- killed replica never delivered (audit FV4-004).
     --
-    -- A timestamp for operators, not a predicate: migration 148 moved "is a link
+    -- A timestamp for operators, not a predicate: migration 145 moved "is a link
     -- still owed" onto the generation below, because this column was never reset
     -- and therefore made emergency access fire at most once per contact row.
     claim_notified_at      TIMESTAMP,
-    -- The grant cycle whose notice this contact received (migration 148). Owed a
+    -- The grant cycle whose notice this contact received (migration 145). Owed a
     -- link whenever it differs from the owner's `grant_generation`, which is what
     -- makes a re-armed grant owe every contact again without any reset path having
     -- to say so (audit RRV4-004). NULL means never notified.
     notified_grant_generation INTEGER,
-    -- The undelivered credential (migration 147), AES-256-GCM under
+    -- The undelivered credential (migration 144), AES-256-GCM under
     -- AI_ENCRYPTION_KEY. Written with the hash before the first send, re-read by a
     -- retry so it re-sends the *same* link rather than minting one that kills the
     -- link already in the recipient's inbox, and cleared in the statement that
@@ -1033,51 +1033,19 @@ CREATE TABLE emergency_access_contacts (
 CREATE UNIQUE INDEX idx_emergency_access_contacts_owner_email
     ON emergency_access_contacts(owner_user_id, lower(email));
 
--- "Granted owners with a contact still owed a link", read on every daily sweep.
--- Partial on the never-notified case, which is every contact of a brand-new grant;
--- the generation comparison for a resumed one falls back to the owner column.
+-- "Granted owners with a contact still owed a link", read on every daily sweep
+-- (migration 145). Composite rather than partial: the predicate is a disjunction
+-- (`notified_grant_generation IS NULL OR notified_grant_generation < $2`) and no
+-- partial index can serve the second arm, so both arms read from this one instead.
 CREATE INDEX idx_eac_awaiting_notice
-    ON emergency_access_contacts(owner_user_id)
-    WHERE notified_grant_generation IS NULL;
+    ON emergency_access_contacts(owner_user_id, notified_grant_generation);
 
 CREATE INDEX idx_emergency_access_contacts_token_hash
     ON emergency_access_contacts(claim_token_hash)
     WHERE claim_token_hash IS NOT NULL;
 
--- Rolling-deployment compatibility for the delivery generation (migration 149).
--- The previous binary acknowledges a delivered link by writing only
--- `claim_notified_at`, leaving `notified_grant_generation` NULL -- which the new
--- pending query would read as "still owed", rotate the token, and kill the link
--- already delivered (audit V4R3-001). This BEFORE UPDATE trigger stamps the owner's
--- current generation whenever an old-binary acknowledgement lands, so both binaries
--- agree on what a delivered notice means. The new code sets the generation itself,
--- so the trigger is a no-op for it. SECURITY DEFINER so it can read the settings row
--- regardless of the invoking identity under RLS.
-CREATE OR REPLACE FUNCTION backfill_notified_grant_generation() RETURNS TRIGGER
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-BEGIN
-    SELECT s.grant_generation
-      INTO NEW.notified_grant_generation
-      FROM emergency_access_settings s
-     WHERE s.owner_user_id = NEW.owner_user_id;
-    -- No settings row (should not happen for a contact) leaves it NULL, which is
-    -- the pre-migration behaviour rather than a spurious generation.
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_eac_backfill_notified_generation
-    BEFORE UPDATE ON emergency_access_contacts
-    FOR EACH ROW
-    WHEN (
-      NEW.claim_notified_at IS NOT NULL
-      AND OLD.claim_notified_at IS NULL
-      AND NEW.notified_grant_generation IS NULL
-    )
-    EXECUTE FUNCTION backfill_notified_grant_generation();
-
 -- Rolling-deployment fence for the binary that predates the delivery columns
--- (migration 150). The pre-147 release rotates `claim_token_hash` guarded only by
+-- (migration 146). The pre-144 release rotates `claim_token_hash` guarded only by
 -- a snapshot of `granted_at`, so a stale old pod can overwrite -- and kill -- a
 -- link the new protocol has already minted or delivered. The current code never
 -- writes a new hash without the matching `claim_token_ciphertext` in the same
@@ -1735,7 +1703,6 @@ CREATE TABLE action_history (
 CREATE INDEX idx_action_history_user_created ON action_history(user_id, created_at DESC);
 CREATE INDEX idx_action_history_user_undone ON action_history(user_id, is_undone, created_at DESC);
 
-
 -- OAuth 2.1 Authorization Server payloads (node-oidc-provider adapter)
 CREATE TABLE oauth_payloads (
     id VARCHAR(255) NOT NULL,
@@ -1754,7 +1721,6 @@ CREATE INDEX idx_oauth_payloads_grant ON oauth_payloads(grant_id) WHERE grant_id
 CREATE INDEX idx_oauth_payloads_uid ON oauth_payloads(uid) WHERE uid IS NOT NULL;
 CREATE INDEX idx_oauth_payloads_user_code ON oauth_payloads(user_code) WHERE user_code IS NOT NULL;
 CREATE INDEX idx_oauth_payloads_expires ON oauth_payloads(expires_at) WHERE expires_at IS NOT NULL;
-
 
 -- Monte Carlo retirement-projection scenarios (saved simulation inputs)
 CREATE TABLE monte_carlo_scenarios (
@@ -1970,8 +1936,6 @@ CREATE TABLE gem_strategy_signals (
 -- current version from answering the same period.
 CREATE UNIQUE INDEX idx_gem_strategy_signals_period ON gem_strategy_signals(strategy_id, evaluated_on, algorithm_version);
 CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
-
-
 
 -- ===========================================================================
 -- Row-Level Security policies

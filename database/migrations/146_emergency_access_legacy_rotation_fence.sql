@@ -1,9 +1,10 @@
--- 150: refuse a generation-blind token rotation that would kill a delivered link.
+-- 146: refuse a generation-blind token rotation that would kill a delivered link.
 --
--- Migration 147 translates the *acknowledgement* the previous release writes into
--- the current grant generation. That covers the binary that knows about
--- `claim_notified_at` -- but the release actually running in production today
--- (pre-147) never writes that column at all. Its grant loop is:
+-- Migrations 144 and 145 add the delivery columns and the grant generation, and
+-- both land in the same release as the code that writes them -- so no binary exists
+-- that knows one and not the other, and nothing has to translate between them. The
+-- binary that genuinely differs is the release running in production today, which
+-- predates all three columns and writes none of them. Its grant loop is:
 --
 --     UPDATE emergency_access_contacts
 --        SET claim_token_hash = $1, claim_token_expires_at = $2,
@@ -14,9 +15,9 @@
 -- a rolling deploy a stale old pod can take that snapshot before the new pod's
 -- grant commits, then rotate the hash *after* the new pod has minted, delivered and
 -- recorded a link -- so the link already in the recipient's inbox dies silently,
--- which is exactly the P4-014 outcome the generation machinery exists to end. No
--- trigger that waits for an acknowledgement ever sees this write, because the old
--- binary acknowledges nothing.
+-- which is exactly the P4-014 outcome the generation machinery exists to end. The
+-- old binary acknowledges nothing, so nothing that waits for an acknowledgement
+-- would ever see this write.
 --
 -- The rule has to live where both binaries meet, so it is a BEFORE UPDATE trigger.
 -- What separates the binaries at the SQL level is the credential protocol: the
@@ -45,7 +46,8 @@
 -- the old binary keeps working, except in the two states above -- where the old
 -- pod's per-contact try/catch logs the refusal and retries daily, which is loud,
 -- while the alternative is a silently dead link during an account recovery. The
--- rollout/drain trade-off is documented in docs/cron-jobs.md.
+-- rollout/drain trade-off and the rollback consequence are written up for operators
+-- in docs/cron-jobs.md, under "Emergency access".
 --
 -- No SECURITY DEFINER: the decision reads only OLD and NEW, no other table.
 --

@@ -207,6 +207,10 @@ export class EmergencyAccessClaimController {
       // UPDATE, so PostgreSQL re-evaluates them after the row lock. Exactly one
       // statement gets a row back; every other caller sees zero and is refused
       // before anything is written.
+      //
+      // `claim_voided_reason = NULL` is belt-and-braces, not a guard: every path
+      // that writes a reason stamps `claim_token_used_at` alongside it, so the
+      // WHERE above already excludes every row where it could be non-NULL.
       const consumed: unknown = await manager.query(
         `UPDATE emergency_access_contacts
             SET claim_token_used_at = CURRENT_TIMESTAMP,
@@ -311,9 +315,30 @@ export class EmergencyAccessClaimController {
       return ownerId;
     });
 
-    // Revoke every existing refresh token outside the transaction so it
-    // uses the TokenService API (which writes via its own repo).
-    await this.tokenService.revokeAllUserRefreshTokens(ownerId);
+    // Revoke every existing refresh token *after* the transaction, and the reason
+    // is not the one that used to be written here ("it writes via its own repo" --
+    // `TokenService.revokeAllUserRefreshTokens` is `withScopedDb` and would join an
+    // ambient transaction happily). It is that the method deliberately runs up to
+    // ten passes, each in its own transaction, converging against sessions being
+    // rotated concurrently; nesting it would collapse those passes into one and
+    // destroy the convergence.
+    //
+    // That leaves a real seam: the password is already replaced and committed, so a
+    // failure here means the takeover happened while the previous holder's sessions
+    // are still live. The claimant sees a 500 and can retry the login, but nothing
+    // retries the revocation -- so it is logged at `error` with the account id,
+    // which is what makes it alertable rather than a line in a stack trace.
+    try {
+      await this.tokenService.revokeAllUserRefreshTokens(ownerId);
+    } catch (error) {
+      this.logger.error(
+        `Emergency-access takeover of account ${ownerId} committed, but revoking ` +
+          `the previous holder's refresh tokens failed; their sessions may still be ` +
+          `active and need revoking by hand`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw error;
+    }
 
     const freshOwner = await this.scoped(User, (repo) =>
       repo.findOne({ where: { id: ownerId } }),

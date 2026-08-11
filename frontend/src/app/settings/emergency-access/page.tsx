@@ -534,6 +534,11 @@ function EmergencyAccessSection() {
   // (audit V4R3-002). So the settings controls are live whenever the feature can
   // be armed OR is currently stored as enabled, and the toggle clamps to "off"
   // while it cannot be armed.
+  //
+  // The waiting periods are gated on `canArmFeature` rather than on
+  // `canEditSettings`: on a degraded install the only useful thing to submit is
+  // `enabled: false`, and the server refuses anything else with a 503. Leaving them
+  // live invites a save that can only fail.
   const canArmFeature =
     view.emailConfigured && view.credentialEncryptionConfigured;
   const canEditSettings = canArmFeature || view.enabled;
@@ -566,7 +571,13 @@ function EmergencyAccessSection() {
           </div>
         )}
 
-        {view.emailConfigured && !view.credentialEncryptionConfigured && (
+        {/*
+          Not gated on `emailConfigured`. The two dependencies fail independently,
+          which is the whole argument for showing this notice at all -- so an install
+          missing both has to be told both, rather than being sent to fix SMTP and
+          only then discovering the second one on the next page load.
+        */}
+        {!view.credentialEncryptionConfigured && (
           <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-6 mb-6">
             <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
               {t('encryptionNotConfigured.heading')}
@@ -638,7 +649,7 @@ function EmergencyAccessSection() {
                     label={t('settings.grantAfterDaysLabel')}
                     decimalPlaces={0}
                     max={365}
-                    disabled={!canEditSettings}
+                    disabled={!canArmFeature}
                     error={settingsForm.formState.errors.grantAfterDays?.message}
                     value={field.value}
                     onChange={field.onChange}
@@ -656,7 +667,7 @@ function EmergencyAccessSection() {
                     label={t('settings.reminderAfterDaysLabel')}
                     decimalPlaces={0}
                     max={364}
-                    disabled={!canEditSettings}
+                    disabled={!canArmFeature}
                     error={settingsForm.formState.errors.reminderAfterDays?.message}
                     value={field.value}
                     onChange={field.onChange}

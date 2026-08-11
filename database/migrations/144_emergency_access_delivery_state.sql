@@ -1,6 +1,6 @@
--- 147: separate an emergency-access delivery from the claim that coordinates it.
+-- 144: separate an emergency-access delivery from the claim that coordinates it.
 --
--- Migration 136 gave the two multi-replica emergency-access jobs a claim each,
+-- Migration 140 gave the two multi-replica emergency-access jobs a claim each,
 -- which stopped two replicas doing the work twice. It did not make either one
 -- *recoverable*, because in both cases the claim was taken before the send and
 -- was the only record that the send was owed (audit FV4-004, FV4-005):
@@ -31,7 +31,8 @@
 -- The recovery is *derived* rather than scheduled: a grant with a contact whose
 -- `claim_notified_at` is NULL is a grant that has not been delivered, and the
 -- daily check re-runs the notification for exactly those contacts. Nothing has
--- to remember to enqueue anything, which is the point (see docs/cron-jobs.md).
+-- to remember to enqueue anything, which is the point. `docs/cron-jobs.md` has
+-- the operator-facing version of this contract and of migration 146's fence.
 --
 -- The credential is issued once and *reused* until delivery is acknowledged, which
 -- is the other half of making a retry safe. SMTP acceptance and a database write
@@ -60,8 +61,14 @@
 --
 -- Two honest states, and only two:
 --
---   * `claim_token_used_at IS NOT NULL` -- the contact opened their link, which is
---     proof of delivery. That, and only that, backfills a timestamp.
+--   * `claim_token_used_at IS NOT NULL` **with no `claim_voided_reason`** -- the
+--     contact opened their link, which is proof of delivery. That, and only that,
+--     backfills a timestamp. The reason for the second half of the predicate: in
+--     the release this upgrades from, `claim_token_used_at` is *also* the void
+--     tombstone -- `revokeAfterReturn`, the disable path and the manual reset all
+--     stamp it alongside `claim_voided_reason`. Without excluding those, a link
+--     that was cancelled before it was ever sent backfills as a delivery, which is
+--     precisely the inference the paragraph above refuses.
 --   * everything else -- unknown, therefore still owed. Left NULL, so the daily
 --     check re-issues and re-sends. That re-issue *deliberately* replaces a legacy
 --     credential nobody can confirm, because a link that is delivered beats one
@@ -75,14 +82,15 @@ ALTER TABLE emergency_access_contacts
 ALTER TABLE emergency_access_contacts
     ADD COLUMN IF NOT EXISTS claim_token_ciphertext TEXT;
 
--- A used token proves the link arrived. Nothing else does.
+-- A used token proves the link arrived. Nothing else does -- and a voided one is
+-- a cancellation stamped into the same column, not a delivery.
 UPDATE emergency_access_contacts
    SET claim_notified_at = claim_token_used_at
  WHERE claim_notified_at IS NULL
-   AND claim_token_used_at IS NOT NULL;
+   AND claim_token_used_at IS NOT NULL
+   AND claim_voided_reason IS NULL;
 
--- The recovery predicate's index: "granted owners with a contact still owed a
--- link" is read on every daily sweep.
-CREATE INDEX IF NOT EXISTS idx_eac_pending_notify
-    ON emergency_access_contacts(owner_user_id)
-    WHERE claim_notified_at IS NULL;
+-- No index for `claim_notified_at IS NULL` here on purpose: migration 145 moves
+-- "is a link still owed" onto the generation two statements later, in the same
+-- release, so building one for a predicate nothing will read is churn an install
+-- with real data pays for nothing.

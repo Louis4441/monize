@@ -1,6 +1,6 @@
--- 148: emergency-access delivery state belongs to one grant cycle, not to the row.
+-- 145: emergency-access delivery state belongs to one grant cycle, not to the row.
 --
--- Migration 145 added `claim_notified_at` so a resumed grant could tell a contact
+-- Migration 144 added `claim_notified_at` so a resumed grant could tell a contact
 -- who already holds a working link from one still owed a notice. That fixed the
 -- resume, and made the marker permanent: `contactsAwaitingNotice` selected
 -- `claim_notified_at IS NULL`, and nothing ever set it back to NULL (audit
@@ -38,14 +38,19 @@
 -- by one query (`contactsAwaitingNotice`), which is what keeps them from drifting.
 --
 -- Backfill: every existing installation is on generation 1 (the column default),
--- and a contact with a non-NULL `claim_notified_at` was notified in the cycle that
--- is current now -- so `notified_grant_generation = 1` preserves exactly today's
--- behaviour for an in-flight grant. The next grant advances to 2 and owes them a
--- link again, which is the whole point.
+-- so a contact migration 144 could confirm was delivered to belongs to the cycle
+-- that is current now, and `notified_grant_generation = 1` says so. The next grant
+-- advances to 2 and owes them a link again, which is the whole point.
 --
 -- Note what is deliberately *not* inferred: a contact with a token hash but no
--- `claim_notified_at` stays NULL here, for the same reason migration 147 refused to
--- treat a hash as evidence of delivery.
+-- `claim_notified_at` stays NULL here, for the same reason migration 144 refused to
+-- treat a hash as evidence of delivery. **State the consequence plainly, because it
+-- is a user-visible upgrade effect rather than a no-op:** a contact who was sent a
+-- link under the previous release and has not opened it is still owed one here, so
+-- the first daily sweep after the upgrade issues a fresh link and the one in their
+-- inbox stops working. That is the deliberate trade migration 144 argues for -- a
+-- link that is known to work beats one nobody can confirm -- and it belongs in the
+-- release notes, not only in a migration header.
 
 ALTER TABLE emergency_access_settings
     ADD COLUMN IF NOT EXISTS grant_generation INTEGER NOT NULL DEFAULT 1;
@@ -59,14 +64,16 @@ UPDATE emergency_access_contacts
    AND notified_grant_generation IS NULL;
 
 -- The pending-contact query is `owner_user_id = $1 AND
--- (notified_grant_generation IS NULL OR notified_grant_generation <> $2)`, which
--- is served by the owner index the table already has; this partial index keeps the
--- never-notified case -- every contact of a brand-new grant -- off the row filter.
+-- (notified_grant_generation IS NULL OR notified_grant_generation < $2)`, a
+-- disjunction whose second arm no partial index can serve -- so the planner cannot
+-- build a BitmapOr and a partial index on the first arm alone would never be
+-- chosen. The composite is what the query can actually use: `owner_user_id` narrows
+-- to the tenant and `notified_grant_generation` sorts NULLs together, so both arms
+-- read from the same index.
 CREATE INDEX IF NOT EXISTS idx_eac_awaiting_notice
-    ON emergency_access_contacts(owner_user_id)
-    WHERE notified_grant_generation IS NULL;
+    ON emergency_access_contacts(owner_user_id, notified_grant_generation);
 
--- And the index built for the predicate this replaces goes with it: no query reads
--- `claim_notified_at IS NULL` any more, so keeping the index would leave a
--- statement of intent in the schema that the code has stopped meaning.
+-- Defensive only: no release ever shipped `idx_eac_pending_notify`, because
+-- migration 144 no longer creates it. Kept so a database that applied a
+-- pre-release build of 144 converges on the same schema as a fresh install.
 DROP INDEX IF EXISTS idx_eac_pending_notify;

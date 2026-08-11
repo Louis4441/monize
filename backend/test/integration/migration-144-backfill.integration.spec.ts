@@ -10,7 +10,7 @@ import {
 import { applyRlsPolicies } from "../helpers/rls-setup";
 
 /**
- * Migration 145's backfill, against the states the *previous* implementation
+ * Migration 144's backfill, against the states the *previous* implementation
  * could actually leave behind (audit RV4-003).
  *
  * The point of the fixture is the ordering the old code used: it persisted
@@ -28,28 +28,25 @@ import { applyRlsPolicies } from "../helpers/rls-setup";
  * concludes from production-shaped rows, so the fixture is a real database and the
  * migration is read from disk.
  */
-describe("migration 147 backfill over legacy delivery state", () => {
+describe("migration 144 backfill over legacy delivery state", () => {
   let dataSource: DataSource;
   let owner: string;
 
   const MIGRATION = path.join(
     __dirname,
-    "../../../database/migrations/147_emergency_access_delivery_state.sql",
+    "../../../database/migrations/144_emergency_access_delivery_state.sql",
   );
 
   const applyMigration = () =>
     dataSource.query(fs.readFileSync(MIGRATION, "utf8"));
 
-  /** Undo migration 147, so the fixture starts from a genuinely pre-147 table. */
+  /** Undo migration 144, so the fixture starts from a genuinely pre-144 table. */
   const removeColumns = async () => {
-    // Later migrations depend on the 145 columns: the generation column (146),
-    // its rollout-compat trigger (147), and the legacy-rotation fence (148),
-    // whose WHEN clause references `claim_token_ciphertext`. All have to come
-    // off before the columns to reach the genuinely pre-147 shape this spec
-    // seeds -- a pre-147 database has none of them either.
-    await dataSource.query(
-      `DROP TRIGGER IF EXISTS trg_eac_backfill_notified_generation ON emergency_access_contacts`,
-    );
+    // Later migrations depend on the 144 columns: the generation column (145)
+    // and the legacy-rotation fence (146), whose WHEN clause references
+    // `claim_token_ciphertext`. Both have to come off before the columns to reach
+    // the genuinely pre-144 shape this spec seeds -- a pre-144 database has
+    // neither.
     await dataSource.query(
       `DROP TRIGGER IF EXISTS trg_eac_reject_legacy_token_rotation ON emergency_access_contacts`,
     );
@@ -91,7 +88,7 @@ describe("migration 147 backfill over legacy delivery state", () => {
 
   beforeAll(async () => {
     if (!fs.existsSync(MIGRATION)) {
-      throw new Error(`Migration 145 not found at ${MIGRATION}`);
+      throw new Error(`Migration 144 not found at ${MIGRATION}`);
     }
     dataSource = new DataSource(INTEGRATION_TYPEORM_OPTIONS as never);
     await dataSource.initialize();
@@ -173,9 +170,43 @@ describe("migration 147 backfill over legacy delivery state", () => {
 
     await applyMigration();
 
+    // Compared against the seeded value, not through `toISOString()`. The column
+    // is TIMESTAMP *without* time zone and node-postgres materialises it in the
+    // process timezone, so round-tripping 10:00 through UTC lands on the previous
+    // day at any offset above +10:00 -- a suite that is green in CI and red in
+    // Auckland, about a migration that is fine.
     const at = await notifiedAt(used);
     expect(at).not.toBeNull();
-    expect(new Date(at!).toISOString()).toContain("2026-05-02");
+    const [{ same }] = (await dataSource.query(
+      `SELECT claim_notified_at = claim_token_used_at AS same
+         FROM emergency_access_contacts WHERE id = $1`,
+      [used],
+    )) as { same: boolean }[];
+    expect(same).toBe(true);
+  });
+
+  it("does not read a revocation tombstone as a delivery", async () => {
+    // `claim_token_used_at` carried two meanings in the release this upgrades
+    // from: the contact opened their link, *and* the link was voided before it was
+    // ever sent -- `revokeAfterReturn`, the disable path and the manual reset all
+    // stamp it alongside a `claim_voided_reason`. Backfilling from it alone
+    // recorded a delivery that never happened, which is precisely the inference
+    // the migration's own header refuses to make.
+    const voided = "50000000-0000-4000-8000-000000000001";
+    await seedLegacyContact(voided, {
+      email: "voided@example.com",
+      hash: null,
+      usedAt: "2026-05-02 10:00:00",
+    });
+    await dataSource.query(
+      `UPDATE emergency_access_contacts
+          SET claim_voided_reason = 'owner_returned' WHERE id = $1`,
+      [voided],
+    );
+
+    await applyMigration();
+
+    expect(await notifiedAt(voided)).toBeNull();
   });
 
   it("leaves a contact who never had a token alone", async () => {

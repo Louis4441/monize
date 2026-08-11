@@ -35,6 +35,49 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 | `emergency-access-monitor.service` | `0 09 * * *` | Daily 9 AM | Advance emergency-access requests past their waiting period and notify |
 | `updates.service` | `0 0-23/12 * * *` | Every 12 hours | Refresh the cached latest-release metadata for the What's New digest |
 
+## Emergency access
+
+The 9 AM sweep does three separable things, and the order matters. **Revocation runs
+first**, ahead of both delivery gates: voiding a returned owner's outstanding links needs
+only the database, and an install whose SMTP or encryption key has gone away must still be
+able to kill a link it already delivered. The SMTP and `AI_ENCRYPTION_KEY` gates then stop
+the *delivery* sweep, which is inert rather than failing per contact.
+
+**Delivery is derived, not scheduled.** A grant advances the owner's
+`emergency_access_settings.grant_generation`, and a contact whose
+`notified_grant_generation` is behind it is owed a link -- whatever caused it: a replica
+killed mid-send, an SMTP failure only some recipients hit, a contact added after the grant
+fired, or an owner re-arming the feature. Nothing has to remember to enqueue a retry, which
+is the property that makes it hold. The credential is held encrypted while the notice is
+owed, so a retry re-sends the *same* link rather than minting one that kills what is
+already in the recipient's inbox.
+
+### Rolling deployments and rollback
+
+Migration 146 installs a trigger that refuses a *generation-blind* token rotation -- a new
+`claim_token_hash` written without touching `claim_token_ciphertext` or
+`notified_grant_generation` -- in exactly two states: an undelivered credential in flight,
+or a live delivered link. Only the pre-144 binary writes that shape, so the trigger is what
+stops a stale pod from killing a link the new protocol has already delivered during a
+rolling deploy.
+
+The cost is on the way back. **After a rollback to the previous release the trigger stays**
+(migrations do not revert), so that binary's grant loop raises for any owner holding a live
+or in-flight link. Its per-contact `try`/`catch` logs the refusal and retries the next day,
+which is loud; the alternative is a silently dead link during an account recovery. If you
+must roll back and clear it, drop the trigger by hand:
+
+```sql
+DROP TRIGGER IF EXISTS trg_eac_reject_legacy_token_rotation ON emergency_access_contacts;
+```
+
+One upgrade effect worth announcing rather than discovering: migration 144 treats only a
+*consumed* token as proof of delivery, so a contact who was sent a link under the previous
+release and has not opened it is still owed one. The first sweep after the upgrade issues a
+fresh link and the one in their inbox stops working. That is deliberate -- a link known to
+work beats one nobody can confirm, and asserting delivery would disarm the safeguard
+permanently -- but it is user-visible.
+
 Every row above is checked against the source by `backend/src/common/cron-doc.spec.ts`, and
 not for membership only: the Cron column is compared verbatim -- timezone included -- against
 the `@Cron` decorators, one row per handler. A service with an undocumented handler fails the

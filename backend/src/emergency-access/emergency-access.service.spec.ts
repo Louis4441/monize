@@ -37,7 +37,11 @@ describe("EmergencyAccessService", () => {
   const userId = "11111111-1111-1111-1111-111111111111";
 
   beforeEach(async () => {
-    settingsRepo = { findOne: jest.fn(), save: jest.fn() };
+    settingsRepo = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+      createQueryBuilder: jest.fn(),
+    };
     contactsRepo = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
@@ -533,6 +537,40 @@ describe("EmergencyAccessService", () => {
       expect(existing.firstName).toBe("Renamed");
     });
 
+    it("updateContact leaves a renamed contact owed a link for the current cycle", async () => {
+      // The token clear was unconditional while the delivery markers were reset
+      // only when the *email* changed, so correcting a typo in a contact's first
+      // name during an active grant destroyed their working link and left
+      // `notified_grant_generation` still claiming they had been served. They then
+      // dropped out of `contactsAwaitingNotice` for the rest of the cycle: a
+      // contact silently owed a link nobody would ever send, which is the exact
+      // failure the generation exists to prevent. Clearing the hash and clearing
+      // the markers are one decision.
+      const existing = {
+        id: "c1",
+        ownerUserId: userId,
+        firstName: "Old",
+        email: "old@example.com",
+        claimTokenHash: "a-delivered-hash",
+        claimTokenExpiresAt: new Date(),
+        claimTokenCiphertext: "enc(token)",
+        claimNotifiedAt: new Date(),
+        notifiedGrantGeneration: 4,
+      };
+      contactsRepo.findOne.mockResolvedValue(existing);
+      contactsRepo.save.mockImplementation(async (row) => row);
+
+      await service.updateContact(userId, "c1", {
+        firstName: "Corrected",
+        email: "old@example.com",
+      });
+
+      expect(existing.claimTokenHash).toBeNull();
+      expect(existing.claimTokenCiphertext).toBeNull();
+      expect(existing.claimNotifiedAt).toBeNull();
+      expect(existing.notifiedGrantGeneration).toBeNull();
+    });
+
     it("updateContact rejects swapping to an email already used by another row", async () => {
       contactsRepo.findOne.mockResolvedValue({
         id: "c1",
@@ -766,17 +804,70 @@ describe("EmergencyAccessService", () => {
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
       };
       contactsRepo.createQueryBuilder.mockReturnValue(updateBuilder);
+      const settingsBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      settingsRepo.createQueryBuilder.mockReturnValue(settingsBuilder);
 
       const view = await service.resetGrantedState(userId);
 
-      expect(stored.grantedAt).toBeNull();
-      expect(stored.lastReminderSentAt).toBeNull();
-      expect(settingsRepo.save).toHaveBeenCalledWith(stored);
+      // A targeted UPDATE of the two markers, not a re-save of the row read above.
+      // The entity carries `grant_generation`, a counter only `claimGrant` may
+      // advance -- and `save` writes back every column whose loaded value differs
+      // from the row TypeORM reloads at persist time, so a bump landing between the
+      // read and the write would be written back *down*.
+      expect(settingsRepo.save).not.toHaveBeenCalled();
+      expect(settingsBuilder.set).toHaveBeenCalledWith({
+        grantedAt: null,
+        lastReminderSentAt: null,
+      });
       expect(updateBuilder.update).toHaveBeenCalledWith(EmergencyAccessContact);
       const setArgs = updateBuilder.set.mock.calls[0][0];
       expect(setArgs.claimTokenUsedAt()).toBe("CURRENT_TIMESTAMP");
       expect(setArgs.claimVoidedReason).toBe("owner_revoked");
       expect(view.grantedAt).toBeNull();
+    });
+
+    it("clears the grant marker and voids the links in one transaction", async () => {
+      // Split across two, a failure on the voiding leaves `granted_at` already
+      // NULL and committed: the page reports the grant cleared, the button says it
+      // worked, and every delivered magic link stays claimable for the rest of its
+      // 30 days. That is the one ordering this method must not have.
+      const stored = {
+        ownerUserId: userId,
+        enabled: true,
+        grantAfterDays: 14,
+        reminderAfterDays: 7,
+        messageCiphertext: null,
+        grantedAt: new Date(),
+        lastReminderSentAt: new Date(),
+      };
+      settingsRepo.findOne.mockResolvedValue(stored);
+      settingsRepo.createQueryBuilder.mockReturnValue({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      contactsRepo.createQueryBuilder.mockReturnValue({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockRejectedValue(new Error("voiding failed")),
+      });
+
+      await expect(service.resetGrantedState(userId)).rejects.toThrow(
+        "voiding failed",
+      );
+
+      // One transaction opened, and it is the one that threw -- so the settings
+      // write rolls back with it rather than standing as a committed lie.
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     });
   });
 });

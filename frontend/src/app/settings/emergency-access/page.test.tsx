@@ -280,6 +280,79 @@ describe('EmergencyAccessPage', () => {
     ).toBe(true);
   });
 
+  it('names both missing dependencies when both are missing', async () => {
+    // Gating the encryption notice on `emailConfigured` made diagnosis
+    // sequential: the operator was told about SMTP, fixed it, reloaded, and only
+    // then learned about the key. The two fail independently, which is the whole
+    // reason this page reports them separately at all.
+    api.get.mockResolvedValue(
+      makeView({ emailConfigured: false, credentialEncryptionConfigured: false }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByText(/Email is not configured/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Encryption key required/)).toBeInTheDocument();
+  });
+
+  it('clamps the enable toggle to off while the feature cannot be armed', async () => {
+    // The clamp is the only thing stopping a degraded install submitting
+    // `enabled: true`, which the server refuses with a 503. Dropping the ternary
+    // leaves every other assertion in this file passing.
+    api.get.mockResolvedValue(
+      makeView({ enabled: true, credentialEncryptionConfigured: false }),
+    );
+    api.updateSettings.mockResolvedValue(makeView({ enabled: false }));
+    await renderPage();
+    await waitFor(() =>
+      screen.getByRole('button', { name: /Save settings/i }),
+    );
+
+    // Try to turn it back *on*; the control must refuse to move.
+    const toggle = screen.getByRole('switch', {
+      name: /Enable emergency access/i,
+    });
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /Save settings/i }),
+      );
+    });
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalled());
+    expect(api.updateSettings.mock.calls[0][0].enabled).toBe(false);
+  });
+
+  it('locks the waiting-period fields while the feature cannot be armed', async () => {
+    // Only disabling is useful on a degraded install, so a live day field invites
+    // a save that can only 503.
+    api.get.mockResolvedValue(
+      makeView({ enabled: true, credentialEncryptionConfigured: false }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      screen.getByRole('button', { name: /Save settings/i }),
+    );
+    expect(
+      (
+        screen.getByLabelText(
+          /Days of inactivity before access is granted/i,
+        ) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByLabelText(
+          /Days of inactivity before reminder emails/i,
+        ) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
+  });
+
   it('shows no configuration notice when both halves are ready', async () => {
     api.get.mockResolvedValue(makeView());
     await renderPage();
