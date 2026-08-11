@@ -19,6 +19,7 @@ import { ForeignCurrencyFeesSection } from '@/components/accounts/shared/Foreign
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { accountsApi } from '@/lib/accounts';
+import { isInvestmentCashHalf } from '@/lib/account-utils';
 import { loanScenariosApi } from '@/lib/loan-scenarios';
 import { loanRateChangesApi } from '@/lib/loan-rate-changes';
 import { fetchAllAccountTransactions, fetchLoanInterestTransactions } from '@/lib/loan-history';
@@ -97,6 +98,14 @@ function AccountDetailContent() {
     setError(null);
     try {
       const accountData = await accountsApi.getById(accountId);
+      // A pair is one account, so it gets one URL: the brokerage half. A link
+      // to the cash id -- an old bookmark, a deep link from a register --
+      // lands on the same page rather than a second one that would carry its
+      // own switcher state and history entry.
+      if (isInvestmentCashHalf(accountData) && accountData.linkedAccountId) {
+        router.replace(`/accounts/${accountData.linkedAccountId}`);
+        return;
+      }
       // Only the amortizing loan/mortgage view needs transaction history and
       // scenarios; the line-of-credit and credit-card views load their own
       // analytics, so just resolve the account for them.
@@ -136,7 +145,7 @@ function AccountDetailContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [accountId, t]);
+  }, [accountId, router, t]);
 
   useEffect(() => {
     loadData();

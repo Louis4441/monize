@@ -55,6 +55,10 @@
     "statusActive": "活跃",
     "statusClosed": "已关闭",
     "marketValue": "市值",
+    "combinedBreakdown": "投资 {investments} · 现金 {cash}",
+    "combinedUnknown": "无法显示总额",
+    "combinedUnknownTooltip": "{count, plural, other {有 # 项持仓没有价格，因此无法计算该账户的总额}}",
+    "combinedUnknownNoPortfolio": "无法加载持仓，因此无法计算该账户的总额",
     "limit": "额度：{amount}",
     "pairedWith": "与 {name} 关联",
     "subtypeBrokerage": "券商账户",
@@ -76,6 +80,7 @@
       "deleteTitle": "永久删除账户（无交易记录）",
       "closeTitleDisabled": "账户余额必须为零才能关闭",
       "closeTitleEnabled": "关闭账户",
+      "closeTitleUnknownValue": "无法计算该账户的总额，因此无法确认账户已清空",
       "details": "详情"
     },
     "jointBadge": "联名",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "正在关闭...",
     "deleteTitle": "删除账户",
     "deleteMessage": "您确定要永久删除\"{name}\"吗？此操作无法撤销。",
+    "deletePairMessage": "确定要永久删除“{name}”吗？两个账目都会被删除：“{brokerageName}”和“{cashName}”。此操作无法撤销。",
     "deleteConfirm": "删除账户",
     "deleteConfirmLoading": "正在删除..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "手续费百分比",
     "fxFeePercentPlaceholder": "例如 2.5",
     "jointSharedWith": "联名账户，已与 {count, plural, other {# 人}}共享",
-    "jointManage": "管理共享"
+    "jointManage": "管理共享",
+    "cashSection": {
+      "title": "现金账户",
+      "description": "存放该账户资金的账目。其名称跟随上方的账户名称。",
+      "openingBalance": "现金期初余额",
+      "accountNumber": "现金账号（可选）",
+      "descriptionField": "现金说明（可选）"
+    }
   },
   "exportModal": {
     "title": "导出 {name}",

@@ -55,6 +55,10 @@
     "statusActive": "Ativa",
     "statusClosed": "Fechada",
     "marketValue": "Valor de mercado",
+    "combinedBreakdown": "Investimentos {investments} · Numerário {cash}",
+    "combinedUnknown": "Total indisponível",
+    "combinedUnknownTooltip": "{count, plural, one {# posição não tem preço, pelo que o total desta conta não pode ser apurado} other {# posições não têm preço, pelo que o total desta conta não pode ser apurado}}",
+    "combinedUnknownNoPortfolio": "Não foi possível carregar as posições, pelo que o total desta conta não pode ser apurado",
     "limit": "Limite: {amount}",
     "pairedWith": "Associada com {name}",
     "subtypeBrokerage": "Corretagem",
@@ -76,6 +80,7 @@
       "deleteTitle": "Eliminar conta permanentemente (sem transações)",
       "closeTitleDisabled": "O saldo da conta deve ser zero para fechar",
       "closeTitleEnabled": "Fechar conta",
+      "closeTitleUnknownValue": "O total desta conta não pode ser apurado, pelo que não é possível confirmar que está vazia",
       "details": "Detalhes"
     },
     "jointBadge": "Conjunta",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "A fechar...",
     "deleteTitle": "Eliminar Conta",
     "deleteMessage": "Tem a certeza de que quer eliminar permanentemente \"{name}\"? Esta ação não pode ser desfeita.",
+    "deletePairMessage": "Tem a certeza de que pretende eliminar definitivamente «{name}»? Ambos os registos são eliminados: «{brokerageName}» e «{cashName}». Esta ação não pode ser anulada.",
     "deleteConfirm": "Eliminar Conta",
     "deleteConfirmLoading": "A eliminar..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Percentagem da comissão",
     "fxFeePercentPlaceholder": "ex.: 2,5",
     "jointSharedWith": "Conta conjunta partilhada com {count, plural, one {# pessoa} other {# pessoas}}",
-    "jointManage": "Gerir partilha"
+    "jointManage": "Gerir partilha",
+    "cashSection": {
+      "title": "Conta de numerário",
+      "description": "O registo que contém o dinheiro desta conta. O nome segue o nome da conta acima.",
+      "openingBalance": "Saldo inicial de numerário",
+      "accountNumber": "Número da conta de numerário (opcional)",
+      "descriptionField": "Descrição do numerário (opcional)"
+    }
   },
   "exportModal": {
     "title": "Exportar {name}",

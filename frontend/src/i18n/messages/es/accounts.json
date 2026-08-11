@@ -55,6 +55,10 @@
     "statusActive": "Activa",
     "statusClosed": "Cerrada",
     "marketValue": "Valor de mercado",
+    "combinedBreakdown": "Inversiones {investments} · Efectivo {cash}",
+    "combinedUnknown": "Total no disponible",
+    "combinedUnknownTooltip": "{count, plural, one {# posición no tiene precio, por lo que no se puede calcular el total de esta cuenta} other {# posiciones no tienen precio, por lo que no se puede calcular el total de esta cuenta}}",
+    "combinedUnknownNoPortfolio": "No se pudieron cargar las posiciones, por lo que no se puede calcular el total de esta cuenta",
     "limit": "Límite: {amount}",
     "pairedWith": "Vinculada con {name}",
     "subtypeBrokerage": "Corretaje",
@@ -76,6 +80,7 @@
       "deleteTitle": "Eliminar permanentemente la cuenta (sin transacciones)",
       "closeTitleDisabled": "La cuenta debe tener saldo cero para cerrarla",
       "closeTitleEnabled": "Cerrar cuenta",
+      "closeTitleUnknownValue": "No se puede calcular el total de esta cuenta, por lo que no se puede confirmar que esté vacía",
       "details": "Detalles"
     },
     "jointBadge": "Conjunta",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Cerrando...",
     "deleteTitle": "Eliminar Cuenta",
     "deleteMessage": "¿Estás seguro de que deseas eliminar permanentemente \"{name}\"? Esta acción no se puede deshacer.",
+    "deletePairMessage": "¿Seguro que quieres eliminar permanentemente «{name}»? Se eliminan sus dos registros: «{brokerageName}» y «{cashName}». Esta acción no se puede deshacer.",
     "deleteConfirm": "Eliminar Cuenta",
     "deleteConfirmLoading": "Eliminando..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Porcentaje de comisión",
     "fxFeePercentPlaceholder": "p. ej. 2,5",
     "jointSharedWith": "Cuenta conjunta compartida con {count, plural, one {# persona} other {# personas}}",
-    "jointManage": "Gestionar uso compartido"
+    "jointManage": "Gestionar uso compartido",
+    "cashSection": {
+      "title": "Cuenta de efectivo",
+      "description": "El registro que guarda el dinero de esta cuenta. Su nombre sigue al nombre de la cuenta de arriba.",
+      "openingBalance": "Saldo inicial de efectivo",
+      "accountNumber": "Número de cuenta de efectivo (opcional)",
+      "descriptionField": "Descripción del efectivo (opcional)"
+    }
   },
   "exportModal": {
     "title": "Exportar {name}",

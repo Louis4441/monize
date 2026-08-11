@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "无法更改有交易记录的账户货币。",
     "alreadyClosed": "账户已关闭",
     "closeNonZeroBalance": "无法关闭余额非零的账户。当前余额：{{ currentBalance }}",
+    "closeWithHoldings": "无法关闭仍持有证券的投资账户。该账户有 {{ holdingCount }} 项数量不为零的持仓；请先卖出或转出。",
     "notClosed": "账户未关闭",
     "modifyBalanceClosed": "无法修改已关闭账户的余额",
     "deleteWithTransactions": "无法删除有 {{ transactionCount }} 笔交易的账户。请改为关闭该账户。",

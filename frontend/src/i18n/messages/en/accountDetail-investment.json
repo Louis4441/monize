@@ -6,5 +6,10 @@
     "realizedGains": "Realized Gains",
     "ytd": "Year to date",
     "empty": "No investment income this year"
+  },
+  "register": {
+    "cashHeading": "Cash transactions",
+    "newCashTransaction": "New Cash Transaction",
+    "deleteFailed": "Failed to delete transaction"
   }
 }

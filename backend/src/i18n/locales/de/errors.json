@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "Die Währung eines Kontos mit Buchungen kann nicht geändert werden.",
     "alreadyClosed": "Konto ist bereits geschlossen",
     "closeNonZeroBalance": "Konto mit nicht-nullem Saldo kann nicht geschlossen werden. Aktueller Saldo: {{ currentBalance }}",
+    "closeWithHoldings": "Ein Anlagekonto mit Wertpapierbestand kann nicht geschlossen werden. Es hat {{ holdingCount }} Position(en) mit einer Menge ungleich null; verkaufen oder übertragen Sie diese zuerst.",
     "notClosed": "Konto ist nicht geschlossen",
     "modifyBalanceClosed": "Saldo eines geschlossenen Kontos kann nicht geändert werden",
     "deleteWithTransactions": "Konto mit {{ transactionCount }} Buchung(en) kann nicht gelöscht werden. Schließen Sie das Konto stattdessen.",

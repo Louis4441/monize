@@ -13,6 +13,7 @@ import { Account } from '@/types/account';
 import { Payee } from '@/types/payee';
 import { getCurrencySymbol } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
+import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { RecentTransactionsPopover } from './RecentTransactionsPopover';
 
 interface SplitTransactionFieldsProps {
@@ -74,6 +75,7 @@ export function SplitTransactionFields({
   amountLabel,
 }: SplitTransactionFieldsProps) {
   const t = useTranslations('transactions');
+  const accountOptionLabel = useAccountOptionLabel();
   const historyButtonRef = useRef<HTMLButtonElement>(null);
   const [showRecentPopover, setShowRecentPopover] = useState(false);
 
@@ -92,6 +94,7 @@ export function SplitTransactionFields({
               (account) =>
                 account.accountSubType !== 'INVESTMENT_BROKERAGE' &&
                 (!account.isClosed || account.id === watchedAccountId),
+              accountOptionLabel,
             ),
           ]}
           {...register('accountId')}

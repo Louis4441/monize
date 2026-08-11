@@ -55,6 +55,10 @@
     "statusActive": "Ativa",
     "statusClosed": "Fechada",
     "marketValue": "Valor de mercado",
+    "combinedBreakdown": "Investimentos {investments} · Caixa {cash}",
+    "combinedUnknown": "Total indisponível",
+    "combinedUnknownTooltip": "{count, plural, one {# posição não tem preço, então o total desta conta não pode ser calculado} other {# posições não têm preço, então o total desta conta não pode ser calculado}}",
+    "combinedUnknownNoPortfolio": "Não foi possível carregar as posições, então o total desta conta não pode ser calculado",
     "limit": "Limite: {amount}",
     "pairedWith": "Associada com {name}",
     "subtypeBrokerage": "Corretagem",
@@ -76,6 +80,7 @@
       "deleteTitle": "Excluir conta permanentemente (sem transações)",
       "closeTitleDisabled": "O saldo da conta deve ser zero para fechar",
       "closeTitleEnabled": "Fechar conta",
+      "closeTitleUnknownValue": "O total desta conta não pode ser calculado, então não dá para confirmar que ela está zerada",
       "details": "Detalhes"
     },
     "jointBadge": "Conjunta",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Fechando...",
     "deleteTitle": "Excluir Conta",
     "deleteMessage": "Tem certeza de que quer excluir permanentemente \"{name}\"? Esta ação não pode ser desfeita.",
+    "deletePairMessage": "Tem certeza de que deseja excluir permanentemente \"{name}\"? Os dois registros são excluídos: \"{brokerageName}\" e \"{cashName}\". Esta ação não pode ser desfeita.",
     "deleteConfirm": "Excluir Conta",
     "deleteConfirmLoading": "Excluindo..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Percentual da taxa",
     "fxFeePercentPlaceholder": "ex.: 2,5",
     "jointSharedWith": "Conta conjunta compartilhada com {count, plural, one {# pessoa} other {# pessoas}}",
-    "jointManage": "Gerenciar compartilhamento"
+    "jointManage": "Gerenciar compartilhamento",
+    "cashSection": {
+      "title": "Conta de caixa",
+      "description": "O registro que guarda o dinheiro desta conta. O nome dela acompanha o nome da conta acima.",
+      "openingBalance": "Saldo inicial de caixa",
+      "accountNumber": "Número da conta de caixa (opcional)",
+      "descriptionField": "Descrição do caixa (opcional)"
+    }
   },
   "exportModal": {
     "title": "Exportar {name}",

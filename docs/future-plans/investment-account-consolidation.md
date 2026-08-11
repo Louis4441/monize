@@ -59,8 +59,12 @@ export interface LogicalAccount {
   memberIds: string[];      // 1 or 2 ids belonging to this entity
   displayName: string;      // suffix-stripped via caller-supplied strip fn
   isInvestment: boolean;
-  // id whose ledger holds the money: pair -> cash half; standalone / orphan brokerage -> self
+  // The ledger the user posts money to: pair -> cash half; standalone -> self;
+  // null for a brokerage with no cash half.
   cashRegisterId: string | null;
+  // The ledger carrying securities: brokerage half, orphan brokerage, or a
+  // standalone account; null when the entity holds none.
+  holdingsAccountId: string | null;
   // market value + cash balance (+ cash futureTransactionsSum);
   // null when unpricedHoldingsCount > 0 or market value is unknown for an account with holdings
   combinedValue: number | null;
@@ -103,16 +107,44 @@ numbers the API already reports.
    holdings has a settled market value of zero and combines normally: "nothing to price" is
    known, "could not price" is not.
 5. **Every shape works when the other half is absent.** Standalone: cash register = self. Orphan
-   brokerage: treated as standalone (cash register = self -- matching the `findCashAccount`
-   settlement fallback, so its own ledger genuinely holds the trade-generated cash rows). Orphan
-   cash: fails `isInvestmentCashHalf` (the link is null) and renders as an ordinary account with
-   its suffix stripped.
+   brokerage: **no cash register** -- its own ledger carries only the cash rows its trades
+   generated, so it is not an account the user posts to, reconciles or transfers into, which is
+   how the app already treated a brokerage in every money picker. (The plan first said "cash
+   register = self" here, which contradicted its own truth table: reconcile hidden, money pickers
+   excluded. The truth table won, and `holdingsAccountId` became a second field so a surface asks
+   for the ledger it actually needs.) Orphan cash: fails `isInvestmentCashHalf` (the link is
+   null) and renders as an ordinary account with its suffix stripped.
 6. **Names stay stored with suffixes; the UI strips.** The server remains the sole owner of
    suffix generation -- at creation as today, and in the one new place: rename propagation
    (below). No stored-name migration.
 7. **Non-investment behavior is untouched.** Every new branch is entered only for
    `account_type = 'INVESTMENT'` rows (or a `LogicalAccount` wrapping one). If a change alters
    how a chequing account lists, labels, closes or filters, the task is wrong.
+
+## As-built notes
+
+Six things the implementation settled that the plan above did not, each because the code or a
+test insisted:
+
+1. **A brokerage is identified by its sub-type alone.** Requiring `accountType = 'INVESTMENT'`
+   as well is stricter than the data: a row marked `INVESTMENT_BROKERAGE` holds securities
+   whatever else it claims, and only a standalone account -- which has no sub-type to go on --
+   needs its type read.
+2. **A closed account's combined value is its cash, not unknown.** `getPortfolioSummary` filters
+   `isClosed: false`, so a closed account is absent from the payload by design. Reading that
+   absence as "could not price" would put an em-dash on every closed investment account; closing
+   requires the account to be emptied first, so "no holdings to value" is the settled answer.
+3. **The close guard checks both ledgers' balances, not only the holdings.** Once either half
+   can close the pair, closing from the brokerage side would otherwise close over a cash balance
+   the user still has.
+4. **`ReportAccountMultiSelect` keeps `filter` alongside the new `mode`.** `mode` expresses the
+   pair split; `filter` stays for genuine domain restrictions (accounts with an FX fee,
+   non-investment accounts) that several callers legitimately pass.
+5. **The pair-mode form carries the cash fields on its payload; the modal issues the second
+   update.** The form's contract is to collect data and call `onSubmit`, and the modal already
+   owns every account write.
+6. **`useAccountOptionLabel` takes `withCurrency`.** Split rows are narrow and never showed a
+   currency; one labeller with an option beats two labellers.
 
 ## Per-surface truth table
 

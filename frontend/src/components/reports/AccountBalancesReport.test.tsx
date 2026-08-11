@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent, act } from "@/test/render";
+import { render, screen, waitFor, fireEvent, act, within } from "@/test/render";
 import { AccountBalancesReport } from "./AccountBalancesReport";
 
 vi.mock("@/lib/pdf-export", () => ({
@@ -318,12 +318,63 @@ describe("AccountBalancesReport", () => {
     });
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("Investments - Brokerage")).toBeInTheDocument();
+      expect(screen.getByText("Investments")).toBeInTheDocument();
     });
-    // Total should be 10000 (holdings) + 5000 (cash account) = 15000
-    // NOT 15000 (holdings+cash in brokerage) + 5000 (cash account) = 20000
+    // One row for the pair, worth 10000 (holdings) + 5000 (cash) = 15000 --
+    // not 15000 counted again against the cash half's own 5000.
     const assetElements = screen.getAllByText("$15000.00");
     expect(assetElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Investments - Brokerage")).not.toBeInTheDocument();
+    expect(screen.queryByText("Investments - Cash")).not.toBeInTheDocument();
+  });
+
+  // Showing the cash the report does know, in a total's place, would read as
+  // the account being worth that much.
+  it("shows no total for an account whose holdings cannot all be priced", async () => {
+    mockGetAll.mockResolvedValue([
+      {
+        id: "acc-brokerage",
+        name: "Investments - Brokerage",
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_BROKERAGE",
+        currentBalance: 0,
+        currencyCode: "CAD",
+        isClosed: false,
+        linkedAccountId: "acc-cash",
+      },
+      {
+        id: "acc-cash",
+        name: "Investments - Cash",
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_CASH",
+        currentBalance: 5000,
+        currencyCode: "CAD",
+        isClosed: false,
+        linkedAccountId: "acc-brokerage",
+      },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue({
+      holdingsByAccount: [
+        {
+          accountId: "acc-brokerage",
+          totalMarketValue: 10000,
+          unpricedHoldingsCount: 2,
+          cashBalance: 5000,
+        },
+      ],
+    });
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Investments")).toBeInTheDocument();
+    });
+
+    // The row itself reports no total. The summary cards above still sum the
+    // components they know -- a deliberate, documented gap: a nullable group
+    // total has to be threaded through those cards to mean anything.
+    const row = screen.getByText("Investments").closest("button")!;
+    expect(within(row).getByText("Total unavailable")).toBeInTheDocument();
+    expect(within(row).queryByText("$15000.00")).not.toBeInTheDocument();
+    expect(within(row).queryByText("$5000.00")).not.toBeInTheDocument();
   });
 
   it("shows negative net worth with orange styling", async () => {
@@ -540,7 +591,7 @@ describe("AccountBalancesReport", () => {
     expect(screen.queryByTestId("pie-chart")).not.toBeInTheDocument();
   });
 
-  it("shows 'Market value' label for brokerage account in table", async () => {
+  it("says what an investment account total is made of", async () => {
     mockGetAll.mockResolvedValue([
       {
         id: "acc-b",
@@ -561,7 +612,9 @@ describe("AccountBalancesReport", () => {
     await waitFor(() => {
       expect(screen.getByText("My Brokerage")).toBeInTheDocument();
     });
-    expect(screen.getByText("Market value")).toBeInTheDocument();
+    expect(
+      screen.getByText("Investments $25000.00 · Cash $0.00"),
+    ).toBeInTheDocument();
   });
 
   it("handles portfolioSummary being null (empty brokerageMarketValues)", async () => {

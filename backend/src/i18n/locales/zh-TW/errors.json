@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "無法更改有交易記錄的科目貨幣。",
     "alreadyClosed": "科目已關閉",
     "closeNonZeroBalance": "無法關閉結餘不為零的科目。目前結餘：{{ currentBalance }}",
+    "closeWithHoldings": "無法關閉仍持有證券的投資帳戶。該帳戶有 {{ holdingCount }} 項數量不為零的持股；請先賣出或轉出。",
     "notClosed": "科目尚未關閉",
     "modifyBalanceClosed": "無法修改已關閉科目的結餘",
     "deleteWithTransactions": "無法刪除有 {{ transactionCount }} 筆交易的科目。請改為關閉科目。",

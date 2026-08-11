@@ -55,6 +55,10 @@
     "statusActive": "[XX-Active-XX]",
     "statusClosed": "[XX-Closed-XX]",
     "marketValue": "[XX-Market value-XX]",
+    "combinedBreakdown": "[XX-Investments {investments} · Cash {cash}-XX]",
+    "combinedUnknown": "[XX-Total unavailable-XX]",
+    "combinedUnknownTooltip": "[XX-{count, plural, one {# holding has no price, so this account's total cannot be worked out} other {# holdings have no price, so this account's total cannot be worked out}}-XX]",
+    "combinedUnknownNoPortfolio": "[XX-Holdings could not be loaded, so this account's total cannot be worked out-XX]",
     "limit": "[XX-Limit: {amount}-XX]",
     "pairedWith": "[XX-Paired with {name}-XX]",
     "subtypeBrokerage": "[XX-Brokerage-XX]",
@@ -76,6 +80,7 @@
       "deleteTitle": "[XX-Permanently delete account (no transactions)-XX]",
       "closeTitleDisabled": "[XX-Account must have zero balance to close-XX]",
       "closeTitleEnabled": "[XX-Close account-XX]",
+      "closeTitleUnknownValue": "[XX-This account's total cannot be worked out, so it cannot be confirmed empty-XX]",
       "details": "[XX-Details-XX]"
     },
     "jointBadge": "[XX-Joint-XX]",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "[XX-Closing...-XX]",
     "deleteTitle": "[XX-Delete Account-XX]",
     "deleteMessage": "[XX-Are you sure you want to permanently delete \"{name}\"? This action cannot be undone.-XX]",
+    "deletePairMessage": "[XX-Are you sure you want to permanently delete \"{name}\"? Both of its ledgers are deleted: \"{brokerageName}\" and \"{cashName}\". This action cannot be undone.-XX]",
     "deleteConfirm": "[XX-Delete Account-XX]",
     "deleteConfirmLoading": "[XX-Deleting...-XX]"
   },
@@ -147,6 +153,13 @@
     "statementSettlementDayTooltip": "[XX-The settlement date (also called the closing date) is the last day of the billing cycle. Transactions posted on or before this day will appear on the current statement.-XX]",
     "investmentPairTitle": "[XX-Create as Cash + Brokerage pair (recommended)-XX]",
     "investmentPairDescription": "[XX-Creates two linked accounts: a Cash account for transfers in/out and a Brokerage account for investment transactions. This is the recommended structure for tracking investments.-XX]",
+    "cashSection": {
+      "title": "[XX-Cash account-XX]",
+      "description": "[XX-The ledger that holds this account's money. Its name follows the account name above.-XX]",
+      "openingBalance": "[XX-Cash Opening Balance-XX]",
+      "accountNumber": "[XX-Cash Account Number (optional)-XX]",
+      "descriptionField": "[XX-Cash Description (optional)-XX]"
+    },
     "accountTypeOptions": {
       "chequing": "[XX-Chequing-XX]",
       "savings": "[XX-Savings-XX]",

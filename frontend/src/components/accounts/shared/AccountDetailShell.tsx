@@ -9,6 +9,7 @@ import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/
 import { formatAccountType } from '@/lib/account-utils';
 import type { Account } from '@/types/account';
 import { AccountSwitcher } from './AccountSwitcher';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 
 export interface AccountDetailShellProps {
   account: Account;
@@ -62,6 +63,9 @@ export function AccountDetailShell({
 }: AccountDetailShellProps) {
   const t = useTranslations('accountDetail');
   const tc = useTranslations('common');
+  // An investment pair's stored name carries the ledger suffix; the page is
+  // about the account, so the title drops it.
+  const displayName = useMainAccountName()(account.name);
   const [isExporting, setIsExporting] = useState(false);
   // Guards the async export's setState against an unmount mid-generation.
   const mountedRef = useRef(true);
@@ -113,7 +117,7 @@ export function AccountDetailShell({
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-1">
                 <h1 className="truncate text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {account.name}
+                  {displayName}
                 </h1>
                 {(account.isJoint || account.jointGranteeCount !== undefined) && (
                   <span className="ml-1 px-2 inline-flex flex-shrink-0 text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">

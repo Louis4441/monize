@@ -6,5 +6,10 @@
     "realizedGains": "Zrealizowane zyski",
     "ytd": "Od początku roku",
     "empty": "Brak dochodu z inwestycji w tym roku"
+  },
+  "register": {
+    "cashHeading": "Transakcje gotówkowe",
+    "newCashTransaction": "Nowa transakcja gotówkowa",
+    "deleteFailed": "Nie udało się usunąć transakcji"
   }
 }

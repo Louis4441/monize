@@ -90,13 +90,20 @@ test.describe('Microsoft Money (.mny) import', () => {
       page.getByText(/upload transaction files/i).first(),
     ).toBeVisible();
 
-    // The accounts really landed, not just the report. `exact` matters here:
-    // the cash sleeve's row carries "Paired with Investments to Watch -
-    // Brokerage", so a substring match resolves to two elements.
+    // The accounts really landed, not just the report. The two ledgers are
+    // stored with their " - Brokerage" / " - Cash" suffixes, but the accounts
+    // list folds a linked pair into the one account the user thinks they
+    // imported, so what is on screen is the Money account's own name.
     await page.goto('/accounts');
     await expect(
-      page.getByText('Investments to Watch - Brokerage', { exact: true }),
+      page.getByText('Investments to Watch', { exact: true }),
     ).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByText('Investments to Watch - Brokerage', { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText('Investments to Watch - Cash', { exact: true }),
+    ).toHaveCount(0);
   });
 
   test('asks for a password, tells a wrong one apart, then opens the file', async ({

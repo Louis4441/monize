@@ -6,5 +6,10 @@
     "realizedGains": "वसूल किया गया लाभ",
     "ytd": "वर्ष अब तक",
     "empty": "इस वर्ष कोई निवेश आय नहीं"
+  },
+  "register": {
+    "cashHeading": "नकद लेनदेन",
+    "newCashTransaction": "नया नकद लेनदेन",
+    "deleteFailed": "लेनदेन हटाने में विफल"
   }
 }

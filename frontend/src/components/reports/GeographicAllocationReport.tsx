@@ -42,8 +42,6 @@ const logger = createLogger('GeographicAllocationReport');
 
 // Holdings are keyed off the brokerage sub-account, so offer those (the
 // sibling cash account is excluded from the picker).
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 type GeoRegionSortField = 'region' | 'count' | 'marketValue' | 'percentage';
 type GeoExchangeSortField = 'exchange' | 'country' | 'count' | 'marketValue' | 'percentage';
 type GeoCountrySortField = 'country' | 'marketValue' | 'percentage';
@@ -359,7 +357,7 @@ export function GeographicAllocationReport() {
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
-              filter={excludeCashAccounts}
+              mode="portfolio"
             />
           </div>
           <div className="flex items-center gap-2">

@@ -215,4 +215,61 @@ describe('AccountFormModal', () => {
     const [, payload] = mockUpdate.mock.calls[0];
     expect(payload).not.toHaveProperty('description');
   });
+  // A pair is one account with two ledgers, so the form can carry edits to
+  // both. The account's own update goes first, since a rename is what the
+  // server propagates to the partner.
+  it('saves the cash ledger edits as a second update, account first', async () => {
+    mockUpdate.mockResolvedValue({});
+    render(
+      <AccountFormModal
+        formModal={buildFormModal({
+          editingItem: { id: 'brok-1', accountType: 'INVESTMENT' } as Account,
+          isEditing: true,
+        })}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(capturedOnSubmit).not.toBeNull());
+    await act(async () => {
+      await capturedOnSubmit!({
+        name: 'TFSA',
+        accountType: 'INVESTMENT',
+        cashAccountId: 'cash-1',
+        cashOpeningBalance: 250,
+        cashAccountNumber: '12345',
+      });
+    });
+
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(mockUpdate.mock.calls[0][0]).toBe('brok-1');
+    expect(mockUpdate.mock.calls[1][0]).toBe('cash-1');
+    expect(mockUpdate.mock.calls[1][1]).toMatchObject({
+      openingBalance: 250,
+      accountNumber: '12345',
+    });
+    // The cash fields describe the other ledger, not this one.
+    expect(mockUpdate.mock.calls[0][1]).not.toHaveProperty('cashAccountId');
+    expect(mockUpdate.mock.calls[0][1]).not.toHaveProperty('cashOpeningBalance');
+  });
+
+  it('issues one update when the form carried no cash ledger edits', async () => {
+    mockUpdate.mockResolvedValue({});
+    render(
+      <AccountFormModal
+        formModal={buildFormModal({
+          editingItem: { id: 'brok-1', accountType: 'INVESTMENT' } as Account,
+          isEditing: true,
+        })}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(capturedOnSubmit).not.toBeNull());
+    await act(async () => {
+      await capturedOnSubmit!({ name: 'TFSA', accountType: 'INVESTMENT' });
+    });
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
 });

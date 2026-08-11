@@ -33,8 +33,6 @@ const logger = createLogger('CurrencyExposureReport');
 
 // Holdings are keyed off the brokerage sub-account, so offer those (the
 // sibling cash account is excluded from the picker).
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 type CurrencyExposureSortField = 'currency' | 'nativeValue' | 'rate' | 'convertedValue' | 'percentage' | 'count';
 
 const CURRENCY_COLOURS: Record<string, string> = {
@@ -268,7 +266,7 @@ export function CurrencyExposureReport() {
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
-              filter={excludeCashAccounts}
+              mode="portfolio"
             />
           </div>
           <div className="flex gap-2 items-center">

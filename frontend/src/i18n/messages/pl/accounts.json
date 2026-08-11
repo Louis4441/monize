@@ -55,6 +55,10 @@
     "statusActive": "Aktywny",
     "statusClosed": "Zamknięte",
     "marketValue": "Wartość rynkowa",
+    "combinedBreakdown": "Inwestycje {investments} · Gotówka {cash}",
+    "combinedUnknown": "Suma niedostępna",
+    "combinedUnknownTooltip": "{count, plural, one {# pozycja nie ma ceny, więc nie można obliczyć sumy tego konta} few {# pozycje nie mają ceny, więc nie można obliczyć sumy tego konta} many {# pozycji nie ma ceny, więc nie można obliczyć sumy tego konta} other {# pozycji nie ma ceny, więc nie można obliczyć sumy tego konta}}",
+    "combinedUnknownNoPortfolio": "Nie udało się wczytać pozycji, więc nie można obliczyć sumy tego konta",
     "limit": "Limit: {amount}",
     "pairedWith": "Powiązane z {name}",
     "subtypeBrokerage": "Maklerskie",
@@ -76,6 +80,7 @@
       "deleteTitle": "Trwale usuń konto (bez transakcji)",
       "closeTitleDisabled": "Konto musi mieć zerowe saldo, aby je zamknąć",
       "closeTitleEnabled": "Zamknij konto",
+      "closeTitleUnknownValue": "Nie można obliczyć sumy tego konta, więc nie da się potwierdzić, że jest puste",
       "details": "Szczegóły"
     },
     "jointBadge": "Wspólne",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Zamykanie...",
     "deleteTitle": "Usuń konto",
     "deleteMessage": "Czy na pewno chcesz trwale usunąć \"{name}\"? Tej operacji nie można cofnąć.",
+    "deletePairMessage": "Czy na pewno chcesz trwale usunąć „{name}”? Usunięte zostaną oba rejestry: „{brokerageName}” i „{cashName}”. Tej operacji nie można cofnąć.",
     "deleteConfirm": "Usuń konto",
     "deleteConfirmLoading": "Usuwanie..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Procent opłaty",
     "fxFeePercentPlaceholder": "np. 2,5",
     "jointSharedWith": "Wspólne konto udostępnione {count, plural, one {# osobie} few {# osobom} many {# osobom} other {# osobom}}",
-    "jointManage": "Zarządzaj udostępnianiem"
+    "jointManage": "Zarządzaj udostępnianiem",
+    "cashSection": {
+      "title": "Konto gotówkowe",
+      "description": "Rejestr, w którym znajdują się pieniądze tego konta. Jego nazwa podąża za nazwą konta powyżej.",
+      "openingBalance": "Saldo początkowe gotówki",
+      "accountNumber": "Numer konta gotówkowego (opcjonalnie)",
+      "descriptionField": "Opis gotówki (opcjonalnie)"
+    }
   },
   "exportModal": {
     "title": "Eksportuj {name}",

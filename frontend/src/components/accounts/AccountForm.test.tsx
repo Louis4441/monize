@@ -18,6 +18,9 @@ vi.mock('@/lib/accounts', () => ({
       investmentTransactionCount: 0,
       canDelete: true,
     }),
+    // Rejects by default: most fixtures are not half of a linked pair, which
+    // is exactly what the endpoint answers for a standalone account.
+    getInvestmentPair: vi.fn().mockRejectedValue(new Error('not a pair')),
   },
 }));
 
@@ -1920,6 +1923,136 @@ describe('AccountForm', () => {
       // Should have called create (regardless of whether it found an existing parent,
       // it creates the child; exercises lines 379 and the parent-found branch)
       expect(categoriesApi.create).toHaveBeenCalled();
+    });
+  });
+  // The gap that stalled the community branch: once the account list shows one
+  // row per pair, the cash half's own fields have no other route in. Editing
+  // "TFSA" has to reach the ledger that actually holds its money.
+  describe('editing a linked pair', () => {
+    const brokerageHalf = () =>
+      createExistingAccount({
+        id: 'brok-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+        openingBalance: 0,
+      });
+
+    const cashHalf = () =>
+      createExistingAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'brok-1',
+        openingBalance: 250,
+        accountNumber: '99887',
+        description: 'Settlement cash',
+      });
+
+    async function renderPairForm() {
+      (accountsApi.getInvestmentPair as ReturnType<typeof vi.fn>).mockResolvedValue({
+        brokerageAccount: brokerageHalf(),
+        cashAccount: cashHalf(),
+      });
+      await act(async () => {
+        render(
+          <AccountForm
+            account={brokerageHalf()}
+            onSubmit={mockOnSubmit}
+            onCancel={mockOnCancel}
+          />,
+        );
+      });
+    }
+
+    it('edits the name the user gave the account, not the stored ledger name', async () => {
+      await renderPairForm();
+
+      const nameInput = screen.getByDisplayValue('TFSA');
+      expect(nameInput).toBeInTheDocument();
+      expect(screen.queryByDisplayValue('TFSA - Brokerage')).not.toBeInTheDocument();
+    });
+
+    it('offers the cash ledger own fields', async () => {
+      await renderPairForm();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Cash account'));
+      });
+
+      expect(screen.getByDisplayValue('99887')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Settlement cash')).toBeInTheDocument();
+    });
+
+    it('submits the cash ledger edits alongside the account', async () => {
+      await renderPairForm();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Cash account'));
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByDisplayValue('99887'), {
+          target: { value: '12345' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Update Account/i }));
+      });
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalled();
+      });
+      const submitted = mockOnSubmit.mock.calls[0][0];
+      expect(submitted.cashAccountId).toBe('cash-1');
+      expect(submitted.cashAccountNumber).toBe('12345');
+      expect(submitted.name).toBe('TFSA');
+    });
+
+    // Resending an untouched section would rewrite the cash half's balance and
+    // description with whatever the form happened to load, on an edit that was
+    // only ever about the account's name.
+    it('sends nothing about the cash ledger when that section is untouched', async () => {
+      await renderPairForm();
+
+      await act(async () => {
+        fireEvent.change(screen.getByDisplayValue('TFSA'), {
+          target: { value: 'RRSP' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Update Account/i }));
+      });
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalled();
+      });
+      const submitted = mockOnSubmit.mock.calls[0][0];
+      expect(submitted.name).toBe('RRSP');
+      expect(submitted).not.toHaveProperty('cashAccountId');
+      expect(submitted).not.toHaveProperty('cashOpeningBalance');
+    });
+
+    it('keeps the single-account form for an account that is not part of a pair', async () => {
+      (accountsApi.getInvestmentPair as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('not a pair'),
+      );
+      await act(async () => {
+        render(
+          <AccountForm
+            account={createExistingAccount({
+              name: 'Self-directed',
+              accountType: 'INVESTMENT',
+            })}
+            onSubmit={mockOnSubmit}
+            onCancel={mockOnCancel}
+          />,
+        );
+      });
+
+      expect(screen.queryByText('Cash account')).not.toBeInTheDocument();
+      expect(screen.getByDisplayValue('Self-directed')).toBeInTheDocument();
     });
   });
 });

@@ -36,6 +36,7 @@ import { Tag } from '@/types/tag';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { roundToCents, getCurrencySymbol, FX_RATE_DISPLAY_DECIMALS } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
+import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { getErrorMessage } from '@/lib/errors';
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -123,6 +124,7 @@ export function ScheduledTransactionForm({
   submitRef,
 }: ScheduledTransactionFormProps) {
   const t = useTranslations('scheduledTransactions');
+  const accountOptionLabel = useAccountOptionLabel();
   const { defaultCurrency, formatCurrency, formatNumber } = useNumberFormat();
   const [isLoading, setIsLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -443,9 +445,9 @@ export function ScheduledTransactionForm({
     buildAccountDropdownOptions(
       accounts,
       (a) => !a.isClosed && a.accountType !== 'ASSET' && a.accountSubType !== 'INVESTMENT_BROKERAGE',
-      (a) => `${a.name} (${a.currencyCode})`,
+      accountOptionLabel,
     ),
-    [accounts]
+    [accounts, accountOptionLabel]
   );
 
   // Investment-mode accounts: only brokerage (share-holding) accounts.
@@ -453,9 +455,9 @@ export function ScheduledTransactionForm({
     buildAccountDropdownOptions(
       accounts,
       (a) => !a.isClosed && a.accountSubType === 'INVESTMENT_BROKERAGE',
-      (a) => `${a.name} (${a.currencyCode})`,
+      accountOptionLabel,
     ),
-    [accounts]
+    [accounts, accountOptionLabel]
   );
 
   // Funding account options: anything that can carry cash, except the
@@ -470,9 +472,9 @@ export function ScheduledTransactionForm({
         a.accountType !== 'ASSET' &&
         a.accountSubType !== 'INVESTMENT_BROKERAGE' &&
         a.accountSubType !== 'INVESTMENT_CASH',
-      (a) => `${a.name} (${a.currencyCode})`,
+      accountOptionLabel,
     ),
-    [accounts, watchedAccountId]
+    [accounts, watchedAccountId, accountOptionLabel]
   );
 
   const securityOptions = useMemo(() =>
@@ -494,9 +496,9 @@ export function ScheduledTransactionForm({
         a.id !== watchedAccountId &&
         a.accountType !== 'ASSET' &&
         a.accountSubType !== 'INVESTMENT_BROKERAGE',
-      (a) => `${a.name} (${a.currencyCode})`,
+      accountOptionLabel,
     ),
-    [accounts, watchedAccountId]
+    [accounts, watchedAccountId, accountOptionLabel]
   );
 
   // Memoize payee options

@@ -62,4 +62,51 @@ describe('AccountSwitcher', () => {
     expect(screen.getByRole('menuitem', { name: /Account number 7/ })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Account number 3/ })).toBeNull();
   });
+  describe('an investment pair', () => {
+    const pair = (): Account[] => [
+      {
+        ...account('brok-1', 'TFSA - Brokerage', 'INVESTMENT'),
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+      } as Account,
+      {
+        ...account('cash-1', 'TFSA - Cash', 'INVESTMENT'),
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'brok-1',
+      } as Account,
+    ];
+
+    // Listing both halves offers the same account twice, under two names the
+    // user never chose.
+    it('lists a linked pair once, under the name the user gave it', () => {
+      open([account('acc-1', 'Everyday Chequing'), ...pair()]);
+
+      expect(screen.getByText('TFSA')).toBeInTheDocument();
+      expect(screen.queryByText('TFSA - Brokerage')).toBeNull();
+      expect(screen.queryByText('TFSA - Cash')).toBeNull();
+    });
+
+    it('selects the pair by its canonical id', () => {
+      const { onSelect } = open([account('acc-1', 'Everyday Chequing'), ...pair()]);
+
+      fireEvent.click(screen.getByText('TFSA'));
+
+      expect(onSelect).toHaveBeenCalledWith('brok-1');
+    });
+
+    it('still finds the account when searching either ledger stored name', () => {
+      // The filter only appears past a threshold, so the list is padded to it.
+      const filler = Array.from({ length: 9 }, (_, i) =>
+        account(`filler-${i}`, `Filler ${i}`),
+      );
+      open([account('acc-1', 'Everyday Chequing'), ...filler, ...pair()]);
+
+      fireEvent.change(screen.getByPlaceholderText('Filter accounts...'), {
+        target: { value: 'Cash' },
+      });
+
+      expect(screen.getByText('TFSA')).toBeInTheDocument();
+      expect(screen.queryByText('Everyday Chequing')).toBeNull();
+    });
+  });
 });

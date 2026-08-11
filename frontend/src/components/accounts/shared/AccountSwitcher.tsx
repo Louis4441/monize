@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { EntitySwitcher, type EntitySwitcherItem } from '@/components/ui/EntitySwitcher';
 import { formatAccountType } from '@/lib/account-utils';
+import { buildLogicalAccounts } from '@/lib/logical-accounts';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import type { Account } from '@/types/account';
 
 interface AccountSwitcherProps {
@@ -22,22 +24,35 @@ interface AccountSwitcherProps {
 export function AccountSwitcher({ currentId, accounts, onSelect }: AccountSwitcherProps) {
   const t = useTranslations('accountDetail');
   const tc = useTranslations('common');
+  const stripAccountName = useMainAccountName();
+
+  // A linked brokerage/cash pair is one account, so it is one entry here --
+  // otherwise the switcher offers the same account twice, under two names the
+  // user never chose.
+  const logicalAccounts = useMemo(
+    () => buildLogicalAccounts([...accounts], stripAccountName),
+    [accounts, stripAccountName],
+  );
 
   const items = useMemo<EntitySwitcherItem[]>(
     () =>
-      accounts.map((account) => {
-        const type = formatAccountType(account.accountType, tc);
+      logicalAccounts.map((logical) => {
+        const type = formatAccountType(logical.primary.accountType, tc);
+        const storedNames = logical.cash
+          ? `${logical.primary.name} ${logical.cash.name}`
+          : logical.primary.name;
         return {
-          id: account.id,
-          primary: account.name,
+          id: logical.id,
+          primary: logical.displayName,
           // The type disambiguates the several accounts a reader names alike
           // ("Joint" at two banks), the same way the payee switcher shows a
           // default category.
           secondary: type,
-          searchText: `${account.name} ${type}`,
+          // Either ledger's stored name still finds the account it belongs to.
+          searchText: `${logical.displayName} ${storedNames} ${type}`,
         };
       }),
-    [accounts, tc],
+    [logicalAccounts, tc],
   );
 
   return (

@@ -39,8 +39,6 @@ const WIDGET_ID = 'portfolio-value';
 // the series stays readable without thousands of points.
 const DAILY_RANGES = new Set(['3m', '6m']);
 
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 interface PortfolioValueWidgetProps {
   accounts: Account[];
   isLoading: boolean;
@@ -144,7 +142,7 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
           accounts={investmentAccounts}
           value={config.accountIds}
           onChange={(accountIds) => updateConfig({ accountIds })}
-          filter={excludeCashAccounts}
+          mode="portfolio"
           className="w-full"
         />
       </WidgetConfigRow>

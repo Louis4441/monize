@@ -1604,6 +1604,7 @@ describe("PortfolioService", () => {
             ],
             totalCostBasis: 1500.1234,
             totalMarketValue: 1800.5678,
+            unpricedHoldingsCount: 0,
             totalGainLoss: 300.4444,
             totalGainLossPercent: 20.123456,
             netInvested: 1500,

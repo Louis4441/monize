@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { AccountRow, AccountRowProps, buildAccountActions } from './AccountRow';
+import type { LogicalAccount } from '@/lib/logical-accounts';
 import { Account } from '@/types/account';
 
 function createAccount(overrides: Partial<Account> = {}): Account {
@@ -111,6 +112,30 @@ function createDefaultProps(overrides: Partial<AccountRowProps> = {}): AccountRo
       onTouchCancel: vi.fn(),
     }),
     ...overrides,
+  };
+}
+
+/**
+ * An orphan brokerage entity (no linked cash half) worth `combinedValue` --
+ * the shape the Close action reads to decide whether the account is empty.
+ */
+function brokerageLogical(combinedValue: number | null): LogicalAccount {
+  const primary = createAccount({
+    isClosed: false,
+    currentBalance: 0,
+    accountType: 'INVESTMENT',
+    accountSubType: 'INVESTMENT_BROKERAGE',
+  });
+  return {
+    id: primary.id,
+    primary,
+    cash: null,
+    memberIds: [primary.id],
+    displayName: primary.name,
+    isInvestment: true,
+    cashRegisterId: null,
+    holdingsAccountId: primary.id,
+    combinedValue,
   };
 }
 
@@ -465,7 +490,7 @@ describe('AccountRow', () => {
       renderAccountRow(props);
 
       fireEvent.click(screen.getByText('Reconcile'));
-      expect(onReconcile).toHaveBeenCalledWith(account);
+      expect(onReconcile).toHaveBeenCalledWith(account.id);
     });
 
     it('renders Close button for active accounts', () => {
@@ -508,7 +533,7 @@ describe('AccountRow', () => {
           currentBalance: 0,
           accountSubType: 'INVESTMENT_BROKERAGE',
         }),
-        brokerageMarketValue: 25000,
+        logical: brokerageLogical(25000),
       });
       renderAccountRow(props);
 
@@ -524,7 +549,7 @@ describe('AccountRow', () => {
           currentBalance: 0,
           accountSubType: 'INVESTMENT_BROKERAGE',
         }),
-        brokerageMarketValue: 0,
+        logical: brokerageLogical(0),
       });
       renderAccountRow(props);
 
@@ -674,7 +699,7 @@ describe('AccountRow', () => {
       renderAccountRow(props);
 
       fireEvent.click(screen.getByTitle('Reconcile'));
-      expect(onReconcile).toHaveBeenCalledWith(account);
+      expect(onReconcile).toHaveBeenCalledWith(account.id);
     });
 
     it('does not render Reconcile icon for brokerage accounts in dense mode', () => {
@@ -1100,6 +1125,210 @@ describe('AccountRow', () => {
       expect(byKey.get('delete')?.hidden).toBe(false);
       // No handler -> the joint-only action never appears for own rows.
       expect(byKey.get('netWorthExclusion')?.hidden).toBe(true);
+    });
+  });
+  describe('a folded investment pair', () => {
+    const brokerage = createAccount({
+      id: 'brok',
+      name: 'TFSA - Brokerage',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_BROKERAGE',
+      linkedAccountId: 'cash',
+      currentBalance: 0,
+      description: null,
+    });
+    const cash = createAccount({
+      id: 'cash',
+      name: 'TFSA - Cash',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_CASH',
+      linkedAccountId: 'brok',
+      currentBalance: 3500,
+    });
+
+    const logical = (combinedValue: number | null): LogicalAccount => ({
+      id: 'brok',
+      primary: brokerage,
+      cash,
+      memberIds: ['brok', 'cash'],
+      displayName: 'TFSA',
+      isInvestment: true,
+      cashRegisterId: 'cash',
+      holdingsAccountId: 'brok',
+      combinedValue,
+    });
+
+    it('shows the entity name without the stored suffix', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: brokerage,
+          logical: logical(15500),
+          brokerageMarketValue: 12000,
+        }),
+      );
+
+      expect(screen.getByText('TFSA')).toBeInTheDocument();
+      expect(screen.queryByText('TFSA - Brokerage')).not.toBeInTheDocument();
+    });
+
+    it('shows the combined total and what it is made of', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: brokerage,
+          logical: logical(15500),
+          brokerageMarketValue: 12000,
+        }),
+      );
+
+      expect(screen.getByText('$15500.00')).toBeInTheDocument();
+      expect(
+        screen.getByText('Investments $12000.00 · Cash $3500.00'),
+      ).toBeInTheDocument();
+    });
+
+    it('drops the pairing chrome that existed to explain two rows', () => {
+      const props = createDefaultProps({
+        account: brokerage,
+        logical: logical(15500),
+        brokerageMarketValue: 12000,
+        accountNameMap: new Map([['cash', 'TFSA - Cash']]),
+      });
+      renderAccountRow(props);
+
+      expect(screen.queryByText(/Paired with/)).not.toBeInTheDocument();
+      expect(screen.getByText('Investment')).toBeInTheDocument();
+      expect(screen.queryByText('Brokerage')).not.toBeInTheDocument();
+    });
+
+    // Showing the cash it does know, in a total's place, would read as the
+    // account being worth that much.
+    it('shows no total when the combined value is unknown', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: brokerage,
+          logical: logical(null),
+          brokerageMarketValue: 9000,
+          unpricedHoldingsCount: 2,
+        }),
+      );
+
+      expect(screen.getByText('—')).toBeInTheDocument();
+      expect(screen.getByText('Total unavailable')).toBeInTheDocument();
+      expect(screen.queryByText('$3500.00')).not.toBeInTheDocument();
+      expect(screen.queryByText('$9000.00')).not.toBeInTheDocument();
+    });
+  });
+  describe('actions on a folded pair', () => {
+    const pairLogical = (over: Partial<LogicalAccount> = {}): LogicalAccount => {
+      const primary = createAccount({
+        id: 'brok',
+        name: 'TFSA - Brokerage',
+        isClosed: false,
+        currentBalance: 0,
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash',
+      });
+      const cash = createAccount({
+        id: 'cash',
+        name: 'TFSA - Cash',
+        isClosed: false,
+        currentBalance: 0,
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'brok',
+      });
+      return {
+        id: 'brok',
+        primary,
+        cash,
+        memberIds: ['brok', 'cash'],
+        displayName: 'TFSA',
+        isInvestment: true,
+        cashRegisterId: 'cash',
+        holdingsAccountId: 'brok',
+        combinedValue: 0,
+        ...over,
+      };
+    };
+
+    // Reconciling compares a cash ledger against a statement, and the pair's
+    // cash lives in the other half -- reconciling the brokerage would open a
+    // register of trade-generated rows against a statement of the cash account.
+    it('reconciles the cash half, not the brokerage the row is built from', () => {
+      const onReconcile = vi.fn();
+      const logical = pairLogical();
+      renderAccountRow(
+        createDefaultProps({ account: logical.primary, logical, onReconcile }),
+      );
+
+      fireEvent.click(screen.getByText('Reconcile'));
+
+      expect(onReconcile).toHaveBeenCalledWith('cash');
+      expect(onReconcile).not.toHaveBeenCalledWith('brok');
+    });
+
+    it('offers Reconcile on a pair, which a lone brokerage row never had', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: pairLogical().primary,
+          logical: pairLogical(),
+        }),
+      );
+
+      expect(screen.getByText('Reconcile')).toBeInTheDocument();
+    });
+
+    it('hides Reconcile for a brokerage with no cash ledger to reconcile', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: brokerageLogical(0).primary,
+          logical: brokerageLogical(0),
+        }),
+      );
+
+      expect(screen.queryByText('Reconcile')).not.toBeInTheDocument();
+    });
+
+    it('enables Close only when the whole entity is empty', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: pairLogical().primary,
+          logical: pairLogical({ combinedValue: 0 }),
+        }),
+      );
+
+      expect(screen.getByText('Close')).not.toBeDisabled();
+    });
+
+    it('disables Close when the pair still holds value anywhere', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: pairLogical().primary,
+          logical: pairLogical({ combinedValue: 3500 }),
+        }),
+      );
+
+      expect(screen.getByText('Close')).toBeDisabled();
+    });
+
+    // An unknown total is not a zero one, so the account cannot be confirmed
+    // empty and Close stays unavailable rather than guessing.
+    it('disables Close when the total cannot be worked out', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: pairLogical().primary,
+          logical: pairLogical({ combinedValue: null }),
+          actionLabels: {
+            ...createDefaultProps().actionLabels,
+            closeTitleUnknownValue: 'Total unknown',
+          },
+        }),
+      );
+
+      const close = screen.getByText('Close');
+      expect(close).toBeDisabled();
+      expect(close.closest('button')).toHaveAttribute('title', 'Total unknown');
     });
   });
 });

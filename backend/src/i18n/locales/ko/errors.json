@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "거래가 있는 계정의 통화는 변경할 수 없습니다.",
     "alreadyClosed": "계정이 이미 폐쇄되었습니다",
     "closeNonZeroBalance": "잔액이 0이 아닌 계정은 폐쇄할 수 없습니다. 현재 잔액: {{ currentBalance }}",
+    "closeWithHoldings": "증권을 보유한 투자 계좌는 닫을 수 없습니다. 수량이 0이 아닌 보유 종목이 {{ holdingCount }}개 있습니다. 먼저 매도하거나 이전하세요.",
     "notClosed": "계정이 폐쇄되지 않았습니다",
     "modifyBalanceClosed": "폐쇄된 계정의 잔액은 수정할 수 없습니다",
     "deleteWithTransactions": "거래가 {{ transactionCount }}건 있는 계정은 삭제할 수 없습니다. 대신 계정을 폐쇄하세요.",

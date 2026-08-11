@@ -3,10 +3,12 @@ import { render, screen, fireEvent, act, waitFor } from '@/test/render';
 import { ReportAccountMultiSelect } from './ReportAccountMultiSelect';
 import { Account } from '@/types/account';
 
+// A real linked pair: the two halves point at each other, which is what makes
+// them one account rather than two rows that happen to share a base name.
 const accounts = [
-  { id: 'a1', name: 'TFSA - Brokerage', accountSubType: 'INVESTMENT_BROKERAGE' },
-  { id: 'a2', name: 'TFSA - Cash', accountSubType: 'INVESTMENT_CASH' },
-  { id: 'a3', name: 'RRSP', accountSubType: 'INVESTMENT_CASH' },
+  { id: 'a1', name: 'TFSA - Brokerage', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE', linkedAccountId: 'a2' },
+  { id: 'a2', name: 'TFSA - Cash', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_CASH', linkedAccountId: 'a1' },
+  { id: 'a3', name: 'RRSP', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_CASH', linkedAccountId: null },
 ] as unknown as Account[];
 
 describe('ReportAccountMultiSelect', () => {
@@ -99,18 +101,72 @@ describe('ReportAccountMultiSelect', () => {
     });
   });
 
-  it('honours a custom filter that excludes cash sub-accounts', () => {
+  // The two modes offer the same account under the same name; what differs is
+  // only the id they submit. Expressed as opposite filters, as it used to be,
+  // two identical-looking pickers quietly reported different accounts.
+  it('offers a pair once in either mode, under the name the user gave it', () => {
+    const { unmount } = render(
+      <ReportAccountMultiSelect accounts={accounts} value={[]} onChange={() => {}} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
+    expect(screen.getAllByText('TFSA')).toHaveLength(1);
+    unmount();
+
     render(
       <ReportAccountMultiSelect
         accounts={accounts}
         value={[]}
         onChange={() => {}}
-        filter={(a) => a.accountSubType !== 'INVESTMENT_CASH'}
+        mode="portfolio"
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
-    // Only the brokerage account remains (label suffix stripped).
-    expect(screen.getByText('TFSA')).toBeInTheDocument();
+    expect(screen.getAllByText('TFSA')).toHaveLength(1);
+  });
+
+  it('submits the cash ledger id for a transaction report', () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    render(
+      <ReportAccountMultiSelect accounts={accounts} value={[]} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
+    fireEvent.click(screen.getByText('TFSA'));
+
+    act(() => { vi.advanceTimersByTime(400); });
+    expect(onChange).toHaveBeenCalledWith(['a2']);
+  });
+
+  it('submits the holdings id for a portfolio report', () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    render(
+      <ReportAccountMultiSelect
+        accounts={accounts}
+        value={[]}
+        onChange={onChange}
+        mode="portfolio"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
+    fireEvent.click(screen.getByText('TFSA'));
+
+    act(() => { vi.advanceTimersByTime(400); });
+    expect(onChange).toHaveBeenCalledWith(['a1']);
+  });
+
+  // An orphan cash half holds no securities, so a portfolio report has no id
+  // to submit for it and does not pretend otherwise.
+  it('omits an account with no ledger for the mode', () => {
+    render(
+      <ReportAccountMultiSelect
+        accounts={accounts}
+        value={[]}
+        onChange={() => {}}
+        mode="portfolio"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
     expect(screen.queryByText('RRSP')).not.toBeInTheDocument();
   });
 });

@@ -6,5 +6,10 @@
     "realizedGains": "Ganancias realizadas",
     "ytd": "En lo que va del año",
     "empty": "No hay ingresos por inversiones este año"
+  },
+  "register": {
+    "cashHeading": "Transacciones de efectivo",
+    "newCashTransaction": "Nueva transacción de efectivo",
+    "deleteFailed": "No se pudo eliminar la transacción"
   }
 }

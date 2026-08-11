@@ -33,8 +33,6 @@ const logger = createLogger('SectorWeightingsReport');
 
 // Portfolio-summary reports key holdings off the brokerage sub-account, so the
 // account picker offers those (the sibling cash account is excluded).
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 type SectorSortField = 'sector' | 'direct' | 'etf' | 'total' | 'percentage';
 
 function CustomTooltip({ active, payload, formatCurrencyFull, defaultCurrency, labelDirect, labelEtf, labelTotal }: {
@@ -216,7 +214,7 @@ export function SectorWeightingsReport() {
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
-              filter={excludeCashAccounts}
+              mode="portfolio"
             />
 
             {/* Security Filter */}

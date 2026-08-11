@@ -3,6 +3,8 @@
 import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { getMainAccountName } from '@/lib/account-utils';
+import { formatAccountOptionLabel } from '@/lib/logical-accounts';
+import { Account } from '@/types/account';
 
 /**
  * Returns a stable function that strips the " - Brokerage"/" - Cash" suffix
@@ -13,12 +15,39 @@ import { getMainAccountName } from '@/lib/account-utils';
  */
 export function useMainAccountName(): (name: string) => string {
   const t = useTranslations('accounts');
+  // Keyed on the resolved words rather than on `t`, whose identity is not
+  // stable across renders: a stripper that changes every render invalidates
+  // every memo built on it, and re-runs every effect that depends on one.
+  const brokerageSuffix = t('nameSuffix.brokerage');
+  const cashSuffix = t('nameSuffix.cash');
   return useCallback(
-    (name: string) =>
-      getMainAccountName(name, [
-        t('nameSuffix.brokerage'),
-        t('nameSuffix.cash'),
-      ]),
-    [t],
+    (name: string) => getMainAccountName(name, [brokerageSuffix, cashSuffix]),
+    [brokerageSuffix, cashSuffix],
+  );
+}
+
+/**
+ * The one way an account picker labels its options: the account's name with any
+ * investment pair suffix stripped, its currency, and a closed marker.
+ *
+ * Every picker uses this rather than building a label from `account.name`, so a
+ * linked cash half reads as the account the user knows ("TFSA") instead of
+ * exposing the storage detail ("TFSA - Cash"). Pass it to
+ * `buildAccountDropdownOptions` as the `labelFn`.
+ */
+export function useAccountOptionLabel(options: {
+  /** Narrow rows (a split line) drop the currency; everything else shows it. */
+  withCurrency?: boolean;
+} = {}): (account: Account) => string {
+  const stripName = useMainAccountName();
+  const t = useTranslations('accounts');
+  const closedLabel = t('row.statusClosed');
+  const withCurrency = options.withCurrency ?? true;
+  return useCallback(
+    (account: Account) =>
+      formatAccountOptionLabel(account, stripName, closedLabel, {
+        withCurrency,
+      }),
+    [stripName, closedLabel, withCurrency],
   );
 }

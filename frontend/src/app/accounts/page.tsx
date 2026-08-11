@@ -88,6 +88,18 @@ function AccountsContent() {
     return map;
   }, [portfolioSummary]);
 
+  // How many holdings each account could not be priced. A market value missing
+  // a component is a subtotal, so the row for such an account shows no total
+  // rather than the cash half alone.
+  const unpricedHoldingCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!portfolioSummary) return map;
+    for (const accountHoldings of portfolioSummary.holdingsByAccount) {
+      map.set(accountHoldings.accountId, accountHoldings.unpricedHoldingsCount ?? 0);
+    }
+    return map;
+  }, [portfolioSummary]);
+
   const calculateSummary = () => {
     const activeAccounts = accounts.filter((a) => !a.isClosed);
     const liabilityTypes = ['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'];
@@ -168,7 +180,7 @@ function AccountsContent() {
           {isLoading ? (
             <LoadingSpinner text={t('page.loadingAccounts')} />
           ) : (
-            <AccountList accounts={accounts} institutions={institutions} brokerageMarketValues={brokerageMarketValues} defaultCurrency={defaultCurrency} convertToDefault={convertToDefault} onEdit={openEdit} onRefresh={loadAccounts} />
+            <AccountList accounts={accounts} institutions={institutions} brokerageMarketValues={brokerageMarketValues} unpricedHoldingCounts={unpricedHoldingCounts} defaultCurrency={defaultCurrency} convertToDefault={convertToDefault} onEdit={openEdit} onRefresh={loadAccounts} />
           )}
         </div>
       </main>

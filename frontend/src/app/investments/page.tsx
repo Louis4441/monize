@@ -32,11 +32,14 @@ import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { Account } from '@/types/account';
 import { buildAccountFilterLabel } from '@/lib/account-utils';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import {
+  InvestmentViewToggle,
+  type InvestmentTransactionView,
+} from '@/components/investments/InvestmentViewToggle';
 import { PAGE_SIZE } from '@/lib/constants';
 
 const TransactionForm = dynamic(() => import('@/components/transactions/TransactionForm').then(m => m.TransactionForm), { ssr: false });
 
-type TransactionViewType = 'brokerage' | 'cash';
 
 export default function InvestmentsPage() {
   return (
@@ -60,7 +63,7 @@ function InvestmentsContent() {
   // the same data as an undo/redo, so refresh the same way.
   useOnAiAction(handleUndoRedo);
   const [listDensity, setListDensity] = useLocalStorage<DensityLevel>('monize-investments-density', 'normal');
-  const [transactionView, setTransactionView] = useLocalStorage<TransactionViewType>('monize-investments-transaction-view', 'brokerage');
+  const [transactionView, setTransactionView] = useLocalStorage<InvestmentTransactionView>('monize-investments-transaction-view', 'brokerage');
   // Tracks whether the investment transaction form currently shows a currency
   // conversion section so the modal can be widened to fit it without scrolling.
   const [investmentFormNeedsConversion, setInvestmentFormNeedsConversion] = useState(false);
@@ -109,7 +112,7 @@ function InvestmentsContent() {
     await data.handleRefreshPrices(scope);
   }, [data]);
 
-  const handleTransactionViewChange = (view: TransactionViewType) => {
+  const handleTransactionViewChange = (view: InvestmentTransactionView) => {
     setTransactionView(view);
     if (view === 'cash') {
       data.setCashCurrentPage(1);
@@ -276,20 +279,10 @@ function InvestmentsContent() {
                   onFiltersChange={data.handleFiltersChange}
                   availableSymbols={[...new Set(data.portfolioSummary?.holdings.map(h => h.symbol) || [])].sort()}
                   viewToggle={
-                    <div className="inline-flex rounded-md bg-gray-100 dark:bg-gray-700 p-0.5">
-                      <button
-                        onClick={() => handleTransactionViewChange('brokerage')}
-                        className="px-3 py-1 text-sm font-medium rounded transition-colors bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm"
-                      >
-                        {t('page.brokerageTab')}
-                      </button>
-                      <button
-                        onClick={() => handleTransactionViewChange('cash')}
-                        className="px-3 py-1 text-sm font-medium rounded transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                      >
-                        {t('page.cashTab')}
-                      </button>
-                    </div>
+                    <InvestmentViewToggle
+                      value={transactionView}
+                      onChange={handleTransactionViewChange}
+                    />
                   }
                 />
               </div>
@@ -326,10 +319,10 @@ function InvestmentsContent() {
                       <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">{t('page.filtered')}</span>
                     )}
                   </h3>
-                  <div className="inline-flex rounded-md bg-gray-100 dark:bg-gray-700 p-0.5">
-                    <button onClick={() => handleTransactionViewChange('brokerage')} className="px-3 py-1 text-sm font-medium rounded transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">{t('page.brokerageTab')}</button>
-                    <button onClick={() => handleTransactionViewChange('cash')} className="px-3 py-1 text-sm font-medium rounded transition-colors bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm">{t('page.cashTab')}</button>
-                  </div>
+                  <InvestmentViewToggle
+                    value={transactionView}
+                    onChange={handleTransactionViewChange}
+                  />
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button onClick={data.openCashCreate} className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 sm:min-w-[14rem]">

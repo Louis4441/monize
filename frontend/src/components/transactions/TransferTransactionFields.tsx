@@ -13,6 +13,7 @@ import { Account, TransferCandidate } from '@/types/account';
 import { Payee } from '@/types/payee';
 import { getCurrencySymbol } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
+import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { useAuthStore } from '@/store/authStore';
 
 interface CrossCurrencyInfo {
@@ -79,6 +80,7 @@ export function TransferTransactionFields({
   createdAtSlot,
 }: TransferTransactionFieldsProps) {
   const t = useTranslations('transactions');
+  const accountOptionLabel = useAccountOptionLabel();
   const isActing = useAuthStore((state) => !!state.actingAsUserId);
   const isEdit = !!transaction;
 
@@ -183,6 +185,7 @@ export function TransferTransactionFields({
               (account) =>
                 account.accountSubType !== 'INVESTMENT_BROKERAGE' &&
                 (!account.isClosed || account.id === watchedAccountId),
+              accountOptionLabel,
             ),
             ...candidateOptions(transferToAccountId),
           ]}
@@ -205,6 +208,7 @@ export function TransferTransactionFields({
                 account.id !== watchedAccountId &&
                 account.accountSubType !== 'INVESTMENT_BROKERAGE' &&
                 (!account.isClosed || account.id === transferToAccountId),
+              accountOptionLabel,
             ),
             ...candidateOptions(watchedAccountId),
           ]}

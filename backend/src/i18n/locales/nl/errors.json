@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "Kan de valuta van een rekening met transacties niet wijzigen.",
     "alreadyClosed": "Rekening is al gesloten",
     "closeNonZeroBalance": "Kan rekening niet sluiten met een saldo dat niet nul is. Huidig saldo: {{ currentBalance }}",
+    "closeWithHoldings": "Een beleggingsrekening met effecten kan niet worden gesloten. Er zijn {{ holdingCount }} positie(s) met een aantal ongelijk aan nul; verkoop of verplaats deze eerst.",
     "notClosed": "Rekening is niet gesloten",
     "modifyBalanceClosed": "Kan het saldo van een gesloten rekening niet wijzigen",
     "deleteWithTransactions": "Kan rekening met {{ transactionCount }} transactie(s) niet verwijderen. Sluit de rekening in plaats daarvan.",

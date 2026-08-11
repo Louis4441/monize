@@ -55,6 +55,10 @@
     "statusActive": "Active",
     "statusClosed": "Closed",
     "marketValue": "Market value",
+    "combinedBreakdown": "Investments {investments} · Cash {cash}",
+    "combinedUnknown": "Total unavailable",
+    "combinedUnknownTooltip": "{count, plural, one {# holding has no price, so this account's total cannot be worked out} other {# holdings have no price, so this account's total cannot be worked out}}",
+    "combinedUnknownNoPortfolio": "Holdings could not be loaded, so this account's total cannot be worked out",
     "limit": "Limit: {amount}",
     "pairedWith": "Paired with {name}",
     "subtypeBrokerage": "Brokerage",
@@ -76,6 +80,7 @@
       "deleteTitle": "Permanently delete account (no transactions)",
       "closeTitleDisabled": "Account must have zero balance to close",
       "closeTitleEnabled": "Close account",
+      "closeTitleUnknownValue": "This account's total cannot be worked out, so it cannot be confirmed empty",
       "details": "Details"
     },
     "jointBadge": "Joint",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Closing...",
     "deleteTitle": "Delete Account",
     "deleteMessage": "Are you sure you want to permanently delete \"{name}\"? This action cannot be undone.",
+    "deletePairMessage": "Are you sure you want to permanently delete \"{name}\"? Both of its ledgers are deleted: \"{brokerageName}\" and \"{cashName}\". This action cannot be undone.",
     "deleteConfirm": "Delete Account",
     "deleteConfirmLoading": "Deleting..."
   },
@@ -147,6 +153,13 @@
     "statementSettlementDayTooltip": "The settlement date (also called the closing date) is the last day of the billing cycle. Transactions posted on or before this day will appear on the current statement.",
     "investmentPairTitle": "Create as Cash + Brokerage pair (recommended)",
     "investmentPairDescription": "Creates two linked accounts: a Cash account for transfers in/out and a Brokerage account for investment transactions. This is the recommended structure for tracking investments.",
+    "cashSection": {
+      "title": "Cash account",
+      "description": "The ledger that holds this account's money. Its name follows the account name above.",
+      "openingBalance": "Cash Opening Balance",
+      "accountNumber": "Cash Account Number (optional)",
+      "descriptionField": "Cash Description (optional)"
+    },
     "accountTypeOptions": {
       "chequing": "Chequing",
       "savings": "Savings",

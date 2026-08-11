@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import { Account, PaymentFrequency, InterestBookingMode } from '@/types/account';
 import { Category } from '@/types/category';
 import { accountsApi } from '@/lib/accounts';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { categoriesApi } from '@/lib/categories';
 import { exchangeRatesApi, CurrencyInfo } from '@/lib/exchange-rates';
 import { getCurrencySymbol } from '@/lib/format';
@@ -104,6 +105,13 @@ const buildAccountSchema = (t: (key: string) => string, isEditing: boolean) => z
   isFavourite: z.boolean().optional(),
   excludeFromNetWorth: z.boolean().optional(),
   createInvestmentPair: z.boolean().optional(),
+  // The cash half of a linked investment pair. The pair is one account to the
+  // user, so its two ledgers are edited on one form: the fields above describe
+  // the account, these describe the ledger that holds its money.
+  cashAccountId: z.string().optional(),
+  cashOpeningBalance: optionalNumber,
+  cashDescription: z.string().optional(),
+  cashAccountNumber: z.string().optional(),
   // Credit card statement fields
   statementDueDay: optionalNumberWithRange(1, 31),
   statementSettlementDay: optionalNumberWithRange(1, 31),
@@ -179,6 +187,7 @@ interface AccountFormProps {
 
 export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submitRef }: AccountFormProps) {
   const t = useTranslations('accounts');
+  const stripAccountName = useMainAccountName();
   const router = useRouter();
 
   const accountTypeOptions = [
@@ -218,6 +227,11 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string>(account?.institutionId || '');
   const [showInstitutionModal, setShowInstitutionModal] = useState(false);
   const [pendingInstitutionName, setPendingInstitutionName] = useState('');
+  // The cash half, when this account is one of a linked pair. Resolved after
+  // mount, so the name field starts on the stored name and is re-based to the
+  // shared one once we know there is a partner to share it with.
+  const [cashHalf, setCashHalf] = useState<Account | null>(null);
+  const [showCashSection, setShowCashSection] = useState(false);
 
   const {
     register,
@@ -289,15 +303,35 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
   // an explicit change or removal (which dirties the field, null on a clear) is
   // sent through (issue #806). Omitting rather than resending the loaded value
   // also avoids overwriting the stored institution with a stale form value.
+  // Same reasoning as institutionId, applied to the cash ledger's own fields:
+  // an untouched section must not be resent, or an edit of the account's name
+  // would rewrite the cash half's balance and description with whatever the
+  // form happened to load.
+  const cashSectionDirty =
+    !!dirtyFields.cashOpeningBalance ||
+    !!dirtyFields.cashDescription ||
+    !!dirtyFields.cashAccountNumber;
+
   const handleValidatedSubmit = useCallback(
     (data: AccountFormData) => {
+      let payload = data;
+      if (!cashSectionDirty) {
+        const {
+          cashAccountId: _id,
+          cashOpeningBalance: _balance,
+          cashDescription: _description,
+          cashAccountNumber: _number,
+          ...withoutCash
+        } = payload;
+        payload = withoutCash;
+      }
       if (account && !dirtyFields.institutionId) {
-        const { institutionId: _untouched, ...rest } = data;
+        const { institutionId: _untouched, ...rest } = payload;
         return onSubmit(rest);
       }
-      return onSubmit(data);
+      return onSubmit(payload);
     },
-    [account, dirtyFields.institutionId, onSubmit],
+    [account, cashSectionDirty, dirtyFields.institutionId, onSubmit],
   );
 
   useFormSubmitRef(submitRef, handleSubmit, handleValidatedSubmit);
@@ -310,6 +344,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
   const isDelegateView = useAuthStore((s) => !!s.actingAsUserId);
   const watchedAccountType = useWatch({ control, name: 'accountType' });
   const watchedOpeningBalance = useWatch({ control, name: 'openingBalance' });
+  const watchedCashOpeningBalance = useWatch({ control, name: 'cashOpeningBalance' });
   const watchedCreditLimit = useWatch({ control, name: 'creditLimit' });
   const watchedInterestRate = useWatch({ control, name: 'interestRate' });
   const watchedPaymentAmount = useWatch({ control, name: 'paymentAmount' });
@@ -337,6 +372,39 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
   const watchedTermMonths = useWatch({ control, name: 'termMonths' });
   const watchedAmortizationMonths = useWatch({ control, name: 'amortizationMonths' });
   const watchedMortgagePaymentFrequency = useWatch({ control, name: 'mortgagePaymentFrequency' });
+
+  // Resolve the linked pair when editing an investment account. A standalone
+  // or orphaned account 400s here and simply keeps the single-account form.
+  const editingAccountId = account?.id;
+  const isInvestmentEdit = account?.accountType === 'INVESTMENT';
+  useEffect(() => {
+    if (!editingAccountId || !isInvestmentEdit) return;
+    let cancelled = false;
+    accountsApi
+      .getInvestmentPair(editingAccountId)
+      .then((pair) => {
+        if (cancelled) return;
+        setCashHalf(pair.cashAccount);
+        // Both halves are stored under the same base name with different
+        // suffixes, so the field edits the base. The server re-suffixes both.
+        setValue('name', stripAccountName(pair.brokerageAccount.name));
+        setValue('cashAccountId', pair.cashAccount.id);
+        setValue(
+          'cashOpeningBalance',
+          pair.cashAccount.openingBalance !== undefined
+            ? Math.round(Number(pair.cashAccount.openingBalance) * 100) / 100
+            : undefined,
+        );
+        setValue('cashDescription', pair.cashAccount.description || undefined);
+        setValue('cashAccountNumber', pair.cashAccount.accountNumber || undefined);
+      })
+      .catch(() => {
+        // Not part of a pair.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingAccountId, isInvestmentEdit, setValue, stripAccountName]);
 
   // Load supported currencies
   useEffect(() => {
@@ -957,6 +1025,63 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
         error={errors.description?.message}
         {...register('description')}
       />
+
+      {/* The cash ledger of a linked pair. Its own fields live here because
+          the pair is one account: without this there is no route to the cash
+          half's opening balance at all once the list shows a single row. */}
+      {cashHalf && (
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+          <button
+            type="button"
+            onClick={() => setShowCashSection((open) => !open)}
+            aria-expanded={showCashSection}
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+          >
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {t('form.cashSection.title')}
+            </span>
+            <svg
+              className={`h-4 w-4 text-gray-500 transition-transform ${showCashSection ? '' : '-rotate-90'}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showCashSection && (
+            <div className="space-y-4 border-t border-gray-200 px-4 py-4 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t('form.cashSection.description')}
+              </p>
+              <CurrencyInput
+                id="cashOpeningBalance"
+                label={t('form.cashSection.openingBalance')}
+                value={watchedCashOpeningBalance}
+                onChange={(value) =>
+                  setValue('cashOpeningBalance', value, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                error={errors.cashOpeningBalance?.message}
+                prefix={currencySymbol}
+              />
+              <Input
+                label={t('form.cashSection.accountNumber')}
+                error={errors.cashAccountNumber?.message}
+                {...register('cashAccountNumber')}
+              />
+              <Input
+                label={t('form.cashSection.descriptionField')}
+                error={errors.cashDescription?.message}
+                {...register('cashDescription')}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Favourite star toggle */}
       <div className="flex flex-wrap items-center justify-between gap-2">

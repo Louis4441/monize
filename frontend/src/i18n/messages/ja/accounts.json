@@ -55,6 +55,10 @@
     "statusActive": "有効",
     "statusClosed": "閉鎖済み",
     "marketValue": "時価",
+    "combinedBreakdown": "投資 {investments} · 現金 {cash}",
+    "combinedUnknown": "合計を表示できません",
+    "combinedUnknownTooltip": "{count, plural, other {# 件の保有銘柄に価格がないため、この口座の合計を算出できません}}",
+    "combinedUnknownNoPortfolio": "保有銘柄を読み込めなかったため、この口座の合計を算出できません",
     "limit": "限度額：{amount}",
     "pairedWith": "{name} とペア",
     "subtypeBrokerage": "証券口座",
@@ -76,6 +80,7 @@
       "deleteTitle": "勘定科目を完全に削除する（取引なし）",
       "closeTitleDisabled": "閉鎖するには残高がゼロである必要があります",
       "closeTitleEnabled": "勘定科目を閉鎖",
+      "closeTitleUnknownValue": "この口座の合計を算出できないため、残高がゼロであることを確認できません",
       "details": "詳細"
     },
     "jointBadge": "共同",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "閉鎖中...",
     "deleteTitle": "勘定科目を削除",
     "deleteMessage": "「{name}」を完全に削除してもよろしいですか？この操作は元に戻せません。",
+    "deletePairMessage": "「{name}」を完全に削除してもよろしいですか？2 つの台帳がどちらも削除されます:「{brokerageName}」と「{cashName}」。この操作は取り消せません。",
     "deleteConfirm": "勘定科目を削除",
     "deleteConfirmLoading": "削除中..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "手数料率",
     "fxFeePercentPlaceholder": "例: 2.5",
     "jointSharedWith": "{count, plural, other {# 人}}と共有している共同口座",
-    "jointManage": "共有を管理"
+    "jointManage": "共有を管理",
+    "cashSection": {
+      "title": "現金口座",
+      "description": "この口座の現金を保持する台帳です。名前は上の口座名に従います。",
+      "openingBalance": "現金の期首残高",
+      "accountNumber": "現金口座番号 (任意)",
+      "descriptionField": "現金の説明 (任意)"
+    }
   },
   "exportModal": {
     "title": "{name} をエクスポート",

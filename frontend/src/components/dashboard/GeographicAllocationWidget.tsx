@@ -32,8 +32,6 @@ import { GEOGRAPHIC_ALLOCATION_DEFAULT, GeographicConfig } from './widget-config
 const WIDGET_ID = 'geographic-allocation';
 const MAX_EXCHANGE_BARS = 8;
 
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 interface GeographicAllocationWidgetProps {
   accounts: Account[];
   isLoading: boolean;
@@ -132,7 +130,7 @@ export function GeographicAllocationWidget({
           accounts={investmentAccounts}
           value={config.accountIds}
           onChange={(ids) => updateConfig({ accountIds: ids })}
-          filter={excludeCashAccounts}
+          mode="portfolio"
           className="w-full"
         />
       </WidgetConfigRow>

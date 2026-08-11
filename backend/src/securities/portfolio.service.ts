@@ -83,7 +83,18 @@ export interface AccountHoldings {
   cashBalance: number;
   holdings: HoldingWithMarketValue[];
   totalCostBasis: number;
+  /**
+   * Sum of the priced holdings only. An unpriced holding contributes nothing,
+   * so this is a **subtotal** whenever `unpricedHoldingsCount` is non-zero --
+   * read the two together before presenting it as an account's value.
+   */
   totalMarketValue: number;
+  /**
+   * How many of this account's holdings have no price, and so are missing from
+   * `totalMarketValue`. Non-zero means the account's market value is unknown
+   * rather than measured (`docs/financial-calculation-contract.md` section 1).
+   */
+  unpricedHoldingsCount: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
   netInvested: number;

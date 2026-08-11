@@ -824,6 +824,105 @@ describe('AccountList', () => {
     });
   });
 
+  // Deleting one row of a pair has to delete both ledgers, and the confirm
+  // has to say so -- the row the user clicked is only half of what goes.
+  it('deletes both ledgers of a pair, brokerage first, behind one confirm', async () => {
+    const accounts = [
+      createAccount({
+        id: 'broker-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+        canDelete: true,
+      }),
+      createAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'broker-1',
+        canDelete: true,
+      }),
+    ];
+
+    render(
+      <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    fireEvent.click(screen.getByText('Delete'));
+    expect(
+      screen.getByText(/Both of its ledgers are deleted/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/TFSA - Cash/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Account' }));
+
+    await waitFor(() => {
+      expect(accountsApi.delete).toHaveBeenCalledTimes(2);
+    });
+    const deleteMock = accountsApi.delete as ReturnType<typeof vi.fn>;
+    expect(deleteMock.mock.calls[0][0]).toBe('broker-1');
+    expect(deleteMock.mock.calls[1][0]).toBe('cash-1');
+  });
+
+  it('deletes only the account itself when it has no linked ledger', async () => {
+    const account = createAccount({ canDelete: true });
+
+    render(
+      <AccountList accounts={[account]} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    fireEvent.click(screen.getByText('Delete'));
+    expect(
+      screen.queryByText(/Both of its ledgers are deleted/),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Account' }));
+
+    await waitFor(() => {
+      expect(accountsApi.delete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('closes a pair with a single call, letting the server carry the partner', async () => {
+    const accounts = [
+      createAccount({
+        id: 'broker-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+        currentBalance: 0,
+      }),
+      createAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'broker-1',
+        currentBalance: 0,
+      }),
+    ];
+
+    render(
+      <AccountList
+        accounts={accounts}
+        brokerageMarketValues={new Map([['broker-1', 0]])}
+        unpricedHoldingCounts={new Map([['broker-1', 0]])}
+        onEdit={mockOnEdit}
+        defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Close'));
+    fireEvent.click(screen.getByRole('button', { name: 'Close Account' }));
+
+    await waitFor(() => {
+      expect(accountsApi.close).toHaveBeenCalledTimes(1);
+    });
+    expect(accountsApi.close).toHaveBeenCalledWith('broker-1');
+  });
+
   it('cancels delete dialog without deleting', () => {
     const account = createAccount({ canDelete: true });
 
@@ -899,6 +998,7 @@ describe('AccountList', () => {
       <AccountList
         accounts={[account]}
         brokerageMarketValues={brokerageMarketValues}
+        unpricedHoldingCounts={new Map([['broker-1', 0]])}
         onEdit={mockOnEdit}
         defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh}
       />
@@ -907,7 +1007,87 @@ describe('AccountList', () => {
     // The market value is shown both on the account row and in the
     // INVESTMENT group header total, so there are two matching nodes.
     expect(screen.getAllByText('$12345.67').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Market value')).toBeInTheDocument();
+    // The row now states what the total is made of rather than labelling it
+    // "Market value": an investment account's worth is holdings plus cash.
+    expect(
+      screen.getByText('Investments $12345.67 · Cash $0.00'),
+    ).toBeInTheDocument();
+  });
+
+  it('combines a pair market value and cash balance into one row total', () => {
+    const accounts = [
+      createAccount({
+        id: 'broker-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+        currentBalance: 0,
+      }),
+      createAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'broker-1',
+        currentBalance: 3500,
+      }),
+    ];
+
+    render(
+      <AccountList
+        accounts={accounts}
+        brokerageMarketValues={new Map([['broker-1', 12000]])}
+        unpricedHoldingCounts={new Map([['broker-1', 0]])}
+        onEdit={mockOnEdit}
+        defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh}
+      />
+    );
+
+    expect(screen.getAllByText('$15500.00').length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getByText('Investments $12000.00 · Cash $3500.00'),
+    ).toBeInTheDocument();
+  });
+
+  // The defect the combined value exists to prevent: an account whose holdings
+  // cannot all be priced has no knowable total, and showing the cash half in a
+  // total's place reads as the account being worth that much.
+  it('shows no total, not the cash balance, when a holding has no price', () => {
+    const accounts = [
+      createAccount({
+        id: 'broker-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+        currentBalance: 0,
+      }),
+      createAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'broker-1',
+        currentBalance: 3500,
+      }),
+    ];
+
+    render(
+      <AccountList
+        accounts={accounts}
+        brokerageMarketValues={new Map([['broker-1', 9000]])}
+        unpricedHoldingCounts={new Map([['broker-1', 2]])}
+        onEdit={mockOnEdit}
+        defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh}
+      />
+    );
+
+    const row = screen.getByText('TFSA').closest('tr')!;
+    expect(within(row).getByText('—')).toBeInTheDocument();
+    expect(within(row).getByText('Total unavailable')).toBeInTheDocument();
+    expect(within(row).queryByText('$3500.00')).not.toBeInTheDocument();
+    expect(within(row).queryByText('$9000.00')).not.toBeInTheDocument();
   });
 
   it('shows credit limit for accounts with a credit limit', () => {
@@ -1113,17 +1293,19 @@ describe('AccountList', () => {
     });
   });
 
-  it('shows linked account info for investment pairs', () => {
+  // A pair is one account, so the row shows the account -- not two rows
+  // explaining themselves to each other with "Paired with".
+  it('renders a linked investment pair as a single row', () => {
     const cashAccount = createAccount({
       id: 'cash-1',
-      name: 'Inv Cash',
+      name: 'TFSA - Cash',
       accountType: 'INVESTMENT',
       accountSubType: 'INVESTMENT_CASH',
       linkedAccountId: 'broker-1',
     });
     const brokerageAccount = createAccount({
       id: 'broker-1',
-      name: 'Inv Brokerage',
+      name: 'TFSA - Brokerage',
       accountType: 'INVESTMENT',
       accountSubType: 'INVESTMENT_BROKERAGE',
       linkedAccountId: 'cash-1',
@@ -1137,9 +1319,65 @@ describe('AccountList', () => {
       />
     );
 
-    // "Paired with" text should be shown for linked investment accounts in normal density
-    expect(screen.getByText(/Paired with Inv Brokerage/)).toBeInTheDocument();
-    expect(screen.getByText(/Paired with Inv Cash/)).toBeInTheDocument();
+    expect(screen.getByText('TFSA')).toBeInTheDocument();
+    expect(screen.queryByText('TFSA - Cash')).not.toBeInTheDocument();
+    expect(screen.queryByText('TFSA - Brokerage')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Paired with/)).not.toBeInTheDocument();
+  });
+
+  // A filtered or partial list must still show everything in it: a cash half
+  // whose partner is absent is an account in its own right, not a hidden one.
+  it('renders a cash half on its own when its partner is not in the list', () => {
+    const cashAccount = createAccount({
+      id: 'cash-1',
+      name: 'RRSP - Cash',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_CASH',
+      linkedAccountId: 'broker-1',
+      currentBalance: 500,
+    });
+
+    render(
+      <AccountList
+        accounts={[cashAccount]}
+        onEdit={mockOnEdit}
+        defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh}
+      />
+    );
+
+    expect(screen.getByText('RRSP')).toBeInTheDocument();
+    expect(screen.getByText('1 of 1 accounts')).toBeInTheDocument();
+  });
+
+  it('finds a folded pair when searching for either ledger stored name', () => {
+    const accounts = [
+      createAccount({
+        id: 'broker-1',
+        name: 'TFSA - Brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        linkedAccountId: 'cash-1',
+      }),
+      createAccount({
+        id: 'cash-1',
+        name: 'TFSA - Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: 'broker-1',
+      }),
+      createAccount({ id: 'chq', name: 'Chequing', accountType: 'CHEQUING' }),
+    ];
+
+    render(
+      <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    fireEvent.change(screen.getByLabelText('Search accounts by name'), {
+      target: { value: 'cash' },
+    });
+
+    expect(screen.getByText('TFSA')).toBeInTheDocument();
+    expect(screen.queryByText('Chequing')).not.toBeInTheDocument();
   });
 
   it('counts a linked investment brokerage/cash pair as a single account in the header', () => {
@@ -1169,18 +1407,18 @@ describe('AccountList', () => {
     expect(screen.getByText('2 of 2 accounts')).toBeInTheDocument();
   });
 
-  it('shows Brokerage and Inv. Cash type labels for investment subtypes', () => {
+  it('labels a folded pair as one Investment account, not by its halves', () => {
     const accounts = [
       createAccount({
         id: 'cash-1',
-        name: 'Investment Cash',
+        name: 'TFSA - Cash',
         accountType: 'INVESTMENT',
         accountSubType: 'INVESTMENT_CASH',
         linkedAccountId: 'broker-1',
       }),
       createAccount({
         id: 'broker-1',
-        name: 'Investment Brokerage',
+        name: 'TFSA - Brokerage',
         accountType: 'INVESTMENT',
         accountSubType: 'INVESTMENT_BROKERAGE',
         linkedAccountId: 'cash-1',
@@ -1191,8 +1429,30 @@ describe('AccountList', () => {
       <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
     );
 
+    const row = screen.getByText('TFSA').closest('tr')!;
+    expect(within(row).getByText('Investment')).toBeInTheDocument();
+    expect(screen.queryByText('Inv. Cash')).not.toBeInTheDocument();
+    expect(screen.queryByText('Brokerage')).not.toBeInTheDocument();
+  });
+
+  // An unfolded half still says which half it is -- there is no entity to
+  // present it as, so hiding the distinction would be a lie about the row.
+  it('still labels an unpaired cash half as Inv. Cash', () => {
+    const accounts = [
+      createAccount({
+        id: 'cash-1',
+        name: 'Orphan Cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        linkedAccountId: null,
+      }),
+    ];
+
+    render(
+      <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
     expect(screen.getByText('Inv. Cash')).toBeInTheDocument();
-    expect(screen.getByText('Brokerage')).toBeInTheDocument();
   });
 
   it('shows description for accounts with description in normal density', () => {
@@ -1261,6 +1521,35 @@ describe('AccountList', () => {
         refresh: vi.fn(),
         prefetch: vi.fn(),
       } as unknown as ReturnType<typeof nextNavigation.useRouter>);
+    });
+
+    // Reconcile compares a cash ledger against a statement. The pair's cash is
+    // in the other half, and a lone brokerage row never offered the action.
+    it('reconciles a pair against its cash half', () => {
+      const accounts = [
+        createAccount({
+          id: 'broker-1',
+          name: 'TFSA - Brokerage',
+          accountType: 'INVESTMENT',
+          accountSubType: 'INVESTMENT_BROKERAGE',
+          linkedAccountId: 'cash-1',
+        }),
+        createAccount({
+          id: 'cash-1',
+          name: 'TFSA - Cash',
+          accountType: 'INVESTMENT',
+          accountSubType: 'INVESTMENT_CASH',
+          linkedAccountId: 'broker-1',
+        }),
+      ];
+
+      render(
+        <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+      );
+
+      fireEvent.click(screen.getByText('Reconcile'));
+
+      expect(mockPush).toHaveBeenCalledWith('/reconcile?accountId=cash-1');
     });
 
     it('navigates to /investments with accountId for brokerage accounts', () => {
@@ -1495,11 +1784,13 @@ describe('AccountList', () => {
       expect(screen.queryByText('Cheq A')).not.toBeInTheDocument();
     });
 
-    it('keeps linked investment cash and brokerage accounts adjacent', () => {
+    // Replaces the old adjacency guarantee: the pair no longer needs to be
+    // rendered next to itself, because it is one row.
+    it('renders one row per investment account, whatever the input order', () => {
       const accounts = [
         createAccount({
           id: 'cash-1',
-          name: 'Pair One Cash',
+          name: 'Pair One - Cash',
           accountType: 'INVESTMENT',
           accountSubType: 'INVESTMENT_CASH',
           linkedAccountId: 'broker-1',
@@ -1512,7 +1803,7 @@ describe('AccountList', () => {
         }),
         createAccount({
           id: 'broker-1',
-          name: 'Pair One Brokerage',
+          name: 'Pair One - Brokerage',
           accountType: 'INVESTMENT',
           accountSubType: 'INVESTMENT_BROKERAGE',
           linkedAccountId: 'cash-1',
@@ -1523,17 +1814,11 @@ describe('AccountList', () => {
         <AccountList accounts={accounts} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
       );
 
-      // Within the INVESTMENT group, the brokerage account is rendered
-      // immediately before its paired cash account, regardless of input order.
-      const rows = screen.getAllByRole('row');
-      const brokerageRow = screen.getByText('Pair One Brokerage').closest('tr');
-      const cashRow = screen.getByText('Pair One Cash').closest('tr');
-      expect(brokerageRow).toBeTruthy();
-      expect(cashRow).toBeTruthy();
-      const brokerageRowIdx = rows.indexOf(brokerageRow as HTMLTableRowElement);
-      const cashRowIdx = rows.indexOf(cashRow as HTMLTableRowElement);
-      expect(brokerageRowIdx).toBeGreaterThan(0);
-      expect(cashRowIdx).toBe(brokerageRowIdx + 1);
+      expect(screen.getByText('Pair One')).toBeInTheDocument();
+      expect(screen.getByText('Solo Investment')).toBeInTheDocument();
+      expect(screen.queryByText('Pair One - Cash')).not.toBeInTheDocument();
+      // One group header + two account rows in the INVESTMENT group.
+      expect(screen.getByText('2 of 2 accounts')).toBeInTheDocument();
     });
 
     it('counts a linked brokerage/cash pair as a single investment account', () => {
@@ -2088,21 +2373,16 @@ describe('AccountList', () => {
       expect(brokerageTexts.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('context menu shows "Inv. Cash" in subtitle for investment cash accounts', () => {
+    // A paired cash half has no row of its own to long-press; an unpaired one
+    // does, and it is still an investment cash account.
+    it('context menu shows "Inv. Cash" in subtitle for an unpaired investment cash account', () => {
       const accounts2 = [
         createAccount({
           id: 'cash-1',
           name: 'Inv Cash Acct',
           accountType: 'INVESTMENT',
           accountSubType: 'INVESTMENT_CASH',
-          linkedAccountId: 'broker-1',
-        }),
-        createAccount({
-          id: 'broker-1',
-          name: 'Inv Broker Acct',
-          accountType: 'INVESTMENT',
-          accountSubType: 'INVESTMENT_BROKERAGE',
-          linkedAccountId: 'cash-1',
+          linkedAccountId: null,
         }),
       ];
 

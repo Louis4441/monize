@@ -1704,8 +1704,10 @@ export class PortfolioCalculationService {
       const acctCurrency = brokerageAccount.currencyCode;
       let accountCostBasis = 0;
       let accountMarketValue = 0;
+      let unpricedHoldingsCount = 0;
       for (const h of accountHoldings) {
         accountCostBasis += h.costBasisAccountCurrency;
+        if (h.marketValue === null) unpricedHoldingsCount += 1;
         accountMarketValue += await this.convertToDefault(
           h.marketValue ?? 0,
           h.currencyCode,
@@ -1741,6 +1743,7 @@ export class PortfolioCalculationService {
         holdings: this.sortHoldings(accountHoldings),
         totalCostBasis: accountCostBasis,
         totalMarketValue: accountMarketValue,
+        unpricedHoldingsCount,
         totalGainLoss: accountGainLoss,
         totalGainLossPercent: accountGainLossPercent,
         netInvested: roundMoney(accountNetInvested),
@@ -1757,8 +1760,10 @@ export class PortfolioCalculationService {
       const standaloneCurrency = standaloneAccount.currencyCode;
       let accountCostBasis = 0;
       let accountMarketValue = 0;
+      let unpricedHoldingsCount = 0;
       for (const h of accountHoldings) {
         accountCostBasis += h.costBasisAccountCurrency;
+        if (h.marketValue === null) unpricedHoldingsCount += 1;
         accountMarketValue += await this.convertToDefault(
           h.marketValue ?? 0,
           h.currencyCode,
@@ -1793,6 +1798,7 @@ export class PortfolioCalculationService {
         holdings: this.sortHoldings(accountHoldings),
         totalCostBasis: accountCostBasis,
         totalMarketValue: accountMarketValue,
+        unpricedHoldingsCount,
         totalGainLoss: accountGainLoss,
         totalGainLossPercent: accountGainLossPercent,
         netInvested: roundMoney(standaloneNetInvested),

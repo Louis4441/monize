@@ -1,4 +1,5 @@
 import {
+  CategorisedAccounts,
   PortfolioCalculationService,
   ReplayedLot,
 } from "./portfolio-calculation.service";
@@ -1334,6 +1335,124 @@ describe("PortfolioCalculationService.buildAllocation", () => {
       70,
       5,
     );
+  });
+});
+
+describe("PortfolioCalculationService.buildHoldingsByAccount", () => {
+  let service: PortfolioCalculationService;
+
+  beforeEach(() => {
+    service = buildService([], {});
+  });
+
+  const account = (
+    id: string,
+    subType: AccountSubType | null,
+    linkedAccountId: string | null = null,
+  ) =>
+    ({
+      id,
+      name: id,
+      currencyCode: "CAD",
+      currentBalance: 0,
+      accountSubType: subType,
+      linkedAccountId,
+    }) as unknown as Account;
+
+  const holding = (
+    id: string,
+    accountId: string,
+    marketValue: number | null,
+  ): HoldingWithMarketValue =>
+    ({
+      id,
+      accountId,
+      securityId: `sec-${id}`,
+      symbol: id,
+      name: id,
+      securityType: "STOCK",
+      currencyCode: "CAD",
+      quantity: 1,
+      averageCost: 100,
+      costBasis: 100,
+      costBasisAccountCurrency: 100,
+      currentPrice: marketValue,
+      marketValue,
+      gainLoss: null,
+      gainLossPercent: null,
+    }) as HoldingWithMarketValue;
+
+  const categorised = (over: Partial<CategorisedAccounts>) => ({
+    cashAccounts: [],
+    brokerageAccounts: [],
+    standaloneAccounts: [],
+    holdingsAccountIds: [],
+    ...over,
+  });
+
+  // An unpriced holding contributes 0 to totalMarketValue, which makes a
+  // priced-zero account and an unpriceable one identical in the payload. The
+  // count is what tells them apart, so a total built on the market value can
+  // go unknown rather than reporting the cash-only subtotal
+  // (docs/financial-calculation-contract.md section 1).
+  it("counts a brokerage account's unpriced holdings without changing totalMarketValue", async () => {
+    const brokerage = account("brok-1", AccountSubType.INVESTMENT_BROKERAGE);
+
+    const [result] = await service.buildHoldingsByAccount(
+      categorised({ brokerageAccounts: [brokerage] }),
+      [holding("h1", "brok-1", 900), holding("h2", "brok-1", null)],
+      new Map<string, number>(),
+      new Map(),
+      new Map<string, number>(),
+    );
+
+    expect(result.unpricedHoldingsCount).toBe(1);
+    expect(result.totalMarketValue).toBe(900);
+  });
+
+  it("reports zero unpriced holdings when every position is priced", async () => {
+    const brokerage = account("brok-1", AccountSubType.INVESTMENT_BROKERAGE);
+
+    const [result] = await service.buildHoldingsByAccount(
+      categorised({ brokerageAccounts: [brokerage] }),
+      [holding("h1", "brok-1", 900), holding("h2", "brok-1", 100)],
+      new Map<string, number>(),
+      new Map(),
+      new Map<string, number>(),
+    );
+
+    expect(result.unpricedHoldingsCount).toBe(0);
+    expect(result.totalMarketValue).toBe(1000);
+  });
+
+  it("counts unpriced holdings on a standalone investment account too", async () => {
+    const standalone = account("solo-1", null);
+
+    const [result] = await service.buildHoldingsByAccount(
+      categorised({ standaloneAccounts: [standalone] }),
+      [holding("h1", "solo-1", null), holding("h2", "solo-1", null)],
+      new Map<string, number>(),
+      new Map(),
+      new Map<string, number>(),
+    );
+
+    expect(result.unpricedHoldingsCount).toBe(2);
+    expect(result.totalMarketValue).toBe(0);
+  });
+
+  it("reports zero for an account holding nothing -- a settled value, not an unknown one", async () => {
+    const brokerage = account("brok-1", AccountSubType.INVESTMENT_BROKERAGE);
+
+    const [result] = await service.buildHoldingsByAccount(
+      categorised({ brokerageAccounts: [brokerage] }),
+      [],
+      new Map<string, number>(),
+      new Map(),
+      new Map<string, number>(),
+    );
+
+    expect(result.unpricedHoldingsCount).toBe(0);
+    expect(result.totalMarketValue).toBe(0);
   });
 });
 

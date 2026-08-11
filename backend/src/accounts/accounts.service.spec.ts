@@ -10,6 +10,7 @@ import {
 } from "./entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
+import { Holding } from "../securities/entities/holding.entity";
 import { Institution } from "../institutions/entities/institution.entity";
 import { CategoriesService } from "../categories/categories.service";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
@@ -923,12 +924,14 @@ describe("AccountsService", () => {
         .mockResolvedValueOnce({
           ...mockAccount,
           currentBalance: 0,
+          accountType: AccountType.INVESTMENT,
           accountSubType: AccountSubType.INVESTMENT_CASH,
           linkedAccountId: "brokerage-1",
         })
         .mockResolvedValueOnce({
           id: "brokerage-1",
           isClosed: false,
+          currentBalance: 0,
           userId: "user-1",
         });
 
@@ -2156,6 +2159,188 @@ describe("AccountsService", () => {
     });
   });
 
+  describe("update - renaming a pair", () => {
+    // An earlier test in this file spies on I18nContext without restoring it,
+    // so the ambient locale here depends on test order. Pin it rather than
+    // inherit it: which words the server appends is part of what these
+    // assertions are about.
+    beforeEach(() => {
+      const localized: Record<string, string> = {
+        "common.accountSuffix.cash": "Bargeld",
+        "common.accountSuffix.brokerage": "Depot",
+      };
+      jest.spyOn(I18nContext, "current").mockReturnValue({
+        t: (key: string) => localized[key] ?? key,
+      } as never);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    const half = (
+      id: string,
+      subType: AccountSubType,
+      name: string,
+      linkedTo: string,
+    ) => ({
+      ...mockAccount,
+      id,
+      name,
+      accountType: AccountType.INVESTMENT,
+      accountSubType: subType,
+      linkedAccountId: linkedTo,
+    });
+
+    // A pair is one account with one name, stored twice. Renaming only the
+    // half the user happened to open leaves the two disagreeing, and the row
+    // shows whichever half it is built from.
+    it("renames the cash half when the brokerage half is renamed", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        );
+
+      await service.update("user-1", "brok-1", { name: "RRSP" });
+
+      const [brokerageSave, cashSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+      expect(cashSave.id).toBe("cash-1");
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+    });
+
+    it("renames the brokerage half when the cash half is renamed", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        );
+
+      await service.update("user-1", "cash-1", { name: "RRSP" });
+
+      const [cashSave, brokerageSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+    });
+
+    // A client that sends the stored name back rather than the base must not
+    // end up with "RRSP - Brokerage - Brokerage".
+    it("does not stack a second suffix when sent an already suffixed name", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        );
+
+      await service.update("user-1", "brok-1", { name: "RRSP - Depot" });
+
+      const [brokerageSave, cashSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+    });
+
+    // The English words are stripped alongside the locale's, so a pair created
+    // before the user switched language still re-bases instead of keeping the
+    // old suffix inside the new base.
+    it("strips the English suffix too, not only the current locale's", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        );
+
+      await service.update("user-1", "brok-1", { name: "RRSP - Brokerage" });
+
+      const [brokerageSave, cashSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+    });
+
+    it("leaves a standalone investment account name exactly as submitted", async () => {
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+        ...mockAccount,
+        accountType: AccountType.INVESTMENT,
+        accountSubType: null,
+        linkedAccountId: null,
+      });
+
+      await service.update("user-1", "account-1", { name: "Self-directed" });
+
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.manager.save.mock.calls[0][0].name).toBe(
+        "Self-directed",
+      );
+    });
+
+    it("does not touch the partner when the rename is not part of the update", async () => {
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce(
+        half(
+          "brok-1",
+          AccountSubType.INVESTMENT_BROKERAGE,
+          "TFSA - Brokerage",
+          "cash-1",
+        ),
+      );
+
+      await service.update("user-1", "brok-1", { description: "notes" });
+
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("update - net worth recalculation", () => {
     it("triggers net worth recalc when openingBalance changes", async () => {
       mockQueryRunner.manager.findOne.mockResolvedValue({
@@ -2203,12 +2388,14 @@ describe("AccountsService", () => {
         .mockResolvedValueOnce({
           ...mockAccount,
           currentBalance: 0,
+          accountType: AccountType.INVESTMENT,
           accountSubType: AccountSubType.INVESTMENT_CASH,
           linkedAccountId: "brokerage-1",
         })
         .mockResolvedValueOnce({
           id: "brokerage-1",
           userId: "user-1",
+          currentBalance: 0,
           isClosed: false,
         });
       mockQueryRunner.manager.save.mockImplementation((data) => data);
@@ -2228,12 +2415,14 @@ describe("AccountsService", () => {
         .mockResolvedValueOnce({
           ...mockAccount,
           currentBalance: 0,
+          accountType: AccountType.INVESTMENT,
           accountSubType: AccountSubType.INVESTMENT_CASH,
           linkedAccountId: "brokerage-1",
         })
         .mockResolvedValueOnce({
           id: "brokerage-1",
           userId: "user-1",
+          currentBalance: 0,
           isClosed: true,
         });
       mockQueryRunner.manager.save.mockImplementation((data) => data);
@@ -2261,6 +2450,130 @@ describe("AccountsService", () => {
     });
   });
 
+  describe("close/reopen - the pair acts as one account", () => {
+    const brokerageHalf = (over: Record<string, unknown> = {}) => ({
+      ...mockAccount,
+      id: "brokerage-1",
+      currentBalance: 0,
+      accountType: AccountType.INVESTMENT,
+      accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+      linkedAccountId: "cash-1",
+      isClosed: false,
+      ...over,
+    });
+    const cashHalf = (over: Record<string, unknown> = {}) => ({
+      ...mockAccount,
+      id: "cash-1",
+      currentBalance: 0,
+      accountType: AccountType.INVESTMENT,
+      accountSubType: AccountSubType.INVESTMENT_CASH,
+      linkedAccountId: "brokerage-1",
+      isClosed: false,
+      ...over,
+    });
+
+    // The cascade used to run one way only, so closing the brokerage left its
+    // cash half open -- half a closed account, from a UI that offers one row.
+    it("closes the cash half when the brokerage half is closed", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(brokerageHalf())
+        .mockResolvedValueOnce(cashHalf());
+
+      await service.close("user-1", "brokerage-1");
+
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(2);
+      const cashSave = mockQueryRunner.manager.save.mock.calls[1][0];
+      expect(cashSave.id).toBe("cash-1");
+      expect(cashSave.isClosed).toBe(true);
+      expect(cashSave.closedDate).toBeDefined();
+    });
+
+    it("reopens the cash half when the brokerage half is reopened", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          brokerageHalf({ isClosed: true, closedDate: new Date() }),
+        )
+        .mockResolvedValueOnce(
+          cashHalf({ isClosed: true, closedDate: new Date() }),
+        );
+
+      await service.reopen("user-1", "brokerage-1");
+
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(2);
+      const cashSave = mockQueryRunner.manager.save.mock.calls[1][0];
+      expect(cashSave.id).toBe("cash-1");
+      expect(cashSave.isClosed).toBe(false);
+      expect(cashSave.closedDate).toBeNull();
+    });
+
+    // Closing the brokerage now closes the cash half too, so the balance that
+    // blocks the close has to be looked for on both -- otherwise the pair
+    // closes over money the user still has.
+    it("refuses to close the brokerage when the cash half holds a balance", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(brokerageHalf())
+        .mockResolvedValueOnce(cashHalf({ currentBalance: 250 }));
+
+      await expect(service.close("user-1", "brokerage-1")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+    });
+
+    // A brokerage's current_balance is deliberately kept at 0, so the balance
+    // check says nothing about the securities it holds: before this guard the
+    // server closed an account full of positions and reported success.
+    it("refuses to close an investment account that still holds securities", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(brokerageHalf())
+        .mockResolvedValueOnce(cashHalf());
+      mockQueryRunner.manager.count.mockResolvedValueOnce(2);
+
+      await expect(service.close("user-1", "brokerage-1")).rejects.toThrow(
+        /still holds securities/,
+      );
+      expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+    });
+
+    it("counts holdings across both halves, from whichever half is addressed", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(cashHalf())
+        .mockResolvedValueOnce(brokerageHalf());
+      mockQueryRunner.manager.count.mockResolvedValueOnce(0);
+
+      await service.close("user-1", "cash-1");
+
+      const [entity, options] = mockQueryRunner.manager.count.mock.calls[0];
+      expect(entity).toBe(Holding);
+      expect(options.where.accountId._value).toEqual(["cash-1", "brokerage-1"]);
+    });
+
+    it("closes a standalone investment account holding nothing", async () => {
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+        ...mockAccount,
+        currentBalance: 0,
+        accountType: AccountType.INVESTMENT,
+        accountSubType: null,
+        linkedAccountId: null,
+      });
+
+      await service.close("user-1", "account-1");
+
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not look for holdings when closing a non-investment account", async () => {
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+        ...mockAccount,
+        currentBalance: 0,
+      });
+
+      await service.close("user-1", "account-1");
+
+      expect(mockQueryRunner.manager.count).not.toHaveBeenCalled();
+    });
+  });
+
   describe("reopen - investment cash account linked behavior", () => {
     it("also reopens linked brokerage account for investment cash", async () => {
       mockQueryRunner.manager.findOne
@@ -2268,6 +2581,7 @@ describe("AccountsService", () => {
           ...mockAccount,
           isClosed: true,
           closedDate: new Date(),
+          accountType: AccountType.INVESTMENT,
           accountSubType: AccountSubType.INVESTMENT_CASH,
           linkedAccountId: "brokerage-1",
         })
@@ -2292,6 +2606,7 @@ describe("AccountsService", () => {
           ...mockAccount,
           isClosed: true,
           closedDate: new Date(),
+          accountType: AccountType.INVESTMENT,
           accountSubType: AccountSubType.INVESTMENT_CASH,
           linkedAccountId: "brokerage-1",
         })
