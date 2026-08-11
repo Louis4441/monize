@@ -536,7 +536,8 @@
     "empty": "File yang diunggah kosong",
     "fileTooLarge": "File melebihi ukuran maksimum {{ max }} byte",
     "unsupportedType": "Jenis file tidak didukung. Jenis yang diizinkan: {{ types }}",
-    "tooMany": "Transaksi ini sudah memiliki maksimum {{ max }} lampiran"
+    "tooMany": "Transaksi ini sudah memiliki maksimum {{ max }} lampiran",
+    "swept": "Unggahan memakan waktu terlalu lama dan penyimpanannya telah dibebaskan. Silakan coba lagi."
   },
   "strategies": {
     "accountNotFound": "Akun tidak ditemukan",

@@ -381,9 +381,38 @@ CREATE TABLE attachment_blob_tombstones (
     storage_provider VARCHAR(20) NOT NULL,
     storage_key VARCHAR(255) NOT NULL,
     deleted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Non-NULL marks this row as an upload still in flight and says until when
+    -- (migration 146). The sweeper skips a live lease, which is a *latency*
+    -- mechanism: it exists so the sweep does not cause avoidable upload failures.
+    -- NULL means an ordinary deletion record, swept immediately.
+    upload_lease_expires_at TIMESTAMP,
+    -- The sweeper's claim, set by a conditional UPDATE *before* the external
+    -- delete. This is the *correctness* mechanism: the uploader's "clear the
+    -- intent" step requires `swept_at IS NULL` inside the transaction that commits
+    -- the metadata row, so metadata pointing at deleted bytes is impossible
+    -- whichever of the two wins the row (audit RV4-002).
+    swept_at TIMESTAMP,
+    -- How long a swept *upload intent* is kept after its object was deleted
+    -- (migration 147). The fence above is about metadata; this is about bytes. A
+    -- put that stalled past its lease can land after the sweep deleted the key, and
+    -- a process killed before its compensating delete leaves those bytes with no
+    -- tombstone to enumerate them -- unreferenced and undiscoverable (audit
+    -- RRV4-002). Keeping the row until this passes means the next hourly sweep
+    -- re-deletes the key and only then retires the row. NULL on an ordinary
+    -- deletion record, whose metadata is already gone, so nothing can write those
+    -- bytes again.
+    late_write_quarantine_until TIMESTAMP,
     attempts INTEGER NOT NULL DEFAULT 0,
     last_error TEXT
 );
+
+-- The sweeper's candidate predicate: rows with no live upload lease. A quarantined
+-- row is found again through this same arm, because the claim that quarantined it
+-- also cleared the lease -- which is why `late_write_quarantine_until` carries no
+-- index of its own (migration 145): nothing selects on it.
+CREATE INDEX idx_abt_sweepable
+    ON attachment_blob_tombstones(storage_provider, deleted_at)
+    WHERE upload_lease_expires_at IS NULL;
 
 -- Unique, so a tombstone is idempotent: two records for one object describe the
 -- same pending deletion, and the trigger can therefore be a plain
@@ -414,6 +443,60 @@ CREATE TRIGGER trg_attachment_blob_tombstone
     FOR EACH ROW
     WHEN (OLD.storage_provider <> 'database')
     EXECUTE FUNCTION record_attachment_blob_tombstone();
+
+-- Late-write quarantine enforcement (migration 148). The sweeper's claim settles
+-- what metadata may commit, not what bytes exist: a put stalled past its lease can
+-- land after the key was deleted. The quarantine is a rule spread across the claim,
+-- the retire and the uploader's compensating clear, and these two triggers are what
+-- make a forgotten predicate in any of them fail loudly rather than silently drop a
+-- row whose key may still be written. Covers DELETE only -- TRUNCATE fires no
+-- row-level trigger.
+CREATE OR REPLACE FUNCTION stamp_attachment_quarantine() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.late_write_quarantine_until := COALESCE(
+        NEW.late_write_quarantine_until,
+        OLD.late_write_quarantine_until,
+        CURRENT_TIMESTAMP + INTERVAL '6 hours'
+    );
+    RETURN NEW;
+END;
+$$;
+
+-- On any claim (swept_at NULL -> non-NULL) of a row that was an upload intent (it
+-- had a lease), stamp the quarantine if unset. Covers a writer that does not know
+-- the column exists; COALESCE lets the application's own value win.
+CREATE TRIGGER trg_abt_stamp_quarantine
+    BEFORE UPDATE ON attachment_blob_tombstones
+    FOR EACH ROW
+    WHEN (
+      NEW.swept_at IS NOT NULL
+      AND OLD.swept_at IS NULL
+      AND OLD.upload_lease_expires_at IS NOT NULL
+    )
+    EXECUTE FUNCTION stamp_attachment_quarantine();
+
+CREATE OR REPLACE FUNCTION reject_quarantined_tombstone_delete() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+      'attachment tombstone % is under late-write quarantine until %; a stalled upload may still write to this key',
+      OLD.storage_key, OLD.late_write_quarantine_until
+      USING ERRCODE = 'raise_exception';
+END;
+$$;
+
+-- Reject deletion of a still-quarantined row. retire()/retireKey() exclude such
+-- rows by the quarantine and both uploader clears exclude them by `swept_at IS
+-- NULL`, so no application path should ever trip this.
+CREATE TRIGGER trg_abt_reject_quarantined_delete
+    BEFORE DELETE ON attachment_blob_tombstones
+    FOR EACH ROW
+    WHEN (
+      OLD.late_write_quarantine_until IS NOT NULL
+      AND OLD.late_write_quarantine_until > CURRENT_TIMESTAMP
+    )
+    EXECUTE FUNCTION reject_quarantined_tombstone_delete();
 
 -- Tags
 CREATE TABLE tags (

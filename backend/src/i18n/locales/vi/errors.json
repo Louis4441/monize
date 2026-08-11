@@ -536,7 +536,8 @@
     "empty": "Tệp đã tải lên trống",
     "fileTooLarge": "Tệp vượt quá kích thước tối đa {{ max }} byte",
     "unsupportedType": "Loại tệp không được hỗ trợ. Các loại được phép: {{ types }}",
-    "tooMany": "Giao tác này đã có tối đa {{ max }} tệp đính kèm"
+    "tooMany": "Giao tác này đã có tối đa {{ max }} tệp đính kèm",
+    "swept": "Quá trình tải lên mất quá nhiều thời gian và bộ nhớ của nó đã được thu hồi. Vui lòng thử lại."
   },
   "strategies": {
     "accountNotFound": "Không tìm thấy tài khoản",
