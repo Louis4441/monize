@@ -131,11 +131,30 @@ export function AccountFormModal({ formModal, onSaved }: AccountFormModalProps) 
         }
       });
 
+      // A linked pair is one account with two ledgers, so the form can carry
+      // edits to both. The cash fields are present only when the user touched
+      // that section; the account's own update goes first, since the rename it
+      // may carry is what the server propagates to the partner.
+      const {
+        cashAccountId,
+        cashOpeningBalance,
+        cashDescription,
+        cashAccountNumber,
+        ...accountData
+      } = cleanedData;
+
       if (editingItem) {
-        await accountsApi.update(editingItem.id, cleanedData);
+        await accountsApi.update(editingItem.id, accountData);
+        if (cashAccountId) {
+          await accountsApi.update(cashAccountId, {
+            openingBalance: cashOpeningBalance,
+            description: cashDescription ?? null,
+            accountNumber: cashAccountNumber ?? null,
+          });
+        }
         toast.success(t('toast.updateSuccess'));
       } else {
-        await accountsApi.create(cleanedData);
+        await accountsApi.create(accountData);
         toast.success(t('toast.createSuccess'));
       }
       close();

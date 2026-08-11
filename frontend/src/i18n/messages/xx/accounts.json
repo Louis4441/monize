@@ -153,6 +153,13 @@
     "statementSettlementDayTooltip": "[XX-The settlement date (also called the closing date) is the last day of the billing cycle. Transactions posted on or before this day will appear on the current statement.-XX]",
     "investmentPairTitle": "[XX-Create as Cash + Brokerage pair (recommended)-XX]",
     "investmentPairDescription": "[XX-Creates two linked accounts: a Cash account for transfers in/out and a Brokerage account for investment transactions. This is the recommended structure for tracking investments.-XX]",
+    "cashSection": {
+      "title": "[XX-Cash account-XX]",
+      "description": "[XX-The ledger that holds this account's money. Its name follows the account name above.-XX]",
+      "openingBalance": "[XX-Cash Opening Balance-XX]",
+      "accountNumber": "[XX-Cash Account Number (optional)-XX]",
+      "descriptionField": "[XX-Cash Description (optional)-XX]"
+    },
     "accountTypeOptions": {
       "chequing": "[XX-Chequing-XX]",
       "savings": "[XX-Savings-XX]",
