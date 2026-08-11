@@ -220,8 +220,11 @@ export function formatAccountOptionLabel(
   account: Account,
   stripName: (name: string) => string,
   closedLabel = 'Closed',
+  options: { withCurrency?: boolean } = {},
 ): string {
-  return `${stripName(account.name)} (${account.currencyCode})${
+  const { withCurrency = true } = options;
+  const currency = withCurrency ? ` (${account.currencyCode})` : '';
+  return `${stripName(account.name)}${currency}${
     account.isClosed ? ` (${closedLabel})` : ''
   }`;
 }

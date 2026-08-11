@@ -601,3 +601,48 @@ describe("an unknown value is not drawn as measured data", () => {
     ).toEqual([]);
   });
 });
+
+describe("an account picker labels its options through the shared hook", () => {
+  /**
+   * A linked investment pair is one account, stored as two rows whose names
+   * carry a " - Cash"/" - Brokerage" suffix the user never chose. A picker that
+   * builds its label from `account.name` shows that suffix, so money pickers
+   * offered "TFSA - Cash" while every other surface called it "TFSA".
+   *
+   * `useAccountOptionLabel` is the one place that label is built. The scan is
+   * what makes it stick: a new picker looks perfectly reasonable on its own.
+   */
+  const PICKER_TREES = [
+    "/src/components/transactions/",
+    "/src/components/scheduled-transactions/",
+  ];
+  /** A label built straight from the stored name, e.g. `(a) => `${a.name}...`. */
+  const RAW_NAME_LABEL = /\(\s*\w+\s*\)\s*=>\s*`\$\{\s*\w+\.name\s*\}/;
+
+  it("builds no account option label from the stored account name", () => {
+    const offenders = productionSources()
+      .filter(([path]) => PICKER_TREES.some((tree) => path.startsWith(tree)))
+      .filter(([, content]) => content.includes("buildAccountDropdownOptions"))
+      .filter(([, content]) => RAW_NAME_LABEL.test(content))
+      .map(([path]) => path);
+
+    expect(
+      offenders,
+      "Label account options with useAccountOptionLabel() so a linked cash " +
+        "half reads as the account the user knows, not its stored ledger name.",
+    ).toEqual([]);
+  });
+
+  it("passes the shared labeller wherever it builds account options", () => {
+    const missing = productionSources()
+      .filter(([path]) => PICKER_TREES.some((tree) => path.startsWith(tree)))
+      .filter(([, content]) => content.includes("buildAccountDropdownOptions("))
+      .filter(([, content]) => !content.includes("useAccountOptionLabel"))
+      .map(([path]) => path);
+
+    expect(
+      missing,
+      "Every account picker in these trees labels through useAccountOptionLabel().",
+    ).toEqual([]);
+  });
+});

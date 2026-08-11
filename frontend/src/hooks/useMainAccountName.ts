@@ -35,13 +35,19 @@ export function useMainAccountName(): (name: string) => string {
  * exposing the storage detail ("TFSA - Cash"). Pass it to
  * `buildAccountDropdownOptions` as the `labelFn`.
  */
-export function useAccountOptionLabel(): (account: Account) => string {
+export function useAccountOptionLabel(options: {
+  /** Narrow rows (a split line) drop the currency; everything else shows it. */
+  withCurrency?: boolean;
+} = {}): (account: Account) => string {
   const stripName = useMainAccountName();
   const t = useTranslations('accounts');
   const closedLabel = t('row.statusClosed');
+  const withCurrency = options.withCurrency ?? true;
   return useCallback(
     (account: Account) =>
-      formatAccountOptionLabel(account, stripName, closedLabel),
-    [stripName, closedLabel],
+      formatAccountOptionLabel(account, stripName, closedLabel, {
+        withCurrency,
+      }),
+    [stripName, closedLabel, withCurrency],
   );
 }

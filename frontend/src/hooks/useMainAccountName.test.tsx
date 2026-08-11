@@ -69,4 +69,22 @@ describe('useAccountOptionLabel', () => {
 
     expect(result.current).toBe(first);
   });
+  // Money pickers list the cash half of a pair -- that is where the money
+  // lands -- so without stripping they offer "TFSA - Cash" while every other
+  // surface calls the same account "TFSA".
+  it('reads a linked cash half as the account the user knows', () => {
+    const { result } = renderHook(() => useAccountOptionLabel(), { wrapper });
+
+    expect(result.current(cashHalf)).not.toContain(' - Cash');
+    expect(result.current(cashHalf)).toContain('TFSA');
+  });
+
+  it('drops the currency for narrow rows that ask for it', () => {
+    const { result } = renderHook(
+      () => useAccountOptionLabel({ withCurrency: false }),
+      { wrapper },
+    );
+
+    expect(result.current(cashHalf)).toBe('TFSA');
+  });
 });

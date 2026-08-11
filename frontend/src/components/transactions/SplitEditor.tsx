@@ -16,6 +16,7 @@ import { CreateSplitData, InvestmentSplitDetails } from '@/types/transaction';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { roundToCents, roundToDecimals, getCurrencySymbol, formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
+import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { InvestmentSplitFields } from './InvestmentSplitFields';
 
 export type SplitType = 'category' | 'transfer' | 'investment';
@@ -74,6 +75,7 @@ export function SplitEditor({
   displayRate,
 }: SplitEditorProps) {
   const t = useTranslations('transactions');
+  const accountOptionLabel = useAccountOptionLabel({ withCurrency: false });
   const investmentSplitsEnabled = parentAccountSubType === 'INVESTMENT_CASH';
   const currencySymbol = getCurrencySymbol(currencyCode);
   const decimals = getDecimalPlacesForCurrency(currencyCode);
@@ -142,9 +144,9 @@ export function SplitEditor({
         a.id !== sourceAccountId &&
         a.accountSubType !== 'INVESTMENT_BROKERAGE' &&
         (!a.isClosed || selectedTransferAccountIds.has(a.id)),
-      (a) => `${a.name}${a.isClosed ? ' (Closed)' : ''}`,
+      accountOptionLabel,
     );
-  }, [accounts, sourceAccountId, supportsTransfers, splits]);
+  }, [accounts, sourceAccountId, supportsTransfers, splits, accountOptionLabel]);
 
   // Sync with parent when splits prop changes
   useEffect(() => {
