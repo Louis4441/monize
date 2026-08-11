@@ -18,6 +18,7 @@
     "changeCurrencyWithTransactions": "Cannot change the currency of an account that has transactions.",
     "alreadyClosed": "Account is already closed",
     "closeNonZeroBalance": "Cannot close account with non-zero balance. Current balance: {{ currentBalance }}",
+    "closeWithHoldings": "Cannot close an investment account that still holds securities. It has {{ holdingCount }} holding(s) with a non-zero quantity; sell or transfer them first.",
     "notClosed": "Account is not closed",
     "modifyBalanceClosed": "Cannot modify balance of a closed account",
     "deleteWithTransactions": "Cannot delete account with {{ transactionCount }} transaction(s). Close the account instead.",

@@ -6,7 +6,7 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { DataSource, In } from "typeorm";
+import { DataSource, EntityManager, In, Not } from "typeorm";
 import {
   Account,
   AccountType,
@@ -14,6 +14,7 @@ import {
 } from "./entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
+import { Holding } from "../securities/entities/holding.entity";
 import { Institution } from "../institutions/entities/institution.entity";
 import { CreateAccountDto } from "./dto/create-account.dto";
 import { UpdateAccountDto } from "./dto/update-account.dto";
@@ -828,7 +829,32 @@ export class AccountsService {
   }
 
   /**
-   * Close an account (soft delete)
+   * The other half of a linked investment pair, locked for update.
+   *
+   * A pair is one account to the user, so closing or reopening either half has
+   * to decide for both -- and every check that can refuse must see both halves
+   * before anything is written.
+   */
+  private async findLinkedInvestmentHalf(
+    m: EntityManager,
+    userId: string,
+    account: Account,
+  ): Promise<Account | null> {
+    if (
+      account.accountType !== AccountType.INVESTMENT ||
+      !account.linkedAccountId
+    ) {
+      return null;
+    }
+    return m.findOne(Account, {
+      where: { id: account.linkedAccountId, userId },
+      lock: { mode: "pessimistic_write" },
+    });
+  }
+
+  /**
+   * Close an account (soft delete). A linked investment pair closes together
+   * from either half.
    */
   async close(userId: string, id: string): Promise<Account> {
     // M19: Use pessimistic_write lock to prevent race condition
@@ -855,35 +881,62 @@ export class AccountsService {
         );
       }
 
+      const linkedHalf = await this.findLinkedInvestmentHalf(
+        m,
+        userId,
+        account,
+      );
+      // The pair closes as one, so both ledgers have to be empty -- checking
+      // only the addressed half would let a brokerage close over a cash
+      // balance the user still has.
+      const halves = linkedHalf ? [account, linkedHalf] : [account];
+
       // Check if balance is not zero (under lock, so no race)
-      if (Number(account.currentBalance) !== 0) {
-        throw new BadRequestException(
-          tr(
-            "errors.accounts.closeNonZeroBalance",
-            `Cannot close account with non-zero balance. Current balance: ${account.currentBalance}`,
-            { currentBalance: account.currentBalance },
-          ),
-        );
+      for (const half of halves) {
+        if (Number(half.currentBalance) !== 0) {
+          throw new BadRequestException(
+            tr(
+              "errors.accounts.closeNonZeroBalance",
+              `Cannot close account with non-zero balance. Current balance: ${half.currentBalance}`,
+              { currentBalance: half.currentBalance },
+            ),
+          );
+        }
       }
 
+      // A brokerage's `current_balance` is deliberately kept at 0 and its worth
+      // lives in its holdings, so the balance check above says nothing about
+      // whether it still holds securities. Without this, closing an account
+      // full of positions succeeded silently.
+      if (account.accountType === AccountType.INVESTMENT) {
+        const openPositions = await m.count(Holding, {
+          where: {
+            accountId: In(halves.map((half) => half.id)),
+            quantity: Not(0),
+          },
+        });
+        if (openPositions > 0) {
+          throw new BadRequestException(
+            tr(
+              "errors.accounts.closeWithHoldings",
+              `Cannot close an investment account that still holds securities. It has ${openPositions} holding(s) with a non-zero quantity; sell or transfer them first.`,
+              { holdingCount: openPositions },
+            ),
+          );
+        }
+      }
+
+      const closedDate = new Date();
       account.isClosed = true;
-      account.closedDate = new Date();
+      account.closedDate = closedDate;
 
       const saved = await m.save(account);
 
-      // If this is an investment cash account, also close the linked brokerage account
-      if (
-        account.accountSubType === AccountSubType.INVESTMENT_CASH &&
-        account.linkedAccountId
-      ) {
-        const brokerageAccount = await m.findOne(Account, {
-          where: { id: account.linkedAccountId, userId },
-        });
-        if (brokerageAccount && !brokerageAccount.isClosed) {
-          brokerageAccount.isClosed = true;
-          brokerageAccount.closedDate = new Date();
-          await m.save(brokerageAccount);
-        }
+      // Either half of an investment pair closes the other.
+      if (linkedHalf && !linkedHalf.isClosed) {
+        linkedHalf.isClosed = true;
+        linkedHalf.closedDate = closedDate;
+        await m.save(linkedHalf);
       }
 
       return saved;
@@ -891,11 +944,12 @@ export class AccountsService {
   }
 
   /**
-   * Reopen a closed account
+   * Reopen a closed account. A linked investment pair reopens together from
+   * either half.
    */
   async reopen(userId: string, id: string): Promise<Account> {
-    // Mirror close(): reopen the account and any linked brokerage account in a
-    // single transaction so the pair cannot end up in mismatched states.
+    // Mirror close(): reopen the account and its linked half in a single
+    // transaction so the pair cannot end up in mismatched states.
     return withScopedDb(this.dataSource, async (m) => {
       const account = await m.findOne(Account, {
         where: { id, userId },
@@ -922,19 +976,16 @@ export class AccountsService {
 
       const saved = await m.save(account);
 
-      // If this is an investment cash account, also reopen the linked brokerage account
-      if (
-        account.accountSubType === AccountSubType.INVESTMENT_CASH &&
-        account.linkedAccountId
-      ) {
-        const brokerageAccount = await m.findOne(Account, {
-          where: { id: account.linkedAccountId, userId },
-        });
-        if (brokerageAccount && brokerageAccount.isClosed) {
-          brokerageAccount.isClosed = false;
-          brokerageAccount.closedDate = null;
-          await m.save(brokerageAccount);
-        }
+      // Either half of an investment pair reopens the other.
+      const linkedHalf = await this.findLinkedInvestmentHalf(
+        m,
+        userId,
+        account,
+      );
+      if (linkedHalf && linkedHalf.isClosed) {
+        linkedHalf.isClosed = false;
+        linkedHalf.closedDate = null;
+        await m.save(linkedHalf);
       }
 
       return saved;
