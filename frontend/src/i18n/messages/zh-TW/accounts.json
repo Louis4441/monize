@@ -55,6 +55,10 @@
     "statusActive": "有效",
     "statusClosed": "已關閉",
     "marketValue": "市場價值",
+    "combinedBreakdown": "投資 {investments} · 現金 {cash}",
+    "combinedUnknown": "無法顯示總額",
+    "combinedUnknownTooltip": "{count, plural, other {有 # 項持股沒有價格，因此無法計算此帳戶的總額}}",
+    "combinedUnknownNoPortfolio": "無法載入持股，因此無法計算此帳戶的總額",
     "limit": "限額：{amount}",
     "pairedWith": "與 {name} 配對",
     "subtypeBrokerage": "券商",
@@ -76,6 +80,7 @@
       "deleteTitle": "永久刪除科目（無交易記錄）",
       "closeTitleDisabled": "科目結餘必須為零才能關閉",
       "closeTitleEnabled": "關閉科目",
+      "closeTitleUnknownValue": "無法計算此帳戶的總額，因此無法確認帳戶已清空",
       "details": "詳情"
     },
     "jointBadge": "聯名",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "關閉中...",
     "deleteTitle": "刪除科目",
     "deleteMessage": "確定要永久刪除「{name}」嗎？此操作無法復原。",
+    "deletePairMessage": "確定要永久刪除「{name}」嗎？兩個帳目都會被刪除：「{brokerageName}」和「{cashName}」。此操作無法復原。",
     "deleteConfirm": "刪除科目",
     "deleteConfirmLoading": "刪除中..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "手續費百分比",
     "fxFeePercentPlaceholder": "例如 2.5",
     "jointSharedWith": "聯名帳戶，已與 {count, plural, other {# 人}}共享",
-    "jointManage": "管理共享"
+    "jointManage": "管理共享",
+    "cashSection": {
+      "title": "現金帳戶",
+      "description": "存放此帳戶資金的帳目。其名稱會跟隨上方的帳戶名稱。",
+      "openingBalance": "現金期初餘額",
+      "accountNumber": "現金帳號（選填）",
+      "descriptionField": "現金說明（選填）"
+    }
   },
   "exportModal": {
     "title": "匯出 {name}",

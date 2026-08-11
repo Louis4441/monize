@@ -6,5 +6,10 @@
     "realizedGains": "Lãi đã thực hiện",
     "ytd": "Từ đầu năm đến nay",
     "empty": "Không có thu nhập đầu tư nào trong năm nay"
+  },
+  "register": {
+    "cashHeading": "Giao dịch tiền mặt",
+    "newCashTransaction": "Giao dịch tiền mặt mới",
+    "deleteFailed": "Không xóa được giao dịch"
   }
 }

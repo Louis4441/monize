@@ -55,6 +55,10 @@
     "statusActive": "Attivo",
     "statusClosed": "Chiuso",
     "marketValue": "Valore di mercato",
+    "combinedBreakdown": "Investimenti {investments} · Liquidità {cash}",
+    "combinedUnknown": "Totale non disponibile",
+    "combinedUnknownTooltip": "{count, plural, one {# posizione non ha un prezzo, quindi il totale di questo conto non può essere calcolato} other {# posizioni non hanno un prezzo, quindi il totale di questo conto non può essere calcolato}}",
+    "combinedUnknownNoPortfolio": "Non è stato possibile caricare le posizioni, quindi il totale di questo conto non può essere calcolato",
     "limit": "Limite: {amount}",
     "pairedWith": "Abbinato con {name}",
     "subtypeBrokerage": "Intermediazione",
@@ -76,6 +80,7 @@
       "deleteTitle": "Elimina definitivamente il conto (senza transazioni)",
       "closeTitleDisabled": "Il saldo del conto deve essere zero per chiuderlo",
       "closeTitleEnabled": "Chiudi conto",
+      "closeTitleUnknownValue": "Il totale di questo conto non può essere calcolato, quindi non se ne può confermare la chiusura a zero",
       "details": "Dettagli"
     },
     "jointBadge": "Cointestato",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Chiusura in corso...",
     "deleteTitle": "Elimina conto",
     "deleteMessage": "Sei sicuro di voler eliminare definitivamente \"{name}\"? Questa azione non può essere annullata.",
+    "deletePairMessage": "Vuoi davvero eliminare definitivamente «{name}»? Vengono eliminati entrambi i registri: «{brokerageName}» e «{cashName}». Questa azione non può essere annullata.",
     "deleteConfirm": "Elimina conto",
     "deleteConfirmLoading": "Eliminazione in corso..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Percentuale della commissione",
     "fxFeePercentPlaceholder": "es. 2,5",
     "jointSharedWith": "Conto cointestato condiviso con {count, plural, one {# persona} other {# persone}}",
-    "jointManage": "Gestisci condivisione"
+    "jointManage": "Gestisci condivisione",
+    "cashSection": {
+      "title": "Conto liquidità",
+      "description": "Il registro che contiene il denaro di questo conto. Il suo nome segue il nome del conto qui sopra.",
+      "openingBalance": "Saldo iniziale liquidità",
+      "accountNumber": "Numero conto liquidità (facoltativo)",
+      "descriptionField": "Descrizione liquidità (facoltativo)"
+    }
   },
   "exportModal": {
     "title": "Esporta {name}",

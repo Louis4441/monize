@@ -55,6 +55,10 @@
     "statusActive": "Aktiv",
     "statusClosed": "Geschlossen",
     "marketValue": "Marktwert",
+    "combinedBreakdown": "Anlagen {investments} · Bargeld {cash}",
+    "combinedUnknown": "Gesamtwert nicht verfügbar",
+    "combinedUnknownTooltip": "{count, plural, one {# Position hat keinen Kurs, daher lässt sich der Gesamtwert dieses Kontos nicht ermitteln} other {# Positionen haben keinen Kurs, daher lässt sich der Gesamtwert dieses Kontos nicht ermitteln}}",
+    "combinedUnknownNoPortfolio": "Die Positionen konnten nicht geladen werden, daher lässt sich der Gesamtwert dieses Kontos nicht ermitteln",
     "limit": "Limit: {amount}",
     "pairedWith": "Verknüpft mit {name}",
     "subtypeBrokerage": "Brokerage",
@@ -76,6 +80,7 @@
       "deleteTitle": "Konto dauerhaft löschen (keine Buchungen)",
       "closeTitleDisabled": "Kontostand muss null sein, um das Konto zu schließen",
       "closeTitleEnabled": "Konto schließen",
+      "closeTitleUnknownValue": "Der Gesamtwert dieses Kontos lässt sich nicht ermitteln, daher kann es nicht als leer bestätigt werden",
       "details": "Details"
     },
     "jointBadge": "Gemeinsam",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Wird geschlossen...",
     "deleteTitle": "Konto löschen",
     "deleteMessage": "Möchten Sie „{name}” wirklich dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deletePairMessage": "Möchten Sie „{name}“ wirklich dauerhaft löschen? Beide Konten werden gelöscht: „{brokerageName}“ und „{cashName}“. Diese Aktion kann nicht rückgängig gemacht werden.",
     "deleteConfirm": "Konto löschen",
     "deleteConfirmLoading": "Wird gelöscht..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Gebührensatz",
     "fxFeePercentPlaceholder": "z. B. 2,5",
     "jointSharedWith": "Gemeinschaftskonto, geteilt mit {count, plural, one {# Person} other {# Personen}}",
-    "jointManage": "Freigabe verwalten"
+    "jointManage": "Freigabe verwalten",
+    "cashSection": {
+      "title": "Bargeldkonto",
+      "description": "Das Konto, auf dem das Geld dieses Kontos liegt. Sein Name folgt dem Kontonamen oben.",
+      "openingBalance": "Anfangssaldo Bargeld",
+      "accountNumber": "Kontonummer Bargeld (optional)",
+      "descriptionField": "Beschreibung Bargeld (optional)"
+    }
   },
   "exportModal": {
     "title": "{name} exportieren",

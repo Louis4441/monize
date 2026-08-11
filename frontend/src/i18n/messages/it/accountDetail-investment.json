@@ -6,5 +6,10 @@
     "realizedGains": "Plusvalenze realizzate",
     "ytd": "Da inizio anno",
     "empty": "Nessun reddito da investimenti quest'anno"
+  },
+  "register": {
+    "cashHeading": "Movimenti di liquidità",
+    "newCashTransaction": "Nuovo movimento di liquidità",
+    "deleteFailed": "Impossibile eliminare il movimento"
   }
 }

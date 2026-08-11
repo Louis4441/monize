@@ -55,6 +55,10 @@
     "statusActive": "Đang hoạt động",
     "statusClosed": "Đã đóng",
     "marketValue": "Giá trị thị trường",
+    "combinedBreakdown": "Đầu tư {investments} · Tiền mặt {cash}",
+    "combinedUnknown": "Không có tổng",
+    "combinedUnknownTooltip": "{count, plural, other {# khoản nắm giữ không có giá, nên không thể tính tổng của tài khoản này}}",
+    "combinedUnknownNoPortfolio": "Không tải được các khoản nắm giữ, nên không thể tính tổng của tài khoản này",
     "limit": "Hạn mức: {amount}",
     "pairedWith": "Ghép với {name}",
     "subtypeBrokerage": "Môi giới",
@@ -76,6 +80,7 @@
       "deleteTitle": "Xóa vĩnh viễn tài khoản (không có giao dịch)",
       "closeTitleDisabled": "Tài khoản phải có số dư bằng không để đóng",
       "closeTitleEnabled": "Đóng tài khoản",
+      "closeTitleUnknownValue": "Không thể tính tổng của tài khoản này, nên không thể xác nhận tài khoản đã trống",
       "details": "Chi tiết"
     },
     "jointBadge": "Chung",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Đang đóng...",
     "deleteTitle": "Xóa tài khoản",
     "deleteMessage": "Bạn có chắc chắn muốn xóa vĩnh viễn \"{name}\" không? Hành động này không thể hoàn tác.",
+    "deletePairMessage": "Bạn có chắc muốn xóa vĩnh viễn \"{name}\"? Cả hai sổ cái đều bị xóa: \"{brokerageName}\" và \"{cashName}\". Hành động này không thể hoàn tác.",
     "deleteConfirm": "Xóa tài khoản",
     "deleteConfirmLoading": "Đang xóa..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Phần trăm phí",
     "fxFeePercentPlaceholder": "vd. 2,5",
     "jointSharedWith": "Tài khoản chung được chia sẻ với {count, plural, other {# người}}",
-    "jointManage": "Quản lý chia sẻ"
+    "jointManage": "Quản lý chia sẻ",
+    "cashSection": {
+      "title": "Tài khoản tiền mặt",
+      "description": "Sổ cái giữ tiền của tài khoản này. Tên của nó theo tên tài khoản ở trên.",
+      "openingBalance": "Số dư đầu kỳ tiền mặt",
+      "accountNumber": "Số tài khoản tiền mặt (tùy chọn)",
+      "descriptionField": "Mô tả tiền mặt (tùy chọn)"
+    }
   },
   "exportModal": {
     "title": "Xuất {name}",

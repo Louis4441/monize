@@ -55,6 +55,10 @@
     "statusActive": "सक्रिय",
     "statusClosed": "बंद",
     "marketValue": "बाज़ार मूल्य",
+    "combinedBreakdown": "निवेश {investments} · नकद {cash}",
+    "combinedUnknown": "कुल उपलब्ध नहीं",
+    "combinedUnknownTooltip": "{count, plural, one {# होल्डिंग का कोई मूल्य नहीं है, इसलिए इस खाते का कुल निकाला नहीं जा सकता} other {# होल्डिंग्स का कोई मूल्य नहीं है, इसलिए इस खाते का कुल निकाला नहीं जा सकता}}",
+    "combinedUnknownNoPortfolio": "होल्डिंग्स लोड नहीं हो सकीं, इसलिए इस खाते का कुल निकाला नहीं जा सकता",
     "limit": "सीमा: {amount}",
     "pairedWith": "{name} के साथ युग्मित",
     "subtypeBrokerage": "ब्रोकरेज",
@@ -76,6 +80,7 @@
       "deleteTitle": "खाता स्थायी रूप से हटाएं (कोई लेनदेन नहीं)",
       "closeTitleDisabled": "बंद करने के लिए खाते का शेष शून्य होना चाहिए",
       "closeTitleEnabled": "खाता बंद करें",
+      "closeTitleUnknownValue": "इस खाते का कुल निकाला नहीं जा सकता, इसलिए इसे खाली नहीं माना जा सकता",
       "details": "विवरण"
     },
     "jointBadge": "संयुक्त",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "बंद हो रहा है...",
     "deleteTitle": "खाता हटाएं",
     "deleteMessage": "क्या आप वाकई \"{name}\" को स्थायी रूप से हटाना चाहते हैं? यह क्रिया वापस नहीं की जा सकती।",
+    "deletePairMessage": "क्या आप वाकई \"{name}\" को स्थायी रूप से हटाना चाहते हैं? इसके दोनों बहीखाते हटा दिए जाएंगे: \"{brokerageName}\" और \"{cashName}\"। यह क्रिया पूर्ववत नहीं की जा सकती।",
     "deleteConfirm": "खाता हटाएं",
     "deleteConfirmLoading": "हटाया जा रहा है..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "शुल्क प्रतिशत",
     "fxFeePercentPlaceholder": "उदा. 2.5",
     "jointSharedWith": "संयुक्त खाता, {count, plural, one {# व्यक्ति} other {# लोगों}} के साथ साझा",
-    "jointManage": "साझाकरण प्रबंधित करें"
+    "jointManage": "साझाकरण प्रबंधित करें",
+    "cashSection": {
+      "title": "नकद खाता",
+      "description": "वह बहीखाता जिसमें इस खाते का पैसा रहता है। इसका नाम ऊपर दिए खाते के नाम का अनुसरण करता है।",
+      "openingBalance": "नकद प्रारंभिक शेष",
+      "accountNumber": "नकद खाता संख्या (वैकल्पिक)",
+      "descriptionField": "नकद विवरण (वैकल्पिक)"
+    }
   },
   "exportModal": {
     "title": "{name} निर्यात करें",

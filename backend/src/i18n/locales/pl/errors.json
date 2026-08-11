@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "Nie można zmienić waluty konta, które ma transakcje.",
     "alreadyClosed": "Konto jest już zamknięte",
     "closeNonZeroBalance": "Nie można zamknąć konta z niezerowym saldem. Bieżące saldo: {{ currentBalance }}",
+    "closeWithHoldings": "Nie można zamknąć konta inwestycyjnego, na którym nadal są papiery wartościowe. Zawiera {{ holdingCount }} pozycji o niezerowej liczbie; najpierw sprzedaj je lub przenieś.",
     "notClosed": "Konto nie jest zamknięte",
     "modifyBalanceClosed": "Nie można zmienić salda zamkniętego konta",
     "deleteWithTransactions": "Nie można usunąć konta z {{ transactionCount }} transakcjami. Zamiast tego zamknij konto.",

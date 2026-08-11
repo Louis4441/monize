@@ -55,6 +55,10 @@
     "statusActive": "Actief",
     "statusClosed": "Gesloten",
     "marketValue": "Marktwaarde",
+    "combinedBreakdown": "Beleggingen {investments} · Contanten {cash}",
+    "combinedUnknown": "Totaal niet beschikbaar",
+    "combinedUnknownTooltip": "{count, plural, one {# positie heeft geen koers, dus het totaal van deze rekening kan niet worden bepaald} other {# posities hebben geen koers, dus het totaal van deze rekening kan niet worden bepaald}}",
+    "combinedUnknownNoPortfolio": "De posities konden niet worden geladen, dus het totaal van deze rekening kan niet worden bepaald",
     "limit": "Limiet: {amount}",
     "pairedWith": "Gekoppeld aan {name}",
     "subtypeBrokerage": "Effectenrekening",
@@ -76,6 +80,7 @@
       "deleteTitle": "Rekening definitief verwijderen (geen transacties)",
       "closeTitleDisabled": "Rekening moet een saldo van nul hebben om te sluiten",
       "closeTitleEnabled": "Rekening sluiten",
+      "closeTitleUnknownValue": "Het totaal van deze rekening kan niet worden bepaald, dus er kan niet worden bevestigd dat de rekening leeg is",
       "details": "Details"
     },
     "jointBadge": "Gezamenlijk",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Sluiten...",
     "deleteTitle": "Rekening verwijderen",
     "deleteMessage": "Weet je zeker dat je \"{name}\" definitief wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+    "deletePairMessage": "Weet je zeker dat je “{name}” permanent wilt verwijderen? Beide grootboeken worden verwijderd: “{brokerageName}” en “{cashName}”. Deze actie kan niet ongedaan worden gemaakt.",
     "deleteConfirm": "Rekening verwijderen",
     "deleteConfirmLoading": "Verwijderen..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Kostenpercentage",
     "fxFeePercentPlaceholder": "bijv. 2,5",
     "jointSharedWith": "Gezamenlijke rekening gedeeld met {count, plural, one {# persoon} other {# personen}}",
-    "jointManage": "Delen beheren"
+    "jointManage": "Delen beheren",
+    "cashSection": {
+      "title": "Contantenrekening",
+      "description": "Het grootboek waarin het geld van deze rekening staat. De naam volgt de rekeningnaam hierboven.",
+      "openingBalance": "Beginsaldo contanten",
+      "accountNumber": "Rekeningnummer contanten (optioneel)",
+      "descriptionField": "Omschrijving contanten (optioneel)"
+    }
   },
   "exportModal": {
     "title": "{name} exporteren",

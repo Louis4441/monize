@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "ऐसे खाते की मुद्रा नहीं बदली जा सकती जिसमें लेनदेन हैं।",
     "alreadyClosed": "खाता पहले से बंद है",
     "closeNonZeroBalance": "गैर-शून्य शेष वाला खाता बंद नहीं किया जा सकता। वर्तमान शेष: {{ currentBalance }}",
+    "closeWithHoldings": "ऐसा निवेश खाता बंद नहीं किया जा सकता जिसमें अब भी प्रतिभूतियाँ हैं। इसमें {{ holdingCount }} होल्डिंग शून्येतर मात्रा के साथ हैं; पहले उन्हें बेचें या स्थानांतरित करें।",
     "notClosed": "खाता बंद नहीं है",
     "modifyBalanceClosed": "बंद खाते का शेष संशोधित नहीं किया जा सकता",
     "deleteWithTransactions": "{{ transactionCount }} लेनदेन वाला खाता हटाया नहीं जा सकता। इसके बजाय खाता बंद करें।",

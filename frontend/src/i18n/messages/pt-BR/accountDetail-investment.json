@@ -6,5 +6,10 @@
     "realizedGains": "Ganhos Realizados",
     "ytd": "Ano até hoje",
     "empty": "Sem rendimentos de investimento este ano"
+  },
+  "register": {
+    "cashHeading": "Transações de caixa",
+    "newCashTransaction": "Nova transação de caixa",
+    "deleteFailed": "Falha ao excluir a transação"
   }
 }

@@ -6,5 +6,10 @@
     "realizedGains": "Gerealiseerde winsten",
     "ytd": "Jaar tot nu",
     "empty": "Dit jaar geen beleggingsinkomsten"
+  },
+  "register": {
+    "cashHeading": "Contante transacties",
+    "newCashTransaction": "Nieuwe contante transactie",
+    "deleteFailed": "Verwijderen van transactie mislukt"
   }
 }

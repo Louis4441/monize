@@ -6,5 +6,10 @@
     "realizedGains": "Realisierte Gewinne",
     "ytd": "Seit Jahresbeginn",
     "empty": "Keine Anlageerträge in diesem Jahr"
+  },
+  "register": {
+    "cashHeading": "Bargeldtransaktionen",
+    "newCashTransaction": "Neue Bargeldtransaktion",
+    "deleteFailed": "Transaktion konnte nicht gelöscht werden"
   }
 }

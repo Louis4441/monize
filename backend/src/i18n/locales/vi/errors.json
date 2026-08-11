@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "Không thể thay đổi tiền tệ của tài khoản đã có giao tác.",
     "alreadyClosed": "Tài khoản đã được đóng",
     "closeNonZeroBalance": "Không thể đóng tài khoản có số dư khác không. Số dư hiện tại: {{ currentBalance }}",
+    "closeWithHoldings": "Không thể đóng tài khoản đầu tư vẫn còn nắm giữ chứng khoán. Tài khoản có {{ holdingCount }} khoản nắm giữ với số lượng khác 0; hãy bán hoặc chuyển đi trước.",
     "notClosed": "Tài khoản chưa được đóng",
     "modifyBalanceClosed": "Không thể sửa đổi số dư của tài khoản đã đóng",
     "deleteWithTransactions": "Không thể xóa tài khoản có {{ transactionCount }} giao tác. Hãy đóng tài khoản thay thế.",

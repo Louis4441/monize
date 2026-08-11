@@ -55,6 +55,10 @@
     "statusActive": "Aktif",
     "statusClosed": "Kapalı",
     "marketValue": "Piyasa değeri",
+    "combinedBreakdown": "Yatırımlar {investments} · Nakit {cash}",
+    "combinedUnknown": "Toplam kullanılamıyor",
+    "combinedUnknownTooltip": "{count, plural, one {# varlığın fiyatı yok, bu nedenle bu hesabın toplamı hesaplanamıyor} other {# varlığın fiyatı yok, bu nedenle bu hesabın toplamı hesaplanamıyor}}",
+    "combinedUnknownNoPortfolio": "Varlıklar yüklenemedi, bu nedenle bu hesabın toplamı hesaplanamıyor",
     "limit": "Limit: {amount}",
     "pairedWith": "{name} ile eşleştirildi",
     "subtypeBrokerage": "Aracılık",
@@ -76,6 +80,7 @@
       "deleteTitle": "Hesabı kalıcı olarak sil (işlem yok)",
       "closeTitleDisabled": "Hesabı kapatmak için bakiyenin sıfır olması gerekir",
       "closeTitleEnabled": "Hesabı kapat",
+      "closeTitleUnknownValue": "Bu hesabın toplamı hesaplanamadığı için boş olduğu doğrulanamıyor",
       "details": "Ayrıntılar"
     },
     "jointBadge": "Ortak",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Kapatılıyor...",
     "deleteTitle": "Hesabı Sil",
     "deleteMessage": "\"{name}\" hesabını kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "deletePairMessage": "\"{name}\" hesabını kalıcı olarak silmek istediğinize emin misiniz? Her iki defter de silinir: \"{brokerageName}\" ve \"{cashName}\". Bu işlem geri alınamaz.",
     "deleteConfirm": "Hesabı Sil",
     "deleteConfirmLoading": "Siliniyor..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Ücret yüzdesi",
     "fxFeePercentPlaceholder": "örn. 2,5",
     "jointSharedWith": "{count, plural, other {# kişiyle}} paylaşılan ortak hesap",
-    "jointManage": "Paylaşımı yönet"
+    "jointManage": "Paylaşımı yönet",
+    "cashSection": {
+      "title": "Nakit hesabı",
+      "description": "Bu hesabın parasını tutan defter. Adı yukarıdaki hesap adını izler.",
+      "openingBalance": "Nakit Açılış Bakiyesi",
+      "accountNumber": "Nakit Hesap Numarası (isteğe bağlı)",
+      "descriptionField": "Nakit Açıklaması (isteğe bağlı)"
+    }
   },
   "exportModal": {
     "title": "{name} Dışa Aktar",

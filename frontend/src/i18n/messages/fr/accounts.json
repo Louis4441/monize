@@ -55,6 +55,10 @@
     "statusActive": "Actif",
     "statusClosed": "Clôturé",
     "marketValue": "Valeur de marché",
+    "combinedBreakdown": "Placements {investments} · Liquidités {cash}",
+    "combinedUnknown": "Total indisponible",
+    "combinedUnknownTooltip": "{count, plural, one {# position n'a pas de cours, le total de ce compte ne peut donc pas être calculé} other {# positions n'ont pas de cours, le total de ce compte ne peut donc pas être calculé}}",
+    "combinedUnknownNoPortfolio": "Les positions n'ont pas pu être chargées, le total de ce compte ne peut donc pas être calculé",
     "limit": "Limite : {amount}",
     "pairedWith": "Associé à {name}",
     "subtypeBrokerage": "Courtage",
@@ -76,6 +80,7 @@
       "deleteTitle": "Supprimer définitivement le compte (sans transactions)",
       "closeTitleDisabled": "Le solde du compte doit être nul pour le clôturer",
       "closeTitleEnabled": "Clôturer le compte",
+      "closeTitleUnknownValue": "Le total de ce compte ne peut pas être calculé, il est donc impossible de confirmer qu'il est vide",
       "details": "Détails"
     },
     "jointBadge": "Joint",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Clôture…",
     "deleteTitle": "Supprimer le compte",
     "deleteMessage": "Êtes-vous sûr de vouloir supprimer définitivement « {name} » ? Cette action est irréversible.",
+    "deletePairMessage": "Voulez-vous vraiment supprimer définitivement « {name} » ? Ses deux registres sont supprimés : « {brokerageName} » et « {cashName} ». Cette action est irréversible.",
     "deleteConfirm": "Supprimer le compte",
     "deleteConfirmLoading": "Suppression…"
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Pourcentage des frais",
     "fxFeePercentPlaceholder": "p. ex. 2,5",
     "jointSharedWith": "Compte joint partagé avec {count, plural, one {# personne} other {# personnes}}",
-    "jointManage": "Gérer le partage"
+    "jointManage": "Gérer le partage",
+    "cashSection": {
+      "title": "Compte de liquidités",
+      "description": "Le registre qui contient l'argent de ce compte. Son nom suit le nom du compte ci-dessus.",
+      "openingBalance": "Solde initial des liquidités",
+      "accountNumber": "Numéro du compte de liquidités (facultatif)",
+      "descriptionField": "Description des liquidités (facultatif)"
+    }
   },
   "exportModal": {
     "title": "Exporter {name}",

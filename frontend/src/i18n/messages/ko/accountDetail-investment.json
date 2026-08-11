@@ -6,5 +6,10 @@
     "realizedGains": "실현 손익",
     "ytd": "연초 이후",
     "empty": "올해 투자 수익이 없습니다"
+  },
+  "register": {
+    "cashHeading": "현금 거래",
+    "newCashTransaction": "새 현금 거래",
+    "deleteFailed": "거래를 삭제하지 못했습니다"
   }
 }

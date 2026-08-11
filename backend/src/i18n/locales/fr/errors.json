@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "Impossible de changer la devise d'un compte qui a des transactions.",
     "alreadyClosed": "Le compte est déjà fermé",
     "closeNonZeroBalance": "Impossible de fermer un compte avec un solde non nul. Solde actuel : {{ currentBalance }}",
+    "closeWithHoldings": "Impossible de fermer un compte de placement qui détient encore des titres. Il comporte {{ holdingCount }} position(s) avec une quantité non nulle ; vendez-les ou transférez-les d'abord.",
     "notClosed": "Le compte n'est pas fermé",
     "modifyBalanceClosed": "Impossible de modifier le solde d'un compte fermé",
     "deleteWithTransactions": "Impossible de supprimer un compte avec {{ transactionCount }} transaction(s). Fermez le compte à la place.",

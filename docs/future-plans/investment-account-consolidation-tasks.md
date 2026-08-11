@@ -38,24 +38,24 @@ merged task.
 
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
-| S1 | Design doc + this task list | -- | none | [x] (this document) |
-| A1 | `logical-accounts.ts` fold + `useLogicalAccounts.ts` + `useAccountOptionLabel` | S1 | inert | [ ] |
-| A2 | Backend `unpricedHoldingsCount` on `AccountHoldings` | S1 | inert | [ ] |
-| B1 | Symmetric close/reopen + holdings close guard | S1 | neutral | [ ] |
-| B2 | Pair rename propagation in `update()` | S1 | neutral | [ ] |
-| L1 | Account list: one row per pair (render only) | A1, A2 | neutral | [ ] |
-| L2 | Account list actions: reconcile/close/reopen/delete pair-aware | L1, B1 | neutral | [ ] |
-| D1 | Extract `InvestmentViewToggle.tsx`; swap `/investments` onto it | S1 | neutral | [ ] |
-| D2 | `InvestmentRegisterPanel.tsx` + mount in `InvestmentDetailView.tsx` | D1, A1 | neutral | [ ] |
-| D3 | Detail canonical URL + shell title + switcher fold | A1 | neutral | [ ] |
-| E1 | AccountForm investment-pair mode | A1, B2 | neutral | [ ] |
-| P1 | Picker + register labels through `useAccountOptionLabel` + guard scan | A1 | neutral | [ ] |
-| R1 | `ReportAccountMultiSelect` mode unification | A1 | neutral | [ ] |
-| R2 | `AccountBalancesReport` logical rows | A1, A2 | neutral | [ ] |
-| R3 | `FavouriteAccounts` card dedupe + dashboard count | A1, A2 | neutral | [ ] |
-| V1 | Playwright e2e journey | L2, D2, D3, E1, P1 | none | [ ] |
-| Q1 | Full-locale i18n pass (final acceptance commit) | all above | none | [ ] |
-| S2 | Docs as-built pass + contract note | all above | none | [ ] |
+| S1 | Design doc + this task list | -- | none | [x] |
+| A1 | `logical-accounts.ts` fold + `useLogicalAccounts.ts` + `useAccountOptionLabel` | S1 | inert | [x] |
+| A2 | Backend `unpricedHoldingsCount` on `AccountHoldings` | S1 | inert | [x] |
+| B1 | Symmetric close/reopen + holdings close guard | S1 | neutral | [x] |
+| B2 | Pair rename propagation in `update()` | S1 | neutral | [x] |
+| L1 | Account list: one row per pair (render only) | A1, A2 | neutral | [x] |
+| L2 | Account list actions: reconcile/close/reopen/delete pair-aware | L1, B1 | neutral | [x] |
+| D1 | Extract `InvestmentViewToggle.tsx`; swap `/investments` onto it | S1 | neutral | [x] |
+| D2 | `InvestmentRegisterPanel.tsx` + mount in `InvestmentDetailView.tsx` | D1, A1 | neutral | [x] |
+| D3 | Detail canonical URL + shell title + switcher fold | A1 | neutral | [x] |
+| E1 | AccountForm investment-pair mode | A1, B2 | neutral | [x] |
+| P1 | Picker + register labels through `useAccountOptionLabel` + guard scan | A1 | neutral | [x] |
+| R1 | `ReportAccountMultiSelect` mode unification | A1 | neutral | [x] |
+| R2 | `AccountBalancesReport` logical rows | A1, A2 | neutral | [x] |
+| R3 | `FavouriteAccounts` card dedupe + dashboard count | A1, A2 | neutral | [x] |
+| V1 | Playwright e2e journey | L2, D2, D3, E1, P1 | none | [x] |
+| Q1 | Full-locale i18n pass (final acceptance commit) | all above | none | [x] |
+| S2 | Docs as-built pass + contract note | all above | none | [x] |
 
 **Why A1/A2 precede every UI task:** every surface consumes the fold and the unpriced-holdings
 signal; landing them first (dark) means each UI task is a consumer-only diff. **Why B1 precedes
@@ -70,7 +70,7 @@ copy.
 
 ### A1 -- Logical-account fold
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/lib/logical-accounts.ts` (new), `frontend/src/lib/logical-accounts.test.ts`
 (new), `frontend/src/hooks/useLogicalAccounts.ts` (new), `frontend/src/lib/account-utils.ts`
@@ -97,7 +97,7 @@ existing `countLogicalAccounts` tests unchanged and green.
 
 ### A2 -- Backend unpriced-holdings count
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `backend/src/securities/portfolio-calculation.service.ts` (both `holdingsByAccount`
 build loops -- pair path and standalone path), `backend/src/securities/portfolio-calculation.service.spec.ts`,
@@ -113,7 +113,7 @@ all-priced account reports 0. Inert: nothing reads the field yet.
 
 ### B1 -- Symmetric close/reopen + holdings close guard
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `backend/src/accounts/accounts.service.ts` (`close()`, `reopen()`),
 `backend/src/accounts/accounts.service.spec.ts`, `backend/src/i18n/locales/en/errors.json`
@@ -135,7 +135,7 @@ the UI already implies, and the guard only refuses closes that were silently wro
 
 ### B2 -- Pair rename propagation
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `backend/src/accounts/accounts.service.ts` (`update()`; reuse the suffix helpers in
 `backend/src/accounts/account-name.util.ts`), `backend/src/accounts/accounts.service.spec.ts`.
@@ -153,7 +153,7 @@ currency/institution propagation specs stay green.
 
 ### L1 -- Account list: one row per pair (render only)
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/accounts/AccountList.tsx`,
 `frontend/src/components/accounts/AccountRow.tsx`, their tests
@@ -175,7 +175,7 @@ fixture (they already fold / already iterate raw accounts).
 
 ### L2 -- Pair-aware actions
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/accounts/AccountRow.tsx` (`buildAccountActions`),
 `frontend/src/components/accounts/AccountList.tsx` (action handlers + delete/close dialogs),
@@ -193,7 +193,7 @@ calls brokerage-first; an orphan brokerage row hides reconcile.
 
 ### D1 -- InvestmentViewToggle extraction
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/investments/InvestmentViewToggle.tsx` (new, + test),
 `frontend/src/app/investments/page.tsx` (replace both inline copies).
@@ -207,7 +207,7 @@ renders the same classes as before the extraction.
 
 ### D2 -- InvestmentRegisterPanel in the detail view
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/investments/InvestmentRegisterPanel.tsx` (new, + test),
 `frontend/src/components/accounts/investment-detail/InvestmentDetailView.tsx` (+ its test),
@@ -229,7 +229,7 @@ standalone scopes both tabs to itself; a create in either tab invalidates the ba
 
 ### D3 -- Canonical URL + shell fold
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/app/accounts/[id]/page.tsx`,
 `frontend/src/components/accounts/shared/AccountDetailShell.tsx`,
@@ -245,7 +245,7 @@ are untouched.
 
 ### E1 -- AccountForm pair mode
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/accounts/AccountForm.tsx` (+
 `frontend/src/components/accounts/AccountForm.test.tsx`),
@@ -265,7 +265,7 @@ Edit action at all** (the community branch's gap).
 
 ### P1 -- Picker + register labels
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/transactions/TransferTransactionFields.tsx`,
 `frontend/src/components/transactions/NormalTransactionFields.tsx`,
@@ -288,7 +288,7 @@ the brokerage half.
 
 ### R1 -- Report picker unification
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/reports/ReportAccountMultiSelect.tsx` (+ its test), callers:
 `frontend/src/components/reports/SectorWeightingsReport.tsx`,
@@ -312,7 +312,7 @@ portfolio mode, orphan cash only in transactions mode.
 
 ### R2 -- AccountBalancesReport logical rows
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/reports/AccountBalancesReport.tsx` (+ its test),
 `frontend/src/i18n/messages/en/reports.json` (caption strings if the accounts namespace is not
@@ -327,7 +327,7 @@ subtotal**.
 
 ### R3 -- Dashboard
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `frontend/src/components/dashboard/FavouriteAccounts.tsx` (+ its test),
 `frontend/src/app/dashboard/page.tsx` (investment count).
@@ -341,7 +341,7 @@ one pair + one standalone counts as 2 investment accounts (**regression -- fails
 
 ### V1 -- Playwright e2e journey
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `e2e/tests/investment-account-consolidation.spec.ts` (new; model on
 `e2e/tests/joint-accounts.spec.ts`).
@@ -356,7 +356,7 @@ row closes both halves -> Reopen restores both.
 
 ### Q1 -- Full-locale i18n pass (final acceptance commit)
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** every locale of each namespace touched by earlier tasks
 (`frontend/src/i18n/messages/{locale}/accounts.json`, `accountDetail-investment.json`,
@@ -373,7 +373,7 @@ pseudo-locales up to date.
 
 ### S2 -- Docs as-built pass
 
-- [ ] Status:
+- [x] Status: done (`claude/investment-account-consolidation-8x3lvz`)
 
 **Files:** `docs/future-plans/investment-account-consolidation.md` (truth tables to as-built),
 this file (statuses), `docs/financial-calculation-contract.md` (record `unpricedHoldingsCount`

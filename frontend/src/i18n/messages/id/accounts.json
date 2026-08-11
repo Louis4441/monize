@@ -55,6 +55,10 @@
     "statusActive": "Aktif",
     "statusClosed": "Ditutup",
     "marketValue": "Nilai pasar",
+    "combinedBreakdown": "Investasi {investments} · Kas {cash}",
+    "combinedUnknown": "Total tidak tersedia",
+    "combinedUnknownTooltip": "{count, plural, other {# kepemilikan tidak memiliki harga, sehingga total akun ini tidak dapat dihitung}}",
+    "combinedUnknownNoPortfolio": "Kepemilikan tidak dapat dimuat, sehingga total akun ini tidak dapat dihitung",
     "limit": "Batas: {amount}",
     "pairedWith": "Dipasangkan dengan {name}",
     "subtypeBrokerage": "Perantara",
@@ -76,6 +80,7 @@
       "deleteTitle": "Hapus akun secara permanen (tanpa transaksi)",
       "closeTitleDisabled": "Saldo akun harus nol untuk menutupnya",
       "closeTitleEnabled": "Tutup akun",
+      "closeTitleUnknownValue": "Total akun ini tidak dapat dihitung, sehingga tidak dapat dipastikan kosong",
       "details": "Detail"
     },
     "jointBadge": "Bersama",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "Menutup...",
     "deleteTitle": "Hapus Akun",
     "deleteMessage": "Apakah Anda yakin ingin menghapus \"{name}\" secara permanen? Tindakan ini tidak dapat dibatalkan.",
+    "deletePairMessage": "Yakin ingin menghapus \"{name}\" secara permanen? Kedua buku besarnya dihapus: \"{brokerageName}\" dan \"{cashName}\". Tindakan ini tidak dapat dibatalkan.",
     "deleteConfirm": "Hapus Akun",
     "deleteConfirmLoading": "Menghapus..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "Persentase biaya",
     "fxFeePercentPlaceholder": "mis. 2,5",
     "jointSharedWith": "Akun bersama dibagikan dengan {count, plural, other {# orang}}",
-    "jointManage": "Kelola berbagi"
+    "jointManage": "Kelola berbagi",
+    "cashSection": {
+      "title": "Akun kas",
+      "description": "Buku besar yang menyimpan uang akun ini. Namanya mengikuti nama akun di atas.",
+      "openingBalance": "Saldo Awal Kas",
+      "accountNumber": "Nomor Akun Kas (opsional)",
+      "descriptionField": "Deskripsi Kas (opsional)"
+    }
   },
   "exportModal": {
     "title": "Ekspor {name}",

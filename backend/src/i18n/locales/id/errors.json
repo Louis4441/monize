@@ -9,6 +9,7 @@
     "changeCurrencyWithTransactions": "Tidak dapat mengubah mata uang akun yang memiliki transaksi.",
     "alreadyClosed": "Akun sudah ditutup",
     "closeNonZeroBalance": "Tidak dapat menutup akun dengan saldo bukan nol. Saldo saat ini: {{ currentBalance }}",
+    "closeWithHoldings": "Tidak dapat menutup akun investasi yang masih memiliki efek. Akun ini memiliki {{ holdingCount }} kepemilikan dengan jumlah bukan nol; jual atau pindahkan terlebih dahulu.",
     "notClosed": "Akun belum ditutup",
     "modifyBalanceClosed": "Tidak dapat mengubah saldo akun yang sudah ditutup",
     "deleteWithTransactions": "Tidak dapat menghapus akun dengan {{ transactionCount }} transaksi. Tutup akun tersebut.",

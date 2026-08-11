@@ -55,6 +55,10 @@
     "statusActive": "활성",
     "statusClosed": "종료",
     "marketValue": "시장 가치",
+    "combinedBreakdown": "투자 {investments} · 현금 {cash}",
+    "combinedUnknown": "합계를 표시할 수 없음",
+    "combinedUnknownTooltip": "{count, plural, other {보유 종목 # 개에 가격이 없어 이 계좌의 합계를 계산할 수 없습니다}}",
+    "combinedUnknownNoPortfolio": "보유 종목을 불러오지 못해 이 계좌의 합계를 계산할 수 없습니다",
     "limit": "한도: {amount}",
     "pairedWith": "{name}과(와) 연결됨",
     "subtypeBrokerage": "증권사",
@@ -76,6 +80,7 @@
       "deleteTitle": "계정 영구 삭제 (거래 없음)",
       "closeTitleDisabled": "잔액이 0이어야 종료할 수 있습니다",
       "closeTitleEnabled": "계정 종료",
+      "closeTitleUnknownValue": "이 계좌의 합계를 계산할 수 없어 잔액이 0인지 확인할 수 없습니다",
       "details": "상세 정보"
     },
     "jointBadge": "공동",
@@ -96,6 +101,7 @@
     "closeConfirmLoading": "종료 중...",
     "deleteTitle": "계정 삭제",
     "deleteMessage": "\"{name}\"을(를) 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "deletePairMessage": "\"{name}\"을(를) 영구히 삭제하시겠습니까? 두 원장이 모두 삭제됩니다: \"{brokerageName}\" 및 \"{cashName}\". 이 작업은 취소할 수 없습니다.",
     "deleteConfirm": "계정 삭제",
     "deleteConfirmLoading": "삭제 중..."
   },
@@ -165,7 +171,14 @@
     "fxFeePercent": "수수료 비율",
     "fxFeePercentPlaceholder": "예: 2.5",
     "jointSharedWith": "{count, plural, other {#명}}과 공유된 공동 계좌",
-    "jointManage": "공유 관리"
+    "jointManage": "공유 관리",
+    "cashSection": {
+      "title": "현금 계좌",
+      "description": "이 계좌의 돈을 보관하는 원장입니다. 이름은 위의 계좌 이름을 따릅니다.",
+      "openingBalance": "현금 기초 잔액",
+      "accountNumber": "현금 계좌 번호 (선택 사항)",
+      "descriptionField": "현금 설명 (선택 사항)"
+    }
   },
   "exportModal": {
     "title": "{name} 내보내기",

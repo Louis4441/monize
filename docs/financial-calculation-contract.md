@@ -94,6 +94,16 @@ value may come from:
 - Multi-currency aggregation converts every component into the reporting
   currency before summing; a missing rate makes the affected component, and
   therefore the total, unknown.
+- **A per-account market value that swallowed its own nulls must ship the count
+  beside it.** `AccountHoldings.totalMarketValue` sums the priced holdings only,
+  which makes an account holding nothing and an account nothing could be priced
+  for look identical -- so a client could not tell a settled zero from an
+  unknown. `unpricedHoldingsCount` on the same object is what carries rule 1
+  across that boundary, and `buildLogicalAccounts` (frontend) reads the pair to
+  decide whether an investment account's combined value is a number or `null`.
+  Prefer emitting the total as `null`; where an existing consumer needs the
+  subtotal, name the subtotal and ship the count with it rather than leaving the
+  caller to guess.
 
 ## 5. Materialized derived results declare their inputs
 
