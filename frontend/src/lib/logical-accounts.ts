@@ -95,11 +95,18 @@ function combinedValueFor(
 
   if (holdingsAccountId === null) return cashComponent;
 
+  // A closed account is one the app required to be emptied first, and the
+  // portfolio deliberately does not report it. That is "no holdings to value",
+  // a settled answer -- not "could not value them" -- so it must not render as
+  // unknown. (Until task B1 lands, closing is only gated on the cash balance,
+  // so a brokerage closed with positions still reads as its cash alone.)
+  if (primary.isClosed) return cashComponent;
+
   // Holdings exist but nothing says what they are worth.
   if (!portfolio) return null;
 
   const marketValue = portfolio.marketValues.get(holdingsAccountId);
-  // The portfolio loaded and did not report this account at all, so its market
+  // The portfolio loaded and did not report this open account, so its market
   // value is unknown -- not zero.
   if (marketValue === undefined) return null;
 

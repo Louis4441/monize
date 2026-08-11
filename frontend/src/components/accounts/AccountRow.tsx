@@ -8,6 +8,7 @@ import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/
 import { RowActions } from '@/components/ui/row-actions/RowActions';
 import type { LongPressRowHandlers } from '@/hooks/useLongPress';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
+import type { LogicalAccount } from '@/lib/logical-accounts';
 
 export interface AccountActionLabels {
   viewTransactions: string;
@@ -163,7 +164,17 @@ export interface AccountRowProps {
   // Institution the account belongs to (for the brand icon). Undefined for
   // cashflow-only accounts, which render a neutral fallback badge.
   institution?: InstitutionLogoData;
+  /**
+   * The account as the user thinks of it. Supplied by the accounts list, where
+   * a linked brokerage/cash pair is one row: the row then shows the pair's
+   * combined value and its name without the " - Brokerage" suffix. Omitted by
+   * callers that render raw accounts, which keep the single-account
+   * presentation.
+   */
+  logical?: LogicalAccount;
   brokerageMarketValue: number | undefined;
+  /** How many of this account's holdings have no price. Drives the unknown-value tooltip. */
+  unpricedHoldingsCount?: number;
   defaultCurrency: string;
   formatCurrency: (amount: number | string | null | undefined, currency: string) => string;
   formatCurrencyBase: (value: number, currencyCode?: string) => string;
@@ -193,7 +204,9 @@ export const AccountRow = memo(function AccountRow({
   isDeletable,
   accountNameMap,
   institution,
+  logical,
   brokerageMarketValue,
+  unpricedHoldingsCount,
   defaultCurrency,
   formatCurrency,
   formatCurrencyBase,
@@ -212,6 +225,29 @@ export const AccountRow = memo(function AccountRow({
   onToggleNetWorthExclusion,
 }: AccountRowProps) {
   const t = useTranslations('accounts');
+  // A folded pair is one account with two ledgers behind it, so the row drops
+  // the pairing chrome (the chain-link icon and the "Paired with" line) that
+  // exists to explain two rows to each other, and shows the entity's name.
+  const isFolded = !!logical?.cash;
+  const displayName = logical?.displayName ?? account.name;
+  // Standalone and orphan-brokerage investment accounts hold securities too,
+  // so they get the same combined presentation -- the pair is not a special
+  // case, it is the case with two ledgers.
+  // Non-null exactly when this row should show a combined investment value.
+  const combined =
+    logical && logical.holdingsAccountId !== null ? logical : null;
+  const ownTotalBalance =
+    (Number(account.currentBalance) || 0) +
+    (Number(account.futureTransactionsSum) || 0);
+  const cashComponent = logical?.cash
+    ? (Number(logical.cash.currentBalance) || 0) +
+      (Number(logical.cash.futureTransactionsSum) || 0)
+    : ownTotalBalance;
+  const showPairingChrome =
+    !isFolded &&
+    !!account.linkedAccountId &&
+    (account.accountSubType === 'INVESTMENT_CASH' ||
+      account.accountSubType === 'INVESTMENT_BROKERAGE');
   const actions = buildAccountActions(account, isDeletable, actionLabels, {
     onDetails,
     onEdit,
@@ -229,9 +265,9 @@ export const AccountRow = memo(function AccountRow({
       <td className={`${cellPadding} ${account.isClosed ? 'opacity-50' : ''} max-w-[50vw] sm:max-w-[180px] md:max-w-none`}>
         <div
           className="text-left w-full"
-          title={account.linkedAccountId && (account.accountSubType === 'INVESTMENT_CASH' || account.accountSubType === 'INVESTMENT_BROKERAGE')
+          title={showPairingChrome && account.linkedAccountId
             ? `${account.name} — ${t('row.pairedWith', { name: accountNameMap.get(account.linkedAccountId) || 'linked account' })}`
-            : account.name}
+            : displayName}
         >
           <div className="flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
             {density !== 'dense' && (
@@ -278,7 +314,7 @@ export const AccountRow = memo(function AccountRow({
                 </svg>
               )
             )}
-            <span className="truncate">{account.name}</span>
+            <span className="truncate">{displayName}</span>
             {(account.isJoint || account.jointGranteeCount !== undefined) && (
               <span
                 className="ml-1.5 px-2 inline-flex flex-shrink-0 text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
@@ -293,13 +329,13 @@ export const AccountRow = memo(function AccountRow({
                 {t('row.jointBadge')}
               </span>
             )}
-            {density !== 'normal' && account.linkedAccountId && (account.accountSubType === 'INVESTMENT_CASH' || account.accountSubType === 'INVESTMENT_BROKERAGE') && (
+            {density !== 'normal' && showPairingChrome && (
               <svg className="w-3.5 h-3.5 ml-1 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
             )}
           </div>
-          {density === 'normal' && account.linkedAccountId && (account.accountSubType === 'INVESTMENT_CASH' || account.accountSubType === 'INVESTMENT_BROKERAGE') && (
+          {density === 'normal' && showPairingChrome && account.linkedAccountId && (
             <div className="text-xs text-gray-400 dark:text-gray-500 truncate flex items-center gap-1">
               <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -317,7 +353,7 @@ export const AccountRow = memo(function AccountRow({
               {t('row.jointSharedWith', { count: account.jointGranteeCount })}
             </div>
           )}
-          {density === 'normal' && account.description && !account.linkedAccountId && (
+          {density === 'normal' && account.description && !showPairingChrome && (
             <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{account.description}</div>
           )}
         </div>
@@ -328,7 +364,10 @@ export const AccountRow = memo(function AccountRow({
             account.accountType
           )}`}
         >
-          {account.accountSubType === 'INVESTMENT_BROKERAGE' ? t('row.subtypeBrokerage') :
+          {/* A folded pair is one investment account, so it takes the plain
+              type. An unfolded half still says which half it is. */}
+          {isFolded ? formatAccountType(account.accountType) :
+           account.accountSubType === 'INVESTMENT_BROKERAGE' ? t('row.subtypeBrokerage') :
            account.accountSubType === 'INVESTMENT_CASH' ? t('row.subtypeInvCash') :
            formatAccountType(account.accountType)}
         </span>
@@ -345,7 +384,49 @@ export const AccountRow = memo(function AccountRow({
         </span>
       </td>
       <td className={`${cellPadding} whitespace-nowrap text-right ${account.isClosed ? 'opacity-50' : ''}`}>
-        {account.accountSubType === 'INVESTMENT_BROKERAGE' && brokerageMarketValue !== undefined ? (
+        {combined ? (
+          combined.combinedValue === null ? (
+            /* Some component of the total is unknown. Showing the part we do
+               know -- the cash -- would read as the account's worth, so the
+               row says it cannot be worked out instead. */
+            <>
+              <div
+                className="text-sm font-medium text-gray-500 dark:text-gray-400"
+                title={
+                  unpricedHoldingsCount
+                    ? t('row.combinedUnknownTooltip', { count: unpricedHoldingsCount })
+                    : t('row.combinedUnknownNoPortfolio')
+                }
+              >
+                {'—'}
+              </div>
+              {density === 'normal' && (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('row.combinedUnknown')}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className={`text-sm font-medium ${gainLossColor(combined.combinedValue)}`}>
+                {formatCurrency(combined.combinedValue, account.currencyCode)}
+              </div>
+              {density === 'normal' && brokerageMarketValue !== undefined && (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('row.combinedBreakdown', {
+                    investments: formatCurrency(brokerageMarketValue, account.currencyCode),
+                    cash: formatCurrency(cashComponent, account.currencyCode),
+                  })}
+                </div>
+              )}
+              {density !== 'dense' && account.currencyCode !== defaultCurrency && (
+                <div className="text-xs text-gray-400 dark:text-gray-500">
+                  {'≈ '}{formatCurrencyBase(convertToDefault(combined.combinedValue, account.currencyCode), defaultCurrency)}
+                </div>
+              )}
+            </>
+          )
+        ) : account.accountSubType === 'INVESTMENT_BROKERAGE' && brokerageMarketValue !== undefined ? (
           <>
             <div className="text-sm font-medium text-green-600 dark:text-green-400">
               {formatCurrency(brokerageMarketValue, account.currencyCode)}

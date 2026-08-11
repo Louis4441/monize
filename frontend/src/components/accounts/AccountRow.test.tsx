@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { AccountRow, AccountRowProps, buildAccountActions } from './AccountRow';
+import type { LogicalAccount } from '@/lib/logical-accounts';
 import { Account } from '@/types/account';
 
 function createAccount(overrides: Partial<Account> = {}): Account {
@@ -1100,6 +1101,97 @@ describe('AccountRow', () => {
       expect(byKey.get('delete')?.hidden).toBe(false);
       // No handler -> the joint-only action never appears for own rows.
       expect(byKey.get('netWorthExclusion')?.hidden).toBe(true);
+    });
+  });
+  describe('a folded investment pair', () => {
+    const brokerage = createAccount({
+      id: 'brok',
+      name: 'TFSA - Brokerage',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_BROKERAGE',
+      linkedAccountId: 'cash',
+      currentBalance: 0,
+      description: null,
+    });
+    const cash = createAccount({
+      id: 'cash',
+      name: 'TFSA - Cash',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_CASH',
+      linkedAccountId: 'brok',
+      currentBalance: 3500,
+    });
+
+    const logical = (combinedValue: number | null): LogicalAccount => ({
+      id: 'brok',
+      primary: brokerage,
+      cash,
+      memberIds: ['brok', 'cash'],
+      displayName: 'TFSA',
+      isInvestment: true,
+      cashRegisterId: 'cash',
+      holdingsAccountId: 'brok',
+      combinedValue,
+    });
+
+    it('shows the entity name without the stored suffix', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: brokerage,
+          logical: logical(15500),
+          brokerageMarketValue: 12000,
+        }),
+      );
+
+      expect(screen.getByText('TFSA')).toBeInTheDocument();
+      expect(screen.queryByText('TFSA - Brokerage')).not.toBeInTheDocument();
+    });
+
+    it('shows the combined total and what it is made of', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: brokerage,
+          logical: logical(15500),
+          brokerageMarketValue: 12000,
+        }),
+      );
+
+      expect(screen.getByText('$15500.00')).toBeInTheDocument();
+      expect(
+        screen.getByText('Investments $12000.00 · Cash $3500.00'),
+      ).toBeInTheDocument();
+    });
+
+    it('drops the pairing chrome that existed to explain two rows', () => {
+      const props = createDefaultProps({
+        account: brokerage,
+        logical: logical(15500),
+        brokerageMarketValue: 12000,
+        accountNameMap: new Map([['cash', 'TFSA - Cash']]),
+      });
+      renderAccountRow(props);
+
+      expect(screen.queryByText(/Paired with/)).not.toBeInTheDocument();
+      expect(screen.getByText('Investment')).toBeInTheDocument();
+      expect(screen.queryByText('Brokerage')).not.toBeInTheDocument();
+    });
+
+    // Showing the cash it does know, in a total's place, would read as the
+    // account being worth that much.
+    it('shows no total when the combined value is unknown', () => {
+      renderAccountRow(
+        createDefaultProps({
+          account: brokerage,
+          logical: logical(null),
+          brokerageMarketValue: 9000,
+          unpricedHoldingsCount: 2,
+        }),
+      );
+
+      expect(screen.getByText('—')).toBeInTheDocument();
+      expect(screen.getByText('Total unavailable')).toBeInTheDocument();
+      expect(screen.queryByText('$3500.00')).not.toBeInTheDocument();
+      expect(screen.queryByText('$9000.00')).not.toBeInTheDocument();
     });
   });
 });

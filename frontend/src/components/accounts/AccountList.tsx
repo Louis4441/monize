@@ -18,7 +18,9 @@ import { useTableDensity, nextDensity, type DensityLevel } from '@/hooks/useTabl
 import { SortIcon } from '@/components/ui/SortIcon';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { formatAccountType, countLogicalAccounts } from '@/lib/account-utils';
+import { formatAccountType } from '@/lib/account-utils';
+import { buildLogicalAccounts, type LogicalAccount } from '@/lib/logical-accounts';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 
 type SortField = 'name' | 'type' | 'balance' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -92,15 +94,22 @@ interface AccountListProps {
   accounts: Account[];
   institutions?: Institution[];
   brokerageMarketValues?: Map<string, number>;
+  /**
+   * Holdings account id -> how many of its holdings have no price. An account
+   * with any unpriced holding has no knowable total, so its row says so rather
+   * than showing the cash it does know.
+   */
+  unpricedHoldingCounts?: Map<string, number>;
   defaultCurrency: string;
   convertToDefault: (value: number, fromCurrency: string) => number;
   onEdit: (account: Account) => void;
   onRefresh: () => void;
 }
 
-export function AccountList({ accounts, institutions, brokerageMarketValues, defaultCurrency, convertToDefault, onEdit, onRefresh }: AccountListProps) {
+export function AccountList({ accounts, institutions, brokerageMarketValues, unpricedHoldingCounts, defaultCurrency, convertToDefault, onEdit, onRefresh }: AccountListProps) {
   const t = useTranslations('accounts');
   const tc = useTranslations('common');
+  const stripAccountName = useMainAccountName();
   const router = useRouter();
   const isDelegateView = useAuthStore((s) => !!s.actingAsUserId);
   const { formatCurrency: formatCurrencyBase } = useNumberFormat();
@@ -254,60 +263,77 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
     setDensity(prev => nextDensity(prev));
   }, []);
 
-  // Filter and sort accounts
-  const filteredAndSortedAccounts = useMemo(() => {
-    let result = accounts.map((a) =>
+  // Every account as the user thinks of it: a linked brokerage/cash pair is one
+  // entry, so it filters, sorts, counts and renders as a single account.
+  const logicalAccounts = useMemo(() => {
+    const withOverrides = accounts.map((a) =>
       a.id in favOverrides
         ? { ...a, isFavourite: favOverrides[a.id] }
         : a,
     );
+    return buildLogicalAccounts(withOverrides, stripAccountName, {
+      marketValues: brokerageMarketValues ?? new Map(),
+      unpricedCounts: unpricedHoldingCounts ?? new Map(),
+    });
+  }, [accounts, favOverrides, stripAccountName, brokerageMarketValues, unpricedHoldingCounts]);
+
+  // Filter and sort logical accounts. Filters read the entity's primary row --
+  // the two halves of a pair share their type, status and sharing state.
+  const filteredAndSortedAccounts = useMemo(() => {
+    let result = logicalAccounts;
 
     // Apply filters
     if (filterStatus) {
-      result = result.filter((a) =>
-        filterStatus === 'active' ? !a.isClosed : a.isClosed
+      result = result.filter((l) =>
+        filterStatus === 'active' ? !l.primary.isClosed : l.primary.isClosed
       );
     }
     if (filterNetWorth) {
-      result = result.filter((a) =>
-        filterNetWorth === 'excluded' ? a.excludeFromNetWorth : !a.excludeFromNetWorth
+      result = result.filter((l) =>
+        filterNetWorth === 'excluded' ? l.primary.excludeFromNetWorth : !l.primary.excludeFromNetWorth
       );
     }
     if (filterJoint) {
-      result = result.filter((a) => !!a.isJoint);
+      result = result.filter((l) => !!l.primary.isJoint);
     }
     if (filterTypes.length > 0) {
       const typeSet = new Set(filterTypes);
-      result = result.filter((a) => typeSet.has(a.accountType));
+      result = result.filter((l) => typeSet.has(l.primary.accountType));
     }
     const search = filterSearch.trim().toLowerCase();
     if (search) {
-      result = result.filter((a) => a.name.toLowerCase().includes(search));
+      // Match the name the row shows and the stored name of either ledger, so
+      // searching "cash" or a suffix still finds the account it belongs to.
+      result = result.filter(
+        (l) =>
+          l.displayName.toLowerCase().includes(search) ||
+          l.primary.name.toLowerCase().includes(search) ||
+          !!l.cash?.name.toLowerCase().includes(search),
+      );
     }
 
     // Apply sorting
-    result.sort((a, b) => {
+    return [...result].sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
+          comparison = a.displayName.localeCompare(b.displayName);
           break;
         case 'type':
-          comparison = a.accountType.localeCompare(b.accountType);
+          comparison = a.primary.accountType.localeCompare(b.primary.accountType);
           break;
         case 'balance':
-          comparison = ((Number(a.currentBalance) || 0) + (Number(a.futureTransactionsSum) || 0)) -
-            ((Number(b.currentBalance) || 0) + (Number(b.futureTransactionsSum) || 0));
+          // Sort key only: an unknown total sorts as zero rather than being
+          // dropped from the list. What the row *shows* stays unknown.
+          comparison = (a.combinedValue ?? 0) - (b.combinedValue ?? 0);
           break;
         case 'status':
-          comparison = (a.isClosed ? 1 : 0) - (b.isClosed ? 1 : 0);
+          comparison = (a.primary.isClosed ? 1 : 0) - (b.primary.isClosed ? 1 : 0);
           break;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-
-    return result;
-  }, [accounts, favOverrides, filterStatus, filterNetWorth, filterJoint, filterTypes, filterSearch, sortField, sortDirection]);
+  }, [logicalAccounts, filterStatus, filterNetWorth, filterJoint, filterTypes, filterSearch, sortField, sortDirection]);
 
   // Account-type options for the type filter, limited to the types actually
   // present and ordered to match the grouped list below (unknown types last).
@@ -334,47 +360,20 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
     return map;
   }, [institutions]);
 
-  // Group accounts by account type. Within the INVESTMENT group, ensure linked
-  // brokerage/cash pairs are rendered adjacently (brokerage first).
+  // Group logical accounts by account type. A pair no longer needs adjacency
+  // ordering -- it is one entry.
   const groupedAccounts = useMemo(() => {
-    const groups = new Map<AccountType, Account[]>();
-    for (const account of filteredAndSortedAccounts) {
-      const existing = groups.get(account.accountType);
+    const groups = new Map<AccountType, LogicalAccount[]>();
+    for (const logical of filteredAndSortedAccounts) {
+      const existing = groups.get(logical.primary.accountType);
       if (existing) {
-        existing.push(account);
+        existing.push(logical);
       } else {
-        groups.set(account.accountType, [account]);
+        groups.set(logical.primary.accountType, [logical]);
       }
     }
 
-    const investments = groups.get('INVESTMENT');
-    if (investments && investments.length > 1) {
-      const byId = new Map(investments.map((a) => [a.id, a]));
-      const placed = new Set<string>();
-      const ordered: Account[] = [];
-      for (const account of investments) {
-        if (placed.has(account.id)) continue;
-        const partner = account.linkedAccountId
-          ? byId.get(account.linkedAccountId)
-          : undefined;
-        if (partner && !placed.has(partner.id)) {
-          // Brokerage first, then its paired cash account.
-          const brokerage =
-            account.accountSubType === 'INVESTMENT_BROKERAGE' ? account : partner;
-          const cash = brokerage === account ? partner : account;
-          ordered.push(brokerage);
-          ordered.push(cash);
-          placed.add(brokerage.id);
-          placed.add(cash.id);
-        } else {
-          ordered.push(account);
-          placed.add(account.id);
-        }
-      }
-      groups.set('INVESTMENT', ordered);
-    }
-
-    const result: { type: AccountType; accounts: Account[] }[] = [];
+    const result: { type: AccountType; accounts: LogicalAccount[] }[] = [];
     for (const type of ACCOUNT_TYPE_ORDER) {
       const list = groups.get(type);
       if (list && list.length > 0) {
@@ -393,19 +392,29 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
   // Brokerage accounts use their portfolio market value (matching the page
   // summary calculation) so net-worth math stays consistent with the cards
   // above the list.
+  // Summed over each entity's underlying ledgers, so the arithmetic is exactly
+  // what it was when the pair was two rows. Deliberately NOT `combinedValue`:
+  // that goes null on an unpriced holding, and a nullable group total has to be
+  // threaded through the summary cards above the list to mean anything -- a
+  // known gap recorded in the plan, not something this row total invents.
   const groupTotals = useMemo(() => {
     const totals = new Map<AccountType, number>();
     for (const { type, accounts: groupAccounts } of groupedAccounts) {
       let totalUnits = 0;
-      for (const account of groupAccounts) {
-        const rawBalance =
-          account.accountSubType === 'INVESTMENT_BROKERAGE'
-            ? brokerageMarketValues?.get(account.id) ?? 0
-            : (Number(account.currentBalance) || 0) +
-              (Number(account.futureTransactionsSum) || 0);
-        const converted = convertToDefault(rawBalance, account.currencyCode);
-        // Accumulate in 1/10000 units to avoid floating-point drift.
-        totalUnits += Math.round(converted * 10000);
+      for (const logical of groupAccounts) {
+        const members = logical.cash
+          ? [logical.primary, logical.cash]
+          : [logical.primary];
+        for (const account of members) {
+          const rawBalance =
+            account.accountSubType === 'INVESTMENT_BROKERAGE'
+              ? brokerageMarketValues?.get(account.id) ?? 0
+              : (Number(account.currentBalance) || 0) +
+                (Number(account.futureTransactionsSum) || 0);
+          const converted = convertToDefault(rawBalance, account.currencyCode);
+          // Accumulate in 1/10000 units to avoid floating-point drift.
+          totalUnits += Math.round(converted * 10000);
+        }
       }
       totals.set(type, totalUnits / 10000);
     }
@@ -417,7 +426,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
   const renderItems = useMemo(() => {
     type Item =
       | { kind: 'header'; type: AccountType; count: number; total: number; isCollapsed: boolean }
-      | { kind: 'row'; account: Account; index: number };
+      | { kind: 'row'; logical: LogicalAccount; index: number };
     const items: Item[] = [];
     let rowIndex = 0;
     for (const { type, accounts: groupAccounts } of groupedAccounts) {
@@ -425,13 +434,15 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
       items.push({
         kind: 'header',
         type,
-        count: countLogicalAccounts(groupAccounts),
+        // One entry per account the user has -- a pair counts once, which is
+        // what `countLogicalAccounts` counted when these were two rows.
+        count: groupAccounts.length,
         total: groupTotals.get(type) ?? 0,
         isCollapsed,
       });
       if (!isCollapsed) {
-        for (const account of groupAccounts) {
-          items.push({ kind: 'row', account, index: rowIndex });
+        for (const logical of groupAccounts) {
+          items.push({ kind: 'row', logical, index: rowIndex });
           rowIndex += 1;
         }
       }
@@ -732,7 +743,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
             </div>
           </div>
           <span className="text-sm text-gray-500 dark:text-gray-400">
-            {t('list.accountCount', { filtered: countLogicalAccounts(filteredAndSortedAccounts), total: countLogicalAccounts(accounts) })}
+            {t('list.accountCount', { filtered: filteredAndSortedAccounts.length, total: logicalAccounts.length })}
           </span>
         </div>
       </div>
@@ -855,15 +866,17 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
                 </tr>
               ) : (
                 <AccountRow
-                  key={item.account.id}
-                  account={item.account}
+                  key={item.logical.id}
+                  account={item.logical.primary}
+                  logical={item.logical}
                   index={item.index}
                   density={density}
                   cellPadding={cellPadding}
-                  isDeletable={deletableAccounts.has(item.account.id)}
+                  isDeletable={deletableAccounts.has(item.logical.id)}
                   accountNameMap={accountNameMap}
-                  institution={item.account.institutionId ? institutionsById.get(item.account.institutionId) : undefined}
-                  brokerageMarketValue={brokerageMarketValues?.get(item.account.id)}
+                  institution={item.logical.primary.institutionId ? institutionsById.get(item.logical.primary.institutionId) : undefined}
+                  brokerageMarketValue={item.logical.holdingsAccountId ? brokerageMarketValues?.get(item.logical.holdingsAccountId) : undefined}
+                  unpricedHoldingsCount={item.logical.holdingsAccountId ? unpricedHoldingCounts?.get(item.logical.holdingsAccountId) : undefined}
                   defaultCurrency={defaultCurrency}
                   formatCurrency={formatCurrency}
                   formatCurrencyBase={formatCurrencyBase}

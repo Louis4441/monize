@@ -242,6 +242,23 @@ describe('buildLogicalAccounts', () => {
       expect(result.combinedValue).toBe(3500);
     });
 
+    // The portfolio summary covers open accounts only, so a closed one is
+    // absent by design. Reading that absence as unknown would put an em-dash
+    // on every closed investment account.
+    it('is the cash balance for a closed account the portfolio does not cover', () => {
+      const [brokerage, cash] = pair('TFSA', {
+        cash: { currentBalance: 0, isClosed: true },
+      });
+
+      const [result] = buildLogicalAccounts(
+        [{ ...brokerage, isClosed: true }, cash],
+        strip,
+        portfolio({ 'other-brok': 5 }),
+      );
+
+      expect(result.combinedValue).toBe(0);
+    });
+
     it('adds a standalone account own balance to its market value', () => {
       const standalone = account('solo', {
         accountType: 'INVESTMENT',
