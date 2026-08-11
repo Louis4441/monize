@@ -11,7 +11,7 @@ import { PortfolioSummaryCard } from '@/components/investments/PortfolioSummaryC
 import { AssetAllocationChart } from '@/components/investments/AssetAllocationChart';
 import { InvestmentValueChart } from '@/components/investments/InvestmentValueChart';
 import { GroupedHoldingsList } from '@/components/investments/GroupedHoldingsList';
-import { InvestmentTransactionList } from '@/components/investments/InvestmentTransactionList';
+import { InvestmentRegisterPanel } from '@/components/investments/InvestmentRegisterPanel';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { InvestmentIncomePanel } from './InvestmentIncomePanel';
 import type { Account } from '@/types/account';
@@ -38,7 +38,6 @@ export function InvestmentDetailView({ account }: InvestmentDetailViewProps) {
   const [brokerage, setBrokerage] = useState<Account>(account);
   const [cash, setCash] = useState<Account | null>(null);
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
-  const [recentTx, setRecentTx] = useState<InvestmentTransaction[]>([]);
   const [dividendInterestYtd, setDividendInterestYtd] = useState(0);
   const [realizedGainsYtd, setRealizedGainsYtd] = useState(0);
   const [loadedForId, setLoadedForId] = useState<string | null>(null);
@@ -65,11 +64,8 @@ export function InvestmentDetailView({ account }: InvestmentDetailViewProps) {
       const today = format(now, 'yyyy-MM-dd');
       const yearStart = `${now.getFullYear()}-01-01`;
 
-      const [summaryData, recent, incomeTx, realized] = await Promise.all([
+      const [summaryData, incomeTx, realized] = await Promise.all([
         investmentsApi.getPortfolioSummary(ids).catch(() => null),
-        investmentsApi
-          .getTransactions({ accountIds: idsStr, page: 1, limit: 15 })
-          .catch(() => ({ data: [] as InvestmentTransaction[] })),
         investmentsApi
           .getTransactions({ accountIds: idsStr, startDate: yearStart, endDate: today, limit: 500 })
           .catch(() => ({ data: [] as InvestmentTransaction[] })),
@@ -82,7 +78,6 @@ export function InvestmentDetailView({ account }: InvestmentDetailViewProps) {
       setBrokerage(resolvedBrokerage);
       setCash(resolvedCash);
       setSummary(summaryData);
-      setRecentTx(recent.data);
       const income = incomeTx.data
         .filter((tx) => tx.action === 'DIVIDEND' || tx.action === 'INTEREST')
         .reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
@@ -97,7 +92,6 @@ export function InvestmentDetailView({ account }: InvestmentDetailViewProps) {
 
   const accountIds = cash ? [brokerage.id, cash.id] : [brokerage.id];
   const currency = brokerage.currencyCode;
-  const accountsForList = cash ? [brokerage, cash] : [brokerage];
 
   return (
     <div className="space-y-6">
@@ -141,10 +135,11 @@ export function InvestmentDetailView({ account }: InvestmentDetailViewProps) {
         isLoading={isLoading}
       />
 
-      <InvestmentTransactionList
-        transactions={recentTx}
-        accounts={accountsForList}
-        isLoading={isLoading}
+      {/* Both ledgers of this account, behind one toggle: the trades, and the
+          cash register that funds them. */}
+      <InvestmentRegisterPanel
+        holdingsAccount={brokerage}
+        cashAccount={cash}
       />
     </div>
   );

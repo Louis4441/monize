@@ -6,5 +6,10 @@
     "realizedGains": "[XX-Realized Gains-XX]",
     "ytd": "[XX-Year to date-XX]",
     "empty": "[XX-No investment income this year-XX]"
+  },
+  "register": {
+    "cashHeading": "[XX-Cash transactions-XX]",
+    "newCashTransaction": "[XX-New Cash Transaction-XX]",
+    "deleteFailed": "[XX-Failed to delete transaction-XX]"
   }
 }

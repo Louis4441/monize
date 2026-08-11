@@ -5,11 +5,19 @@ import { Account } from '@/types/account';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
-  usePathname: () => '/accounts/loan-1',
-  useParams: () => ({ id: 'loan-1' }),
-}));
+// One router for the run, as the real useRouter returns. Rebuilt per call it
+// changes identity every render, so every useCallback holding it does too --
+// and an effect depending on such a callback re-runs forever.
+vi.mock('next/navigation', () => {
+  // Built on first use, not in the factory body: vi.mock is hoisted above the
+  // consts it closes over.
+  let router: { push: typeof mockPush; replace: typeof mockReplace } | null = null;
+  return {
+    useRouter: () => (router ??= { push: mockPush, replace: mockReplace }),
+    usePathname: () => '/accounts/loan-1',
+    useParams: () => ({ id: 'loan-1' }),
+  };
+});
 
 vi.mock('@/store/authStore', () => ({
   useAuthStore: Object.assign(
@@ -317,5 +325,55 @@ describe('AccountDetailPage', () => {
       viewTransactions.click();
     });
     expect(mockPush).toHaveBeenCalledWith('/transactions?accountId=loan-1');
+  });
+  // A pair is one account, so it gets one URL. A link to the cash id -- an old
+  // bookmark, a deep link out of a register -- lands on the same page instead
+  // of a second one carrying its own switcher state and history entry.
+  it('sends a link to the cash half to the account canonical URL', async () => {
+    mockGetById.mockResolvedValue(makeAccount({
+      id: 'cash-1',
+      name: 'TFSA - Cash',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_CASH',
+      linkedAccountId: 'brok-1',
+    }));
+
+    await act(async () => {
+      render(<AccountDetailPage />);
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/accounts/brok-1');
+  });
+
+  it('stays put for the brokerage half, which is the canonical URL', async () => {
+    mockGetById.mockResolvedValue(makeAccount({
+      id: 'brok-1',
+      name: 'TFSA - Brokerage',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_BROKERAGE',
+      linkedAccountId: 'cash-1',
+    }));
+
+    await act(async () => {
+      render(<AccountDetailPage />);
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('stays put for an unpaired cash account, which has nowhere to redirect', async () => {
+    mockGetById.mockResolvedValue(makeAccount({
+      id: 'orphan-cash',
+      name: 'RRSP - Cash',
+      accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_CASH',
+      linkedAccountId: null,
+    }));
+
+    await act(async () => {
+      render(<AccountDetailPage />);
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });
