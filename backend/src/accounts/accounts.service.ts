@@ -33,7 +33,9 @@ import { tr } from "../i18n/translate";
 import {
   brokerageSuffix,
   cashSuffix,
+  pairHalfName,
   stripBrokerageSuffix,
+  stripPairSuffix,
 } from "./account-name.util";
 import { formatDateYMD, todayInTimezone, todayYMD } from "../common/date-utils";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
@@ -770,28 +772,54 @@ export class AccountsService {
         if (updateAccountDto.amortizationMonths !== undefined)
           account.amortizationMonths = updateAccountDto.amortizationMonths;
 
-        const saved = await m.save(account);
-
         // Keep a linked investment pair (cash <-> brokerage) in sync. Both halves
-        // represent one real-world account, so shared attributes -- currency and
-        // institution -- propagate to the partner automatically.
+        // represent one real-world account, so shared attributes -- currency,
+        // institution and the name -- propagate to the partner automatically.
         const currencyChanged = updateAccountDto.currencyCode !== undefined;
         const institutionChanged = updateAccountDto.institutionId !== undefined;
-        if (
-          (currencyChanged || institutionChanged) &&
+        const nameChanged = updateAccountDto.name !== undefined;
+        const linkedAccount =
+          (currencyChanged || institutionChanged || nameChanged) &&
           account.linkedAccountId &&
           account.accountType === AccountType.INVESTMENT
+            ? await m.findOne(Account, {
+                where: { id: account.linkedAccountId, userId },
+              })
+            : null;
+        let linkedChanged = false;
+
+        // A pair has one name, stored twice with different suffixes, so a
+        // rename re-derives both halves from the submitted base -- whichever
+        // half was addressed. The base is stripped first so a client sending
+        // either the bare name or a suffixed one lands in the same place
+        // instead of stacking a second suffix.
+        if (
+          nameChanged &&
+          linkedAccount &&
+          account.accountSubType &&
+          linkedAccount.accountSubType
         ) {
-          const linkedAccount = await m.findOne(Account, {
-            where: { id: account.linkedAccountId, userId },
-          });
-          if (linkedAccount) {
-            if (updateAccountDto.currencyCode !== undefined) {
-              linkedAccount.currencyCode = updateAccountDto.currencyCode;
-            }
-            if (updateAccountDto.institutionId !== undefined) {
-              linkedAccount.institutionId = updateAccountDto.institutionId;
-            }
+          const baseName = stripPairSuffix(account.name);
+          account.name = pairHalfName(baseName, account.accountSubType);
+          linkedAccount.name = pairHalfName(
+            baseName,
+            linkedAccount.accountSubType,
+          );
+          linkedChanged = true;
+        }
+
+        const saved = await m.save(account);
+
+        if (linkedAccount) {
+          if (updateAccountDto.currencyCode !== undefined) {
+            linkedAccount.currencyCode = updateAccountDto.currencyCode;
+            linkedChanged = true;
+          }
+          if (updateAccountDto.institutionId !== undefined) {
+            linkedAccount.institutionId = updateAccountDto.institutionId;
+            linkedChanged = true;
+          }
+          if (linkedChanged) {
             await m.save(linkedAccount);
           }
         }

@@ -2159,6 +2159,188 @@ describe("AccountsService", () => {
     });
   });
 
+  describe("update - renaming a pair", () => {
+    // An earlier test in this file spies on I18nContext without restoring it,
+    // so the ambient locale here depends on test order. Pin it rather than
+    // inherit it: which words the server appends is part of what these
+    // assertions are about.
+    beforeEach(() => {
+      const localized: Record<string, string> = {
+        "common.accountSuffix.cash": "Bargeld",
+        "common.accountSuffix.brokerage": "Depot",
+      };
+      jest.spyOn(I18nContext, "current").mockReturnValue({
+        t: (key: string) => localized[key] ?? key,
+      } as never);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    const half = (
+      id: string,
+      subType: AccountSubType,
+      name: string,
+      linkedTo: string,
+    ) => ({
+      ...mockAccount,
+      id,
+      name,
+      accountType: AccountType.INVESTMENT,
+      accountSubType: subType,
+      linkedAccountId: linkedTo,
+    });
+
+    // A pair is one account with one name, stored twice. Renaming only the
+    // half the user happened to open leaves the two disagreeing, and the row
+    // shows whichever half it is built from.
+    it("renames the cash half when the brokerage half is renamed", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        );
+
+      await service.update("user-1", "brok-1", { name: "RRSP" });
+
+      const [brokerageSave, cashSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+      expect(cashSave.id).toBe("cash-1");
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+    });
+
+    it("renames the brokerage half when the cash half is renamed", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        );
+
+      await service.update("user-1", "cash-1", { name: "RRSP" });
+
+      const [cashSave, brokerageSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+    });
+
+    // A client that sends the stored name back rather than the base must not
+    // end up with "RRSP - Brokerage - Brokerage".
+    it("does not stack a second suffix when sent an already suffixed name", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        );
+
+      await service.update("user-1", "brok-1", { name: "RRSP - Depot" });
+
+      const [brokerageSave, cashSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+    });
+
+    // The English words are stripped alongside the locale's, so a pair created
+    // before the user switched language still re-bases instead of keeping the
+    // old suffix inside the new base.
+    it("strips the English suffix too, not only the current locale's", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce(
+          half(
+            "brok-1",
+            AccountSubType.INVESTMENT_BROKERAGE,
+            "TFSA - Brokerage",
+            "cash-1",
+          ),
+        )
+        .mockResolvedValueOnce(
+          half(
+            "cash-1",
+            AccountSubType.INVESTMENT_CASH,
+            "TFSA - Cash",
+            "brok-1",
+          ),
+        );
+
+      await service.update("user-1", "brok-1", { name: "RRSP - Brokerage" });
+
+      const [brokerageSave, cashSave] =
+        mockQueryRunner.manager.save.mock.calls.map((c) => c[0]);
+      expect(brokerageSave.name).toBe("RRSP - Depot");
+      expect(cashSave.name).toBe("RRSP - Bargeld");
+    });
+
+    it("leaves a standalone investment account name exactly as submitted", async () => {
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+        ...mockAccount,
+        accountType: AccountType.INVESTMENT,
+        accountSubType: null,
+        linkedAccountId: null,
+      });
+
+      await service.update("user-1", "account-1", { name: "Self-directed" });
+
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.manager.save.mock.calls[0][0].name).toBe(
+        "Self-directed",
+      );
+    });
+
+    it("does not touch the partner when the rename is not part of the update", async () => {
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce(
+        half(
+          "brok-1",
+          AccountSubType.INVESTMENT_BROKERAGE,
+          "TFSA - Brokerage",
+          "cash-1",
+        ),
+      );
+
+      await service.update("user-1", "brok-1", { description: "notes" });
+
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("update - net worth recalculation", () => {
     it("triggers net worth recalc when openingBalance changes", async () => {
       mockQueryRunner.manager.findOne.mockResolvedValue({
