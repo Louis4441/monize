@@ -159,8 +159,13 @@ export function buildLogicalAccounts(
       const isBrokerage = primary.accountSubType === 'INVESTMENT_BROKERAGE';
       // Securities hang off a brokerage half, an orphan brokerage, or a
       // standalone investment account -- never off a cash ledger.
+      //
+      // The sub-type decides on its own where it is set: an account marked
+      // INVESTMENT_BROKERAGE holds securities whatever else it claims. Only a
+      // standalone account, which has no sub-type to go on, is identified by
+      // its type.
       const holdingsAccountId =
-        isInvestment && primary.accountSubType !== 'INVESTMENT_CASH'
+        isBrokerage || (isInvestment && primary.accountSubType == null)
           ? primary.id
           : null;
       // A brokerage with no cash half has no ledger the user posts money to.

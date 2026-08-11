@@ -33,8 +33,6 @@ const logger = createLogger('SecurityTypeAllocationReport');
 
 // Holdings are keyed off the brokerage sub-account, so offer those (the
 // sibling cash account is excluded from the picker).
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 type SecurityTypeSortField = 'label' | 'totalValue' | 'percentage' | 'count';
 
 const TYPE_COLOURS: Record<string, string> = {
@@ -262,7 +260,7 @@ export function SecurityTypeAllocationReport() {
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
-              filter={excludeCashAccounts}
+              mode="portfolio"
             />
           </div>
           <div className="flex gap-2 items-center">

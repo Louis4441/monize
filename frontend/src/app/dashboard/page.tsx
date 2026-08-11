@@ -21,6 +21,7 @@ import { investmentsApi } from '@/lib/investments';
 import { netWorthApi } from '@/lib/net-worth';
 import { invalidateCache } from '@/lib/apiCache';
 import { Account } from '@/types/account';
+import { countLogicalAccounts } from '@/lib/account-utils';
 import { Category } from '@/types/category';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { TopMover, PortfolioSummary, FavouriteSecurityQuote } from '@/types/investment';
@@ -74,6 +75,15 @@ function DashboardContent() {
     if (!portfolioSummary) return map;
     for (const accountHoldings of portfolioSummary.holdingsByAccount) {
       map.set(accountHoldings.accountId, accountHoldings.totalMarketValue);
+    }
+    return map;
+  }, [portfolioSummary]);
+
+  const unpricedHoldingCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!portfolioSummary) return map;
+    for (const accountHoldings of portfolioSummary.holdingsByAccount) {
+      map.set(accountHoldings.accountId, accountHoldings.unpricedHoldingsCount ?? 0);
     }
     return map;
   }, [portfolioSummary]);
@@ -154,7 +164,9 @@ function DashboardContent() {
       const investmentAccounts = accountsData.filter(
         (a: Account) => a.accountType === 'INVESTMENT' && !a.isClosed,
       );
-      const hasInvestmentAccounts = investmentAccounts.length > 0;
+      // A linked pair is one investment account, not two.
+      const investmentAccountCount = countLogicalAccounts(investmentAccounts);
+      const hasInvestmentAccounts = investmentAccountCount > 0;
       setHasInvestments(hasInvestmentAccounts);
 
       // Load investment data directly so it appears even when price refresh is
@@ -198,6 +210,7 @@ function DashboardContent() {
     favouriteSecurities,
     netWorthData,
     brokerageMarketValues,
+    unpricedHoldingCounts,
     isLoading,
     hasInvestments,
     hasSecurities,

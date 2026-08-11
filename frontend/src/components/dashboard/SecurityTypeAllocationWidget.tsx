@@ -19,8 +19,6 @@ import { SECURITY_TYPE_ALLOCATION_DEFAULT, AccountsConfig } from './widget-confi
 
 const WIDGET_ID = 'security-type-allocation';
 
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 const TYPE_COLOURS: Record<string, string> = {
   STOCK: CHART_SERIES[0],
   ETF: CHART_SERIES[1],
@@ -109,7 +107,7 @@ export function SecurityTypeAllocationWidget({
         accounts={investmentAccounts}
         value={config.accountIds}
         onChange={(accountIds) => updateConfig({ accountIds })}
-        filter={excludeCashAccounts}
+        mode="portfolio"
         className="w-full"
       />
     </WidgetConfigRow>

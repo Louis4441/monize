@@ -87,6 +87,8 @@ export interface DashboardWidgetContext {
   favouriteSecurities: FavouriteSecurityQuote[];
   netWorthData: MonthlyNetWorth[];
   brokerageMarketValues: Map<string, number>;
+  /** Holdings account id -> how many of its holdings have no price. */
+  unpricedHoldingCounts: Map<string, number>;
   isLoading: boolean;
   hasInvestments: boolean;
   hasSecurities: boolean;
@@ -128,6 +130,7 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
       <FavouriteAccounts
         accounts={ctx.accounts}
         brokerageMarketValues={ctx.brokerageMarketValues}
+        unpricedHoldingCounts={ctx.unpricedHoldingCounts}
         isLoading={ctx.isLoading}
         onAccountsChanged={ctx.onAccountsChanged}
       />

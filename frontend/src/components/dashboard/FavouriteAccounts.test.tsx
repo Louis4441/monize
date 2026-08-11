@@ -188,7 +188,7 @@ describe("FavouriteAccounts", () => {
     expect(screen.queryByText(/Settlement:/)).not.toBeInTheDocument();
   });
 
-  it("displays market value for brokerage accounts", () => {
+  it("says what an investment account card total is made of", () => {
     const accounts = [
       {
         id: "brok-1",
@@ -213,7 +213,9 @@ describe("FavouriteAccounts", () => {
       />
     );
     expect(screen.getByText("$25000.00")).toBeInTheDocument();
-    expect(screen.getByText("Market value")).toBeInTheDocument();
+    expect(
+      screen.getByText("Investments $25000.00 · Cash $0.00"),
+    ).toBeInTheDocument();
   });
 
   it("displays current balance for non-brokerage accounts even when market values provided", () => {
@@ -611,5 +613,90 @@ describe("FavouriteAccounts", () => {
       expect(screen.getByText("Reorder")).toBeInTheDocument();
       expect(screen.queryByTitle("Move up")).not.toBeInTheDocument();
     });
+  });
+  // Favouriting both halves is favouriting one account, so it gets one card --
+  // otherwise the same account appears twice under two names.
+  it("shows one card when both halves of a pair are favourited", () => {
+    const accounts = [
+      {
+        id: "brok-1",
+        name: "TFSA - Brokerage",
+        currentBalance: 0,
+        currencyCode: "CAD",
+        isFavourite: true,
+        favouriteSortOrder: 0,
+        isClosed: false,
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_BROKERAGE",
+        linkedAccountId: "cash-1",
+      },
+      {
+        id: "cash-1",
+        name: "TFSA - Cash",
+        currentBalance: 3500,
+        currencyCode: "CAD",
+        isFavourite: true,
+        favouriteSortOrder: 1,
+        isClosed: false,
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_CASH",
+        linkedAccountId: "brok-1",
+      },
+    ] as any[];
+
+    render(
+      <FavouriteAccounts
+        accounts={accounts}
+        brokerageMarketValues={new Map([["brok-1", 12000]])}
+        unpricedHoldingCounts={new Map([["brok-1", 0]])}
+        isLoading={false}
+      />
+    );
+
+    expect(screen.getAllByText("TFSA")).toHaveLength(1);
+    expect(screen.queryByText("TFSA - Cash")).not.toBeInTheDocument();
+    expect(screen.getByText("$15500.00")).toBeInTheDocument();
+  });
+
+  it("shows no total on a card whose holdings cannot all be priced", () => {
+    const accounts = [
+      {
+        id: "brok-1",
+        name: "TFSA - Brokerage",
+        currentBalance: 0,
+        currencyCode: "CAD",
+        isFavourite: true,
+        favouriteSortOrder: 0,
+        isClosed: false,
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_BROKERAGE",
+        linkedAccountId: "cash-1",
+      },
+      {
+        id: "cash-1",
+        name: "TFSA - Cash",
+        currentBalance: 3500,
+        currencyCode: "CAD",
+        isFavourite: false,
+        favouriteSortOrder: 1,
+        isClosed: false,
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_CASH",
+        linkedAccountId: "brok-1",
+      },
+    ] as any[];
+
+    render(
+      <FavouriteAccounts
+        accounts={accounts}
+        brokerageMarketValues={new Map([["brok-1", 9000]])}
+        unpricedHoldingCounts={new Map([["brok-1", 2]])}
+        isLoading={false}
+      />
+    );
+
+    expect(screen.getByText("Total unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("$3500.00")).not.toBeInTheDocument();
+    expect(screen.queryByText("$9000.00")).not.toBeInTheDocument();
   });
 });

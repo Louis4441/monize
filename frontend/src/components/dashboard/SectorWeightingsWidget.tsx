@@ -28,8 +28,6 @@ const WIDGET_ID = 'sector-weightings';
 
 // Holdings are keyed off the brokerage sub-account; the sibling cash account is
 // excluded from the picker.
-const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CASH';
-
 interface SectorWeightingsWidgetProps {
   accounts: Account[];
   isLoading: boolean;
@@ -75,7 +73,7 @@ export function SectorWeightingsWidget({ accounts, isLoading }: SectorWeightings
         accounts={investmentAccounts}
         value={config.accountIds}
         onChange={(accountIds) => updateConfig({ accountIds })}
-        filter={excludeCashAccounts}
+        mode="portfolio"
         className="w-full"
       />
     </WidgetConfigRow>

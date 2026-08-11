@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { gainLossColor } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Account } from '@/types/account';
+import { isInvestmentCashHalf } from '@/lib/account-utils';
+import { buildLogicalAccounts, type LogicalAccount } from '@/lib/logical-accounts';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { accountsApi } from '@/lib/accounts';
@@ -15,12 +18,16 @@ import { useDragReorder, DropIndicatorLine } from '@/hooks/useDragReorder';
 interface FavouriteAccountsProps {
   accounts: Account[];
   brokerageMarketValues?: Map<string, number>;
+  /** Holdings account id -> how many of its holdings have no price. */
+  unpricedHoldingCounts?: Map<string, number>;
   isLoading: boolean;
   onAccountsChanged?: () => void;
 }
 
-export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, onAccountsChanged: _onAccountsChanged }: FavouriteAccountsProps) {
+export function FavouriteAccounts({ accounts, brokerageMarketValues, unpricedHoldingCounts, isLoading, onAccountsChanged: _onAccountsChanged }: FavouriteAccountsProps) {
+  const mainAccountName = useMainAccountName();
   const t = useTranslations('dashboard');
+  const tAccounts = useTranslations('accounts');
   const router = useRouter();
   const preferences = usePreferencesStore((s) => s.preferences);
   const { formatCurrency: formatCurrencyBase } = useNumberFormat();
@@ -31,9 +38,33 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
   // Invalidate local order when parent accounts reference changes
   const effectiveLocalOrder = localOrder?.accounts === accounts ? localOrder.order : null;
 
+  // The entity each card stands for, keyed by either of its ledger ids, so a
+  // card knows the account's name and what it is worth across both halves.
+  const logicalByMemberId = useMemo(() => {
+    const map = new Map<string, LogicalAccount>();
+    for (const logical of buildLogicalAccounts(accounts, mainAccountName, {
+      marketValues: brokerageMarketValues ?? new Map(),
+      unpricedCounts: unpricedHoldingCounts ?? new Map(),
+    })) {
+      for (const id of logical.memberIds) map.set(id, logical);
+    }
+    return map;
+  }, [accounts, mainAccountName, brokerageMarketValues, unpricedHoldingCounts]);
+
+  // Favouriting both halves of a pair is favouriting one account, so it gets
+  // one card -- the brokerage half stands for the entity.
+  const favouritedIds = useMemo(
+    () => new Set(accounts.filter((a) => a.isFavourite && !a.isClosed).map((a) => a.id)),
+    [accounts],
+  );
+
   const favouriteAccounts = effectiveLocalOrder ??
     [...accounts]
       .filter((a) => a.isFavourite && !a.isClosed)
+      .filter(
+        (a) =>
+          !(isInvestmentCashHalf(a) && favouritedIds.has(a.linkedAccountId!)),
+      )
       .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder);
 
   /**
@@ -42,10 +73,12 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
    */
   const navigateTo = (account: Account) => () => {
     if (reordering) return;
+    const logical = logicalByMemberId.get(account.id);
+    const target = logical?.primary ?? account;
     router.push(
-      account.accountSubType === 'INVESTMENT_BROKERAGE'
-        ? `/investments?accountId=${account.id}`
-        : `/transactions?accountId=${account.id}`,
+      target.accountSubType === 'INVESTMENT_BROKERAGE'
+        ? `/investments?accountId=${target.id}`
+        : `/transactions?accountId=${target.id}`,
     );
   };
 
@@ -65,6 +98,19 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
       const current = effectiveLocalOrder ??
         [...accounts]
           .filter((a) => a.isFavourite && !a.isClosed)
+          .filter(
+            (a) =>
+              !(
+                isInvestmentCashHalf(a) &&
+                a.linkedAccountId !== null &&
+                accounts.some(
+                  (other) =>
+                    other.id === a.linkedAccountId &&
+                    other.isFavourite &&
+                    !other.isClosed,
+                )
+              ),
+          )
           .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder);
 
       if (from === to || to < 0 || to >= current.length) return;
@@ -233,7 +279,9 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
                 </svg>
                 <div className="min-w-0">
                   <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                    {account.name}
+                    {/* The account, not the ledger: a pair's stored names carry
+                        a suffix the user never chose. */}
+                    {logicalByMemberId.get(account.id)?.displayName ?? account.name}
                   </div>
                   {account.institution && (
                     <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -243,12 +291,28 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
                 </div>
               </div>
               {(() => {
-                const brokerageMarketValue = account.accountSubType === 'INVESTMENT_BROKERAGE'
-                  ? brokerageMarketValues?.get(account.id)
+                const logical = logicalByMemberId.get(account.id);
+                const holdsSecurities = !!logical?.holdingsAccountId;
+                const combined = logical?.combinedValue ?? null;
+                if (holdsSecurities && combined === null) {
+                  // Showing the cash we do know, in a total's place, would read
+                  // as the account being worth that much.
+                  return (
+                    <div className="text-right ml-2">
+                      <div className="font-semibold whitespace-nowrap text-gray-500 dark:text-gray-400">
+                        {'\u2014'}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {tAccounts('row.combinedUnknown')}
+                      </div>
+                    </div>
+                  );
+                }
+                const marketValue = logical?.holdingsAccountId
+                  ? brokerageMarketValues?.get(logical.holdingsAccountId)
                   : undefined;
-                const displayValue = brokerageMarketValue !== undefined
-                  ? brokerageMarketValue
-                  : (Number(account.currentBalance) || 0) + (Number(account.futureTransactionsSum) || 0);
+                const displayValue = combined ??
+                  (Number(account.currentBalance) || 0) + (Number(account.futureTransactionsSum) || 0);
                 return (
                   <div className="text-right ml-2">
                     <div
@@ -258,9 +322,19 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
                     >
                       {formatCurrency(displayValue, account.currencyCode)}
                     </div>
-                    {brokerageMarketValue !== undefined && (
+                    {holdsSecurities && marketValue !== undefined && (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {t('favouriteAccounts.marketValue')}
+                        {tAccounts('row.combinedBreakdown', {
+                          investments: formatCurrency(marketValue, account.currencyCode),
+                          cash: formatCurrency(
+                            logical?.cash
+                              ? (Number(logical.cash.currentBalance) || 0) +
+                                  (Number(logical.cash.futureTransactionsSum) || 0)
+                              : (Number(account.currentBalance) || 0) +
+                                  (Number(account.futureTransactionsSum) || 0),
+                            account.currencyCode,
+                          ),
+                        })}
                       </div>
                     )}
                   </div>

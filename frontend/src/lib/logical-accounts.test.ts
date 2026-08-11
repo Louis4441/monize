@@ -129,6 +129,20 @@ describe('buildLogicalAccounts', () => {
       expect(result.holdingsAccountId).toBe('solo');
     });
 
+    // A row marked INVESTMENT_BROKERAGE holds securities whatever else it
+    // claims; only a standalone account, with no sub-type to go on, needs its
+    // type read.
+    it('identifies a brokerage by its sub-type alone', () => {
+      const brokerage = account('brok', {
+        accountType: 'CHEQUING',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+      });
+
+      const [result] = buildLogicalAccounts([brokerage], strip);
+
+      expect(result.holdingsAccountId).toBe('brok');
+    });
+
     it('gives an orphan brokerage holdings but no cash ledger to post to', () => {
       const orphan = account('orphan-brok', {
         accountType: 'INVESTMENT',

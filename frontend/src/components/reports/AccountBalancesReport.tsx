@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -8,6 +8,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { accountsApi } from '@/lib/accounts';
 import { investmentsApi } from '@/lib/investments';
 import { Account } from '@/types/account';
+import { buildLogicalAccounts, type LogicalAccount } from '@/lib/logical-accounts';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { PortfolioSummary } from '@/types/investment';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -25,6 +27,7 @@ const LIABILITY_TYPES = ['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'];
 
 export function AccountBalancesReport() {
   const t = useTranslations('reports');
+  const tAccounts = useTranslations('accounts');
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
   const { convertToDefault, defaultCurrency } = useExchangeRates();
@@ -66,11 +69,22 @@ export function AccountBalancesReport() {
   // Build a map of brokerage account ID -> market value of holdings only.
   // Cash balance is tracked separately via the linked INVESTMENT_CASH account
   // to avoid double-counting in the net worth summary.
+  const mainAccountName = useMainAccountName();
+
   const brokerageMarketValues = useMemo(() => {
     const map = new Map<string, number>();
     if (!portfolioSummary) return map;
     for (const accountHoldings of portfolioSummary.holdingsByAccount) {
       map.set(accountHoldings.accountId, accountHoldings.totalMarketValue);
+    }
+    return map;
+  }, [portfolioSummary]);
+
+  const unpricedHoldingCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!portfolioSummary) return map;
+    for (const accountHoldings of portfolioSummary.holdingsByAccount) {
+      map.set(accountHoldings.accountId, accountHoldings.unpricedHoldingsCount ?? 0);
     }
     return map;
   }, [portfolioSummary]);
@@ -87,32 +101,39 @@ export function AccountBalancesReport() {
     });
   }, [accounts, typeFilter]);
 
-  const groupedAccounts = useMemo(() => {
-    const groups = new Map<string, Account[]>();
+  // A linked brokerage/cash pair is one account, so it is one row here -- with
+  // one value covering both ledgers, rather than a market value and a cash
+  // balance listed as though they were separate accounts.
+  const logicalAccounts = useMemo(
+    () =>
+      buildLogicalAccounts(filteredAccounts, mainAccountName, {
+        marketValues: brokerageMarketValues,
+        unpricedCounts: unpricedHoldingCounts,
+      }),
+    [filteredAccounts, mainAccountName, brokerageMarketValues, unpricedHoldingCounts],
+  );
 
-    filteredAccounts.forEach((acc) => {
-      const type = acc.accountType || 'OTHER';
+  const groupedAccounts = useMemo(() => {
+    const groups = new Map<string, LogicalAccount[]>();
+
+    logicalAccounts.forEach((logical) => {
+      const type = logical.primary.accountType || 'OTHER';
       if (!groups.has(type)) {
         groups.set(type, []);
       }
-      groups.get(type)!.push(acc);
+      groups.get(type)!.push(logical);
     });
 
-    // Sort accounts within each group by effective balance
-    groups.forEach((accs) => {
-      accs.sort((a, b) => {
-        const balA = a.accountSubType === 'INVESTMENT_BROKERAGE'
-          ? (brokerageMarketValues.get(a.id) ?? 0)
-          : Math.abs((Number(a.currentBalance) || 0) + (Number(a.futureTransactionsSum) || 0));
-        const balB = b.accountSubType === 'INVESTMENT_BROKERAGE'
-          ? (brokerageMarketValues.get(b.id) ?? 0)
-          : Math.abs((Number(b.currentBalance) || 0) + (Number(b.futureTransactionsSum) || 0));
-        return balB - balA;
-      });
+    // Sort accounts within each group by value. An unknown total sorts as zero
+    // -- a sort key only; what the row shows stays unknown.
+    groups.forEach((entries) => {
+      entries.sort(
+        (a, b) => Math.abs(b.combinedValue ?? 0) - Math.abs(a.combinedValue ?? 0),
+      );
     });
 
     return groups;
-  }, [filteredAccounts, brokerageMarketValues]);
+  }, [logicalAccounts]);
 
   const totals = useMemo(() => {
     let assets = 0;
@@ -134,21 +155,20 @@ export function AccountBalancesReport() {
     return { assets, liabilities, netWorth: assets - liabilities };
   }, [filteredAccounts, brokerageMarketValues, convertToDefault]);
 
-  // Helper to get effective balance for an account (includes future-dated transactions)
-  const getEffectiveBalance = useCallback((acc: Account): number => {
-    return acc.accountSubType === 'INVESTMENT_BROKERAGE'
-      ? (brokerageMarketValues.get(acc.id) ?? 0)
-      : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0);
-  }, [brokerageMarketValues]);
-
   // Build chart data
   const chartData = useMemo(() => {
     if (chartGrouping === 'type') {
       const data: Array<{ name: string; value: number; color: string }> = [];
       let colorIdx = 0;
-      groupedAccounts.forEach((accs, type) => {
-        const total = accs.reduce((sum, acc) => {
-          return sum + Math.abs(convertToDefault(getEffectiveBalance(acc), acc.currencyCode));
+      groupedAccounts.forEach((entries, type) => {
+        const total = entries.reduce((sum, entry) => {
+          if (entry.combinedValue === null) return sum;
+          return (
+            sum +
+            Math.abs(
+              convertToDefault(entry.combinedValue, entry.primary.currencyCode),
+            )
+          );
         }, 0);
         if (total > 0) {
           data.push({
@@ -162,11 +182,14 @@ export function AccountBalancesReport() {
       return data.sort((a, b) => b.value - a.value);
     } else {
       const data: Array<{ name: string; value: number; color: string }> = [];
-      filteredAccounts.forEach((acc, idx) => {
-        const converted = Math.abs(convertToDefault(getEffectiveBalance(acc), acc.currencyCode));
+      logicalAccounts.forEach((entry, idx) => {
+        if (entry.combinedValue === null) return;
+        const converted = Math.abs(
+          convertToDefault(entry.combinedValue, entry.primary.currencyCode),
+        );
         if (converted > 0) {
           data.push({
-            name: acc.name,
+            name: entry.displayName,
             value: converted,
             color: CHART_COLOURS[idx % CHART_COLOURS.length],
           });
@@ -174,7 +197,7 @@ export function AccountBalancesReport() {
       });
       return data.sort((a, b) => b.value - a.value);
     }
-  }, [chartGrouping, groupedAccounts, filteredAccounts, convertToDefault, getEffectiveBalance, accountTypeLabels]);
+  }, [chartGrouping, groupedAccounts, logicalAccounts, convertToDefault, accountTypeLabels]);
 
   const chartTotal = useMemo(() => {
     return chartData.reduce((sum, d) => sum + d.value, 0);
@@ -211,10 +234,13 @@ export function AccountBalancesReport() {
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     const headers = [t('accountBalances.colAccount'), t('accountBalances.colType'), t('accountBalances.colBalance')];
-    const rows = filteredAccounts.map(acc => [
-      acc.name,
-      accountTypeLabels[acc.accountType] || acc.accountType,
-      formatCurrency(getEffectiveBalance(acc), acc.currencyCode),
+    const rows = logicalAccounts.map(entry => [
+      entry.displayName,
+      accountTypeLabels[entry.primary.accountType] || entry.primary.accountType,
+      // An unknown total is exported as unknown, not as the part we do know.
+      entry.combinedValue === null
+        ? tAccounts('row.combinedUnknown')
+        : formatCurrency(entry.combinedValue, entry.primary.currencyCode),
     ]);
     await exportToPdf({
       title: t('accountBalances.pdfTitle'),
@@ -407,13 +433,20 @@ export function AccountBalancesReport() {
       {/* Table View - Account Groups */}
       {viewMode === 'table' && (
         <>
-          {Array.from(groupedAccounts.entries()).map(([type, accs]) => {
+          {Array.from(groupedAccounts.entries()).map(([type, entries]) => {
             const isLiabilityGroup = LIABILITY_TYPES.includes(type);
-            const groupTotal = accs.reduce((sum, acc) => {
-              const rawBalance = acc.accountSubType === 'INVESTMENT_BROKERAGE'
-                ? (brokerageMarketValues.get(acc.id) ?? 0)
-                : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0);
-              return sum + convertToDefault(rawBalance, acc.currencyCode);
+            // Summed over the underlying ledgers, so the arithmetic is what it
+            // was when the pair was two rows. Deliberately not combinedValue,
+            // which goes null on an unpriced holding: a nullable group total
+            // has to be threaded through the summary cards to mean anything.
+            const groupTotal = entries.reduce((sum, entry) => {
+              const members = entry.cash ? [entry.primary, entry.cash] : [entry.primary];
+              return sum + members.reduce((memberSum, acc) => {
+                const rawBalance = acc.accountSubType === 'INVESTMENT_BROKERAGE'
+                  ? (brokerageMarketValues.get(acc.id) ?? 0)
+                  : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0);
+                return memberSum + convertToDefault(rawBalance, acc.currencyCode);
+              }, 0);
             }, 0);
 
             return (
@@ -429,47 +462,71 @@ export function AccountBalancesReport() {
                   </span>
                 </div>
                 <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {accs.map((acc) => {
+                  {entries.map((entry) => {
+                    const acc = entry.primary;
                     const isBrokerage = acc.accountSubType === 'INVESTMENT_BROKERAGE';
-                    const effectiveBalance = isBrokerage
-                      ? (brokerageMarketValues.get(acc.id) ?? 0)
+                    const combined = entry.combinedValue;
+                    const marketValue = entry.holdingsAccountId
+                      ? brokerageMarketValues.get(entry.holdingsAccountId)
+                      : undefined;
+                    const cashComponent = entry.cash
+                      ? (Number(entry.cash.currentBalance) || 0) +
+                        (Number(entry.cash.futureTransactionsSum) || 0)
                       : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0);
                     return (
                       <button
-                        key={acc.id}
+                        key={entry.id}
                         onClick={() => isBrokerage ? router.push('/investments') : handleAccountClick(acc.id)}
                         className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
                       >
                         <div>
                           <div className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            {acc.name}
+                            {entry.displayName}
                             {acc.isClosed && (
                               <span className="px-2 py-0.5 text-xs bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded">
                                 {t('accountBalances.closed')}
                               </span>
                             )}
                           </div>
-                          {isBrokerage && (
+                          {entry.holdingsAccountId && marketValue !== undefined && combined !== null && (
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {t('accountBalances.marketValue')}
+                              {tAccounts('row.combinedBreakdown', {
+                                investments: formatCurrency(marketValue, acc.currencyCode),
+                                cash: formatCurrency(cashComponent, acc.currencyCode),
+                              })}
                             </div>
                           )}
-                          {!isBrokerage && acc.description && (
+                          {!entry.holdingsAccountId && acc.description && (
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               {acc.description}
                             </div>
                           )}
                         </div>
                         <div className="text-right">
-                          <div className={`font-semibold ${
-                            isLiabilityGroup ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                          }`}>
-                            {formatCurrency(isLiabilityGroup ? Math.abs(effectiveBalance) : effectiveBalance, acc.currencyCode)}
-                          </div>
-                          {acc.currencyCode !== defaultCurrency && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              {'\u2248 '}{formatCurrency(convertToDefault(Math.abs(effectiveBalance), acc.currencyCode), defaultCurrency)}
-                            </div>
+                          {combined === null ? (
+                            /* Some component of the total is unknown, so the row
+                               says so rather than showing the part it does know. */
+                            <>
+                              <div className="font-semibold text-gray-500 dark:text-gray-400">
+                                {'\u2014'}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {tAccounts('row.combinedUnknown')}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className={`font-semibold ${
+                                isLiabilityGroup ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                              }`}>
+                                {formatCurrency(isLiabilityGroup ? Math.abs(combined) : combined, acc.currencyCode)}
+                              </div>
+                              {acc.currencyCode !== defaultCurrency && (
+                                <div className="text-xs text-gray-400 dark:text-gray-500">
+                                  {'\u2248 '}{formatCurrency(convertToDefault(Math.abs(combined), acc.currencyCode), defaultCurrency)}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </button>
