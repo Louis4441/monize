@@ -60,6 +60,26 @@ ended. Two rules follow, and both were broken at once:
   calculation depends on needs a writer on the recurring path, not only on the
   manual one.
 
+The newest session is the one case where a writer with no adjusted close of
+its own may still supply one: **the adjustment factor of the latest bar is 1**,
+because nothing has gone ex after it, which is why a provider reports its last
+bar's adjusted close as equal to its close. So the quote path fills
+`adjusted_close` with the close it is already writing, and today is in the
+series from the first intraday refresh rather than from the evening's
+settlement. Two conditions on that, both enforced in the statement rather than
+by convention:
+
+- **Only where the series already carries an adjusted close.** Completing a
+  basis is not the same as changing one. A provider that supplies none (MSN)
+  leaves a series raw throughout, which is consistent and complete; one
+  inferred adjusted row flips `bool_or(...)` and collapses that entire series
+  to that single row -- a worse failure than the gap being fixed.
+- **Only for the session the quote is for.** The inference is about the newest
+  bar and nothing else. A price for an arbitrary past date -- a manual entry, a
+  transaction-derived price -- has an adjustment factor we do not know, and
+  must not pretend to. Such a row stays out of the adjusted series, which is
+  the correct answer to "what was this worth, adjusted?" when nobody knows.
+
 ## 2. Quote age and period boundaries
 
 - A price used to value a period boundary (period start, period end, or

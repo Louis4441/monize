@@ -466,9 +466,25 @@ Three rules, each with a test rather than a paragraph:
   not degrade to raw prices -- it silently truncated every return series at the
   last backfill date.
 
+The quote path fills `adjusted_close` with the close it is writing, so today is
+in the series from the first intraday refresh rather than only after
+settlement. That is definitional, not a guess -- the newest session's
+adjustment factor is 1 -- but it holds *only* for the newest session, and only
+where the series already carries an adjusted close. Both conditions live in the
+`CASE ... EXISTS` inside the statement, because the second one is not obvious:
+an MSN-priced series has no adjusted closes anywhere, and giving it exactly one
+flips `bool_or(...)` and collapses the series to that single row.
+
 A daily bar is also not a quote, so settling clears `quoted_at`; and a
 `source = 'manual'` row is a correction the user typed, which no provider write
-may overwrite (`bulkUpsertPrices`, and the backfill through it).
+may overwrite -- the quote path and `bulkUpsertPrices` both carry
+`WHERE security_prices.source IS DISTINCT FROM 'manual'`, and the quote path
+treats the refusal as a successful no-op that reads back the row that won,
+not as a failure. The guard is what makes a nightly settlement pass safe to
+add at all; without it every manual correction would be destroyed each night.
+Its cost, which is the honest half: a manual row on a provider-priced security
+has no adjusted close and no way to derive one, so that day stays out of the
+adjusted series rather than being overwritten into it.
 
 A related one, in the same family as the DATE-transformer rule above: **a bar's
 timestamp is the instant its session opened, so the day it belongs to is the

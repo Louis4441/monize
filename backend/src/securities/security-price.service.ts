@@ -730,20 +730,50 @@ export class SecurityPriceService {
     // the quote does not supply one, which is what the `?? existing.x` in the old
     // update branch meant -- except it now reads the stored value rather than a
     // copy fetched before another writer touched it.
+    //
+    // `adjusted_close` takes the close, under two conditions that the `CASE`
+    // states in SQL so no caller can forget either:
+    //
+    //   1. A quote is always for the newest session, and the adjustment factor
+    //      of the newest session is 1 -- nothing has gone ex after it yet. So
+    //      "adjusted close = close" is not a guess here, it is the definition,
+    //      and it is what the provider itself reports for its last bar. Without
+    //      it today's row is the one row in the window carrying no adjusted
+    //      close, and `loadPriceSeries` -- which keeps only the adjusted rows
+    //      once any row has one -- drops today from every return series until
+    //      the evening's settlement writes the official bar.
+    //   2. Only where the series already holds an adjusted close. A provider
+    //      that supplies none (MSN) leaves a series that is raw throughout,
+    //      which is consistent and complete; adding a single adjusted row to it
+    //      would flip `bool_or(adjusted_close IS NOT NULL)` to true and collapse
+    //      that whole series to this one row. The `EXISTS` is what keeps a
+    //      basis-completing write from becoming a basis-changing one.
+    //
+    // The settlement pass overwrites both with the provider's own numbers once
+    // the session ends, so an inferred value survives at most until 5 PM.
     return withScopedDb(this.dataSource, async (m) => {
       const rows: unknown = await m.query(
         `INSERT INTO security_prices
            (security_id, price_date, open_price, high_price, low_price,
-            close_price, volume, source, quoted_at)
-         VALUES ($1, $2::DATE, $3, $4, $5, $6, $7, $8, $9)
+            close_price, adjusted_close, volume, source, quoted_at)
+         SELECT $1::UUID, $2::DATE, $3::NUMERIC, $4::NUMERIC, $5::NUMERIC,
+                $6::NUMERIC,
+                CASE WHEN EXISTS (
+                       SELECT 1 FROM security_prices adj
+                        WHERE adj.security_id = $1::UUID
+                          AND adj.adjusted_close IS NOT NULL
+                     ) THEN $6::NUMERIC ELSE NULL END,
+                $7::BIGINT, $8::VARCHAR, $9::TIMESTAMPTZ
          ON CONFLICT (security_id, price_date) DO UPDATE SET
-           close_price = EXCLUDED.close_price,
+           close_price    = EXCLUDED.close_price,
+           adjusted_close = EXCLUDED.adjusted_close,
            open_price  = COALESCE(EXCLUDED.open_price,  security_prices.open_price),
            high_price  = COALESCE(EXCLUDED.high_price,  security_prices.high_price),
            low_price   = COALESCE(EXCLUDED.low_price,   security_prices.low_price),
            volume      = COALESCE(EXCLUDED.volume,      security_prices.volume),
            source      = EXCLUDED.source,
            quoted_at   = COALESCE(EXCLUDED.quoted_at,   security_prices.quoted_at)
+         WHERE security_prices.source IS DISTINCT FROM 'manual'
          RETURNING id`,
         [
           securityId,
@@ -759,12 +789,17 @@ export class SecurityPriceService {
       );
 
       const id = returnedRows<{ id: number }>(rows)[0]?.id;
-      const saved = id
-        ? await m.getRepository(SecurityPrice).findOne({ where: { id } })
-        : null;
+      // No id means the `DO UPDATE` was refused, which happens for exactly one
+      // reason: the stored row is a manual correction the user typed, and a
+      // provider quote does not get to overwrite it. That is a successful
+      // no-op, not a fault -- so read the row that won and return it. Only a
+      // genuinely absent row after all that is an error.
+      const saved = await (id
+        ? m.getRepository(SecurityPrice).findOne({ where: { id } })
+        : m
+            .getRepository(SecurityPrice)
+            .findOne({ where: { securityId, priceDate } }));
       if (!saved) {
-        // `DO UPDATE` always returns its row, so this cannot happen without a
-        // real fault -- better to say so than to hand back a synthesized entity.
         throw new Error(
           `Failed to persist price for security ${securityId} on ${priceDate}`,
         );
