@@ -22,6 +22,7 @@ import {
 } from "./providers/quote-provider.registry";
 import { getTradingDateFromQuote } from "./providers/trading-date.util";
 import { getMarketSessionFromQuote } from "./providers/market-session.util";
+import { isSessionSettled } from "./providers/settled-bar.util";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
 import {
@@ -44,6 +45,16 @@ const TRANSACTION_SOURCES = [
 // Cap simultaneous external quote fetches so a large securities universe does
 // not fire hundreds of concurrent Yahoo/MSN requests and trip rate limits.
 const QUOTE_FETCH_CONCURRENCY = 6;
+
+/**
+ * How far back the daily settlement pass re-reads the provider's bars.
+ *
+ * Wide enough that a job which did not fire, a provider outage or a week of
+ * intraday-only rows repairs itself without anyone noticing it needs to; short
+ * enough that the response is a few dozen bars per symbol rather than the
+ * several megabytes a `max` range returns. Deep history is the backfill's job.
+ */
+const SETTLEMENT_RANGE = "1mo";
 
 /**
  * Price writes that were started without anybody waiting for them.
@@ -127,6 +138,15 @@ export interface PriceRefreshSummary {
   skipped: number;
   results: PriceUpdateResult[];
   lastUpdated: Date;
+}
+
+export interface DailySettlementSummary {
+  totalSecurities: number;
+  /** Securities that had at least one settled bar written. */
+  securitiesSettled: number;
+  /** Rows written, counting a security once per settled session. */
+  barsSettled: number;
+  failed: number;
 }
 
 export interface HistoricalBackfillResult {
@@ -409,15 +429,6 @@ export class SecurityPriceService {
   // ─── Refresh (current price) ─────────────────────────────────────────────
 
   /**
-   * @param skipFresh When true, skip securities that already have a
-   *   provider-fetched price for today so a post-close re-run of the scheduled
-   *   job does not re-fetch quotes it just stored. Only the scheduled cron
-   *   passes true; on-demand/manual refreshes pass false (the default) and
-   *   always re-fetch every eligible security. Manual price entries
-   *   (source = 'manual') never count as fresh, so a user-entered intraday
-   *   price does not suppress the official close fetch.
-   */
-  /**
    * Refresh prices for EVERY user's active securities.
    *
    * Global by definition -- prices are keyed by symbol, not by owner, and one
@@ -432,14 +443,24 @@ export class SecurityPriceService {
    *
    * `refreshPricesForSecurities` is the per-user counterpart: its controller
    * verifies ownership of every id before calling it.
+   *
+   * **Every eligible security is fetched, including ones already priced
+   * today.** The closing run used to skip a security that had any
+   * provider-written row for the day, on the reasoning that the row was the
+   * quote it had just stored. It was not: the frontend auto-refreshes prices
+   * through the trading session (`usePriceRefresh`), so on any day the user had
+   * the app open there was already a row -- struck at 14:42, with a running
+   * volume and a high that was only the highest so far -- and the closing job
+   * skipped the one fetch that would have replaced it with the close. The
+   * stored "close" was then whichever mid-session quote happened to be last,
+   * for as long as that row existed. A duplicate fetch costs one request; the
+   * skip cost a wrong closing price on every day the user watched the market.
    */
-  async refreshAllPrices(skipFresh = false): Promise<PriceRefreshSummary> {
-    return withSystemContext(() => this.refreshAllPricesGlobally(skipFresh));
+  async refreshAllPrices(): Promise<PriceRefreshSummary> {
+    return withSystemContext(() => this.refreshAllPricesGlobally());
   }
 
-  private async refreshAllPricesGlobally(
-    skipFresh: boolean,
-  ): Promise<PriceRefreshSummary> {
+  private async refreshAllPricesGlobally(): Promise<PriceRefreshSummary> {
     const startTime = Date.now();
     this.logger.log("Starting price refresh for all securities");
 
@@ -448,34 +469,14 @@ export class SecurityPriceService {
         where: { isActive: true },
       }),
     );
-    const eligible = allActive.filter((s) => isRefreshEligible(s));
-
-    let securities = eligible;
-    let skipped = 0;
-    if (skipFresh && eligible.length > 0) {
-      const today = formatDateYMD(new Date());
-      const freshRows: { security_id: string }[] =
-        (await withScopedDb(this.dataSource, (m) =>
-          m.query(
-            `SELECT DISTINCT security_id FROM security_prices
-           WHERE security_id = ANY($1) AND price_date >= $2
-             AND source IS DISTINCT FROM 'manual'`,
-            [eligible.map((s) => s.id), today],
-          ),
-        )) ?? [];
-      const freshIds = new Set(freshRows.map((r) => r.security_id));
-      if (freshIds.size > 0) {
-        securities = eligible.filter((s) => !freshIds.has(s.id));
-        skipped = eligible.length - securities.length;
-      }
-    }
+    const securities = allActive.filter((s) => isRefreshEligible(s));
 
     if (securities.length === 0) {
       return {
-        totalSecurities: eligible.length,
+        totalSecurities: 0,
         updated: 0,
         failed: 0,
-        skipped,
+        skipped: 0,
         results: [],
         lastUpdated: new Date(),
       };
@@ -573,14 +574,14 @@ export class SecurityPriceService {
 
     const duration = Date.now() - startTime;
     this.logger.log(
-      `Price refresh completed in ${duration}ms: ${updated} updated, ${failed} failed, ${skipped} skipped`,
+      `Price refresh completed in ${duration}ms: ${updated} updated, ${failed} failed`,
     );
 
     return {
       totalSecurities: securities.length,
       updated,
       failed,
-      skipped,
+      skipped: 0,
       results,
       lastUpdated: new Date(),
     };
@@ -1178,7 +1179,11 @@ export class SecurityPriceService {
       for (const p of batch) {
         params.push(
           securityId,
-          p.date,
+          // As a `YYYY-MM-DD` string rather than a `Date`: the driver
+          // serialises a Date with the *server's* offset, so which day a bar
+          // lands on would depend on where the container runs. The Date is
+          // already UTC midnight of the exchange's calendar day (`barDate`).
+          formatDateYMD(p.date),
           p.open,
           p.high,
           p.low,
@@ -1192,6 +1197,17 @@ export class SecurityPriceService {
       // Only overwrite adjusted_close on conflict when the new payload has a
       // non-null value, so providers without adjclose support (MSN today)
       // don't blow away a previously-stored Yahoo value.
+      //
+      // `quoted_at` is cleared because the row no longer holds a quote: a daily
+      // bar is a whole session, not an instant, and leaving the timestamp of the
+      // 14:42 quote these numbers just replaced would describe the row as
+      // something it is not. The column's contract already says so -- NULL for
+      // rows that are not a struck quote.
+      //
+      // A `manual` row is a correction the user typed, so the provider does not
+      // get to overwrite it. `refreshAllPricesGlobally` used to be the only
+      // place that respected manual entries, which meant a backfill silently
+      // undid every one of them.
       await withScopedDb(this.dataSource, (m) =>
         m.query(
           `INSERT INTO security_prices (security_id, price_date, open_price, high_price, low_price, close_price, adjusted_close, volume, source)
@@ -1203,11 +1219,128 @@ export class SecurityPriceService {
            low_price = EXCLUDED.low_price,
            adjusted_close = COALESCE(EXCLUDED.adjusted_close, security_prices.adjusted_close),
            volume = EXCLUDED.volume,
-           source = EXCLUDED.source`,
+           source = EXCLUDED.source,
+           quoted_at = NULL
+         WHERE security_prices.source IS DISTINCT FROM 'manual'`,
           params,
         ),
       );
     }
+  }
+
+  // ─── Daily settlement ────────────────────────────────────────────────────
+
+  /**
+   * Replace the day's provisional quotes with the provider's official daily
+   * bars, for every session that has ended.
+   *
+   * A quote and a daily bar are different claims, and only one of them is the
+   * thing `security_prices` is supposed to hold. `regularMarketPrice` is the
+   * last print at the moment it was asked for; the daily bar is the session --
+   * its official close, its full-day volume, its high and low over the whole
+   * session, and its **adjusted close**, which no quote carries at all. Storing
+   * quotes and never coming back for the bar is what left `adjusted_close`
+   * empty on every row the closing job wrote, and left a close that was only
+   * the last quote of whatever minute the user last looked at the app.
+   *
+   * Re-running over a window rather than only the current day is deliberate: it
+   * repairs whatever the previous runs got wrong (a day the job did not fire, a
+   * provider outage, a row written intraday and never settled) without anyone
+   * having to notice and ask. A bar whose session is still open is left alone,
+   * because settling it would store the same half-day the quote already did.
+   */
+  async settleDailyBars(): Promise<DailySettlementSummary> {
+    return withSystemContext(() => this.settleDailyBarsGlobally());
+  }
+
+  private async settleDailyBarsGlobally(): Promise<DailySettlementSummary> {
+    const startTime = Date.now();
+    const now = new Date();
+
+    const allActive = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({ where: { isActive: true } }),
+    );
+    const securities = allActive.filter((s) => isRefreshEligible(s));
+    if (securities.length === 0) {
+      return {
+        totalSecurities: 0,
+        securitiesSettled: 0,
+        barsSettled: 0,
+        failed: 0,
+      };
+    }
+
+    const userContexts = await this.loadUserContexts(
+      securities.map((s) => s.userId),
+    );
+
+    const symbolGroups = new Map<string, Security[]>();
+    for (const security of securities) {
+      const key = this.groupKey(security);
+      symbolGroups.set(key, [...(symbolGroups.get(key) ?? []), security]);
+    }
+
+    const groups = [...symbolGroups.values()];
+    const bundles = await mapWithConcurrency(
+      groups,
+      QUOTE_FETCH_CONCURRENCY,
+      (group) => {
+        const rep = group[0];
+        const ctx = userContexts.get(rep.userId) || {
+          defaultQuoteProvider: DEFAULT_QUOTE_PROVIDER,
+          preferredExchanges: [],
+        };
+        return this.fetchHistoricalWithFallback(rep, SETTLEMENT_RANGE, ctx);
+      },
+    );
+
+    let securitiesSettled = 0;
+    let barsSettled = 0;
+    let failed = 0;
+
+    for (const [i, group] of groups.entries()) {
+      const bundle = bundles[i];
+      if (!bundle || bundle.prices.length === 0) {
+        failed += group.length;
+        continue;
+      }
+      const source = sourceFor(bundle.provider);
+
+      for (const security of group) {
+        // Per security rather than per group: the session lives on the row, and
+        // a symbol nothing has quoted yet has none, which is a different answer
+        // from a symbol whose exchange is known.
+        const settled = bundle.prices.filter((p) =>
+          isSessionSettled(formatDateYMD(p.date), security, now),
+        );
+        if (settled.length === 0) continue;
+
+        try {
+          await this.bulkUpsertPrices(security.id, settled, source);
+          securitiesSettled++;
+          barsSettled += settled.length;
+        } catch (error) {
+          this.logger.error(
+            `Failed to settle daily bars for ${security.symbol}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+          failed++;
+        }
+      }
+    }
+
+    this.logger.log(
+      `Daily settlement completed in ${Date.now() - startTime}ms: ` +
+        `${barsSettled} bars over ${securitiesSettled} securities, ${failed} failed`,
+    );
+
+    return {
+      totalSecurities: securities.length,
+      securitiesSettled,
+      barsSettled,
+      failed,
+    };
   }
 
   @Cron("0 17 * * 1-5", { timeZone: "America/New_York" })
@@ -1218,8 +1351,14 @@ export class SecurityPriceService {
       // symbol (irreducibly cross-user), and the snapshot recalc fans out over
       // every investment account, so the whole job runs under a system context.
       await withSystemContext(async () => {
-        const result = await this.refreshAllPrices(true);
-        if (result.updated > 0) {
+        const result = await this.refreshAllPrices();
+        // Settlement runs *after* the quote refresh, and its writes are the
+        // ones that survive: the quote is what the security is worth right now
+        // (and is all a still-open market can offer), the bar is what the
+        // finished session actually did. Ordering them the other way round
+        // would leave the day holding a 17:00 quote again.
+        const settlement = await this.settleDailyBars();
+        if (result.updated > 0 || settlement.barsSettled > 0) {
           this.logger.log(
             "Recalculating investment snapshots after price refresh",
           );

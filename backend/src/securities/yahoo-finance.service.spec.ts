@@ -501,6 +501,51 @@ describe("YahooFinanceService", () => {
       expect(result![1].adjClose).toBe(184);
     });
 
+    /**
+     * A daily bar's timestamp is the instant its session opened, so the day it
+     * belongs to is the exchange's calendar day. Deriving it with
+     * `setHours(0,0,0,0)` read it on the *server's* calendar, which made
+     * `security_prices.price_date` a function of the container's TZ -- and
+     * silently wrong, not merely inconsistent, for any exchange whose open
+     * falls on the other side of midnight UTC.
+     */
+    it("dates a bar by the exchange's calendar day, not the server's", async () => {
+      // 2026-08-11T23:00:00Z is 10:00 on the 12th in Sydney: the bar belongs to
+      // the 12th, and under a UTC server the old arithmetic filed it on the 11th.
+      mockFetchResponse({
+        chart: {
+          result: [
+            {
+              meta: { exchangeTimezoneName: "Australia/Sydney" },
+              timestamp: [Date.UTC(2026, 7, 11, 23, 0, 0) / 1000],
+              indicators: { quote: [{ close: [100] }] },
+            },
+          ],
+        },
+      });
+
+      const result = await service.fetchHistorical("BHP", "ASX");
+
+      expect(result![0].date.toISOString()).toBe("2026-08-12T00:00:00.000Z");
+    });
+
+    it("dates a bar in UTC when the provider names no exchange zone", async () => {
+      mockFetchResponse({
+        chart: {
+          result: [
+            {
+              timestamp: [Date.UTC(2026, 7, 11, 13, 30, 0) / 1000],
+              indicators: { quote: [{ close: [100] }] },
+            },
+          ],
+        },
+      });
+
+      const result = await service.fetchHistorical("AAPL");
+
+      expect(result![0].date.toISOString()).toBe("2026-08-11T00:00:00.000Z");
+    });
+
     it("should use range=max for historical data", async () => {
       mockFetchResponse({
         chart: {

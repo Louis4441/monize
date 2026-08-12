@@ -430,6 +430,52 @@ An endpoint that deliberately stays owner-only says so where it is skipped:
 `tag-key-breakdown` does, because tags are personal and a joint row never
 carries the grantee's.
 
+## A stored price says which session it belongs to, not which minute it was fetched
+
+`security_prices` holds one row per trading day, and the thing that row is
+supposed to hold is the **session**: the official close, the full-day volume,
+the high and low over the whole day, and the adjusted close. A live quote is
+none of those. `regularMarketPrice` is the last print at the moment it was
+asked for, which is a true statement about 14:42 and a false one about the day.
+
+The frontend auto-refreshes quotes through the trading session
+(`usePriceRefresh`), so a row for today exists long before the day is over --
+and the closing job used to treat that as "already done" and skip the security,
+leaving whichever mid-session quote arrived last stored as the close. On real
+data that was sixteen of seventeen consecutive rows disagreeing with the
+provider, by a cent or two, with volumes at a third of the real figure. The two
+correct ones were the days nobody opened the app.
+
+Three rules, each with a test rather than a paragraph:
+
+- **"Has a price for today" is not "the day is settled".** Ask whether the
+  *session* has ended -- `isSessionSettled` (`providers/settled-bar.util.ts`),
+  on the market's own clock in the market's own zone, from the
+  `market_timezone` / `market_close_time` the quote refresh stores. Never from
+  the presence of a row, and never from the server's clock.
+- **The closing job settles the day from the daily bar, after the quote
+  refresh.** `settleDailyBars` re-reads a bounded recent window and upserts the
+  bars whose sessions have ended, so a missed run, a provider outage or a week
+  of intraday-only rows repairs itself. Order matters: the quote is what a
+  still-open market can offer, the bar is what the finished session did, and
+  the bar has to win.
+- **A calculated column needs a writer on the recurring path.**
+  `adjusted_close` was populated by the on-demand backfill and by nothing else,
+  so it was null on every row the daily job wrote. Because `loadPriceSeries`
+  picks one basis per series and then keeps only the adjusted rows, that did
+  not degrade to raw prices -- it silently truncated every return series at the
+  last backfill date.
+
+A daily bar is also not a quote, so settling clears `quoted_at`; and a
+`source = 'manual'` row is a correction the user typed, which no provider write
+may overwrite (`bulkUpsertPrices`, and the backfill through it).
+
+A related one, in the same family as the DATE-transformer rule above: **a bar's
+timestamp is the instant its session opened, so the day it belongs to is the
+exchange's calendar day.** `barDate` reads it in `meta.exchangeTimezoneName`,
+falling back to UTC. Reading it with `setHours(0,0,0,0)` made `price_date` a
+function of the container's timezone and put an ASX bar on the wrong day.
+
 ## A money value carries the currency it was calculated into
 
 Not the currency of the account it is filed under. `InvestmentTransaction.exchangeRate`

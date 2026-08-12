@@ -30,6 +30,36 @@ handling.
   ever traded. Decide once per instrument over the window being read: adjusted
   rows only where any exist, raw throughout where none do, never both.
 
+### 1.1 A quote is provisional; a daily bar is the day
+
+A live quote and a daily bar answer different questions, and only one of them
+is what a daily price series holds. `regularMarketPrice` is the last print at
+the instant it was asked for -- true about that instant, and false about the
+day: it is not the close, its volume is a running total, and its high and low
+are only the extremes reached so far. The provider's daily bar is the finished
+session, and it is the only thing carrying an **adjusted** close at all.
+
+So a row written from a quote during the session is *provisional*, and the
+closing job's obligation is to come back for the bar once the session has
+ended. Two rules follow, and both were broken at once:
+
+- **Never let "a price exists for today" stand in for "the day is settled".**
+  The closing refresh skipped any security already carrying a provider-written
+  row for the day, which is exactly what an intraday refresh leaves behind --
+  so the stored close was whichever mid-session quote happened to be last, on
+  every day the user had the app open. The predicate is whether the *session*
+  has ended (`isSessionSettled`, evaluated on the market's own clock in the
+  market's own zone), not whether a row is present.
+- **A column only one writer populates is a column that is usually empty.**
+  `adjusted_close` was written by the historical backfill and by nothing else,
+  and the backfill runs on demand -- so every row the daily job wrote left it
+  null. Combined with the per-series basis rule above, that is worse than a
+  gap: `bool_or(adjusted_close IS NOT NULL)` is true because the backfilled
+  rows have it, so the unadjusted rows are *dropped*, and a series silently
+  ends at the last backfill instead of at the last trading day. A column a
+  calculation depends on needs a writer on the recurring path, not only on the
+  manual one.
+
 ## 2. Quote age and period boundaries
 
 - A price used to value a period boundary (period start, period end, or
