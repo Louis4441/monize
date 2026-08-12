@@ -131,6 +131,12 @@
     "timeFormatLabel": "समय स्वरूप",
     "recentTransactionsLabel": "त्वरित भरण में हाल के लेन-देन",
     "recentTransactionsHelp": "लेन-देन फ़ॉर्म पर भुगतानकर्ता फ़ील्ड के बगल में इतिहास बटन पॉपओवर में दिखाई जाने वाली प्रविष्टियों की संख्या।",
+    "portfolioChangeBaselineLabel": "पोर्टफोलियो परिवर्तन की गणना का आधार",
+    "portfolioChangeBaselineHelp": "1D, 1W और MTD पोर्टफोलियो चार्ट के परिवर्तन आंकड़ों पर लागू होता है। लंबी अवधियाँ हमेशा अपने पहले बिंदु से मापी जाती हैं।",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "पिछले कारोबारी दिन का समापन भाव",
+      "periodStart": "अवधि की शुरुआत (1D पर दिन का खुलने का भाव)"
+    },
     "saveButton": "प्राथमिकताएं सहेजें",
     "savingButton": "सहेजा जा रहा है...",
     "toasts": {

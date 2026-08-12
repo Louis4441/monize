@@ -1104,6 +1104,8 @@
     "lowestValue": "Laagste waarde",
     "periodChange": "Periodewijziging",
     "periodReturn": "Perioderendement",
+    "priorCloseTooltip": "Gemeten vanaf de slotkoers van de vorige handelsdag op {date}.",
+    "notAvailable": "N/B",
     "intradayUnavailable": "Gedetailleerde intraday-koersen niet beschikbaar",
     "intradayUnavailableTitle": "Intraday-weergave niet beschikbaar voor deze rekeningcombinatie",
     "intradayUnavailableDesc": "Een of meer posities gebruiken een koersaanbieder (MSN Money) die geen intraday-gegevens beschikbaar stelt{skipped}. Schakel over naar een langere periode om dagelijkse momentopnamen te zien.",

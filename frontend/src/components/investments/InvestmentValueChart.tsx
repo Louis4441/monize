@@ -22,7 +22,9 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { createLogger } from '@/lib/logger';
 import {
   INTRADAY_RANGES,
@@ -31,9 +33,12 @@ import {
   writeIntradayCache,
   clearAllIntradayCache,
   computeTightYAxisDomain,
+  intradayRangeParam,
+  trimIntradayPoints,
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from './portfolio-chart-utils';
+import { isoDatePart, priorCloseChange } from './portfolio-change-baseline';
 
 const logger = createLogger('InvestmentChart');
 
@@ -60,7 +65,11 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
   const formatChartDate = useChartDateFormat();
   const { defaultCurrency } = useExchangeRates();
   const isMobile = useIsMobile();
-  const [chartPoints, setChartPoints] = useState<Array<{ name: string; Value: number }>>([]);
+  // `iso` is the point's own date/timestamp, kept beside the display label so
+  // the prior-close baseline can be looked up for the data actually on screen.
+  const [chartPoints, setChartPoints] = useState<
+    Array<{ name: string; Value: number; iso: string }>
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   // High/low value bubbles the user has temporarily dismissed, keyed by the
   // value they marked so a later data change with a new extreme shows the
@@ -70,7 +79,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
   const [intradayUnavailable, setIntradayUnavailable] = useState<{
     skipped: string[];
   } | null>(null);
-  // Set when 1W/1M silently fall back to daily snapshots because one or more
+  // Set when 1W/MTD/1M silently fall back to daily snapshots because one or more
   // holdings use a quote provider (MSN Money) without intraday support. We
   // surface a small warning icon next to the title so the user understands
   // why the chart resolution is coarser than the button label suggests.
@@ -153,13 +162,14 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
         displayCurrency: foreignCurrency || undefined,
       };
       if (useDaily || isIntraday) {
-        // 1W/1M intraday fallback also uses the daily endpoint.
+        // 1W/MTD/1M intraday fallback also uses the daily endpoint.
         const data = await netWorthApi.getInvestmentsDaily(params);
         if (loadSeqRef.current !== seq) return;
         setChartPoints(
           data.map((d) => ({
             name: formatChartDate(d.date, 'MMM d, yyyy'),
             Value: d.value,
+            iso: d.date,
           })),
         );
       } else {
@@ -169,6 +179,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
             Value: d.value,
+            iso: d.month,
           })),
         );
       }
@@ -194,13 +205,16 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           // Hydrate from cache immediately so the chart appears even before
           // the network round-trip resolves.
           if (cached && !cached.fallbackToDaily) {
-            const cachedPoints = dateRange === 'mtd'
-              ? cached.points.filter((p) => p.timestamp >= resolvedRange.start)
-              : cached.points;
+            const cachedPoints = trimIntradayPoints(
+              cached.points,
+              dateRange,
+              resolvedRange.start,
+            );
             setChartPoints(
               cachedPoints.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: p.value,
+                iso: p.timestamp,
               })),
             );
             setIsLoading(false);
@@ -209,7 +223,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           let response;
           try {
             response = await investmentsApi.getIntradayValue({
-              range: (dateRange === 'mtd' ? '1m' : dateRange) as '1d' | '1w' | '1m',
+              range: intradayRangeParam(dateRange),
               accountIds: accountIds?.length ? accountIds.join(',') : undefined,
               displayCurrency: foreignCurrency || undefined,
             });
@@ -243,7 +257,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
               setIsLoading(false);
               return;
             }
-            // 1W / 1M: silently fall back to the daily-snapshot endpoint and
+            // 1W / MTD / 1M: silently fall back to the daily-snapshot endpoint and
             // flag the title with a small warning icon so the user knows the
             // chart is at daily resolution rather than the requested intraday
             // resolution.
@@ -253,13 +267,16 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
             return;
           }
 
-          const responsePoints = dateRange === 'mtd'
-            ? response.points.filter((p) => p.timestamp >= resolvedRange.start)
-            : response.points;
+          const responsePoints = trimIntradayPoints(
+            response.points,
+            dateRange,
+            resolvedRange.start,
+          );
           setChartPoints(
             responsePoints.map((p) => ({
               name: formatIntradayLabel(p.timestamp, dateRange),
               Value: p.value,
+              iso: p.timestamp,
             })),
           );
         } else {
@@ -306,19 +323,50 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
     };
   }, [isIntraday, loadData]);
 
+  // On 1D / 1W / MTD the change is reported against the close of the trading
+  // day before the window rather than against the first point drawn, unless the
+  // user's Settings preference says otherwise. The baseline is looked up for
+  // the first point actually on screen.
+  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
+    range: dateRange,
+    firstPointDate: isoDatePart(chartPoints[0]?.iso),
+    accountIds: accountIds?.length ? accountIds.join(',') : undefined,
+    displayCurrency: foreignCurrency || undefined,
+  });
+
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {
-      return { highest: 0, lowest: 0, change: 0, changePercent: 0 };
+      return {
+        highest: 0,
+        lowest: 0,
+        change: 0 as number | null,
+        changePercent: 0 as number | null,
+      };
     }
     const values = chartPoints.map((p) => p.Value);
     const highest = Math.max(...values);
     const lowest = Math.min(...values);
     const current = chartPoints[chartPoints.length - 1]?.Value || 0;
+    if (usesPriorClose) {
+      // A baseline that has not loaded (or could not be established) leaves
+      // the change unknown -- never the first point's change wearing the
+      // prior close's label.
+      return {
+        highest,
+        lowest,
+        ...priorCloseChange(current, priorClose?.value ?? null),
+      };
+    }
     const initial = chartPoints[0]?.Value || 0;
     const change = current - initial;
     const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
-    return { highest, lowest, change, changePercent };
-  }, [chartPoints]);
+    return {
+      highest,
+      lowest,
+      change: change as number | null,
+      changePercent: changePercent as number | null,
+    };
+  }, [chartPoints, usesPriorClose, priorClose]);
 
   const xAxisTicks = useMemo(() => {
     if (chartPoints.length <= 36) return undefined;
@@ -477,15 +525,37 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           </div>
         </div>
         <div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">{t('investmentValueChart.change')}</div>
-          <div className={`text-lg font-bold ${gainLossColor(summary.change)}`}>
-            {summary.change >= 0 ? '+' : ''}{fmtFull(summary.change)}
+          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+            {t('investmentValueChart.change')}
+            {priorClose && (
+              <InfoTooltip
+                placement="top"
+                text={t('investmentValueChart.priorCloseTooltip', {
+                  date: formatChartDate(priorClose.date, 'MMM d, yyyy'),
+                })}
+              />
+            )}
+          </div>
+          <div className={`text-lg font-bold ${summary.change === null ? '' : gainLossColor(summary.change)}`}>
+            {summary.change === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-sm font-normal">
+                {t('investmentValueChart.notAvailable')}
+              </span>
+            ) : (
+              <>{summary.change >= 0 ? '+' : ''}{fmtFull(summary.change)}</>
+            )}
           </div>
         </div>
         <div>
           <div className="text-xs text-gray-500 dark:text-gray-400">{t('investmentValueChart.changePercent')}</div>
-          <div className={`text-lg font-bold ${gainLossColor(summary.changePercent)}`}>
-            {formatSignedPercent(summary.changePercent, 1)}
+          <div className={`text-lg font-bold ${summary.changePercent === null ? '' : gainLossColor(summary.changePercent)}`}>
+            {summary.changePercent === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-sm font-normal">
+                {t('investmentValueChart.notAvailable')}
+              </span>
+            ) : (
+              formatSignedPercent(summary.changePercent, 1)
+            )}
           </div>
         </div>
       </div>

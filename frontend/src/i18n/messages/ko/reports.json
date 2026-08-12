@@ -1104,6 +1104,8 @@
     "lowestValue": "최저 가치",
     "periodChange": "기간 변화",
     "periodReturn": "기간 수익률",
+    "priorCloseTooltip": "직전 거래일({date}) 종가를 기준으로 계산한 값입니다.",
+    "notAvailable": "N/A",
     "intradayUnavailable": "상세 당일 가격 정보를 이용할 수 없습니다",
     "intradayUnavailableTitle": "이 계정 조합에 대한 당일 보기를 이용할 수 없습니다",
     "intradayUnavailableDesc": "하나 이상의 보유 항목이 당일 데이터를 제공하지 않는 시세 제공업체(MSN Money)를 사용합니다{skipped}. 일별 스냅샷을 보려면 더 긴 범위로 전환하세요.",

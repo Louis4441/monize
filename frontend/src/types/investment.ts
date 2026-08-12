@@ -15,6 +15,22 @@ export type InvestmentAction =
 
 export type QuoteProviderName = 'yahoo' | 'msn';
 
+/**
+ * What the Portfolio Value chart's Change / Change % measure from on the short
+ * ranges (1D, 1W, MTD), as chosen in Settings -> Preferences.
+ *
+ *  - `previous_close`: the close of the last trading day before the window --
+ *    the point a daily move is normally quoted against, so a 1W chart drawn
+ *    from Aug 5 measures from Aug 4's close and includes Aug 5's own movement.
+ *  - `period_start`: the first point plotted -- the day's open on 1D, the first
+ *    bar of the week or month on 1W and MTD.
+ *
+ * Longer ranges always measure from their first point: their window opens on an
+ * arbitrary calendar date whose first point already is that day's close, so the
+ * two answers coincide and the preference has nothing to choose between.
+ */
+export type PortfolioChangeBaseline = 'previous_close' | 'period_start';
+
 export interface Security {
   id: string;
   symbol: string;

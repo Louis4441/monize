@@ -131,6 +131,12 @@
     "timeFormatLabel": "Format d'heure",
     "recentTransactionsLabel": "Transactions récentes dans la saisie rapide",
     "recentTransactionsHelp": "Nombre d'entrées affichées dans le popover de l'historique à côté du champ Bénéficiaire dans les formulaires de transaction.",
+    "portfolioChangeBaselineLabel": "Variation du portefeuille mesurée à partir de",
+    "portfolioChangeBaselineHelp": "S'applique aux chiffres de variation des graphiques de portefeuille 1D, 1W et MTD. Les périodes plus longues sont toujours mesurées à partir de leur premier point.",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "Clôture de la séance précédente",
+      "periodStart": "Début de la période (l'ouverture du jour pour 1D)"
+    },
     "saveButton": "Enregistrer les préférences",
     "savingButton": "Enregistrement...",
     "toasts": {

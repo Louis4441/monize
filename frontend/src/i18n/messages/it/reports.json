@@ -1104,6 +1104,8 @@
     "lowestValue": "Valore minimo",
     "periodChange": "Variazione del periodo",
     "periodReturn": "Rendimento del periodo",
+    "priorCloseTooltip": "Misurato dalla chiusura della seduta precedente del {date}.",
+    "notAvailable": "N/D",
     "intradayUnavailable": "Prezzi intraday dettagliati non disponibili",
     "intradayUnavailableTitle": "Vista intraday non disponibile per questa combinazione di conti",
     "intradayUnavailableDesc": "Una o più posizioni utilizzano un fornitore di quotazioni (MSN Money) che non espone dati intraday{skipped}. Passa a un intervallo più lungo per vedere gli snapshot giornalieri.",

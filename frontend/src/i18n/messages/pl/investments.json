@@ -123,6 +123,8 @@
     "lowestValue": "Najniższa wartość",
     "change": "Zmiana",
     "changePercent": "Zmiana %",
+    "priorCloseTooltip": "Mierzone od kursu zamknięcia poprzedniej sesji z dnia {date}.",
+    "notAvailable": "Brak",
     "portfolioLabel": "Portfel:"
   },
   "transactionList": {

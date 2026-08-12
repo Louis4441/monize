@@ -1104,6 +1104,8 @@
     "lowestValue": "Nilai Terendah",
     "periodChange": "Perubahan Periode",
     "periodReturn": "Imbal Hasil Periode",
+    "priorCloseTooltip": "Diukur dari harga penutupan hari bursa sebelumnya pada {date}.",
+    "notAvailable": "T/A",
     "intradayUnavailable": "Harga intraday terperinci tidak tersedia",
     "intradayUnavailableTitle": "Tampilan intraday tidak tersedia untuk campuran akun ini",
     "intradayUnavailableDesc": "Satu atau lebih kepemilikan menggunakan penyedia kuotasi (MSN Money) yang tidak mengekspos data intraday{skipped}. Beralih ke rentang yang lebih panjang untuk melihat snapshot harian.",

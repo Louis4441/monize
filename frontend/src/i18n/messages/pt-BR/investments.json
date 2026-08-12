@@ -123,6 +123,8 @@
     "lowestValue": "Valor Mais Baixo",
     "change": "Variação",
     "changePercent": "Variação %",
+    "priorCloseTooltip": "Medido a partir do fechamento do pregão anterior, em {date}.",
+    "notAvailable": "N/D",
     "portfolioLabel": "Portfólio:"
   },
   "transactionList": {

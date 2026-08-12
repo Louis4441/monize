@@ -1104,6 +1104,8 @@
     "lowestValue": "Valor más bajo",
     "periodChange": "Cambio del período",
     "periodReturn": "Retorno del período",
+    "priorCloseTooltip": "Medido desde el cierre de la sesión bursátil anterior, el {date}.",
+    "notAvailable": "N/A",
     "intradayUnavailable": "Precios intradía detallados no disponibles",
     "intradayUnavailableTitle": "Vista intradía no disponible para esta combinación de cuentas",
     "intradayUnavailableDesc": "Una o más posiciones usan un proveedor de cotizaciones (MSN Money) que no expone datos intradía{skipped}. Cambia a un rango más largo para ver instantáneas diarias.",

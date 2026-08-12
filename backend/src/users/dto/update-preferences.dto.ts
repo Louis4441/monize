@@ -243,6 +243,16 @@ export class UpdatePreferencesDto {
 
   @ApiPropertyOptional({
     description:
+      "What the Portfolio Value chart's change is measured from on the 1D / 1W / MTD ranges: 'previous_close' (the close of the last trading day before the window) or 'period_start' (the first point plotted). Longer ranges always measure from their first point.",
+    example: "previous_close",
+    enum: ["previous_close", "period_start"],
+  })
+  @IsOptional()
+  @IsIn(["previous_close", "period_start"])
+  portfolioChangeBaseline?: "previous_close" | "period_start";
+
+  @ApiPropertyOptional({
+    description:
       "Number of entries shown in the recent-transactions quick-fill popover (1-20).",
     example: 5,
     minimum: 1,

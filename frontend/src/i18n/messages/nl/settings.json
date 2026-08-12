@@ -131,6 +131,12 @@
     "timeFormatLabel": "Tijdnotatie",
     "recentTransactionsLabel": "Recente transacties in snel invullen",
     "recentTransactionsHelp": "Aantal vermeldingen dat wordt weergegeven in de popover van de geschiedenis-knop naast het veld Begunstigde op transactieformulieren.",
+    "portfolioChangeBaselineLabel": "Portefeuillewijziging gemeten vanaf",
+    "portfolioChangeBaselineHelp": "Geldt voor de wijzigingscijfers in de portefeuillegrafieken 1D, 1W en MTD. Langere periodes worden altijd vanaf hun eerste punt gemeten.",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "Slotkoers van de vorige handelsdag",
+      "periodStart": "Begin van de periode (bij 1D de opening van de dag)"
+    },
     "saveButton": "Voorkeuren opslaan",
     "savingButton": "Opslaan...",
     "toasts": {

@@ -123,6 +123,8 @@
     "lowestValue": "En Düşük Değer",
     "change": "Değişim",
     "changePercent": "Değişim %",
+    "priorCloseTooltip": "Bir önceki işlem gününün ({date}) kapanışına göre ölçülür.",
+    "notAvailable": "Yok",
     "portfolioLabel": "Portföy:"
   },
   "transactionList": {

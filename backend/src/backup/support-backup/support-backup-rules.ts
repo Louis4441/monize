@@ -82,6 +82,7 @@ export const RULES: Record<string, TableRules> = {
     show_whats_new: keep,
     tour_progress: keep, // guided-tour completion state; opaque ids + status, no PII
     default_quote_provider: keep,
+    portfolio_change_baseline: keep,
     recent_transactions_limit: keep,
     ai_bubble_enabled: keep,
     language: keep,

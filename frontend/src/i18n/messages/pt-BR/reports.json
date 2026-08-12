@@ -1104,6 +1104,8 @@
     "lowestValue": "Valor Mais Baixo",
     "periodChange": "Variação do Período",
     "periodReturn": "Rentabilidade do Período",
+    "priorCloseTooltip": "Medido a partir do fechamento do pregão anterior, em {date}.",
+    "notAvailable": "N/D",
     "intradayUnavailable": "Dados de preço intradiário detalhados indisponíveis",
     "intradayUnavailableTitle": "Vista intradiária indisponível para esta combinação de contas",
     "intradayUnavailableDesc": "Uma ou mais posições utilizam um fornecedor de cotações (MSN Money) que não disponibiliza dados intradiários{skipped}. Selecione um intervalo mais longo para ver instantâneos diários.",

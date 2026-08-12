@@ -27,7 +27,9 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
+import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
@@ -46,7 +48,13 @@ type PortfolioChartSortField = 'name' | 'value';
 // drives x-axis label shortening.
 type SecuritiesBreakdown = {
   series: InvestmentBreakdownSeries[];
-  points: Array<{ name: string; total: number; values: Record<string, number> }>;
+  points: Array<{
+    name: string;
+    /** The point's own date/timestamp, kept beside the display label. */
+    iso: string;
+    total: number;
+    values: Record<string, number>;
+  }>;
   kind: 'daily' | 'monthly' | 'intraday';
 };
 import {
@@ -55,9 +63,15 @@ import {
   readIntradayCache,
   writeIntradayCache,
   computeTightYAxisDomain,
+  intradayRangeParam,
+  trimIntradayPoints,
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from '@/components/investments/portfolio-chart-utils';
+import {
+  isoDatePart,
+  priorCloseChange,
+} from '@/components/investments/portfolio-change-baseline';
 
 const logger = createLogger('PortfolioValueReport');
 
@@ -122,7 +136,11 @@ export function PortfolioValueReport() {
   const { formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatCurrency: formatCurrencyFull, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
-  const [chartPoints, setChartPoints] = useState<Array<{ name: string; Value: number }>>([]);
+  // `iso` is the point's own date/timestamp, kept beside the display label so
+  // the prior-close baseline can be looked up for the data actually on screen.
+  const [chartPoints, setChartPoints] = useState<
+    Array<{ name: string; Value: number; iso: string }>
+  >([]);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Account filter is persisted so the report opens on the same set of accounts
@@ -158,7 +176,7 @@ export function PortfolioValueReport() {
   const [intradayUnavailable, setIntradayUnavailable] = useState<{
     skipped: string[];
   } | null>(null);
-  // Set when 1W/1M silently fall back to daily snapshots because one or more
+  // Set when 1W/MTD/1M silently fall back to daily snapshots because one or more
   // holdings use a quote provider (MSN Money) without intraday support. We
   // surface a small warning icon next to the title so the user understands
   // why the chart resolution is coarser than the button label suggests.
@@ -264,6 +282,7 @@ export function PortfolioValueReport() {
           data.map((d) => ({
             name: formatChartDate(d.date, 'MMM d, yyyy'),
             Value: d.value,
+            iso: d.date,
           })),
         );
       } else {
@@ -273,13 +292,14 @@ export function PortfolioValueReport() {
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
             Value: d.value,
+            iso: d.month,
           })),
         );
       }
     };
 
     // Daily/monthly per-security breakdown. Also the fallback target when a
-    // 1W/1M intraday breakdown has no intraday data for the account mix.
+    // 1W/MTD/1M intraday breakdown has no intraday data for the account mix.
     const loadDailyMonthlyBreakdown = async (
       granularity: 'daily' | 'monthly',
     ) => {
@@ -297,21 +317,24 @@ export function PortfolioValueReport() {
           granularity === 'monthly'
             ? formatChartDate(p.date, 'MMM yyyy')
             : formatChartDate(p.date, 'MMM d, yyyy'),
+        iso: p.date,
         total: p.total,
         values: p.values,
       }));
       setBreakdown({ series: data.series, points, kind: granularity });
-      setChartPoints(points.map((p) => ({ name: p.name, Value: p.total })));
+      setChartPoints(
+        points.map((p) => ({ name: p.name, Value: p.total, iso: p.iso })),
+      );
     };
 
-    // Per-security intraday breakdown (1D/1W/1M). Mirrors the total intraday
-    // chart's fallback handling: 1D shows an "unavailable" note, 1W/1M silently
+    // Per-security intraday breakdown (1D/1W/MTD/1M). Mirrors the total intraday
+    // chart's fallback handling: 1D shows an "unavailable" note, the rest silently
     // fall back to the daily-snapshot breakdown with a small warning icon.
     const loadIntradayBreakdown = async () => {
       let data;
       try {
         data = await investmentsApi.getIntradayBreakdown({
-          range: dateRange as '1d' | '1w' | '1m',
+          range: intradayRangeParam(dateRange),
           accountIds: accountIdsCsv,
           displayCurrency: foreignCurrency || undefined,
         });
@@ -335,13 +358,20 @@ export function PortfolioValueReport() {
         return;
       }
 
-      const points = data.points.map((p) => ({
+      const points = trimIntradayPoints(
+        data.points,
+        dateRange,
+        resolvedRange.start,
+      ).map((p) => ({
         name: formatIntradayLabel(p.timestamp, dateRange),
+        iso: p.timestamp,
         total: p.total,
         values: p.values,
       }));
       setBreakdown({ series: data.series, points, kind: 'intraday' });
-      setChartPoints(points.map((p) => ({ name: p.name, Value: p.total })));
+      setChartPoints(
+        points.map((p) => ({ name: p.name, Value: p.total, iso: p.iso })),
+      );
     };
 
     const loadData = async () => {
@@ -379,9 +409,10 @@ export function PortfolioValueReport() {
           const cached = readIntradayCache(cacheKey);
           if (cached && !cached.fallbackToDaily) {
             setChartPoints(
-              cached.points.map((p) => ({
+              trimIntradayPoints(cached.points, dateRange, resolvedRange.start).map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: p.value,
+                iso: p.timestamp,
               })),
             );
             setIsLoading(false);
@@ -390,7 +421,7 @@ export function PortfolioValueReport() {
           let response;
           try {
             response = await investmentsApi.getIntradayValue({
-              range: dateRange as '1d' | '1w' | '1m',
+              range: intradayRangeParam(dateRange),
               accountIds: accountIdsCsv,
               displayCurrency: foreignCurrency || undefined,
             });
@@ -421,7 +452,7 @@ export function PortfolioValueReport() {
               setChartPoints([]);
               setIntradayUnavailable({ skipped: response.skippedSymbols });
             } else {
-              // 1W / 1M silently fall back to the daily endpoint, with a
+              // 1W / MTD / 1M silently fall back to the daily endpoint, with a
               // small warning icon next to the title so the user knows
               // intraday detail isn't available for this account mix.
               setIntradayFallbackNotice({ skipped: response.skippedSymbols });
@@ -429,10 +460,13 @@ export function PortfolioValueReport() {
             }
           } else {
             setChartPoints(
-              response.points.map((p) => ({
-                name: formatIntradayLabel(p.timestamp, dateRange),
-                Value: p.value,
-              })),
+              trimIntradayPoints(response.points, dateRange, resolvedRange.start).map(
+                (p) => ({
+                  name: formatIntradayLabel(p.timestamp, dateRange),
+                  Value: p.value,
+                  iso: p.timestamp,
+                }),
+              ),
             );
           }
         } else {
@@ -473,19 +507,51 @@ export function PortfolioValueReport() {
     formatChartDate,
   ]);
 
+  // On 1D / 1W / MTD the change is reported against the close of the trading
+  // day before the window rather than against the first point drawn, unless the
+  // user's Settings preference says otherwise. The baseline is looked up for
+  // the first point actually on screen.
+  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
+    range: dateRange,
+    firstPointDate: isoDatePart(chartPoints[0]?.iso),
+    accountIds:
+      selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined,
+    displayCurrency: foreignCurrency || undefined,
+  });
+
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {
-      return { change: 0, changePercent: 0, highest: 0, lowest: 0 };
+      return {
+        change: 0 as number | null,
+        changePercent: 0 as number | null,
+        highest: 0,
+        lowest: 0,
+      };
     }
     const values = chartPoints.map((d) => d.Value);
     const highest = Math.max(...values);
     const lowest = Math.min(...values);
     const current = chartPoints[chartPoints.length - 1]?.Value || 0;
+    if (usesPriorClose) {
+      // A baseline that has not loaded (or could not be established) leaves
+      // the change unknown -- never the first point's change wearing the
+      // prior close's label.
+      return {
+        highest,
+        lowest,
+        ...priorCloseChange(current, priorClose?.value ?? null),
+      };
+    }
     const initial = chartPoints[0]?.Value || 0;
     const change = current - initial;
     const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
-    return { change, changePercent, highest, lowest };
-  }, [chartPoints]);
+    return {
+      change: change as number | null,
+      changePercent: changePercent as number | null,
+      highest,
+      lowest,
+    };
+  }, [chartPoints, usesPriorClose, priorClose]);
 
   const sortedChartTableData = useMemo(() => {
     const sorted = chartPoints.map((p, idx) => ({ ...p, index: idx }));
@@ -631,8 +697,27 @@ export function PortfolioValueReport() {
       summaryCards: [
         { label: t('portfolioValue.highestValue'), value: fmtVal(summary.highest), color: '#111827' },
         { label: t('portfolioValue.lowestValue'), value: fmtVal(summary.lowest), color: '#111827' },
-        { label: t('portfolioValue.periodChange'), value: `${summary.change >= 0 ? '+' : ''}${fmtVal(summary.change)}`, color: summary.change >= 0 ? '#16a34a' : '#dc2626' },
-        { label: t('portfolioValue.periodReturn'), value: formatSignedPercent(summary.changePercent, 1), color: summary.changePercent >= 0 ? '#16a34a' : '#dc2626' },
+        {
+          label: t('portfolioValue.periodChange'),
+          value:
+            summary.change === null
+              ? t('portfolioValue.notAvailable')
+              : `${summary.change >= 0 ? '+' : ''}${fmtVal(summary.change)}`,
+          color: summary.change === null ? '#6b7280' : summary.change >= 0 ? '#16a34a' : '#dc2626',
+        },
+        {
+          label: t('portfolioValue.periodReturn'),
+          value:
+            summary.changePercent === null
+              ? t('portfolioValue.notAvailable')
+              : formatSignedPercent(summary.changePercent, 1),
+          color:
+            summary.changePercent === null
+              ? '#6b7280'
+              : summary.changePercent >= 0
+                ? '#16a34a'
+                : '#dc2626',
+        },
       ],
       chartContainer: chartRef.current,
       additionalTables: breakdownRows.length > 0 ? [{
@@ -695,15 +780,37 @@ export function PortfolioValueReport() {
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.periodChange')}</div>
-          <div className={`text-xl font-bold ${gainLossColor(summary.change)}`}>
-            {summary.change >= 0 ? '+' : ''}{fmtVal(summary.change)}
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.periodChange')}
+            {priorClose && (
+              <InfoTooltip
+                placement="top"
+                text={t('portfolioValue.priorCloseTooltip', {
+                  date: formatChartDate(priorClose.date, 'MMM d, yyyy'),
+                })}
+              />
+            )}
+          </div>
+          <div className={`text-xl font-bold ${summary.change === null ? '' : gainLossColor(summary.change)}`}>
+            {summary.change === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
+                {t('portfolioValue.notAvailable')}
+              </span>
+            ) : (
+              <>{summary.change >= 0 ? '+' : ''}{fmtVal(summary.change)}</>
+            )}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.periodReturn')}</div>
-          <div className={`text-xl font-bold ${gainLossColor(summary.changePercent)}`}>
-            {formatSignedPercent(summary.changePercent, 1)}
+          <div className={`text-xl font-bold ${summary.changePercent === null ? '' : gainLossColor(summary.changePercent)}`}>
+            {summary.changePercent === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
+                {t('portfolioValue.notAvailable')}
+              </span>
+            ) : (
+              formatSignedPercent(summary.changePercent, 1)
+            )}
           </div>
         </div>
       </div>
@@ -718,7 +825,7 @@ export function PortfolioValueReport() {
               onChange={setSelectedAccountIds}
             />
             <DateRangeSelector
-              ranges={['1d', '1w', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']}
+              ranges={['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']}
               value={dateRange}
               onChange={handleRangeChange}
               activeColour="bg-emerald-600"

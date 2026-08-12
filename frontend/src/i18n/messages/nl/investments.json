@@ -123,6 +123,8 @@
     "lowestValue": "Laagste waarde",
     "change": "Wijziging",
     "changePercent": "Wijziging %",
+    "priorCloseTooltip": "Gemeten vanaf de slotkoers van de vorige handelsdag op {date}.",
+    "notAvailable": "N/A",
     "portfolioLabel": "Portefeuille:"
   },
   "transactionList": {

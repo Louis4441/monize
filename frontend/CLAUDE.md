@@ -352,6 +352,53 @@ scan can hold: neither file is wrong on its own. Changing a shared component's
 trigger element is a change to every call site, so the guard is what tells you
 which ones.
 
+### A short-range portfolio change is measured from the user's chosen baseline
+
+On `1d`, `1w` and `mtd` the Change and Change % can be measured from two
+different points, and which one is the user's `portfolioChangeBaseline`
+preference (Settings -> Preferences), not a constant: `previous_close` (the
+default) uses the close of the last trading day *before* the window, so a chart
+showing a week from Aug 5 measures from Aug 4 and includes Aug 5's own
+movement; `period_start` uses the first point plotted, which is the day's open
+on 1D. The longer ranges ignore the preference entirely -- their window opens
+on an arbitrary calendar date whose first point already *is* that day's close,
+so the two answers coincide.
+
+Both halves of that decision come from **one hook**,
+`hooks/usePortfolioChangeBaseline.ts`, which returns `usesPriorClose` and the
+`priorClose` together; the arithmetic and the range set live once in
+`components/investments/portfolio-change-baseline.ts`. The Investments-page
+chart and the Portfolio Value report both go through them, and a new surface
+showing the same figure must too, rather than reading the preference itself or
+subtracting `points[0]`. Reading the setting in one place and the close in
+another is the specific bug the single hook exists to prevent: while the two
+are out of step the card shows a prior-close number under a period-start
+setting, and nothing about it looks wrong.
+
+An absent preference takes the **default**, never the other option -- the
+figure must not flip as the preferences arrive, so
+`DEFAULT_PORTFOLIO_CHANGE_BASELINE` matches the column default in
+`database/schema.sql`.
+
+The baseline is looked up for the **first point on screen**, never for the
+requested window start: on a weekend or a holiday the 1D chart shows the last
+session rather than today, and the day before *that* is the close the change
+belongs to. A baseline that has not loaded, or could not be established, makes
+the change **unknown** -- both cards read N/A. It never falls back to the
+first-point change, which would put a different number under the same label.
+
+Relatedly, `mtd` is a chart range with no backend series of its own: its window
+is 1 to 31 days long, so it rides on the rolling 1M series and is trimmed to the
+month client-side. Both halves go through `portfolio-chart-utils.tsx` --
+`intradayRangeParam` before every intraday request, `trimIntradayPoints` on
+every response, including the sessionStorage-cached one and the per-security
+breakdown. Sending `mtd` verbatim is a 400 from `IntradayValueQueryDto`'s enum,
+which surfaces as the chart's generic "couldn't load" fallback and so reads as
+an outage rather than as a missing case; a response used untrimmed puts last
+month's bars in a month-to-date chart, where they can become its high or low.
+A guard test asserts every member of `INTRADAY_RANGES` maps onto a range the
+endpoint accepts, so a fourth one cannot be added without a mapping.
+
 ### An unknown value must not render as a measured zero
 
 The server goes to real trouble to send `null` rather than `0` for anything it
