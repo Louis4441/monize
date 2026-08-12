@@ -8,34 +8,85 @@ export interface MarketSession {
   closeTime: string;
 }
 
+/** An instant expressed as the wall clock of some zone. */
+export interface ZonedWallClock {
+  /** Calendar date in the zone, "YYYY-MM-DD". */
+  date: string;
+  /** Time of day in the zone, "HH:mm:ss". */
+  time: string;
+}
+
 /**
- * The wall-clock time an instant falls on in a given zone, as "HH:mm:ss".
+ * The calendar date and wall-clock time an instant falls on in a given zone.
  *
  * `en-GB` rather than the default locale so the hour is 24-hour and the parts
  * are stable; `hourCycle: "h23"` because `hour12: false` alone still yields
  * "24" for midnight in some engines, which is not a time Postgres accepts.
+ *
+ * Returns null for a zone the runtime cannot resolve rather than falling back
+ * to the server's own zone: a date derived from the wrong place is worse than
+ * no date, because nothing downstream can tell the two apart.
  */
-function localTimeOfDay(epochSeconds: number, timezone: string): string | null {
+export function zonedWallClock(
+  instant: Date,
+  timezone: string,
+): ZonedWallClock | null {
   try {
     const formatter = new Intl.DateTimeFormat("en-GB", {
       timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
       hourCycle: "h23",
     });
-    const parts = formatter.formatToParts(new Date(epochSeconds * 1000));
-    const hour = parts.find((p) => p.type === "hour")?.value;
-    const minute = parts.find((p) => p.type === "minute")?.value;
-    const second = parts.find((p) => p.type === "second")?.value;
-    if (!hour || !minute || !second) return null;
-    return `${hour}:${minute}:${second}`;
+    const parts = formatter.formatToParts(instant);
+    const at = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((p) => p.type === type)?.value;
+    const year = at("year");
+    const month = at("month");
+    const day = at("day");
+    const hour = at("hour");
+    const minute = at("minute");
+    const second = at("second");
+    if (!year || !month || !day || !hour || !minute || !second) return null;
+    return {
+      date: `${year}-${month}-${day}`,
+      time: `${hour}:${minute}:${second}`,
+    };
   } catch {
     // An unknown zone throws rather than falling back, which is the right
     // outcome: a session recorded against a zone we cannot resolve would be
     // read back as a time in the wrong place.
     return null;
   }
+}
+
+function localTimeOfDay(epochSeconds: number, timezone: string): string | null {
+  return zonedWallClock(new Date(epochSeconds * 1000), timezone)?.time ?? null;
+}
+
+/**
+ * The calendar day a daily bar belongs to, as UTC midnight.
+ *
+ * Providers stamp a daily bar with the instant its session opened, which lands
+ * on a different date in different zones -- 23:00 UTC is already tomorrow in
+ * Sydney. So the day is read in the exchange's own zone where the provider
+ * reports one, and in UTC otherwise; never in the server's local zone, which
+ * would make the stored `price_date` depend on where the container runs.
+ *
+ * The result is UTC midnight so `formatDateYMD` (UTC components) and every
+ * `toISOString().substring(0, 10)` in the price path yield that same day.
+ */
+export function barDate(epochSeconds: number, timezone?: string | null): Date {
+  const instant = new Date(epochSeconds * 1000);
+  const local = timezone ? zonedWallClock(instant, timezone) : null;
+  if (local) return new Date(`${local.date}T00:00:00.000Z`);
+  const utcMidnight = new Date(instant);
+  utcMidnight.setUTCHours(0, 0, 0, 0);
+  return utcMidnight;
 }
 
 /**

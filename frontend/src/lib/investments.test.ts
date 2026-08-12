@@ -216,9 +216,23 @@ describe('investmentsApi', () => {
     expect(apiClient.post).toHaveBeenCalledWith(
       '/securities/s-1/prices/backfill',
       undefined,
-      { timeout: 120_000 },
+      { timeout: 120_000, params: undefined },
     );
     expect(result.pricesLoaded).toBe(100);
+  });
+
+  // A range asks for a fixed window and drops the holding-period clip, so it
+  // has to reach the server as a query param rather than being dropped here.
+  it('backfillSecurityPrices forwards an explicit range', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { symbol: 'AAPL', success: true, pricesLoaded: 2500 },
+    });
+    await investmentsApi.backfillSecurityPrices('s-1', 'max');
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/securities/s-1/prices/backfill',
+      undefined,
+      { timeout: 120_000, params: { range: 'max' } },
+    );
   });
 
   it('getPriceStatus fetches /securities/prices/status', async () => {

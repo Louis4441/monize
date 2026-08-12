@@ -1,17 +1,7 @@
 import { netWorthApi } from '@/lib/net-worth';
 import { createLogger } from '@/lib/logger';
-import type { PortfolioChangeBaseline } from '@/types/investment';
 
 const logger = createLogger('PortfolioChangeBaseline');
-
-/**
- * What the change is measured from when the user has expressed no preference:
- * a stored value the client has not loaded yet, or an account predating the
- * column. Matches the column default in `database/schema.sql`, so the first
- * render and the server agree.
- */
-export const DEFAULT_PORTFOLIO_CHANGE_BASELINE: PortfolioChangeBaseline =
-  'previous_close';
 
 /**
  * Ranges whose "Change" is measured from the close of the last trading day
@@ -43,18 +33,14 @@ export const BASELINE_LOOKBACK_DAYS = 30;
 /**
  * Whether this chart measures its change from the prior trading day's close.
  *
- * Both halves have to hold: the range must be one where the two baselines
- * differ at all, and the user must not have chosen `period_start`. An absent
- * preference (still loading, or an account predating the column) takes the
- * default rather than the other option, so the answer never flips as the
- * preferences arrive.
+ * A property of the range and nothing else. This was briefly also a user
+ * preference (`portfolio_change_baseline`, migrations 152 and 153); it was
+ * removed because the answer every quote source gives for a daily move is the
+ * prior close, and offering the other one asked the user to adjudicate
+ * something with a right answer.
  */
-export function usesPriorCloseBaseline(
-  range: string,
-  preference?: PortfolioChangeBaseline | null,
-): boolean {
-  const setting = preference ?? DEFAULT_PORTFOLIO_CHANGE_BASELINE;
-  return setting === 'previous_close' && PRIOR_CLOSE_BASELINE_RANGES.has(range);
+export function usesPriorCloseBaseline(range: string): boolean {
+  return PRIOR_CLOSE_BASELINE_RANGES.has(range);
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

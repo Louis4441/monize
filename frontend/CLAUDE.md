@@ -352,33 +352,34 @@ scan can hold: neither file is wrong on its own. Changing a shared component's
 trigger element is a change to every call site, so the guard is what tells you
 which ones.
 
-### A short-range portfolio change is measured from the user's chosen baseline
+### A short-range portfolio change is measured from the prior close
 
-On `1d`, `1w` and `mtd` the Change and Change % can be measured from two
-different points, and which one is the user's `portfolioChangeBaseline`
-preference (Settings -> Preferences), not a constant: `previous_close` (the
-default) uses the close of the last trading day *before* the window, so a chart
-showing a week from Aug 5 measures from Aug 4 and includes Aug 5's own
-movement; `period_start` uses the first point plotted, which is the day's open
-on 1D. The longer ranges ignore the preference entirely -- their window opens
-on an arbitrary calendar date whose first point already *is* that day's close,
-so the two answers coincide.
+On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the
+last trading day *before* the window, so a chart showing a week from Aug 5
+measures from Aug 4 and includes Aug 5's own movement. That is the convention
+every quote source reports a daily move against. The longer ranges measure from
+their first point instead -- their window opens on a calendar date whose first
+point already *is* that day's close, so there is nothing earlier to reach for.
+Which ranges are which lives in `PRIOR_CLOSE_BASELINE_RANGES`.
 
-Both halves of that decision come from **one hook**,
+This was briefly a user preference (`portfolio_change_baseline`, added by
+migration 152 and dropped by 153). It was removed because the prior close is
+the right answer rather than a taste, and a settings row asking the user to
+adjudicate it made the figure harder to trust, not easier. `usesPriorCloseBaseline`
+now takes the range and nothing else; if you find yourself adding a second
+argument to it, the question to ask first is whether the alternative is
+actually defensible.
+
+Both halves of the decision come from **one hook**,
 `hooks/usePortfolioChangeBaseline.ts`, which returns `usesPriorClose` and the
 `priorClose` together; the arithmetic and the range set live once in
 `components/investments/portfolio-change-baseline.ts`. The Investments-page
 chart and the Portfolio Value report both go through them, and a new surface
-showing the same figure must too, rather than reading the preference itself or
-subtracting `points[0]`. Reading the setting in one place and the close in
-another is the specific bug the single hook exists to prevent: while the two
-are out of step the card shows a prior-close number under a period-start
-setting, and nothing about it looks wrong.
-
-An absent preference takes the **default**, never the other option -- the
-figure must not flip as the preferences arrive, so
-`DEFAULT_PORTFOLIO_CHANGE_BASELINE` matches the column default in
-`database/schema.sql`.
+showing the same figure must too, rather than deciding for itself or
+subtracting `points[0]`. Deciding *whether* a prior close applies in one place
+and reading the close in another is the specific bug the single hook prevents:
+while the two are out of step the card shows one under the rules of the other,
+and nothing about it looks wrong.
 
 The baseline is looked up for the **first point on screen**, never for the
 requested window start: on a weekend or a holiday the 1D chart shows the last
@@ -386,6 +387,54 @@ session rather than today, and the day before *that* is the close the change
 belongs to. A baseline that has not loaded, or could not be established, makes
 the change **unknown** -- both cards read N/A. It never falls back to the
 first-point change, which would put a different number under the same label.
+
+### The window a price chart requests is not the period its range names
+
+`resolveRangePreset` answers "what period is the user asking about", and ten
+reports depend on that answer -- a spending report's 3M window must not quietly
+start a day early. A *price* chart asks a narrower question: **which close is
+the series measured from**, so the figure beside it matches what every other
+quote source reports for the same period. Those are different questions, so
+they have different functions:
+`components/investments/portfolio-range-window.ts` holds the second one as a
+table (`PORTFOLIO_WINDOW_STARTS`), and the Portfolio Value report, the
+Investments chart and the dashboard widget all resolve through
+`usePortfolioRangeWindow`. Do not reach for `resolveRangePreset` directly in a
+fourth portfolio surface, and do not "fix" a range by editing the shared
+resolver.
+
+The rules are not uniform, and that is the point -- each was set to match the
+platform being compared against, not derived from a principle:
+
+- **3M, 6M, 1Y, 2Y, 5Y** open on the calendar day *before* the period, so 1Y on
+  12 Aug 2026 opens on 11 Aug 2025. A rule naming an exact day ignores month
+  alignment, and 2Y follows the calendar rather than a 730-day count, which
+  differ in any window containing a leap day.
+- **YTD** opens on the year's first *trading* day. The daily series values every
+  calendar day at the latest close at or before it, so 1 January plots
+  December's close and a market holiday is indistinguishable from a flat
+  session there. `netWorthApi.getFirstPricedDay` answers it from
+  `security_prices`, whose rows exist only for days a price was struck. A null
+  answer is unknown, not "1 January is a trading day": the window keeps its
+  calendar boundary rather than claiming a trading day nobody observed.
+- **1M** keeps its window and collapses its first *day* to that day's close
+  (`trimIntradayToFirstDayClose`), because it is an intraday chart and opening
+  partway through the session a month ago mixes a mid-session price into a
+  series of closes. 1D deliberately still opens at the open; 1W and MTD are
+  measured from the prior close already, so collapsing their first day would
+  only throw away detail.
+
+Both intraday adjustments live inside `trimIntradayPoints`, which every
+intraday render site already calls -- a shaping step applied at three of four
+call sites is a chart that disagrees with itself depending on which path drew
+it.
+
+**A range served monthly cannot honour a day-precision rule.** 2Y and 5Y use
+month buckets on the report and the widget, so their first point is a
+month-end close and moving the window by a day changes nothing visible. Switch
+the range to daily if the exact opening close matters; do not prepend a single
+daily point to a monthly series, which is the sampling splice
+`docs/time-series-contract.md` section 1.2 exists to stop.
 
 Relatedly, `mtd` is a chart range with no backend series of its own: its window
 is 1 to 31 days long, so it rides on the rolling 1M series and is trimmed to the

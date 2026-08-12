@@ -45,6 +45,24 @@ export const netWorthApi = {
     return response.data;
   },
 
+  /**
+   * The first day on or after `onOrAfter` on which anything held was actually
+   * priced — a trading day for this portfolio, which the daily series cannot
+   * report because it values every calendar day from the last close at or
+   * before it. `date` is null when the scope holds nothing priced; the caller
+   * keeps its calendar boundary rather than inventing a trading day.
+   */
+  getFirstPricedDay: async (params: {
+    onOrAfter: string;
+    accountIds?: string;
+  }): Promise<{ date: string | null }> => {
+    const response = await apiClient.get<{ date: string | null }>(
+      '/net-worth/investments-first-priced-day',
+      { params },
+    );
+    return response.data;
+  },
+
   getInvestmentsBreakdown: async (params: {
     granularity: InvestmentBreakdownGranularity;
     startDate?: string;

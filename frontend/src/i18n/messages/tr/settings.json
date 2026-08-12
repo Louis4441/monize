@@ -131,12 +131,6 @@
     "timeFormatLabel": "Saat Biçimi",
     "recentTransactionsLabel": "Hızlı doldurma için son işlemler",
     "recentTransactionsHelp": "İşlem formlarında Alacaklı alanı yanındaki geçmiş düğmesi açılır penceresinde gösterilen kayıt sayısı.",
-    "portfolioChangeBaselineLabel": "Portföy değişimi şuna göre ölçülür",
-    "portfolioChangeBaselineHelp": "1D, 1W ve MTD portföy grafiklerindeki Değişim değerleri için geçerlidir. Daha uzun aralıklar her zaman ilk noktalarına göre ölçülür.",
-    "portfolioChangeBaselineOptions": {
-      "previousClose": "Bir önceki işlem gününün kapanışı",
-      "periodStart": "Dönemin başlangıcı (1D için günün açılışı)"
-    },
     "saveButton": "Tercihleri Kaydet",
     "savingButton": "Kaydediliyor...",
     "toasts": {

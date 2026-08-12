@@ -497,10 +497,13 @@ describe('InvestmentValueChart', () => {
       expect(card('Change')).not.toContain('$1000.00');
     });
 
-    it('measures from the first point when the user chose the period start', async () => {
-      usePreferencesStore.setState({
-        preferences: { portfolioChangeBaseline: 'period_start' } as never,
-      });
+    /**
+     * The period-start alternative was a user preference
+     * (`portfolio_change_baseline`, migration 152, dropped by 153). With it
+     * gone, a prior-close range always looks the close up -- there is no
+     * stored setting that can turn it off.
+     */
+    it('always uses the prior close on a short range', async () => {
       dateRangeState.dateRange = '1w';
       dateRangeState.resolvedRange = { start: '2024-01-08', end: '2024-01-15' };
       vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
@@ -515,22 +518,45 @@ describe('InvestmentValueChart', () => {
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
 
-      await waitFor(() => expect(card('Change')).toContain('+$1000.00'));
-      expect(card('Change')).not.toContain('+$2000.00');
-      // The setting is off, so the baseline is not even fetched.
-      expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
+      // From 9000, not from the 10000 first point.
+      await waitFor(() => expect(card('Change')).toContain('+$2000.00'));
+      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalled();
     });
 
     it('still measures a long range from the first point plotted', async () => {
-      // 1y: the window opens on an arbitrary calendar date, and its first
-      // point already is that day's close.
+      // 1y: its first point already is a close, so no separate baseline
+      // request is made. The window's own start comes from the portfolio
+      // rule rather than from useDateRange -- pinned in the test below, and
+      // exhaustively in portfolio-range-window.test.ts.
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
       await waitFor(() => expect(card('Change')).toContain('+$5000.00'));
       // One call, for the chart itself -- no baseline lookup.
       expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1);
       expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-        expect.objectContaining({ startDate: '2023-01-01', endDate: '2024-01-01' }),
+        expect.objectContaining({ endDate: '2024-01-01' }),
+      );
+    });
+
+    /**
+     * The window a price chart requests is not the period the range names: 1Y
+     * opens on the close of the day *before* the anniversary, so on
+     * 12 Aug 2026 the first point is 11 Aug 2025. The clock is pinned because
+     * otherwise this is a test about the day it ran.
+     */
+    it('opens 1Y on the day before the anniversary, not on useDateRange start', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2026, 7, 12));
+      try {
+        render(<InvestmentValueChart />);
+        await vi.waitFor(() =>
+          expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalled(),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: '2025-08-11' }),
       );
     });
   });

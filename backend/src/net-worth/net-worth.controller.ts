@@ -239,6 +239,56 @@ export class NetWorthController {
     );
   }
 
+  @Get("investments-first-priced-day")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  @ApiOperation({
+    summary:
+      "First day on or after a date on which any held security has a price",
+    description:
+      "A trading day for this portfolio, as opposed to a calendar day. The daily series values every calendar day from the last close at or before it, so it cannot distinguish a market holiday from a flat session; this can. Returns date: null when the scope holds nothing priced.",
+  })
+  @ApiQuery({ name: "onOrAfter", required: true, example: "2026-01-01" })
+  @ApiQuery({
+    name: "accountIds",
+    required: false,
+    description: "Comma-separated account IDs to filter by",
+  })
+  @ApiResponse({ status: 200, description: "First priced day, or null" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getFirstPricedDay(
+    @Request() req,
+    @Query("onOrAfter") onOrAfter?: string,
+    @Query("accountIds") accountIds?: string,
+  ): Promise<{ date: string | null }> {
+    const from = assertStringParam(onOrAfter, "onOrAfter");
+    const aIds = assertStringParam(accountIds, "accountIds");
+    if (!from || !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+      throw new BadRequestException(
+        tr("errors.netWorth.invalidStartDate", "onOrAfter must be YYYY-MM-DD"),
+      );
+    }
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const ids = aIds ? aIds.split(",").filter(Boolean) : undefined;
+    if (ids) {
+      for (const id of ids) {
+        if (!uuidRegex.test(id))
+          throw new BadRequestException(
+            tr(
+              "errors.netWorth.invalidAccountIds",
+              "accountIds must be comma-separated UUIDs",
+            ),
+          );
+      }
+    }
+    return this.netWorthService.getFirstPricedDay(
+      req.user.id,
+      from,
+      await this.scopeIds(req, ids),
+    );
+  }
+
   @Get("investments-breakdown")
   @AllowDelegate()
   @DelegateRequiresSection("investments")

@@ -27,18 +27,76 @@ export function intradayRangeParam(range: string): '1d' | '1w' | '1m' {
 }
 
 /**
- * Trim an intraday series to the window the chart actually shows. Only MTD
- * needs it -- it is served a rolling month that reaches back into the previous
- * one -- and `windowStart` is a YYYY-MM-DD date compared against the ISO
- * timestamps' own prefix, so no parsing is involved.
+ * Shape an intraday series into the one the chart shows.
+ *
+ * Two adjustments, both keyed off the range and neither optional:
+ *
+ * - **MTD is trimmed to its window.** It is served a rolling month that reaches
+ *   back into the previous one. `windowStart` is a YYYY-MM-DD date compared
+ *   against the ISO timestamps' own prefix, so no parsing is involved.
+ * - **1M opens at its first day's close** (see
+ *   {@link trimIntradayToFirstDayClose}).
+ *
+ * They live in one function because every intraday render site calls this one,
+ * and a shaping step applied at three of four call sites is a chart that
+ * disagrees with itself depending on which code path drew it.
  */
 export function trimIntradayPoints<T extends { timestamp: string }>(
   points: T[],
   range: string,
   windowStart: string,
 ): T[] {
-  if (range !== 'mtd' || !windowStart) return points;
-  return points.filter((p) => p.timestamp >= windowStart);
+  const windowed =
+    range === 'mtd' && windowStart
+      ? points.filter((p) => p.timestamp >= windowStart)
+      : points;
+  return trimIntradayToFirstDayClose(windowed, range);
+}
+
+/**
+ * Ranges whose intraday series opens at the *close* of its first day rather
+ * than partway through it.
+ *
+ * A 1D chart starts at the day's open, which is what every quote source shows
+ * and what `IntradayPoint.open` exists to supply. A 1M chart is a different
+ * claim: the month is measured from a close, so opening on the first bar of the
+ * day a month ago mixes a mid-session price into a series of closes and reports
+ * a change that includes part of a session nobody asked about.
+ *
+ * 1W and MTD are absent deliberately -- both are measured from the prior close
+ * already (`PRIOR_CLOSE_BASELINE_RANGES`), so their first bar is not the
+ * baseline and collapsing it would only throw away detail.
+ */
+const FIRST_DAY_CLOSE_RANGES = new Set(['1m']);
+
+/**
+ * Drop the first day's intraday bars except its last, so the series begins at
+ * that day's closing price.
+ *
+ * Left alone when the whole series is one day: collapsing it would leave a
+ * single point and no chart. The last bar of a completed session is its close;
+ * for a session still open it is the latest price, which is the best available
+ * answer and the same one every other point in the series carries.
+ */
+export function trimIntradayToFirstDayClose<T extends { timestamp: string }>(
+  points: T[],
+  range: string,
+): T[] {
+  if (!FIRST_DAY_CLOSE_RANGES.has(range) || points.length === 0) return points;
+  const firstDay = points[0].timestamp.slice(0, 10);
+  let lastOfFirstDay = 0;
+  while (
+    lastOfFirstDay + 1 < points.length &&
+    points[lastOfFirstDay + 1].timestamp.slice(0, 10) === firstDay
+  ) {
+    lastOfFirstDay += 1;
+  }
+  // Every point is on the first day: one day of data, nothing to trim against.
+  if (lastOfFirstDay === points.length - 1) return points;
+  // Already the day's only bar. Returning the same reference keeps this a
+  // no-op for callers that compare identity to decide whether to re-render.
+  if (lastOfFirstDay === 0) return points;
+  return points.slice(lastOfFirstDay);
 }
 
 /**

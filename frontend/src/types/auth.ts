@@ -1,5 +1,4 @@
 import type { ColorTheme } from '@/lib/color-themes';
-import type { PortfolioChangeBaseline } from '@/types/investment';
 
 /**
  * The acting-context profile (`GET /auth/profile`, `GET /users/me`). While a
@@ -158,11 +157,6 @@ export interface UserPreferences {
   timeFormat: '24h' | '12h';
   preferredExchanges: string[];
   defaultQuoteProvider: 'yahoo' | 'msn';
-  /**
-   * What the Portfolio Value chart's Change / Change % measure from on the
-   * short ranges (1D, 1W, MTD). See `PortfolioChangeBaseline`.
-   */
-  portfolioChangeBaseline: PortfolioChangeBaseline;
   recentTransactionsLimit: number;
   aiBubbleEnabled: boolean;
   showWhatsNew: boolean;
@@ -246,7 +240,6 @@ export interface UpdatePreferencesData {
   timeFormat?: '24h' | '12h';
   preferredExchanges?: string[];
   defaultQuoteProvider?: 'yahoo' | 'msn';
-  portfolioChangeBaseline?: PortfolioChangeBaseline;
   recentTransactionsLimit?: number;
   aiBubbleEnabled?: boolean;
   showWhatsNew?: boolean;

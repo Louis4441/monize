@@ -940,10 +940,12 @@ describe('PortfolioValueReport', () => {
       expect(card('Period Change')).not.toContain('$1000');
     });
 
-    it('measures from the first point when the user chose the period start', async () => {
-      usePreferencesStore.setState({
-        preferences: { portfolioChangeBaseline: 'period_start' } as never,
-      });
+    /**
+     * The period-start alternative was a user preference
+     * (`portfolio_change_baseline`, migration 152, dropped by 153). With it
+     * gone, a prior-close range always looks the close up.
+     */
+    it('always uses the prior close on a short range', async () => {
       mockDateRangeValue = '1w';
       mockGetIntradayValue.mockResolvedValue({
         points: [
@@ -967,10 +969,9 @@ describe('PortfolioValueReport', () => {
         expect(screen.getByText('Period Change')).toBeInTheDocument();
       });
 
-      await waitFor(() => expect(card('Period Change')).toContain('+$1000'));
-      expect(card('Period Change')).not.toContain('+$2000');
-      // The setting is off, so the baseline is not even fetched.
-      expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
+      // From 49000, not from the 50000 first point.
+      await waitFor(() => expect(card('Period Change')).toContain('+$2000'));
+      expect(mockGetInvestmentsDaily).toHaveBeenCalled();
     });
 
     it('still measures a long range from the first point plotted', async () => {

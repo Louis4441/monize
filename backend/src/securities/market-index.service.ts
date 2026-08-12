@@ -17,6 +17,10 @@ import {
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { HistoricalPrice } from "./providers/quote-provider.interface";
 import {
+  MAX_DAILY_GAP_DAYS,
+  medianGapDays,
+} from "./providers/daily-spacing.util";
+import {
   MARKET_INDEXES,
   MarketIndexDefinition,
   marketIndexByCode,
@@ -90,41 +94,11 @@ const FALLBACK_HISTORY_YEARS = 10;
  */
 const FETCH_CHUNK_DAYS = 365;
 
-/**
- * The widest median spacing a response may have and still be a daily series.
- *
- * Daily closes sit one day apart with a three-day step over a weekend, so the
- * median is 1; weekly bars give 7 and monthly about 30. Four separates them
- * with room to spare.
- */
-const MAX_DAILY_GAP_DAYS = 4;
-
 /** ISO date `years` from `date`. */
 function withYears(date: string, years: number): string {
   const shifted = new Date(`${date}T00:00:00Z`);
   shifted.setUTCFullYear(shifted.getUTCFullYear() + years);
   return shifted.toISOString().slice(0, 10);
-}
-
-/**
- * Median whole days between consecutive observations, or null when there are
- * fewer than two. The median rather than the mean: one long exchange closure
- * must not make a daily series look weekly.
- */
-function medianGapDays(dates: readonly Date[]): number | null {
-  if (dates.length < 2) return null;
-  const ordered = [...dates].sort((a, b) => a.getTime() - b.getTime());
-  const gaps: number[] = [];
-  for (let i = 1; i < ordered.length; i += 1) {
-    gaps.push(
-      Math.round(
-        (ordered[i].getTime() - ordered[i - 1].getTime()) / 86_400_000,
-      ),
-    );
-  }
-  gaps.sort((a, b) => a - b);
-  const mid = Math.floor(gaps.length / 2);
-  return gaps.length % 2 === 0 ? (gaps[mid - 1] + gaps[mid]) / 2 : gaps[mid];
 }
 
 interface UpsertRow {

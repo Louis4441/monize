@@ -30,6 +30,73 @@ handling.
   ever traded. Decide once per instrument over the window being read: adjusted
   rows only where any exist, raw throughout where none do, never both.
 
+### 1.1 A quote is provisional; a daily bar is the day
+
+A live quote and a daily bar answer different questions, and only one of them
+is what a daily price series holds. `regularMarketPrice` is the last print at
+the instant it was asked for -- true about that instant, and false about the
+day: it is not the close, its volume is a running total, and its high and low
+are only the extremes reached so far. The provider's daily bar is the finished
+session, and it is the only thing carrying an **adjusted** close at all.
+
+So a row written from a quote during the session is *provisional*, and the
+closing job's obligation is to come back for the bar once the session has
+ended. Two rules follow, and both were broken at once:
+
+- **Never let "a price exists for today" stand in for "the day is settled".**
+  The closing refresh skipped any security already carrying a provider-written
+  row for the day, which is exactly what an intraday refresh leaves behind --
+  so the stored close was whichever mid-session quote happened to be last, on
+  every day the user had the app open. The predicate is whether the *session*
+  has ended (`isSessionSettled`, evaluated on the market's own clock in the
+  market's own zone), not whether a row is present.
+- **A column only one writer populates is a column that is usually empty.**
+  `adjusted_close` was written by the historical backfill and by nothing else,
+  and the backfill runs on demand -- so every row the daily job wrote left it
+  null. Combined with the per-series basis rule above, that is worse than a
+  gap: `bool_or(adjusted_close IS NOT NULL)` is true because the backfilled
+  rows have it, so the unadjusted rows are *dropped*, and a series silently
+  ends at the last backfill instead of at the last trading day. A column a
+  calculation depends on needs a writer on the recurring path, not only on the
+  manual one.
+
+The newest session is the one case where a writer with no adjusted close of
+its own may still supply one: **the adjustment factor of the latest bar is 1**,
+because nothing has gone ex after it, which is why a provider reports its last
+bar's adjusted close as equal to its close. So the quote path fills
+`adjusted_close` with the close it is already writing, and today is in the
+series from the first intraday refresh rather than from the evening's
+settlement. Two conditions on that, both enforced in the statement rather than
+by convention:
+
+- **Only where the series already carries an adjusted close.** Completing a
+  basis is not the same as changing one. A provider that supplies none (MSN)
+  leaves a series raw throughout, which is consistent and complete; one
+  inferred adjusted row flips `bool_or(...)` and collapses that entire series
+  to that single row -- a worse failure than the gap being fixed.
+- **Only for the session the quote is for.** The inference is about the newest
+  bar and nothing else. A price for an arbitrary past date -- a manual entry, a
+  transaction-derived price -- has an adjustment factor we do not know, and
+  must not pretend to. Such a row stays out of the adjusted series, which is
+  the correct answer to "what was this worth, adjusted?" when nobody knows.
+
+### 1.2 A coarser series is not a sparser one
+
+A provider asked for a long range may answer with weekly or monthly bars. Stored
+into a daily table they are indistinguishable from daily rows, and they
+overwrite whatever real daily rows sat on those dates -- so a payload nobody
+checked corrupts more than it adds. **Check the median spacing of every provider
+payload before storing it, and refuse one coarser than daily** rather than
+storing it as though it were daily (`assertDailySeries`; the median, not the
+mean, so one long exchange closure does not disqualify a daily series).
+
+This compounds with the basis rule above in a way worth stating plainly, because
+it is how the defect stayed invisible: the monthly rows arrived *with* adjusted
+closes and the daily rows around them had none, so `bool_or(...)` was true and
+the adjusted-only filter kept the twelve monthly points and discarded the ~250
+daily ones. The window did not look empty or wrong -- it looked like a monthly
+series, which is a perfectly plausible thing for a chart to be showing.
+
 ## 2. Quote age and period boundaries
 
 - A price used to value a period boundary (period start, period end, or

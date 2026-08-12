@@ -667,7 +667,6 @@ describe("UsersService", () => {
       ["showCreatedAt", true],
       ["timeFormat", "24h"],
       ["defaultQuoteProvider", "yahoo"],
-      ["portfolioChangeBaseline", "period_start"],
       ["recentTransactionsLimit", 25],
       ["language", "fr"],
       ["colorTheme", "latte"],

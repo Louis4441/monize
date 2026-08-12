@@ -2344,6 +2344,77 @@ describe("NetWorthService", () => {
     });
   });
 
+  /**
+   * A YTD chart opens on the first *trading* day of the year, which
+   * `getDailyInvestments` cannot report: it values every calendar day at the
+   * latest close at or before it, so 1 January carries December's close and a
+   * market holiday is indistinguishable from a flat session. `security_prices`
+   * rows exist only for days a price was struck, which is why the question is
+   * answerable here.
+   */
+  describe("getFirstPricedDay", () => {
+    it("returns the earliest priced day on or after the date", async () => {
+      reportQuery.mockResolvedValueOnce([{ date: "2026-01-02" }]);
+
+      const result = await service.getFirstPricedDay("user-1", "2026-01-01");
+
+      expect(result).toEqual({ date: "2026-01-02" });
+      const [sql, params] = reportQuery.mock.calls[0];
+      expect(sql).toContain("MIN(sp.price_date)");
+      expect(sql).toContain("FROM security_prices sp");
+      expect(params).toEqual(["user-1", "2026-01-01"]);
+    });
+
+    /**
+     * Unknown, never a substituted date: the caller keeps the calendar
+     * boundary it already had rather than a chart claiming a trading day
+     * nobody observed.
+     */
+    it("returns null when nothing in scope was priced", async () => {
+      reportQuery.mockResolvedValueOnce([{ date: null }]);
+
+      expect(await service.getFirstPricedDay("user-1", "2026-01-01")).toEqual({
+        date: null,
+      });
+    });
+
+    it("returns null when the aggregate produced no row at all", async () => {
+      reportQuery.mockResolvedValueOnce([]);
+
+      expect(await service.getFirstPricedDay("user-1", "2026-01-01")).toEqual({
+        date: null,
+      });
+    });
+
+    it("restricts to the requested accounts, parameterized", async () => {
+      reportQuery.mockResolvedValueOnce([{ date: "2026-01-05" }]);
+
+      await service.getFirstPricedDay("user-1", "2026-01-01", [
+        "acct-1",
+        "acct-2",
+      ]);
+
+      const [sql, params] = reportQuery.mock.calls[0];
+      expect(sql).toContain("AND a.id IN ($3, $4)");
+      expect(params).toEqual(["user-1", "2026-01-01", "acct-1", "acct-2"]);
+    });
+
+    /**
+     * A security sold years ago still has prices, and its later prices are not
+     * this portfolio's trading days. The holdings filter is on the transaction
+     * date so the answer describes what the scope actually held.
+     */
+    it("only considers securities transacted on or before the date", async () => {
+      reportQuery.mockResolvedValueOnce([{ date: "2026-01-02" }]);
+
+      await service.getFirstPricedDay("user-1", "2026-01-01");
+
+      expect(reportQuery.mock.calls[0][0]).toContain(
+        "it.transaction_date <= $2::DATE",
+      );
+    });
+  });
+
   describe("getDailyInvestments", () => {
     it("returns empty array when no accounts match", async () => {
       prefRepository.findOne.mockResolvedValue({

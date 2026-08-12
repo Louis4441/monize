@@ -58,6 +58,7 @@ describe("SecurityPriceService", () => {
       highPrice: (row.highPrice as number) ?? null,
       lowPrice: (row.lowPrice as number) ?? null,
       closePrice: row.closePrice as number,
+      adjustedClose: (row.adjustedClose as number) ?? null,
       volume: (row.volume as number) ?? null,
       source: (row.source as string) ?? "yahoo_finance",
       quotedAt: (row.quotedAt as Date) ?? null,
@@ -77,6 +78,7 @@ describe("SecurityPriceService", () => {
     highPrice: number | null;
     lowPrice: number | null;
     closePrice: number;
+    adjustedClose: number | null;
     volume: number | null;
     source: string;
     quotedAt: Date | null;
@@ -169,6 +171,10 @@ describe("SecurityPriceService", () => {
     chart: {
       result: [
         {
+          meta: {
+            exchangeTimezoneName:
+              overrides.exchangeTimezone ?? "America/New_York",
+          },
           timestamp: overrides.timestamps ?? [1748700000, 1748800000],
           indicators: {
             quote: [
@@ -180,6 +186,9 @@ describe("SecurityPriceService", () => {
                 volume: overrides.volumes ?? [50000000, 51000000],
               },
             ],
+            ...(overrides.adjcloses
+              ? { adjclose: [{ adjclose: overrides.adjcloses }] }
+              : {}),
           },
         },
       ],
@@ -200,10 +209,31 @@ describe("SecurityPriceService", () => {
       // Default: answer a by-id read (the price upsert's read-back) from the
       // rows the upsert recorded. Tests that care about a specific stored row
       // still override this with `mockResolvedValue`.
-      findOne: jest.fn(async ({ where }: { where?: { id?: number } } = {}) =>
-        where?.id === undefined
-          ? null
-          : (upsertedPrices.find((row) => row.id === where.id) ?? null),
+      findOne: jest.fn(
+        async ({
+          where,
+        }: {
+          where?: { id?: number; securityId?: string; priceDate?: string };
+        } = {}) => {
+          if (where?.id !== undefined) {
+            return upsertedPrices.find((row) => row.id === where.id) ?? null;
+          }
+          // The read-back the write path falls to when its `DO UPDATE` was
+          // refused, so the refusal returns the row that won.
+          if (
+            where?.securityId !== undefined &&
+            where?.priceDate !== undefined
+          ) {
+            return (
+              upsertedPrices.find(
+                (row) =>
+                  row.securityId === where.securityId &&
+                  row.priceDate === where.priceDate,
+              ) ?? null
+            );
+          }
+          return null;
+        },
       ),
       find: jest.fn(),
       create: jest.fn().mockImplementation((data) => ({ ...data, id: 1 })),
@@ -291,6 +321,17 @@ describe("SecurityPriceService", () => {
             (row) =>
               row.securityId === securityId && row.priceDate === priceDate,
           );
+          // `WHERE security_prices.source IS DISTINCT FROM 'manual'` on the
+          // `DO UPDATE`: a manual correction refuses the write and the
+          // statement returns no row.
+          if (previous?.source === "manual") return [];
+          // The statement's `CASE WHEN EXISTS (... adjusted_close IS NOT NULL)`:
+          // the close doubles as the adjusted close only for a series that is
+          // already on the adjusted basis.
+          const seriesIsAdjusted = upsertedPrices.some(
+            (row) =>
+              row.securityId === securityId && row.adjustedClose !== null,
+          );
           // `COALESCE(EXCLUDED.x, security_prices.x)` in the statement: a value
           // the quote did not supply keeps whatever is stored.
           const row = {
@@ -305,6 +346,9 @@ describe("SecurityPriceService", () => {
               | null,
             lowPrice: (lowPrice ?? previous?.lowPrice ?? null) as number | null,
             closePrice: closePrice as number,
+            adjustedClose: (seriesIsAdjusted
+              ? (closePrice as number)
+              : null) as number | null,
             volume: (volume ?? previous?.volume ?? null) as number | null,
             source: (source ?? "manual") as string,
             quotedAt: (quotedAt ?? previous?.quotedAt ?? null) as Date | null,
@@ -599,49 +643,6 @@ describe("SecurityPriceService", () => {
       expect(result.skipped).toBe(0);
       expect(result.results).toHaveLength(0);
       expect(result.lastUpdated).toBeInstanceOf(Date);
-    });
-
-    it("skips securities that already have a price for today when skipFresh is set", async () => {
-      securitiesRepository.find.mockResolvedValue([mockSecurity]);
-      // staleness query reports this security as already fresh today
-      dataSourceMock.query.mockResolvedValueOnce([
-        { security_id: mockSecurity.id },
-      ]);
-      global.fetch = jest.fn() as jest.Mock;
-
-      const result = await service.refreshAllPrices(true);
-
-      expect(result.totalSecurities).toBe(1);
-      expect(result.skipped).toBe(1);
-      expect(result.updated).toBe(0);
-      expect(result.results).toHaveLength(0);
-      // no external fetch when everything is already fresh
-      expect(global.fetch).not.toHaveBeenCalled();
-      // the freshness query must exclude manually-entered prices so a manual
-      // intraday entry does not suppress the official close fetch
-      expect(dataSourceMock.query).toHaveBeenCalledWith(
-        expect.stringContaining("source IS DISTINCT FROM 'manual'"),
-        expect.any(Array),
-      );
-    });
-
-    it("does not consult the freshness query on an on-demand refresh (skipFresh=false)", async () => {
-      securitiesRepository.find.mockResolvedValue([mockSecurity]);
-      const yahooData = makeYahooChartResponse();
-      global.fetch = jest
-        .fn()
-        .mockResolvedValue(createMockFetchResponse(yahooData)) as jest.Mock;
-
-      const result = await service.refreshAllPrices();
-
-      // Default (on-demand) path refreshes everything and never runs the
-      // DISTINCT-security freshness query.
-      expect(result.skipped).toBe(0);
-      expect(result.updated).toBe(1);
-      expect(dataSourceMock.query).not.toHaveBeenCalledWith(
-        expect.stringContaining("source IS DISTINCT FROM 'manual'"),
-        expect.any(Array),
-      );
     });
 
     it("successfully refreshes prices for a US security", async () => {
@@ -1840,6 +1841,388 @@ describe("SecurityPriceService", () => {
     });
   });
 
+  describe("settleDailyBars", () => {
+    const DAY_SECONDS = 24 * 60 * 60;
+
+    /** The bulk historical upsert the settlement pass issues, if any. */
+    function bulkUpsertCall(): [string, unknown[]] | undefined {
+      return dataSourceMock.query.mock.calls.find(
+        (call: unknown[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("INSERT INTO security_prices") &&
+          call[0].includes("adjusted_close"),
+      ) as [string, unknown[]] | undefined;
+    }
+
+    beforeEach(() => {
+      dataSourceMock.query.mockResolvedValue(undefined);
+    });
+
+    it("stores the adjusted close the daily bar carries", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: [
+              nowSeconds - 3 * DAY_SECONDS,
+              nowSeconds - 2 * DAY_SECONDS,
+            ],
+            closes: [193.0, 194.0],
+            adjcloses: [192.4, 193.4],
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(result.barsSettled).toBe(2);
+      const call = bulkUpsertCall();
+      expect(call).toBeDefined();
+      // Nine params per bar; the adjusted close is the seventh.
+      const params = call![1];
+      expect(params[6]).toBe(192.4);
+      expect(params[15]).toBe(193.4);
+    });
+
+    /**
+     * A bar for a session that has not finished is the same provisional
+     * half-day the intraday quote already stored, so writing it as the day's
+     * bar would launder a quote into a close. A date in the future is
+     * unsettled under every timezone rule, which keeps the case independent of
+     * the clock the suite happens to run on.
+     */
+    it("does not settle a bar whose session has not ended", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: [
+              nowSeconds - 2 * DAY_SECONDS,
+              nowSeconds + 2 * DAY_SECONDS,
+            ],
+            closes: [193.0, 194.0],
+            adjcloses: [192.4, 193.4],
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(result.barsSettled).toBe(1);
+      const params = bulkUpsertCall()![1];
+      expect(params).toHaveLength(9);
+      expect(params[5]).toBe(193.0);
+    });
+
+    it("reads a bounded recent window rather than the full history", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(makeYahooHistoricalResponse()),
+        ) as jest.Mock;
+
+      await service.settleDailyBars();
+
+      expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain(
+        "range=1mo",
+      );
+    });
+
+    it("counts a provider that returns nothing as a failure, not a settlement", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse({ chart: { result: [] } }),
+        ) as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(result.failed).toBe(1);
+      expect(result.barsSettled).toBe(0);
+      expect(bulkUpsertCall()).toBeUndefined();
+    });
+
+    it("skips securities flagged to skip price updates", async () => {
+      securitiesRepository.find.mockResolvedValue([
+        { ...mockSecurity, skipPriceUpdates: true, quoteProvider: null },
+      ]);
+      global.fetch = jest.fn() as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(result.totalSecurities).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("runs under a system context: prices are global, not the caller's", async () => {
+      let ctx: ReturnType<typeof getRequestContext>;
+      securitiesRepository.find.mockImplementation(() => {
+        ctx = getRequestContext();
+        return Promise.resolve([]);
+      });
+
+      await requestContextStorage.run({ userId: "admin-1" }, () =>
+        service.settleDailyBars(),
+      );
+
+      expect(ctx).toMatchObject({ system: true });
+      expect(ctx).not.toHaveProperty("userId");
+    });
+
+    /**
+     * A manual price is a correction the user typed. Before this the backfill's
+     * `DO UPDATE` overwrote every column unconditionally, so the settlement
+     * pass would have undone those corrections nightly.
+     */
+    it("leaves a manually entered price alone", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: [nowSeconds - 2 * DAY_SECONDS],
+            closes: [193.0],
+          }),
+        ),
+      ) as jest.Mock;
+
+      await service.settleDailyBars();
+
+      expect(bulkUpsertCall()![0]).toContain(
+        "WHERE security_prices.source IS DISTINCT FROM 'manual'",
+      );
+    });
+
+    /**
+     * A daily bar is a session, not an instant. Leaving the timestamp of the
+     * intraday quote these numbers replaced would describe the row as a quote
+     * struck at 14:42 whose close is the official one -- two claims that
+     * cannot both be true.
+     */
+    it("clears the quote timestamp it supersedes", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: [nowSeconds - 2 * DAY_SECONDS],
+            closes: [193.0],
+          }),
+        ),
+      ) as jest.Mock;
+
+      await service.settleDailyBars();
+
+      expect(bulkUpsertCall()![0]).toContain("quoted_at = NULL");
+    });
+  });
+
+  describe("a coarser-than-daily payload is refused, not spliced", () => {
+    const DAY = 24 * 60 * 60;
+
+    /** `count` bars `stepDays` apart, ending a week ago so all are settled. */
+    function timestamps(count: number, stepDays: number): number[] {
+      const end = Math.floor(Date.now() / 1000) - 7 * DAY;
+      return Array.from(
+        { length: count },
+        (_, i) => end - (count - 1 - i) * stepDays * DAY,
+      );
+    }
+
+    function bulkUpsertCalls(): unknown[][] {
+      return dataSourceMock.query.mock.calls.filter(
+        (call: unknown[]) =>
+          typeof call[0] === "string" && call[0].includes("adjusted_close"),
+      );
+    }
+
+    beforeEach(() => {
+      dataSourceMock.query.mockResolvedValue(undefined);
+    });
+
+    /**
+     * The defect this catches, seen in production data: six years of one
+     * adjusted row per month spliced through a daily history, from a
+     * long-range request the provider answered with monthly bars. Under the
+     * one-basis-per-series rule those monthly rows then *excluded* every daily
+     * row around them, reducing the window to twelve points a year -- and they
+     * had already overwritten the real daily close on each date they landed on.
+     */
+    it("writes nothing when the provider returns monthly bars", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: timestamps(72, 30),
+            closes: Array.from({ length: 72 }, (_, i) => 100 + i),
+            adjcloses: Array.from({ length: 72 }, (_, i) => 100 + i),
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(bulkUpsertCalls()).toHaveLength(0);
+      expect(result.barsSettled).toBe(0);
+      expect(result.failed).toBe(1);
+    });
+
+    it("writes a daily payload as before", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: timestamps(30, 1),
+            closes: Array.from({ length: 30 }, (_, i) => 100 + i),
+            adjcloses: Array.from({ length: 30 }, (_, i) => 100 + i),
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(bulkUpsertCalls()).toHaveLength(1);
+      expect(result.barsSettled).toBe(30);
+    });
+
+    /**
+     * The guard sits in `bulkUpsertPrices` rather than in each caller because
+     * there are four of them, and a guard one caller forgets is not a guard.
+     */
+    it("refuses on the force-backfill path too, and says why", async () => {
+      securitiesRepository.findOne.mockResolvedValue(mockSecurity);
+      dataSourceMock.query.mockResolvedValueOnce([{ earliest: "2016-05-01" }]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: timestamps(60, 7),
+            closes: Array.from({ length: 60 }, (_, i) => 100 + i),
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "max",
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("daily series was requested");
+      expect(bulkUpsertCalls()).toHaveLength(0);
+    });
+  });
+
+  describe("backfillSecurityHoldingPeriod with an explicit range", () => {
+    const DAY = 24 * 60 * 60;
+
+    function dailyResponse(count: number) {
+      const end = Math.floor(Date.now() / 1000) - DAY;
+      return makeYahooHistoricalResponse({
+        timestamps: Array.from(
+          { length: count },
+          (_, i) => end - (count - 1 - i) * DAY,
+        ),
+        closes: Array.from({ length: count }, (_, i) => 100 + i),
+      });
+    }
+
+    beforeEach(() => {
+      dataSourceMock.query.mockResolvedValue(undefined);
+      securitiesRepository.findOne.mockResolvedValue(mockSecurity);
+    });
+
+    it("asks the provider for the range it was given", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "10y",
+      );
+
+      expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain(
+        "range=10y",
+      );
+    });
+
+    /**
+     * The point of the parameter. Without it the write is clipped to the first
+     * transaction date, so a security first bought in May 2025 could hold
+     * fifteen months of history and no more -- and a backtest, the GEM report
+     * and the comparison chart all need prices from before the user bought.
+     */
+    it("does not clip to the first transaction date", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "max",
+      );
+
+      expect(result.pricesLoaded).toBe(40);
+      // Never consults the earliest-transaction date, because it cannot matter.
+      for (const [sql] of scopedManagerQuery.mock.calls) {
+        expect(String(sql)).not.toContain("MIN(transaction_date)");
+      }
+    });
+
+    /**
+     * Imports set `skipPriceUpdates` on securities whose symbol was
+     * auto-generated, which is exactly the set a user is most likely to be
+     * correcting by hand -- so the explicit request overrides the flag, as the
+     * unranged path already did.
+     */
+    it("overrides skipPriceUpdates, as the default path does", async () => {
+      securitiesRepository.findOne.mockResolvedValue({
+        ...mockSecurity,
+        skipPriceUpdates: true,
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "max",
+      );
+
+      expect(result.pricesLoaded).toBe(40);
+    });
+
+    it("still clips when no range is given", async () => {
+      dataSourceMock.query.mockResolvedValueOnce([{ earliest: "2026-08-01" }]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+      );
+
+      expect(result.pricesLoaded).toBeLessThan(40);
+    });
+  });
+
   describe("scheduledPriceRefresh", () => {
     it("calls refreshAllPrices", async () => {
       securitiesRepository.find.mockResolvedValue([]);
@@ -1849,8 +2232,123 @@ describe("SecurityPriceService", () => {
       expect(securitiesRepository.find).toHaveBeenCalled();
     });
 
-    it("enables skip-fresh so a post-close re-run does not re-fetch", async () => {
-      const spy = jest.spyOn(service, "refreshAllPrices").mockResolvedValue({
+    /**
+     * Order is the whole point. The quote refresh stores what the security is
+     * worth at 17:00; settlement then replaces the day with the provider's
+     * official bar, which is the only thing carrying a full-session high, low,
+     * volume and adjusted close. Run the other way round, the quote would
+     * overwrite the bar and the day would be provisional again.
+     */
+    it("settles the day's official bars after refreshing quotes", async () => {
+      const order: string[] = [];
+      const refresh = jest
+        .spyOn(service, "refreshAllPrices")
+        .mockImplementation(async () => {
+          order.push("refresh");
+          return {
+            totalSecurities: 0,
+            updated: 0,
+            failed: 0,
+            skipped: 0,
+            results: [],
+            lastUpdated: new Date(),
+          };
+        });
+      const settle = jest
+        .spyOn(service, "settleDailyBars")
+        .mockImplementation(async () => {
+          order.push("settle");
+          return {
+            totalSecurities: 0,
+            securitiesSettled: 0,
+            barsSettled: 0,
+            failed: 0,
+          };
+        });
+
+      await service.scheduledPriceRefresh();
+
+      expect(refresh).toHaveBeenCalled();
+      expect(settle).toHaveBeenCalled();
+      expect(order).toEqual(["refresh", "settle"]);
+    });
+
+    it("recalculates snapshots when settlement moved prices but no quote did", async () => {
+      jest.spyOn(service, "refreshAllPrices").mockResolvedValue({
+        totalSecurities: 3,
+        updated: 0,
+        failed: 3,
+        skipped: 0,
+        results: [],
+        lastUpdated: new Date(),
+      });
+      jest.spyOn(service, "settleDailyBars").mockResolvedValue({
+        totalSecurities: 3,
+        securitiesSettled: 3,
+        barsSettled: 12,
+        failed: 0,
+      });
+
+      await service.scheduledPriceRefresh();
+
+      expect(
+        netWorthService.recalculateAllInvestmentSnapshots,
+      ).toHaveBeenCalled();
+    });
+
+    /**
+     * The regression that motivated all of this, pinned where it happened.
+     *
+     * The closing job passed `skipFresh`, which skipped any security already
+     * carrying a provider-written row for today. The frontend auto-refreshes
+     * quotes through the trading session, so on any day the user opened the
+     * app there *was* such a row -- a quote struck mid-session, with a running
+     * volume and a high that was only the highest so far -- and the job skipped
+     * the one fetch that would have replaced it with the close. Real data: of
+     * seventeen consecutive XGRO rows, the only two matching the provider's
+     * published close were the two written at 17:00 by a run that had nothing
+     * to skip.
+     *
+     * Two assertions, because each alone is satisfiable by the wrong code. The
+     * quote fetch is the behaviour; the absent freshness query is what
+     * actually fails against the old job, whose skip was decided by a
+     * `SELECT DISTINCT security_id ... source IS DISTINCT FROM 'manual'` this
+     * job must no longer ask.
+     */
+    it("fetches the close unconditionally, with no freshness query in front of it", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      seedStoredPrice({
+        securityId: mockSecurity.id,
+        priceDate: new Date().toISOString().substring(0, 10),
+        closePrice: 191.11,
+        source: "yahoo_finance",
+        quotedAt: new Date(),
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(makeYahooChartResponse()),
+        ) as jest.Mock;
+
+      await service.scheduledPriceRefresh();
+
+      const quoteFetches = (global.fetch as jest.Mock).mock.calls.filter(
+        (call) => String(call[0]).includes("range=1d"),
+      );
+      expect(quoteFetches).toHaveLength(1);
+      for (const [sql] of scopedManagerQuery.mock.calls) {
+        expect(String(sql)).not.toContain("SELECT DISTINCT security_id");
+      }
+    });
+
+    it("does not throw when refreshAllPrices fails", async () => {
+      securitiesRepository.find.mockRejectedValue(new Error("DB down"));
+
+      await expect(service.scheduledPriceRefresh()).resolves.not.toThrow();
+    });
+
+    it("does not throw when settlement fails", async () => {
+      jest.spyOn(service, "refreshAllPrices").mockResolvedValue({
         totalSecurities: 0,
         updated: 0,
         failed: 0,
@@ -1858,14 +2356,9 @@ describe("SecurityPriceService", () => {
         results: [],
         lastUpdated: new Date(),
       });
-
-      await service.scheduledPriceRefresh();
-
-      expect(spy).toHaveBeenCalledWith(true);
-    });
-
-    it("does not throw when refreshAllPrices fails", async () => {
-      securitiesRepository.find.mockRejectedValue(new Error("DB down"));
+      jest
+        .spyOn(service, "settleDailyBars")
+        .mockRejectedValue(new Error("Yahoo down"));
 
       await expect(service.scheduledPriceRefresh()).resolves.not.toThrow();
     });
@@ -2381,6 +2874,145 @@ describe("SecurityPriceService", () => {
 
       const upsertCall = dataSourceMock.query.mock.calls[1];
       expect(upsertCall[1][2]).toBe(150.123457);
+    });
+  });
+
+  describe("a quote completes the adjusted basis for the day it is for", () => {
+    /**
+     * `loadPriceSeries` keeps only the adjusted rows once any row in the window
+     * has one, so a today-row with a null `adjusted_close` is not a raw
+     * fallback -- it is dropped, and every return series ends yesterday until
+     * the evening settlement. The quote may fill it because the newest
+     * session's adjustment factor is 1: nothing has gone ex after it, which is
+     * why the provider's own last bar reports the close as its adjusted close.
+     */
+    it("writes the close as the adjusted close on an adjusted series", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      // One backfilled row is what puts this series on the adjusted basis.
+      seedStoredPrice({
+        securityId: mockSecurity.id,
+        priceDate: "2026-08-10",
+        closePrice: 190.0,
+        adjustedClose: 189.2,
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(
+            makeYahooChartResponse({ regularMarketPrice: 200.0 }),
+          ),
+        ) as jest.Mock;
+
+      await service.refreshAllPrices();
+
+      const written = upsertedPrices.find((row) => row.closePrice === 200.0);
+      expect(written?.adjustedClose).toBe(200.0);
+    });
+
+    /**
+     * The other half, and the reason this is a `CASE` rather than an
+     * assignment. MSN publishes no adjusted closes, so such a series is raw
+     * throughout -- consistent, and complete. A single adjusted row would flip
+     * `bool_or(adjusted_close IS NOT NULL)` to true and collapse the entire
+     * series to that one row, which is a worse outcome than the gap this is
+     * fixing.
+     */
+    it("leaves it null on a series that has no adjusted closes at all", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      seedStoredPrice({
+        securityId: mockSecurity.id,
+        priceDate: "2026-08-10",
+        closePrice: 190.0,
+        adjustedClose: null,
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(
+            makeYahooChartResponse({ regularMarketPrice: 200.0 }),
+          ),
+        ) as jest.Mock;
+
+      await service.refreshAllPrices();
+
+      const written = upsertedPrices.find((row) => row.closePrice === 200.0);
+      expect(written?.adjustedClose).toBeNull();
+      expect(priceUpsertSql()).toContain("adj.adjusted_close IS NOT NULL");
+    });
+
+    it("keeps the close and the adjusted close in step on a same-day re-quote", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      seedStoredPrice({
+        securityId: mockSecurity.id,
+        priceDate: "2026-08-10",
+        closePrice: 190.0,
+        adjustedClose: 189.2,
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(
+            makeYahooChartResponse({ regularMarketPrice: 200.0 }),
+          ),
+        ) as jest.Mock;
+      await service.refreshAllPrices();
+
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(
+            makeYahooChartResponse({ regularMarketPrice: 201.5 }),
+          ),
+        ) as jest.Mock;
+      await service.refreshAllPrices();
+
+      const written = upsertedPrices.find(
+        (row) => row.priceDate !== "2026-08-10",
+      );
+      expect(written).toMatchObject({
+        closePrice: 201.5,
+        adjustedClose: 201.5,
+      });
+    });
+
+    /**
+     * A manual price is the user's own correction. The quote path used to
+     * overwrite it -- the freshness query excluded manual rows from counting as
+     * fresh, which let the fetch through and then wrote straight over the
+     * entry. The refusal is a successful no-op, so the caller gets the row that
+     * won rather than an error.
+     */
+    it("refuses to overwrite a manual price, and returns the manual row", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      const tradingDate = new Date(1748800000 * 1000)
+        .toISOString()
+        .substring(0, 10);
+      seedStoredPrice({
+        securityId: mockSecurity.id,
+        priceDate: tradingDate,
+        closePrice: 123.45,
+        source: "manual",
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(
+            makeYahooChartResponse({ regularMarketPrice: 200.0 }),
+          ),
+        ) as jest.Mock;
+
+      const result = await service.refreshAllPrices();
+
+      expect(result.failed).toBe(0);
+      expect(result.updated).toBe(1);
+      expect(upsertedPrices).toHaveLength(1);
+      expect(upsertedPrices[0]).toMatchObject({
+        closePrice: 123.45,
+        source: "manual",
+      });
+      expect(priceUpsertSql()).toContain(
+        "WHERE security_prices.source IS DISTINCT FROM 'manual'",
+      );
     });
   });
 

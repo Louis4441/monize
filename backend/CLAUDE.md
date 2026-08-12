@@ -430,6 +430,109 @@ An endpoint that deliberately stays owner-only says so where it is skipped:
 `tag-key-breakdown` does, because tags are personal and a joint row never
 carries the grantee's.
 
+## A stored price says which session it belongs to, not which minute it was fetched
+
+`security_prices` holds one row per trading day, and the thing that row is
+supposed to hold is the **session**: the official close, the full-day volume,
+the high and low over the whole day, and the adjusted close. A live quote is
+none of those. `regularMarketPrice` is the last print at the moment it was
+asked for, which is a true statement about 14:42 and a false one about the day.
+
+The frontend auto-refreshes quotes through the trading session
+(`usePriceRefresh`), so a row for today exists long before the day is over --
+and the closing job used to treat that as "already done" and skip the security,
+leaving whichever mid-session quote arrived last stored as the close. On real
+data that was sixteen of seventeen consecutive rows disagreeing with the
+provider, by a cent or two, with volumes at a third of the real figure. The two
+correct ones were the days nobody opened the app.
+
+Three rules, each with a test rather than a paragraph:
+
+- **"Has a price for today" is not "the day is settled".** Ask whether the
+  *session* has ended -- `isSessionSettled` (`providers/settled-bar.util.ts`),
+  on the market's own clock in the market's own zone, from the
+  `market_timezone` / `market_close_time` the quote refresh stores. Never from
+  the presence of a row, and never from the server's clock.
+- **The closing job settles the day from the daily bar, after the quote
+  refresh.** `settleDailyBars` re-reads a bounded recent window and upserts the
+  bars whose sessions have ended, so a missed run, a provider outage or a week
+  of intraday-only rows repairs itself. Order matters: the quote is what a
+  still-open market can offer, the bar is what the finished session did, and
+  the bar has to win.
+- **A calculated column needs a writer on the recurring path.**
+  `adjusted_close` was populated by the on-demand backfill and by nothing else,
+  so it was null on every row the daily job wrote. Because `loadPriceSeries`
+  picks one basis per series and then keeps only the adjusted rows, that did
+  not degrade to raw prices -- it silently truncated every return series at the
+  last backfill date.
+
+The quote path fills `adjusted_close` with the close it is writing, so today is
+in the series from the first intraday refresh rather than only after
+settlement. That is definitional, not a guess -- the newest session's
+adjustment factor is 1 -- but it holds *only* for the newest session, and only
+where the series already carries an adjusted close. Both conditions live in the
+`CASE ... EXISTS` inside the statement, because the second one is not obvious:
+an MSN-priced series has no adjusted closes anywhere, and giving it exactly one
+flips `bool_or(...)` and collapses the series to that single row.
+
+A daily bar is also not a quote, so settling clears `quoted_at`; and a
+`source = 'manual'` row is a correction the user typed, which no provider write
+may overwrite -- the quote path and `bulkUpsertPrices` both carry
+`WHERE security_prices.source IS DISTINCT FROM 'manual'`, and the quote path
+treats the refusal as a successful no-op that reads back the row that won,
+not as a failure. The guard is what makes a nightly settlement pass safe to
+add at all; without it every manual correction would be destroyed each night.
+Its cost, which is the honest half: a manual row on a provider-priced security
+has no adjusted close and no way to derive one, so that day stays out of the
+adjusted series rather than being overwritten into it.
+
+A related one, in the same family as the DATE-transformer rule above: **a bar's
+timestamp is the instant its session opened, so the day it belongs to is the
+exchange's calendar day.** `barDate` reads it in `meta.exchangeTimezoneName`,
+falling back to UTC. Reading it with `setHours(0,0,0,0)` made `price_date` a
+function of the container's timezone and put an ASX bar on the wrong day.
+
+## A payload coarser than daily is a different series, not a sparse one
+
+Ask a provider for a long range and it may answer with weekly or monthly bars.
+Written into a daily table those rows are indistinguishable from daily ones --
+and they overwrite the real daily rows that sat on those dates, so the damage
+is not limited to what was added. `market_index_prices` refused this from the
+day it was written; `security_prices` did not, and one production catalogue
+carried **six years of a single adjusted row per month** spliced through a daily
+history. Under the one-basis-per-series rule that did not merely add noise: the
+monthly rows carried adjusted closes and the daily ones did not, so
+`loadPriceSeries` kept the monthly rows and *dropped every daily row around
+them*, reducing six years of return series to twelve points a year.
+
+`assertDailySeries` (`providers/daily-spacing.util.ts`) is the one test, and it
+runs inside `bulkUpsertPrices` -- not in its callers, of which there are four,
+because a guard one caller forgets is not a guard. Every caller already wraps
+that write in a try/catch that reports a failed security, so the throw surfaces
+as "this one did not update" rather than as a crash. The threshold, the median
+(never the mean -- one long exchange closure must not make a daily series look
+weekly) and the minimum sample size live there too, and
+`daily-spacing.util.spec.ts` fails if a second copy of any of them appears
+anywhere under `securities/`.
+
+## History depth is a request, not a property of the holding
+
+`backfillSecurityHoldingPeriod` clips its write to the first transaction date,
+which is right for a position valuation and wrong for everything else: a
+backtest, the GEM report and the performance comparison all need prices from
+before the user bought. A security first transacted in May 2025 therefore held
+fifteen months of history out of ten available, with no way to ask for more --
+`backfillSecurityRange` can fetch any range but has no HTTP route of its own,
+reachable only as a side effect of running one of those reports.
+
+Both backfill endpoints now take `range` (`BackfillPricesQueryDto`), and
+supplying it means two things at once, deliberately: fetch that range, **and**
+store all of it. Omitting it keeps the clipped default. When you add a caller,
+decide which of the two questions it is asking -- "what is this position worth
+over the time I held it" or "what did this instrument do" -- rather than
+reaching for `max` because more data seems safer; the clip exists so an
+untouched catalogue does not accumulate decades of prices nobody reads.
+
 ## A money value carries the currency it was calculated into
 
 Not the currency of the account it is filed under. `InvestmentTransaction.exchangeRate`

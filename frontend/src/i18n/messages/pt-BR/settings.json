@@ -131,12 +131,6 @@
     "timeFormatLabel": "Formato de Hora",
     "recentTransactionsLabel": "Transações recentes no preenchimento rápido",
     "recentTransactionsHelp": "Número de entradas mostradas no menu do botão de histórico ao lado do campo Beneficiário nos formulários de transação.",
-    "portfolioChangeBaselineLabel": "Variação da carteira medida a partir de",
-    "portfolioChangeBaselineHelp": "Aplica-se aos valores de variação nos gráficos da carteira 1D, 1W e MTD. Os períodos mais longos são sempre medidos a partir do seu primeiro ponto.",
-    "portfolioChangeBaselineOptions": {
-      "previousClose": "Fechamento do pregão anterior",
-      "periodStart": "Início do período (a abertura do dia em 1D)"
-    },
     "saveButton": "Salvar Preferências",
     "savingButton": "Salvando...",
     "toasts": {

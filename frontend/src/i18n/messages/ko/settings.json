@@ -131,12 +131,6 @@
     "timeFormatLabel": "시간 형식",
     "recentTransactionsLabel": "빠른 채우기의 최근 거래 수",
     "recentTransactionsHelp": "거래 양식의 수취인 필드 옆 기록 버튼 팝오버에 표시되는 항목 수입니다.",
-    "portfolioChangeBaselineLabel": "포트폴리오 변화 기준",
-    "portfolioChangeBaselineHelp": "포트폴리오 차트의 1D, 1W, MTD 변화 수치에 적용됩니다. 더 긴 기간은 항상 첫 번째 지점을 기준으로 측정합니다.",
-    "portfolioChangeBaselineOptions": {
-      "previousClose": "직전 거래일 종가",
-      "periodStart": "기간 시작 시점(1D에서는 당일 시가)"
-    },
     "saveButton": "환경설정 저장",
     "savingButton": "저장 중...",
     "toasts": {

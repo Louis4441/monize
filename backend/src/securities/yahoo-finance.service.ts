@@ -15,6 +15,7 @@ import {
   EtfSectorWeighting,
 } from "./providers/quote-provider.interface";
 import { getTradingDateFromQuote } from "./providers/trading-date.util";
+import { barDate } from "./providers/market-session.util";
 
 // Back-compat re-exports so existing imports keep compiling during the migration.
 export type YahooQuoteResult = QuoteResult;
@@ -557,6 +558,13 @@ export class YahooFinanceService implements QuoteProvider {
       };
 
       const timestamps: number[] = result.timestamp;
+      // A daily bar's timestamp is the instant its session *opened*, so the
+      // calendar day it belongs to is the exchange's, not the server's and not
+      // UTC. Reading it with `setHours(0,0,0,0)` made `price_date` a function of
+      // the container's TZ, and shifted an ASX bar opening 23:00 UTC (10:00
+      // AEDT the following day) back onto the previous date under a UTC server.
+      const exchangeZone: string | undefined =
+        result.meta?.exchangeTimezoneName;
       const quote = result.indicators.quote[0];
       // Total-return adjusted close (split + dividend adjusted). Yahoo
       // returns this as a parallel array under indicators.adjclose[0].
@@ -568,8 +576,7 @@ export class YahooFinanceService implements QuoteProvider {
         const close = quote.close?.[i];
         if (close == null || isNaN(close)) continue;
 
-        const date = new Date(timestamps[i] * 1000);
-        date.setHours(0, 0, 0, 0);
+        const date = barDate(timestamps[i], exchangeZone);
 
         const adjRaw = adjcloseSeries?.[i];
         const adjClose =

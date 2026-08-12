@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { usePortfolioChangeBaseline } from './usePortfolioChangeBaseline';
-import { usePreferencesStore } from '@/store/preferencesStore';
 import { netWorthApi } from '@/lib/net-worth';
-import type { UserPreferences } from '@/types/auth';
-import type { PortfolioChangeBaseline } from '@/types/investment';
 
 vi.mock('@/lib/net-worth', () => ({
   netWorthApi: { getInvestmentsDaily: vi.fn() },
@@ -23,20 +20,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-/** Put the stored preference in whichever of its three states a test needs. */
-function setPreference(value: PortfolioChangeBaseline | undefined) {
-  usePreferencesStore.setState({
-    preferences:
-      value === undefined
-        ? null
-        : ({ portfolioChangeBaseline: value } as UserPreferences),
-  });
-}
-
 describe('usePortfolioChangeBaseline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setPreference('previous_close');
     vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
       { date: '2026-08-04', value: 1000 },
     ]);
@@ -72,42 +58,18 @@ describe('usePortfolioChangeBaseline', () => {
     );
   });
 
-  describe('the stored preference', () => {
-    it('turns the lookup off entirely when set to the period start', () => {
-      setPreference('period_start');
-      const { result } = renderHook(() =>
-        usePortfolioChangeBaseline({ range: '1w', firstPointDate: '2026-08-05' }),
-      );
-      expect(result.current.usesPriorClose).toBe(false);
-      expect(result.current.priorClose).toBeNull();
-      // No preference, no request: the chart measures from its own first point.
-      expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
-    });
-
-    it('falls back to the prior close while preferences have not loaded', async () => {
-      // The default matches the column default, so the figure on screen does
-      // not flip the moment the preferences arrive.
-      setPreference(undefined);
-      const { result } = renderHook(() =>
-        usePortfolioChangeBaseline({ range: '1w', firstPointDate: '2026-08-05' }),
-      );
-      expect(result.current.usesPriorClose).toBe(true);
-      await waitFor(() => expect(result.current.priorClose?.value).toBe(1000));
-    });
-
-    it('drops a loaded baseline when the preference switches away from it', async () => {
-      const { result, rerender } = renderHook(() =>
-        usePortfolioChangeBaseline({ range: '1w', firstPointDate: '2026-08-05' }),
-      );
-      await waitFor(() => expect(result.current.priorClose?.value).toBe(1000));
-
-      setPreference('period_start');
-      rerender();
-      // Both halves move together -- a stale prior close must not stay on
-      // screen under a setting that says to measure from somewhere else.
-      expect(result.current.usesPriorClose).toBe(false);
-      expect(result.current.priorClose).toBeNull();
-    });
+  /**
+   * The lookup used to be gated on a `portfolio_change_baseline` preference as
+   * well as on the range (migration 152, dropped by 153). With the setting
+   * gone, the range decides alone -- and a chart on a prior-close range always
+   * looks the close up.
+   */
+  it('is decided by the range alone, with no stored setting involved', async () => {
+    const { result } = renderHook(() =>
+      usePortfolioChangeBaseline({ range: '1w', firstPointDate: '2026-08-05' }),
+    );
+    expect(result.current.usesPriorClose).toBe(true);
+    await waitFor(() => expect(result.current.priorClose?.value).toBe(1000));
   });
 
   it('is unknown while a new selection is still loading', async () => {
