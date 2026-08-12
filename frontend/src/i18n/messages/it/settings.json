@@ -131,6 +131,12 @@
     "timeFormatLabel": "Formato ora",
     "recentTransactionsLabel": "Transazioni recenti nel riempimento rapido",
     "recentTransactionsHelp": "Numero di voci mostrate nel popover della cronologia accanto al campo Beneficiario nei moduli transazione.",
+    "portfolioChangeBaselineLabel": "Variazione del portafoglio misurata da",
+    "portfolioChangeBaselineHelp": "Si applica ai valori di variazione nei grafici del portafoglio 1D, 1W e MTD. I periodi più lunghi sono sempre misurati dal loro primo punto.",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "Chiusura della seduta precedente",
+      "periodStart": "Inizio del periodo (l'apertura della giornata su 1D)"
+    },
     "saveButton": "Salva preferenze",
     "savingButton": "Salvataggio...",
     "toasts": {

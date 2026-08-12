@@ -22,7 +22,7 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { usePriorCloseBaseline } from '@/hooks/usePriorCloseBaseline';
+import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { createLogger } from '@/lib/logger';
@@ -38,11 +38,7 @@ import {
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from './portfolio-chart-utils';
-import {
-  isoDatePart,
-  priorCloseChange,
-  usesPriorCloseBaseline,
-} from './portfolio-change-baseline';
+import { isoDatePart, priorCloseChange } from './portfolio-change-baseline';
 
 const logger = createLogger('InvestmentChart');
 
@@ -327,11 +323,11 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
     };
   }, [isIntraday, loadData]);
 
-  // 1D / 1W / MTD report their change against the close of the trading day
-  // before the window rather than against the first point drawn; the baseline
-  // is looked up for the first point actually on screen.
-  const usesPriorClose = usesPriorCloseBaseline(dateRange);
-  const priorClose = usePriorCloseBaseline({
+  // On 1D / 1W / MTD the change is reported against the close of the trading
+  // day before the window rather than against the first point drawn, unless the
+  // user's Settings preference says otherwise. The baseline is looked up for
+  // the first point actually on screen.
+  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
     range: dateRange,
     firstPointDate: isoDatePart(chartPoints[0]?.iso),
     accountIds: accountIds?.length ? accountIds.join(',') : undefined,

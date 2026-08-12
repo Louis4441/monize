@@ -901,6 +901,7 @@ CREATE TABLE user_preferences (
     show_whats_new BOOLEAN DEFAULT true, -- settings kill-switch for the What's New auto-popup
     tour_progress JSONB NOT NULL DEFAULT '{}', -- guided-tour completion, keyed by opaque tour id: { status, version?, updatedAt }
     default_quote_provider VARCHAR(20) NOT NULL DEFAULT 'yahoo',
+    portfolio_change_baseline VARCHAR(20) NOT NULL DEFAULT 'previous_close', -- what the Portfolio Value chart's 1D/1W/MTD change is measured from: the prior trading close, or the first point plotted
     recent_transactions_limit SMALLINT NOT NULL DEFAULT 5,
     ai_bubble_enabled BOOLEAN DEFAULT false, -- opt-in app-wide floating AI chat bubble
     language VARCHAR(10) NOT NULL DEFAULT 'en', -- UI language; ISO 639-1 or BCP 47 tag matched against SUPPORTED_LOCALES
@@ -909,6 +910,8 @@ CREATE TABLE user_preferences (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT user_preferences_default_quote_provider_check
       CHECK (default_quote_provider IN ('yahoo','msn')),
+    CONSTRAINT user_preferences_portfolio_change_baseline_check
+      CHECK (portfolio_change_baseline IN ('previous_close','period_start')),
     CONSTRAINT user_preferences_recent_transactions_limit_check
       CHECK (recent_transactions_limit BETWEEN 1 AND 20)
 );

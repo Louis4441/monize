@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { PortfolioValueReport } from './PortfolioValueReport';
 import { renderChartFlagDot } from '@/components/investments/portfolio-chart-utils';
 import { chartColors } from '@/lib/chart-colors';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 vi.mock('@/lib/pdf-export', () => ({
   exportToPdf: vi.fn().mockResolvedValue(undefined),
@@ -197,6 +198,8 @@ const emptyPortfolio = {
 describe('PortfolioValueReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // A null store is the pre-load state, where the hook takes the default.
+    usePreferencesStore.setState({ preferences: null });
     mockDateRangeValue = '2y';
     mockSeriesMode = 'total';
     mockStoredValues.clear();
@@ -935,6 +938,39 @@ describe('PortfolioValueReport', () => {
       await waitFor(() => expect(card('Period Change')).toContain('N/A'));
       expect(card('Period Return')).toContain('N/A');
       expect(card('Period Change')).not.toContain('$1000');
+    });
+
+    it('measures from the first point when the user chose the period start', async () => {
+      usePreferencesStore.setState({
+        preferences: { portfolioChangeBaseline: 'period_start' } as never,
+      });
+      mockDateRangeValue = '1w';
+      mockGetIntradayValue.mockResolvedValue({
+        points: [
+          { timestamp: '2024-06-03T13:30:00Z', value: 50000 },
+          { timestamp: '2024-06-07T20:00:00Z', value: 51000 },
+        ],
+        interval: '15m',
+        currency: 'CAD',
+        range: '1w',
+        fetchedAt: new Date().toISOString(),
+        skippedSymbols: [],
+        fallbackToDaily: false,
+      });
+      mockGetInvestmentsDaily.mockResolvedValue([
+        { date: '2024-06-02', value: 49000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Period Change')).toBeInTheDocument();
+      });
+
+      await waitFor(() => expect(card('Period Change')).toContain('+$1000'));
+      expect(card('Period Change')).not.toContain('+$2000');
+      // The setting is off, so the baseline is not even fetched.
+      expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
     });
 
     it('still measures a long range from the first point plotted', async () => {

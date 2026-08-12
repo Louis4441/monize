@@ -131,6 +131,12 @@
     "timeFormatLabel": "時間格式",
     "recentTransactionsLabel": "快速填字中的最近交易",
     "recentTransactionsHelp": "在交易表單收款人欄位旁的歷史按鈕彈出視窗中顯示的記錄數量。",
+    "portfolioChangeBaselineLabel": "投資組合變化的計算基準",
+    "portfolioChangeBaselineHelp": "適用於投資組合圖表 1D、1W 和 MTD 的變化數值。更長的時間範圍始終以其第一個資料點為基準。",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "上一交易日收盤價",
+      "periodStart": "期間起點（1D 為當日開盤價）"
+    },
     "saveButton": "儲存偏好設定",
     "savingButton": "儲存中...",
     "toasts": {

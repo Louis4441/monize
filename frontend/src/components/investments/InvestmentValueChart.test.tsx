@@ -7,6 +7,7 @@ import {
 } from './InvestmentValueChart';
 import { netWorthApi } from '@/lib/net-worth';
 import { investmentsApi } from '@/lib/investments';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 const dateRangeState = { dateRange: '1y', resolvedRange: { start: '2023-01-01', end: '2024-01-01' } };
 
@@ -125,6 +126,8 @@ vi.mock('@/components/ui/DateRangeSelector', () => ({
 describe('InvestmentValueChart', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // A null store is the pre-load state, where the hook takes the default.
+    usePreferencesStore.setState({ preferences: null });
     dateRangeState.dateRange = '1y';
     dateRangeState.resolvedRange = { start: '2023-01-01', end: '2024-01-01' };
     // 1y is a daily range, so mock getInvestmentsDaily
@@ -492,6 +495,30 @@ describe('InvestmentValueChart', () => {
       await waitFor(() => expect(card('Change')).toContain('N/A'));
       expect(card('Change %')).toContain('N/A');
       expect(card('Change')).not.toContain('$1000.00');
+    });
+
+    it('measures from the first point when the user chose the period start', async () => {
+      usePreferencesStore.setState({
+        preferences: { portfolioChangeBaseline: 'period_start' } as never,
+      });
+      dateRangeState.dateRange = '1w';
+      dateRangeState.resolvedRange = { start: '2024-01-08', end: '2024-01-15' };
+      vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
+        intraday([
+          { timestamp: '2024-01-08T14:30:00.000Z', value: 10000 },
+          { timestamp: '2024-01-15T14:30:00.000Z', value: 11000 },
+        ]),
+      );
+      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+        { date: '2024-01-07', value: 9000 },
+      ]);
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+
+      await waitFor(() => expect(card('Change')).toContain('+$1000.00'));
+      expect(card('Change')).not.toContain('+$2000.00');
+      // The setting is off, so the baseline is not even fetched.
+      expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
     });
 
     it('still measures a long range from the first point plotted', async () => {

@@ -250,6 +250,9 @@ export class UsersService {
     if (dto.defaultQuoteProvider !== undefined) {
       patch.defaultQuoteProvider = dto.defaultQuoteProvider;
     }
+    if (dto.portfolioChangeBaseline !== undefined) {
+      patch.portfolioChangeBaseline = dto.portfolioChangeBaseline;
+    }
     if (dto.recentTransactionsLimit !== undefined) {
       patch.recentTransactionsLimit = dto.recentTransactionsLimit;
     }

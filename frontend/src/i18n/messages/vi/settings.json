@@ -131,6 +131,12 @@
     "timeFormatLabel": "Định dạng giờ",
     "recentTransactionsLabel": "Giao tác gần đây trong điền nhanh",
     "recentTransactionsHelp": "Số mục được hiển thị trong cửa sổ bật lên lịch sử bên cạnh trường Người nhận trên biểu mẫu giao tác.",
+    "portfolioChangeBaselineLabel": "Thay đổi danh mục được tính từ",
+    "portfolioChangeBaselineHelp": "Áp dụng cho các giá trị Thay đổi trên biểu đồ danh mục 1D, 1W và MTD. Các khoảng thời gian dài hơn luôn được tính từ điểm đầu tiên.",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "Giá đóng cửa phiên giao dịch trước",
+      "periodStart": "Đầu kỳ (giá mở cửa trong ngày với 1D)"
+    },
     "saveButton": "Lưu sở thích",
     "savingButton": "Đang lưu...",
     "toasts": {

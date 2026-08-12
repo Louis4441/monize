@@ -66,6 +66,7 @@ const mockPreferences: UserPreferences = {
   dashboardWidgetConfig: {},
   preferredExchanges: [],
     defaultQuoteProvider: 'yahoo' as const,
+    portfolioChangeBaseline: 'previous_close',
     recentTransactionsLimit: 5,
   aiBubbleEnabled: false,
   showWhatsNew: true,
@@ -153,6 +154,43 @@ describe('PreferencesSection', () => {
       expect(userSettingsApi.updatePreferences).toHaveBeenCalledWith(
         expect.objectContaining({ recentTransactionsLimit: 10 }),
       );
+    });
+  });
+
+  it('offers both portfolio-change baselines and saves the chosen one', async () => {
+    (userSettingsApi.updatePreferences as ReturnType<typeof vi.fn>).mockResolvedValue(mockPreferences);
+
+    render(<PreferencesSection preferences={mockPreferences} onPreferencesUpdated={mockOnPreferencesUpdated} />);
+
+    const select = screen.getByLabelText('Portfolio change measured from') as HTMLSelectElement;
+    expect(
+      Array.from(select.options).map((o) => o.value),
+    ).toEqual(['previous_close', 'period_start']);
+    // The stored preference is what the control opens on, not the first option.
+    expect(select.value).toBe('previous_close');
+
+    fireEvent.change(select, { target: { value: 'period_start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }));
+
+    await waitFor(() => {
+      expect(userSettingsApi.updatePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ portfolioChangeBaseline: 'period_start' }),
+      );
+    });
+  });
+
+  it('opens the baseline control on the stored preference', async () => {
+    render(
+      <PreferencesSection
+        preferences={{ ...mockPreferences, portfolioChangeBaseline: 'period_start' }}
+        onPreferencesUpdated={mockOnPreferencesUpdated}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText('Portfolio change measured from') as HTMLSelectElement).value,
+      ).toBe('period_start');
     });
   });
 

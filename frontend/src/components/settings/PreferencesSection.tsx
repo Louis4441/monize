@@ -10,6 +10,8 @@ import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { UserPreferences, UpdatePreferencesData } from '@/types/auth';
+import { PortfolioChangeBaseline } from '@/types/investment';
+import { DEFAULT_PORTFOLIO_CHANGE_BASELINE } from '@/components/investments/portfolio-change-baseline';
 import { getErrorMessage } from '@/lib/errors';
 import { exchangeRatesApi, CurrencyInfo } from '@/lib/exchange-rates';
 import { investmentsApi } from '@/lib/investments';
@@ -69,6 +71,14 @@ const QUOTE_PROVIDER_OPTIONS = [
   { value: 'msn', label: 'MSN Money' },
 ];
 
+const PORTFOLIO_CHANGE_BASELINE_OPTIONS: Array<{
+  value: PortfolioChangeBaseline;
+  labelKey: string;
+}> = [
+  { value: 'previous_close', labelKey: 'portfolioChangeBaselineOptions.previousClose' },
+  { value: 'period_start', labelKey: 'portfolioChangeBaselineOptions.periodStart' },
+];
+
 const RECENT_TRANSACTIONS_LIMIT_OPTIONS = [
   { value: '3', label: '3' },
   { value: '5', label: '5' },
@@ -103,6 +113,10 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
   const [defaultQuoteProvider, setDefaultQuoteProvider] = useState<'yahoo' | 'msn'>(
     preferences.defaultQuoteProvider ?? 'yahoo',
   );
+  const [portfolioChangeBaseline, setPortfolioChangeBaseline] =
+    useState<PortfolioChangeBaseline>(
+      preferences.portfolioChangeBaseline ?? DEFAULT_PORTFOLIO_CHANGE_BASELINE,
+    );
   const [recentTransactionsLimit, setRecentTransactionsLimit] = useState(
     preferences.recentTransactionsLimit ?? 5,
   );
@@ -147,6 +161,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
         timeFormat,
         preferredExchanges: preferredExchanges.filter(Boolean),
         defaultQuoteProvider,
+        portfolioChangeBaseline,
         recentTransactionsLimit,
       };
 
@@ -240,6 +255,23 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
               {t('msnNotConfigured')}
             </p>
           )}
+        </div>
+
+        <div>
+          <Select
+            label={t('portfolioChangeBaselineLabel')}
+            options={PORTFOLIO_CHANGE_BASELINE_OPTIONS.map((o) => ({
+              value: o.value,
+              label: t(o.labelKey),
+            }))}
+            value={portfolioChangeBaseline}
+            onChange={(e) =>
+              setPortfolioChangeBaseline(e.target.value as PortfolioChangeBaseline)
+            }
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {t('portfolioChangeBaselineHelp')}
+          </p>
         </div>
 
         <Select

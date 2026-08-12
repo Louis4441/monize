@@ -131,6 +131,12 @@
     "timeFormatLabel": "Format czasu",
     "recentTransactionsLabel": "Ostatnie transakcje w szybkim uzupełnianiu",
     "recentTransactionsHelp": "Liczba wpisów wyświetlanych w okienku przycisku historii obok pola Odbiorca w formularzach transakcji.",
+    "portfolioChangeBaselineLabel": "Zmiana portfela mierzona od",
+    "portfolioChangeBaselineHelp": "Dotyczy wartości zmiany na wykresach portfela 1D, 1W i MTD. Dłuższe zakresy są zawsze mierzone od pierwszego punktu.",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "Kurs zamknięcia poprzedniej sesji",
+      "periodStart": "Początek okresu (przy 1D kurs otwarcia dnia)"
+    },
     "saveButton": "Zapisz preferencje",
     "savingButton": "Zapisywanie...",
     "toasts": {

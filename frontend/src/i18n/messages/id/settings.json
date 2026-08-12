@@ -131,6 +131,12 @@
     "timeFormatLabel": "Format Waktu",
     "recentTransactionsLabel": "Transaksi terbaru dalam isi-cepat",
     "recentTransactionsHelp": "Jumlah entri yang ditampilkan di popover tombol riwayat di samping kolom Penerima pada formulir transaksi.",
+    "portfolioChangeBaselineLabel": "Perubahan portofolio diukur dari",
+    "portfolioChangeBaselineHelp": "Berlaku untuk angka Perubahan pada grafik portofolio 1D, 1W, dan MTD. Rentang yang lebih panjang selalu diukur dari titik pertamanya.",
+    "portfolioChangeBaselineOptions": {
+      "previousClose": "Penutupan hari bursa sebelumnya",
+      "periodStart": "Awal periode (harga pembukaan hari itu pada 1D)"
+    },
     "saveButton": "Simpan Preferensi",
     "savingButton": "Menyimpan...",
     "toasts": {
