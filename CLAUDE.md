@@ -233,6 +233,39 @@ A field named `total*`, `portfolioValue`, `transferValue`, `gain`, `tax`, or `es
 
 The full rules -- cost basis and tax truth table, cash, valuation, materialized-result versioning, stale quotes, backtests over incomplete history, and the required adversarial test matrix -- live in `docs/financial-calculation-contract.md` and `docs/time-series-contract.md`. Read both **before** writing or changing any financial calculation, not when a review asks about them: every rule those documents contain has been read, agreed with and broken anyway by someone who reached them afterwards. `docs/testing-contract.md` lists the adversarial inputs that have broken this codebase before -- dates, money precision, aggregation, currency conversion, ownership, concurrency -- so a test author picks from a list rather than recalling edge cases; it is explicitly not a requirement that every test use every value. A financial feature of any substance -- it computes money, materializes a derived result, or reads a time series -- starts from a short approved spec (invariants, truth tables, numerical examples, missing-data policy, test matrix), committed *before* the implementation it guides.
 
+### What a category cost is its debits NET OF its credits
+
+A refund, a return, a chargeback or a cashback filed against an expense
+category is a debit that came back, so it belongs in that category's total.
+Every surface that reached for the gross instead -- `WHERE amount < 0` plus
+`SUM(ABS(...))` in SQL, `if (amount >= 0) return` in a client-side reduce,
+`summary.totalExpenses` on its own -- put a figure on screen that disagreed
+with the register's own balance for the same filter, which is issue #1125:
+$23,212.25 reported against a $23,206.07 balance, the difference being one
+$6.18 credit.
+
+Sum the signed amount over rows of **both** signs, per category, and decide
+what the row *is* from the net. `isNetSpending` and `NET_SPEND_AMOUNT`
+(`backend/src/built-in-reports/spending-reports.service.ts`) are that decision
+on the server; `netEntityTotal`
+(`frontend/src/components/transactions/widget-shared.ts`) is the single
+headline figure for a summary scoped to one category. Never take `totalIncome`
+or `totalExpenses` alone as a category's headline -- those two are a register's
+in/out split, and one of them is half the answer. (The payee surfaces are a
+separate decision and deliberately unchanged: `PayeeInfoWidget` prints the
+credits it received as their own line beside the spend, so netting them into
+the headline as well would count them twice.)
+
+Dropping the sign filter means credits are read at all, so income now reaches
+the aggregate and has to leave by a different door: a bucket whose net is not
+spending is not a row in a spending report. That is one predicate, not a
+per-call-site `> 0`, and it is what keeps an income category (and uncategorized
+income, which the row-level filter used to exclude) out of the breakdown.
+
+Netting is **within** one category, never across two. Both halves come from the
+same filtered aggregate, so a refund can only ever reduce the category it was
+filed under.
+
 ## Environment
 
 Key env vars (see `.env.example` for full list):

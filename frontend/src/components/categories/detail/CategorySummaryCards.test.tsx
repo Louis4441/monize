@@ -95,6 +95,37 @@ describe('CategorySummaryCards', () => {
     expect(screen.getByText(/5,000\.00/).className).toContain('text-green-600');
   });
 
+  // Issue #1125: a refund filed against an expense category was dropped from
+  // the headline, which then disagreed with the register's own balance.
+  it('nets a credit filed against an expense category out of the headline', () => {
+    const netted = { income: 6.18, expenses: 23212.25, net: -23206.07 };
+    renderCards({ lifetime: netted, thisYear: netted });
+    expect(screen.getByText(/23,206\.07/)).toBeInTheDocument();
+    expect(screen.queryByText(/23,212\.25/)).toBeNull();
+  });
+
+  it('nets a debit filed against an income category out of the headline', () => {
+    const netted = { income: 5000, expenses: 250, net: 4750 };
+    renderCards({
+      detail: detailFixture({ category: category({ isIncome: true }) }),
+      lifetime: netted,
+      thisYear: netted,
+    });
+    expect(screen.getByText(/4,750\.00/)).toBeInTheDocument();
+    expect(screen.queryByText(/5,000\.00/)).toBeNull();
+  });
+
+  it('measures the year-over-year change on the netted figures', () => {
+    renderCards({
+      thisYear: { income: 200, expenses: 1400, net: -1200 },
+      lastYear: { income: 0, expenses: 1000, net: -1000 },
+    });
+    // 1200 against 1000, not the gross 1400 against 1000.
+    expect(
+      screen.getByText(/\+20(\.00)?% vs same period last year/),
+    ).toBeInTheDocument();
+  });
+
   it('notes the year-over-year change against the same period', () => {
     renderCards({
       thisYear: { income: 0, expenses: 1200, net: -1200 },

@@ -65,6 +65,29 @@ export function summarizeInDisplayCurrency(
   return { income, expenses, net: income - expenses };
 }
 
+/**
+ * The single headline figure for a summary scoped to one category: what it
+ * cost (an expense category) or what it brought in (an income category), net
+ * of the movements filed against it in the other direction.
+ *
+ * `totalExpenses` alone is the gross debit total, and a credit filed against
+ * an expense category -- a refund, a return, a chargeback -- is a debit that
+ * came back. Reporting the gross puts a figure on screen that disagrees with
+ * the register's own balance for the same filter, which is issue #1125. Both
+ * halves come from the same summary, so the netting is within one category and
+ * never across two.
+ *
+ * Only for a surface that shows ONE figure. `PayeeInfoWidget` prints the
+ * credits it received on their own line beside the spend, and netting them
+ * into the headline there would count them twice.
+ */
+export function netEntityTotal(
+  totals: { income: number; expenses: number },
+  isIncome: boolean,
+): number {
+  return isIncome ? totals.income - totals.expenses : totals.expenses - totals.income;
+}
+
 export interface AggregatedGroupRow {
   id: string | null;
   name: string | null;
