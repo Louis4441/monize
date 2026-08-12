@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "帳單",
       "deposit": "存款",
-      "transfer": "轉帳"
+      "transfer": "轉帳",
+      "reminder": "提醒"
     }
   },
   "gettingStarted": {

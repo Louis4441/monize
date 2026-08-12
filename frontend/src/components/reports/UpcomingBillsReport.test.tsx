@@ -101,7 +101,7 @@ describe('UpcomingBillsReport', () => {
     });
   });
 
-  it('filters out transfers and inactive transactions', async () => {
+  it('filters out inactive transactions but keeps transfers', async () => {
     mockGetAll.mockResolvedValue([
       makeTransaction({ id: 'st-1', name: 'Rent', isTransfer: false, isActive: true }),
       makeTransaction({ id: 'st-2', name: 'Transfer', isTransfer: true, isActive: true }),
@@ -111,9 +111,52 @@ describe('UpcomingBillsReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Active Bills')).toBeInTheDocument();
     });
-    // Only Rent should appear as active bill count (1)
+    // Rent and Transfer are active; Inactive is not.
     const activeBillsValue = screen.getByText('Active Bills').nextElementSibling;
-    expect(activeBillsValue?.textContent).toBe('1');
+    expect(activeBillsValue?.textContent).toBe('2');
+    expect(screen.queryByText('Inactive')).not.toBeInTheDocument();
+  });
+
+  // Issue #1124: a zero-amount transfer used as a payment reminder never
+  // reached the calendar, because every transfer was filtered out.
+  it('shows a zero-amount transfer on the calendar', async () => {
+    mockGetAll.mockResolvedValue([
+      makeTransaction({ id: 'st-9', name: 'Card Payment Reminder', amount: 0, isTransfer: true }),
+    ]);
+    render(<UpcomingBillsReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Card Payment Reminder')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Card Payment Reminder').closest('div')?.className).toContain('bg-blue-100');
+  });
+
+  it('shows a zero-amount reminder without painting it as a deposit', async () => {
+    mockGetAll.mockResolvedValue([
+      makeTransaction({ id: 'st-10', name: 'Water Bill', amount: 0, isTransfer: false }),
+    ]);
+    render(<UpcomingBillsReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Water Bill')).toBeInTheDocument();
+    });
+    const chip = screen.getByText('Water Bill').closest('div');
+    expect(chip?.className).not.toContain('bg-green-100');
+    expect(chip?.className).toContain('bg-gray-100');
+  });
+
+  it('keeps transfer amounts out of the money totals', async () => {
+    mockGetAll.mockResolvedValue([
+      makeTransaction({ id: 'st-1', name: 'Rent', amount: -1500, nextDueDate: '2026-02-20' }),
+      makeTransaction({ id: 'st-2', name: 'Card Payment', amount: -900, isTransfer: true, nextDueDate: '2026-02-20' }),
+    ]);
+    render(<UpcomingBillsReport />);
+    await waitFor(() => {
+      expect(screen.getByText('This Month')).toBeInTheDocument();
+    });
+    // Both occurrences are counted, but only the bill's $1500 is summed.
+    const card = screen.getByText('This Month').parentElement;
+    expect(card?.textContent).toContain('2');
+    expect(card?.textContent).toContain('1500');
+    expect(card?.textContent).not.toContain('2400');
   });
 
   it('renders summary cards and view controls with data', async () => {

@@ -169,6 +169,39 @@ does not say.
 a balance: most accounts are in credit most of the time, and green there spends
 the emphasis on the ordinary case.
 
+### A scheduled transaction has four kinds, not two -- `scheduledKind`
+
+`amount < 0` / `amount > 0` answers only half the question, and the half it
+leaves out is invisible: a **transfer** between the user's own accounts is
+neither a bill nor a deposit, and an amount of exactly **zero** is a deliberate
+placeholder for something whose amount is not known until it arrives (a credit
+card bill, a variable utility). A ternary on the sign paints the zero green as a
+deposit, and a `!st.isTransfer` filter deletes the transfer from the screen
+entirely -- which is how a scheduled transfer the Bills list showed was missing
+from both calendars (issue #1124).
+
+Classify with `scheduledKind` (`lib/scheduled-kind.ts`), which returns
+`bill | deposit | transfer | reminder`, and colour from
+`SCHEDULED_KIND_CHIP_CLASSES` / `SCHEDULED_KIND_AMOUNT_CLASSES` so every surface
+reads the same way -- the two calendars, the dashboard widget's type badge, and
+the budget panel all go through it. Pass the *effective* amount
+(`nextOverride?.amount ?? amount`) where the surface is about one occurrence.
+
+A surface listing *occurrences* -- a calendar, an upcoming list -- includes every
+active schedule whatever its kind. Filtering by kind is for a surface genuinely
+about bills or about deposits (the Bills/Deposits tabs, the budget's committed
+spending), and there a `reminder` belongs in neither bucket rather than silently
+in the positive one -- except where the surface is about *what the user still has
+to pay*, where a zero-amount reminder counts as an upcoming bill contributing
+nothing to the total (`BudgetUpcomingBills`).
+
+A **money total** is the separate decision, and it is not the same list as the
+count: a transfer is counted as something coming up but its amount never joins a
+bills-and-deposits sum, or the same money is reported twice
+(`UpcomingBillsReport`'s `summary.totalOf`). A reminder's zero is a placeholder,
+not a measurement, so it is never given a `+`/`-` sign or a red/green treatment
+that would read as a real amount.
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 Two patterns, depending on where it lives:

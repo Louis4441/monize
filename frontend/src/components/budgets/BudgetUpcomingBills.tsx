@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { gainLossColor } from '@/lib/format';
+import { SCHEDULED_KIND_AMOUNT_CLASSES, scheduledKind } from '@/lib/scheduled-kind';
 import { differenceInDays, startOfDay, parseISO } from 'date-fns';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
 
@@ -32,7 +33,14 @@ export function BudgetUpcomingBills({
     return scheduledTransactions
       .filter((st) => {
         if (!st.isActive) return false;
-        if (getEffectiveAmount(st) >= 0) return false; // only bills (negative amounts)
+        // Bills, plus zero-amount reminders: a schedule left at 0 because the
+        // amount is not known until it arrives is still a payment the user has
+        // to make, and dropping it made it invisible here (issue #1124). It
+        // contributes 0 to the total below -- the placeholder is not a claim
+        // about what the payment will cost. Deposits and transfers are not
+        // budgeted spending and stay out.
+        const kind = scheduledKind({ amount: getEffectiveAmount(st), isTransfer: st.isTransfer });
+        if (kind !== 'bill' && kind !== 'reminder') return false;
         const dueDate = parseISO(st.nextDueDate);
         const daysUntil = differenceInDays(dueDate, today);
         const daysUntilEnd = differenceInDays(endDate, dueDate);
@@ -76,7 +84,13 @@ export function BudgetUpcomingBills({
                   {bill.nextDueDate}
                 </span>
               </div>
-              <span className="font-medium text-red-600 dark:text-red-400 ml-2 whitespace-nowrap">
+              <span
+                className={`font-medium ml-2 whitespace-nowrap ${
+                  SCHEDULED_KIND_AMOUNT_CLASSES[
+                    scheduledKind({ amount: getEffectiveAmount(bill), isTransfer: bill.isTransfer })
+                  ]
+                }`}
+              >
                 {formatCurrency(Math.abs(getEffectiveAmount(bill)))}
               </span>
             </div>

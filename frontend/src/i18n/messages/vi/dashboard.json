@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Hóa đơn",
       "deposit": "Tiền gửi",
-      "transfer": "Chuyển khoản"
+      "transfer": "Chuyển khoản",
+      "reminder": "Nhắc nhở"
     }
   },
   "gettingStarted": {

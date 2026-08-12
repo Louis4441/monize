@@ -19,6 +19,11 @@ import {
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { parseLocalDate } from '@/lib/utils';
+import {
+  SCHEDULED_KIND_AMOUNT_CLASSES,
+  SCHEDULED_KIND_CHIP_CLASSES,
+  scheduledKind,
+} from '@/lib/scheduled-kind';
 import { advanceByFrequency, isOneTime } from '@/lib/frequency';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
@@ -52,9 +57,12 @@ export function UpcomingBillsReport() {
     [],
   );
 
-  // Filter to active, non-transfer transactions.
+  // Every active schedule is reported, whatever its kind: a transfer between the
+  // user's own accounts and a zero-amount reminder both have due dates, and
+  // leaving them out made them vanish from the calendar (issue #1124). Their
+  // amounts are kept out of the money totals below -- see `summary`.
   const scheduledTransactions = useMemo(
-    () => (response ?? []).filter((st) => st.isActive && !st.isTransfer),
+    () => (response ?? []).filter((st) => st.isActive),
     [response],
   );
 
@@ -149,11 +157,19 @@ export function UpcomingBillsReport() {
       (b) => !b.isOverdue && b.dueDate <= monthEnd && isSameMonth(b.dueDate, currentMonth)
     );
 
+    // A transfer moves money between the user's own accounts, so it is counted
+    // as something coming up but never added to a money total -- summing it
+    // beside bills and deposits would overstate both.
+    const totalOf = (bills: UpcomingBill[]) =>
+      bills
+        .filter((b) => !b.scheduledTransaction.isTransfer)
+        .reduce((sum, b) => sum + Math.abs(b.amount), 0);
+
     return {
       overdueCount: overdue.length,
-      overdueTotal: overdue.reduce((sum, b) => sum + Math.abs(b.amount), 0),
+      overdueTotal: totalOf(overdue),
       thisMonthCount: thisMonth.length,
-      thisMonthTotal: thisMonth.reduce((sum, b) => sum + Math.abs(b.amount), 0),
+      thisMonthTotal: totalOf(thisMonth),
     };
   }, [upcomingBills, currentMonth]);
 
@@ -350,15 +366,12 @@ export function UpcomingBillsReport() {
                 </div>
                 <div className="space-y-0.5">
                   {day.bills.slice(0, 3).map((bill, billIndex) => {
-                    const isExpense = bill.amount < 0;
                     return (
                       <div
                         key={billIndex}
                         onClick={() => handleBillClick(bill)}
                         className={`px-1 py-0.5 text-xs rounded truncate cursor-pointer flex items-center gap-0.5 ${
-                          isExpense
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          SCHEDULED_KIND_CHIP_CLASSES[scheduledKind(bill)]
                         } hover:opacity-80`}
                         title={bill.autoPost ? t('upcomingBills.calendarAutoTitle', { name: bill.name }) : t('upcomingBills.calendarManualTitle', { name: bill.name })}
                       >
@@ -423,9 +436,7 @@ export function UpcomingBillsReport() {
                 </div>
                 <div className="text-right">
                   <div className={`font-medium ${
-                    bill.amount < 0
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
+                    SCHEDULED_KIND_AMOUNT_CLASSES[scheduledKind(bill.scheduledTransaction)]
                   }`}>
                     {formatCurrency(Math.abs(bill.amount))}
                   </div>

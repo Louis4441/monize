@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Fattura",
       "deposit": "Versamento",
-      "transfer": "Trasferimento"
+      "transfer": "Trasferimento",
+      "reminder": "Promemoria"
     }
   },
   "gettingStarted": {

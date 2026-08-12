@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Factuur",
       "deposit": "Storting",
-      "transfer": "Overboeking"
+      "transfer": "Overboeking",
+      "reminder": "Herinnering"
     }
   },
   "gettingStarted": {

@@ -128,6 +128,33 @@ describe('UpcomingBills', () => {
     expect(screen.getByText('Transfer')).toBeInTheDocument();
   });
 
+  // Issue #1124: a schedule left at 0 because the amount is not known yet was
+  // badged "Deposit" and printed as a green "+$0.00".
+  it('badges a zero-amount schedule as a reminder, not a deposit', () => {
+    const dateStr = futureDateStr(1);
+    const transactions = [
+      { id: '1', name: 'Card Payment', amount: 0, currencyCode: 'CAD', nextDueDate: dateStr, isActive: true, autoPost: false, isTransfer: false },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+    expect(screen.getByText('Reminder')).toBeInTheDocument();
+    expect(screen.queryByText('Deposit')).not.toBeInTheDocument();
+    expect(screen.queryByText('Total incoming')).not.toBeInTheDocument();
+    // No sign, and not painted as money arriving.
+    const amount = screen.getByText('$0.00');
+    expect(amount.className).toContain('text-gray-500');
+  });
+
+  it('keeps a zero-amount transfer badged as a transfer', () => {
+    const dateStr = futureDateStr(1);
+    const transactions = [
+      { id: '1', name: 'Card Payment', amount: 0, currencyCode: 'CAD', nextDueDate: dateStr, isActive: true, autoPost: false, isTransfer: true },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+    expect(screen.getByText('Transfer')).toBeInTheDocument();
+  });
+
   it('filters out inactive scheduled transactions', () => {
     const dateStr = futureDateStr(1);
     const transactions = [
