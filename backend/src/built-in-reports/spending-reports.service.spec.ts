@@ -362,6 +362,109 @@ describe("SpendingReportsService", () => {
       );
     });
 
+    // Issue #1125: a credit filed against an expense category (a refund, a
+    // return) was dropped row by row, so the report disagreed with the
+    // register's own balance for the same filter.
+    describe("credits filed against an expense category", () => {
+      it("reads rows of both signs and sums the negated amount", async () => {
+        scopedManager.query.mockResolvedValue([]);
+        categoriesRepository.find.mockResolvedValue([]);
+
+        await service.getSpendingByCategory(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        const sql: string = scopedManager.query.mock.calls[0][0];
+        expect(sql).toContain("SUM(-COALESCE(ts.amount, t.amount))");
+        expect(sql).toContain("COALESCE(ts.amount, t.amount) <> 0");
+        // The two shapes that discard credits.
+        expect(sql).not.toContain("COALESCE(ts.amount, t.amount) < 0");
+        expect(sql).not.toContain("ABS(COALESCE(ts.amount, t.amount))");
+      });
+
+      it("reports the debits net of the credits", async () => {
+        // The issue's figures: $23,212.25 of travel spending against a $6.18
+        // credit, which the register totals as $23,206.07.
+        scopedManager.query.mockResolvedValue([
+          {
+            category_id: "cat-parent",
+            currency_code: "USD",
+            total: "23206.07",
+          },
+        ]);
+        categoriesRepository.find.mockResolvedValue([mockParentCategory]);
+
+        const result = await service.getSpendingByCategory(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        expect(result.data[0].total).toBe(23206.07);
+        expect(result.totalSpending).toBe(23206.07);
+      });
+
+      it("drops a category whose credits outweigh its debits", async () => {
+        scopedManager.query.mockResolvedValue([
+          { category_id: "cat-parent", currency_code: "USD", total: "-500.00" },
+          { category_id: "cat-child", currency_code: "USD", total: "-25.00" },
+          { category_id: null, currency_code: "USD", total: "40.00" },
+        ]);
+        categoriesRepository.find.mockResolvedValue([
+          { ...mockParentCategory, parentId: null },
+          { ...mockChildCategory, parentId: null },
+        ]);
+
+        const result = await service.getSpendingByCategory(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        expect(result.data.map((d) => d.categoryId)).toEqual([null]);
+        expect(result.totalSpending).toBe(40);
+      });
+
+      it("drops a category refunded back to exactly zero", async () => {
+        scopedManager.query.mockResolvedValue([
+          { category_id: "cat-parent", currency_code: "USD", total: "0.00" },
+        ]);
+        categoriesRepository.find.mockResolvedValue([mockParentCategory]);
+
+        const result = await service.getSpendingByCategory(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        expect(result.data).toEqual([]);
+        expect(result.totalSpending).toBe(0);
+      });
+
+      it("nets a subcategory's refund against its parent's spending", async () => {
+        scopedManager.query.mockResolvedValue([
+          { category_id: "cat-parent", currency_code: "USD", total: "150.00" },
+          { category_id: "cat-child", currency_code: "USD", total: "-20.00" },
+        ]);
+        categoriesRepository.find.mockResolvedValue([
+          mockParentCategory,
+          mockChildCategory,
+        ]);
+
+        const result = await service.getSpendingByCategory(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        expect(result.data).toHaveLength(1);
+        expect(result.data[0].categoryId).toBe("cat-parent");
+        expect(result.data[0].total).toBe(130);
+      });
+    });
+
     describe("rollupToParent = false", () => {
       it("keeps subcategories separate with 'Parent: Child' name format", async () => {
         scopedManager.query.mockResolvedValue([
@@ -835,6 +938,109 @@ describe("SpendingReportsService", () => {
       );
       expect(febParent).toBeDefined();
       expect(febParent!.total).toBe(0);
+    });
+
+    // Issue #1125, the trend's half of it.
+    describe("credits filed against an expense category", () => {
+      it("reads rows of both signs and sums the negated amount", async () => {
+        scopedManager.query.mockResolvedValue([]);
+        categoriesRepository.find.mockResolvedValue([]);
+
+        await service.getMonthlySpendingTrend(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        const sql: string = scopedManager.query.mock.calls[0][0];
+        expect(sql).toContain("SUM(-COALESCE(ts.amount, t.amount))");
+        expect(sql).toContain("COALESCE(ts.amount, t.amount) <> 0");
+        expect(sql).not.toContain("COALESCE(ts.amount, t.amount) < 0");
+        expect(sql).not.toContain("ABS(COALESCE(ts.amount, t.amount))");
+      });
+
+      it("nets a later month's refund against the same category", async () => {
+        scopedManager.query.mockResolvedValue([
+          {
+            month: "2025-01",
+            category_id: "cat-parent",
+            currency_code: "USD",
+            total: "100.00",
+          },
+          {
+            month: "2025-02",
+            category_id: "cat-parent",
+            currency_code: "USD",
+            total: "-30.00",
+          },
+        ]);
+        categoriesRepository.find.mockResolvedValue([mockParentCategory]);
+
+        const result = await service.getMonthlySpendingTrend(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        expect(result.data.map((m) => m.totalSpending)).toEqual([100, -30]);
+      });
+
+      it("keeps a net-credit category out of the series", async () => {
+        scopedManager.query.mockResolvedValue([
+          {
+            month: "2025-01",
+            category_id: "cat-parent",
+            currency_code: "USD",
+            total: "100.00",
+          },
+          {
+            month: "2025-01",
+            category_id: "cat-child",
+            currency_code: "USD",
+            total: "-80.00",
+          },
+        ]);
+        categoriesRepository.find.mockResolvedValue([
+          { ...mockParentCategory, parentId: null },
+          { ...mockChildCategory, parentId: null },
+        ]);
+
+        const result = await service.getMonthlySpendingTrend(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        expect(result.data[0].categories.map((c) => c.categoryId)).toEqual([
+          "cat-parent",
+        ]);
+      });
+
+      it("drops a month that holds only credits", async () => {
+        scopedManager.query.mockResolvedValue([
+          {
+            month: "2025-01",
+            category_id: "cat-parent",
+            currency_code: "USD",
+            total: "100.00",
+          },
+          {
+            month: "2025-02",
+            category_id: "cat-income",
+            currency_code: "USD",
+            total: "-4000.00",
+          },
+        ]);
+        categoriesRepository.find.mockResolvedValue([mockParentCategory]);
+
+        const result = await service.getMonthlySpendingTrend(
+          mockUserId,
+          "2025-01-01",
+          "2025-12-31",
+        );
+
+        expect(result.data.map((m) => m.month)).toEqual(["2025-01"]);
+      });
     });
 
     it("filters out the asset value change category in the SQL query", async () => {

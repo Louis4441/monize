@@ -126,6 +126,53 @@ describe('CategoryInfoWidget', () => {
     );
   });
 
+  // Issue #1125: the headline read the gross debits, so a refund filed against
+  // the category left it disagreeing with the register's own balance for the
+  // same filter.
+  it('nets a credit filed against an expense category out of the headline', async () => {
+    mockedTransactions.getSummary.mockResolvedValue({
+      totalIncome: 6.18,
+      totalExpenses: 23212.25,
+      netCashFlow: -23206.07,
+      transactionCount: 41,
+      lastTransactionDate: '2026-06-20',
+      byCurrency: {
+        CAD: {
+          totalIncome: 6.18,
+          totalExpenses: 23212.25,
+          netCashFlow: -23206.07,
+          transactionCount: 41,
+        },
+      },
+    });
+    await renderWidget();
+
+    expect(screen.getByText('CAD 23206.07')).toBeInTheDocument();
+    expect(screen.queryByText('CAD 23212.25')).not.toBeInTheDocument();
+  });
+
+  it('nets a debit filed against an income category out of the headline', async () => {
+    mockedTransactions.getSummary.mockResolvedValue({
+      totalIncome: 5000,
+      totalExpenses: 250,
+      netCashFlow: 4750,
+      transactionCount: 4,
+      lastTransactionDate: '2026-06-20',
+      byCurrency: {
+        CAD: {
+          totalIncome: 5000,
+          totalExpenses: 250,
+          netCashFlow: 4750,
+          transactionCount: 4,
+        },
+      },
+    });
+    await renderWidget({ category: makeCategory({ isIncome: true }) });
+
+    expect(screen.getByText('CAD 4750.00')).toBeInTheDocument();
+    expect(screen.queryByText('CAD 5000.00')).not.toBeInTheDocument();
+  });
+
   it('shows earned labels for income categories and hides the budget bar', async () => {
     await renderWidget({
       category: makeCategory({ isIncome: true }),

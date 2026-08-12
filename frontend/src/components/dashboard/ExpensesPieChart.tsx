@@ -73,17 +73,20 @@ export function ExpensesPieChart({
       if (tx.isTransfer) return;
       if (tx.account?.accountType === 'INVESTMENT') return;
 
-      // Only count expenses (negative amounts)
+      // Spend is netted per category: a credit filed against an expense
+      // category (a refund, a return) reduces what was spent there rather than
+      // being skipped, so both signs are read and negated. Categories that end
+      // up net-credit are dropped below, which is what keeps income out.
       const txAmount = Number(tx.amount) || 0;
-      if (txAmount >= 0) return;
-      const expenseAmount = Math.abs(convertToDefault(txAmount, tx.currencyCode));
+      if (txAmount === 0) return;
+      const expenseAmount = -convertToDefault(txAmount, tx.currencyCode);
 
       if (tx.isSplit && tx.splits && tx.splits.length > 0) {
         // Handle split transactions
         tx.splits.forEach((split) => {
           const splitAmt = Number(split.amount) || 0;
-          if (splitAmt >= 0) return;
-          const splitAmount = Math.abs(convertToDefault(splitAmt, tx.currencyCode));
+          if (splitAmt === 0) return;
+          const splitAmount = -convertToDefault(splitAmt, tx.currencyCode);
           if (split.categoryId && split.category) {
             const cat = categoryLookup.get(split.categoryId) || split.category;
             const existing = categoryMap.get(split.categoryId);
@@ -131,8 +134,11 @@ export function ExpensesPieChart({
       });
     }
 
-    // Convert to array and sort by value descending
+    // Convert to array and sort by value descending. A category whose credits
+    // met or exceeded its debits over the range was not spent in, so it is not
+    // a slice -- and neither is an income category, which nets negative.
     const sorted = Array.from(categoryMap.values())
+      .filter((entry) => entry.value > 0)
       .sort((a, b) => b.value - a.value);
 
     const MAX_SLICES = 11;

@@ -7,6 +7,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { countElapsedPeriods } from '@/lib/chart-buckets';
 import { sumMoney } from '@/lib/format';
+import { netEntityTotal } from '@/components/transactions/widget-shared';
 import type { DisplayCurrencyStrategy } from '@/components/transactions/widget-shared';
 import type { MonthlyTotal } from '@/types/transaction';
 import type { CategoryDetail } from '@/types/category';
@@ -59,7 +60,7 @@ export function CategorySummaryCards({
   const isIncome = category.isIncome;
 
   const headlineOf = (totals: CategoryPeriodTotals | null) =>
-    totals === null ? null : isIncome ? totals.income : totals.expenses;
+    totals === null ? null : netEntityTotal(totals, isIncome);
 
   const thisYear = headlineOf(thisYearTotals);
   const lastYear = headlineOf(lastYearTotals);

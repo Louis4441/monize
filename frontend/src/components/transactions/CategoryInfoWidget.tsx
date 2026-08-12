@@ -27,6 +27,7 @@ import {
   buildDisplayCurrencyStrategy,
   summarizeInDisplayCurrency,
   aggregateGroupedTotals,
+  netEntityTotal,
 } from './widget-shared';
 
 const logger = createLogger('CategoryInfoWidget');
@@ -189,7 +190,7 @@ export function CategoryInfoWidget({
     return elapsedMonths > 0 ? sum / elapsedMonths : null;
   }, [monthlyTotals]);
 
-  const headlineTotal = totals ? (category.isIncome ? totals.income : totals.expenses) : null;
+  const headlineTotal = totals ? netEntityTotal(totals, category.isIncome) : null;
   const swatchColor = category.effectiveColor ?? category.color;
   const budgetPercent = budgetStatus ? Math.min(budgetStatus.percentUsed, 100) : 0;
   const budgetBarColor = budgetStatus

@@ -20,6 +20,31 @@ import {
   MonthlyCategorySpending,
 } from "./dto";
 
+/**
+ * Spending in a category is the DEBITS NET OF THE CREDITS filed against it: a
+ * refund, a return or a chargeback is money that came back, so it reduces what
+ * was spent there rather than being dropped (issue #1125). The aggregate
+ * therefore sums the negated signed amount over rows of both signs -- positive
+ * result means "spent" -- instead of the absolute value of debit rows only.
+ *
+ * Restricting to `<> 0` (rather than dropping the amount predicate entirely)
+ * keeps a zero-amount row from creating a category bucket, which is what the
+ * old `< 0` predicate did.
+ */
+const NET_SPEND_AMOUNT = "-COALESCE(ts.amount, t.amount)";
+const NONZERO_AMOUNT = "COALESCE(ts.amount, t.amount) <> 0";
+
+/**
+ * A category whose credits meet or exceed its debits over the period was not
+ * spent in, so it is not a row in a spending report. This is also what keeps
+ * income categories (and uncategorized income, which the old debit-only
+ * predicate excluded row by row) out of the breakdown now that credits are
+ * read at all.
+ */
+export function isNetSpending(total: number): boolean {
+  return total > 0;
+}
+
 @Injectable()
 export class SpendingReportsService {
   constructor(
@@ -41,13 +66,13 @@ export class SpendingReportsService {
       SELECT
         COALESCE(ts.category_id, t.category_id) as category_id,
         t.currency_code,
-        SUM(ABS(COALESCE(ts.amount, t.amount))) as total
+        SUM(${NET_SPEND_AMOUNT}) as total
       FROM transactions t
       LEFT JOIN transaction_splits ts ON ts.transaction_id = t.id
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE t.user_id = $1
         AND t.transaction_date <= $2
-        AND COALESCE(ts.amount, t.amount) < 0
+        AND ${NONZERO_AMOUNT}
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
@@ -158,6 +183,9 @@ export class SpendingReportsService {
         color: category?.color || null,
         total: roundMoney(total),
       }))
+      // Netting happens before this filter, so a category is judged on what it
+      // cost after its refunds -- not on whether it happened to hold a debit.
+      .filter((item) => isNetSpending(item.total))
       .sort((a, b) => b.total - a.total)
       .slice(0, 15);
 
@@ -283,13 +311,13 @@ export class SpendingReportsService {
         TO_CHAR(t.transaction_date, 'YYYY-MM') as month,
         COALESCE(ts.category_id, t.category_id) as category_id,
         t.currency_code,
-        SUM(ABS(COALESCE(ts.amount, t.amount))) as total
+        SUM(${NET_SPEND_AMOUNT}) as total
       FROM transactions t
       LEFT JOIN transaction_splits ts ON ts.transaction_id = t.id
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE t.user_id = $1
         AND t.transaction_date <= $2
-        AND COALESCE(ts.amount, t.amount) < 0
+        AND ${NONZERO_AMOUNT}
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
@@ -378,12 +406,35 @@ export class SpendingReportsService {
         );
       }
     }
+    // Whether a category belongs in a spending trend is decided over the whole
+    // period, not per month: one month's refund is still part of a category
+    // that was spent in. A category that is net-credit across the range was
+    // not -- and an income category, now that credits are read at all, never
+    // is one.
+    const spendingCategories = new Set(
+      Array.from(allCategoryTotals.entries())
+        .filter(([, total]) => isNetSpending(roundMoney(total)))
+        .map(([id]) => id),
+    );
     const topCategories = Array.from(allCategoryTotals.entries())
+      .filter(([id]) => spendingCategories.has(id))
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([id]) => id);
 
     const data: MonthlySpendingItem[] = Array.from(monthlyData.entries())
+      // Reading credits means a month holding nothing but income now produces a
+      // bucket where the debit-only predicate produced no row at all. Such a
+      // month has nothing to draw, so it stays out of a spending trend. The
+      // test is whether the month touched a spending category at all, not the
+      // sign of its own total -- a month that is one category's refund is still
+      // that category's month -- and a month whose spending fell outside the
+      // top ten is kept exactly as before.
+      .filter(([, catMap]) =>
+        Array.from(catMap.keys()).some((catId) =>
+          spendingCategories.has(catId),
+        ),
+      )
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([month, catMap]) => {
         const categories: MonthlyCategorySpending[] = topCategories.map(

@@ -141,6 +141,69 @@ describe('ExpensesPieChart', () => {
     await waitFor(() => expect(screen.getByText('No expense data for this period.')).toBeInTheDocument());
   });
 
+  // Issue #1125: credits were skipped row by row, so a refund never reached
+  // the category it belonged to. They are read and netted now; a category that
+  // ends up net-credit is what drops out.
+  it('nets a refund against the category it was filed under', async () => {
+    const transactions = [
+      {
+        id: '1', amount: -100, categoryId: 'cat1',
+        category: { id: 'cat1', name: 'Travel', color: '#ef4444' },
+        currencyCode: 'CAD', isTransfer: false, isSplit: false, transactionDate: '2024-01-15',
+      },
+      {
+        id: '2', amount: 25, categoryId: 'cat1',
+        category: { id: 'cat1', name: 'Travel', color: '#ef4444' },
+        currencyCode: 'CAD', isTransfer: false, isSplit: false, transactionDate: '2024-01-20',
+      },
+    ];
+    await renderChart(transactions, [{ id: 'cat1', name: 'Travel', color: '#ef4444' }]);
+    await waitFor(() => expect(screen.getByText('Total')).toBeInTheDocument());
+    expect(screen.getByText('$75.00')).toBeInTheDocument();
+    expect(screen.queryByText('$100.00')).not.toBeInTheDocument();
+  });
+
+  it('nets a refund carried on a split line', async () => {
+    const transactions = [
+      {
+        id: '1', amount: -100, categoryId: null, category: null,
+        currencyCode: 'CAD', isTransfer: false, isSplit: true, transactionDate: '2024-01-15',
+        splits: [
+          { id: 's1', amount: -100, categoryId: 'cat1', category: { id: 'cat1', name: 'Travel' } },
+        ],
+      },
+      {
+        id: '2', amount: 40, categoryId: null, category: null,
+        currencyCode: 'CAD', isTransfer: false, isSplit: true, transactionDate: '2024-01-20',
+        splits: [
+          { id: 's2', amount: 40, categoryId: 'cat1', category: { id: 'cat1', name: 'Travel' } },
+        ],
+      },
+    ];
+    await renderChart(transactions, [{ id: 'cat1', name: 'Travel', color: '#ef4444' }]);
+    await waitFor(() => expect(screen.getByText('Total')).toBeInTheDocument());
+    expect(screen.getByText('$60.00')).toBeInTheDocument();
+  });
+
+  it('drops a category whose refunds outweigh its spending', async () => {
+    const transactions = [
+      {
+        id: '1', amount: -30, categoryId: 'cat1',
+        category: { id: 'cat1', name: 'Travel', color: '#ef4444' },
+        currencyCode: 'CAD', isTransfer: false, isSplit: false, transactionDate: '2024-01-15',
+      },
+      {
+        id: '2', amount: 50, categoryId: 'cat1',
+        category: { id: 'cat1', name: 'Travel', color: '#ef4444' },
+        currencyCode: 'CAD', isTransfer: false, isSplit: false, transactionDate: '2024-01-20',
+      },
+    ];
+    await renderChart(transactions, [{ id: 'cat1', name: 'Travel', color: '#ef4444' }]);
+    await waitFor(() =>
+      expect(screen.getByText('No expense data for this period.')).toBeInTheDocument(),
+    );
+  });
+
   it('skips positive amounts (income)', async () => {
     const transactions = [
       {
