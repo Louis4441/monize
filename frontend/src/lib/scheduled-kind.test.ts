@@ -1,0 +1,42 @@
+import { describe, it, expect } from 'vitest';
+import {
+  SCHEDULED_KIND_AMOUNT_CLASSES,
+  SCHEDULED_KIND_CHIP_CLASSES,
+  scheduledKind,
+} from './scheduled-kind';
+
+describe('scheduledKind', () => {
+  it('classifies a negative amount as a bill', () => {
+    expect(scheduledKind({ amount: -1200 })).toBe('bill');
+    expect(scheduledKind({ amount: '-0.0001' })).toBe('bill');
+  });
+
+  it('classifies a positive amount as a deposit', () => {
+    expect(scheduledKind({ amount: 5000 })).toBe('deposit');
+    expect(scheduledKind({ amount: '0.0001' })).toBe('deposit');
+  });
+
+  it('classifies a zero amount as a reminder, not a deposit', () => {
+    expect(scheduledKind({ amount: 0 })).toBe('reminder');
+    expect(scheduledKind({ amount: '0.0000' })).toBe('reminder');
+    expect(scheduledKind({ amount: -0 })).toBe('reminder');
+  });
+
+  it('classifies a transfer as a transfer whatever its amount', () => {
+    expect(scheduledKind({ amount: 0, isTransfer: true })).toBe('transfer');
+    expect(scheduledKind({ amount: -500, isTransfer: true })).toBe('transfer');
+    expect(scheduledKind({ amount: 500, isTransfer: true })).toBe('transfer');
+  });
+
+  it('treats an unparseable amount as a reminder rather than a deposit', () => {
+    expect(scheduledKind({ amount: 'n/a' })).toBe('reminder');
+  });
+
+  it('gives every kind its own chip and amount styling', () => {
+    const kinds = ['bill', 'deposit', 'transfer', 'reminder'] as const;
+    const chips = kinds.map((k) => SCHEDULED_KIND_CHIP_CLASSES[k]);
+    const amounts = kinds.map((k) => SCHEDULED_KIND_AMOUNT_CLASSES[k]);
+    expect(new Set(chips).size).toBe(kinds.length);
+    expect(new Set(amounts).size).toBe(kinds.length);
+  });
+});

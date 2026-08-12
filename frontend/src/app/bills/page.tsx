@@ -43,6 +43,7 @@ import {
   deriveAccountsFromScheduledTransactions,
 } from '@/lib/bills-filters';
 import { parseLocalDate } from '@/lib/utils';
+import { SCHEDULED_KIND_CHIP_CLASSES, scheduledKind } from '@/lib/scheduled-kind';
 import { advanceByFrequency, isOneTime, monthlyEquivalent } from '@/lib/frequency';
 import type { FutureTransaction } from '@/lib/forecast';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -536,8 +537,11 @@ function BillsContent() {
     const days = eachDayOfInterval({ start: calStart, end: calEnd });
     const billsByDate = new Map<string, ScheduledTransaction[]>();
 
-    const activeNonTransfer = scheduledTransactions.filter((st) => st.isActive && !st.isTransfer);
-    activeNonTransfer.forEach((st) => {
+    // Every active schedule is on the calendar, whatever its kind: transfers and
+    // zero-amount reminders have due dates like anything else, and leaving them
+    // off makes a schedule the list shows simply vanish (issue #1124).
+    const active = scheduledTransactions.filter((st) => st.isActive);
+    active.forEach((st) => {
       getNextOccurrences(st).forEach((date) => {
         const key = format(date, 'yyyy-MM-dd');
         const existing = billsByDate.get(key) || [];
@@ -766,22 +770,17 @@ function BillsContent() {
                     {format(day.date, 'd')}
                   </div>
                   <div className="space-y-0.5">
-                    {day.bills.slice(0, 3).map((bill, billIndex) => {
-                      const isExpense = bill.amount < 0;
-                      return (
-                        <div
-                          key={billIndex}
-                          onClick={() => handleEdit(bill)}
-                          className={`px-1 py-0.5 text-xs rounded truncate cursor-pointer ${
-                            isExpense
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          } hover:opacity-80`}
-                        >
-                          {bill.name}
-                        </div>
-                      );
-                    })}
+                    {day.bills.slice(0, 3).map((bill, billIndex) => (
+                      <div
+                        key={billIndex}
+                        onClick={() => handleEdit(bill)}
+                        className={`px-1 py-0.5 text-xs rounded truncate cursor-pointer ${
+                          SCHEDULED_KIND_CHIP_CLASSES[scheduledKind(bill)]
+                        } hover:opacity-80`}
+                      >
+                        {bill.name}
+                      </div>
+                    ))}
                     {day.bills.length > 3 && (
                       <div className="text-xs text-gray-500 dark:text-gray-400 px-1">
                         {t('calendar.more', { count: day.bills.length - 3 })}

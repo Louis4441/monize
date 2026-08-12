@@ -249,6 +249,9 @@ const mockScheduledTransactions = [
   { id: 'st-3', name: 'Savings Transfer', amount: -500, frequency: 'MONTHLY', nextDueDate: '2026-03-01', isActive: true, isTransfer: true, startDate: '2026-01-01', endDate: null },
   { id: 'st-4', name: 'Netflix', amount: -15.99, frequency: 'MONTHLY', nextDueDate: '2026-02-10', isActive: true, isTransfer: false, startDate: '2026-01-01', endDate: null },
   { id: 'st-5', name: 'Old Bill', amount: -50, frequency: 'MONTHLY', nextDueDate: '2026-02-20', isActive: false, isTransfer: false, startDate: '2026-01-01', endDate: null },
+  // A zero-amount transfer used purely as a reminder: the amount varies month to
+  // month, so the user leaves it at 0 (issue #1124).
+  { id: 'st-6', name: 'Card Payment Reminder', amount: 0, frequency: 'MONTHLY', nextDueDate: '2026-02-18', isActive: true, isTransfer: true, startDate: '2026-01-01', endDate: null },
 ];
 
 describe('BillsPage', () => {
@@ -378,7 +381,7 @@ describe('BillsPage', () => {
     it('shows correct filter counts', async () => {
       render(<BillsPage />);
       await waitFor(() => {
-        expect(screen.getByText('All (5)')).toBeInTheDocument();
+        expect(screen.getByText('All (6)')).toBeInTheDocument();
         expect(screen.getByText('Bills (4)')).toBeInTheDocument();
         expect(screen.getByText('Deposits (1)')).toBeInTheDocument();
       });
@@ -424,10 +427,10 @@ describe('BillsPage', () => {
       render(<BillsPage />);
       await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
       // Filter tabs visible in list view
-      expect(screen.getByText('All (5)')).toBeInTheDocument();
+      expect(screen.getByText('All (6)')).toBeInTheDocument();
       fireEvent.click(screen.getByText('Calendar'));
       // Filter tabs hidden in calendar view
-      expect(screen.queryByText('All (5)')).not.toBeInTheDocument();
+      expect(screen.queryByText('All (6)')).not.toBeInTheDocument();
     });
   });
 
@@ -447,11 +450,30 @@ describe('BillsPage', () => {
       expect(screen.getByText('Rent')).toBeInTheDocument();
     });
 
-    it('excludes transfers from calendar', async () => {
+    // Issue #1124: a zero-amount transfer used as a payment reminder was on the
+    // list but missing from the calendar, because the calendar dropped every
+    // transfer.
+    it('shows zero-amount transfers on the calendar', async () => {
       render(<BillsPage />);
       await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
       fireEvent.click(screen.getByText('Calendar'));
-      expect(screen.queryByText('Savings Transfer')).not.toBeInTheDocument();
+      expect(screen.getByText('Card Payment Reminder')).toBeInTheDocument();
+    });
+
+    it('styles a transfer chip distinctly from a bill and a deposit', async () => {
+      render(<BillsPage />);
+      await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Calendar'));
+      expect(screen.getByText('Card Payment Reminder').className).toContain('bg-blue-100');
+      expect(screen.getByText('Rent').className).toContain('bg-red-100');
+      expect(screen.getByText('Salary').className).toContain('bg-green-100');
+    });
+
+    it('excludes inactive schedules from the calendar', async () => {
+      render(<BillsPage />);
+      await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Calendar'));
+      expect(screen.queryByText('Old Bill')).not.toBeInTheDocument();
     });
 
     it('navigates to previous month', async () => {
