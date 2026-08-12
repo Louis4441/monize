@@ -693,7 +693,7 @@ describe("SecuritiesController", () => {
       };
       securityPriceService.backfillHistoricalPrices.mockResolvedValue(summary);
 
-      const result = await controller.backfillHistoricalPrices();
+      const result = await controller.backfillHistoricalPrices({});
 
       expect(securityPriceService.backfillHistoricalPrices).toHaveBeenCalled();
       expect(result).toEqual(summary);
@@ -712,11 +712,15 @@ describe("SecuritiesController", () => {
         result,
       );
 
-      const response = await controller.backfillSecurityPrices(req, "sec-1");
+      const response = await controller.backfillSecurityPrices(
+        req,
+        "sec-1",
+        {},
+      );
 
       expect(
         securityPriceService.backfillSecurityHoldingPeriod,
-      ).toHaveBeenCalledWith("user-1", "sec-1");
+      ).toHaveBeenCalledWith("user-1", "sec-1", undefined);
       expect(response).toEqual(result);
       // Fire-and-forget recalc runs in the background.
       await Promise.resolve();
@@ -733,7 +737,7 @@ describe("SecuritiesController", () => {
         provider: "yahoo",
       });
 
-      await controller.backfillSecurityPrices(req, "sec-1");
+      await controller.backfillSecurityPrices(req, "sec-1", {});
 
       expect(netWorthService.recalculateAllAccounts).not.toHaveBeenCalled();
     });
@@ -745,7 +749,11 @@ describe("SecuritiesController", () => {
         error: "No historical data available",
       });
 
-      const response = await controller.backfillSecurityPrices(req, "sec-1");
+      const response = await controller.backfillSecurityPrices(
+        req,
+        "sec-1",
+        {},
+      );
 
       expect(response.success).toBe(false);
       expect(netWorthService.recalculateAllAccounts).not.toHaveBeenCalled();
@@ -763,7 +771,7 @@ describe("SecuritiesController", () => {
       );
 
       await expect(
-        controller.backfillSecurityPrices(req, "sec-1"),
+        controller.backfillSecurityPrices(req, "sec-1", {}),
       ).resolves.toBeDefined();
     });
   });

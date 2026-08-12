@@ -492,6 +492,47 @@ exchange's calendar day.** `barDate` reads it in `meta.exchangeTimezoneName`,
 falling back to UTC. Reading it with `setHours(0,0,0,0)` made `price_date` a
 function of the container's timezone and put an ASX bar on the wrong day.
 
+## A payload coarser than daily is a different series, not a sparse one
+
+Ask a provider for a long range and it may answer with weekly or monthly bars.
+Written into a daily table those rows are indistinguishable from daily ones --
+and they overwrite the real daily rows that sat on those dates, so the damage
+is not limited to what was added. `market_index_prices` refused this from the
+day it was written; `security_prices` did not, and one production catalogue
+carried **six years of a single adjusted row per month** spliced through a daily
+history. Under the one-basis-per-series rule that did not merely add noise: the
+monthly rows carried adjusted closes and the daily ones did not, so
+`loadPriceSeries` kept the monthly rows and *dropped every daily row around
+them*, reducing six years of return series to twelve points a year.
+
+`assertDailySeries` (`providers/daily-spacing.util.ts`) is the one test, and it
+runs inside `bulkUpsertPrices` -- not in its callers, of which there are four,
+because a guard one caller forgets is not a guard. Every caller already wraps
+that write in a try/catch that reports a failed security, so the throw surfaces
+as "this one did not update" rather than as a crash. The threshold, the median
+(never the mean -- one long exchange closure must not make a daily series look
+weekly) and the minimum sample size live there too, and
+`daily-spacing.util.spec.ts` fails if a second copy of any of them appears
+anywhere under `securities/`.
+
+## History depth is a request, not a property of the holding
+
+`backfillSecurityHoldingPeriod` clips its write to the first transaction date,
+which is right for a position valuation and wrong for everything else: a
+backtest, the GEM report and the performance comparison all need prices from
+before the user bought. A security first transacted in May 2025 therefore held
+fifteen months of history out of ten available, with no way to ask for more --
+`backfillSecurityRange` can fetch any range but has no HTTP route of its own,
+reachable only as a side effect of running one of those reports.
+
+Both backfill endpoints now take `range` (`BackfillPricesQueryDto`), and
+supplying it means two things at once, deliberately: fetch that range, **and**
+store all of it. Omitting it keeps the clipped default. When you add a caller,
+decide which of the two questions it is asking -- "what is this position worth
+over the time I held it" or "what did this instrument do" -- rather than
+reaching for `max` because more data seems safer; the clip exists so an
+untouched catalogue does not accumulate decades of prices nobody reads.
+
 ## A money value carries the currency it was calculated into
 
 Not the currency of the account it is filed under. `InvestmentTransaction.exchangeRate`

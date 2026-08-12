@@ -80,6 +80,23 @@ by convention:
   must not pretend to. Such a row stays out of the adjusted series, which is
   the correct answer to "what was this worth, adjusted?" when nobody knows.
 
+### 1.2 A coarser series is not a sparser one
+
+A provider asked for a long range may answer with weekly or monthly bars. Stored
+into a daily table they are indistinguishable from daily rows, and they
+overwrite whatever real daily rows sat on those dates -- so a payload nobody
+checked corrupts more than it adds. **Check the median spacing of every provider
+payload before storing it, and refuse one coarser than daily** rather than
+storing it as though it were daily (`assertDailySeries`; the median, not the
+mean, so one long exchange closure does not disqualify a daily series).
+
+This compounds with the basis rule above in a way worth stating plainly, because
+it is how the defect stayed invisible: the monthly rows arrived *with* adjusted
+closes and the daily rows around them had none, so `bool_or(...)` was true and
+the adjusted-only filter kept the twelve monthly points and discarded the ~250
+daily ones. The window did not look empty or wrong -- it looked like a monthly
+series, which is a perfectly plausible thing for a chart to be showing.
+
 ## 2. Quote age and period boundaries
 
 - A price used to value a period boundary (period start, period end, or

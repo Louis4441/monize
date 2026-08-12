@@ -2021,6 +2021,208 @@ describe("SecurityPriceService", () => {
     });
   });
 
+  describe("a coarser-than-daily payload is refused, not spliced", () => {
+    const DAY = 24 * 60 * 60;
+
+    /** `count` bars `stepDays` apart, ending a week ago so all are settled. */
+    function timestamps(count: number, stepDays: number): number[] {
+      const end = Math.floor(Date.now() / 1000) - 7 * DAY;
+      return Array.from(
+        { length: count },
+        (_, i) => end - (count - 1 - i) * stepDays * DAY,
+      );
+    }
+
+    function bulkUpsertCalls(): unknown[][] {
+      return dataSourceMock.query.mock.calls.filter(
+        (call: unknown[]) =>
+          typeof call[0] === "string" && call[0].includes("adjusted_close"),
+      );
+    }
+
+    beforeEach(() => {
+      dataSourceMock.query.mockResolvedValue(undefined);
+    });
+
+    /**
+     * The defect this catches, seen in production data: six years of one
+     * adjusted row per month spliced through a daily history, from a
+     * long-range request the provider answered with monthly bars. Under the
+     * one-basis-per-series rule those monthly rows then *excluded* every daily
+     * row around them, reducing the window to twelve points a year -- and they
+     * had already overwritten the real daily close on each date they landed on.
+     */
+    it("writes nothing when the provider returns monthly bars", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: timestamps(72, 30),
+            closes: Array.from({ length: 72 }, (_, i) => 100 + i),
+            adjcloses: Array.from({ length: 72 }, (_, i) => 100 + i),
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(bulkUpsertCalls()).toHaveLength(0);
+      expect(result.barsSettled).toBe(0);
+      expect(result.failed).toBe(1);
+    });
+
+    it("writes a daily payload as before", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: timestamps(30, 1),
+            closes: Array.from({ length: 30 }, (_, i) => 100 + i),
+            adjcloses: Array.from({ length: 30 }, (_, i) => 100 + i),
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(bulkUpsertCalls()).toHaveLength(1);
+      expect(result.barsSettled).toBe(30);
+    });
+
+    /**
+     * The guard sits in `bulkUpsertPrices` rather than in each caller because
+     * there are four of them, and a guard one caller forgets is not a guard.
+     */
+    it("refuses on the force-backfill path too, and says why", async () => {
+      securitiesRepository.findOne.mockResolvedValue(mockSecurity);
+      dataSourceMock.query.mockResolvedValueOnce([{ earliest: "2016-05-01" }]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: timestamps(60, 7),
+            closes: Array.from({ length: 60 }, (_, i) => 100 + i),
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "max",
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("daily series was requested");
+      expect(bulkUpsertCalls()).toHaveLength(0);
+    });
+  });
+
+  describe("backfillSecurityHoldingPeriod with an explicit range", () => {
+    const DAY = 24 * 60 * 60;
+
+    function dailyResponse(count: number) {
+      const end = Math.floor(Date.now() / 1000) - DAY;
+      return makeYahooHistoricalResponse({
+        timestamps: Array.from(
+          { length: count },
+          (_, i) => end - (count - 1 - i) * DAY,
+        ),
+        closes: Array.from({ length: count }, (_, i) => 100 + i),
+      });
+    }
+
+    beforeEach(() => {
+      dataSourceMock.query.mockResolvedValue(undefined);
+      securitiesRepository.findOne.mockResolvedValue(mockSecurity);
+    });
+
+    it("asks the provider for the range it was given", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "10y",
+      );
+
+      expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain(
+        "range=10y",
+      );
+    });
+
+    /**
+     * The point of the parameter. Without it the write is clipped to the first
+     * transaction date, so a security first bought in May 2025 could hold
+     * fifteen months of history and no more -- and a backtest, the GEM report
+     * and the comparison chart all need prices from before the user bought.
+     */
+    it("does not clip to the first transaction date", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "max",
+      );
+
+      expect(result.pricesLoaded).toBe(40);
+      // Never consults the earliest-transaction date, because it cannot matter.
+      for (const [sql] of scopedManagerQuery.mock.calls) {
+        expect(String(sql)).not.toContain("MIN(transaction_date)");
+      }
+    });
+
+    /**
+     * Imports set `skipPriceUpdates` on securities whose symbol was
+     * auto-generated, which is exactly the set a user is most likely to be
+     * correcting by hand -- so the explicit request overrides the flag, as the
+     * unranged path already did.
+     */
+    it("overrides skipPriceUpdates, as the default path does", async () => {
+      securitiesRepository.findOne.mockResolvedValue({
+        ...mockSecurity,
+        skipPriceUpdates: true,
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+        "max",
+      );
+
+      expect(result.pricesLoaded).toBe(40);
+    });
+
+    it("still clips when no range is given", async () => {
+      dataSourceMock.query.mockResolvedValueOnce([{ earliest: "2026-08-01" }]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(dailyResponse(40)),
+        ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+      );
+
+      expect(result.pricesLoaded).toBeLessThan(40);
+    });
+  });
+
   describe("scheduledPriceRefresh", () => {
     it("calls refreshAllPrices", async () => {
       securitiesRepository.find.mockResolvedValue([]);

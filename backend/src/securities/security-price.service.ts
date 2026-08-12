@@ -23,6 +23,8 @@ import {
 import { getTradingDateFromQuote } from "./providers/trading-date.util";
 import { getMarketSessionFromQuote } from "./providers/market-session.util";
 import { isSessionSettled } from "./providers/settled-bar.util";
+import { assertDailySeries } from "./providers/daily-spacing.util";
+import { BackfillRange } from "./dto/backfill-prices-query.dto";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
 import {
@@ -1013,7 +1015,9 @@ export class SecurityPriceService {
     );
   }
 
-  async backfillHistoricalPrices(): Promise<HistoricalBackfillSummary> {
+  async backfillHistoricalPrices(
+    range?: BackfillRange,
+  ): Promise<HistoricalBackfillSummary> {
     const startTime = Date.now();
     this.logger.log("Starting historical price backfill");
 
@@ -1076,12 +1080,12 @@ export class SecurityPriceService {
 
       const daily = await this.fetchHistoricalWithFallback(
         representative,
-        "1y",
+        range ?? "1y",
         ctx,
       );
 
       let maxBundle: HistoricalWithProvider | null = null;
-      if (needsOlderData) {
+      if (!range && needsOlderData) {
         maxBundle = await this.fetchHistoricalWithFallback(
           representative,
           "max",
@@ -1129,12 +1133,20 @@ export class SecurityPriceService {
 
       for (const security of group) {
         const secEarliest = earliestTxDate.get(security.id);
-        const secCutoffStr = secEarliest
-          ? [oneYearAgoStr, secEarliest].sort()[0]
-          : oneYearAgoStr;
-        const secCutoff = new Date(secCutoffStr);
-        secCutoff.setHours(0, 0, 0, 0);
-        const prices = allPrices.filter((p) => p.date >= secCutoff);
+        // An explicit range asks for history as such, so nothing is clipped:
+        // see `BackfillPricesQueryDto.range`. Without one, the window is the
+        // *earlier* of a year ago and the first transaction -- never less than
+        // a year, and as far back as the security has been held.
+        const secCutoffStr = range
+          ? null
+          : secEarliest
+            ? [oneYearAgoStr, secEarliest].sort()[0]
+            : oneYearAgoStr;
+        const prices = secCutoffStr
+          ? allPrices.filter(
+              (p) => p.date >= new Date(`${secCutoffStr}T00:00:00Z`),
+            )
+          : allPrices;
 
         if (prices.length === 0) {
           results.push({
@@ -1151,7 +1163,8 @@ export class SecurityPriceService {
           await this.bulkUpsertPrices(security.id, prices, source);
 
           this.logger.log(
-            `Backfilled ${prices.length} prices for ${security.symbol} via ${winner.provider} (from ${secCutoffStr})`,
+            `Backfilled ${prices.length} prices for ${security.symbol} via ${winner.provider} ` +
+              `(${secCutoffStr ? `from ${secCutoffStr}` : `full ${range} range`})`,
           );
           results.push({
             symbol: security.symbol,
@@ -1200,6 +1213,25 @@ export class SecurityPriceService {
     prices: HistoricalPrice[],
     source: string,
   ): Promise<void> {
+    // Before anything is written, and over the whole payload rather than per
+    // batch: a provider asked for a long range may answer with weekly or
+    // monthly bars, and stored into a daily table those rows are
+    // indistinguishable from daily ones -- while overwriting the real daily
+    // rows that sat on those dates. `market_index_prices` has refused this
+    // since it was written; `security_prices` did not, and a monthly series
+    // spliced through six years of daily history is what that cost.
+    //
+    // Here rather than in each caller because there are four of them (the
+    // catalog backfill, the per-security backfill, the holding-period
+    // backfill, and settlement) and a guard one of them forgets is not a
+    // guard. Every caller already wraps this in a try/catch that reports the
+    // failure, so the throw surfaces as "this security did not update" rather
+    // than as a crash.
+    assertDailySeries(
+      securityId,
+      prices.map((p) => p.date),
+    );
+
     const batchSize = 500;
     for (let i = 0; i < prices.length; i += batchSize) {
       const batch = prices.slice(i, i + batchSize);
@@ -1426,8 +1458,40 @@ export class SecurityPriceService {
   async backfillSecurityRange(
     security: Security,
     range: string,
+    opts: { force?: boolean } = {},
   ): Promise<number> {
-    if (security.skipPriceUpdates) return 0;
+    try {
+      return await this.fetchAndStoreRange(security, range, opts);
+    } catch (error) {
+      this.logger.error(
+        `Failed to upsert backfilled prices for ${security.symbol}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 0;
+    }
+  }
+
+  /**
+   * The body of `backfillSecurityRange`, which **throws** instead of reporting
+   * zero.
+   *
+   * The two exist separately because zero rows and a refused payload are
+   * different facts, and only one caller can act on the difference. The
+   * background callers (Monte Carlo, GEM, the comparison chart) are enriching a
+   * report and want a number; a user who explicitly asked for ten years of
+   * history needs to be told *why* they got nothing -- "the provider answered
+   * with monthly bars" is a different problem from "the symbol has no data",
+   * and a swallowed error makes them the same non-answer.
+   *
+   * @param opts.force Ignore `skipPriceUpdates`. Imports set that flag on
+   *   securities whose symbol was auto-generated, so it is exactly the set a
+   *   user is most likely to be correcting by hand.
+   */
+  private async fetchAndStoreRange(
+    security: Security,
+    range: string,
+    opts: { force?: boolean } = {},
+  ): Promise<number> {
+    if (security.skipPriceUpdates && !opts.force) return 0;
 
     const [ctx] =
       (await this.loadUserContexts([security.userId])).values() || [];
@@ -1450,22 +1514,15 @@ export class SecurityPriceService {
       await this.persistMsnInstrumentIdIfResolved(security, "msn", userCtx);
     }
 
-    try {
-      await this.bulkUpsertPrices(
-        security.id,
-        bundle.prices,
-        sourceFor(bundle.provider),
-      );
-      this.logger.log(
-        `Backfilled ${bundle.prices.length} ${range} prices for ${security.symbol} via ${bundle.provider}`,
-      );
-      return bundle.prices.length;
-    } catch (error) {
-      this.logger.error(
-        `Failed to upsert backfilled prices for ${security.symbol}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return 0;
-    }
+    await this.bulkUpsertPrices(
+      security.id,
+      bundle.prices,
+      sourceFor(bundle.provider),
+    );
+    this.logger.log(
+      `Backfilled ${bundle.prices.length} ${range} prices for ${security.symbol} via ${bundle.provider}`,
+    );
+    return bundle.prices.length;
   }
 
   /**
@@ -1480,6 +1537,7 @@ export class SecurityPriceService {
   async backfillSecurityHoldingPeriod(
     userId: string,
     securityId: string,
+    range?: BackfillRange,
   ): Promise<HistoricalBackfillResult> {
     const security = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Security).findOne({
@@ -1500,6 +1558,26 @@ export class SecurityPriceService {
       defaultQuoteProvider: DEFAULT_QUOTE_PROVIDER,
       preferredExchanges: [],
     };
+
+    // An explicit range is a request for history as such, so it takes the
+    // whole payload: fetch that range and store all of it. The clip below
+    // exists to avoid hoarding prices from before the user owned anything,
+    // which is right for a position valuation and wrong for every calculation
+    // that needs a return series longer than the holding.
+    if (range) {
+      try {
+        const loaded = await this.fetchAndStoreRange(security, range, {
+          force: true,
+        });
+        return { symbol: security.symbol, success: true, pricesLoaded: loaded };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Failed to backfill ${range} of prices for ${security.symbol}: ${message}`,
+        );
+        return { symbol: security.symbol, success: false, error: message };
+      }
+    }
 
     // Earliest date the user has held the security. Null when there are no
     // transactions yet (e.g. a watchlist-only security) -- fall back to 1y.
@@ -1556,8 +1634,10 @@ export class SecurityPriceService {
     // Clip to the holding period: from the first transaction date (or 1y ago
     // when the security has never been transacted) through the latest price.
     const cutoffStr = earliestTx ?? oneYearAgoStr;
-    const cutoff = new Date(cutoffStr);
-    cutoff.setHours(0, 0, 0, 0);
+    // UTC midnight, matching the UTC-midnight dates `barDate` produces. The
+    // old `setHours(0, 0, 0, 0)` made this local midnight, so the cutoff moved
+    // by a day depending on where the container runs.
+    const cutoff = new Date(`${cutoffStr}T00:00:00Z`);
     const prices = allPrices.filter((p) => p.date >= cutoff);
 
     if (prices.length === 0) {

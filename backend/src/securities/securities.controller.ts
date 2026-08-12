@@ -58,6 +58,7 @@ import { UpdateSecurityDto } from "./dto/update-security.dto";
 import { RefreshSecurityPricesDto } from "./dto/refresh-security-prices.dto";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { PriceHistoryQueryDto } from "./dto/price-history-query.dto";
+import { BackfillPricesQueryDto } from "./dto/backfill-prices-query.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
 import { Security } from "./entities/security.entity";
 import { withSystemContext } from "../common/db/with-context";
@@ -680,8 +681,10 @@ export class SecuritiesController {
       "Fetches full price history from Yahoo Finance for all active securities",
   })
   @ApiResponse({ status: 200, description: "Historical backfill completed" })
-  backfillHistoricalPrices(): Promise<HistoricalBackfillSummary> {
-    return this.securityPriceService.backfillHistoricalPrices();
+  backfillHistoricalPrices(
+    @Query() query: BackfillPricesQueryDto,
+  ): Promise<HistoricalBackfillSummary> {
+    return this.securityPriceService.backfillHistoricalPrices(query.range);
   }
 
   @Get("prices/status")
@@ -752,11 +755,13 @@ export class SecuritiesController {
   async backfillSecurityPrices(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: BackfillPricesQueryDto,
   ): Promise<HistoricalBackfillResult> {
     const result =
       await this.securityPriceService.backfillSecurityHoldingPeriod(
         req.user.id,
         id,
+        query.range,
       );
     if (result.success && (result.pricesLoaded ?? 0) > 0) {
       // Fire-and-forget: recalculate this user's accounts so holdings and

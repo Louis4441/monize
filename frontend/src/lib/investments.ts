@@ -1,5 +1,11 @@
 import apiClient from './api';
 import { Account } from '@/types/account';
+/**
+ * Mirrors `BACKFILL_RANGES` in the backend's `backfill-prices-query.dto.ts`.
+ * The server validates against its own allowlist; this keeps a caller from
+ * sending a range the DTO would reject.
+ */
+export type BackfillRange = '1y' | '2y' | '5y' | '10y' | 'ytd' | 'max';
 import {
   PortfolioSummary,
   AssetAllocation,
@@ -564,8 +570,14 @@ export const investmentsApi = {
 
   // Force-refresh historical prices for a single security across the full
   // period the user has held it, overwriting existing rows.
+  //
+  // `range` asks for a fixed history window instead ('5y', 'max', ...), which
+  // also drops the holding-period clip: without it the write stops at the first
+  // transaction date, so a security bought recently can hold no history from
+  // before the purchase — which is what a backtest or the GEM report needs.
   backfillSecurityPrices: async (
     securityId: string,
+    range?: BackfillRange,
   ): Promise<{
     symbol: string;
     success: boolean;
@@ -578,7 +590,7 @@ export const investmentsApi = {
     const response = await apiClient.post(
       `/securities/${securityId}/prices/backfill`,
       undefined,
-      { timeout: 120_000 },
+      { timeout: 120_000, params: range ? { range } : undefined },
     );
     invalidateCache('investments:');
     return response.data;
