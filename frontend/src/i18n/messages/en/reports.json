@@ -1101,6 +1101,8 @@
     "lowestValue": "Lowest Value",
     "periodChange": "Period Change",
     "periodReturn": "Period Return",
+    "priorCloseTooltip": "Measured from the previous trading day's close on {date}.",
+    "notAvailable": "N/A",
     "intradayUnavailable": "Detailed intraday pricing unavailable",
     "intradayUnavailableTitle": "Intraday view unavailable for this account mix",
     "intradayUnavailableDesc": "One or more holdings use a quote provider (MSN Money) that does not expose intraday data{skipped}. Switch to a longer range to see daily snapshots.",

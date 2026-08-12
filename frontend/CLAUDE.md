@@ -352,6 +352,27 @@ scan can hold: neither file is wrong on its own. Changing a shared component's
 trigger element is a change to every call site, so the guard is what tells you
 which ones.
 
+### A short-range portfolio change is measured from the prior close
+
+`1d`, `1w` and `mtd` report their Change and Change % against the close of the
+last trading day *before* the window, not against the first point plotted --
+otherwise the chart shows a week starting Aug 5 while the number beside it
+silently omits what happened on Aug 5. The decision lives once, in
+`components/investments/portfolio-change-baseline.ts`
+(`PRIOR_CLOSE_BASELINE_RANGES`, `priorCloseChange`), and the lookup once, in
+`hooks/usePriorCloseBaseline.ts`; the Investments-page chart and the Portfolio
+Value report both go through them, and a new surface showing the same figure
+must too rather than subtracting `points[0]` itself. The longer ranges keep
+measuring from their first point, because there the window opens on an
+arbitrary calendar date whose first point already *is* that day's close.
+
+The baseline is looked up for the **first point on screen**, never for the
+requested window start: on a weekend or a holiday the 1D chart shows the last
+session rather than today, and the day before *that* is the close the change
+belongs to. A baseline that has not loaded, or could not be established, makes
+the change **unknown** -- both cards read N/A. It never falls back to the
+first-point change, which would put a different number under the same label.
+
 ### An unknown value must not render as a measured zero
 
 The server goes to real trouble to send `null` rather than `0` for anything it

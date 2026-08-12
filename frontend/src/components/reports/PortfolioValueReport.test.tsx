@@ -731,6 +731,95 @@ describe('PortfolioValueReport', () => {
     });
   });
 
+  describe('prior-close change baseline', () => {
+    /** Text of the summary card carrying `label`. */
+    const card = (label: string) => screen.getByText(label).parentElement!.textContent;
+
+    it('measures the 1w change from the close before the week shown', async () => {
+      mockDateRangeValue = '1w';
+      mockGetIntradayValue.mockResolvedValue({
+        points: [
+          { timestamp: '2024-06-03T13:30:00Z', value: 50000 },
+          { timestamp: '2024-06-07T20:00:00Z', value: 51000 },
+        ],
+        interval: '15m',
+        currency: 'CAD',
+        range: '1w',
+        fetchedAt: new Date().toISOString(),
+        skippedSymbols: [],
+        fallbackToDaily: false,
+      });
+      // Jun 1/2 is a weekend, so the Jun 2 point already carries Friday's close.
+      mockGetInvestmentsDaily.mockResolvedValue([
+        { date: '2024-06-01', value: 49000 },
+        { date: '2024-06-02', value: 49000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Period Change')).toBeInTheDocument();
+      });
+
+      await waitFor(() =>
+        expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
+          expect.objectContaining({ endDate: '2024-06-02' }),
+        ),
+      );
+      await waitFor(() => expect(card('Period Change')).toContain('+$2000'));
+      // Not the change from the first point plotted, which is what this
+      // measured before and would still read as plausible.
+      expect(card('Period Change')).not.toContain('+$1000');
+      expect(card('Period Return')).toContain('+4.1%');
+    });
+
+    it('reports the change as unknown when the baseline cannot be loaded', async () => {
+      mockDateRangeValue = '1w';
+      mockGetIntradayValue.mockResolvedValue({
+        points: [
+          { timestamp: '2024-06-03T13:30:00Z', value: 50000 },
+          { timestamp: '2024-06-07T20:00:00Z', value: 51000 },
+        ],
+        interval: '15m',
+        currency: 'CAD',
+        range: '1w',
+        fetchedAt: new Date().toISOString(),
+        skippedSymbols: [],
+        fallbackToDaily: false,
+      });
+      mockGetInvestmentsDaily.mockRejectedValue(new Error('baseline unavailable'));
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Period Change')).toBeInTheDocument();
+      });
+
+      // A missing baseline is not a change of zero, and not the first point's
+      // change wearing the prior close's label.
+      await waitFor(() => expect(card('Period Change')).toContain('N/A'));
+      expect(card('Period Return')).toContain('N/A');
+      expect(card('Period Change')).not.toContain('$1000');
+    });
+
+    it('still measures a long range from the first point plotted', async () => {
+      // 2y: the window opens on an arbitrary calendar date, and its first
+      // point already is that month's close.
+      mockGetInvestmentsMonthly.mockResolvedValue([
+        { month: '2024-06-01', value: 50000 },
+        { month: '2024-07-01', value: 55000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Period Change')).toBeInTheDocument();
+      });
+      await waitFor(() => expect(card('Period Change')).toContain('+$5000'));
+      expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
+    });
+  });
+
   it('handles intraday fetch error gracefully', async () => {
     mockDateRangeValue = '1d';
     mockGetIntradayValue.mockRejectedValue(new Error('network error'));
