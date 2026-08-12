@@ -887,6 +887,54 @@ export class NetWorthService {
     return result;
   }
 
+  /**
+   * The first day on or after `onOrAfter` on which any security the scope holds
+   * actually has a price -- a trading day for this portfolio, as opposed to a
+   * calendar day.
+   *
+   * `getDailyInvestments` values *every* calendar day at the latest close at or
+   * before it, which is what makes a chart continuous and what makes 1 January
+   * plot the previous 31 December's close. A YTD chart asked to open on the
+   * first trading day of the year therefore cannot find it in that series: a
+   * carried-forward holiday and a genuinely flat session look identical there.
+   * `security_prices` rows exist only for days a price was struck, so the
+   * question is answerable here and nowhere else.
+   *
+   * Returns **null** when the scope holds nothing priced, rather than a
+   * substituted date: the caller then keeps the calendar boundary it already
+   * had, and no chart claims a trading day nobody observed.
+   */
+  async getFirstPricedDay(
+    userId: string,
+    onOrAfter: string,
+    accountIds?: string[],
+  ): Promise<{ date: string | null }> {
+    const params: any[] = [userId, onOrAfter];
+    let accountFilter = "";
+    if (accountIds && accountIds.length > 0) {
+      const placeholders = accountIds.map((_, i) => `$${i + 3}`).join(", ");
+      accountFilter = `AND a.id IN (${placeholders})`;
+      params.push(...accountIds);
+    }
+
+    const rows: Array<{ date: string | null }> = await this.scopedQuery(
+      `SELECT MIN(sp.price_date)::TEXT AS date
+         FROM security_prices sp
+        WHERE sp.price_date >= $2::DATE
+          AND sp.security_id IN (
+                SELECT DISTINCT it.security_id
+                  FROM investment_transactions it
+                  JOIN accounts a ON a.id = it.account_id
+                 WHERE a.user_id = $1
+                   AND it.security_id IS NOT NULL
+                   AND it.transaction_date <= $2::DATE
+                   ${accountFilter}
+              )`,
+      params,
+    );
+    return { date: rows[0]?.date ?? null };
+  }
+
   async getDailyInvestments(
     userId: string,
     startDate?: string,

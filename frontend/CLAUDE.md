@@ -387,6 +387,54 @@ belongs to. A baseline that has not loaded, or could not be established, makes
 the change **unknown** -- both cards read N/A. It never falls back to the
 first-point change, which would put a different number under the same label.
 
+### The window a price chart requests is not the period its range names
+
+`resolveRangePreset` answers "what period is the user asking about", and ten
+reports depend on that answer -- a spending report's 3M window must not quietly
+start a day early. A *price* chart asks a narrower question: **which close is
+the series measured from**, so the figure beside it matches what every other
+quote source reports for the same period. Those are different questions, so
+they have different functions:
+`components/investments/portfolio-range-window.ts` holds the second one as a
+table (`PORTFOLIO_WINDOW_STARTS`), and the Portfolio Value report, the
+Investments chart and the dashboard widget all resolve through
+`usePortfolioRangeWindow`. Do not reach for `resolveRangePreset` directly in a
+fourth portfolio surface, and do not "fix" a range by editing the shared
+resolver.
+
+The rules are not uniform, and that is the point -- each was set to match the
+platform being compared against, not derived from a principle:
+
+- **3M, 6M, 1Y, 2Y, 5Y** open on the calendar day *before* the period, so 1Y on
+  12 Aug 2026 opens on 11 Aug 2025. A rule naming an exact day ignores month
+  alignment, and 2Y follows the calendar rather than a 730-day count, which
+  differ in any window containing a leap day.
+- **YTD** opens on the year's first *trading* day. The daily series values every
+  calendar day at the latest close at or before it, so 1 January plots
+  December's close and a market holiday is indistinguishable from a flat
+  session there. `netWorthApi.getFirstPricedDay` answers it from
+  `security_prices`, whose rows exist only for days a price was struck. A null
+  answer is unknown, not "1 January is a trading day": the window keeps its
+  calendar boundary rather than claiming a trading day nobody observed.
+- **1M** keeps its window and collapses its first *day* to that day's close
+  (`trimIntradayToFirstDayClose`), because it is an intraday chart and opening
+  partway through the session a month ago mixes a mid-session price into a
+  series of closes. 1D deliberately still opens at the open; 1W and MTD are
+  measured from the prior close already, so collapsing their first day would
+  only throw away detail.
+
+Both intraday adjustments live inside `trimIntradayPoints`, which every
+intraday render site already calls -- a shaping step applied at three of four
+call sites is a chart that disagrees with itself depending on which path drew
+it.
+
+**A range served monthly cannot honour a day-precision rule.** 2Y and 5Y use
+month buckets on the report and the widget, so their first point is a
+month-end close and moving the window by a day changes nothing visible. Switch
+the range to daily if the exact opening close matters; do not prepend a single
+daily point to a monthly series, which is the sampling splice
+`docs/time-series-contract.md` section 1.2 exists to stop.
+
 Relatedly, `mtd` is a chart range with no backend series of its own: its window
 is 1 to 31 days long, so it rides on the rolling 1M series and is trimmed to the
 month client-side. Both halves go through `portfolio-chart-utils.tsx` --

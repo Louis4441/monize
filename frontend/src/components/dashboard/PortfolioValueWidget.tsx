@@ -22,6 +22,7 @@ import { usePriceRefresh } from '@/hooks/usePriceRefresh';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
+import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { chartColors } from '@/lib/chart-colors';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
@@ -60,13 +61,22 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   );
 
   const isDaily = DAILY_RANGES.has(config.range);
-  const { start, end } = useMemo(
+  const baseWindow = useMemo(
     () => resolveRangePreset(config.range, { alignment: isDaily ? 'day' : 'month' }),
     [config.range, isDaily],
   );
 
   const accountIdsCsv =
     config.accountIds.length > 0 ? config.accountIds.join(',') : undefined;
+
+  // A price series opens on the close it is measured from, not on the period
+  // boundary the range names -- see `portfolio-range-window.ts`. Shared with
+  // the Portfolio Value report and the Investments chart so all three agree.
+  const { start, end } = usePortfolioRangeWindow({
+    range: config.range,
+    base: baseWindow,
+    accountIdsCsv,
+  });
 
   const { data: series, isLoading: dataLoading, reload: reloadSeries } = useReportData(() => {
     const params = {

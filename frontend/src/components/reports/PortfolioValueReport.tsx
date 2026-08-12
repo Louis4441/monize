@@ -25,6 +25,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
+import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
@@ -202,6 +203,17 @@ export function PortfolioValueReport() {
   const isIntraday = INTRADAY_RANGES.has(dateRange);
   const useDaily = !isIntraday && DAILY_RANGES.has(dateRange);
 
+  // The window this chart requests is not the period the range names: a price
+  // series opens on the close it is measured from. See
+  // `portfolio-range-window.ts` for the per-range rules.
+  const accountIdsCsvForWindow =
+    selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined;
+  const chartWindow = usePortfolioRangeWindow({
+    range: dateRange,
+    base: resolvedRange,
+    accountIdsCsv: accountIdsCsvForWindow,
+  });
+
   // Per-security stacked view. Available on every range: intraday ranges pull
   // the live per-security intraday series, the rest use the daily/monthly
   // breakdown (daily for the shorter ranges, monthly for 2y/5y/all).
@@ -268,7 +280,7 @@ export function PortfolioValueReport() {
     const accountIdsCsv = accountIds?.join(',');
 
     const loadDailyOrMonthly = async () => {
-      const { start, end } = resolvedRange;
+      const { start, end } = chartWindow;
       const params = {
         startDate: start,
         endDate: end,
@@ -303,7 +315,7 @@ export function PortfolioValueReport() {
     const loadDailyMonthlyBreakdown = async (
       granularity: 'daily' | 'monthly',
     ) => {
-      const { start, end } = resolvedRange;
+      const { start, end } = chartWindow;
       const data = await netWorthApi.getInvestmentsBreakdown({
         granularity,
         startDate: start,
@@ -361,7 +373,7 @@ export function PortfolioValueReport() {
       const points = trimIntradayPoints(
         data.points,
         dateRange,
-        resolvedRange.start,
+        chartWindow.start,
       ).map((p) => ({
         name: formatIntradayLabel(p.timestamp, dateRange),
         iso: p.timestamp,
@@ -409,7 +421,7 @@ export function PortfolioValueReport() {
           const cached = readIntradayCache(cacheKey);
           if (cached && !cached.fallbackToDaily) {
             setChartPoints(
-              trimIntradayPoints(cached.points, dateRange, resolvedRange.start).map((p) => ({
+              trimIntradayPoints(cached.points, dateRange, chartWindow.start).map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: p.value,
                 iso: p.timestamp,
@@ -460,7 +472,7 @@ export function PortfolioValueReport() {
             }
           } else {
             setChartPoints(
-              trimIntradayPoints(response.points, dateRange, resolvedRange.start).map(
+              trimIntradayPoints(response.points, dateRange, chartWindow.start).map(
                 (p) => ({
                   name: formatIntradayLabel(p.timestamp, dateRange),
                   Value: p.value,
@@ -494,7 +506,7 @@ export function PortfolioValueReport() {
   }, [
     selectedAccountIds,
     reloadKey,
-    resolvedRange,
+    chartWindow,
     isValid,
     foreignCurrency,
     effectiveCurrency,

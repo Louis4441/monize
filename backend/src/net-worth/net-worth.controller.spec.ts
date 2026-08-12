@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { NetWorthController } from "./net-worth.controller";
 import { NetWorthService } from "./net-worth.service";
@@ -19,6 +20,7 @@ describe("NetWorthController", () => {
       getMonthlyNetWorth: jest.fn(),
       getMonthlyInvestments: jest.fn(),
       getDailyInvestments: jest.fn(),
+      getFirstPricedDay: jest.fn(),
       getInvestmentBreakdown: jest.fn(),
       recalculateAllAccounts: jest.fn(),
     };
@@ -199,6 +201,44 @@ describe("NetWorthController", () => {
         [NO_READABLE],
         undefined,
       );
+    });
+  });
+
+  describe("getFirstPricedDay()", () => {
+    it("delegates with the date and the caller's scoped accounts", async () => {
+      mockNetWorthService.getFirstPricedDay!.mockResolvedValue({
+        date: "2026-01-02",
+      });
+
+      const result = await controller.getFirstPricedDay(
+        mockReq,
+        "2026-01-01",
+        `${UUID_A},${UUID_B}`,
+      );
+
+      expect(result).toEqual({ date: "2026-01-02" });
+      expect(mockNetWorthService.getFirstPricedDay).toHaveBeenCalledWith(
+        "user-1",
+        "2026-01-01",
+        [UUID_A, UUID_B],
+      );
+    });
+
+    it("rejects a missing or malformed date rather than defaulting one", async () => {
+      await expect(
+        controller.getFirstPricedDay(mockReq, undefined),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.getFirstPricedDay(mockReq, "01-01-2026"),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockNetWorthService.getFirstPricedDay).not.toHaveBeenCalled();
+    });
+
+    it("rejects account ids that are not UUIDs", async () => {
+      await expect(
+        controller.getFirstPricedDay(mockReq, "2026-01-01", "not-a-uuid"),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockNetWorthService.getFirstPricedDay).not.toHaveBeenCalled();
     });
   });
 

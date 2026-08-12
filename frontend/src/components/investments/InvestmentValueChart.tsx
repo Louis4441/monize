@@ -20,6 +20,7 @@ import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
+import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
@@ -106,6 +107,14 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
   const isIntraday = INTRADAY_RANGES.has(dateRange);
   const useDaily = !isIntraday && DAILY_RANGES.has(dateRange);
 
+  // A price series opens on the close it is measured from, which is not the
+  // period the range names -- see `portfolio-range-window.ts`.
+  const chartWindow = usePortfolioRangeWindow({
+    range: dateRange,
+    base: resolvedRange,
+    accountIdsCsv: accountIds?.length ? accountIds.join(',') : undefined,
+  });
+
   // Determine the effective currency for display
   const foreignCurrency = displayCurrency && displayCurrency !== defaultCurrency
     ? displayCurrency
@@ -154,7 +163,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
 
   const loadDailyOrMonthly = useCallback(
     async (seq: number) => {
-      const { start, end } = resolvedRange;
+      const { start, end } = chartWindow;
       const params = {
         startDate: start,
         endDate: end,
@@ -184,7 +193,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
         );
       }
     },
-    [resolvedRange, accountIds, foreignCurrency, useDaily, isIntraday, formatChartDate],
+    [chartWindow, accountIds, foreignCurrency, useDaily, isIntraday, formatChartDate],
   );
 
   const loadData = useCallback(
@@ -208,7 +217,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
             const cachedPoints = trimIntradayPoints(
               cached.points,
               dateRange,
-              resolvedRange.start,
+              chartWindow.start,
             );
             setChartPoints(
               cachedPoints.map((p) => ({
@@ -270,7 +279,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           const responsePoints = trimIntradayPoints(
             response.points,
             dateRange,
-            resolvedRange.start,
+            chartWindow.start,
           );
           setChartPoints(
             responsePoints.map((p) => ({
@@ -293,7 +302,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
     [
       isIntraday,
       dateRange,
-      resolvedRange,
+      chartWindow,
       accountIds,
       effectiveCurrency,
       foreignCurrency,
