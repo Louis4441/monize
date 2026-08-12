@@ -63,6 +63,8 @@ import {
   readIntradayCache,
   writeIntradayCache,
   computeTightYAxisDomain,
+  intradayRangeParam,
+  trimIntradayPoints,
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from '@/components/investments/portfolio-chart-utils';
@@ -175,7 +177,7 @@ export function PortfolioValueReport() {
   const [intradayUnavailable, setIntradayUnavailable] = useState<{
     skipped: string[];
   } | null>(null);
-  // Set when 1W/1M silently fall back to daily snapshots because one or more
+  // Set when 1W/MTD/1M silently fall back to daily snapshots because one or more
   // holdings use a quote provider (MSN Money) without intraday support. We
   // surface a small warning icon next to the title so the user understands
   // why the chart resolution is coarser than the button label suggests.
@@ -298,7 +300,7 @@ export function PortfolioValueReport() {
     };
 
     // Daily/monthly per-security breakdown. Also the fallback target when a
-    // 1W/1M intraday breakdown has no intraday data for the account mix.
+    // 1W/MTD/1M intraday breakdown has no intraday data for the account mix.
     const loadDailyMonthlyBreakdown = async (
       granularity: 'daily' | 'monthly',
     ) => {
@@ -326,14 +328,14 @@ export function PortfolioValueReport() {
       );
     };
 
-    // Per-security intraday breakdown (1D/1W/1M). Mirrors the total intraday
-    // chart's fallback handling: 1D shows an "unavailable" note, 1W/1M silently
+    // Per-security intraday breakdown (1D/1W/MTD/1M). Mirrors the total intraday
+    // chart's fallback handling: 1D shows an "unavailable" note, the rest silently
     // fall back to the daily-snapshot breakdown with a small warning icon.
     const loadIntradayBreakdown = async () => {
       let data;
       try {
         data = await investmentsApi.getIntradayBreakdown({
-          range: dateRange as '1d' | '1w' | '1m',
+          range: intradayRangeParam(dateRange),
           accountIds: accountIdsCsv,
           displayCurrency: foreignCurrency || undefined,
         });
@@ -357,7 +359,11 @@ export function PortfolioValueReport() {
         return;
       }
 
-      const points = data.points.map((p) => ({
+      const points = trimIntradayPoints(
+        data.points,
+        dateRange,
+        resolvedRange.start,
+      ).map((p) => ({
         name: formatIntradayLabel(p.timestamp, dateRange),
         iso: p.timestamp,
         total: p.total,
@@ -404,7 +410,7 @@ export function PortfolioValueReport() {
           const cached = readIntradayCache(cacheKey);
           if (cached && !cached.fallbackToDaily) {
             setChartPoints(
-              cached.points.map((p) => ({
+              trimIntradayPoints(cached.points, dateRange, resolvedRange.start).map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: p.value,
                 iso: p.timestamp,
@@ -416,7 +422,7 @@ export function PortfolioValueReport() {
           let response;
           try {
             response = await investmentsApi.getIntradayValue({
-              range: dateRange as '1d' | '1w' | '1m',
+              range: intradayRangeParam(dateRange),
               accountIds: accountIdsCsv,
               displayCurrency: foreignCurrency || undefined,
             });
@@ -447,7 +453,7 @@ export function PortfolioValueReport() {
               setChartPoints([]);
               setIntradayUnavailable({ skipped: response.skippedSymbols });
             } else {
-              // 1W / 1M silently fall back to the daily endpoint, with a
+              // 1W / MTD / 1M silently fall back to the daily endpoint, with a
               // small warning icon next to the title so the user knows
               // intraday detail isn't available for this account mix.
               setIntradayFallbackNotice({ skipped: response.skippedSymbols });
@@ -455,11 +461,13 @@ export function PortfolioValueReport() {
             }
           } else {
             setChartPoints(
-              response.points.map((p) => ({
-                name: formatIntradayLabel(p.timestamp, dateRange),
-                Value: p.value,
-                iso: p.timestamp,
-              })),
+              trimIntradayPoints(response.points, dateRange, resolvedRange.start).map(
+                (p) => ({
+                  name: formatIntradayLabel(p.timestamp, dateRange),
+                  Value: p.value,
+                  iso: p.timestamp,
+                }),
+              ),
             );
           }
         } else {
@@ -818,7 +826,7 @@ export function PortfolioValueReport() {
               onChange={setSelectedAccountIds}
             />
             <DateRangeSelector
-              ranges={['1d', '1w', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']}
+              ranges={['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']}
               value={dateRange}
               onChange={handleRangeChange}
               activeColour="bg-emerald-600"

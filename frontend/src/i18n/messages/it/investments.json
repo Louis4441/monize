@@ -123,6 +123,8 @@
     "lowestValue": "Valore minimo",
     "change": "Variazione",
     "changePercent": "Variazione %",
+    "priorCloseTooltip": "Misurato dalla chiusura della seduta precedente del {date}.",
+    "notAvailable": "N/A",
     "portfolioLabel": "Portafoglio:"
   },
   "transactionList": {

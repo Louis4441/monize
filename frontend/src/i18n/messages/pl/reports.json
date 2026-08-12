@@ -1104,6 +1104,8 @@
     "lowestValue": "Najniższa wartość",
     "periodChange": "Zmiana w okresie",
     "periodReturn": "Zwrot w okresie",
+    "priorCloseTooltip": "Mierzone od kursu zamknięcia poprzedniej sesji z dnia {date}.",
+    "notAvailable": "Brak",
     "intradayUnavailable": "Szczegółowe ceny śróddzienne niedostępne",
     "intradayUnavailableTitle": "Widok śróddzienny niedostępny dla tego zestawu kont",
     "intradayUnavailableDesc": "Jedna lub więcej pozycji korzysta z dostawcy notowań (MSN Money), który nie udostępnia danych śróddziennych{skipped}. Przełącz na dłuższy zakres, aby zobaczyć migawki dzienne.",

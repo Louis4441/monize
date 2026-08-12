@@ -123,6 +123,8 @@
     "lowestValue": "最低價值",
     "change": "變化",
     "changePercent": "變化 %",
+    "priorCloseTooltip": "以上一交易日（{date}）收盤價為基準計算。",
+    "notAvailable": "不適用",
     "portfolioLabel": "投資組合："
   },
   "transactionList": {

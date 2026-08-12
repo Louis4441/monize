@@ -1104,6 +1104,8 @@
     "lowestValue": "En Düşük Değer",
     "periodChange": "Dönem Değişimi",
     "periodReturn": "Dönem Getirisi",
+    "priorCloseTooltip": "Bir önceki işlem gününün ({date}) kapanışına göre ölçülür.",
+    "notAvailable": "Y/A",
     "intradayUnavailable": "Ayrıntılı gün içi fiyatlandırma mevcut değil",
     "intradayUnavailableTitle": "Bu hesap kombinasyonu için gün içi görünüm mevcut değil",
     "intradayUnavailableDesc": "Bir veya daha fazla varlık, gün içi veri sunmayan bir fiyat sağlayıcısı (MSN Money) kullanıyor{skipped}. Günlük anlık görüntüleri görmek için daha uzun bir aralığa geçin.",

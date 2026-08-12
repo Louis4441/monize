@@ -123,6 +123,8 @@
     "lowestValue": "Tiefstwert",
     "change": "Änderung",
     "changePercent": "Änderung %",
+    "priorCloseTooltip": "Gemessen ab dem Schlusskurs des vorherigen Handelstags am {date}.",
+    "notAvailable": "N/A",
     "portfolioLabel": "Portfolio:"
   },
   "transactionList": {

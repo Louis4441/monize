@@ -1104,6 +1104,8 @@
     "lowestValue": "最低價值",
     "periodChange": "期間變化",
     "periodReturn": "期間報酬",
+    "priorCloseTooltip": "以上一交易日（{date}）收盤價為基準計算。",
+    "notAvailable": "不適用",
     "intradayUnavailable": "無法取得詳細的盤中報價",
     "intradayUnavailableTitle": "此科目組合無法使用盤中檢視",
     "intradayUnavailableDesc": "一個或多個持倉使用不提供盤中資料的報價來源（MSN Money）{skipped}，請切換至較長的時間範圍以查看每日快照。",

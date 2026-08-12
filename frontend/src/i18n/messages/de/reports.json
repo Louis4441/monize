@@ -1104,6 +1104,8 @@
     "lowestValue": "Tiefstwert",
     "periodChange": "Periodenänderung",
     "periodReturn": "Periodenrendite",
+    "priorCloseTooltip": "Gemessen ab dem Schlusskurs des vorherigen Handelstags am {date}.",
+    "notAvailable": "k. A.",
     "intradayUnavailable": "Detaillierte Intraday-Kurse nicht verfügbar",
     "intradayUnavailableTitle": "Intraday-Ansicht für diese Kontokombination nicht verfügbar",
     "intradayUnavailableDesc": "Eine oder mehrere Positionen verwenden einen Kursanbieter (MSN Money), der keine Intraday-Daten bereitstellt{skipped}. Wechseln Sie zu einem längeren Zeitraum, um Tages-Schnappschüsse zu sehen.",

@@ -6,12 +6,67 @@ import {
   computeMinMaxFlagIndices,
   computeTightYAxisDomain,
   INTRADAY_CACHE_PREFIX,
+  INTRADAY_RANGES,
+  intradayRangeParam,
   niceAxisStep,
+  trimIntradayPoints,
   readIntradayCache,
   renderChartFlagDot,
   renderMinMaxFlagDots,
   writeIntradayCache,
 } from './portfolio-chart-utils';
+
+describe('intradayRangeParam', () => {
+  it('serves mtd from the rolling 1m series', () => {
+    expect(intradayRangeParam('mtd')).toBe('1m');
+  });
+
+  it('passes every other intraday range through unchanged', () => {
+    for (const range of ['1d', '1w', '1m']) {
+      expect(intradayRangeParam(range)).toBe(range);
+    }
+  });
+
+  it('maps every intraday range onto one the endpoint accepts', () => {
+    // The backend's IntradayValueQueryDto enum. A range added to
+    // INTRADAY_RANGES without a mapping here is a 400 at runtime.
+    const accepted = new Set(['1d', '1w', '1m']);
+    for (const range of INTRADAY_RANGES) {
+      expect(accepted.has(intradayRangeParam(range))).toBe(true);
+    }
+  });
+});
+
+describe('trimIntradayPoints', () => {
+  const points = [
+    { timestamp: '2026-07-28T13:30:00.000Z', value: 1 },
+    { timestamp: '2026-08-01T13:30:00.000Z', value: 2 },
+    { timestamp: '2026-08-12T13:30:00.000Z', value: 3 },
+  ];
+
+  it('drops the bars the rolling month reached back into', () => {
+    expect(trimIntradayPoints(points, 'mtd', '2026-08-01')).toEqual([
+      points[1],
+      points[2],
+    ]);
+  });
+
+  it('keeps a bar that starts exactly on the window boundary', () => {
+    expect(
+      trimIntradayPoints(points, 'mtd', '2026-08-01').map((p) => p.timestamp),
+    ).toContain('2026-08-01T13:30:00.000Z');
+  });
+
+  it('leaves the other ranges alone -- their series is already the window', () => {
+    for (const range of ['1d', '1w', '1m']) {
+      expect(trimIntradayPoints(points, range, '2026-08-01')).toBe(points);
+    }
+  });
+
+  it('does not trim without a window start', () => {
+    expect(trimIntradayPoints(points, 'mtd', '')).toBe(points);
+  });
+});
 
 describe('buildIntradayCacheKey', () => {
   it('builds key with defined account ids (sorted)', () => {

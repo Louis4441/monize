@@ -123,6 +123,8 @@
     "lowestValue": "最低价值",
     "change": "变动",
     "changePercent": "变动 %",
+    "priorCloseTooltip": "以上一交易日（{date}）收盘价为基准计算。",
+    "notAvailable": "不适用",
     "portfolioLabel": "投资组合："
   },
   "transactionList": {

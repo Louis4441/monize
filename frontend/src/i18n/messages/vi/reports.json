@@ -1104,6 +1104,8 @@
     "lowestValue": "Giá trị thấp nhất",
     "periodChange": "Thay đổi trong kỳ",
     "periodReturn": "Lợi nhuận trong kỳ",
+    "priorCloseTooltip": "Được tính từ giá đóng cửa của phiên giao dịch trước đó, ngày {date}.",
+    "notAvailable": "N/A",
     "intradayUnavailable": "Không có giá nội ngày chi tiết",
     "intradayUnavailableTitle": "Chế độ xem nội ngày không khả dụng cho kết hợp tài khoản này",
     "intradayUnavailableDesc": "Một hoặc nhiều vị thế sử dụng nhà cung cấp báo giá (MSN Money) không công bố dữ liệu nội ngày{skipped}. Chuyển sang phạm vi dài hơn để xem ảnh chụp hàng ngày.",

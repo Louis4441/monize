@@ -33,6 +33,8 @@ import {
   writeIntradayCache,
   clearAllIntradayCache,
   computeTightYAxisDomain,
+  intradayRangeParam,
+  trimIntradayPoints,
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from './portfolio-chart-utils';
@@ -81,7 +83,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
   const [intradayUnavailable, setIntradayUnavailable] = useState<{
     skipped: string[];
   } | null>(null);
-  // Set when 1W/1M silently fall back to daily snapshots because one or more
+  // Set when 1W/MTD/1M silently fall back to daily snapshots because one or more
   // holdings use a quote provider (MSN Money) without intraday support. We
   // surface a small warning icon next to the title so the user understands
   // why the chart resolution is coarser than the button label suggests.
@@ -164,7 +166,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
         displayCurrency: foreignCurrency || undefined,
       };
       if (useDaily || isIntraday) {
-        // 1W/1M intraday fallback also uses the daily endpoint.
+        // 1W/MTD/1M intraday fallback also uses the daily endpoint.
         const data = await netWorthApi.getInvestmentsDaily(params);
         if (loadSeqRef.current !== seq) return;
         setChartPoints(
@@ -207,9 +209,11 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           // Hydrate from cache immediately so the chart appears even before
           // the network round-trip resolves.
           if (cached && !cached.fallbackToDaily) {
-            const cachedPoints = dateRange === 'mtd'
-              ? cached.points.filter((p) => p.timestamp >= resolvedRange.start)
-              : cached.points;
+            const cachedPoints = trimIntradayPoints(
+              cached.points,
+              dateRange,
+              resolvedRange.start,
+            );
             setChartPoints(
               cachedPoints.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
@@ -223,7 +227,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           let response;
           try {
             response = await investmentsApi.getIntradayValue({
-              range: (dateRange === 'mtd' ? '1m' : dateRange) as '1d' | '1w' | '1m',
+              range: intradayRangeParam(dateRange),
               accountIds: accountIds?.length ? accountIds.join(',') : undefined,
               displayCurrency: foreignCurrency || undefined,
             });
@@ -257,7 +261,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
               setIsLoading(false);
               return;
             }
-            // 1W / 1M: silently fall back to the daily-snapshot endpoint and
+            // 1W / MTD / 1M: silently fall back to the daily-snapshot endpoint and
             // flag the title with a small warning icon so the user knows the
             // chart is at daily resolution rather than the requested intraday
             // resolution.
@@ -267,9 +271,11 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
             return;
           }
 
-          const responsePoints = dateRange === 'mtd'
-            ? response.points.filter((p) => p.timestamp >= resolvedRange.start)
-            : response.points;
+          const responsePoints = trimIntradayPoints(
+            response.points,
+            dateRange,
+            resolvedRange.start,
+          );
           setChartPoints(
             responsePoints.map((p) => ({
               name: formatIntradayLabel(p.timestamp, dateRange),

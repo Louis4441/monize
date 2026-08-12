@@ -123,6 +123,8 @@
     "lowestValue": "最低値",
     "change": "変動",
     "changePercent": "変動率",
+    "priorCloseTooltip": "前営業日（{date}）の終値を基準に算出しています。",
+    "notAvailable": "N/A",
     "portfolioLabel": "ポートフォリオ："
   },
   "transactionList": {

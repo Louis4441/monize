@@ -1104,6 +1104,8 @@
     "lowestValue": "निम्नतम मूल्य",
     "periodChange": "अवधि परिवर्तन",
     "periodReturn": "अवधि रिटर्न",
+    "priorCloseTooltip": "पिछले कारोबारी दिन ({date}) के समापन भाव से मापा गया।",
+    "notAvailable": "N/A",
     "intradayUnavailable": "विस्तृत इंट्राडे मूल्य निर्धारण अनुपलब्ध",
     "intradayUnavailableTitle": "इस खाता मिश्रण के लिए इंट्राडे दृश्य अनुपलब्ध",
     "intradayUnavailableDesc": "एक या अधिक होल्डिंग एक उद्धरण प्रदाता (MSN Money) का उपयोग करती हैं जो इंट्राडे डेटा{skipped} का खुलासा नहीं करता। दैनिक स्नैपशॉट देखने के लिए लंबी सीमा पर स्विच करें।",

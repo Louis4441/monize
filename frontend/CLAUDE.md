@@ -373,6 +373,18 @@ belongs to. A baseline that has not loaded, or could not be established, makes
 the change **unknown** -- both cards read N/A. It never falls back to the
 first-point change, which would put a different number under the same label.
 
+Relatedly, `mtd` is a chart range with no backend series of its own: its window
+is 1 to 31 days long, so it rides on the rolling 1M series and is trimmed to the
+month client-side. Both halves go through `portfolio-chart-utils.tsx` --
+`intradayRangeParam` before every intraday request, `trimIntradayPoints` on
+every response, including the sessionStorage-cached one and the per-security
+breakdown. Sending `mtd` verbatim is a 400 from `IntradayValueQueryDto`'s enum,
+which surfaces as the chart's generic "couldn't load" fallback and so reads as
+an outage rather than as a missing case; a response used untrimmed puts last
+month's bars in a month-to-date chart, where they can become its high or low.
+A guard test asserts every member of `INTRADAY_RANGES` maps onto a range the
+endpoint accepts, so a fourth one cannot be added without a mapping.
+
 ### An unknown value must not render as a measured zero
 
 The server goes to real trouble to send `null` rather than `0` for anything it

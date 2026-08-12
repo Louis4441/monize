@@ -136,8 +136,9 @@ vi.mock('recharts', () => ({
   },
 }));
 
-vi.mock('@/components/investments/portfolio-chart-utils', () => ({
-  INTRADAY_RANGES: new Set(['1d', '1w', '1m']),
+vi.mock('@/components/investments/portfolio-chart-utils', async (importActual) => ({
+  ...(await importActual<typeof import('@/components/investments/portfolio-chart-utils')>()),
+  INTRADAY_RANGES: new Set(['1d', '1w', 'mtd', '1m']),
   buildIntradayCacheKey: vi.fn(() => 'test-cache-key'),
   readIntradayCache: vi.fn(() => null),
   writeIntradayCache: vi.fn(),
@@ -338,7 +339,7 @@ describe('PortfolioValueReport', () => {
     expect(screen.getAllByText('TFSA').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('passes date filter ranges including 1w, 1m, 3m, ytd to DateRangeSelector', async () => {
+  it('passes date filter ranges including 1w, mtd, 1m, 3m, ytd to DateRangeSelector', async () => {
     mockGetInvestmentsMonthly.mockResolvedValue([]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -347,7 +348,8 @@ describe('PortfolioValueReport', () => {
       expect(mockDateRangeSelectorProps).toHaveBeenCalled();
     });
     const lastCall = mockDateRangeSelectorProps.mock.calls[mockDateRangeSelectorProps.mock.calls.length - 1][0];
-    expect(lastCall.ranges).toEqual(['1d', '1w', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']);
+    // Same list, in the same order, as the Investments page chart offers.
+    expect(lastCall.ranges).toEqual(['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']);
   });
 
   it('handles loadData error gracefully', async () => {
@@ -728,6 +730,139 @@ describe('PortfolioValueReport', () => {
     render(<PortfolioValueReport />);
     await waitFor(() => {
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
+    });
+  });
+
+  describe('mtd range', () => {
+    /** An intraday response carrying `points`, otherwise unremarkable. */
+    const intraday = (points: Array<{ timestamp: string; value: number }>) => ({
+      points,
+      interval: '15m',
+      currency: 'CAD',
+      range: '1m',
+      fetchedAt: new Date().toISOString(),
+      skippedSymbols: [],
+      fallbackToDaily: false,
+    });
+
+    it('asks the backend for the 1m series, which is what serves mtd', async () => {
+      mockDateRangeValue = 'mtd';
+      mockGetIntradayValue.mockResolvedValue(
+        intraday([{ timestamp: '2024-01-02T14:30:00Z', value: 50000 }]),
+      );
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(mockGetIntradayValue).toHaveBeenCalled();
+      });
+      // 'mtd' is not in the endpoint's enum -- sending it verbatim is a 400.
+      expect(mockGetIntradayValue).toHaveBeenCalledWith(
+        expect.objectContaining({ range: '1m' }),
+      );
+    });
+
+    it('trims the rolling month back to the window the chart shows', async () => {
+      mockDateRangeValue = 'mtd';
+      mockGetIntradayValue.mockResolvedValue(
+        intraday([
+          // The 1m series reaches into the previous month; mtd starts at
+          // STABLE_RESOLVED_RANGE.start (2024-01-01).
+          { timestamp: '2023-12-28T14:30:00Z', value: 40000 },
+          { timestamp: '2024-01-02T14:30:00Z', value: 50000 },
+          { timestamp: '2024-01-10T14:30:00Z', value: 52000 },
+        ]),
+      );
+      // The prior close is Dec 31's -- the day before the first point shown.
+      mockGetInvestmentsDaily.mockResolvedValue([
+        { date: '2023-12-31', value: 49000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Highest Value')).toBeInTheDocument();
+      });
+
+      // 40000 came from December and is not part of the month to date, so it
+      // must not become the chart's low.
+      await waitFor(() =>
+        expect(
+          screen.getByText('Lowest Value').parentElement!.textContent,
+        ).toContain('$50000'),
+      );
+      expect(
+        screen.getByText('Lowest Value').parentElement!.textContent,
+      ).not.toContain('$40000');
+    });
+
+    it('measures the mtd change from the close before the month started', async () => {
+      mockDateRangeValue = 'mtd';
+      mockGetIntradayValue.mockResolvedValue(
+        intraday([
+          { timestamp: '2024-01-02T14:30:00Z', value: 50000 },
+          { timestamp: '2024-01-10T14:30:00Z', value: 52000 },
+        ]),
+      );
+      mockGetInvestmentsDaily.mockResolvedValue([
+        { date: '2023-12-31', value: 49000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Period Change')).toBeInTheDocument();
+      });
+
+      await waitFor(() =>
+        expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
+          expect.objectContaining({ endDate: '2024-01-01' }),
+        ),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByText('Period Change').parentElement!.textContent,
+        ).toContain('+$3000'),
+      );
+      // Not the change from the first point plotted.
+      expect(
+        screen.getByText('Period Change').parentElement!.textContent,
+      ).not.toContain('+$2000');
+    });
+
+    it('asks the per-security breakdown for the 1m series too', async () => {
+      mockDateRangeValue = 'mtd';
+      mockSeriesMode = 'securities';
+      mockGetIntradayBreakdown.mockResolvedValue({
+        series: [{ key: 'sec-1', type: 'security', symbol: 'VFV', name: 'VFV' }],
+        points: [
+          { timestamp: '2023-12-28T14:30:00Z', total: 40000, values: { 'sec-1': 40000 } },
+          { timestamp: '2024-01-02T14:30:00Z', total: 50000, values: { 'sec-1': 50000 } },
+        ],
+        interval: '15m',
+        currency: 'CAD',
+        range: '1m',
+        fetchedAt: new Date().toISOString(),
+        skippedSymbols: [],
+        failedSymbols: [],
+        fallbackToDaily: false,
+      });
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(mockGetIntradayBreakdown).toHaveBeenCalled();
+      });
+      expect(mockGetIntradayBreakdown).toHaveBeenCalledWith(
+        expect.objectContaining({ range: '1m' }),
+      );
+      // The December bar is trimmed here as well, so the stacked view and the
+      // total view cover the same days.
+      await waitFor(() =>
+        expect(
+          screen.getByText('Highest Value').parentElement!.textContent,
+        ).toContain('$50000'),
+      );
     });
   });
 

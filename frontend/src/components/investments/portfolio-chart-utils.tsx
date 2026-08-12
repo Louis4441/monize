@@ -15,6 +15,33 @@ const logger = createLogger('PortfolioValueChart');
 export const INTRADAY_RANGES = new Set(['1d', '1w', 'mtd', '1m']);
 
 /**
+ * The range the backend serves a chart range from. MTD has no series of its
+ * own -- its window is 1 to 31 days long, so it rides on the rolling 1M series
+ * and the caller trims it with {@link trimIntradayPoints}. Every intraday
+ * request goes through this: passing 'mtd' straight through is a 400 from the
+ * `IntradayValueQueryDto` enum, which is the shape of failure that reads as an
+ * outage rather than as a missing case.
+ */
+export function intradayRangeParam(range: string): '1d' | '1w' | '1m' {
+  return (range === 'mtd' ? '1m' : range) as '1d' | '1w' | '1m';
+}
+
+/**
+ * Trim an intraday series to the window the chart actually shows. Only MTD
+ * needs it -- it is served a rolling month that reaches back into the previous
+ * one -- and `windowStart` is a YYYY-MM-DD date compared against the ISO
+ * timestamps' own prefix, so no parsing is involved.
+ */
+export function trimIntradayPoints<T extends { timestamp: string }>(
+  points: T[],
+  range: string,
+  windowStart: string,
+): T[] {
+  if (range !== 'mtd' || !windowStart) return points;
+  return points.filter((p) => p.timestamp >= windowStart);
+}
+
+/**
  * sessionStorage prefix for cached intraday responses. Per-tab, so the data
  * persists during a navigation but not across browser sessions.
  */

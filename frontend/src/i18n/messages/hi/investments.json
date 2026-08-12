@@ -123,6 +123,8 @@
     "lowestValue": "न्यूनतम मूल्य",
     "change": "परिवर्तन",
     "changePercent": "परिवर्तन %",
+    "priorCloseTooltip": "पिछले कारोबारी दिन ({date}) के समापन भाव से मापा गया।",
+    "notAvailable": "उपलब्ध नहीं",
     "portfolioLabel": "पोर्टफोलियो:"
   },
   "transactionList": {
