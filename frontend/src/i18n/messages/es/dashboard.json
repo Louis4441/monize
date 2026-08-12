@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Factura",
       "deposit": "Depósito",
-      "transfer": "Transferencia"
+      "transfer": "Transferencia",
+      "reminder": "Recordatorio"
     }
   },
   "gettingStarted": {

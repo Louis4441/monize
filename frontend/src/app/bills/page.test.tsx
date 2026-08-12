@@ -382,7 +382,9 @@ describe('BillsPage', () => {
       render(<BillsPage />);
       await waitFor(() => {
         expect(screen.getByText('All (6)')).toBeInTheDocument();
-        expect(screen.getByText('Bills (4)')).toBeInTheDocument();
+        // Rent, Netflix and Old Bill. The negative Savings Transfer is a
+        // transfer and the zero-amount Card Payment Reminder is neither.
+        expect(screen.getByText('Bills (3)')).toBeInTheDocument();
         expect(screen.getByText('Deposits (1)')).toBeInTheDocument();
       });
     });
@@ -1081,9 +1083,24 @@ describe('BillsPage', () => {
       render(<BillsPage />);
       await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
       fireEvent.click(screen.getByText(/Bills \(/));
-      // Savings Transfer has amount < 0 but show in bills filter (filter is purely by amount sign)
-      // Savings Transfer amount = -500, isTransfer = true -> appears in filter (filter doesn't check isTransfer)
-      expect(screen.getByText('Savings Transfer')).toBeInTheDocument();
+      // Savings Transfer is negative but moves money between the user's own
+      // accounts, so it is not a bill -- and the Active Bills summary card has
+      // always said so. The tab now agrees with it.
+      expect(screen.queryByText('Savings Transfer')).not.toBeInTheDocument();
+    });
+
+    it('bills filter excludes a zero-amount reminder', async () => {
+      render(<BillsPage />);
+      await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
+      fireEvent.click(screen.getByText(/Bills \(/));
+      expect(screen.queryByText('Card Payment Reminder')).not.toBeInTheDocument();
+    });
+
+    it('deposits filter excludes a zero-amount reminder', async () => {
+      render(<BillsPage />);
+      await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
+      fireEvent.click(screen.getByText(/Deposits \(/));
+      expect(screen.queryByText('Card Payment Reminder')).not.toBeInTheDocument();
     });
 
     it('deposits filter shows only positive-amount items', async () => {

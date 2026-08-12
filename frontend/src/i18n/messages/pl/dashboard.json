@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Rachunek",
       "deposit": "Wpłata",
-      "transfer": "Przelew"
+      "transfer": "Przelew",
+      "reminder": "Przypomnienie"
     }
   },
   "gettingStarted": {

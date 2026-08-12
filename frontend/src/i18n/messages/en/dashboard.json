@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Bill",
       "deposit": "Deposit",
-      "transfer": "Transfer"
+      "transfer": "Transfer",
+      "reminder": "Reminder"
     }
   },
   "gettingStarted": {

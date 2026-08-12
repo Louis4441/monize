@@ -182,16 +182,25 @@ from both calendars (issue #1124).
 
 Classify with `scheduledKind` (`lib/scheduled-kind.ts`), which returns
 `bill | deposit | transfer | reminder`, and colour from
-`SCHEDULED_KIND_CHIP_CLASSES` / `SCHEDULED_KIND_AMOUNT_CLASSES` so the Bills &
-Deposits calendar and the Upcoming Bills report read the same way. A surface
-listing *occurrences* -- a calendar, an upcoming list -- includes every active
-schedule whatever its kind; filtering by kind is for a surface that is genuinely
-about bills or about deposits, and even then a zero-amount reminder belongs in
-neither bucket rather than silently in the positive one.
+`SCHEDULED_KIND_CHIP_CLASSES` / `SCHEDULED_KIND_AMOUNT_CLASSES` so every surface
+reads the same way -- the two calendars, the dashboard widget's type badge, and
+the budget panel all go through it. Pass the *effective* amount
+(`nextOverride?.amount ?? amount`) where the surface is about one occurrence.
 
-A **money total** is the separate decision: a transfer is counted as something
-coming up but its amount never joins a bills-and-deposits sum, or the same money
-is reported twice (`UpcomingBillsReport`'s `summary.totalOf`).
+A surface listing *occurrences* -- a calendar, an upcoming list -- includes every
+active schedule whatever its kind. Filtering by kind is for a surface genuinely
+about bills or about deposits (the Bills/Deposits tabs, the budget's committed
+spending), and there a `reminder` belongs in neither bucket rather than silently
+in the positive one -- except where the surface is about *what the user still has
+to pay*, where a zero-amount reminder counts as an upcoming bill contributing
+nothing to the total (`BudgetUpcomingBills`).
+
+A **money total** is the separate decision, and it is not the same list as the
+count: a transfer is counted as something coming up but its amount never joins a
+bills-and-deposits sum, or the same money is reported twice
+(`UpcomingBillsReport`'s `summary.totalOf`). A reminder's zero is a placeholder,
+not a measurement, so it is never given a `+`/`-` sign or a red/green treatment
+that would read as a real amount.
 
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 

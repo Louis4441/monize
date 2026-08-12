@@ -10,6 +10,11 @@ import { parseLocalDate } from '@/lib/utils';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import {
+  SCHEDULED_KIND_AMOUNT_CLASSES,
+  scheduledKind,
+  type ScheduledKind,
+} from '@/lib/scheduled-kind';
 
 const LIABILITY_TYPES = new Set(['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT']);
 
@@ -118,12 +123,10 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
     return item.nextOverride?.amount ?? item.amount;
   };
 
-  const getItemType = (item: ScheduledTransaction): 'bill' | 'deposit' | 'transfer' => {
-    if (item.isTransfer) return 'transfer';
-    return getEffectiveAmount(item) < 0 ? 'bill' : 'deposit';
-  };
+  const getItemType = (item: ScheduledTransaction): ScheduledKind =>
+    scheduledKind({ amount: getEffectiveAmount(item), isTransfer: item.isTransfer });
 
-  const getTypeBadge = (type: 'bill' | 'deposit' | 'transfer') => {
+  const getTypeBadge = (type: ScheduledKind) => {
     switch (type) {
       case 'bill':
         return <span className="px-1.5 py-0.5 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-xs rounded font-medium">{t('upcomingBills.typeBadge.bill')}</span>;
@@ -131,29 +134,21 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
         return <span className="px-1.5 py-0.5 bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400 text-xs rounded font-medium">{t('upcomingBills.typeBadge.deposit')}</span>;
       case 'transfer':
         return <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-xs rounded font-medium">{t('upcomingBills.typeBadge.transfer')}</span>;
+      case 'reminder':
+        return <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 text-xs rounded font-medium">{t('upcomingBills.typeBadge.reminder')}</span>;
     }
   };
 
   const getAmountDisplay = (item: ScheduledTransaction) => {
     const amount = getEffectiveAmount(item);
     const type = getItemType(item);
-    switch (type) {
-      case 'bill':
-        return {
-          text: `-${formatCurrency(amount, item.currencyCode)}`,
-          className: 'text-red-600 dark:text-red-400',
-        };
-      case 'deposit':
-        return {
-          text: `+${formatCurrency(amount, item.currencyCode)}`,
-          className: 'text-green-600 dark:text-green-400',
-        };
-      case 'transfer':
-        return {
-          text: formatCurrency(amount, item.currencyCode),
-          className: 'text-blue-600 dark:text-blue-400',
-        };
-    }
+    // A reminder carries no sign: its amount is a placeholder the user will fill
+    // in when the real one arrives, so it is neither money out nor money in.
+    const sign = type === 'bill' ? '-' : type === 'deposit' ? '+' : '';
+    return {
+      text: `${sign}${formatCurrency(amount, item.currencyCode)}`,
+      className: SCHEDULED_KIND_AMOUNT_CLASSES[type],
+    };
   };
 
   const goToPost = (id: string) => {
@@ -198,10 +193,10 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
 
   // Totals use the full list; display is capped at maxItems
   const totalDue = upcomingItems
-    .filter((item) => !item.isTransfer && getEffectiveAmount(item) < 0)
+    .filter((item) => getItemType(item) === 'bill')
     .reduce((sum, item) => sum + Math.abs(convertToDefault(getEffectiveAmount(item), item.currencyCode)), 0);
   const totalIncoming = upcomingItems
-    .filter((item) => !item.isTransfer && getEffectiveAmount(item) > 0)
+    .filter((item) => getItemType(item) === 'deposit')
     .reduce((sum, item) => sum + convertToDefault(getEffectiveAmount(item), item.currencyCode), 0);
 
   const visibleItems = upcomingItems.slice(0, maxItems);

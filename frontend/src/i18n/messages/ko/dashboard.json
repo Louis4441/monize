@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "청구서",
       "deposit": "입금",
-      "transfer": "이체"
+      "transfer": "이체",
+      "reminder": "알림"
     }
   },
   "gettingStarted": {

@@ -435,8 +435,8 @@ function BillsContent() {
   // effective date (considering overrides)
   const filteredTransactions = useMemo(() => {
     const byType = scheduledTransactions.filter((t) => {
-      if (filterType === 'bills') return Number(t.amount) < 0;
-      if (filterType === 'deposits') return Number(t.amount) > 0;
+      if (filterType === 'bills') return scheduledKind(t) === 'bill';
+      if (filterType === 'deposits') return scheduledKind(t) === 'deposit';
       return true;
     });
 
@@ -462,16 +462,16 @@ function BillsContent() {
 
     for (const t of scheduledTransactions) {
       const amount = Number(t.amount);
-      const isActiveNonTransfer = t.isActive && !t.isTransfer;
+      // Transfers move money between the user's own accounts and a zero-amount
+      // reminder states no amount, so neither is a bill or a deposit here.
+      const kind = t.isActive ? scheduledKind(t) : null;
 
-      if (isActiveNonTransfer) {
-        if (amount < 0) {
-          totalBills++;
-          monthlyBills += monthlyEquivalent(Math.abs(amount), t.frequency);
-        } else if (amount > 0) {
-          totalDeposits++;
-          monthlyDeposits += monthlyEquivalent(amount, t.frequency);
-        }
+      if (kind === 'bill') {
+        totalBills++;
+        monthlyBills += monthlyEquivalent(Math.abs(amount), t.frequency);
+      } else if (kind === 'deposit') {
+        totalDeposits++;
+        monthlyDeposits += monthlyEquivalent(amount, t.frequency);
       }
 
       if (t.isActive && t.nextDueDate) {
@@ -680,8 +680,8 @@ function BillsContent() {
                     }`}
                   >
                     {type === 'all' ? t('viewTabs.filterAll', { count: scheduledTransactions.length }) :
-                     type === 'bills' ? t('viewTabs.filterBills', { count: scheduledTransactions.filter((st) => st.amount < 0).length }) :
-                     t('viewTabs.filterDeposits', { count: scheduledTransactions.filter((st) => st.amount > 0).length })}
+                     type === 'bills' ? t('viewTabs.filterBills', { count: scheduledTransactions.filter((st) => scheduledKind(st) === 'bill').length }) :
+                     t('viewTabs.filterDeposits', { count: scheduledTransactions.filter((st) => scheduledKind(st) === 'deposit').length })}
                   </button>
                 ))}
               </div>

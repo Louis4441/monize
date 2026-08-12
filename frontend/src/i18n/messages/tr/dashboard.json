@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Fatura",
       "deposit": "Ödeme",
-      "transfer": "Transfer"
+      "transfer": "Transfer",
+      "reminder": "Hatırlatma"
     }
   },
   "gettingStarted": {

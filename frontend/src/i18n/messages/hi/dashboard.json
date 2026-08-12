@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "बिल",
       "deposit": "जमा",
-      "transfer": "स्थानांतरण"
+      "transfer": "स्थानांतरण",
+      "reminder": "अनुस्मारक"
     }
   },
   "gettingStarted": {

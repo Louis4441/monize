@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Rechnung",
       "deposit": "Einzahlung",
-      "transfer": "Überweisung"
+      "transfer": "Überweisung",
+      "reminder": "Erinnerung"
     }
   },
   "gettingStarted": {

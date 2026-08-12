@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Tagihan",
       "deposit": "Setoran",
-      "transfer": "Transfer"
+      "transfer": "Transfer",
+      "reminder": "Pengingat"
     }
   },
   "gettingStarted": {

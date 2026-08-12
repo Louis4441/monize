@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Счёт",
       "deposit": "Поступление",
-      "transfer": "Перевод"
+      "transfer": "Перевод",
+      "reminder": "Напоминание"
     }
   },
   "gettingStarted": {

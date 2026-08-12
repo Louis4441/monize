@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Facture",
       "deposit": "Dépôt",
-      "transfer": "Virement"
+      "transfer": "Virement",
+      "reminder": "Rappel"
     }
   },
   "gettingStarted": {

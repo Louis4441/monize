@@ -37,7 +37,8 @@
     "typeBadge": {
       "bill": "Рахунок",
       "deposit": "Надходження",
-      "transfer": "Переказ"
+      "transfer": "Переказ",
+      "reminder": "Нагадування"
     }
   },
   "gettingStarted": {

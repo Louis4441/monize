@@ -192,6 +192,72 @@ describe('BudgetUpcomingBills', () => {
     expect(screen.queryByText('Deposit')).not.toBeInTheDocument();
   });
 
+  // Issue #1124: a bill left at 0 because the amount varies month to month was
+  // dropped by a `>= 0` sign test, so a payment the user still has to make was
+  // invisible on the budget.
+  it('shows a zero-amount reminder without adding it to the total', () => {
+    const bills = [
+      createBill({ id: 'st-1', name: 'Internet', amount: -80, nextDueDate: '2026-02-25' }),
+      createBill({ id: 'st-2', name: 'Card Payment', amount: 0, nextDueDate: '2026-02-26' }),
+    ];
+
+    render(
+      <BudgetUpcomingBills
+        scheduledTransactions={bills}
+        currentSpent={3000}
+        totalBudgeted={5200}
+        periodEnd="2026-02-28"
+        formatCurrency={mockFormat}
+      />,
+    );
+
+    expect(screen.getByText('Card Payment')).toBeInTheDocument();
+    // Total upcoming is the $80 bill alone -- the placeholder states no amount.
+    // The row and the total both read $80.00.
+    expect(screen.getAllByText('$80.00')).toHaveLength(2);
+    expect(screen.getByText('$2120.00')).toBeInTheDocument();
+  });
+
+  it('does not paint a zero-amount reminder as a bill', () => {
+    const bills = [
+      createBill({ id: 'st-2', name: 'Card Payment', amount: 0, nextDueDate: '2026-02-26' }),
+    ];
+
+    render(
+      <BudgetUpcomingBills
+        scheduledTransactions={bills}
+        currentSpent={3000}
+        totalBudgeted={5200}
+        periodEnd="2026-02-28"
+        formatCurrency={mockFormat}
+      />,
+    );
+
+    const amount = screen.getAllByText('$0.00')[0];
+    expect(amount.className).not.toContain('text-red-600');
+    expect(amount.className).toContain('text-gray-500');
+  });
+
+  it('excludes transfers', () => {
+    const bills = [
+      createBill({ id: 'st-1', name: 'Bill', amount: -80, nextDueDate: '2026-02-25' }),
+      createBill({ id: 'st-2', name: 'Card Transfer', amount: -300, isTransfer: true, nextDueDate: '2026-02-25' }),
+    ];
+
+    render(
+      <BudgetUpcomingBills
+        scheduledTransactions={bills}
+        currentSpent={3000}
+        totalBudgeted={5200}
+        periodEnd="2026-02-28"
+        formatCurrency={mockFormat}
+      />,
+    );
+
+    expect(screen.getByText('Bill')).toBeInTheDocument();
+    expect(screen.queryByText('Card Transfer')).not.toBeInTheDocument();
+  });
+
   it('shows overflow indicator when more than 5 bills', () => {
     const bills = Array.from({ length: 7 }, (_, i) =>
       createBill({
