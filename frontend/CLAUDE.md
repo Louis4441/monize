@@ -352,33 +352,34 @@ scan can hold: neither file is wrong on its own. Changing a shared component's
 trigger element is a change to every call site, so the guard is what tells you
 which ones.
 
-### A short-range portfolio change is measured from the user's chosen baseline
+### A short-range portfolio change is measured from the prior close
 
-On `1d`, `1w` and `mtd` the Change and Change % can be measured from two
-different points, and which one is the user's `portfolioChangeBaseline`
-preference (Settings -> Preferences), not a constant: `previous_close` (the
-default) uses the close of the last trading day *before* the window, so a chart
-showing a week from Aug 5 measures from Aug 4 and includes Aug 5's own
-movement; `period_start` uses the first point plotted, which is the day's open
-on 1D. The longer ranges ignore the preference entirely -- their window opens
-on an arbitrary calendar date whose first point already *is* that day's close,
-so the two answers coincide.
+On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the
+last trading day *before* the window, so a chart showing a week from Aug 5
+measures from Aug 4 and includes Aug 5's own movement. That is the convention
+every quote source reports a daily move against. The longer ranges measure from
+their first point instead -- their window opens on a calendar date whose first
+point already *is* that day's close, so there is nothing earlier to reach for.
+Which ranges are which lives in `PRIOR_CLOSE_BASELINE_RANGES`.
 
-Both halves of that decision come from **one hook**,
+This was briefly a user preference (`portfolio_change_baseline`, added by
+migration 152 and dropped by 153). It was removed because the prior close is
+the right answer rather than a taste, and a settings row asking the user to
+adjudicate it made the figure harder to trust, not easier. `usesPriorCloseBaseline`
+now takes the range and nothing else; if you find yourself adding a second
+argument to it, the question to ask first is whether the alternative is
+actually defensible.
+
+Both halves of the decision come from **one hook**,
 `hooks/usePortfolioChangeBaseline.ts`, which returns `usesPriorClose` and the
 `priorClose` together; the arithmetic and the range set live once in
 `components/investments/portfolio-change-baseline.ts`. The Investments-page
 chart and the Portfolio Value report both go through them, and a new surface
-showing the same figure must too, rather than reading the preference itself or
-subtracting `points[0]`. Reading the setting in one place and the close in
-another is the specific bug the single hook exists to prevent: while the two
-are out of step the card shows a prior-close number under a period-start
-setting, and nothing about it looks wrong.
-
-An absent preference takes the **default**, never the other option -- the
-figure must not flip as the preferences arrive, so
-`DEFAULT_PORTFOLIO_CHANGE_BASELINE` matches the column default in
-`database/schema.sql`.
+showing the same figure must too, rather than deciding for itself or
+subtracting `points[0]`. Deciding *whether* a prior close applies in one place
+and reading the close in another is the specific bug the single hook prevents:
+while the two are out of step the card shows one under the rules of the other,
+and nothing about it looks wrong.
 
 The baseline is looked up for the **first point on screen**, never for the
 requested window start: on a weekend or a holiday the 1D chart shows the last

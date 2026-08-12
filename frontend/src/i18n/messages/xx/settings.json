@@ -131,12 +131,6 @@
     "timeFormatLabel": "[XX-Time Format-XX]",
     "recentTransactionsLabel": "[XX-Recent transactions in quick-fill-XX]",
     "recentTransactionsHelp": "[XX-Number of entries shown in the history button popover next to the Payee field on transaction forms.-XX]",
-    "portfolioChangeBaselineLabel": "[XX-Portfolio change measured from-XX]",
-    "portfolioChangeBaselineHelp": "[XX-Applies to the Change figures on the 1D, 1W and MTD portfolio charts. Longer ranges always measure from their first point.-XX]",
-    "portfolioChangeBaselineOptions": {
-      "previousClose": "[XX-Previous trading day's close-XX]",
-      "periodStart": "[XX-Start of the period (the day's open on 1D)-XX]"
-    },
     "saveButton": "[XX-Save Preferences-XX]",
     "savingButton": "[XX-Saving...-XX]",
     "toasts": {

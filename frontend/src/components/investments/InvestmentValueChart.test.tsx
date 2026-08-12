@@ -497,10 +497,13 @@ describe('InvestmentValueChart', () => {
       expect(card('Change')).not.toContain('$1000.00');
     });
 
-    it('measures from the first point when the user chose the period start', async () => {
-      usePreferencesStore.setState({
-        preferences: { portfolioChangeBaseline: 'period_start' } as never,
-      });
+    /**
+     * The period-start alternative was a user preference
+     * (`portfolio_change_baseline`, migration 152, dropped by 153). With it
+     * gone, a prior-close range always looks the close up -- there is no
+     * stored setting that can turn it off.
+     */
+    it('always uses the prior close on a short range', async () => {
       dateRangeState.dateRange = '1w';
       dateRangeState.resolvedRange = { start: '2024-01-08', end: '2024-01-15' };
       vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
@@ -515,10 +518,9 @@ describe('InvestmentValueChart', () => {
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
 
-      await waitFor(() => expect(card('Change')).toContain('+$1000.00'));
-      expect(card('Change')).not.toContain('+$2000.00');
-      // The setting is off, so the baseline is not even fetched.
-      expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
+      // From 9000, not from the 10000 first point.
+      await waitFor(() => expect(card('Change')).toContain('+$2000.00'));
+      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalled();
     });
 
     it('still measures a long range from the first point plotted', async () => {

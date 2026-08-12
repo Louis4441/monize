@@ -131,12 +131,6 @@
     "timeFormatLabel": "Formato de hora",
     "recentTransactionsLabel": "Transacciones recientes en completado rápido",
     "recentTransactionsHelp": "Número de entradas mostradas en el historial emergente junto al campo Beneficiario en los formularios de transacciones.",
-    "portfolioChangeBaselineLabel": "Variación de la cartera medida desde",
-    "portfolioChangeBaselineHelp": "Se aplica a las cifras de variación en los gráficos de cartera 1D, 1W y MTD. Los periodos más largos siempre se miden desde su primer punto.",
-    "portfolioChangeBaselineOptions": {
-      "previousClose": "Cierre de la sesión bursátil anterior",
-      "periodStart": "Inicio del periodo (la apertura del día en 1D)"
-    },
     "saveButton": "Guardar preferencias",
     "savingButton": "Guardando...",
     "toasts": {

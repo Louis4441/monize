@@ -131,12 +131,6 @@
     "timeFormatLabel": "时间格式",
     "recentTransactionsLabel": "快速填充中的近期交易数量",
     "recentTransactionsHelp": "交易表单中收款人字段旁历史按钮弹出框中显示的条目数量。",
-    "portfolioChangeBaselineLabel": "投资组合变化的计算基准",
-    "portfolioChangeBaselineHelp": "适用于投资组合图表 1D、1W 和 MTD 的变化数值。更长的时间范围始终以其第一个数据点为基准。",
-    "portfolioChangeBaselineOptions": {
-      "previousClose": "上一交易日收盘价",
-      "periodStart": "期间起点（1D 为当日开盘价）"
-    },
     "saveButton": "保存偏好设置",
     "savingButton": "保存中...",
     "toasts": {

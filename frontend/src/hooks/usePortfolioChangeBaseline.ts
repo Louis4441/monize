@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { usePreferencesStore } from '@/store/preferencesStore';
 import {
   PriorCloseBaseline,
   buildPriorCloseKey,
@@ -26,8 +25,7 @@ interface UsePortfolioChangeBaselineOptions {
 interface PortfolioChangeBaselineResult {
   /**
    * Whether this chart's change is measured from a prior close. False when the
-   * range measures from its first point regardless, or when the user's
-   * `portfolioChangeBaseline` preference says `period_start`.
+   * range measures from its first point regardless.
    */
   usesPriorClose: boolean;
   /**
@@ -40,12 +38,13 @@ interface PortfolioChangeBaselineResult {
 
 /**
  * The baseline the Portfolio Value chart's Change / Change % are measured
- * from, for whichever of the two the user has chosen in Settings.
+ * from.
  *
  * Both halves of the answer come from here so they cannot disagree: a
- * component that read the preference itself and the close from somewhere else
- * could show a prior-close figure under a period-start setting for as long as
- * the two were out of step. The value carries the request that produced it, so
+ * component deciding *whether* a prior close applies in one place and reading
+ * the close itself in another could show one under the rules of the other for
+ * as long as the two were out of step. The value carries the request that
+ * produced it, so
  * a baseline fetched for a previous range, account filter or currency can
  * never be paired with the current chart -- it simply stops matching and reads
  * as unknown.
@@ -56,10 +55,7 @@ export function usePortfolioChangeBaseline({
   accountIds,
   displayCurrency,
 }: UsePortfolioChangeBaselineOptions): PortfolioChangeBaselineResult {
-  const preference = usePreferencesStore(
-    (state) => state.preferences?.portfolioChangeBaseline,
-  );
-  const usesPriorClose = usesPriorCloseBaseline(range, preference);
+  const usesPriorClose = usesPriorCloseBaseline(range);
   const key =
     usesPriorClose && firstPointDate
       ? buildPriorCloseKey({ range, firstPointDate, accountIds, displayCurrency })

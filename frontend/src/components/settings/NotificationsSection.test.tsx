@@ -43,7 +43,6 @@ const mockPreferences: UserPreferences = {
   dashboardWidgetConfig: {},
   preferredExchanges: [],
     defaultQuoteProvider: 'yahoo' as const,
-    portfolioChangeBaseline: 'previous_close',
     recentTransactionsLimit: 5,
   aiBubbleEnabled: false,
   showWhatsNew: true,

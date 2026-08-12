@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   BASELINE_LOOKBACK_DAYS,
-  DEFAULT_PORTFOLIO_CHANGE_BASELINE,
   buildPriorCloseKey,
   fetchPriorCloseBaseline,
   isoDatePart,
@@ -23,34 +22,22 @@ vi.mock('@/lib/logger', () => ({
 
 describe('usesPriorCloseBaseline', () => {
   it('covers the intraday-boundary ranges only', () => {
-    expect(usesPriorCloseBaseline('1d', 'previous_close')).toBe(true);
-    expect(usesPriorCloseBaseline('1w', 'previous_close')).toBe(true);
-    expect(usesPriorCloseBaseline('mtd', 'previous_close')).toBe(true);
-    for (const range of ['1m', '3m', 'ytd', '1y', '2y', '5y', 'all', 'custom']) {
-      expect(usesPriorCloseBaseline(range, 'previous_close')).toBe(false);
-    }
-  });
-
-  it('is off for every range when the user chose the period start', () => {
-    for (const range of ['1d', '1w', 'mtd', '1m', '1y']) {
-      expect(usesPriorCloseBaseline(range, 'period_start')).toBe(false);
-    }
-  });
-
-  it('takes the default when no preference has loaded', () => {
-    // Undefined is "not known yet", not "the other option" -- otherwise the
-    // figure on screen flips as the preferences arrive.
-    expect(DEFAULT_PORTFOLIO_CHANGE_BASELINE).toBe('previous_close');
-    expect(usesPriorCloseBaseline('1w', undefined)).toBe(true);
-    expect(usesPriorCloseBaseline('1w', null)).toBe(true);
+    expect(usesPriorCloseBaseline('1d')).toBe(true);
     expect(usesPriorCloseBaseline('1w')).toBe(true);
+    expect(usesPriorCloseBaseline('mtd')).toBe(true);
+    for (const range of ['1m', '3m', 'ytd', '1y', '2y', '5y', 'all', 'custom']) {
+      expect(usesPriorCloseBaseline(range)).toBe(false);
+    }
   });
 
-  it('never turns a long range on, whatever the preference says', () => {
-    // The preference chooses between two answers that only differ where a
-    // window boundary is a session boundary.
-    expect(usesPriorCloseBaseline('1y', 'previous_close')).toBe(false);
-    expect(usesPriorCloseBaseline('1y', 'period_start')).toBe(false);
+  /**
+   * This was briefly a user preference (`portfolio_change_baseline`, added by
+   * migration 152 and dropped by 153). It is now a property of the range and
+   * nothing else: the prior close is the answer every quote source gives for a
+   * daily move, so there was no second answer worth asking the user to pick.
+   */
+  it('depends on the range alone', () => {
+    expect(usesPriorCloseBaseline.length).toBe(1);
   });
 });
 

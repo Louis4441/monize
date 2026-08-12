@@ -157,20 +157,6 @@ export class UserPreference {
   })
   defaultQuoteProvider: "yahoo" | "msn";
 
-  // What the Portfolio Value chart's Change / Change % measure from on the
-  // short ranges (1D, 1W, MTD). "previous_close" is the close of the last
-  // trading day before the window -- the convention a daily move is normally
-  // quoted against; "period_start" is the first point plotted, i.e. the day's
-  // open on 1D and the first bar of the week or month on 1W and MTD. Longer
-  // ranges always measure from their first point and ignore this.
-  @Column({
-    name: "portfolio_change_baseline",
-    type: "varchar",
-    length: 20,
-    default: "previous_close",
-  })
-  portfolioChangeBaseline: "previous_close" | "period_start";
-
   @Column({
     name: "recent_transactions_limit",
     type: "smallint",
