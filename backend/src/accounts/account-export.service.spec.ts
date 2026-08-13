@@ -5,7 +5,10 @@ import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
-import { AccountExportService } from "./account-export.service";
+import {
+  AccountExportService,
+  CSV_SPLIT_CATEGORY_LABEL,
+} from "./account-export.service";
 import { AccountsService } from "./accounts.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
@@ -286,8 +289,8 @@ describe("AccountExportService", () => {
       const csv = await service.exportCsv(userId, accountId);
       const lines = csv.split("\n");
 
-      // Main row with "-- Split --"
-      expect(lines[1]).toContain("-- Split --");
+      // Main row carries the split marker in the category column.
+      expect(lines[1].split(",")[3]).toBe(CSV_SPLIT_CATEGORY_LABEL);
       expect(lines[1]).toContain("Store");
       // Split sub-rows
       expect(lines[2]).toContain("Food:Groceries");
@@ -308,8 +311,8 @@ describe("AccountExportService", () => {
 
       // Header + 1 transaction row only (no sub-rows)
       expect(lines).toHaveLength(2);
-      // Should show "-- Split --" as the category label
-      expect(lines[1]).toContain("-- Split --");
+      // Should show the split marker as the category label
+      expect(lines[1].split(",")[3]).toBe(CSV_SPLIT_CATEGORY_LABEL);
       // Should contain the transaction data on a single line
       expect(lines[1]).toContain("Store");
       expect(lines[1]).toContain("2025-02-01");
@@ -326,7 +329,7 @@ describe("AccountExportService", () => {
 
       // Header + main row + 2 split sub-rows
       expect(lines).toHaveLength(4);
-      expect(lines[1]).toContain("-- Split --");
+      expect(lines[1].split(",")[3]).toBe(CSV_SPLIT_CATEGORY_LABEL);
     });
 
     it("escapes CSV values with commas and quotes", async () => {
@@ -345,6 +348,57 @@ describe("AccountExportService", () => {
 
       expect(lines[1]).toContain('"Store, ""The Best"""');
       expect(lines[1]).toContain('"Item with, comma"');
+    });
+
+    it("writes the split marker as a plain cell, not a neutralized one", async () => {
+      // `toContain("-- Split --")` is satisfied by "'-- Split --", which is how
+      // the exporter's own label sat in every split row of every account export
+      // wearing the formula guard's apostrophe. Compare the field.
+      const transactions = [buildSplitTransaction()];
+      const qb = createMockQueryBuilder(transactions);
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const csv = await service.exportCsv(userId, accountId);
+      const categoryCell = csv.split("\n")[1].split(",")[3];
+
+      expect(categoryCell).toBe(CSV_SPLIT_CATEGORY_LABEL);
+    });
+
+    it("neutralizes nothing in a document whose own data is inert", async () => {
+      // Every user-supplied field in these fixtures is ordinary text, so an
+      // apostrophe anywhere in the output came from a literal the exporter
+      // wrote itself -- which is a label that needs to be renamed, not guarded.
+      // This is the check the split marker escaped for as long as it existed.
+      const transactions = [
+        ...buildMockTransactions(),
+        buildTransferTransaction(),
+        buildSplitTransaction(),
+      ];
+      const qb = createMockQueryBuilder(transactions);
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const csv = await service.exportCsv(userId, accountId);
+      const guarded = csv
+        .split("\n")
+        .flatMap((line) => line.split(","))
+        .filter((cell) => cell.startsWith("'") || cell.startsWith("\"'"));
+
+      expect(guarded).toEqual([]);
+    });
+
+    it("writes a numeric reference number as a number", async () => {
+      // Same rule as the frontend writer (issue #1134): a value a spreadsheet
+      // reads as a number is data, so guarding it only stops the column adding
+      // up. A cheque number is the one text column that can hold one.
+      const transactions = [
+        { ...buildMockTransactions()[0], referenceNumber: "-123" },
+      ];
+      const qb = createMockQueryBuilder(transactions);
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const csv = await service.exportCsv(userId, accountId);
+
+      expect(csv.split("\n")[1].split(",")[1]).toBe("-123");
     });
 
     it("guards against CSV formula injection", async () => {
