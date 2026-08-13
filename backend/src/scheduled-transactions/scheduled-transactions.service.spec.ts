@@ -146,6 +146,7 @@ describe("ScheduledTransactionsService", () => {
 
     accountsRepo = {
       findOne: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     tagRepo = {
@@ -868,6 +869,63 @@ describe("ScheduledTransactionsService", () => {
         }),
       );
     });
+
+    it("syncs the durable loan configuration when the user edits a loan payment schedule", async () => {
+      // The per-posting recalculation reads the configured payment and extra
+      // from the account, because the template also carries transient clamps.
+      // A user edit of the template is a reconfiguration, so it must land on
+      // the account too -- otherwise the recalculation would grow the edit
+      // back to the stale configured value (review #1131).
+      const scheduled = makeScheduled({ amount: -1000 });
+      stubFindOne(scheduled);
+      accountsRepo.findOne.mockResolvedValueOnce({
+        id: "acc-loan",
+        scheduledTransactionId: stId,
+      });
+
+      await service.update(userId, stId, {
+        amount: -800,
+        splits: [
+          { transferAccountId: "acc-loan", amount: -500, memo: "Principal" },
+          { categoryId: "cat-interest", amount: -100, memo: "Interest" },
+          {
+            transferAccountId: "acc-loan",
+            amount: -200,
+            memo: "Extra Principal",
+          },
+        ],
+      });
+
+      expect(accountsRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { scheduledTransactionId: stId, userId },
+        }),
+      );
+      expect(accountsRepo.update).toHaveBeenCalledWith("acc-loan", {
+        paymentAmount: 800,
+        extraPaymentAmount: 200,
+      });
+    });
+
+    it("does not touch any account when the schedule is not a loan payment", async () => {
+      const scheduled = makeScheduled();
+      stubFindOne(scheduled);
+      accountsRepo.findOne.mockResolvedValueOnce(null);
+
+      await service.update(userId, stId, { amount: -1200 });
+
+      expect(accountsRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("does not look up a loan account for a presentation-only edit", async () => {
+      const scheduled = makeScheduled();
+      stubFindOne(scheduled);
+
+      await service.update(userId, stId, { name: "Renamed" });
+
+      expect(accountsRepo.findOne).not.toHaveBeenCalled();
+      expect(accountsRepo.update).not.toHaveBeenCalled();
+    });
   });
 
   // ==================== remove ====================
@@ -1254,6 +1312,35 @@ describe("ScheduledTransactionsService", () => {
 
       expect(transactionsService.completeTransfer).toHaveBeenCalled();
       expect(completedInsideTransaction).toBe(false);
+    });
+
+    it("does not send currency codes, leaving the transfer service to derive them (P5-002)", async () => {
+      // A schedule stores only its source currency. Sending that as
+      // `fromCurrencyCode` with no target currency, rate or destination amount
+      // is what made a cross-currency scheduled transfer post at 1:1 with the
+      // destination row labelled in the source's currency.
+      //
+      // Sending the stored code and nothing else is also fragile the other way:
+      // if the account's currency has since changed, the stored code is stale
+      // and the posting would now be rejected. The accounts are the authority,
+      // so neither code is sent at all.
+      const scheduled = makeScheduled({
+        isTransfer: true,
+        transferAccountId: "acc-2",
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await service.post(userId, stId);
+
+      const dto = transactionsService.prepareTransfer.mock.calls[0][1];
+      expect(dto).not.toHaveProperty("fromCurrencyCode");
+      expect(dto).not.toHaveProperty("toCurrencyCode");
+      expect(dto).not.toHaveProperty("exchangeRate");
+      expect(dto).not.toHaveProperty("toAmount");
     });
 
     it("forwards the schedule's category to prepareTransfer (#743)", async () => {

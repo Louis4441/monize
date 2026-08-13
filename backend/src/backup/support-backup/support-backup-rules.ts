@@ -162,6 +162,7 @@ export const RULES: Record<string, TableRules> = {
     favourite_sort_order: keep,
     exclude_from_net_worth: keep,
     payment_amount: scale,
+    extra_payment_amount: scale, // money like payment_amount, scaled the same way
     payment_frequency: keep,
     payment_start_date: keep,
     source_account_id: keep,

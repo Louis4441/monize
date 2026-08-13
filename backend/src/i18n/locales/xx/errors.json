@@ -326,7 +326,9 @@
   "monteCarlo": {
     "scenarioNotFound": "[XX-Scenario {{ id }} not found-XX]",
     "scenarioIdsMustBeArray": "[XX-scenarioIds must be an array-XX]",
-    "atLeastOneAccountRequired": "[XX-At least one accountId is required-XX]"
+    "atLeastOneAccountRequired": "[XX-At least one accountId is required-XX]",
+    "currentValueUnavailable": "[XX-The current value of the selected accounts could not be determined, so a simulation cannot start from it. Enter a starting value explicitly, or retry once prices and exchange rates are available.-XX]",
+    "historicalReturnsUnavailable": "[XX-Historical returns for the selected accounts could not be computed, so a simulation cannot use them. Enter an expected return and volatility manually, or retry once prices and exchange rates are available.-XX]"
   },
   "netWorth": {
     "invalidStartDate": "[XX-startDate must be YYYY-MM-DD-XX]",
@@ -445,7 +447,8 @@
     "noUpdateFields": "[XX-Provide at least one field to change.-XX]",
     "documentNotFound": "[XX-Document not found-XX]",
     "selectionNotFound": "[XX-One or more of the selected securities could not be found-XX]",
-    "comparisonSelectionEmpty": "[XX-Select at least one security or market index to compare-XX]"
+    "comparisonSelectionEmpty": "[XX-Select at least one security or market index to compare-XX]",
+    "exchangeRateNotPositive": "[XX-Exchange rate must be greater than zero-XX]"
   },
   "tags": {
     "notFound": "[XX-Tag with ID {{ id }} not found-XX]",
@@ -499,15 +502,24 @@
     "transferAmountNegative": "[XX-Transfer amount must not be negative-XX]",
     "notATransfer": "[XX-Transaction is not a transfer-XX]",
     "splitTransferLegAccountLocked": "[XX-This transfer is part of a split transaction. Change its accounts by editing the split on the source transaction instead.-XX]",
+    "splitTransferLegStatusLocked": "[XX-This transfer is part of a split transaction. Void or restore it by editing the split transaction it belongs to, so both sides change together.-XX]",
     "notFoundById": "[XX-Transaction with ID {{ id }} not found-XX]",
     "bulkUpdateNoFields": "[XX-At least one update field must be provided-XX]",
     "bulkSplitNoMatchingLinesOne": "[XX-1 split transaction was skipped because none of its split lines matched the category update-XX]",
     "bulkSplitNoMatchingLinesMany": "[XX-{{ count }} split transactions were skipped because none of their split lines matched the category update-XX]",
+    "bulkSplitTransferLegSkippedOne": "[XX-1 split transfer was skipped (void or restore it from the split transaction it belongs to, so both sides change together)-XX]",
+    "bulkSplitTransferLegSkippedMany": "[XX-{{ count }} split transfers were skipped (void or restore them from the split transaction they belong to, so both sides change together)-XX]",
     "payeeNotFound": "[XX-Payee not found-XX]",
     "fxFieldsIncomplete": "[XX-originalAmount and originalCurrencyCode must be provided together-XX]",
     "fxRateRequired": "[XX-A positive exchange rate is required for a foreign-currency transaction-XX]",
     "fxSignMismatch": "[XX-originalAmount and amount must have the same sign-XX]",
-    "jointAccountMoveLocked": "[XX-Transactions in a shared account cannot be moved to another account.-XX]"
+    "jointAccountMoveLocked": "[XX-Transactions in a shared account cannot be moved to another account.-XX]",
+    "currencyMustMatchAccount": "[XX-Transaction currency {{ supplied }} must match the account currency {{ account }}. Use originalAmount and originalCurrencyCode for a foreign-currency entry.-XX]",
+    "transferSameCurrencyMustConserve": "[XX-A transfer between two {{ currency }} accounts must move the same amount on both sides-XX]",
+    "transferSameCurrencyRateMustBeOne": "[XX-A transfer between two {{ currency }} accounts cannot have an exchange rate other than 1-XX]",
+    "transferRateUnavailable": "[XX-Could not determine an exchange rate for {{ from }} -> {{ to }}. Supply an exchangeRate or a destination amount so the transfer posts correctly.-XX]",
+    "transferAmountsMustAgreeOnZero": "[XX-A transfer must move a non-zero amount on both sides, or zero on both-XX]",
+    "transferImpliedRateInvalid": "[XX-The destination amount implies an unusable exchange rate against the source amount-XX]"
   },
   "users": {
     "userNotFound": "[XX-User not found-XX]",
