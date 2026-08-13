@@ -7,6 +7,10 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "../securities/entities/investment-transaction.entity";
+import {
+  acquisitionCost,
+  applyActionToQuantity,
+} from "../securities/investment-replay.util";
 import { Account } from "../accounts/entities/account.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { InvestmentCellValue } from "./dto/execute-investment-report.dto";
@@ -21,8 +25,12 @@ export interface ComputedHolding {
   symbol: string;
   securityName: string;
   currencyCode: string;
-  /** Rate to convert this holding's native monetary values to the base currency. */
-  exchangeRate: number;
+  /**
+   * Rate to convert this holding's native monetary values to the base currency,
+   * or `null` when no rate exists for the pair. `null` must not render as a
+   * measured value, and the "% of portfolio" column it feeds is unknown too.
+   */
+  exchangeRate: number | null;
   /** Every column key -> computed value (null when unavailable). */
   values: Record<string, InvestmentCellValue>;
 }
@@ -103,23 +111,29 @@ function applyQuantity(
   state: { quantity: number },
   tx: InvestmentTransaction,
 ): void {
-  const quantity = Number(tx.quantity) || 0;
-  switch (tx.action) {
-    case InvestmentAction.BUY:
-    case InvestmentAction.REINVEST:
-    case InvestmentAction.TRANSFER_IN:
-    case InvestmentAction.ADD_SHARES:
-      state.quantity += quantity;
-      break;
-    case InvestmentAction.SELL:
-    case InvestmentAction.TRANSFER_OUT:
-    case InvestmentAction.REMOVE_SHARES:
-      state.quantity -= quantity;
-      break;
-    case InvestmentAction.SPLIT:
-      if (quantity > 0) state.quantity *= quantity;
-      break;
-  }
+  state.quantity = applyActionToQuantity(
+    state.quantity,
+    tx.action,
+    Number(tx.quantity) || 0,
+  );
+}
+
+/**
+ * What an acquisition cost in the **security's** currency.
+ *
+ * Every monetary column this report produces is denominated in the holding's
+ * own currency (see the class comment), so the row's `exchangeRate` -- which
+ * converts into the settlement account's currency -- must not be applied here.
+ * The commission still belongs in the basis: it is part of what was paid.
+ */
+function securityCurrencyAcquisitionCost(
+  tx: InvestmentTransaction,
+): number | null {
+  return acquisitionCost({
+    quantity: tx.quantity,
+    price: tx.price,
+    commission: tx.commission,
+  });
 }
 
 /**
@@ -332,8 +346,10 @@ export class InvestmentReportDataService {
         baseCurrency,
         fxCache,
       );
+      // Unknown rate makes the base-currency value unknown, not equal to the
+      // native one.
       const marketValueBase =
-        marketValue !== null ? marketValue * fxRate : null;
+        marketValue !== null && fxRate !== null ? marketValue * fxRate : null;
 
       const { high: high52, low: low52 } = this.fiftyTwoWeek(prices, asOfDate);
 
@@ -371,7 +387,7 @@ export class InvestmentReportDataService {
         sales: roundToDecimals(group.state.sales, 4),
         reinvestments: roundToDecimals(group.state.reinvestments, 4),
         realizedGains: roundToDecimals(group.state.realizedGains, 4),
-        exchangeRate: roundToDecimals(fxRate, 6),
+        exchangeRate: fxRate === null ? null : roundToDecimals(fxRate, 6),
         lastUpdated: asOfRow?.date ?? null,
         fiftyTwoWeekHigh: high52,
         fiftyTwoWeekLow: low52,
@@ -568,7 +584,6 @@ export class InvestmentReportDataService {
   /** Apply one transaction to the cumulative state (native security currency). */
   private applyToState(state: ReplayState, tx: InvestmentTransaction): void {
     const quantity = Number(tx.quantity) || 0;
-    const price = Number(tx.price) || 0;
     const totalAmount = Number(tx.totalAmount) || 0;
     const commission = Number(tx.commission) || 0;
     state.commissions += commission;
@@ -577,15 +592,24 @@ export class InvestmentReportDataService {
     switch (tx.action) {
       case InvestmentAction.BUY:
       case InvestmentAction.TRANSFER_IN:
-        state.costBasis += quantity * price;
-        state.quantity += quantity;
+      case InvestmentAction.REINVEST: {
+        // The acquisition commission is part of the basis a later disposal is
+        // measured against -- omitting it reported the commission as realized
+        // gain in this report's gain columns too. `null` means the row cannot
+        // say what it cost, and unknown is not free.
+        const cost = securityCurrencyAcquisitionCost(tx);
+        if (cost !== null) state.costBasis += cost;
+        state.quantity = applyActionToQuantity(
+          state.quantity,
+          tx.action,
+          quantity,
+        );
         if (tx.action === InvestmentAction.BUY) state.purchases += totalAmount;
+        if (tx.action === InvestmentAction.REINVEST) {
+          state.reinvestments += totalAmount;
+        }
         break;
-      case InvestmentAction.REINVEST:
-        state.costBasis += quantity * price;
-        state.quantity += quantity;
-        state.reinvestments += totalAmount;
-        break;
+      }
       case InvestmentAction.SELL:
       case InvestmentAction.TRANSFER_OUT: {
         const sellQty = Math.min(quantity, state.quantity);
@@ -605,14 +629,12 @@ export class InvestmentReportDataService {
       case InvestmentAction.CAPITAL_GAIN:
         state.income += totalAmount;
         break;
-      case InvestmentAction.ADD_SHARES:
-        state.quantity += quantity;
-        break;
-      case InvestmentAction.REMOVE_SHARES:
-        state.quantity -= quantity;
-        break;
-      case InvestmentAction.SPLIT:
-        if (quantity > 0) state.quantity *= quantity;
+      default:
+        state.quantity = applyActionToQuantity(
+          state.quantity,
+          tx.action,
+          quantity,
+        );
         break;
     }
 
@@ -780,19 +802,29 @@ export class InvestmentReportDataService {
     return result;
   }
 
+  /**
+   * Latest rate for a pair, or `null` when there is none.
+   *
+   * `null`, not 1: this used to end `rate = reverse !== null ? 1 / reverse : 1`,
+   * so a base-currency column for a security with no rate reported the foreign
+   * number as though the currencies were at par (audit P5-009, same defect as
+   * the net-worth and portfolio paths). Rate 1 is returned only when the two
+   * codes are equal.
+   */
   private async fxRate(
     from: string,
     to: string,
     cache: Map<string, number>,
-  ): Promise<number> {
+  ): Promise<number | null> {
     if (!from || !to || from === to) return 1;
     const key = `${from}->${to}`;
     const cached = cache.get(key);
     if (cached !== undefined) return cached;
     let rate = await this.exchangeRateService.getLatestRate(from, to);
-    if (rate === null) {
+    if (rate === null || rate <= 0) {
       const reverse = await this.exchangeRateService.getLatestRate(to, from);
-      rate = reverse !== null ? 1 / reverse : 1;
+      if (reverse === null || reverse <= 0) return null;
+      rate = 1 / reverse;
     }
     cache.set(key, rate);
     return rate;

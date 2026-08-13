@@ -11,6 +11,7 @@ import {
 } from "../accounts/mortgage-amortization.util";
 import { getPeriodsPerYear } from "../accounts/loan-amortization.util";
 import { roundMoney } from "../common/round.util";
+import { allocateLoanPayment } from "../accounts/loan-payment-waterfall.util";
 import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
@@ -52,7 +53,7 @@ export class ScheduledTransactionLoanService {
         return;
       }
 
-      const paymentAmount = Math.abs(Number(scheduledTransaction.amount));
+      const templateAmount = Math.abs(Number(scheduledTransaction.amount));
       const interestRate = Number(loanAccount.interestRate) || 0;
       const frequency = (loanAccount.paymentFrequency ||
         scheduledTransaction.frequency) as PaymentFrequency;
@@ -76,9 +77,29 @@ export class ScheduledTransactionLoanService {
         (s) => s.categoryId && !s.transferAccountId,
       );
 
-      // The base payment for amortization calculation excludes extra principal
-      const extraPrincipalAmount = extraPrincipalSplit
+      // What the template holds is what was just posted -- including any clamp
+      // a previous pass wrote for that one installment (a final payment, an
+      // interest spike consuming the extra). Deriving the *configured* payment
+      // from it therefore ratchets: the clamp becomes the configuration and
+      // nothing can grow back, even after the balance is restored by a void or
+      // an import (review #1131). The durable configuration lives on the
+      // account (payment_amount / extra_payment_amount, kept in sync when the
+      // user edits the schedule); the template only wins where it is larger,
+      // which can only mean a user edit the account columns have not seen.
+      const templateExtraAmount = extraPrincipalSplit
         ? Math.abs(Number(extraPrincipalSplit.amount))
+        : 0;
+      const paymentAmount = Math.max(
+        templateAmount,
+        Number(loanAccount.paymentAmount) || 0,
+      );
+      // The extra can only ride in an existing split row -- this recalculation
+      // never creates one -- so without the row the configured extra is 0.
+      const extraPrincipalAmount = extraPrincipalSplit
+        ? Math.max(
+            templateExtraAmount,
+            Number(loanAccount.extraPaymentAmount) || 0,
+          )
         : 0;
       const basePaymentAmount = paymentAmount - extraPrincipalAmount;
 
@@ -121,7 +142,10 @@ export class ScheduledTransactionLoanService {
               )
             : interestRate / 100 / periodsPerYear;
 
-        const totalPrevPrincipal = prevPrincipal + extraPrincipalAmount;
+        // The recurrence advances from what was actually posted, so the extra
+        // here is the template's (possibly clamped) figure, not the configured
+        // one.
+        const totalPrevPrincipal = prevPrincipal + templateExtraAmount;
         newInterest = prevInterest - totalPrevPrincipal * periodicRate;
         newInterest = Math.max(0, roundMoney(newInterest));
         newPrincipal = roundMoney(basePaymentAmount - newInterest);
@@ -149,13 +173,31 @@ export class ScheduledTransactionLoanService {
         newInterest = roundMoney(currentBalance * periodicRate);
         newPrincipal = roundMoney(basePaymentAmount - newInterest);
         if (newPrincipal < 0) newPrincipal = 0;
-        if (newPrincipal > currentBalance) newPrincipal = currentBalance;
       }
+
+      // The clamp sequence -- interest-first across the whole installment
+      // (recheck RR2-006, DR3-01), principal bounded by the debt with the
+      // discretionary extra absorbing the shortfall (audit P5-008, FR-009) --
+      // is `allocateLoanPayment`, shared with the first installment written by
+      // `LoanPaymentSetupService` because the two must agree about what any
+      // installment looks like.
+      const allocation = allocateLoanPayment({
+        paymentAmount,
+        extraPrincipal: extraPrincipalAmount,
+        interest: newInterest,
+        principal: newPrincipal,
+        currentBalance,
+      });
+      newInterest = allocation.interest;
+      newPrincipal = allocation.principal;
+      const finalExtraPrincipal = allocation.extraPrincipal;
+      const requiredParentAmount = allocation.total;
 
       this.logger.log(
         `Recalculate loan splits: prevPrincipal=${prevPrincipal}, prevInterest=${prevInterest}, ` +
           `rate=${interestRate}%, freq=${frequency}, basePayment=${basePaymentAmount}, ` +
-          `extra=${extraPrincipalAmount}, newPrincipal=${newPrincipal}, newInterest=${newInterest}, ` +
+          `extra=${extraPrincipalAmount} (final ${finalExtraPrincipal}), ` +
+          `newPrincipal=${newPrincipal}, newInterest=${newInterest}, ` +
           `isMortgage=${loanAccount.accountType === "MORTGAGE"}, ` +
           `isCanadian=${loanAccount.isCanadianMortgage}`,
       );
@@ -168,6 +210,41 @@ export class ScheduledTransactionLoanService {
       if (interestSplit) {
         interestSplit.amount = -newInterest;
         await m.getRepository(ScheduledTransactionSplit).save(interestSplit);
+      }
+
+      // The extra principal child was never written here, so a clamped total had
+      // nowhere to land: the parent would shrink while the children still summed
+      // to the unclamped figure, and the posting path's split validator requires
+      // exact 4dp equality between them (audit P5-008 again, on the child the
+      // first fix did not reach). Written whenever it differs from what the
+      // template holds -- in either direction, so one clamped installment does
+      // not become the standing instruction (review #1131).
+      if (extraPrincipalSplit && finalExtraPrincipal !== templateExtraAmount) {
+        extraPrincipalSplit.amount = -finalExtraPrincipal;
+        await m
+          .getRepository(ScheduledTransactionSplit)
+          .save(extraPrincipalSplit);
+      }
+
+      // Parent and children are written in the same transaction, so a posting
+      // can never see one without the other. The parent is written whenever the
+      // next installment differs from what the template holds: shrunk when the
+      // debt no longer needs the whole configured payment, and grown back
+      // toward the configured payment when a clamp written for one installment
+      // no longer binds -- a voided final payment or an imported balance must
+      // not leave the schedule billing the clamped figure forever (review
+      // #1131). `allocateLoanPayment` bounds the total by the configured
+      // payment, so this can never grow past what the user set.
+      if (
+        requiredParentAmount > 0 &&
+        requiredParentAmount !== roundMoney(templateAmount)
+      ) {
+        await m
+          .getRepository(ScheduledTransaction)
+          .update(scheduledTransactionId, { amount: -requiredParentAmount });
+        this.logger.log(
+          `Loan payment recalculated: scheduled amount changed from ${templateAmount} to ${requiredParentAmount} (configured payment ${paymentAmount}, outstanding balance ${currentBalance})`,
+        );
       }
     });
   }

@@ -269,6 +269,60 @@ it in the catalog, not in JSX. `"{units} ({share})"` is one string a translator
 can reorder; `{value}{' ('}{share}{')'}` in a component is three fragments they
 cannot reach.
 
+### A transfer's direction comes from the row's own amount -- `transferDirection`
+
+Money leaving an account went **to** the counterpart; money arriving came
+**from** it. So the two legs of one transfer are labelled differently and both
+are right, and a split line pointing at another account is asked with *its* own
+amount rather than the parent's. `transferDirection` (`lib/transfer-label.ts`)
+is the only place that decision is made, and `transferCsvLabel` is the export's
+rendering of it (`Transfer To Savings`); the register renders the same decision
+as its arrow chip.
+
+The rule had been written out four times inside `TransactionRow` and was missing
+from both CSV exports entirely -- the Transactions export left the Category cell
+empty for a transfer, and a transfer split line was exported as `Uncategorized`,
+which is not merely blank but wrong. A `ui-conventions.test.ts` guard fails on a
+new `? 'to' : 'from'` outside the helper.
+
+Coerce before comparing: `'-67.9900' < 0` is false, and a decimal string is what
+the API sends, so a hand-rolled comparison labels every debit backwards.
+
+### A CSV file is written by `exportToCsv`, and a number in it is a number
+
+`lib/csv-export.ts` is the only CSV writer: it owns the BOM, the CRLF line
+endings, the RFC 4180 quoting, the formula-injection guard and the download.
+Multi-table exports take `exportCsvSections` rather than assembling their own
+lines -- `MonteCarloReport` had a hand-rolled copy that quoted every field and
+guarded none of them, so the report with the *most* user-supplied text in it was
+the one export a formula could ride out of. `ui-conventions.test.ts` fails the
+build on a second `text/csv` Blob or a second `replace(/"/g, '""')`.
+
+The guard cannot key off the first character, because `-` opens both
+`-1+cmd|'/c calc'!A0` and every debit in the ledger. Deciding from that
+character alone is issue #1134: Excel showed `-67.99` as the text ` -67.99` and
+refused to total the column, on 59 of 64 rows. So it asks whether the value *is*
+a number -- an optional sign then only digits, separators, whitespace and
+currency symbols, with an optional `%` -- which is provably inert as a formula
+and covers a formatted `-$1,652.73` as well as a bare `-67.99`.
+
+**The reason it reached the user is worth more than the fix.** A prior pass had
+already exempted negative numbers, with a passing test to prove it -- but it
+tested `-100`, the JS number, and the value the API actually sends is the
+*string* `"-67.9900"`. `decimal(20,4)` columns cross the wire as strings while
+`types/transaction.ts` declares `amount: number`, so the fix and its test agreed
+with each other and neither described the running app. Two consequences:
+
+- **A money value off the API is a string until you make it one.** `Number(...)`
+  it at the boundary of anything that branches on its type -- an export, a
+  `typeof` check, a `.toFixed`. The transactions export now does; the split
+  branch beside it always did, which is precisely why split rows were the only
+  ones the reporter found intact.
+- **A test for a type-dependent branch uses the shape the API sends**, not the
+  shape the interface claims. `page.test.tsx` exports a fixture whose `amount`
+  is `'-67.9900'` for this reason. Where a fixture disagrees with the wire, the
+  suite is checking the type declaration rather than the code.
+
 ### Asynchronous data carries the request that produced it
 
 **Asynchronous data is not only a payload. It is the payload plus the complete

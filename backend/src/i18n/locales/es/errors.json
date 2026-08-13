@@ -317,7 +317,9 @@
   "monteCarlo": {
     "scenarioNotFound": "Escenario {{ id }} no encontrado",
     "scenarioIdsMustBeArray": "scenarioIds debe ser un array",
-    "atLeastOneAccountRequired": "Se requiere al menos un accountId"
+    "atLeastOneAccountRequired": "Se requiere al menos un accountId",
+    "currentValueUnavailable": "No se pudo determinar el valor actual de las cuentas seleccionadas, por lo que una simulación no puede partir de él. Introduzca un valor inicial explícitamente o vuelva a intentarlo cuando haya precios y tipos de cambio disponibles.",
+    "historicalReturnsUnavailable": "No se pudieron calcular los rendimientos históricos de las cuentas seleccionadas, por lo que una simulación no puede usarlos. Introduzca manualmente un rendimiento esperado y una volatilidad, o reinténtelo cuando los precios y los tipos de cambio estén disponibles."
   },
   "netWorth": {
     "invalidStartDate": "startDate debe estar en formato YYYY-MM-DD",
@@ -436,7 +438,8 @@
     "assetOptionNameRequired": "Se requiere un nombre de clase de activo.",
     "documentNotFound": "Documento no encontrado",
     "selectionNotFound": "No se encontraron uno o varios de los valores seleccionados",
-    "comparisonSelectionEmpty": "Seleccione al menos un valor o índice de mercado para comparar"
+    "comparisonSelectionEmpty": "Seleccione al menos un valor o índice de mercado para comparar",
+    "exchangeRateNotPositive": "El tipo de cambio debe ser mayor que cero"
   },
   "tags": {
     "notFound": "Etiqueta con ID {{ id }} no encontrada",
@@ -490,15 +493,24 @@
     "transferAmountNegative": "La cantidad de la transferencia no puede ser negativa",
     "notATransfer": "La transacción no es una transferencia",
     "splitTransferLegAccountLocked": "Esta transferencia forma parte de una transacción desglosada. Para cambiar sus cuentas, edite el desglose en la transacción de origen.",
+    "splitTransferLegStatusLocked": "Esta transferencia forma parte de una transacción dividida. Anúlela o restáurela editando la transacción dividida a la que pertenece, para que ambos lados cambien juntos.",
     "notFoundById": "Transacción con ID {{ id }} no encontrada",
     "bulkUpdateNoFields": "Se debe proporcionar al menos un campo de actualización",
     "bulkSplitNoMatchingLinesOne": "Se omitió 1 transacción dividida porque ninguno de sus desgloses coincidía con la actualización de categoría",
     "bulkSplitNoMatchingLinesMany": "Se omitieron {{ count }} transacciones divididas porque ninguno de sus desgloses coincidía con la actualización de categoría",
+    "bulkSplitTransferLegSkippedOne": "Se omitió 1 transferencia dividida (anúlela o restáurela desde la transacción dividida a la que pertenece, para que ambos lados cambien juntos)",
+    "bulkSplitTransferLegSkippedMany": "Se omitieron {{ count }} transferencias divididas (anúlelas o restáurelas desde la transacción dividida a la que pertenecen, para que ambos lados cambien juntos)",
     "payeeNotFound": "Beneficiario no encontrado",
     "fxFieldsIncomplete": "originalAmount y originalCurrencyCode deben proporcionarse juntos",
     "fxRateRequired": "Se requiere un tipo de cambio positivo para una transacción en moneda extranjera",
     "fxSignMismatch": "originalAmount y amount deben tener el mismo signo",
-    "jointAccountMoveLocked": "Las transacciones de una cuenta compartida no se pueden mover a otra cuenta."
+    "jointAccountMoveLocked": "Las transacciones de una cuenta compartida no se pueden mover a otra cuenta.",
+    "currencyMustMatchAccount": "La moneda de la transacción {{ supplied }} debe coincidir con la moneda de la cuenta {{ account }}. Use originalAmount y originalCurrencyCode para un asiento en moneda extranjera.",
+    "transferSameCurrencyMustConserve": "Una transferencia entre dos cuentas en {{ currency }} debe mover el mismo importe en ambos lados",
+    "transferSameCurrencyRateMustBeOne": "Una transferencia entre dos cuentas en {{ currency }} no puede tener un tipo de cambio distinto de 1",
+    "transferRateUnavailable": "No se pudo determinar un tipo de cambio para {{ from }} -> {{ to }}. Indique un exchangeRate o un importe de destino para que la transferencia se registre correctamente.",
+    "transferAmountsMustAgreeOnZero": "Una transferencia debe mover un importe distinto de cero en ambos lados, o cero en ambos",
+    "transferImpliedRateInvalid": "El importe de destino implica un tipo de cambio inutilizable frente al importe de origen"
   },
   "users": {
     "userNotFound": "Usuario no encontrado",

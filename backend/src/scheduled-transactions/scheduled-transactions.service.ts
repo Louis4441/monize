@@ -29,7 +29,7 @@ import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
-import { AccountSubType } from "../accounts/entities/account.entity";
+import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { todayInTimezone, todayYMD } from "../common/date-utils";
@@ -1302,6 +1302,46 @@ export class ScheduledTransactionsService {
       if (Object.keys(fieldsToUpdate).length > 0) {
         await m.update(ScheduledTransaction, id, fieldsToUpdate);
       }
+
+      // A user edit of a loan payment schedule is a reconfiguration, so it has
+      // to reach the durable copy on the account: the per-posting
+      // recalculation grows the template back toward
+      // payment_amount / extra_payment_amount, because the template itself
+      // also carries transient clamps a previous pass wrote (a final payment,
+      // an interest spike) and cannot say which of the two it holds (review
+      // #1131).
+      if (
+        updateData.amount !== undefined ||
+        splits !== undefined ||
+        clearSplitsForModeSwitch
+      ) {
+        const loanAccount = await m.getRepository(Account).findOne({
+          where: { scheduledTransactionId: id, userId },
+        });
+        if (loanAccount) {
+          const accountUpdate: Partial<Account> = {};
+          if (updateData.amount !== undefined) {
+            accountUpdate.paymentAmount = Math.abs(Number(updateData.amount));
+          }
+          if (Array.isArray(splits)) {
+            const extraSplit = splits.find(
+              (s) =>
+                s.transferAccountId === loanAccount.id &&
+                s.memo?.toLowerCase().includes("extra"),
+            );
+            accountUpdate.extraPaymentAmount = extraSplit
+              ? Math.abs(Number(extraSplit.amount))
+              : 0;
+          } else if (clearSplitsForModeSwitch) {
+            accountUpdate.extraPaymentAmount = 0;
+          }
+          if (Object.keys(accountUpdate).length > 0) {
+            await m
+              .getRepository(Account)
+              .update(loanAccount.id, accountUpdate);
+          }
+        }
+      }
     });
 
     const result = await this.findOne(userId, id);
@@ -1657,7 +1697,13 @@ export class ScheduledTransactionsService {
             toAccountId: scheduled.transferAccountId,
             amount: Math.abs(finalAmount),
             transactionDate: postDate,
-            fromCurrencyCode: scheduled.currencyCode,
+            // Currency codes are deliberately not sent: the transfer service
+            // derives both from the accounts. A schedule stores only its source
+            // currency, so supplying that and nothing else is what made a
+            // cross-currency scheduled transfer post at 1:1 with the
+            // destination row mislabelled (audit P5-002). Sending a stored code
+            // that has since gone stale would now fail the posting instead,
+            // which is no better.
             description: finalDescription || undefined,
             referenceNumber: postDto?.referenceNumber || undefined,
             payeeId: scheduled.payeeId || undefined,
