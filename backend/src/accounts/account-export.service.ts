@@ -48,6 +48,22 @@ interface ExportSplit {
 export const CSV_SPLIT_CATEGORY_LABEL = "(Split)";
 
 /**
+ * Category label for a transfer: `Transfer To Savings`.
+ *
+ * The direction is a fact about the row being written -- money leaving this
+ * account went *to* the counterpart, money arriving came *from* it -- so the
+ * two legs of one transfer are labelled differently, and a split line is asked
+ * with its own amount rather than the parent's. `Transfer: Savings` named the
+ * counterpart without saying which way the money went, which is the half that
+ * matters when reading an export away from the register's arrows. Twin of
+ * `transferCsvLabel` in `frontend/src/lib/transfer-label.ts`; an amount of
+ * exactly zero has no direction and takes the same branch there as here.
+ */
+export function csvTransferLabel(accountName: string, amount: number): string {
+  return `Transfer ${Number(amount) < 0 ? "To" : "From"} ${accountName}`;
+}
+
+/**
  * Values a spreadsheet reads as a number rather than as a formula, so the guard
  * in `escapeCsv` leaves them alone: a leading sign followed only by digits,
  * separators, whitespace and currency symbols names no function and no cell,
@@ -119,7 +135,7 @@ export class AccountExportService {
         );
         for (const split of tx.splits) {
           const categoryLabel = split.isTransfer
-            ? `Transfer: ${split.transferAccountName}`
+            ? csvTransferLabel(split.transferAccountName, split.amount)
             : split.categoryPath;
           rows.push(
             this.csvRow(
@@ -136,7 +152,7 @@ export class AccountExportService {
         }
       } else {
         const categoryLabel = tx.isTransfer
-          ? `Transfer: ${tx.transferAccountName}`
+          ? csvTransferLabel(tx.transferAccountName, tx.amount)
           : tx.isSplit
             ? CSV_SPLIT_CATEGORY_LABEL
             : tx.categoryPath;

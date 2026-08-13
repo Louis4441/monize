@@ -218,7 +218,20 @@ describe("AccountExportService", () => {
       const csv = await service.exportCsv(userId, accountId);
       const lines = csv.split("\n");
 
-      expect(lines[1]).toContain("Transfer: Savings");
+      // -200 left this account, so the counterpart is where it went.
+      expect(lines[1].split(",")[3]).toBe("Transfer To Savings");
+    });
+
+    it("labels the receiving leg of a transfer From its counterpart", async () => {
+      // The same transfer read from the other account is money arriving. Both
+      // legs are correct and they read differently; the sign is what decides.
+      const transactions = [{ ...buildTransferTransaction(), amount: 200 }];
+      const qb = createMockQueryBuilder(transactions);
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const csv = await service.exportCsv(userId, accountId);
+
+      expect(csv.split("\n")[1].split(",")[3]).toBe("Transfer From Savings");
     });
 
     it("masks a cross-owner counterpart the reader cannot read (post-unshare)", async () => {
@@ -239,7 +252,7 @@ describe("AccountExportService", () => {
       const csv = await service.exportCsv(userId, accountId);
       const lines = csv.split("\n");
 
-      expect(lines[1]).toContain("Transfer: Hidden account");
+      expect(lines[1].split(",")[3]).toBe("Transfer To Hidden account");
       expect(lines[1]).toContain("Transfer to Hidden account");
       expect(csv).not.toContain("Savings");
     });
@@ -266,7 +279,7 @@ describe("AccountExportService", () => {
       const csv = await service.exportCsv(userId, accountId);
       const lines = csv.split("\n");
 
-      expect(lines[1]).toContain("Transfer: Savings");
+      expect(lines[1].split(",")[3]).toBe("Transfer To Savings");
       expect(lines[1]).toContain("Transfer to Savings");
     });
 
@@ -295,7 +308,8 @@ describe("AccountExportService", () => {
       // Split sub-rows
       expect(lines[2]).toContain("Food:Groceries");
       expect(lines[2]).toContain("Food items");
-      expect(lines[3]).toContain("Transfer: Savings");
+      // A split line is labelled from its own amount (-50), not the parent's.
+      expect(lines[3].split(",")[3]).toBe("Transfer To Savings");
       expect(lines[3]).toContain("Gift card");
     });
 

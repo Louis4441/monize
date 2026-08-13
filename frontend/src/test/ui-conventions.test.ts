@@ -682,3 +682,33 @@ describe("a CSV file is written by the shared exporter", () => {
     expect(CSV_QUOTING.test(writer)).toBe(true);
   });
 });
+
+describe("a transfer's direction is decided in one place", () => {
+  /** The one file allowed to turn an amount's sign into a direction. */
+  const HELPER = "/src/lib/transfer-label.ts";
+  const DIRECTION_TERNARY = /['"]to['"]\s*:\s*['"]from['"]|['"]from['"]\s*:\s*['"]to['"]/;
+
+  it("derives to/from from an amount nowhere else", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== HELPER)
+      .filter(([, content]) => DIRECTION_TERNARY.test(content))
+      .map(([path]) => path);
+
+    // Money leaving an account went *to* the counterpart and money arriving
+    // came *from* it, so both legs of one transfer read differently and each
+    // line -- a split line included -- is asked with its own amount. That rule
+    // was written out four times in TransactionRow and omitted from both CSV
+    // exports, which is how the register showed a counterpart the export did
+    // not mention. Call transferDirection().
+    expect(
+      offenders,
+      "Decide a transfer's direction with transferDirection() from @/lib/transfer-label.",
+    ).toEqual([]);
+  });
+
+  it("still finds the helper, so the rule cannot pass by accident", () => {
+    const helper = sources[HELPER];
+    expect(helper, `${HELPER} not found -- update HELPER in this test`).toBeTruthy();
+    expect(DIRECTION_TERNARY.test(helper)).toBe(true);
+  });
+});

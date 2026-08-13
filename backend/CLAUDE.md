@@ -317,6 +317,15 @@ half: export a fixture whose every user-supplied field is ordinary text, and
 assert no cell carries the guard's prefix. Any future literal that needs
 escaping fails it, wherever it is added.
 
+A transfer's label is `csvTransferLabel` in the same file, and it names the
+direction as well as the counterpart (`Transfer To Savings`): money leaving this
+account went *to* the other one, money arriving came *from* it, and a split line
+is asked with its own amount rather than the parent's. `Transfer: Savings` named
+the counterpart without saying which way the money moved -- the half a reader
+cannot recover from the sign of a column they are looking at in a spreadsheet.
+Its twin is `transferCsvLabel` in `frontend/src/lib/transfer-label.ts`; the QIF
+export keeps Quicken's `L[Account]` form and is deliberately untouched.
+
 The guard also asks what a value *is* rather than what it starts with, matching
 its twin in `frontend/src/lib/csv-export.ts`: a value a spreadsheet reads as a
 number is data, and prefixing one stops the column adding up (issue #1134).

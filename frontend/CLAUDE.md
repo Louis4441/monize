@@ -269,6 +269,25 @@ it in the catalog, not in JSX. `"{units} ({share})"` is one string a translator
 can reorder; `{value}{' ('}{share}{')'}` in a component is three fragments they
 cannot reach.
 
+### A transfer's direction comes from the row's own amount -- `transferDirection`
+
+Money leaving an account went **to** the counterpart; money arriving came
+**from** it. So the two legs of one transfer are labelled differently and both
+are right, and a split line pointing at another account is asked with *its* own
+amount rather than the parent's. `transferDirection` (`lib/transfer-label.ts`)
+is the only place that decision is made, and `transferCsvLabel` is the export's
+rendering of it (`Transfer To Savings`); the register renders the same decision
+as its arrow chip.
+
+The rule had been written out four times inside `TransactionRow` and was missing
+from both CSV exports entirely -- the Transactions export left the Category cell
+empty for a transfer, and a transfer split line was exported as `Uncategorized`,
+which is not merely blank but wrong. A `ui-conventions.test.ts` guard fails on a
+new `? 'to' : 'from'` outside the helper.
+
+Coerce before comparing: `'-67.9900' < 0` is false, and a decimal string is what
+the API sends, so a hand-rolled comparison labels every debit backwards.
+
 ### A CSV file is written by `exportToCsv`, and a number in it is a number
 
 `lib/csv-export.ts` is the only CSV writer: it owns the BOM, the CRLF line
