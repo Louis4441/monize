@@ -854,15 +854,18 @@ function TransactionsContent() {
 
       const headers = ['Date', 'Account', 'Payee', 'Category', 'Description', 'Tags', 'Amount', 'Currency', 'Status'];
       const rows = allTransactions.map(tx => {
+        // `tx.amount` is typed number but arrives as the decimal string the
+        // API serialized ("-67.9900"), so coerce it: the Amount column holds a
+        // number, the way the split branch below already produces one.
+        let amount = Number(tx.amount);
         // Use the filtered split amount when only some splits match the
         // active filter, matching what the UI displays.
-        let amount = tx.amount;
         if (tx.isSplit && tx.splits && tx.splits.length > 0) {
           const splitsSumCents = tx.splits.reduce(
             (sum, s) => sum + Math.round(Number(s.amount) * 10000),
             0,
           );
-          const txAmountCents = Math.round(Number(tx.amount) * 10000);
+          const txAmountCents = Math.round(amount * 10000);
           if (splitsSumCents !== txAmountCents) {
             amount = splitsSumCents / 10000;
           }

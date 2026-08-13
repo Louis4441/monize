@@ -646,3 +646,39 @@ describe("an account picker labels its options through the shared hook", () => {
     ).toEqual([]);
   });
 });
+
+describe("a CSV file is written by the shared exporter", () => {
+  /** The one file allowed to build a CSV -- it *is* the writer. */
+  const WRITER = "/src/lib/csv-export.ts";
+  /** A `text/csv` Blob: the last step of writing one by hand. */
+  const CSV_BLOB = /new Blob\([\s\S]{0,200}?text\/csv/;
+  /** RFC 4180 quoting, doubled quotes and all. */
+  const CSV_QUOTING = /replace\(\/"\/g,\s*['"]""['"]\)/;
+
+  it("builds no CSV outside the shared writer", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== WRITER)
+      .filter(
+        ([, content]) => CSV_BLOB.test(content) || CSV_QUOTING.test(content),
+      )
+      .map(([path]) => path);
+
+    // A second writer is a second set of answers to the questions this one
+    // already answers: the BOM, CRLF line endings, quoting, and which values a
+    // spreadsheet would evaluate rather than display. MonteCarloReport had one,
+    // and it applied no formula-injection guard at all -- while the shared
+    // writer applied it to every negative amount (issue #1134). Neither file
+    // looked wrong on its own, which is why this is a scan.
+    expect(
+      offenders,
+      "Write CSV through exportToCsv/exportCsvSections in @/lib/csv-export.",
+    ).toEqual([]);
+  });
+
+  it("still finds the writer, so the rule cannot pass by accident", () => {
+    const writer = sources[WRITER];
+    expect(writer, `${WRITER} not found -- update WRITER in this test`).toBeTruthy();
+    expect(CSV_BLOB.test(writer)).toBe(true);
+    expect(CSV_QUOTING.test(writer)).toBe(true);
+  });
+});

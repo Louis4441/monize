@@ -2164,6 +2164,45 @@ describe('TransactionsPage', () => {
       expect(rows[0]).toEqual(['2026-02-01', '', '', '', '', '', -25, 'USD', 'UNRECONCILED']);
     });
 
+    it('exports the amount as a number when the API sends it as a decimal string', async () => {
+      // `decimal(20,4)` has no TypeORM transformer, so `amount` arrives as the
+      // string "-67.9900" while the type says number. Passing it through
+      // unconverted put text in the Amount column, which the CSV writer then
+      // read as a formula and neutralized with a leading tab -- issue #1134.
+      // The split branch below never showed it because it recomputes a real
+      // number, and a positive string opens with no character the guard looks
+      // for, which is why the reporter's only clean rows were splits and one
+      // credit.
+      const apiShapedTransactions = [
+        { id: 'tx-1', transactionDate: '2026-08-12', amount: '-67.9900', status: 'UNRECONCILED', payee: { id: 'p1', name: 'AliExpress' }, payeeName: 'AliExpress', category: { id: 'c1', name: 'Sporting Goods' }, account: { id: 'acc-1', name: 'WS VISA' }, description: 'TPU tubes x6', tags: [], currencyCode: 'CAD', isTransfer: false },
+        { id: 'tx-2', transactionDate: '2026-08-06', amount: '38.5700', status: 'UNRECONCILED', payee: { id: 'p2', name: 'WealthSimple' }, payeeName: 'WealthSimple', category: { id: 'c2', name: 'Cashback' }, account: { id: 'acc-1', name: 'WS VISA' }, description: 'From credit card', tags: [], currencyCode: 'CAD', isTransfer: false },
+      ];
+
+      mockGetAll.mockResolvedValue({
+        data: apiShapedTransactions,
+        pagination: { page: 1, totalPages: 1, total: 2 },
+        startingBalance: 5000,
+      });
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('tx-count')).toHaveTextContent('2 transactions');
+      });
+
+      fireEvent.click(screen.getByTestId('export-btn'));
+
+      await waitFor(() => {
+        expect(mockExportToCsv).toHaveBeenCalledTimes(1);
+      });
+
+      const [, , rows] = mockExportToCsv.mock.calls[0];
+      expect(rows[0][6]).toBe(-67.99);
+      expect(rows[1][6]).toBe(38.57);
+      expect(typeof rows[0][6]).toBe('number');
+      expect(typeof rows[1][6]).toBe('number');
+    });
+
     it('exports filtered split amount when only some splits match the filter', async () => {
       const splitTransaction = [
         {
