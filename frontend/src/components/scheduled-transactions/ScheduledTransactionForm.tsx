@@ -729,6 +729,9 @@ export function ScheduledTransactionForm({
     setInvestmentTotalValue('');
     setMarketPrice(null);
     setLastSeenMarketPrice(null);
+    // Clear the previous security's "no history" verdict too, or it would flash
+    // the hint against the newly chosen security until the new fetch resolves.
+    setPriceHistoryEmpty(false);
   };
 
   // Load accounts, categories, active payees on mount

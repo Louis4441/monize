@@ -470,6 +470,10 @@ export function PostTransactionDialog({
         setInvestmentTotalValue('');
       }
       setMarketPrice(null);
+      // This dialog stays mounted across open/close, so reset the previous
+      // occurrence's "no history" verdict here too -- otherwise reopening for a
+      // different security paints the hint one frame before the fetch resets it.
+      setPriceHistoryEmpty(false);
     }
   }, [isOpen, scheduledTransaction]);
 
@@ -519,6 +523,9 @@ export function PostTransactionDialog({
   //   editor enforces on its side).
   // - `userEditedInvestment`: a value the user typed after the dialog opened but
   //   before this fetch resolved is theirs, not something to clobber on arrival.
+  const investmentSign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
+  const investmentCommission = Number(scheduledTransaction.investmentCommission ?? 0);
+
   const [lastSeenMarketPrice, setLastSeenMarketPrice] = useState<number | null>(null);
   if (isOpen && marketPrice !== lastSeenMarketPrice) {
     setLastSeenMarketPrice(marketPrice);
@@ -531,20 +538,15 @@ export function PostTransactionDialog({
     ) {
       const rounded = roundPrice(marketPrice);
       setInvestmentPrice(rounded);
-      const commission = Number(scheduledTransaction.investmentCommission ?? 0);
-      const sign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
       if (investmentTotalValue !== '' && Number(investmentTotalValue) > 0) {
         // Preserve the scheduled total -- adjust quantity to the new price.
-        setInvestmentQuantity(quantityFromTotal(Number(investmentTotalValue), rounded, sign, commission));
+        setInvestmentQuantity(quantityFromTotal(Number(investmentTotalValue), rounded, investmentSign, investmentCommission));
       } else if (investmentQuantity !== '' && Number(investmentQuantity) > 0) {
         // No scheduled total to preserve -- fall back to deriving it from qty.
-        setInvestmentTotalValue(totalFromQuantity(Number(investmentQuantity), rounded, sign, commission));
+        setInvestmentTotalValue(totalFromQuantity(Number(investmentQuantity), rounded, investmentSign, investmentCommission));
       }
     }
   }
-
-  const investmentSign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
-  const investmentCommission = Number(scheduledTransaction.investmentCommission ?? 0);
 
   // A close rounded for display (6dp). marketPrice is already null unless it is a
   // usable positive number (usableClose rejects zero/negative/NaN before it is
