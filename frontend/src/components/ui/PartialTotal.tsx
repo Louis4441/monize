@@ -35,6 +35,15 @@ export function PartialTotal({ children, total, displayCurrency }: PartialTotalP
     return <>{children}</>;
   }
 
+  // `excludedCount` is every component left out, by any cause; `missingCurrencies`
+  // names the subset whose cause was a missing rate. The message keeps the two as
+  // independent clauses ("N amounts excluded" then "no rate for these currencies")
+  // rather than claiming all N lacked a rate -- a total can mix a missing-rate
+  // account with a value-unknown one (a failed brokerage valuation), and only the
+  // former has a currency to name. Splitting the count by cause is deliberately
+  // not modelled here: the figure and the marker are correct, and a per-cause
+  // count would thread two extra numbers through every ConvertedTotal producer for
+  // a wording nuance.
   const explanation =
     total.missingCurrencies.length > 0
       ? t('partialTotal.explanation', {
