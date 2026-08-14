@@ -231,7 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "（部分合计）",
-    "explanation": "部分合计：{count, plural, one {# 笔金额} other {# 笔金额}}因 {currencies} 没有汇率而无法换算为 {displayCurrency}。所示数字不包含这些金额。",
+    "explanation": "部分合计：有 {count, plural, other {# 笔金额}} 无法计入，因此所示数字已将其排除。没有 {currencies} 兑 {displayCurrency} 的汇率。",
     "explanationExcluded": "部分合计：有 {count, plural, other {# 笔金额}} 无法计算，因此所示数字已将其排除。"
   }
 }

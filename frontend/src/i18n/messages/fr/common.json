@@ -231,7 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(total partiel)",
-    "explanation": "Total partiel : {count, plural, one {# montant n'a pas pu} other {# montants n'ont pas pu}} être converti(s) en {displayCurrency}, aucun taux n'étant disponible pour {currencies}. Le chiffre affiché les exclut.",
+    "explanation": "Total partiel : {count, plural, one {# montant n’a pas pu être inclus} other {# montants n’ont pas pu être inclus}}, la valeur affichée les exclut donc. Aucun taux vers {displayCurrency} n’est disponible pour {currencies}.",
     "explanationExcluded": "Total partiel : {count, plural, one {# montant n’a pas pu être calculé} other {# montants n’ont pas pu être calculés}}, la valeur affichée les exclut donc."
   }
 }

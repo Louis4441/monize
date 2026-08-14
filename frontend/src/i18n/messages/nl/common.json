@@ -231,7 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(deeltotaal)",
-    "explanation": "Deeltotaal: {count, plural, one {# bedrag kon} other {# bedragen konden}} niet worden omgerekend naar {displayCurrency} omdat er geen koers beschikbaar is voor {currencies}. Het getoonde cijfer laat ze buiten beschouwing.",
+    "explanation": "Deeltotaal: {count, plural, one {# bedrag} other {# bedragen}} konden niet worden meegeteld, dus het weergegeven bedrag sluit ze uit. Er is geen koers naar {displayCurrency} beschikbaar voor {currencies}.",
     "explanationExcluded": "Deeltotaal: {count, plural, one {# bedrag} other {# bedragen}} konden niet worden berekend, dus het weergegeven bedrag sluit ze uit."
   }
 }

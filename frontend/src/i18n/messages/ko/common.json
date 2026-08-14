@@ -231,7 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(부분 합계)",
-    "explanation": "부분 합계: {count, plural, one {#개 금액} other {#개 금액}}을(를) {displayCurrency}(으)로 환산할 수 없었습니다({currencies} 환율 없음). 표시된 수치는 이를 제외합니다.",
+    "explanation": "부분 합계: {count, plural, other {# 개의 금액}}을(를) 포함할 수 없어 표시된 수치에서 제외했습니다. {currencies}에 대한 {displayCurrency} 환율이 없습니다.",
     "explanationExcluded": "부분 합계: {count, plural, other {# 개의 금액}}을(를) 계산할 수 없어 표시된 수치에서 제외했습니다."
   }
 }
