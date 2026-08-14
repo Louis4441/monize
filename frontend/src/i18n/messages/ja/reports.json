@@ -957,8 +957,7 @@
     "tooltipRow10th": "10パーセンタイル",
     "tooltipRecurring": "定期 · {startYear}〜{endYear}年",
     "tooltipRecurringOpen": "定期 · {startYear}年以降",
-    "tooltipInflated": "（インフレ調整済み）",
-    "currentBalanceUnavailable": "現在、口座を評価できないため、シミュレーションを現在残高から開始できません。再試行するか、「現在残高を使用」をオフにして開始値を入力してください。"
+    "tooltipInflated": "（インフレ調整済み）"
   },
   "monteCarloResults": {
     "colYear": "年",

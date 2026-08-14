@@ -957,8 +957,7 @@
     "tooltipRow10th": "Phân vị 10",
     "tooltipRecurring": "Định kỳ · năm {startYear}–{endYear}",
     "tooltipRecurringOpen": "Định kỳ · năm {startYear}+",
-    "tooltipInflated": " (đã điều chỉnh lạm phát)",
-    "currentBalanceUnavailable": "Hiện không thể định giá các tài khoản của bạn, nên mô phỏng không thể bắt đầu từ số dư hiện tại. Thử lại, hoặc tắt “Dùng số dư hiện tại” và nhập một giá trị khởi đầu."
+    "tooltipInflated": " (đã điều chỉnh lạm phát)"
   },
   "monteCarloResults": {
     "colYear": "Năm",

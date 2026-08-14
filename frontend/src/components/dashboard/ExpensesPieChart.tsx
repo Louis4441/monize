@@ -93,7 +93,14 @@ export function ExpensesPieChart({
       // net-credit filter regardless, so naming its currency here would warn
       // about a currency that has no expenses.
       if (convertedTx === null) {
-        const incomeOnly = !tx.isSplit && tx.category?.isIncome === true;
+        // A transaction that would not land in the expense breakdown even with a
+        // rate does not make the expense total partial: an income-category
+        // transaction, or -- by the chart's own sign rule -- an uncategorized
+        // positive one, both net credit and are dropped regardless.
+        const uncategorized = !tx.categoryId || !tx.category;
+        const incomeOnly =
+          !tx.isSplit &&
+          (tx.category?.isIncome === true || (uncategorized && txAmount > 0));
         if (!incomeOnly) {
           missingCurrencies.add(tx.currencyCode);
           excludedCount += 1;

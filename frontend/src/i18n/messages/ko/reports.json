@@ -957,8 +957,7 @@
     "tooltipRow10th": "10번째 백분위",
     "tooltipRecurring": "반복 · {startYear}~{endYear}년",
     "tooltipRecurringOpen": "반복 · {startYear}년+",
-    "tooltipInflated": " (인플레이션 적용)",
-    "currentBalanceUnavailable": "지금은 계좌를 평가할 수 없어 시뮬레이션을 현재 잔액에서 시작할 수 없습니다. 다시 시도하거나 “현재 잔액 사용”을 끄고 시작 값을 입력하세요."
+    "tooltipInflated": " (인플레이션 적용)"
   },
   "monteCarloResults": {
     "colYear": "연도",

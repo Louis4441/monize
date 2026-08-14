@@ -957,8 +957,7 @@
     "tooltipRow10th": "[XX-10th percentile-XX]",
     "tooltipRecurring": "[XX-Recurring · year {startYear}–{endYear}-XX]",
     "tooltipRecurringOpen": "[XX-Recurring · year {startYear}+-XX]",
-    "tooltipInflated": "[XX- (inflated)-XX]",
-    "currentBalanceUnavailable": "[XX-Your accounts could not be valued right now, so a simulation cannot start from the current balance. Retry, or turn off “Use current balance” and enter a starting value.-XX]"
+    "tooltipInflated": "[XX- (inflated)-XX]"
   },
   "monteCarloResults": {
     "colYear": "[XX-Year-XX]",

@@ -302,7 +302,10 @@ export function buildForecast(
   const conv = (amount: number, acctId: string): number => {
     if (!convertAmount) return amount;
     const currency = accountCurrencyMap.get(acctId);
-    if (!currency) return amount;
+    // The account is a target account (transactions are filtered to those), so
+    // its currency is always known. Defensive only: never add a raw foreign
+    // amount to the running balance under the display currency.
+    if (!currency) return 0;
     const converted = convertAmount(amount, currency);
     if (converted === null) {
       missingRateCurrencies.add(currency);
@@ -325,7 +328,10 @@ export function buildForecast(
   // For a specific account, include transfers where this account is the destination
   // (transferAccountId) since those represent money coming IN to this account.
   const relevantTransactions = accountId === 'all'
-    ? transactions.filter(t => t.isActive && !isTransfer(t))
+    ? // Only target (non-closed) accounts: a schedule on a closed account is not
+      // part of this forecast, and its currency is not in the map, so including
+      // it would add an unconverted foreign amount to the running balance.
+      transactions.filter(t => t.isActive && !isTransfer(t) && targetAccountIds.has(t.accountId))
     : transactions.filter(t => t.isActive && (t.accountId === accountId || (isTransfer(t) && t.transferAccountId === accountId)));
 
   // Track which transactions are inbound transfers (destination account matches)

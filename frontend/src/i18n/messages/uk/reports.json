@@ -957,8 +957,7 @@
     "tooltipRow10th": "10-й перцентиль",
     "tooltipRecurring": "Регулярний · рік {startYear}–{endYear}",
     "tooltipRecurringOpen": "Регулярний · рік {startYear}+",
-    "tooltipInflated": " (індексовано)",
-    "currentBalanceUnavailable": "Не вдалося оцінити ваші рахунки просто зараз, тому симуляція не може початися з поточного балансу. Повторіть спробу або вимкніть «Використовувати поточний баланс» і введіть початкове значення."
+    "tooltipInflated": " (індексовано)"
   },
   "monteCarloResults": {
     "colYear": "Рік",

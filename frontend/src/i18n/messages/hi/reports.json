@@ -957,8 +957,7 @@
     "tooltipRow10th": "10वाँ प्रतिशतक",
     "tooltipRecurring": "आवर्ती · वर्ष {startYear}–{endYear}",
     "tooltipRecurringOpen": "आवर्ती · वर्ष {startYear}+",
-    "tooltipInflated": " (मुद्रास्फीति-समायोजित)",
-    "currentBalanceUnavailable": "आपके खातों का मूल्यांकन अभी नहीं हो सका, इसलिए सिमुलेशन वर्तमान शेष से शुरू नहीं हो सकता। पुनः प्रयास करें, या “वर्तमान शेष का उपयोग करें” बंद करके एक प्रारंभिक मान दर्ज करें।"
+    "tooltipInflated": " (मुद्रास्फीति-समायोजित)"
   },
   "monteCarloResults": {
     "colYear": "वर्ष",

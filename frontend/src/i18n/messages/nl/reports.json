@@ -957,8 +957,7 @@
     "tooltipRow10th": "10e percentiel",
     "tooltipRecurring": "Terugkerend · jaar {startYear}–{endYear}",
     "tooltipRecurringOpen": "Terugkerend · jaar {startYear}+",
-    "tooltipInflated": " (inflatiegecorrigeerd)",
-    "currentBalanceUnavailable": "Uw rekeningen konden op dit moment niet worden gewaardeerd, dus de simulatie kan niet starten vanaf het huidige saldo. Probeer opnieuw, of zet „Huidig saldo gebruiken” uit en voer een startwaarde in."
+    "tooltipInflated": " (inflatiegecorrigeerd)"
   },
   "monteCarloResults": {
     "colYear": "Jaar",

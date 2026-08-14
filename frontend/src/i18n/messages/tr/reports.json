@@ -957,8 +957,7 @@
     "tooltipRow10th": "10. yüzdelik",
     "tooltipRecurring": "Tekrarlayan · {startYear}-{endYear}. yıl",
     "tooltipRecurringOpen": "Tekrarlayan · {startYear}+. yıl",
-    "tooltipInflated": " (enflasyona göre artırılmış)",
-    "currentBalanceUnavailable": "Hesaplarınız şu anda değerlenemedi; simülasyon mevcut bakiyeden başlayamıyor. Yeniden deneyin veya “Mevcut bakiyeyi kullan” seçeneğini kapatıp bir başlangıç değeri girin."
+    "tooltipInflated": " (enflasyona göre artırılmış)"
   },
   "monteCarloResults": {
     "colYear": "Yıl",

@@ -957,8 +957,7 @@
     "tooltipRow10th": "10-й процентиль",
     "tooltipRecurring": "Регулярный · год {startYear}–{endYear}",
     "tooltipRecurringOpen": "Регулярный · год {startYear}+",
-    "tooltipInflated": " (с учётом инфляции)",
-    "currentBalanceUnavailable": "Не удалось оценить ваши счета прямо сейчас, поэтому симуляция не может начаться с текущего баланса. Повторите попытку или отключите «Использовать текущий баланс» и введите начальное значение."
+    "tooltipInflated": " (с учётом инфляции)"
   },
   "monteCarloResults": {
     "colYear": "Год",

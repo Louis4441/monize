@@ -56,9 +56,15 @@ export function AccountBalancesReport() {
     async () => {
       const [data, portfolio] = await Promise.all([
         accountsApi.getAll(),
-        investmentsApi.getPortfolioSummary().catch(() => null),
+        // A failed request is not an empty portfolio: kept apart so a brokerage
+        // is excluded (unknown) only on failure, not treated as unknown when the
+        // summary resolves empty -- matching the Accounts page.
+        investmentsApi
+          .getPortfolioSummary()
+          .then((summary) => ({ ok: true as const, summary }))
+          .catch(() => ({ ok: false as const, summary: null })),
       ]);
-      return { accounts: data, portfolioSummary: portfolio };
+      return { accounts: data, portfolioSummary: portfolio.summary, portfolioFailed: !portfolio.ok };
     },
     [],
   );
@@ -68,6 +74,7 @@ export function AccountBalancesReport() {
     () => response?.portfolioSummary ?? null,
     [response],
   );
+  const portfolioFailed = response?.portfolioFailed ?? false;
 
   // Build a map of brokerage account ID -> market value of holdings only.
   // Cash balance is tracked separately via the linked INVESTMENT_CASH account
@@ -152,7 +159,7 @@ export function AccountBalancesReport() {
     let excludedCount = 0;
     filteredAccounts.forEach((acc) => {
       const isBrokerage = acc.accountSubType === 'INVESTMENT_BROKERAGE';
-      if (isBrokerage && (!portfolioSummary || (unpricedHoldingCounts.get(acc.id) ?? 0) > 0)) {
+      if (isBrokerage && (portfolioFailed || (unpricedHoldingCounts.get(acc.id) ?? 0) > 0)) {
         // Its market value is unknown (valuation failed) or a subtotal (unpriced
         // holdings), so it is not summed as a measured number.
         excludedCount += 1;
@@ -182,7 +189,7 @@ export function AccountBalancesReport() {
       missingCurrencies: [...missing],
       excludedCount,
     };
-  }, [filteredAccounts, brokerageMarketValues, unpricedHoldingCounts, portfolioSummary, convertToDefault]);
+  }, [filteredAccounts, brokerageMarketValues, unpricedHoldingCounts, portfolioFailed, convertToDefault]);
 
   // The partial-total marker the three summary cards share: any account left out
   // is left out of every one of assets/liabilities/net worth.
@@ -493,7 +500,7 @@ export function AccountBalancesReport() {
             );
             const isUnknownBrokerage = (acc: Account) =>
               acc.accountSubType === 'INVESTMENT_BROKERAGE' &&
-              (!portfolioSummary || (unpricedHoldingCounts.get(acc.id) ?? 0) > 0);
+              (portfolioFailed || (unpricedHoldingCounts.get(acc.id) ?? 0) > 0);
             const knownMembers = members.filter((acc) => !isUnknownBrokerage(acc));
             const unknownMembers = members.length - knownMembers.length;
             const knownTotal = sumConverted(

@@ -957,8 +957,7 @@
     "tooltipRow10th": "Percentil 10",
     "tooltipRecurring": "Recurrente · año {startYear}–{endYear}",
     "tooltipRecurringOpen": "Recurrente · año {startYear}+",
-    "tooltipInflated": " (ajustado por inflación)",
-    "currentBalanceUnavailable": "Tus cuentas no pudieron valorarse en este momento, así que la simulación no puede partir del saldo actual. Reintenta, o desactiva “Usar saldo actual” e introduce un valor inicial."
+    "tooltipInflated": " (ajustado por inflación)"
   },
   "monteCarloResults": {
     "colYear": "Año",

@@ -957,8 +957,7 @@
     "tooltipRow10th": "Persentil ke-10",
     "tooltipRecurring": "Berulang · tahun {startYear}–{endYear}",
     "tooltipRecurringOpen": "Berulang · tahun {startYear}+",
-    "tooltipInflated": " (diinflasikan)",
-    "currentBalanceUnavailable": "Akun Anda tidak dapat dinilai saat ini, jadi simulasi tidak dapat dimulai dari saldo saat ini. Coba lagi, atau matikan “Gunakan saldo saat ini” dan masukkan nilai awal."
+    "tooltipInflated": " (diinflasikan)"
   },
   "monteCarloResults": {
     "colYear": "Tahun",

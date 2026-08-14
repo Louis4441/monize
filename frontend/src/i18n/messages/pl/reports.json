@@ -957,8 +957,7 @@
     "tooltipRow10th": "10. percentyl",
     "tooltipRecurring": "Cykliczny · rok {startYear}–{endYear}",
     "tooltipRecurringOpen": "Cykliczny · rok {startYear}+",
-    "tooltipInflated": " (indeksowane inflacją)",
-    "currentBalanceUnavailable": "Nie udało się teraz wycenić Twoich kont, więc symulacja nie może zacząć od bieżącego salda. Ponów próbę lub wyłącz „Użyj bieżącego salda” i podaj wartość początkową."
+    "tooltipInflated": " (indeksowane inflacją)"
   },
   "monteCarloResults": {
     "colYear": "Rok",

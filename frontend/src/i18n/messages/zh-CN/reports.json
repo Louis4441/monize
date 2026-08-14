@@ -957,8 +957,7 @@
     "tooltipRow10th": "第 10 百分位",
     "tooltipRecurring": "定期 · 第 {startYear}–{endYear} 年",
     "tooltipRecurringOpen": "定期 · 第 {startYear} 年起",
-    "tooltipInflated": "（经通胀调整）",
-    "currentBalanceUnavailable": "目前无法对您的账户估值，因此模拟无法从当前余额开始。请重试，或关闭“使用当前余额”并输入起始值。"
+    "tooltipInflated": "（经通胀调整）"
   },
   "monteCarloResults": {
     "colYear": "年",

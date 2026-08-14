@@ -305,7 +305,10 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
         </button>
       )}
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
-        {totalDue.value > 0 && (
+        {/* Also shown when the value is 0 but items were excluded for want of a
+            rate, so the missing-currency marker still tells the user the total
+            could not be worked out rather than hiding the row entirely. */}
+        {(totalDue.value > 0 || totalDue.excludedCount > 0) && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600 dark:text-gray-400">{t('upcomingBills.totalDue')}</span>
             <span className="font-semibold text-red-600 dark:text-red-400">
@@ -315,7 +318,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
             </span>
           </div>
         )}
-        {totalIncoming.value > 0 && (
+        {(totalIncoming.value > 0 || totalIncoming.excludedCount > 0) && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600 dark:text-gray-400">{t('upcomingBills.totalIncoming')}</span>
             <span className="font-semibold text-green-600 dark:text-green-400">
