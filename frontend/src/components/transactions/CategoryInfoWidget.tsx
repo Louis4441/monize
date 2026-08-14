@@ -282,7 +282,7 @@ export function CategoryInfoWidget({
               total={{
                 value: headlineTotal,
                 missingCurrencies: totals?.missingCurrencies ?? [],
-                excludedCount: totals?.missingCurrencies.length ?? 0,
+                excludedCount: totals?.excludedTransactionCount ?? 0,
               }}
               displayCurrency={currencyStrategy.displayCurrency}
             >
@@ -336,7 +336,7 @@ export function CategoryInfoWidget({
                 total={{
                   value: averageAmount,
                   missingCurrencies: totals?.missingCurrencies ?? [],
-                  excludedCount: totals?.missingCurrencies.length ?? 0,
+                  excludedCount: totals?.excludedTransactionCount ?? 0,
                 }}
                 displayCurrency={currencyStrategy.displayCurrency}
               >

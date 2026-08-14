@@ -172,7 +172,7 @@ export function PayeeInfoWidget({
   // headline is marked partial rather than presented as the complete total.
   const summaryMarker = {
     missingCurrencies: totals?.missingCurrencies ?? [],
-    excludedCount: totals?.missingCurrencies.length ?? 0,
+    excludedCount: totals?.excludedTransactionCount ?? 0,
   };
   // The label map wins over the relation's own name: it carries the parent
   // ("Utilities: Hydro"), and the relation only ever holds the leaf, which is

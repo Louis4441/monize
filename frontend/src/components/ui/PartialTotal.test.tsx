@@ -29,7 +29,7 @@ describe('PartialTotal', () => {
     // The tooltip is exposed via the trigger button's aria-label.
     const explanation = screen.getByRole('button').getAttribute('aria-label') ?? '';
     expect(explanation).toContain('GBP');
-    expect(explanation).toContain('no rate');
+    expect(explanation).toContain('No rate');
   });
 
   it('marks a figure short by an unpriced component that carries no currency', () => {
@@ -46,6 +46,6 @@ describe('PartialTotal', () => {
     expect(screen.getByText('(partial total)')).toBeInTheDocument();
     const explanation = screen.getByRole('button').getAttribute('aria-label') ?? '';
     expect(explanation).toContain('could not be worked out');
-    expect(explanation).not.toContain('no rate');
+    expect(explanation).not.toContain('No rate');
   });
 });

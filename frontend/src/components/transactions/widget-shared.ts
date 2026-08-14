@@ -63,6 +63,12 @@ export function summarizeInDisplayCurrency(
    * actually sums rather than the full count (which includes excluded ones).
    */
   includedTransactionCount: number;
+  /**
+   * Transactions dropped because their currency has no rate. The component count
+   * a partial-total marker reports -- the number of amounts left out, not the
+   * number of distinct currencies.
+   */
+  excludedTransactionCount: number;
 } {
   const buckets = Object.entries(summary.byCurrency ?? {});
   if (buckets.length <= 1) {
@@ -72,6 +78,7 @@ export function summarizeInDisplayCurrency(
       net: summary.netCashFlow,
       missingCurrencies: [],
       includedTransactionCount: summary.transactionCount,
+      excludedTransactionCount: 0,
     };
   }
   // A bucket with no rate is excluded and named, so the caller can label the
@@ -79,12 +86,14 @@ export function summarizeInDisplayCurrency(
   let income = 0;
   let expenses = 0;
   let includedTransactionCount = 0;
+  let excludedTransactionCount = 0;
   const missing = new Set<string>();
   for (const [currency, bucket] of buckets) {
     const bucketIncome = strategy.toDisplay(bucket.totalIncome, currency);
     const bucketExpenses = strategy.toDisplay(bucket.totalExpenses, currency);
     if (bucketIncome === null || bucketExpenses === null) {
       missing.add(currency);
+      excludedTransactionCount += bucket.transactionCount;
       continue;
     }
     income += bucketIncome;
@@ -97,6 +106,7 @@ export function summarizeInDisplayCurrency(
     net: income - expenses,
     missingCurrencies: [...missing],
     includedTransactionCount,
+    excludedTransactionCount,
   };
 }
 

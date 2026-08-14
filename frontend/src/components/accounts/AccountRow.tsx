@@ -463,19 +463,16 @@ export const AccountRow = memo(function AccountRow({
                   })}
                 </div>
               )}
-              {density !== 'dense' && account.currencyCode !== defaultCurrency &&
-                (() => {
-                  // Nothing rather than the unconverted amount under the display
-                  // currency's symbol: a missing rate makes the approximation
-                  // unknown, not zero.
-                  const approx = convertToDefault(combined.combinedValue, account.currencyCode);
-                  if (approx === null) return null;
-                  return (
-                    <div className="text-xs text-gray-400 dark:text-gray-500">
-                      {'≈ '}{formatCurrencyBase(approx, defaultCurrency)}
-                    </div>
-                  );
-                })()}
+              {density !== 'dense' && account.currencyCode !== defaultCurrency && (
+                // Nothing rather than the unconverted amount under the display
+                // currency's symbol: a missing rate makes the approximation
+                // unknown, not zero (ApproxInDefault renders null then).
+                <ApproxInDefault
+                  amount={convertToDefault(combined.combinedValue, account.currencyCode)}
+                  defaultCurrency={defaultCurrency}
+                  format={formatCurrencyBase}
+                />
+              )}
             </>
           )
         ) : account.accountSubType === 'INVESTMENT_BROKERAGE' && brokerageMarketValue !== undefined ? (
