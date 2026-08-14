@@ -231,6 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(total parcial)",
-    "explanation": "Total parcial: {count, plural, one {# valor não pôde} other {# valores não puderam}} ser convertido(s) para {displayCurrency} porque não há taxa disponível para {currencies}. O número mostrado os exclui."
+    "explanation": "Total parcial: {count, plural, one {# valor não pôde} other {# valores não puderam}} ser convertido(s) para {displayCurrency} porque não há taxa disponível para {currencies}. O número mostrado os exclui.",
+    "explanationExcluded": "Total parcial: não foi possível calcular {count, plural, one {# valor} other {# valores}}, portanto o número exibido os exclui."
   }
 }

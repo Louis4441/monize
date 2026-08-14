@@ -142,17 +142,29 @@ export function AccountBalancesReport() {
     let assets = 0;
     let liabilities = 0;
 
-    // An account with no rate to the display currency is excluded and its
-    // currency named, so the headline figures are marked as subtotals rather
+    // A component is left out when its value is not a measured figure: no rate
+    // to the display currency (currency named), a failed portfolio valuation, or
+    // a brokerage holding the server could not price. Each excludes the account
+    // and increments the count, so the headline figures are marked as subtotals
+    // -- matching the account row, which already shows an unknown marker -- rather
     // than under-reporting silently.
     const missing = new Set<string>();
+    let excludedCount = 0;
     filteredAccounts.forEach((acc) => {
-      const rawBalance = acc.accountSubType === 'INVESTMENT_BROKERAGE'
+      const isBrokerage = acc.accountSubType === 'INVESTMENT_BROKERAGE';
+      if (isBrokerage && (!portfolioSummary || (unpricedHoldingCounts.get(acc.id) ?? 0) > 0)) {
+        // Its market value is unknown (valuation failed) or a subtotal (unpriced
+        // holdings), so it is not summed as a measured number.
+        excludedCount += 1;
+        return;
+      }
+      const rawBalance = isBrokerage
         ? (brokerageMarketValues.get(acc.id) ?? 0)
         : (Number(acc.currentBalance) || 0) + (Number(acc.futureTransactionsSum) || 0);
       const convertedBalance = convertToDefault(rawBalance, acc.currencyCode);
       if (convertedBalance === null) {
         missing.add(acc.currencyCode);
+        excludedCount += 1;
         return;
       }
 
@@ -168,14 +180,15 @@ export function AccountBalancesReport() {
       liabilities,
       netWorth: assets - liabilities,
       missingCurrencies: [...missing],
+      excludedCount,
     };
-  }, [filteredAccounts, brokerageMarketValues, convertToDefault]);
+  }, [filteredAccounts, brokerageMarketValues, unpricedHoldingCounts, portfolioSummary, convertToDefault]);
 
-  // The partial-total marker the three summary cards share: an account with no
-  // rate is excluded from every one of assets/liabilities/net worth.
+  // The partial-total marker the three summary cards share: any account left out
+  // is left out of every one of assets/liabilities/net worth.
   const totalsMarker = {
     missingCurrencies: totals.missingCurrencies,
-    excludedCount: totals.missingCurrencies.length,
+    excludedCount: totals.excludedCount,
   };
 
   // Build chart data
@@ -266,7 +279,7 @@ export function AccountBalancesReport() {
     // A missing rate excludes an account from these totals, so the PDF marks
     // them partial too rather than printing a bare figure as the whole.
     const pdfPartialSuffix =
-      totals.missingCurrencies.length > 0 ? ` ${tCommon('partialTotal.srSuffix')}` : '';
+      totals.excludedCount > 0 ? ` ${tCommon('partialTotal.srSuffix')}` : '';
     await exportToPdf({
       title: t('accountBalances.pdfTitle'),
       summaryCards: [

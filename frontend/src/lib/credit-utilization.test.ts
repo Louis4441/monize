@@ -92,6 +92,7 @@ describe('computeCreditTotals', () => {
       available: 1400,
       utilizationPercent: 30,
       missingCurrencies: [],
+      excludedCount: 0,
     });
   });
 
@@ -102,6 +103,7 @@ describe('computeCreditTotals', () => {
       available: 0,
       utilizationPercent: 0,
       missingCurrencies: [],
+      excludedCount: 0,
     });
   });
 
@@ -127,6 +129,7 @@ describe('computeCreditTotals', () => {
     expect(totals.used).toBe(300);
     expect(totals.utilizationPercent).toBe(30);
     expect(totals.missingCurrencies).toEqual(['EUR']);
+    expect(totals.excludedCount).toBe(1);
   });
 
   // Utilisation is a ratio inside one currency, so it needs no rate and stays

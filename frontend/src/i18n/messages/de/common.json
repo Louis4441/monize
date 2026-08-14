@@ -231,6 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(Teilsumme)",
-    "explanation": "Teilsumme: {count, plural, one {# Betrag konnte} other {# Beträge konnten}} nicht nach {displayCurrency} umgerechnet werden, weil für {currencies} kein Kurs verfügbar ist. Die angezeigte Zahl schließt sie aus."
+    "explanation": "Teilsumme: {count, plural, one {# Betrag konnte} other {# Beträge konnten}} nicht nach {displayCurrency} umgerechnet werden, weil für {currencies} kein Kurs verfügbar ist. Die angezeigte Zahl schließt sie aus.",
+    "explanationExcluded": "Teilsumme: {count, plural, one {# Betrag} other {# Beträge}} konnten nicht ermittelt werden, daher schließt der angezeigte Wert sie aus."
   }
 }

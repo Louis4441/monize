@@ -231,6 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(tổng một phần)",
-    "explanation": "Tổng một phần: {count, plural, one {# khoản tiền} other {# khoản tiền}} không thể quy đổi sang {displayCurrency} vì không có tỷ giá cho {currencies}. Con số hiển thị không bao gồm chúng."
+    "explanation": "Tổng một phần: {count, plural, one {# khoản tiền} other {# khoản tiền}} không thể quy đổi sang {displayCurrency} vì không có tỷ giá cho {currencies}. Con số hiển thị không bao gồm chúng.",
+    "explanationExcluded": "Tổng một phần: không thể tính được {count, plural, other {# khoản}}, vì vậy số liệu hiển thị đã loại trừ chúng."
   }
 }

@@ -231,6 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "（部分合計）",
-    "explanation": "部分合計：{count, plural, one {# 件の金額} other {# 件の金額}}を {displayCurrency} に換算できませんでした（{currencies} のレートがないため）。表示中の数値はそれらを除いています。"
+    "explanation": "部分合計：{count, plural, one {# 件の金額} other {# 件の金額}}を {displayCurrency} に換算できませんでした（{currencies} のレートがないため）。表示中の数値はそれらを除いています。",
+    "explanationExcluded": "部分的な合計: {count, plural, other {# 件の金額}}を算出できなかったため、表示されている金額はこれらを除外しています。"
   }
 }

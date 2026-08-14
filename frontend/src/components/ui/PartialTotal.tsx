@@ -27,7 +27,22 @@ interface PartialTotalProps {
 export function PartialTotal({ children, total, displayCurrency }: PartialTotalProps) {
   const t = useTranslations('common');
 
-  if (total.missingCurrencies.length === 0) return <>{children}</>;
+  // A total is a subtotal whenever any component was left out, whether the
+  // reason was a missing rate (named currencies) or a value that could not be
+  // worked out at all (an unpriced holding, which carries no currency). Keying
+  // only off missingCurrencies left the second case rendering as complete.
+  if (total.missingCurrencies.length === 0 && total.excludedCount === 0) {
+    return <>{children}</>;
+  }
+
+  const explanation =
+    total.missingCurrencies.length > 0
+      ? t('partialTotal.explanation', {
+          currencies: total.missingCurrencies.join(', '),
+          displayCurrency,
+          count: total.excludedCount,
+        })
+      : t('partialTotal.explanationExcluded', { count: total.excludedCount });
 
   return (
     <span className="inline-flex items-baseline gap-1">
@@ -36,14 +51,7 @@ export function PartialTotal({ children, total, displayCurrency }: PartialTotalP
         *
       </span>
       <span className="sr-only">{t('partialTotal.srSuffix')}</span>
-      <InfoTooltip
-        placement="top"
-        text={t('partialTotal.explanation', {
-          currencies: total.missingCurrencies.join(', '),
-          displayCurrency,
-          count: total.excludedCount,
-        })}
-      />
+      <InfoTooltip placement="top" text={explanation} />
     </span>
   );
 }

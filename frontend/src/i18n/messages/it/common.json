@@ -231,6 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(totale parziale)",
-    "explanation": "Totale parziale: {count, plural, one {# importo non ha potuto} other {# importi non hanno potuto}} essere convertito in {displayCurrency} perché nessun tasso è disponibile per {currencies}. La cifra mostrata li esclude."
+    "explanation": "Totale parziale: {count, plural, one {# importo non ha potuto} other {# importi non hanno potuto}} essere convertito in {displayCurrency} perché nessun tasso è disponibile per {currencies}. La cifra mostrata li esclude.",
+    "explanationExcluded": "Totale parziale: non è stato possibile calcolare {count, plural, one {# importo} other {# importi}}, quindi la cifra mostrata li esclude."
   }
 }

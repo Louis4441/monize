@@ -231,6 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(total sebagian)",
-    "explanation": "Total sebagian: {count, plural, one {# jumlah} other {# jumlah}} tidak dapat dikonversi ke {displayCurrency} karena tidak ada kurs untuk {currencies}. Angka yang ditampilkan tidak menyertakannya."
+    "explanation": "Total sebagian: {count, plural, one {# jumlah} other {# jumlah}} tidak dapat dikonversi ke {displayCurrency} karena tidak ada kurs untuk {currencies}. Angka yang ditampilkan tidak menyertakannya.",
+    "explanationExcluded": "Total sebagian: {count, plural, other {# jumlah}} tidak dapat dihitung, sehingga angka yang ditampilkan mengecualikannya."
   }
 }

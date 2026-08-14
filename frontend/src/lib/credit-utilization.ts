@@ -50,6 +50,8 @@ export interface CreditUtilizationTotals {
    * accounts.
    */
   missingCurrencies: string[];
+  /** Number of accounts left out of the totals (a component count, not a currency count). */
+  excludedCount: number;
 }
 
 /**
@@ -87,12 +89,14 @@ export function computeCreditTotals(
   // counted as a zero limit and a zero balance -- which would quietly improve
   // the utilisation figure the widget exists to warn about.
   const missing = new Set<string>();
+  let excludedCount = 0;
   let limit = 0;
   let used = 0;
   let available = 0;
   for (const row of rows) {
     if (row.limit === null || row.used === null || row.available === null) {
       missing.add(row.currencyCode);
+      excludedCount += 1;
       continue;
     }
     limit += row.limit;
@@ -105,5 +109,6 @@ export function computeCreditTotals(
     available,
     utilizationPercent: limit > 0 ? (used / limit) * 100 : 0,
     missingCurrencies: [...missing],
+    excludedCount,
   };
 }

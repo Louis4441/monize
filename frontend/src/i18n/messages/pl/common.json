@@ -231,6 +231,7 @@
   },
   "partialTotal": {
     "srSuffix": "(suma częściowa)",
-    "explanation": "Suma częściowa: {count, plural, one {# kwoty nie udało się} few {# kwot nie udało się} many {# kwot nie udało się} other {# kwoty nie udało się}} przeliczyć na {displayCurrency}, bo brak kursu dla {currencies}. Pokazana liczba ich nie obejmuje."
+    "explanation": "Suma częściowa: {count, plural, one {# kwoty nie udało się} few {# kwot nie udało się} many {# kwot nie udało się} other {# kwoty nie udało się}} przeliczyć na {displayCurrency}, bo brak kursu dla {currencies}. Pokazana liczba ich nie obejmuje.",
+    "explanationExcluded": "Suma częściowa: {count, plural, one {# kwoty} few {# kwot} many {# kwot} other {# kwoty}} nie udało się ustalić, więc pokazana liczba ich nie obejmuje."
   }
 }

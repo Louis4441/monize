@@ -168,7 +168,7 @@ export function CreditUtilizationTotalWidget({
             // would have worsened.
             <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
               {tCommon('partialTotal.explanation', {
-                count: totals.missingCurrencies.length,
+                count: totals.excludedCount,
                 displayCurrency,
                 currencies: totals.missingCurrencies.join(', '),
               })}

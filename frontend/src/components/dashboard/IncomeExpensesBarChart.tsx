@@ -129,8 +129,10 @@ export function IncomeExpensesBarChart({
   // split each bucket's activity into income and expenses.
   const breakdown = useMemo(() => {
     const txns = transactions ?? [];
-    // Currencies excluded from the bars for want of a rate.
+    // Currencies excluded from the bars for want of a rate, and how many
+    // individual amounts (a component count, not a currency count) were dropped.
     const missingCurrencies = new Set<string>();
+    let excludedCount = 0;
     const startDate = start ? parseLocalDate(start) : parseLocalDate(end);
     const endDate = parseLocalDate(end);
 
@@ -173,6 +175,7 @@ export function IncomeExpensesBarChart({
         // silently shrink the month.
         if (amount === null) {
           missingCurrencies.add(tx.currencyCode);
+          excludedCount += 1;
           return;
         }
         if (category?.isIncome === true) {
@@ -208,6 +211,7 @@ export function IncomeExpensesBarChart({
         endDate: format(b.bucketEnd, 'yyyy-MM-dd'),
       })),
       missingCurrencies: [...missingCurrencies],
+      excludedCount,
     };
   }, [transactions, start, end, isWeekly, formatDate, formatChartDate, convertToDefault, weekStartsOn]);
 
@@ -215,7 +219,7 @@ export function IncomeExpensesBarChart({
   // The partial-total marker the income/expenses/net figures share.
   const totalsMarker = {
     missingCurrencies: breakdown.missingCurrencies,
-    excludedCount: breakdown.missingCurrencies.length,
+    excludedCount: breakdown.excludedCount,
   };
 
   const barClickedRef = useRef(false);
