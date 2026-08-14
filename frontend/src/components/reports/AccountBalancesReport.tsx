@@ -15,6 +15,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { sumConverted } from '@/lib/currency-total';
 import { PartialTotal } from '@/components/ui/PartialTotal';
+import { sumMoney } from '@/lib/format';
 import { useReportData } from '@/hooks/useReportData';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
@@ -185,7 +186,8 @@ export function AccountBalancesReport() {
     return {
       assets,
       liabilities,
-      netWorth: assets - liabilities,
+      // The difference of two 4dp values is not itself 4dp; round it.
+      netWorth: sumMoney([assets, -liabilities]),
       missingCurrencies: [...missing],
       excludedCount,
     };
@@ -344,7 +346,11 @@ export function AccountBalancesReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.netWorth')}</div>
           <div className={`text-2xl font-bold ${
-            totals.netWorth >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'
+            // A partial net worth has an uncertain sign, so it stays neutral
+            // rather than asserting a blue/orange the subtotal cannot vouch for.
+            totals.excludedCount > 0
+              ? 'text-gray-900 dark:text-gray-100'
+              : totals.netWorth >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'
           }`}>
             <PartialTotal total={{ value: totals.netWorth, ...totalsMarker }} displayCurrency={defaultCurrency}>
               {formatCurrency(totals.netWorth)}

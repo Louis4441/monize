@@ -21,6 +21,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { SummaryCard, SummaryIcons } from '@/components/ui/SummaryCard';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { sumConverted, combineTotals } from '@/lib/currency-total';
+import { sumMoney } from '@/lib/format';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useFormModal } from '@/hooks/useFormModal';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -147,12 +148,15 @@ function AccountsContent() {
       accts: Account[],
       convert: (amount: number, currency: string) => number | null,
     ) => {
-      const known = accts.filter((a) => contributedBalance(a) !== null);
-      const unknownCount = accts.length - known.length;
+      // Compute each contribution once (a brokerage lookup + balance arithmetic)
+      // rather than in both the filter and the amount accessor.
+      const contributions = accts.map((a) => ({ account: a, value: contributedBalance(a) }));
+      const known = contributions.filter((c): c is { account: Account; value: number } => c.value !== null);
+      const unknownCount = contributions.length - known.length;
       const converted = sumConverted(
         known,
-        (a) => contributedBalance(a) as number,
-        (a) => a.currencyCode,
+        (c) => c.value,
+        (c) => c.account.currencyCode,
         convert,
       );
       return { ...converted, excludedCount: converted.excludedCount + unknownCount };
@@ -167,7 +171,9 @@ function AccountsContent() {
     // makes the difference partial too.
     const totalBalance = combineTotals(
       [totalAssets, totalLiabilities],
-      ([a, l]) => a - l,
+      // The difference of two 4dp values is not itself 4dp: round it so the
+      // stored value and the sign test do not carry sub-cent float drift.
+      ([a, l]) => sumMoney([a, -l]),
     );
 
     return {
@@ -210,7 +216,16 @@ function AccountsContent() {
               </PartialTotal>
             }
             icon={SummaryIcons.money}
-            valueColor={summary.totalBalance.value >= 0 ? 'blue' : 'red'}
+            valueColor={
+              // A partial net worth has an uncertain sign -- an excluded account
+              // could flip it -- so it is left neutral rather than asserting a
+              // red/blue the subtotal cannot vouch for.
+              summary.totalBalance.excludedCount > 0
+                ? 'default'
+                : summary.totalBalance.value >= 0
+                  ? 'blue'
+                  : 'red'
+            }
           />
           <SummaryCard
             label={t('page.summary.totalAssets')}

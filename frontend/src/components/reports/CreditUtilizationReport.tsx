@@ -16,6 +16,11 @@ import {
 } from 'recharts';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { accountsApi } from '@/lib/accounts';
+import {
+  computeCreditRows,
+  computeCreditTotals,
+  type CreditUtilizationRow,
+} from '@/lib/credit-utilization';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -53,21 +58,6 @@ function utilizationColour(percent: number): string {
   return chartColors.income;
 }
 
-interface CreditAccountRow {
-  id: string;
-  name: string;
-  accountType: Account['accountType'];
-  currencyCode: string;
-  /**
-   * Amounts in the report's display currency, or `null` when this account's
-   * currency has no rate to it.
-   */
-  limit: number | null;
-  used: number | null;
-  available: number | null;
-  /** Utilization is currency-independent (a ratio of native amounts). */
-  utilizationPercent: number;
-}
 
 /** One slice of the total-utilization donut: drawn vs available credit. */
 interface TotalUtilizationSlice {
@@ -130,26 +120,12 @@ export function CreditUtilizationReport() {
 
   const isConverted = activeAccounts.some((a) => a.currencyCode !== displayCurrency);
 
-  const rows = useMemo<CreditAccountRow[]>(() => {
-    return activeAccounts.map((account) => {
-      const limitNative = Number(account.creditLimit) || 0;
-      // Liability balances are stored negative when money is owed (same
-      // convention as the debt reports); the magnitude is the amount drawn.
-      const usedNative = Math.abs(Number(account.currentBalance) || 0);
-      const availableNative = limitNative - usedNative;
-      const utilizationPercent = limitNative > 0 ? (usedNative / limitNative) * 100 : 0;
-      return {
-        id: account.id,
-        name: account.name,
-        accountType: account.accountType,
-        currencyCode: account.currencyCode,
-        limit: convert(limitNative, account.currencyCode, displayCurrency),
-        used: convert(usedNative, account.currencyCode, displayCurrency),
-        available: convert(availableNative, account.currencyCode, displayCurrency),
-        utilizationPercent,
-      };
-    });
-  }, [activeAccounts, convert, displayCurrency]);
+  // The dashboard credit widgets share these helpers; the report uses the same
+  // ones rather than a second copy of the null-exclusion logic.
+  const rows = useMemo(
+    () => computeCreditRows(activeAccounts, convert, displayCurrency),
+    [activeAccounts, convert, displayCurrency],
+  );
 
   /** A money figure, or a short "no rate" marker in its place. */
   const fmtOrUnknown = (value: number | null) =>
@@ -157,34 +133,7 @@ export function CreditUtilizationReport() {
       ? t('creditUtilization.noRate')
       : formatCurrency(value, displayCurrency);
 
-  const totals = useMemo(() => {
-    // A row with no rate to the display currency is excluded and its currency
-    // named. Counting it as a zero limit with a zero balance would improve the
-    // utilisation figure this report exists to warn about.
-    const missing = new Set<string>();
-    let excludedCount = 0;
-    let limit = 0;
-    let used = 0;
-    let available = 0;
-    for (const r of rows) {
-      if (r.limit === null || r.used === null || r.available === null) {
-        missing.add(r.currencyCode);
-        excludedCount += 1;
-        continue;
-      }
-      limit += r.limit;
-      used += r.used;
-      available += r.available;
-    }
-    return {
-      limit,
-      used,
-      available,
-      missingCurrencies: [...missing],
-      excludedCount,
-      utilizationPercent: limit > 0 ? (used / limit) * 100 : 0,
-    };
-  }, [rows]);
+  const totals = useMemo(() => computeCreditTotals(rows), [rows]);
 
   // The partial-total marker the money summary cards share.
   const totalsMarker = {
@@ -410,7 +359,7 @@ export function CreditUtilizationReport() {
                     <Tooltip
                       content={({ active, payload }) => {
                         if (!active || !payload?.length) return null;
-                        const row = payload[0].payload as CreditAccountRow;
+                        const row = payload[0].payload as CreditUtilizationRow;
                         return (
                           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
                             <p className="font-medium text-gray-900 dark:text-gray-100">{row.name}</p>

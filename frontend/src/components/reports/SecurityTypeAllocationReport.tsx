@@ -188,7 +188,10 @@ export function SecurityTypeAllocationReport() {
   const allocationGaps = useMemo(() => {
     const missing = new Set<string>();
     let excludedCount = 0;
-    for (const h of holdings) {
+    // Iterate the same by-security aggregation the total is built from: a
+    // position summed to a null market value drops as one aggregated holding,
+    // so counting raw lots here would disagree with what actually left the total.
+    for (const h of aggregateHoldingsBySecurity(holdings)) {
       if (h.marketValue === null || h.marketValue === undefined) {
         excludedCount += 1;
         continue;
