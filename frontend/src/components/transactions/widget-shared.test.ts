@@ -41,6 +41,7 @@ describe('summarizeInDisplayCurrency', () => {
       net: -700,
       missingCurrencies: [],
       includedTransactionCount: 20,
+      excludedTransactionCount: 0,
     });
   });
 
@@ -74,5 +75,7 @@ describe('summarizeInDisplayCurrency', () => {
     expect(result.net).toBe(-100);
     expect(result.missingCurrencies).toEqual(['EUR']);
     expect(result.includedTransactionCount).toBe(10);
+    // Five EUR transactions were dropped -- the component count, not one per currency.
+    expect(result.excludedTransactionCount).toBe(5);
   });
 });
