@@ -94,13 +94,15 @@ export function ExpensesPieChart({
       // about a currency that has no expenses.
       if (convertedTx === null) {
         // A transaction that would not land in the expense breakdown even with a
-        // rate does not make the expense total partial: an income-category
-        // transaction, or -- by the chart's own sign rule -- an uncategorized
-        // positive one, both net credit and are dropped regardless.
+        // rate does not make the expense total partial. Only a *positive* amount
+        // on an income category, or an uncategorized positive one, nets credit and
+        // is dropped regardless; a negative amount (a clawback of income) would
+        // become an expense slice, so it still counts as excluded.
         const uncategorized = !tx.categoryId || !tx.category;
         const incomeOnly =
           !tx.isSplit &&
-          (tx.category?.isIncome === true || (uncategorized && txAmount > 0));
+          txAmount > 0 &&
+          (tx.category?.isIncome === true || uncategorized);
         if (!incomeOnly) {
           missingCurrencies.add(tx.currencyCode);
           excludedCount += 1;

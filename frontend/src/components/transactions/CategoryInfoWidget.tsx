@@ -73,6 +73,7 @@ export function CategoryInfoWidget({
   onPayeeClick,
 }: CategoryInfoWidgetProps) {
   const t = useTranslations('transactions');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -166,14 +167,21 @@ export function CategoryInfoWidget({
   // Roll grouped rows (which the backend returns per leaf category) up to
   // this category's direct children; rows for the category itself become a
   // "This category" bucket. Shares are of the summed absolute total.
+  const subcategoryAggregated = useMemo(
+    () => aggregateGroupedTotals(groupedCategories, currencyStrategy),
+    [groupedCategories, currencyStrategy],
+  );
   const subcategoryShares = useMemo(
-    () =>
-      rollupToDirectChildren(
-        aggregateGroupedTotals(groupedCategories, currencyStrategy),
-        categories,
-        category.id,
-      ),
-    [categories, groupedCategories, currencyStrategy, category.id],
+    () => rollupToDirectChildren(subcategoryAggregated, categories, category.id),
+    [subcategoryAggregated, categories, category.id],
+  );
+  // rollupToDirectChildren drops an unconvertible child, so the shares would
+  // otherwise sum to 100% of only the children that converted. Count the dropped
+  // ones (the backend scopes these rows to this category's subtree) to mark the
+  // section partial.
+  const subcategoriesExcluded = useMemo(
+    () => subcategoryAggregated.filter((r) => r.total === null).length,
+    [subcategoryAggregated],
   );
 
   const transactionCount = summary?.transactionCount ?? 0;
@@ -398,6 +406,11 @@ export function CategoryInfoWidget({
               );
             })}
           </ul>
+          {subcategoriesExcluded > 0 && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              {tCommon('partialTotal.explanationExcluded', { count: subcategoriesExcluded })}
+            </p>
+          )}
         </div>
       )}
 
