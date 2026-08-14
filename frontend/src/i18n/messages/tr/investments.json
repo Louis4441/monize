@@ -112,10 +112,8 @@
     "avgCostColumn": "Ort. Maliyet",
     "priceColumn": "Fiyat",
     "costBasisColumn": "Maliyet Esası",
-    "costBasisColumnTooltip": "Adet çarpı hisse başına ortalama maliyet, menkul kıymetin kendi para biriminde. Alış komisyonları ortalama maliyete dahil değildir; bu yüzden bu rakam, komisyonlar dahil işlem geçmişinden yeniden oluşturulan yukarıdaki portföy Maliyet Esasından düşük olabilir.",
     "mktValueColumn": "Piy. Değeri",
     "gainLossColumn": "Kazanç/Kayıp",
-    "gainLossColumnTooltip": "Piyasa değeri eksi bu satırdaki maliyet esası; yani aynı komisyonsuz ortalama maliyeti izler.",
     "portfolioPercentColumn": "% Port."
   },
   "investmentValueChart": {

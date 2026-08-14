@@ -112,10 +112,8 @@
     "avgCostColumn": "Durchschn. Kosten",
     "priceColumn": "Kurs",
     "costBasisColumn": "Anschaffungskosten",
-    "costBasisColumnTooltip": "Stückzahl mal durchschnittliche Kosten je Anteil, in der eigenen Währung des Wertpapiers. Kaufprovisionen sind nicht Teil der Durchschnittskosten, daher kann dieser Wert unter den Anschaffungskosten des Portfolios oben liegen, die mit Provisionen aus der Buchungshistorie rekonstruiert werden.",
     "mktValueColumn": "Marktwert",
     "gainLossColumn": "Gewinn/Verlust",
-    "gainLossColumnTooltip": "Marktwert minus die Anschaffungskosten dieser Zeile, folgt also denselben provisionsfreien Durchschnittskosten.",
     "portfolioPercentColumn": "% Portfolio"
   },
   "investmentValueChart": {

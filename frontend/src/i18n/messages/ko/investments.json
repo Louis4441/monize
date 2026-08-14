@@ -112,10 +112,8 @@
     "avgCostColumn": "평균 취득원가",
     "priceColumn": "가격",
     "costBasisColumn": "취득원가",
-    "costBasisColumnTooltip": "수량 × 주당 평균 단가(증권 자체 통화 기준)입니다. 매수 수수료는 평균 단가에 포함되지 않으므로, 이 수치는 수수료를 포함해 거래 내역에서 재구성한 위의 포트폴리오 취득원가보다 낮을 수 있습니다.",
     "mktValueColumn": "시장 가치",
     "gainLossColumn": "이익/손실",
-    "gainLossColumnTooltip": "시장 가치에서 이 행의 취득원가를 뺀 값으로, 같은 수수료 제외 평균 단가를 따릅니다.",
     "portfolioPercentColumn": "포트폴리오 %"
   },
   "investmentValueChart": {

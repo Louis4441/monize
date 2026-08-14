@@ -112,10 +112,8 @@
     "avgCostColumn": "Custo Médio",
     "priceColumn": "Preço",
     "costBasisColumn": "Custo de Aquisição",
-    "costBasisColumnTooltip": "Quantidade vezes o custo médio por ação, na moeda do próprio título. As comissões de compra não fazem parte do custo médio, pelo que este valor pode ser inferior ao Custo de Aquisição da carteira acima, reconstruído do histórico com comissões incluídas.",
     "mktValueColumn": "Val. Mercado",
     "gainLossColumn": "Ganho/Perda",
-    "gainLossColumnTooltip": "Valor de mercado menos o custo de aquisição desta linha, seguindo portanto o mesmo custo médio sem comissões.",
     "portfolioPercentColumn": "% Port."
   },
   "investmentValueChart": {

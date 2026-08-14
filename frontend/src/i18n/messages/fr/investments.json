@@ -112,10 +112,8 @@
     "avgCostColumn": "Coût moyen",
     "priceColumn": "Prix",
     "costBasisColumn": "Prix de revient",
-    "costBasisColumnTooltip": "Quantité multipliée par le coût moyen par action, dans la devise propre du titre. Les commissions d'achat ne font pas partie du coût moyen ; ce chiffre peut donc être inférieur au Prix de revient du portefeuille ci-dessus, reconstruit à partir de votre historique avec commissions incluses.",
     "mktValueColumn": "Val. marché",
     "gainLossColumn": "Gain/Perte",
-    "gainLossColumnTooltip": "Valeur de marché moins le prix de revient de cette ligne ; elle suit donc le même coût moyen hors commissions.",
     "portfolioPercentColumn": "% Port."
   },
   "investmentValueChart": {

@@ -112,10 +112,8 @@
     "avgCostColumn": "Avg Cost",
     "priceColumn": "Price",
     "costBasisColumn": "Cost Basis",
-    "costBasisColumnTooltip": "Quantity times average cost per share, in the security's own currency. Purchase commissions are not part of the average cost, so this figure can be lower than the portfolio Cost Basis above, which is rebuilt from your transaction history with commissions included.",
     "mktValueColumn": "Mkt Value",
     "gainLossColumn": "Gain/Loss",
-    "gainLossColumnTooltip": "Market value minus the cost basis in this row, so it follows the same commission-free average cost.",
     "portfolioPercentColumn": "% Port"
   },
   "investmentValueChart": {

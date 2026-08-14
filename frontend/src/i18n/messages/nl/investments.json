@@ -112,10 +112,8 @@
     "avgCostColumn": "Gemid. kostprijs",
     "priceColumn": "Koers",
     "costBasisColumn": "Kostprijs",
-    "costBasisColumnTooltip": "Aantal maal de gemiddelde kostprijs per aandeel, in de eigen valuta van het effect. Aankoopcommissies maken geen deel uit van de gemiddelde kostprijs, dus dit cijfer kan lager liggen dan de kostprijs van de portefeuille hierboven, die met commissies uit de transactiegeschiedenis wordt gereconstrueerd.",
     "mktValueColumn": "Marktwaarde",
     "gainLossColumn": "Winst/verlies",
-    "gainLossColumnTooltip": "Marktwaarde minus de kostprijs in deze rij, en volgt dus dezelfde commissievrije gemiddelde kostprijs.",
     "portfolioPercentColumn": "% Port"
   },
   "investmentValueChart": {

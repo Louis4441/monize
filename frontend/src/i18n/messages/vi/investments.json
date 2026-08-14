@@ -112,10 +112,8 @@
     "avgCostColumn": "Giá TB",
     "priceColumn": "Giá",
     "costBasisColumn": "Cơ sở chi phí",
-    "costBasisColumnTooltip": "Số lượng nhân chi phí bình quân mỗi cổ phiếu, bằng chính đồng tiền của chứng khoán. Hoa hồng mua không tính vào chi phí bình quân, nên con số này có thể thấp hơn Cơ sở chi phí danh mục ở trên — vốn được dựng lại từ lịch sử giao tác có bao gồm hoa hồng.",
     "mktValueColumn": "Giá trị TT",
     "gainLossColumn": "Lãi/Lỗ",
-    "gainLossColumnTooltip": "Giá trị thị trường trừ cơ sở chi phí ở dòng này, nên theo cùng chi phí bình quân không gồm hoa hồng.",
     "portfolioPercentColumn": "% Danh mục"
   },
   "investmentValueChart": {

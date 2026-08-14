@@ -112,10 +112,8 @@
     "avgCostColumn": "Śr. koszt",
     "priceColumn": "Cena",
     "costBasisColumn": "Koszt nabycia",
-    "costBasisColumnTooltip": "Liczba sztuk razy średni koszt na akcję, w walucie samego papieru wartościowego. Prowizje od zakupów nie wchodzą w średni koszt, więc ta wartość może być niższa niż Koszt nabycia portfela powyżej, odtwarzany z historii transakcji z prowizjami.",
     "mktValueColumn": "Wart. rynk.",
     "gainLossColumn": "Zysk/Strata",
-    "gainLossColumnTooltip": "Wartość rynkowa minus koszt nabycia z tego wiersza, a więc oparta na tym samym średnim koszcie bez prowizji.",
     "portfolioPercentColumn": "% portf."
   },
   "investmentValueChart": {

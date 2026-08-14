@@ -112,10 +112,8 @@
     "avgCostColumn": "Costo Prom.",
     "priceColumn": "Precio",
     "costBasisColumn": "Base de Costo",
-    "costBasisColumnTooltip": "Cantidad por costo promedio por acción, en la propia moneda del valor. Las comisiones de compra no forman parte del costo promedio, así que esta cifra puede ser menor que la Base de Costo del portafolio de arriba, que se reconstruye desde tu historial de transacciones con comisiones incluidas.",
     "mktValueColumn": "Val. Mercado",
     "gainLossColumn": "Ganancia/Pérdida",
-    "gainLossColumnTooltip": "Valor de mercado menos la base de costo de esta fila, así que sigue el mismo costo promedio sin comisiones.",
     "portfolioPercentColumn": "% Cartera"
   },
   "investmentValueChart": {

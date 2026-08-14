@@ -112,10 +112,8 @@
     "avgCostColumn": "平均成本",
     "priceColumn": "价格",
     "costBasisColumn": "成本基础",
-    "costBasisColumnTooltip": "数量乘以每股平均成本，以证券自身货币计。买入佣金不计入平均成本，因此该数字可能低于上面的投资组合成本基础——后者由交易历史重建并包含佣金。",
     "mktValueColumn": "市值",
     "gainLossColumn": "盈亏",
-    "gainLossColumnTooltip": "市值减去本行的成本基础，因此采用同样不含佣金的平均成本。",
     "portfolioPercentColumn": "% 组合"
   },
   "investmentValueChart": {

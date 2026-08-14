@@ -2793,22 +2793,26 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
    * commission-inclusive, this test is the one that has to change, and its
    * failure is the prompt to update the tooltip with it.
    */
-  it("keeps the native basis commission-free while the replayed one includes it", async () => {
-    // A realistic pairing: 10 shares at an average cost of 30 is a 300 native
-    // basis, and the same acquisition with a 5 commission replays to 305. The
-    // gap is the commission, small against the purchase -- not the 620 a 920
-    // replayed basis against a 300 native one would have implied, which no
-    // commission-free average cost can produce.
+  it("reads costBasis from the stored average cost and costBasisAccountCurrency from the replay", async () => {
+    // Two cost-basis figures reach the holdings list from different sources and
+    // the projection must not conflate them. `costBasis` is quantity times the
+    // live `averageCost` -- which includes each purchase's commission
+    // (P5-006/FR-008), so it is not a commission-free figure -- expressed in the
+    // security's own currency. `costBasisAccountCurrency` is the replayed lot
+    // basis in the account's currency. Both include commission; they can still
+    // differ through currency conversion or the replay's lot handling versus a
+    // running average, so the mock gives them distinct values to prove each field
+    // is read from its own source rather than one overwriting the other. gainLoss
+    // follows the native figure.
     const result = await valuation(lot({ costBasis: 305 }));
     const holding = result.holdingsWithValues[0];
 
-    // Stored average cost: 10 x 30. No commission is blended into it.
+    // 10 x stored averageCost 30.
     expect(holding.costBasis).toBe(300);
-    // Replayed: what the acquisitions actually cost, commission included.
+    // The replayed lot basis, surfaced as its own field.
     expect(holding.costBasisAccountCurrency).toBe(305);
-    // And the row's gain follows the native figure, so it differs from the
-    // card's gain (500 - 305 = 195) by the same 5 commission.
-    expect(holding.gainLoss).toBe(200); // 10 x 50 market - 300 native basis
+    // Gain follows the native costBasis: 10 x 50 market - 300.
+    expect(holding.gainLoss).toBe(200);
   });
 });
 

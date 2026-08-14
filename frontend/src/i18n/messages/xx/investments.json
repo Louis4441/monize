@@ -112,10 +112,8 @@
     "avgCostColumn": "[XX-Avg Cost-XX]",
     "priceColumn": "[XX-Price-XX]",
     "costBasisColumn": "[XX-Cost Basis-XX]",
-    "costBasisColumnTooltip": "[XX-Quantity times average cost per share, in the security's own currency. Purchase commissions are not part of the average cost, so this figure can be lower than the portfolio Cost Basis above, which is rebuilt from your transaction history with commissions included.-XX]",
     "mktValueColumn": "[XX-Mkt Value-XX]",
     "gainLossColumn": "[XX-Gain/Loss-XX]",
-    "gainLossColumnTooltip": "[XX-Market value minus the cost basis in this row, so it follows the same commission-free average cost.-XX]",
     "portfolioPercentColumn": "[XX-% Port-XX]"
   },
   "investmentValueChart": {

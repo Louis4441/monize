@@ -112,10 +112,8 @@
     "avgCostColumn": "Biaya Rata-rata",
     "priceColumn": "Harga",
     "costBasisColumn": "Dasar Biaya",
-    "costBasisColumnTooltip": "Jumlah dikali biaya rata-rata per saham, dalam mata uang sekuritas itu sendiri. Komisi pembelian bukan bagian dari biaya rata-rata, jadi angka ini bisa lebih rendah dari Dasar Biaya portofolio di atas, yang direkonstruksi dari riwayat transaksi dengan komisi disertakan.",
     "mktValueColumn": "Nilai Pasar",
     "gainLossColumn": "Untung/Rugi",
-    "gainLossColumnTooltip": "Nilai pasar dikurangi dasar biaya di baris ini, jadi mengikuti biaya rata-rata bebas komisi yang sama.",
     "portfolioPercentColumn": "% Port"
   },
   "investmentValueChart": {

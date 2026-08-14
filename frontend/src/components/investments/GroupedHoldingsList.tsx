@@ -7,7 +7,6 @@ import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { gainLossColor } from '@/lib/format';
-import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 
 interface GroupedHoldingsListProps {
@@ -247,25 +246,13 @@ export function GroupedHoldingsList({
                           {t('groupedHoldings.priceColumn')}
                         </th>
                         <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          <span className="inline-flex items-center justify-end">
-                            {t('groupedHoldings.costBasisColumn')}
-                            <InfoTooltip
-                              placement="top"
-                              text={t('groupedHoldings.costBasisColumnTooltip')}
-                            />
-                          </span>
+                          {t('groupedHoldings.costBasisColumn')}
                         </th>
                         <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.mktValueColumn')}
                         </th>
                         <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          <span className="inline-flex items-center justify-end">
-                            {t('groupedHoldings.gainLossColumn')}
-                            <InfoTooltip
-                              placement="top"
-                              text={t('groupedHoldings.gainLossColumnTooltip')}
-                            />
-                          </span>
+                          {t('groupedHoldings.gainLossColumn')}
                         </th>
                         <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.portfolioPercentColumn')}

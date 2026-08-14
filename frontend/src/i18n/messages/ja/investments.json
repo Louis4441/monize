@@ -112,10 +112,8 @@
     "avgCostColumn": "平均取得原価",
     "priceColumn": "価格",
     "costBasisColumn": "取得原価",
-    "costBasisColumnTooltip": "数量 × 1株あたり平均取得単価（証券自体の通貨建て）です。購入手数料は平均取得単価に含まれないため、この数値は上のポートフォリオの取得原価（手数料込みで取引履歴から再構築）より低くなることがあります。",
     "mktValueColumn": "市場価値",
     "gainLossColumn": "損益",
-    "gainLossColumnTooltip": "時価からこの行の取得原価を差し引いたもので、同じ手数料抜きの平均取得単価に従います。",
     "portfolioPercentColumn": "% ポート"
   },
   "investmentValueChart": {

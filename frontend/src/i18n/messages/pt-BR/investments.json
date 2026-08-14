@@ -112,10 +112,8 @@
     "avgCostColumn": "Custo Médio",
     "priceColumn": "Preço",
     "costBasisColumn": "Custo de Aquisição",
-    "costBasisColumnTooltip": "Quantidade vezes o custo médio por ação, na moeda do próprio ativo. As corretagens de compra não fazem parte do custo médio, então este valor pode ser menor que o Custo de Aquisição da carteira acima, reconstruído do histórico com corretagens incluídas.",
     "mktValueColumn": "Val. Mercado",
     "gainLossColumn": "Ganho/Perda",
-    "gainLossColumnTooltip": "Valor de mercado menos o custo de aquisição desta linha, seguindo portanto o mesmo custo médio sem corretagens.",
     "portfolioPercentColumn": "% Port."
   },
   "investmentValueChart": {
