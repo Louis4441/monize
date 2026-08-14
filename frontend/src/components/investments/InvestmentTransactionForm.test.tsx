@@ -2064,6 +2064,10 @@ describe('InvestmentTransactionForm - extra coverage', () => {
     }
 
     async function submitBuy(buttonName: RegExp) {
+      // sec-1 is USD and a1 is CAD, so this posts a cross-currency cash leg:
+      // give it a resolved market rate, or the form (correctly) refuses to
+      // commit an unpriced trade and the submit never fires.
+      getMarketRateMock.mockReturnValue(1.35);
       await act(async () => {
         fireEvent.change(screen.getByLabelText('Brokerage Account'), {
           target: { value: 'a1' },
