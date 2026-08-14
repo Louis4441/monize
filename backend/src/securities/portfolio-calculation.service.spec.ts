@@ -2961,11 +2961,87 @@ describe("PortfolioCalculationService.calculateTWR", () => {
     expect(await runSplitTwr(10)).toBeCloseTo(0, 5);
   });
 
-  // The mechanical half, kept as a cheap secondary guard: the value invariance
-  // above means the ignored-split regression only moves a TWR at a holdings
-  // sign change, so a source pin catches a re-introduction the arithmetic tests
-  // would sleep through. `investment-replay.guard.spec.ts` only flags a
-  // hand-rolled SPLIT *case*; this walk omitted SPLIT through a comment instead.
+  // Where the ignored split DOES move a single-security TWR: a sale that only
+  // the post-split count can cover. BUY 100 @ 10, 2-for-1 split, SELL 150 @ 10
+  // -- valid against the 200 shares the split produces, an oversell against the
+  // 100 the old walk kept. Prices hold at 10 so no split-date price artifact
+  // enters, then the last close is 12. The correct walk holds 50 shares into
+  // that +20% final period; the old walk drives holdings to -50, whose negative
+  // value trips the `previousValue > 0` gate and drops the final factor, so it
+  // reports 0% and silently loses the gain. This is the arithmetic pin the
+  // value-invariant cases above cannot provide.
+  it("keeps the post-split count through an oversell so the final gain counts", async () => {
+    const txRepo = {
+      find: jest.fn().mockResolvedValue([
+        {
+          id: "b1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.BUY,
+          transactionDate: "2024-01-01",
+          quantity: 100,
+          price: 10,
+          createdAt: new Date("2024-01-01"),
+        },
+        {
+          id: "s1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.SPLIT,
+          transactionDate: "2024-02-01",
+          quantity: 2,
+          createdAt: new Date("2024-02-01"),
+        },
+        {
+          id: "sell1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.SELL,
+          transactionDate: "2024-03-01",
+          quantity: 150,
+          price: 10,
+          createdAt: new Date("2024-03-01"),
+        },
+      ]),
+    };
+    const service = buildService([[InvestmentTransaction, txRepo]], {
+      getLatestRate: jest.fn().mockResolvedValue(1),
+    });
+    jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
+      new Map([
+        [
+          "sec-a",
+          [
+            { date: "2024-01-01", price: 10 },
+            { date: "2024-02-01", price: 10 },
+            { date: "2024-03-01", price: 10 },
+          ],
+        ],
+      ]),
+    );
+    const twr = await service.calculateTWR(
+      userId,
+      ["acct-1"],
+      "USD",
+      new Map(),
+      async () => new Map([["sec-a", 12]]),
+    );
+    // 50 shares x (12/10) over the final period; the old ignored-split walk
+    // reports 0% here.
+    expect(twr).toBeCloseTo(20, 5);
+  });
+
+  // The mechanical half, kept as a cheap secondary guard alongside the oversell
+  // case above: a source pin catches a re-introduction wherever a future price
+  // path happens not to cross a holdings sign change.
+  // `investment-replay.guard.spec.ts` only flags a hand-rolled SPLIT *case*;
+  // this walk omitted SPLIT through a comment instead.
   it("folds the split through the shared reducer rather than deciding inline", () => {
     expect(applyActionToQuantity(100, InvestmentAction.SPLIT, 2)).toBe(200);
 
