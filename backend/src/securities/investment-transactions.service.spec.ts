@@ -4689,6 +4689,19 @@ describe("InvestmentTransactionsService", () => {
         expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
       });
 
+      it("accepts the 4dp amount a real rate produces, not its cents rounding", async () => {
+        // A real FX rate rarely yields a 2dp-clean product, and the amount is
+        // stored as decimal(20,4). 75 x 10 USD = 750, x 1.36523 = 1023.9225 CAD.
+        // The producer must state that 4dp figure; the cents rounding a
+        // 2dp-only producer would send (-1023.92) is off by the sub-cent and
+        // must be refused, or the split's two halves disagree again.
+        exchangeRateService.getRateForDate.mockResolvedValue(1.36523);
+        await expect(runEmbedded(-1023.9225)).resolves.toBeDefined();
+        await expect(runEmbedded(-1023.92)).rejects.toThrow(
+          /converts to -1023.9225 at a rate of 1.36523/,
+        );
+      });
+
       it("has nothing to check when the caller states no split amount", async () => {
         await expect(
           service.createEmbeddedForSplit(

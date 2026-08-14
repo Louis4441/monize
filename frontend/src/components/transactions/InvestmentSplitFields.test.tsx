@@ -209,6 +209,33 @@ describe('InvestmentSplitFields', () => {
       expect(amount).toBe(-136.35);
     });
 
+    it('emits the converted amount at money precision, not cents', async () => {
+      // A real FX rate rarely yields a 2dp-clean product. The amount is stored
+      // as decimal(20,4) and the backend validates it at 4dp (roundMoney) both
+      // in validateSplits and where the embedded investment row is written, so
+      // rounding it to cents here made the two disagree and the commit was
+      // rejected. -101 USD x 1.3652 = -137.8852 CAD: cents would emit -137.89,
+      // which fails the backend's 4dp check.
+      mockGetLatestRates.mockResolvedValue([
+        { fromCurrency: 'USD', toCurrency: 'CAD', rate: 1.3652 },
+      ]);
+      const onChange = vi.fn();
+      await renderFieldsAsync({ value: noStatedRate(), onChange });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText('Exchange rate (CAD per 1 USD)'),
+        ).toHaveValue('1.365200'),
+      );
+
+      await act(async () => {
+        fireEvent.change(screen.getByPlaceholderText('Quantity'), {
+          target: { value: '20' },
+        });
+      });
+      const [, amount] = onChange.mock.calls.at(-1)!;
+      expect(amount).toBe(-137.8852);
+    });
+
     it('says the rate is unknown rather than settling at par', async () => {
       mockGetLatestRates.mockResolvedValue([]);
       await renderFieldsAsync({ value: noStatedRate() });

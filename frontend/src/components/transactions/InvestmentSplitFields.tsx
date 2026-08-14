@@ -12,7 +12,7 @@ import {
 } from '@/lib/investmentCashImpact';
 import {
   FX_RATE_DISPLAY_DECIMALS,
-  roundToCents,
+  roundToDecimals,
   getCurrencySymbol,
 } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -134,8 +134,16 @@ export function InvestmentSplitFields({
     );
     // No rate means the cash impact is unknown, not unconverted: emit 0 so the
     // split cannot balance silently, and the alert below says why.
+    //
+    // Round to 4dp, not cents: money is decimal(20,4) and the backend validates
+    // this amount against `roundMoney(cashImpact * rate)` (4dp) both in
+    // `validateSplits` and where the embedded investment row is written. Cents
+    // (2dp) here disagreed with that 4dp figure for any rate whose product has a
+    // sub-cent digit -- i.e. essentially every real FX rate -- so a legitimate
+    // cross-currency split was rejected at commit. This matches the top-level
+    // investment form, which already converts at 4dp.
     const rate = Number(next.exchangeRate);
-    const amount = rate > 0 ? roundToCents(cashImpact * rate) : 0;
+    const amount = rate > 0 ? roundToDecimals(cashImpact * rate, 4) : 0;
     onChange(next, amount);
   };
 
