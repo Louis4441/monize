@@ -50,6 +50,8 @@ interface ActionSummary {
   action: InvestmentAction;
   count: number;
   totalAmount: number;
+  missingCurrencies: string[];
+  excludedCount: number;
 }
 
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-transactions-accounts';
@@ -173,18 +175,25 @@ export function InvestmentTransactionHistoryReport() {
     filteredTransactions.forEach((tx) => {
       let entry = map.get(tx.action);
       if (!entry) {
-        entry = { action: tx.action, count: 0, totalAmount: 0 };
+        entry = { action: tx.action, count: 0, totalAmount: 0, missingCurrencies: [], excludedCount: 0 };
         map.set(tx.action, entry);
       }
       entry.count += 1;
       const amount = getTxAmount(tx);
       // The row is still counted -- the transaction happened -- but an
-      // unconvertible amount does not join a total in another currency.
-      if (amount !== null) entry.totalAmount += amount;
+      // unconvertible amount does not join a total in another currency; its
+      // currency is named so the action's volume reads as a subtotal.
+      if (amount !== null) {
+        entry.totalAmount += amount;
+      } else {
+        const currency = accountCurrencyMap.get(tx.accountId) || defaultCurrency;
+        if (!entry.missingCurrencies.includes(currency)) entry.missingCurrencies.push(currency);
+        entry.excludedCount += 1;
+      }
     });
 
     return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [filteredTransactions, getTxAmount]);
+  }, [filteredTransactions, getTxAmount, accountCurrencyMap, defaultCurrency]);
 
   const totalAmount = useMemo(
     () =>
@@ -394,7 +403,14 @@ export function InvestmentTransactionHistoryReport() {
                   {summary.count}
                 </span>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  ({fmtValue(summary.totalAmount)})
+                  (
+                  <PartialTotal
+                    total={{ value: summary.totalAmount, missingCurrencies: summary.missingCurrencies, excludedCount: summary.excludedCount }}
+                    displayCurrency={displayCurrency}
+                  >
+                    {fmtValue(summary.totalAmount)}
+                  </PartialTotal>
+                  )
                 </span>
               </div>
             ))}

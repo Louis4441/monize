@@ -25,6 +25,7 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { aggregateHoldingsBySecurity, AggregatedHolding } from '@/lib/aggregate-holdings';
@@ -86,6 +87,7 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-security-type-allocation-accounts';
 
 export function SecurityTypeAllocationReport() {
   const t = useTranslations('reports');
+  const tCommon = useTranslations('common');
   const { formatCurrencyCompact: formatCurrency, formatCurrency: formatCurrencyFull } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -180,6 +182,25 @@ export function SecurityTypeAllocationReport() {
     [allocationData],
   );
 
+  // Holdings the allocation had to leave out (mirrors its exclusion rule): an
+  // unpriced holding, or one with no rate to the display currency. Non-empty
+  // means the total and every percentage are over a subset of the portfolio.
+  const allocationGaps = useMemo(() => {
+    const missing = new Set<string>();
+    let excludedCount = 0;
+    for (const h of holdings) {
+      if (h.marketValue === null || h.marketValue === undefined) {
+        excludedCount += 1;
+        continue;
+      }
+      if (convertToDefault(h.marketValue, h.currencyCode) === null) {
+        missing.add(h.currencyCode);
+        excludedCount += 1;
+      }
+    }
+    return { missingCurrencies: [...missing], excludedCount };
+  }, [holdings, convertToDefault]);
+
   const sortedAllocationData = useMemo(() => {
     const sorted = [...allocationData];
     sorted.sort((a, b) => {
@@ -221,7 +242,7 @@ export function SecurityTypeAllocationReport() {
     await exportToPdf({
       title: t('securityTypeAllocation.pdfTitle'),
       summaryCards: [
-        { label: t('securityTypeAllocation.pdfTotalPortfolio'), value: formatCurrency(totalPortfolioValue, defaultCurrency), color: '#111827' },
+        { label: t('securityTypeAllocation.pdfTotalPortfolio'), value: `${formatCurrency(totalPortfolioValue, defaultCurrency)}${allocationGaps.excludedCount > 0 ? ` ${tCommon('partialTotal.srSuffix')}` : ''}`, color: '#111827' },
         { label: t('securityTypeAllocation.pdfAssetTypes'), value: String(allocationData.length), color: '#111827' },
         { label: t('securityTypeAllocation.pdfTotalHoldings'), value: String(totalHoldings), color: '#111827' },
         { label: t('securityTypeAllocation.pdfLargestType'), value: allocationData[0]?.label || '-', color: '#111827' },
@@ -288,7 +309,12 @@ export function SecurityTypeAllocationReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('securityTypeAllocation.totalPortfolio')}</p>
           <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatCurrency(totalPortfolioValue, defaultCurrency)}
+            <PartialTotal
+              total={{ value: totalPortfolioValue, ...allocationGaps }}
+              displayCurrency={defaultCurrency}
+            >
+              {formatCurrency(totalPortfolioValue, defaultCurrency)}
+            </PartialTotal>
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">

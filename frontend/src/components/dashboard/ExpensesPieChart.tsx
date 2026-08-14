@@ -87,10 +87,17 @@ export function ExpensesPieChart({
       if (txAmount === 0) return;
       const convertedTx = convertToDefault(txAmount, tx.currencyCode);
       // No rate, no slice. A pie slice cannot say "unknown", and counting the
-      // unconverted figure would size it in the wrong currency.
+      // unconverted figure would size it in the wrong currency. Only a
+      // transaction that could land in the expense breakdown makes the total
+      // partial: a non-split income-category transaction is dropped by the
+      // net-credit filter regardless, so naming its currency here would warn
+      // about a currency that has no expenses.
       if (convertedTx === null) {
-        missingCurrencies.add(tx.currencyCode);
-        excludedCount += 1;
+        const incomeOnly = !tx.isSplit && tx.category?.isIncome === true;
+        if (!incomeOnly) {
+          missingCurrencies.add(tx.currencyCode);
+          excludedCount += 1;
+        }
         return;
       }
       const expenseAmount = -convertedTx;

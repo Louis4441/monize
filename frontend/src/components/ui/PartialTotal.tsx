@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import type { ConvertedTotal } from '@/lib/currency-total';
+import { isComplete, type ConvertedTotal } from '@/lib/currency-total';
 
 interface PartialTotalProps {
   /** Formatted subtotal, already rendered in the display currency. */
@@ -29,9 +29,9 @@ export function PartialTotal({ children, total, displayCurrency }: PartialTotalP
 
   // A total is a subtotal whenever any component was left out, whether the
   // reason was a missing rate (named currencies) or a value that could not be
-  // worked out at all (an unpriced holding, which carries no currency). Keying
-  // only off missingCurrencies left the second case rendering as complete.
-  if (total.missingCurrencies.length === 0 && total.excludedCount === 0) {
+  // worked out at all (an unpriced holding, which carries no currency).
+  // `isComplete` is the one definition of "nothing excluded".
+  if (isComplete(total)) {
     return <>{children}</>;
   }
 
