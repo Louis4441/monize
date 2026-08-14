@@ -222,9 +222,23 @@ export function InvestmentSplitFields({
         <div className="space-y-1">
           <NumericInput
             value={effectiveRate}
-            onChange={(v) =>
-              updateField('exchangeRate', v !== undefined && v > 0 ? v : undefined)
-            }
+            onChange={(v) => {
+              const incoming = v !== undefined && v > 0 ? v : undefined;
+              // The field shows 6dp but the market rate is stored at 10dp, so a
+              // blur on the untouched field re-reports the 6dp rounding of it.
+              // Do not turn that into a user-stated override that truncates the
+              // rate: ignore a re-report matching the effective rate at display
+              // precision (only relevant while the rate is market-derived).
+              if (
+                incoming !== undefined &&
+                statedRate === undefined &&
+                roundToDecimals(Number(effectiveRate) || 0, FX_RATE_DISPLAY_DECIMALS) ===
+                  roundToDecimals(incoming, FX_RATE_DISPLAY_DECIMALS)
+              ) {
+                return;
+              }
+              updateField('exchangeRate', incoming);
+            }}
             decimalPlaces={FX_RATE_DISPLAY_DECIMALS}
             min={0}
             disabled={disabled}

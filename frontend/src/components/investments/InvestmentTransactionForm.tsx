@@ -28,7 +28,12 @@ import {
   CreateSecurityData,
   Holding,
 } from '@/types/investment';
-import { getCurrencySymbol, roundToDecimals, roundFxRate } from '@/lib/format';
+import {
+  getCurrencySymbol,
+  roundToDecimals,
+  roundFxRate,
+  FX_RATE_DISPLAY_DECIMALS,
+} from '@/lib/format';
 import { getErrorMessage } from '@/lib/errors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -1356,13 +1361,29 @@ function InvestmentTransactionFormFields({
               label={t('transactionForm.exchangeRate', { from: transactionCurrency })}
               suffix={cashCurrency}
               value={watchedExchangeRate || undefined}
-              onChange={(value) =>
-                setValue('exchangeRate', value ?? 0, {
+              onChange={(value) => {
+                const incoming = value ?? 0;
+                // The field shows FX_RATE_DISPLAY_DECIMALS (6) but the
+                // auto-filled market rate is stored at 10dp (roundFxRate). A
+                // blur on an untouched field hands back the 6dp rounding of that
+                // value, which is not an edit: adopting it would truncate the
+                // stored precision this PR exists to keep and mark the form dirty
+                // for a change the user never made. Ignore a re-report that
+                // matches the stored rate at the field's display precision.
+                if (
+                  roundToDecimals(
+                    watchedExchangeRate ?? 0,
+                    FX_RATE_DISPLAY_DECIMALS,
+                  ) === roundToDecimals(incoming, FX_RATE_DISPLAY_DECIMALS)
+                ) {
+                  return;
+                }
+                setValue('exchangeRate', incoming, {
                   shouldDirty: true,
                   shouldValidate: true,
-                })
-              }
-              decimalPlaces={6}
+                });
+              }}
+              decimalPlaces={FX_RATE_DISPLAY_DECIMALS}
               min={0}
               error={errors.exchangeRate?.message}
             />

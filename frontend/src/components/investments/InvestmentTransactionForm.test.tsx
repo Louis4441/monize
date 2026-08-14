@@ -551,6 +551,46 @@ describe('InvestmentTransactionForm', () => {
       expect(stored.date).toBe('2026-09-09');
     });
 
+    it('keeps the auto-filled 10dp rate when the rate field is only focused and blurred', async () => {
+      // The rate field shows 6dp but the market rate is stored at 10dp
+      // (roundFxRate). Tabbing through it without editing must not truncate the
+      // stored precision, nor dirty the form: NumericInput re-reports the 6dp
+      // rounding on blur, and its own finalValue !== value guard cannot catch it
+      // because the stored value carries more precision than the field displays.
+      getMarketRateMock.mockReturnValue(1.2345678); // more than 6 decimals
+      render(<InvestmentTransactionForm accounts={accounts} />);
+      await waitFor(() => {
+        expect(screen.getByText('Brokerage Account')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brokerage Account'), {
+          target: { value: 'a1' },
+        });
+      });
+      await waitFor(() => {
+        expect(screen.getByLabelText('Security')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Security'), {
+          target: { value: 'sec-1' },
+        });
+      });
+      const rateField = await screen.findByLabelText(/Exchange rate/i);
+      await act(async () => {
+        fireEvent.focus(rateField);
+        fireEvent.blur(rateField);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Create Transaction'));
+      });
+      await waitFor(() => {
+        expect(investmentsApi.createTransaction).toHaveBeenCalled();
+      });
+      const payload = vi.mocked(investmentsApi.createTransaction).mock
+        .calls[0][0] as any;
+      expect(payload.exchangeRate).toBe(1.2345678);
+    });
+
     it('does not write to the regular-transaction date key', async () => {
       // sec-1 is USD and a1 is CAD, so this posts a cross-currency cash leg: give
       // it a rate, or the form (correctly) refuses to commit an unpriced trade.

@@ -236,6 +236,30 @@ describe('InvestmentSplitFields', () => {
       expect(amount).toBe(-137.8852);
     });
 
+    it('does not truncate the market rate when the field is only blurred', async () => {
+      // The field shows 6dp but the market rate is stored at 10dp, so blurring
+      // the untouched field re-reports the 6dp rounding. That is not a user
+      // override: adopting it would replace the fetched rate with a truncated
+      // one (the FX-panel bug frontend/CLAUDE.md warns about). The guard drops a
+      // re-report matching the market rate at display precision, so no onChange
+      // fires from the blur alone.
+      mockGetLatestRates.mockResolvedValue([
+        { fromCurrency: 'USD', toCurrency: 'CAD', rate: 1.2345678 },
+      ]);
+      const onChange = vi.fn();
+      await renderFieldsAsync({ value: noStatedRate(), onChange });
+      const rateField = await screen.findByLabelText(
+        'Exchange rate (CAD per 1 USD)',
+      );
+      await waitFor(() => expect(rateField).toHaveValue('1.234568'));
+      onChange.mockClear();
+      await act(async () => {
+        fireEvent.focus(rateField);
+        fireEvent.blur(rateField);
+      });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
     it('says the rate is unknown rather than settling at par', async () => {
       mockGetLatestRates.mockResolvedValue([]);
       await renderFieldsAsync({ value: noStatedRate() });
