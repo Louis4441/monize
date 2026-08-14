@@ -157,11 +157,20 @@ export function SecurityTypeAllocationReport() {
         percentage: totalValue > 0 ? (data.totalValue / totalValue) * 100 : 0,
         count: data.holdings.length,
         color: getColor(type, colorIndex++),
-        holdings: data.holdings.sort(
-          (a, b) =>
-            (convertToDefault(b.marketValue ?? 0, b.currencyCode) ?? 0) -
-            (convertToDefault(a.marketValue ?? 0, a.currencyCode) ?? 0),
-        ),
+        holdings: [...data.holdings].sort((a, b) => {
+          // An unpriced or unconvertible holding has an unknown value, not a
+          // zero: it sorts after every known one rather than as the smallest.
+          const value = (h: (typeof data.holdings)[number]) =>
+            h.marketValue === null || h.marketValue === undefined
+              ? null
+              : convertToDefault(h.marketValue, h.currencyCode);
+          const va = value(a);
+          const vb = value(b);
+          if (va === null && vb === null) return 0;
+          if (va === null) return 1;
+          if (vb === null) return -1;
+          return vb - va;
+        }),
       }))
       .sort((a, b) => b.totalValue - a.totalValue);
   }, [holdings, convertToDefault]);

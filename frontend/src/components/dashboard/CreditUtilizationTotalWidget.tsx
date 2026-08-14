@@ -106,6 +106,17 @@ export function CreditUtilizationTotalWidget({
     >
       {isLoading ? (
         <div className="flex-1 min-h-[260px] animate-pulse rounded-md bg-gray-100 dark:bg-gray-700/50" />
+      ) : totals.limit === 0 && totals.missingCurrencies.length > 0 ? (
+        // Cards exist but none could be converted -- say the utilisation could
+        // not be worked out and name the currencies, rather than showing the
+        // generic "no cards" empty state as if there were nothing to warn about.
+        <WidgetMessage>
+          {tCommon('partialTotal.explanation', {
+            count: totals.excludedCount,
+            displayCurrency,
+            currencies: totals.missingCurrencies.join(', '),
+          })}
+        </WidgetMessage>
       ) : totals.limit === 0 ? (
         <WidgetMessage>{t('creditUtilizationTotal.empty')}</WidgetMessage>
       ) : (
