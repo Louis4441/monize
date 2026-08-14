@@ -177,11 +177,14 @@ export function CategoryInfoWidget({
   );
   // rollupToDirectChildren drops an unconvertible child, so the shares would
   // otherwise sum to 100% of only the children that converted. Count the dropped
-  // ones (the backend scopes these rows to this category's subtree) to mark the
-  // section partial.
+  // ones -- only those inside this category's subtree, the same rows the rollup
+  // actually consumes, so a stray out-of-subtree row is not miscounted here.
   const subcategoriesExcluded = useMemo(
-    () => subcategoryAggregated.filter((r) => r.total === null).length,
-    [subcategoryAggregated],
+    () =>
+      subcategoryAggregated.filter(
+        (r) => r.total === null && r.id !== null && descendantIds.has(r.id),
+      ).length,
+    [subcategoryAggregated, descendantIds],
   );
 
   const transactionCount = summary?.transactionCount ?? 0;

@@ -96,8 +96,11 @@ export function ExpensesPieChart({
         // A transaction that would not land in the expense breakdown even with a
         // rate does not make the expense total partial. Only a *positive* amount
         // on an income category, or an uncategorized positive one, nets credit and
-        // is dropped regardless; a negative amount (a clawback of income) would
-        // become an expense slice, so it still counts as excluded.
+        // is dropped regardless; a negative amount (a clawback of income) can
+        // become an expense slice, so it still counts as excluded. This is a
+        // per-transaction heuristic and cannot see the category-level net, so it
+        // errs toward marking partial rather than hiding a real gap -- the safe
+        // direction under "a subtotal is not a total".
         const uncategorized = !tx.categoryId || !tx.category;
         const incomeOnly =
           !tx.isSplit &&
