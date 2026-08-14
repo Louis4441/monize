@@ -177,7 +177,7 @@ function AccountsContent() {
       accountCount: countLogicalAccounts(activeAccounts),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts, brokerageMarketValues, portfolioFailed, convertToDefault]);
+  }, [accounts, brokerageMarketValues, unpricedHoldingCounts, portfolioFailed, convertToDefault]);
 
   return (
     <PageLayout>

@@ -100,6 +100,10 @@ export function ExpensesPieChart({
         tx.splits.forEach((split) => {
           const splitAmt = Number(split.amount) || 0;
           if (splitAmt === 0) return;
+          // Splits carry the transaction's currency, which the whole-amount
+          // conversion above already resolved, so this null branch is a defensive
+          // guard rather than a reachable exclusion -- the missing rate is caught
+          // once at the transaction level, not per split.
           const convertedSplit = convertToDefault(splitAmt, tx.currencyCode);
           if (convertedSplit === null) {
             missingCurrencies.add(tx.currencyCode);
