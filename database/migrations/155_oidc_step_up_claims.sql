@@ -11,8 +11,13 @@
 -- NOTHING` is atomic across every replica: whoever inserts the row has the
 -- proof, and everyone else gets zero rows affected and is refused.
 --
--- Rows are self-expiring. `expires_at` is the proof's own `exp`, so a sweep can
--- delete anything past it; nothing reads a row back, only the insert matters.
+-- Rows expire logically at `expires_at` (the proof's own `exp`), but nothing
+-- reaps them on a schedule: each claim opportunistically deletes rows already
+-- past their expiry in the same statement, and under RLS enforcement that sweep
+-- sees only the acting user's rows. Nothing ever reads a row back -- only the
+-- insert's success or conflict matters -- so a lingering expired row is
+-- harmless growth, not a correctness risk. A system-context retention job is
+-- where bounded cleanup would go if that growth ever mattered.
 --
 -- Not user-owned data in the backup sense -- it is transient auth bookkeeping
 -- with a five-minute lifetime, listed in INTENTIONALLY_EXCLUDED_TABLES beside

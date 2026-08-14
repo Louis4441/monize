@@ -330,6 +330,14 @@ describe('CallbackPage', () => {
         expect(mockRouterPush).toHaveBeenCalledWith('/dashboard');
       });
       expect(vi.mocked(stashOidcReauthArtifact)).toHaveBeenCalledWith('artifact-1');
+      // The token lives in the URL fragment; keeping it out of the address bar
+      // (so it never lands in history or a bookmark) is a stated property of
+      // this flow, so assert the clear rather than only stubbing it away.
+      expect(window.history.replaceState).toHaveBeenCalledWith(
+        null,
+        '',
+        '/auth/callback',
+      );
       expect(toast.default.error).not.toHaveBeenCalled();
       expect(toast.default.success).not.toHaveBeenCalled();
     });

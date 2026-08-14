@@ -975,7 +975,9 @@ CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 -- deployment rather than once per Node process: `INSERT ... ON CONFLICT DO
 -- NOTHING` on the primary key is atomic, so of two concurrent restores routed to
 -- two replicas exactly one inserts and the other is refused. Transient auth
--- bookkeeping with a five-minute lifetime; excluded from backups.
+-- bookkeeping with a logical five-minute lifetime (each claim opportunistically
+-- sweeps rows past expiry; nothing reaps them on a schedule); excluded from
+-- backups.
 CREATE TABLE oidc_step_up_claims (
     jti TEXT PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

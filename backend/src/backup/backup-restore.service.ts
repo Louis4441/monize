@@ -202,6 +202,11 @@ export class BackupRestoreService {
       // exactly as the other operation will leave it (audit DR-04-02). Staged
       // attachment bytes are discarded by the `.catch` below, since they were
       // written before the lease and this request no longer owns the restore.
+      // One thing has happened by here, though: the OIDC step-up proof was
+      // already spent in its own committed transaction during
+      // verifyAuthentication above, so a 409 (or any later throw) leaves it
+      // consumed and the user must re-authenticate to retry. That is the safe
+      // direction -- do not "fix" this path by treating it as replay-safe.
       return this.maintenance
         .withMaintenanceLease(userId, "backup restore", () =>
           withPreserveTimestamps(() =>

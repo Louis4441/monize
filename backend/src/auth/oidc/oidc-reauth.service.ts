@@ -418,12 +418,16 @@ export class OidcReauthService {
     if (!payload!.jti) {
       this.reject(userId, purpose, "no jti, so it cannot be spent once");
     }
+    if (typeof payload!.exp !== "number") {
+      // Every artifact we mint carries an `exp` (issue() sets `expiresIn`). A
+      // token without one never expires at the JWT layer, so once the sweep
+      // dropped its claim row it could be re-claimed -- single use for a token
+      // that never dies. Enforce the invariant rather than trust it, in the
+      // same spirit as the "no jti" refusal above.
+      this.reject(userId, purpose, "no exp, so its lifetime is unbounded");
+    }
 
-    const expiresAt = new Date(
-      payload!.exp
-        ? payload!.exp * 1000
-        : Date.now() + OIDC_REAUTH_TTL_SECONDS * 1000,
-    );
+    const expiresAt = new Date(payload!.exp * 1000);
     const claimed = await this.claimJti(
       payload!.jti,
       userId,

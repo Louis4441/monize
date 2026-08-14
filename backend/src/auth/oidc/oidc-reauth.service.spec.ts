@@ -223,6 +223,30 @@ describe("OidcReauthService", () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    it("rejects a well-formed artifact that carries no exp", async () => {
+      // issue() always sets exp; a token without one never expires at the JWT
+      // layer, so after the sweep dropped its claim row it could be re-claimed.
+      // consume refuses it rather than assuming the invariant holds. Signed with
+      // the real secret and every other claim present, so only the missing exp
+      // can be what rejects it.
+      const noExp = jwt.sign(
+        {
+          sub: USER,
+          type: "oidc_reauth",
+          purpose: "delete-account",
+          jti: "no-exp",
+        },
+        SECRET,
+        { algorithm: "HS256" },
+      );
+
+      await expect(
+        service.consume(USER, "delete-account", noExp),
+      ).rejects.toThrow(UnauthorizedException);
+      // And nothing was claimed, so the ledger never saw it.
+      expect(claimStore.rows.size).toBe(0);
+    });
+
     it("rejects a token of another type carrying the right claims", async () => {
       // An ordinary access token has sub and a signature from the same secret.
       // Only `type` distinguishes it, and each type answers a different question.
