@@ -294,7 +294,10 @@ export function AccountBalancesReport() {
       summaryCards: [
         { label: t('accountBalances.totalAssets'), value: `${formatCurrency(totals.assets)}${pdfPartialSuffix}`, color: '#16a34a' },
         { label: t('accountBalances.totalLiabilities'), value: `${formatCurrency(totals.liabilities)}${pdfPartialSuffix}`, color: '#dc2626' },
-        { label: t('accountBalances.netWorth'), value: `${formatCurrency(totals.netWorth)}${pdfPartialSuffix}`, color: totals.netWorth >= 0 ? '#2563eb' : '#ea580c' },
+        // Neutral grey when the net worth is a subtotal: its sign is uncertain,
+        // so the PDF must not assert a blue/orange the on-screen card just
+        // declined to show for the same excluded account.
+        { label: t('accountBalances.netWorth'), value: `${formatCurrency(totals.netWorth)}${pdfPartialSuffix}`, color: totals.excludedCount > 0 ? '#111827' : totals.netWorth >= 0 ? '#2563eb' : '#ea580c' },
       ],
       chartContainer: chartRef.current,
       tableData: { headers, rows },
