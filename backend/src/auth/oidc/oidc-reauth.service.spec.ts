@@ -1,4 +1,6 @@
 import { UnauthorizedException } from "@nestjs/common";
+import * as fs from "fs";
+import * as path from "path";
 import * as jwt from "jsonwebtoken";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 
@@ -79,35 +81,49 @@ describe("OidcReauthService", () => {
   describe("isFreshAuthentication", () => {
     const now = 1_700_000_000_000; // fixed epoch ms, so the cases are exact
     const nowSeconds = Math.floor(now / 1000);
+    const flowStart = nowSeconds - 30; // the flow began 30s ago
 
-    it("accepts an authentication from a moment ago", () => {
-      expect(isFreshAuthentication(nowSeconds - 5, now)).toBe(true);
+    it("accepts an authentication during the flow", () => {
+      expect(isFreshAuthentication(nowSeconds - 5, flowStart, now)).toBe(true);
+      expect(isFreshAuthentication(flowStart, flowStart, now)).toBe(true);
     });
 
-    it("accepts the whole freshness window and nothing past it", () => {
+    it("rejects a warm session whose auth predates the flow, even if recent", () => {
+      // The hole this anchoring closes: an auth from two minutes ago is well
+      // inside any now-relative window, but it happened before this challenge
+      // began, so a non-compliant provider replaying it must not pass.
+      const flowJustStarted = nowSeconds - 10;
       expect(
-        isFreshAuthentication(nowSeconds - OIDC_REAUTH_TTL_SECONDS, now),
-      ).toBe(true);
-      expect(
-        isFreshAuthentication(nowSeconds - OIDC_REAUTH_TTL_SECONDS - 1, now),
+        isFreshAuthentication(nowSeconds - 120, flowJustStarted, now),
       ).toBe(false);
     });
 
+    it("tolerates clock skew either side of the flow start", () => {
+      // Our clock a little ahead of the IdP's can put a genuine fresh auth just
+      // before the recorded flow start; a minute of drift is skew, not a replay.
+      expect(isFreshAuthentication(flowStart - 60, flowStart, now)).toBe(true);
+      expect(isFreshAuthentication(flowStart - 61, flowStart, now)).toBe(false);
+    });
+
     it("rejects a reused SSO session from this morning", () => {
-      expect(isFreshAuthentication(nowSeconds - 6 * 3600, now)).toBe(false);
+      expect(isFreshAuthentication(nowSeconds - 6 * 3600, flowStart, now)).toBe(
+        false,
+      );
     });
 
     it("tolerates small clock skew ahead of us, but not a future claim", () => {
       // The IdP's clock running up to a minute ahead is skew, not an attack.
-      expect(isFreshAuthentication(nowSeconds + 59, now)).toBe(true);
-      expect(isFreshAuthentication(nowSeconds + 61, now)).toBe(false);
+      expect(isFreshAuthentication(nowSeconds + 59, flowStart, now)).toBe(true);
+      expect(isFreshAuthentication(nowSeconds + 61, flowStart, now)).toBe(
+        false,
+      );
     });
 
     it("treats an absent or malformed claim as not fresh", () => {
       // A provider that omits auth_time has not answered the question.
-      expect(isFreshAuthentication(undefined, now)).toBe(false);
-      expect(isFreshAuthentication(Number.NaN, now)).toBe(false);
-      expect(isFreshAuthentication(Infinity, now)).toBe(false);
+      expect(isFreshAuthentication(undefined, flowStart, now)).toBe(false);
+      expect(isFreshAuthentication(Number.NaN, flowStart, now)).toBe(false);
+      expect(isFreshAuthentication(Infinity, flowStart, now)).toBe(false);
     });
   });
 
@@ -367,12 +383,13 @@ describe("OidcReauthService", () => {
     const STATE = "state-of-the-forced-round-trip";
     const OTHER_STATE = "state-of-some-other-round-trip";
 
-    it("round-trips the purpose for the user who started the flow", () => {
+    it("round-trips the purpose and flow start for the user who started the flow", () => {
       const marker = service.createPendingMarker(USER, "restore-backup", STATE);
 
-      expect(service.readPendingMarker(marker, USER, STATE)).toBe(
-        "restore-backup",
-      );
+      expect(service.readPendingMarker(marker, USER, STATE)).toEqual({
+        purpose: "restore-backup",
+        flowStartedAt: expect.any(Number),
+      });
     });
 
     it("refuses a marker started by a different account", () => {
@@ -409,6 +426,31 @@ describe("OidcReauthService", () => {
       );
 
       expect(service.readPendingMarker(marker, USER, STATE)).toBeNull();
+    });
+
+    it("refuses an otherwise-valid marker that carries no iat", () => {
+      // Freshness is anchored to the marker's iat (the flow start). Every marker
+      // we mint has one; a bound marker without it is not ours, so it fails
+      // closed rather than minting with no flow-start reference. Craft one by
+      // reusing a genuine marker's flow-binding hash but signing with no iat.
+      const genuine = service.createPendingMarker(
+        USER,
+        "delete-account",
+        STATE,
+      );
+      const { sth } = jwt.decode(genuine) as { sth: string };
+      const noIat = jwt.sign(
+        {
+          sub: USER,
+          type: "oidc_reauth_pending",
+          purpose: "delete-account",
+          sth,
+        },
+        SECRET,
+        { algorithm: "HS256", noTimestamp: true },
+      );
+
+      expect(service.readPendingMarker(noIat, USER, STATE)).toBeNull();
     });
 
     it("refuses a valid marker when the callback validated no state", () => {
@@ -482,6 +524,45 @@ describe("OidcReauthService", () => {
       };
 
       expect(first.jti).not.toBe(second.jti);
+    });
+  });
+
+  // The single-use guarantee is that two requests racing on one artifact insert
+  // the same jti and exactly one wins. That rests entirely on `ON CONFLICT
+  // (jti)` conflicting against a real UNIQUE/PRIMARY KEY: the in-memory claim
+  // store above models a conflict on jti, but a mock cannot prove the column is
+  // actually unique in the database. If a migration ever dropped the primary
+  // key or changed the conflict target, every unit test here would stay green
+  // while the real INSERT raised "no unique or exclusion constraint matching
+  // the ON CONFLICT" at runtime. So bind the three artifacts -- the service's
+  // conflict target, schema.sql, and migration 155 -- to one column here.
+  describe("ledger conflict target is a real primary key", () => {
+    const root = path.join(__dirname, "../../../..");
+    const read = (rel: string) => fs.readFileSync(path.join(root, rel), "utf8");
+    const tableBlock = (sql: string) =>
+      sql.match(
+        /CREATE TABLE[^;]*?oidc_step_up_claims\s*\(([^;]*?)\)\s*;/is,
+      )?.[1] ?? "";
+    const pkColumn = (sql: string) =>
+      tableBlock(sql).match(/(\w+)\s+[a-z ]*\bprimary key\b/i)?.[1];
+    const serviceSource = read("backend/src/auth/oidc/oidc-reauth.service.ts");
+    const conflictColumn = serviceSource.match(
+      /ON CONFLICT \((\w+)\) DO NOTHING/i,
+    )?.[1];
+
+    it("declares jti PRIMARY KEY in schema.sql", () => {
+      expect(pkColumn(read("database/schema.sql"))).toBe("jti");
+    });
+
+    it("declares jti PRIMARY KEY in migration 155", () => {
+      expect(
+        pkColumn(read("database/migrations/155_oidc_step_up_claims.sql")),
+      ).toBe("jti");
+    });
+
+    it("targets that primary key in the INSERT's ON CONFLICT", () => {
+      expect(conflictColumn).toBe("jti");
+      expect(conflictColumn).toBe(pkColumn(read("database/schema.sql")));
     });
   });
 });

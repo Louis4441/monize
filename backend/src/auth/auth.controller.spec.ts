@@ -2436,7 +2436,7 @@ describe("AuthController", () => {
       expect(cookie[2]).toMatchObject({ httpOnly: true });
       expect(
         reauth.readPendingMarker(cookie[1] as string, REAUTH_USER, "state-1"),
-      ).toBe("restore-backup");
+      ).toMatchObject({ purpose: "restore-backup" });
     });
 
     it("refuses an unknown purpose", async () => {
@@ -2487,7 +2487,7 @@ describe("AuthController", () => {
       );
       expect(
         reauth.readPendingMarker(cookie[1] as string, delegate, "state-1"),
-      ).toBe("delete-data");
+      ).toMatchObject({ purpose: "delete-data" });
     });
 
     it("mints the artifact in the callback and returns it in the fragment", async () => {
@@ -2539,6 +2539,13 @@ describe("AuthController", () => {
       [
         "a reused SSO session (auth_time before the window)",
         Math.floor(Date.now() / 1000) - 3600,
+      ],
+      [
+        // The anchoring fix: this auth_time is only two minutes old -- inside
+        // any now-relative window -- but it predates the flow that just started,
+        // so a provider replaying a warm session's earlier login is refused.
+        "a warm session whose auth_time predates the flow",
+        Math.floor(Date.now() / 1000) - 120,
       ],
       ["a provider that omits auth_time", undefined],
     ])(

@@ -72,8 +72,15 @@ export function isOidcReauthPurpose(
 export const OIDC_REAUTH_TTL_SECONDS = 5 * 60;
 
 /**
- * Whether the provider's asserted authentication time is inside the freshness
- * window.
+ * Clock-drift tolerance, in seconds, applied to `auth_time` comparisons in both
+ * directions -- a genuine fresh authentication can report a timestamp a little
+ * before the flow start (our clock ahead of the IdP's) or a little after `now`.
+ */
+export const OIDC_AUTH_TIME_SKEW_SECONDS = 60;
+
+/**
+ * Whether the provider's asserted authentication happened in response to
+ * *this* re-authentication challenge.
  *
  * The authorization request sends `prompt=login` and `max_age=0`, but a
  * parameter is a request, not a property: providers honour them unevenly, and
@@ -83,17 +90,30 @@ export const OIDC_REAUTH_TTL_SECONDS = 5 * 60;
  * "re-authenticate to continue" step can be satisfied by an unattended browser
  * whose session was simply still warm.
  *
+ * Freshness is anchored to when the flow began -- the pending marker's `iat` --
+ * not to `now`. Anchoring to `now` with a fixed window was the subtle hole: a
+ * user who authenticated a few minutes ago for something unrelated leaves a
+ * warm session, and a non-compliant provider answers our `prompt=login` from it
+ * with that *earlier* login's `auth_time`. That timestamp is recent enough to
+ * sit inside any now-relative window, so the check passed exactly against the
+ * providers it exists to defend against. Requiring `auth_time` at or after the
+ * flow start refuses it: a genuine fresh challenge authenticates during the
+ * round trip, so its `auth_time` cannot precede the flow.
+ *
  * A provider that omits the claim has not answered the question, so an absent
- * or malformed `auth_time` is "not fresh" rather than "fine". A small negative
- * age is clock skew between us and the IdP, not a problem.
+ * or malformed `auth_time` is "not fresh" rather than "fine". A small skew
+ * absorbs clock drift between us and the IdP in both directions.
  */
 export function isFreshAuthentication(
   authTime: number | undefined,
+  flowStartedAt: number,
   now = Date.now(),
 ): boolean {
   if (typeof authTime !== "number" || !Number.isFinite(authTime)) return false;
-  const ageSeconds = Math.floor(now / 1000) - authTime;
-  return ageSeconds >= -60 && ageSeconds <= OIDC_REAUTH_TTL_SECONDS;
+  const nowSeconds = Math.floor(now / 1000);
+  // Implausibly in the future is a provider we cannot reason about: fail closed.
+  if (authTime > nowSeconds + OIDC_AUTH_TIME_SKEW_SECONDS) return false;
+  return authTime >= flowStartedAt - OIDC_AUTH_TIME_SKEW_SECONDS;
 }
 
 const TOKEN_TYPE = "oidc_reauth";
@@ -113,6 +133,8 @@ interface PendingReauthPayload {
   purpose: string;
   /** SHA-256 of the `state` this marker was minted alongside. See `flowHash`. */
   sth?: string;
+  /** Issued-at, seconds. Set by `jwt.sign`; the flow-start anchor for freshness. */
+  iat?: number;
   exp?: number;
 }
 
@@ -203,6 +225,13 @@ export class OidcReauthService {
    * again is only harmless table growth, not a correctness risk. A
    * system-context retention job is the place to bound that growth; this
    * statement is best-effort housekeeping.
+   *
+   * `userId` must be the ambient scoped identity -- `consume` enforces
+   * `payload.sub === userId` and every caller runs it as `req.user.id`, so the
+   * INSERT's `user_id` matches `app_current_user_id()` and the isolation
+   * policy's `WITH CHECK` passes. A caller that ever passed a different id would
+   * trip that check and surface as a 500 rather than the clean 401 path; keep
+   * the two the same principal.
    */
   private async claimJti(
     jti: string,
@@ -268,7 +297,7 @@ export class OidcReauthService {
     marker: string | undefined,
     authenticatedUserId: string,
     state: string | undefined,
-  ): OidcReauthPurpose | null {
+  ): { purpose: OidcReauthPurpose; flowStartedAt: number } | null {
     if (!marker) return null;
     let payload: PendingReauthPayload;
     try {
@@ -305,7 +334,18 @@ export class OidcReauthService {
       );
       return null;
     }
-    return isOidcReauthPurpose(payload.purpose) ? payload.purpose : null;
+    if (!isOidcReauthPurpose(payload.purpose)) return null;
+    if (typeof payload.iat !== "number") {
+      // Every marker we mint carries an `iat` (jwt.sign adds it), and freshness
+      // is anchored to it. A marker without one is not something we issued, so
+      // fail closed rather than mint with no flow-start reference.
+      this.logger.warn(
+        `OIDC re-auth marker rejected for user ${authenticatedUserId}: ` +
+          "no iat, so the flow start is unknown",
+      );
+      return null;
+    }
+    return { purpose: payload.purpose, flowStartedAt: payload.iat };
   }
 
   /**
