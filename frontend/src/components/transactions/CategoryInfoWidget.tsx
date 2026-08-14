@@ -383,7 +383,10 @@ export function CategoryInfoWidget({
           <ul className="space-y-1 text-sm">
             {topPayees.map((row) => {
               const label = row.name ?? t('categoryWidget.noPayee');
-              const amount = formatCurrency(Math.abs(row.total), currencyStrategy.displayCurrency);
+              const amount =
+                row.total === null
+                  ? t('categoryWidget.amountUnavailable')
+                  : formatCurrency(Math.abs(row.total), currencyStrategy.displayCurrency);
               return (
                 <li key={row.id ?? 'no-payee'}>
                   {row.id && onPayeeClick ? (
