@@ -483,15 +483,21 @@ export function AccountBalancesReport() {
             const isLiabilityGroup = LIABILITY_TYPES.includes(type);
             // Group subtotal, summed over each entity's underlying ledgers (a
             // brokerage pair is primary plus its cash sub-account) so the
-            // arithmetic is what it was when the pair was two rows. An account
-            // with no rate is left out and the header marks the figure partial;
-            // an unpriced holding is already excluded from the brokerage market
-            // value, so that gap is surfaced by the row, not by this total.
+            // arithmetic is what it was when the pair was two rows. A brokerage
+            // whose valuation failed or holds an unpriced position is left out by
+            // count -- matching the account row and the summary cards -- and an
+            // account with no rate is left out with its currency named; the
+            // header marks the figure partial either way.
             const members = entries.flatMap((entry) =>
               entry.cash ? [entry.primary, entry.cash] : [entry.primary],
             );
-            const groupTotal = sumConverted(
-              members,
+            const isUnknownBrokerage = (acc: Account) =>
+              acc.accountSubType === 'INVESTMENT_BROKERAGE' &&
+              (!portfolioSummary || (unpricedHoldingCounts.get(acc.id) ?? 0) > 0);
+            const knownMembers = members.filter((acc) => !isUnknownBrokerage(acc));
+            const unknownMembers = members.length - knownMembers.length;
+            const knownTotal = sumConverted(
+              knownMembers,
               (acc) =>
                 acc.accountSubType === 'INVESTMENT_BROKERAGE'
                   ? (brokerageMarketValues.get(acc.id) ?? 0)
@@ -499,6 +505,10 @@ export function AccountBalancesReport() {
               (acc) => acc.currencyCode,
               convertToDefault,
             );
+            const groupTotal = {
+              ...knownTotal,
+              excludedCount: knownTotal.excludedCount + unknownMembers,
+            };
 
             return (
               <div key={type} className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">

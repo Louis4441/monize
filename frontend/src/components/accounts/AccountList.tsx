@@ -103,6 +103,12 @@ interface AccountListProps {
    * than showing the cash it does know.
    */
   unpricedHoldingCounts?: Map<string, number>;
+  /**
+   * True when the portfolio-summary request failed, so every brokerage market
+   * value is unknown rather than a real zero. Group totals exclude and mark
+   * those accounts instead of folding a fabricated 0 in.
+   */
+  portfolioFailed?: boolean;
   defaultCurrency: string;
   /** Returns `null` when no rate for the pair is known. */
   convertToDefault: (value: number, fromCurrency: string) => number | null;
@@ -117,7 +123,7 @@ const EMPTY_CONVERTED_TOTAL: ConvertedTotal = {
   excludedCount: 0,
 };
 
-export function AccountList({ accounts, institutions, brokerageMarketValues, unpricedHoldingCounts, defaultCurrency, convertToDefault, onEdit, onRefresh }: AccountListProps) {
+export function AccountList({ accounts, institutions, brokerageMarketValues, unpricedHoldingCounts, portfolioFailed, defaultCurrency, convertToDefault, onEdit, onRefresh }: AccountListProps) {
   const t = useTranslations('accounts');
   const tc = useTranslations('common');
   const stripAccountName = useMainAccountName();
@@ -431,22 +437,33 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
       const members = groupAccounts.flatMap((logical) =>
         logical.cash ? [logical.primary, logical.cash] : [logical.primary],
       );
-      totals.set(
-        type,
-        sumConverted(
-          members,
-          (account) =>
-            account.accountSubType === 'INVESTMENT_BROKERAGE'
-              ? brokerageMarketValues?.get(account.id) ?? 0
-              : (Number(account.currentBalance) || 0) +
-                (Number(account.futureTransactionsSum) || 0),
-          (account) => account.currencyCode,
-          convertToDefault,
-        ),
+      // A brokerage market value is unknown when the valuation failed, and a
+      // subtotal when some holdings could not be priced. Either way it is not a
+      // measured number and has no currency to name, so the member is left out
+      // by count -- matching the account row's unknown marker -- rather than
+      // folded in as a fabricated 0.
+      const isUnknownBrokerage = (account: Account) =>
+        account.accountSubType === 'INVESTMENT_BROKERAGE' &&
+        (portfolioFailed === true || (unpricedHoldingCounts?.get(account.id) ?? 0) > 0);
+      const known = members.filter((account) => !isUnknownBrokerage(account));
+      const unknownCount = members.length - known.length;
+      const converted = sumConverted(
+        known,
+        (account) =>
+          account.accountSubType === 'INVESTMENT_BROKERAGE'
+            ? brokerageMarketValues?.get(account.id) ?? 0
+            : (Number(account.currentBalance) || 0) +
+              (Number(account.futureTransactionsSum) || 0),
+        (account) => account.currencyCode,
+        convertToDefault,
       );
+      totals.set(type, {
+        ...converted,
+        excludedCount: converted.excludedCount + unknownCount,
+      });
     }
     return totals;
-  }, [groupedAccounts, brokerageMarketValues, convertToDefault]);
+  }, [groupedAccounts, brokerageMarketValues, unpricedHoldingCounts, portfolioFailed, convertToDefault]);
 
   // Flatten groups into a sequence of header / row entries with stable striping
   // indices so AccountRow alternation continues to look right across groups.

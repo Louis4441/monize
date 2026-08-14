@@ -65,8 +65,10 @@ export function ExpensesPieChart({
   const breakdown = useMemo(() => {
     const categoryMap = new Map<string, { id: string; name: string; value: number; colour: string }>();
     // Currencies left out of the breakdown for want of a rate, so the chart can
-    // say the slices do not add up to everything spent.
+    // say the slices do not add up to everything spent, and how many individual
+    // amounts (a component count) were dropped.
     const missingCurrencies = new Set<string>();
+    let excludedCount = 0;
     let uncategorizedTotal = 0;
 
     // Build category lookup
@@ -88,6 +90,7 @@ export function ExpensesPieChart({
       // unconverted figure would size it in the wrong currency.
       if (convertedTx === null) {
         missingCurrencies.add(tx.currencyCode);
+        excludedCount += 1;
         return;
       }
       const expenseAmount = -convertedTx;
@@ -100,6 +103,7 @@ export function ExpensesPieChart({
           const convertedSplit = convertToDefault(splitAmt, tx.currencyCode);
           if (convertedSplit === null) {
             missingCurrencies.add(tx.currencyCode);
+            excludedCount += 1;
             return;
           }
           const splitAmount = -convertedSplit;
@@ -180,7 +184,7 @@ export function ExpensesPieChart({
       }
     });
 
-    return { data, missingCurrencies: [...missingCurrencies] };
+    return { data, missingCurrencies: [...missingCurrencies], excludedCount };
   }, [transactions, categories, convertToDefault, t]);
 
   const chartData = breakdown.data;
@@ -300,7 +304,7 @@ export function ExpensesPieChart({
                 total={{
                   value: totalExpenses,
                   missingCurrencies: breakdown.missingCurrencies,
-                  excludedCount: breakdown.missingCurrencies.length,
+                  excludedCount: breakdown.excludedCount,
                 }}
                 displayCurrency={defaultCurrency}
               >

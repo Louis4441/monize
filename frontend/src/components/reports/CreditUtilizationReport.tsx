@@ -24,6 +24,7 @@ import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { ReportError } from '@/components/reports/ReportError';
 import { useTranslations } from 'next-intl';
@@ -83,6 +84,7 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-credit-utilization-accounts';
 
 export function CreditUtilizationReport() {
   const t = useTranslations('reports');
+  const tCommon = useTranslations('common');
   const { formatCurrency } = useNumberFormat();
   const { convert, defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -160,12 +162,14 @@ export function CreditUtilizationReport() {
     // named. Counting it as a zero limit with a zero balance would improve the
     // utilisation figure this report exists to warn about.
     const missing = new Set<string>();
+    let excludedCount = 0;
     let limit = 0;
     let used = 0;
     let available = 0;
     for (const r of rows) {
       if (r.limit === null || r.used === null || r.available === null) {
         missing.add(r.currencyCode);
+        excludedCount += 1;
         continue;
       }
       limit += r.limit;
@@ -177,9 +181,16 @@ export function CreditUtilizationReport() {
       used,
       available,
       missingCurrencies: [...missing],
+      excludedCount,
       utilizationPercent: limit > 0 ? (used / limit) * 100 : 0,
     };
   }, [rows]);
+
+  // The partial-total marker the money summary cards share.
+  const totalsMarker = {
+    missingCurrencies: totals.missingCurrencies,
+    excludedCount: totals.excludedCount,
+  };
 
   const sortedRows = useMemo(() => {
     const sorted = [...rows];
@@ -230,13 +241,17 @@ export function CreditUtilizationReport() {
       fmtOrUnknown(r.available),
       `${r.utilizationPercent.toFixed(1)}%`,
     ]);
+    // A card with no rate is excluded from the totals, so the PDF marks them
+    // partial rather than printing a subtotal as the whole.
+    const pdfPartialSuffix =
+      totals.excludedCount > 0 ? ` ${tCommon('partialTotal.srSuffix')}` : '';
     await exportToPdf({
       title: t('creditUtilization.pdfTitle'),
       summaryCards: [
-        { label: t('creditUtilization.totalLimit'), value: formatCurrency(totals.limit, displayCurrency), color: '#2563eb' },
-        { label: t('creditUtilization.totalUsed'), value: formatCurrency(totals.used, displayCurrency), color: '#dc2626' },
-        { label: t('creditUtilization.totalAvailable'), value: formatCurrency(totals.available, displayCurrency), color: '#16a34a' },
-        { label: t('creditUtilization.overallUtilization'), value: `${totals.utilizationPercent.toFixed(1)}%`, color: '#ea580c' },
+        { label: t('creditUtilization.totalLimit'), value: `${formatCurrency(totals.limit, displayCurrency)}${pdfPartialSuffix}`, color: '#2563eb' },
+        { label: t('creditUtilization.totalUsed'), value: `${formatCurrency(totals.used, displayCurrency)}${pdfPartialSuffix}`, color: '#dc2626' },
+        { label: t('creditUtilization.totalAvailable'), value: `${formatCurrency(totals.available, displayCurrency)}${pdfPartialSuffix}`, color: '#16a34a' },
+        { label: t('creditUtilization.overallUtilization'), value: `${totals.utilizationPercent.toFixed(1)}%${pdfPartialSuffix}`, color: '#ea580c' },
       ],
       chartContainer: chartRef.current,
       tableData: { headers, rows: exportRows },
@@ -312,33 +327,53 @@ export function CreditUtilizationReport() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards. A card with no rate is excluded from the money totals
+          and the utilisation ratio, so the figures are marked partial rather
+          than reporting an improved ratio the excluded card would have worsened. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('creditUtilization.totalLimit')}</p>
           <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatCurrency(totals.limit, displayCurrency)}
+            <PartialTotal total={{ value: totals.limit, ...totalsMarker }} displayCurrency={displayCurrency}>
+              {formatCurrency(totals.limit, displayCurrency)}
+            </PartialTotal>
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('creditUtilization.totalUsed')}</p>
           <p className="text-lg sm:text-xl font-bold text-red-600 dark:text-red-400">
-            {formatCurrency(totals.used, displayCurrency)}
+            <PartialTotal total={{ value: totals.used, ...totalsMarker }} displayCurrency={displayCurrency}>
+              {formatCurrency(totals.used, displayCurrency)}
+            </PartialTotal>
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('creditUtilization.totalAvailable')}</p>
           <p className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400">
-            {formatCurrency(totals.available, displayCurrency)}
+            <PartialTotal total={{ value: totals.available, ...totalsMarker }} displayCurrency={displayCurrency}>
+              {formatCurrency(totals.available, displayCurrency)}
+            </PartialTotal>
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('creditUtilization.overallUtilization')}</p>
           <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
             {totals.utilizationPercent.toFixed(1)}%
+            {totals.excludedCount > 0 && (
+              <span className="text-amber-600 dark:text-amber-400" aria-hidden="true"> *</span>
+            )}
           </p>
         </div>
       </div>
+      {totals.missingCurrencies.length > 0 && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          {tCommon('partialTotal.explanation', {
+            count: totals.excludedCount,
+            displayCurrency,
+            currencies: totals.missingCurrencies.join(', '),
+          })}
+        </p>
+      )}
 
       {isConverted && (
         <p className="text-xs text-gray-500 dark:text-gray-400">

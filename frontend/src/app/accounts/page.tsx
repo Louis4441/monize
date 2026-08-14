@@ -123,7 +123,10 @@ function AccountsContent() {
    */
   const contributedBalance = (a: Account): number | null => {
     if (a.accountSubType === 'INVESTMENT_BROKERAGE') {
-      if (portfolioFailed) return null;
+      // Unknown when the valuation failed, and a subtotal when some holdings
+      // could not be priced -- either way not a measured figure, matching the
+      // account row, which shows an unknown marker in both cases.
+      if (portfolioFailed || (unpricedHoldingCounts.get(a.id) ?? 0) > 0) return null;
       return brokerageMarketValues.get(a.id) ?? 0;
     }
     return (Number(a.currentBalance) || 0) + (Number(a.futureTransactionsSum) || 0);
@@ -134,26 +137,32 @@ function AccountsContent() {
     const assets = activeAccounts.filter((a) => !LIABILITY_TYPES.includes(a.accountType));
     const liabilities = activeAccounts.filter((a) => LIABILITY_TYPES.includes(a.accountType));
 
-    // An unknown component excludes the account from the subtotal and is
-    // reported, rather than being converted to zero or 1:1.
-    const convertOrUnknown = (amount: number | null, currency: string) =>
-      amount === null ? null : convertToDefault(amount, currency);
+    // An account whose contribution is unknown -- a brokerage whose valuation
+    // failed -- has no currency to name, so it is excluded by count and kept
+    // apart from the missing-rate path (which names currencies). Feeding it
+    // through sumConverted as NaN would misreport it as a missing rate for its
+    // own currency, including a nonsensical "no rate for USD" when that is the
+    // display currency.
+    const sumSide = (
+      accts: Account[],
+      convert: (amount: number, currency: string) => number | null,
+    ) => {
+      const known = accts.filter((a) => contributedBalance(a) !== null);
+      const unknownCount = accts.length - known.length;
+      const converted = sumConverted(
+        known,
+        (a) => contributedBalance(a) as number,
+        (a) => a.currencyCode,
+        convert,
+      );
+      return { ...converted, excludedCount: converted.excludedCount + unknownCount };
+    };
 
-    const totalAssets = sumConverted(
-      assets,
-      (a) => contributedBalance(a) ?? Number.NaN,
-      (a) => a.currencyCode,
-      (amount, currency) => convertOrUnknown(amount, currency),
-    );
-    const totalLiabilities = sumConverted(
-      liabilities,
-      (a) => contributedBalance(a) ?? Number.NaN,
-      (a) => a.currencyCode,
-      (amount, currency) => {
-        const converted = convertOrUnknown(amount, currency);
-        return converted === null ? null : Math.abs(converted);
-      },
-    );
+    const totalAssets = sumSide(assets, convertToDefault);
+    const totalLiabilities = sumSide(liabilities, (amount, currency) => {
+      const converted = convertToDefault(amount, currency);
+      return converted === null ? null : Math.abs(converted);
+    });
     // Net worth inherits the incompleteness of both sides: a hole in either
     // makes the difference partial too.
     const totalBalance = combineTotals(
@@ -233,7 +242,7 @@ function AccountsContent() {
           {isLoading ? (
             <LoadingSpinner text={t('page.loadingAccounts')} />
           ) : (
-            <AccountList accounts={accounts} institutions={institutions} brokerageMarketValues={brokerageMarketValues} unpricedHoldingCounts={unpricedHoldingCounts} defaultCurrency={defaultCurrency} convertToDefault={convertToDefault} onEdit={openEdit} onRefresh={loadAccounts} />
+            <AccountList accounts={accounts} institutions={institutions} brokerageMarketValues={brokerageMarketValues} unpricedHoldingCounts={unpricedHoldingCounts} portfolioFailed={portfolioFailed} defaultCurrency={defaultCurrency} convertToDefault={convertToDefault} onEdit={openEdit} onRefresh={loadAccounts} />
           )}
         </div>
       </main>

@@ -162,8 +162,12 @@ export function PayeeInfoWidget({
   );
 
   const transactionCount = summary?.transactionCount ?? 0;
+  // Average over the transactions the figures actually sum, not the full count
+  // (which includes transactions excluded for want of a rate).
   const averageAmount =
-    totals && transactionCount > 0 ? (totals.income + totals.expenses) / transactionCount : null;
+    totals && totals.includedTransactionCount > 0
+      ? (totals.income + totals.expenses) / totals.includedTransactionCount
+      : null;
   // A currency bucket with no rate is excluded from the summary figures, so each
   // headline is marked partial rather than presented as the complete total.
   const summaryMarker = {

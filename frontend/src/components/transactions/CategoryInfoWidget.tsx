@@ -177,8 +177,13 @@ export function CategoryInfoWidget({
   );
 
   const transactionCount = summary?.transactionCount ?? 0;
+  // Average over the transactions the figures actually sum: dividing a partial
+  // income/expenses by the full count (which includes excluded transactions)
+  // understates it.
   const averageAmount =
-    totals && transactionCount > 0 ? (totals.income + totals.expenses) / transactionCount : null;
+    totals && totals.includedTransactionCount > 0
+      ? (totals.income + totals.expenses) / totals.includedTransactionCount
+      : null;
 
   // Average spend per elapsed month over the period the chart covers. Dividing
   // by elapsed months (including months with no transaction) rather than only

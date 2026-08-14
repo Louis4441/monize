@@ -52,7 +52,18 @@ export function buildDisplayCurrencyStrategy(
 export function summarizeInDisplayCurrency(
   summary: TransactionSummary,
   strategy: DisplayCurrencyStrategy,
-): { income: number; expenses: number; net: number; missingCurrencies: string[] } {
+): {
+  income: number;
+  expenses: number;
+  net: number;
+  missingCurrencies: string[];
+  /**
+   * Transactions whose currency converted, so they contribute to income/expenses.
+   * The denominator for an average, so it stays over the transactions the figure
+   * actually sums rather than the full count (which includes excluded ones).
+   */
+  includedTransactionCount: number;
+} {
   const buckets = Object.entries(summary.byCurrency ?? {});
   if (buckets.length <= 1) {
     return {
@@ -60,12 +71,14 @@ export function summarizeInDisplayCurrency(
       expenses: summary.totalExpenses,
       net: summary.netCashFlow,
       missingCurrencies: [],
+      includedTransactionCount: summary.transactionCount,
     };
   }
   // A bucket with no rate is excluded and named, so the caller can label the
   // figures as partial rather than presenting a short total as the whole.
   let income = 0;
   let expenses = 0;
+  let includedTransactionCount = 0;
   const missing = new Set<string>();
   for (const [currency, bucket] of buckets) {
     const bucketIncome = strategy.toDisplay(bucket.totalIncome, currency);
@@ -76,12 +89,14 @@ export function summarizeInDisplayCurrency(
     }
     income += bucketIncome;
     expenses += bucketExpenses;
+    includedTransactionCount += bucket.transactionCount;
   }
   return {
     income,
     expenses,
     net: income - expenses,
     missingCurrencies: [...missing],
+    includedTransactionCount,
   };
 }
 
