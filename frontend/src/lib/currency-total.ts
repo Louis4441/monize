@@ -30,9 +30,16 @@ export interface ConvertedTotal {
   excludedCount: number;
 }
 
-/** True when every component converted, so `value` is a complete total. */
+/**
+ * True when every component was included, so `value` is a complete total.
+ *
+ * Both causes of exclusion count: a missing rate (named in `missingCurrencies`)
+ * and a component with no rate to name (an unpriced holding, a non-finite amount)
+ * which only shows up in `excludedCount`. Checking `missingCurrencies` alone
+ * reported the second case as complete -- the same gap PartialTotal was fixed for.
+ */
 export function isComplete(total: ConvertedTotal): boolean {
-  return total.missingCurrencies.length === 0;
+  return total.missingCurrencies.length === 0 && total.excludedCount === 0;
 }
 
 /**

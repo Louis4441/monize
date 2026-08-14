@@ -19,6 +19,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
@@ -89,6 +90,7 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-currency-exposure-accounts';
 
 export function CurrencyExposureReport() {
   const t = useTranslations('reports');
+  const tCommon = useTranslations('common');
   const { formatCurrencyCompact: formatCurrency, formatCurrency: formatCurrencyFull } = useNumberFormat();
   const { defaultCurrency, convertToDefault, getRate } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -168,6 +170,26 @@ export function CurrencyExposureReport() {
     () => allocationData.reduce((sum, a) => sum + a.convertedValue, 0),
     [allocationData],
   );
+
+  // Holdings allocationData had to leave out (mirrors its exclusion rules): an
+  // unpriced holding, and -- worse for an exposure report -- a currency with no
+  // rate, which is an exposure the user has that simply cannot be shown. Tracked
+  // so the total is marked and the excluded currencies are named.
+  const exposureGaps = useMemo(() => {
+    const missing = new Set<string>();
+    let excludedCount = 0;
+    for (const h of holdings) {
+      if (h.marketValue === null || h.marketValue === undefined) {
+        excludedCount += 1;
+        continue;
+      }
+      if (convertToDefault(h.marketValue, h.currencyCode) === null) {
+        missing.add(h.currencyCode);
+        excludedCount += 1;
+      }
+    }
+    return { missingCurrencies: [...missing], excludedCount };
+  }, [holdings, convertToDefault]);
 
   const sortedAllocationData = useMemo(() => {
     const sorted = [...allocationData];
@@ -287,7 +309,12 @@ export function CurrencyExposureReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('currencyExposure.totalPortfolio')}</p>
           <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatCurrency(totalPortfolioValue, defaultCurrency)}
+            <PartialTotal
+              total={{ value: totalPortfolioValue, missingCurrencies: exposureGaps.missingCurrencies, excludedCount: exposureGaps.excludedCount }}
+              displayCurrency={defaultCurrency}
+            >
+              {formatCurrency(totalPortfolioValue, defaultCurrency)}
+            </PartialTotal>
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
@@ -311,6 +338,16 @@ export function CurrencyExposureReport() {
           </p>
         </div>
       </div>
+
+      {exposureGaps.missingCurrencies.length > 0 && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          {tCommon('partialTotal.explanation', {
+            count: exposureGaps.excludedCount,
+            displayCurrency: defaultCurrency,
+            currencies: exposureGaps.missingCurrencies.join(', '),
+          })}
+        </p>
+      )}
 
       {/* Pie Chart */}
       <div ref={chartRef} className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6">

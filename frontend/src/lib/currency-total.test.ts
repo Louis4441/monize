@@ -69,6 +69,12 @@ describe('sumConverted', () => {
     expect(isComplete(total)).toBe(true);
   });
 
+  // A component excluded with no currency to name (an unpriced holding) still
+  // makes the total incomplete, even though missingCurrencies is empty.
+  it('is incomplete when a component was excluded without a currency', () => {
+    expect(isComplete({ value: 100, missingCurrencies: [], excludedCount: 1 })).toBe(false);
+  });
+
   it('accumulates at storage precision rather than drifting', () => {
     const total = sum(rows([0.1, 'CAD'], [0.2, 'CAD']));
     expect(total.value).toBe(0.3);

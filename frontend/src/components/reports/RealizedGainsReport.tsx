@@ -70,6 +70,7 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-realized-gains-accounts';
 
 export function RealizedGainsReport() {
   const t = useTranslations('reports');
+  const tCommon = useTranslations('common');
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -171,6 +172,24 @@ export function RealizedGainsReport() {
 
     return Array.from(map.values());
   }, [entries, toDisplay]);
+
+  // Lots securityGains had to drop because a side could not be converted
+  // (mirrors its exclusion rule), so the per-symbol and grand totals are
+  // subtotals whenever this is non-empty.
+  const gainsGaps = useMemo(() => {
+    const missing = new Set<string>();
+    let excludedCount = 0;
+    for (const entry of entries) {
+      const proceeds = toDisplay(entry.proceeds, entry.accountCurrencyCode);
+      const costBasis = toDisplay(entry.costBasis, entry.accountCurrencyCode);
+      const realizedGain = toDisplay(entry.realizedGain, entry.accountCurrencyCode);
+      if (proceeds === null || costBasis === null || realizedGain === null) {
+        missing.add(entry.accountCurrencyCode || defaultCurrency);
+        excludedCount += 1;
+      }
+    }
+    return { missingCurrencies: [...missing], excludedCount };
+  }, [entries, toDisplay, defaultCurrency]);
 
   const sortedSecurityGains = useMemo(() => {
     const sorted = [...securityGains];
@@ -348,6 +367,16 @@ export function RealizedGainsReport() {
           </div>
         </div>
       </div>
+
+      {gainsGaps.missingCurrencies.length > 0 && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          {tCommon('partialTotal.explanation', {
+            count: gainsGaps.excludedCount,
+            displayCurrency,
+            currencies: gainsGaps.missingCurrencies.join(', '),
+          })}
+        </p>
+      )}
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">

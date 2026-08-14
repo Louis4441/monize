@@ -20,6 +20,7 @@ import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -55,6 +56,7 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-transactions-accounts';
 
 export function InvestmentTransactionHistoryReport() {
   const t = useTranslations('reports');
+  const tCommon = useTranslations('common');
   const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
@@ -193,6 +195,20 @@ export function InvestmentTransactionHistoryReport() {
     [filteredTransactions, getTxAmount],
   );
 
+  // Transactions counted but left out of the volume total because their currency
+  // has no rate, so the total volume is a subtotal whenever this is non-empty.
+  const volumeGaps = useMemo(() => {
+    const missing = new Set<string>();
+    let excludedCount = 0;
+    for (const tx of filteredTransactions) {
+      if (getTxAmount(tx) === null) {
+        missing.add(accountCurrencyMap.get(tx.accountId) || defaultCurrency);
+        excludedCount += 1;
+      }
+    }
+    return { missingCurrencies: [...missing], excludedCount };
+  }, [filteredTransactions, getTxAmount, accountCurrencyMap, defaultCurrency]);
+
   const accountNameMap = useMemo(() => {
     const map = new Map<string, string>();
     accounts.forEach((a) => map.set(a.id, a.name));
@@ -263,19 +279,22 @@ export function InvestmentTransactionHistoryReport() {
       ? mainAccountName(selectedAccount.name)
       : t('investmentTransactions.allAccounts');
     const uniqueSecurities = new Set(filteredTransactions.filter((tx) => tx.security).map((tx) => tx.security!.symbol)).size;
+    // A transaction with no rate is counted but left out of the volume, so the
+    // PDF marks it partial rather than printing a subtotal as the whole.
+    const volumeSuffix = volumeGaps.excludedCount > 0 ? ` ${tCommon('partialTotal.srSuffix')}` : '';
     await exportToPdf({
       title: t('investmentTransactions.pdfTitle'),
-      subtitle: `${accountLabel} | ${filteredTransactions.length} transactions | Total volume: ${fmtValue(totalAmount)}`,
+      subtitle: `${accountLabel} | ${filteredTransactions.length} transactions | Total volume: ${fmtValue(totalAmount)}${volumeSuffix}`,
       summaryCards: [
         { label: t('investmentTransactions.totalTransactions'), value: String(filteredTransactions.length), color: '#111827' },
-        { label: t('investmentTransactions.totalVolume'), value: fmtValue(totalAmount), color: '#111827' },
+        { label: t('investmentTransactions.totalVolume'), value: `${fmtValue(totalAmount)}${volumeSuffix}`, color: '#111827' },
         { label: t('investmentTransactions.actionTypes'), value: String(actionSummaries.length), color: '#111827' },
         { label: t('investmentTransactions.securitiesTraded'), value: String(uniqueSecurities), color: '#111827' },
       ],
       tableData: { headers, rows },
       filename: 'investment-transactions',
     });
-  }, [getExportData, selectedAccount, filteredTransactions, fmtValue, totalAmount, actionSummaries, t, mainAccountName]);
+  }, [getExportData, selectedAccount, filteredTransactions, fmtValue, totalAmount, actionSummaries, t, tCommon, volumeGaps.excludedCount, mainAccountName]);
 
   if (error) {
     return <ReportError onRetry={reload} />;
@@ -305,7 +324,9 @@ export function InvestmentTransactionHistoryReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('investmentTransactions.totalVolume')}</div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {fmtValue(totalAmount)}
+            <PartialTotal total={{ value: totalAmount, ...volumeGaps }} displayCurrency={displayCurrency}>
+              {fmtValue(totalAmount)}
+            </PartialTotal>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">

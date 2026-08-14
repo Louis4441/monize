@@ -168,6 +168,10 @@ export function IncomeExpensesBarChart({
       );
       if (!bucket) return;
 
+      // Every line of a transaction shares its currency, so a missing rate
+      // excludes the whole transaction once -- not once per split line, which
+      // would report more excluded amounts than there are transactions.
+      let txExcluded = false;
       const classifyAmount = (rawAmount: number, category: { isIncome: boolean } | null | undefined) => {
         const amount = convertToDefault(rawAmount, tx.currencyCode);
         // No rate: the amount belongs to neither bar. Counting the unconverted
@@ -175,7 +179,7 @@ export function IncomeExpensesBarChart({
         // silently shrink the month.
         if (amount === null) {
           missingCurrencies.add(tx.currencyCode);
-          excludedCount += 1;
+          txExcluded = true;
           return;
         }
         if (category?.isIncome === true) {
@@ -200,6 +204,7 @@ export function IncomeExpensesBarChart({
       } else {
         classifyAmount(Number(tx.amount) || 0, tx.category);
       }
+      if (txExcluded) excludedCount += 1;
     });
 
     return {
