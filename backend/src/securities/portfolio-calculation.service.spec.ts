@@ -2794,15 +2794,20 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
    * failure is the prompt to update the tooltip with it.
    */
   it("keeps the native basis commission-free while the replayed one includes it", async () => {
-    const result = await valuation(lot({ costBasis: 920 }));
+    // A realistic pairing: 10 shares at an average cost of 30 is a 300 native
+    // basis, and the same acquisition with a 5 commission replays to 305. The
+    // gap is the commission, small against the purchase -- not the 620 a 920
+    // replayed basis against a 300 native one would have implied, which no
+    // commission-free average cost can produce.
+    const result = await valuation(lot({ costBasis: 305 }));
     const holding = result.holdingsWithValues[0];
 
     // Stored average cost: 10 x 30. No commission is blended into it.
     expect(holding.costBasis).toBe(300);
     // Replayed: what the acquisitions actually cost, commission included.
-    expect(holding.costBasisAccountCurrency).toBe(920);
+    expect(holding.costBasisAccountCurrency).toBe(305);
     // And the row's gain follows the native figure, so it differs from the
-    // card's gain by the same commission.
+    // card's gain (500 - 305 = 195) by the same 5 commission.
     expect(holding.gainLoss).toBe(200); // 10 x 50 market - 300 native basis
   });
 });
@@ -2881,14 +2886,83 @@ describe("PortfolioCalculationService.calculateTWR", () => {
     expect(twr).toBeNull();
   });
 
-  // The sub-period walk listed SPLIT under "no quantity change", so from the
-  // split forward it valued the pre-split share count: a 2-for-1 on a 100-share
-  // position kept reporting 100 shares, halving the position's contribution to
-  // every sub-period value after it. The other holdings replays multiplied.
-  // Upstream folds every other walk through `applyActionToQuantity`; the guard
-  // in `investment-replay.guard.spec.ts` only catches a hand-rolled SPLIT
-  // *case*, and this walk omitted SPLIT via a comment, so it needs its own pin.
-  it("folds a split through the shared reducer in the sub-period walk", () => {
+  const runSplitTwr = async (latestPrice: number) => {
+    const txRepo = {
+      find: jest.fn().mockResolvedValue([
+        {
+          id: "b1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.BUY,
+          transactionDate: "2024-01-01",
+          quantity: 100,
+          price: 10,
+          createdAt: new Date("2024-01-01"),
+        },
+        {
+          id: "s1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.SPLIT,
+          transactionDate: "2024-02-01",
+          quantity: 2,
+          createdAt: new Date("2024-02-01"),
+        },
+      ]),
+    };
+    const service = buildService([[InvestmentTransaction, txRepo]], {
+      getLatestRate: jest.fn().mockResolvedValue(1),
+    });
+    jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
+      new Map([
+        [
+          "sec-a",
+          [
+            { date: "2024-01-01", price: 10 },
+            { date: "2024-02-01", price: 10 },
+          ],
+        ],
+      ]),
+    );
+    return service.calculateTWR(
+      userId,
+      ["acct-1"],
+      "USD",
+      new Map(),
+      async () => new Map([["sec-a", latestPrice]]),
+    );
+  };
+
+  // The behavioural half. TWR chains price ratios and resets the running value
+  // after each date's transactions, so within every sub-period the share count
+  // is constant and divides out of V(t)/V(t-1) = P(t)/P(t-1): a correct walk
+  // returns the security's price return whatever the absolute count. That
+  // invariance is why an *ignored* split is not visible to a normal-holdings
+  // TWR -- 100 shares and 200 shares give the identical ratio -- and why the
+  // net-worth history, which reports absolute value, is where the 2-for-1 ->
+  // 200-share arithmetic is pinned (see net-worth.service.spec.ts). What this
+  // case does pin is the *timing*: the split has to fold in AFTER the factor for
+  // its own date is taken against the pre-split count. Fold it before, and the
+  // boundary factor doubles. BUY 100 @ 10, steady at 10 across the split, latest
+  // 12 -> a clean +20%; applying the split a step early would report +140%.
+  it("returns the price return through a split, not a share-count jump", async () => {
+    expect(await runSplitTwr(12)).toBeCloseTo(20, 5);
+  });
+
+  it("is flat when price is unchanged across the split", async () => {
+    expect(await runSplitTwr(10)).toBeCloseTo(0, 5);
+  });
+
+  // The mechanical half, kept as a cheap secondary guard: the value invariance
+  // above means the ignored-split regression only moves a TWR at a holdings
+  // sign change, so a source pin catches a re-introduction the arithmetic tests
+  // would sleep through. `investment-replay.guard.spec.ts` only flags a
+  // hand-rolled SPLIT *case*; this walk omitted SPLIT through a comment instead.
+  it("folds the split through the shared reducer rather than deciding inline", () => {
     expect(applyActionToQuantity(100, InvestmentAction.SPLIT, 2)).toBe(200);
 
     const source = readFileSync(
@@ -2897,7 +2971,6 @@ describe("PortfolioCalculationService.calculateTWR", () => {
     );
     const walk = source.slice(source.indexOf("async calculateTWR("));
     expect(walk).toContain("applyActionToQuantity(current, tx.action, qty)");
-    // ...and no longer decides for itself.
     expect(walk).not.toContain(
       "DIVIDEND, INTEREST, CAPITAL_GAIN, SPLIT: no quantity change",
     );
