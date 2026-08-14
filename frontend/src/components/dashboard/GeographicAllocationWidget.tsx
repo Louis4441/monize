@@ -270,7 +270,7 @@ export function GeographicAllocationWidget({
       {!loading && !isEmpty && partialNote && (
         // Some holdings converted and some did not: the shares above are of the
         // convertible subset, so mark them a subtotal rather than 100%.
-        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{partialNote}</p>
+        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400" data-testid="partial-note">{partialNote}</p>
       )}
     </WidgetCard>
   );

@@ -177,7 +177,7 @@ export function CreditUtilizationTotalWidget({
             // used/limit/available figures and the utilisation percentage, so
             // say so rather than reporting an improved ratio the excluded card
             // would have worsened.
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400" data-testid="partial-note">
               {tCommon('partialTotal.explanation', {
                 count: totals.excludedCount,
                 displayCurrency,

@@ -410,7 +410,7 @@ export function CategoryInfoWidget({
             })}
           </ul>
           {subcategoriesExcluded > 0 && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400" data-testid="partial-note">
               {tCommon('partialTotal.explanationExcluded', { count: subcategoriesExcluded })}
             </p>
           )}

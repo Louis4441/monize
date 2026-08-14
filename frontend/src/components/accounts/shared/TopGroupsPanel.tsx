@@ -135,7 +135,7 @@ export function TopGroupsPanel({
           </ul>
         )}
         {excludedCount > 0 && (
-          <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+          <p className="mt-2 text-xs text-amber-600 dark:text-amber-400" data-testid="partial-note">
             {tCommon('partialTotal.explanationExcluded', { count: excludedCount })}
           </p>
         )}

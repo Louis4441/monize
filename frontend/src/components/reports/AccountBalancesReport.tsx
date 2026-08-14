@@ -330,7 +330,7 @@ export function AccountBalancesReport() {
           each is marked as a subtotal rather than presented as the complete
           figure it no longer is. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6" data-testid="summary-assets">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.totalAssets')}</div>
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
             <PartialTotal total={{ value: totals.assets, ...totalsMarker }} displayCurrency={defaultCurrency}>
@@ -338,7 +338,7 @@ export function AccountBalancesReport() {
             </PartialTotal>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6" data-testid="summary-liabilities">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.totalLiabilities')}</div>
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
             <PartialTotal total={{ value: totals.liabilities, ...totalsMarker }} displayCurrency={defaultCurrency}>
@@ -346,7 +346,7 @@ export function AccountBalancesReport() {
             </PartialTotal>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6" data-testid="summary-networth">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.netWorth')}</div>
           <div className={`text-2xl font-bold ${
             // A partial net worth has an uncertain sign, so it stays neutral

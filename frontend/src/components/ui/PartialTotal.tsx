@@ -54,9 +54,9 @@ export function PartialTotal({ children, total, displayCurrency }: PartialTotalP
       : t('partialTotal.explanationExcluded', { count: total.excludedCount });
 
   return (
-    <span className="inline-flex items-baseline gap-1">
+    <span className="inline-flex items-baseline gap-1" data-testid="partial-total">
       <span>{children}</span>
-      <span className="text-amber-600 dark:text-amber-400" aria-hidden="true">
+      <span className="text-amber-600 dark:text-amber-400" aria-hidden="true" data-testid="partial-total-marker">
         *
       </span>
       <span className="sr-only">{t('partialTotal.srSuffix')}</span>
