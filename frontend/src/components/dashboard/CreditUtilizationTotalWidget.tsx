@@ -39,6 +39,7 @@ export function CreditUtilizationTotalWidget({
   isLoading,
 }: CreditUtilizationTotalWidgetProps) {
   const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
   const { formatCurrency } = useNumberFormat();
   const { convert, defaultCurrency } = useExchangeRates();
   const { config, updateConfig } = useWidgetConfig<AccountsConfig>(
@@ -160,6 +161,19 @@ export function CreditUtilizationTotalWidget({
               </div>
             ))}
           </div>
+          {totals.missingCurrencies.length > 0 && (
+            // A card with no rate to the display currency is excluded from the
+            // used/limit/available figures and the utilisation percentage, so
+            // say so rather than reporting an improved ratio the excluded card
+            // would have worsened.
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              {tCommon('partialTotal.explanation', {
+                count: totals.missingCurrencies.length,
+                displayCurrency,
+                currencies: totals.missingCurrencies.join(', '),
+              })}
+            </p>
+          )}
         </>
       )}
     </WidgetCard>

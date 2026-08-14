@@ -31,6 +31,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useReportData } from '@/hooks/useReportData';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { usePreferencesStore } from '@/store/preferencesStore';
@@ -100,7 +101,7 @@ export function IncomeExpensesBarChart({
   const { formatDate } = useDateFormat();
   const formatChartDate = useChartDateFormat();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis } = useNumberFormat();
-  const { convertToDefault } = useExchangeRates();
+  const { convertToDefault, defaultCurrency } = useExchangeRates();
   const weekStartsOn = (usePreferencesStore((s) => s.preferences?.weekStartsOn) ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
   const { config, updateConfig } = useWidgetConfig<RangeAccountsConfig>(
     WIDGET_ID,
@@ -211,6 +212,11 @@ export function IncomeExpensesBarChart({
   }, [transactions, start, end, isWeekly, formatDate, formatChartDate, convertToDefault, weekStartsOn]);
 
   const chartData = breakdown.data;
+  // The partial-total marker the income/expenses/net figures share.
+  const totalsMarker = {
+    missingCurrencies: breakdown.missingCurrencies,
+    excludedCount: breakdown.missingCurrencies.length,
+  };
 
   const barClickedRef = useRef(false);
 
@@ -334,17 +340,24 @@ export function IncomeExpensesBarChart({
               </BarChart>
             </ResponsiveContainer>
           </div>
+          {/* A month with a transaction in a currency that has no rate is a
+              subtotal: the bar and these figures exclude it, so each is marked
+              rather than passing as the complete month. */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-3 gap-4 text-center flex-shrink-0">
             <div>
               <div className="text-sm text-gray-500 dark:text-gray-400">{t('incomeExpenses.income')}</div>
               <div className="font-semibold text-green-600 dark:text-green-400">
-                {formatCurrency(totals.income)}
+                <PartialTotal total={{ value: totals.income, ...totalsMarker }} displayCurrency={defaultCurrency}>
+                  {formatCurrency(totals.income)}
+                </PartialTotal>
               </div>
             </div>
             <div>
               <div className="text-sm text-gray-500 dark:text-gray-400">{t('incomeExpenses.expenses')}</div>
               <div className="font-semibold text-red-600 dark:text-red-400">
-                {formatCurrency(totals.expenses)}
+                <PartialTotal total={{ value: totals.expenses, ...totalsMarker }} displayCurrency={defaultCurrency}>
+                  {formatCurrency(totals.expenses)}
+                </PartialTotal>
               </div>
             </div>
             <div>
@@ -352,7 +365,9 @@ export function IncomeExpensesBarChart({
               <div
                 className={`font-semibold ${gainLossColor(totals.income - totals.expenses)}`}
               >
-                {formatCurrency(totals.income - totals.expenses)}
+                <PartialTotal total={{ value: totals.income - totals.expenses, ...totalsMarker }} displayCurrency={defaultCurrency}>
+                  {formatCurrency(totals.income - totals.expenses)}
+                </PartialTotal>
               </div>
             </div>
           </div>

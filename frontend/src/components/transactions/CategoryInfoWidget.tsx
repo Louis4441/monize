@@ -22,6 +22,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { createLogger } from '@/lib/logger';
+import { PartialTotal } from '@/components/ui/PartialTotal';
 import {
   WidgetFilterParams,
   buildDisplayCurrencyStrategy,
@@ -271,9 +272,20 @@ export function CategoryInfoWidget({
               : 'text-red-600 dark:text-red-400'
           }`}
         >
-          {headlineTotal !== null
-            ? formatCurrency(headlineTotal, currencyStrategy.displayCurrency)
-            : '—'}
+          {headlineTotal !== null ? (
+            <PartialTotal
+              total={{
+                value: headlineTotal,
+                missingCurrencies: totals?.missingCurrencies ?? [],
+                excludedCount: totals?.missingCurrencies.length ?? 0,
+              }}
+              displayCurrency={currencyStrategy.displayCurrency}
+            >
+              {formatCurrency(headlineTotal, currencyStrategy.displayCurrency)}
+            </PartialTotal>
+          ) : (
+            '—'
+          )}
         </p>
       </div>
 
@@ -315,7 +327,16 @@ export function CategoryInfoWidget({
               {t('categoryWidget.averageAmount')}
             </dt>
             <dd className="text-gray-900 dark:text-gray-100 text-right">
-              {formatCurrency(averageAmount, currencyStrategy.displayCurrency)}
+              <PartialTotal
+                total={{
+                  value: averageAmount,
+                  missingCurrencies: totals?.missingCurrencies ?? [],
+                  excludedCount: totals?.missingCurrencies.length ?? 0,
+                }}
+                displayCurrency={currencyStrategy.displayCurrency}
+              >
+                {formatCurrency(averageAmount, currencyStrategy.displayCurrency)}
+              </PartialTotal>
             </dd>
           </div>
         )}

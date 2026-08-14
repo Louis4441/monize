@@ -30,6 +30,7 @@ const LIABILITY_TYPES = ['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'];
 export function AccountBalancesReport() {
   const t = useTranslations('reports');
   const tAccounts = useTranslations('accounts');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
   const { convertToDefault, defaultCurrency } = useExchangeRates();
@@ -170,6 +171,13 @@ export function AccountBalancesReport() {
     };
   }, [filteredAccounts, brokerageMarketValues, convertToDefault]);
 
+  // The partial-total marker the three summary cards share: an account with no
+  // rate is excluded from every one of assets/liabilities/net worth.
+  const totalsMarker = {
+    missingCurrencies: totals.missingCurrencies,
+    excludedCount: totals.missingCurrencies.length,
+  };
+
   // Build chart data
   const chartData = useMemo(() => {
     if (chartGrouping === 'type') {
@@ -255,12 +263,16 @@ export function AccountBalancesReport() {
         ? tAccounts('row.combinedUnknown')
         : formatCurrency(entry.combinedValue, entry.primary.currencyCode),
     ]);
+    // A missing rate excludes an account from these totals, so the PDF marks
+    // them partial too rather than printing a bare figure as the whole.
+    const pdfPartialSuffix =
+      totals.missingCurrencies.length > 0 ? ` ${tCommon('partialTotal.srSuffix')}` : '';
     await exportToPdf({
       title: t('accountBalances.pdfTitle'),
       summaryCards: [
-        { label: t('accountBalances.totalAssets'), value: formatCurrency(totals.assets), color: '#16a34a' },
-        { label: t('accountBalances.totalLiabilities'), value: formatCurrency(totals.liabilities), color: '#dc2626' },
-        { label: t('accountBalances.netWorth'), value: formatCurrency(totals.netWorth), color: totals.netWorth >= 0 ? '#2563eb' : '#ea580c' },
+        { label: t('accountBalances.totalAssets'), value: `${formatCurrency(totals.assets)}${pdfPartialSuffix}`, color: '#16a34a' },
+        { label: t('accountBalances.totalLiabilities'), value: `${formatCurrency(totals.liabilities)}${pdfPartialSuffix}`, color: '#dc2626' },
+        { label: t('accountBalances.netWorth'), value: `${formatCurrency(totals.netWorth)}${pdfPartialSuffix}`, color: totals.netWorth >= 0 ? '#2563eb' : '#ea580c' },
       ],
       chartContainer: chartRef.current,
       tableData: { headers, rows },
@@ -289,18 +301,24 @@ export function AccountBalancesReport() {
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
+      {/* Summary Cards. A missing rate excludes an account from these totals, so
+          each is marked as a subtotal rather than presented as the complete
+          figure it no longer is. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.totalAssets')}</div>
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {formatCurrency(totals.assets)}
+            <PartialTotal total={{ value: totals.assets, ...totalsMarker }} displayCurrency={defaultCurrency}>
+              {formatCurrency(totals.assets)}
+            </PartialTotal>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.totalLiabilities')}</div>
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-            {formatCurrency(totals.liabilities)}
+            <PartialTotal total={{ value: totals.liabilities, ...totalsMarker }} displayCurrency={defaultCurrency}>
+              {formatCurrency(totals.liabilities)}
+            </PartialTotal>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
@@ -308,7 +326,9 @@ export function AccountBalancesReport() {
           <div className={`text-2xl font-bold ${
             totals.netWorth >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'
           }`}>
-            {formatCurrency(totals.netWorth)}
+            <PartialTotal total={{ value: totals.netWorth, ...totalsMarker }} displayCurrency={defaultCurrency}>
+              {formatCurrency(totals.netWorth)}
+            </PartialTotal>
           </div>
         </div>
       </div>
