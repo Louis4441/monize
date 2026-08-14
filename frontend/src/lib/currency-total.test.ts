@@ -49,11 +49,14 @@ describe('sumConverted', () => {
     expect(total.excludedCount).toBe(3);
   });
 
-  // A non-finite component is an upstream failure, not a zero.
-  it('excludes a NaN component', () => {
+  // A non-finite component is an upstream value failure, not a zero and not a
+  // missing rate: it is excluded by count, but its currency (which may have a
+  // perfectly good rate) is not named.
+  it('excludes a NaN component without naming its currency', () => {
     const total = sum(rows([Number.NaN, 'CAD'], [10, 'CAD']));
     expect(total.value).toBe(10);
-    expect(total.missingCurrencies).toEqual(['CAD']);
+    expect(total.missingCurrencies).toEqual([]);
+    expect(total.excludedCount).toBe(1);
   });
 
   it('is complete and zero for no components at all', () => {

@@ -60,15 +60,23 @@ export function sumConverted<T>(
 
   for (const item of items) {
     const amount = amountOf(item);
-    // A non-finite component is not a zero either; it is an upstream failure.
+    // A non-finite component is not a zero either; it is an upstream value
+    // failure with no currency to blame, so it is excluded by count -- naming its
+    // currency would report a missing rate for a currency that may have one.
     if (!Number.isFinite(amount)) {
-      missing.add(currencyOf(item));
       excludedCount += 1;
       continue;
     }
     const value = convert(amount, currencyOf(item));
-    if (value === null || !Number.isFinite(value)) {
+    // No rate for this pair: name the currency so the caller can say which.
+    if (value === null) {
       missing.add(currencyOf(item));
+      excludedCount += 1;
+      continue;
+    }
+    // A finite amount that converted to a non-finite value is a value failure,
+    // not a rate gap, so again it is excluded without naming a currency.
+    if (!Number.isFinite(value)) {
       excludedCount += 1;
       continue;
     }
