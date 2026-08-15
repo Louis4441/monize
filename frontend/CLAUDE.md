@@ -202,6 +202,79 @@ bills-and-deposits sum, or the same money is reported twice
 not a measurement, so it is never given a `+`/`-` sign or a red/green treatment
 that would read as a real amount.
 
+### A stored occurrence price is an instruction; the market close is a suggestion
+
+An investment price *or quantity* the user saved -- on a scheduled occurrence's
+override, or carried from the schedule -- is a decision, not a stale default, so
+live market data may be *offered* beside it but never *written over* it. Both
+dialogs that fill a price obey this. `OverrideEditorDialog` fills the field from
+the latest close only when the occurrence has no price of its own and the user
+has not typed a total (`hasStoredPrice` false, `userEditedTotal` false, field
+empty), otherwise exposing an explicit "use latest close" action;
+`PostTransactionDialog` skips its market-price refresh when the prefill came from
+a per-occurrence override (`investmentFromStoredOverride`, keyed off a stored
+price *or quantity* -- an override that set only the shares must not have them
+rescaled) or when the user has edited any field, keeping the base-schedule DCA
+refresh only for a price that is a creation-time snapshot.
+
+The two guards differ **because their fill precedence differs**, and the guard
+protects whichever field that precedence would clobber. The override editor's
+fill is quantity-first (it keeps the shares and recomputes the total), so it must
+not run once the user has typed a **total** -- but a quantity-only edit is safe
+and is left to auto-fill. The post dialog's refresh is total-first (it preserves
+the scheduled total and rescales the shares), so it must not run once the user
+has typed anything, because a typed **quantity** is what its precedence would
+overwrite. The fetch being asynchronous is what makes this matter: it can resolve
+*after* the dialog opens, and a value typed in the meantime (price still blank,
+so an "is the field empty" check alone lets the fill through) is the user's own
+instruction. The defect all of this prevents is a silent re-price: reopening an
+override to change only its date, posting an occurrence whose price the user set,
+or having a value you just typed re-derived under you, must not move money to
+today's close. A NaN or zero close is not a usable price -- normalize it to null
+where `marketPrice` is set (through `usableClose`), so the fill, the placeholder
+and the latch all treat it as "no price" rather than a value.
+
+`marketPrice == null` is three states at once -- loading, a failed lookup, and a
+genuinely empty history -- so it must not gate the "no price history, enter
+manually" hint: a failed lookup is not an empty dataset, and flashing the hint
+mid-fetch is a lie the resolve then retracts. Each surface carries a
+`priceHistoryEmpty` flag set true *only* when a request completes with no usable
+close, reset false while in flight and left false on rejection; the hint reads
+that flag, never the bare null.
+
+There are three surfaces that fill these fields -- the two dialogs and
+`ScheduledTransactionForm` -- and all three do the price/quantity/total
+arithmetic through `lib/investmentFold.ts` (`totalFromQuantity` /
+`quantityFromTotal` -- one rounding scale and one signed commission fold, so the
+surfaces cannot drift on the math, only on which conversion they run). Never
+hand-roll the fold inline; `lib/investmentFold.guard.test.ts` scans for the 8dp
+share-precision rounding that fingerprints a hand-rolled `quantityFromTotal` and
+fails for any occurrence outside the helper. State a stored price's provenance
+truthfully (a price on this override reads "saved on this occurrence", one
+inherited from the schedule reads "from the schedule" -- the two are different
+keys, not one); and format the "latest close" copy through
+`useNumberFormat().formatPrice` (a price is not money: up to six decimals,
+trailing zeros trimmed by Intl), never a hand-rolled `toFixed`/trailing-zero
+regex, which leaves a dangling separator in comma-decimal locales. Compose any
+"Label: value" line (the transfer and category banners) in the catalog as one
+string a translator can reorder, never as `{t('label')}: {value}` fragments in
+JSX.
+
+`ScheduledTransactionForm` reconciles the same way the dialogs do, and two more
+invariants live here because its `Total Value` is a shown figure that submit
+recomputes from `quantity * price (+/-) commission`: **the displayed total and
+the persisted amount must never disagree.** So every field that moves the
+economic total -- price, quantity, **commission, and the BUY/SELL action whose
+sign flips the fee** -- recomputes the shown total through the same fold, and the
+async close arriving mid-entry preserves an already-typed total and re-derives
+the quantity from it (total-first) rather than only writing the price. And **a
+market price belongs to one security**: changing the selected security clears the
+auto-filled price (and the seen-market-price latch) so the new security's own
+close fills the field, instead of the previous security's quote lingering because
+the field is non-empty. A NaN or zero close is not a usable price -- gate the
+"Latest:" placeholder on a positive `roundedMarketPrice`, never a bare
+`marketPrice != null`, so it never renders as "Latest: NaN".
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 Two patterns, depending on where it lives:
