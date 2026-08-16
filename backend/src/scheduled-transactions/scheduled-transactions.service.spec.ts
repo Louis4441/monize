@@ -2578,6 +2578,104 @@ describe("ScheduledTransactionsService", () => {
       expect(fundingClear).toBeUndefined();
     });
 
+    it("update() switching BUY to DIVIDEND nulls quantity/price/commission (issue #1154)", async () => {
+      // The action no longer uses shares or a per-share price, so the stale
+      // quantity/price/commission from the BUY must not linger on the row.
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-voo",
+          investmentQuantity: 1,
+          investmentPrice: 500,
+          investmentCommission: 5,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentAction: "DIVIDEND" as any,
+        investmentTotalAmount: 75,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) => c[1] === stId && c[2].investmentAction !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentQuantity).toBeNull();
+      expect(fields.investmentPrice).toBeNull();
+      expect(fields.investmentCommission).toBeNull();
+      // The DIVIDEND's own required field is written, not cleared.
+      expect(fields.investmentTotalAmount).toBe(75);
+    });
+
+    it("update() switching DIVIDEND to BUY nulls the stale total amount (issue #1154)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "DIVIDEND" as any,
+          investmentSecurityId: "sec-voo",
+          investmentTotalAmount: 75,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentAction: "BUY" as any,
+        investmentQuantity: 2,
+        investmentPrice: 100,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) => c[1] === stId && c[2].investmentAction !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentTotalAmount).toBeNull();
+      expect(fields.investmentQuantity).toBe(2);
+      expect(fields.investmentPrice).toBe(100);
+    });
+
+    it("update() keeps quantity but nulls price/total when switching to ADD_SHARES", async () => {
+      // ADD_SHARES uses only a quantity; price/commission/total do not apply.
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-voo",
+          investmentQuantity: 3,
+          investmentPrice: 500,
+          investmentCommission: 5,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentAction: "ADD_SHARES" as any,
+        investmentQuantity: 4,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) => c[1] === stId && c[2].investmentAction !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentQuantity).toBe(4);
+      expect(fields.investmentPrice).toBeNull();
+      expect(fields.investmentCommission).toBeNull();
+      expect(fields.investmentTotalAmount).toBeNull();
+    });
+
     it("create() drops a funding account supplied for a non-funding action (issue #1154)", async () => {
       accountsService.findOne.mockImplementation(
         async (uid: string, id: string) => {

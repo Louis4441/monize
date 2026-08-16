@@ -1287,6 +1287,34 @@ export class ScheduledTransactionsService {
       ) {
         fieldsToUpdate.investmentFundingAccountId = null;
       }
+
+      // The same omit-doesn't-clear defect applies to the numeric fields the
+      // issue calls out (issue #1154): switching action leaves quantity/price/
+      // commission/total from the old action on the row. This is not a money
+      // bug -- postInvestment reads only the fields its effective action uses --
+      // but it leaves the row internally inconsistent, so clear each field the
+      // effective action does not use. The clear is safe: validateInvestmentFields
+      // (run above) guarantees the action's required field is present, and the
+      // fields dropped here are exactly the ones postInvestment ignores for that
+      // action, so no posted amount changes. Unlike investmentExchangeRate (see
+      // postInvestment), none of these carries a value that is legitimate under
+      // more than one action, so an action-keyed clear cannot over-clear.
+      const usesQuantity =
+        !!effectiveInvestmentAction &&
+        (QUANTITY_PRICE_ACTIONS.has(effectiveInvestmentAction) ||
+          QUANTITY_ONLY_ACTIONS.has(effectiveInvestmentAction));
+      const usesPrice =
+        !!effectiveInvestmentAction &&
+        QUANTITY_PRICE_ACTIONS.has(effectiveInvestmentAction);
+      const usesTotalAmount =
+        !!effectiveInvestmentAction &&
+        AMOUNT_ONLY_ACTIONS.has(effectiveInvestmentAction);
+      if (!usesQuantity) fieldsToUpdate.investmentQuantity = null;
+      if (!usesPrice) {
+        fieldsToUpdate.investmentPrice = null;
+        fieldsToUpdate.investmentCommission = null;
+      }
+      if (!usesTotalAmount) fieldsToUpdate.investmentTotalAmount = null;
     }
 
     // Apply the split rewrite, any mode-switch split clearing, and the main
