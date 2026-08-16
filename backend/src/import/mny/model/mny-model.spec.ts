@@ -397,9 +397,6 @@ describe("mapFrequency", () => {
     [MNY_FREQUENCY.WEEKLY, FrequencyType.WEEKLY],
     [MNY_FREQUENCY.MONTHLY, FrequencyType.MONTHLY],
     [MNY_FREQUENCY.YEARLY, FrequencyType.YEARLY],
-    [MNY_FREQUENCY.EVERY_2_MONTHS, FrequencyType.EVERY2MONTHS],
-    [MNY_FREQUENCY.QUARTERLY, FrequencyType.QUARTERLY],
-    [MNY_FREQUENCY.SEMIANNUAL, FrequencyType.SEMIANNUAL],
   ])("maps frq %p to %s exactly", (frequency, expected) => {
     expect(mapFrequency(frequency)).toEqual({
       frequency: expected,
@@ -435,27 +432,50 @@ describe("mapFrequency", () => {
     },
   );
 
-  it("maps every-two-months exactly, by code and by interval", () => {
-    // PR #192 mapped this to BIWEEKLY -- every two weeks, not every two
-    // months. Before task B3 Monize had no type for it and the mapper
-    // downgraded to MONTHLY with a warning.
-    const expected = {
-      frequency: FrequencyType.EVERY2MONTHS,
+  it("maps a yearly bill to YEARLY, not to every two months (issue #1150)", () => {
+    // The regression: `frq` 5 was mapped to EVERY2MONTHS on PR #192's word,
+    // and a Money Plus Sunset file's yearly bills imported six times a year.
+    expect(mapFrequency(5)).toEqual({
+      frequency: FrequencyType.YEARLY,
       approximate: false,
-    };
-    expect(mapFrequency(MNY_FREQUENCY.EVERY_2_MONTHS)).toEqual(expected);
-    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 2)).toEqual(expected);
+    });
   });
 
-  it("maps semiannual exactly, by code and by interval", () => {
-    // PR #192 stretched it to YEARLY, halving the reminders; before B3 the
-    // mapper downgraded to QUARTERLY with a warning.
-    const expected = {
+  it("maps every-two-months and semiannual by interval", () => {
+    // PR #192 mapped the first to BIWEEKLY -- every two weeks, not every two
+    // months -- and stretched the second to YEARLY, halving the reminders.
+    // Before task B3 Monize had no type for either. Money expresses both as a
+    // monthly code with a multiplier, which is the only spelling of them this
+    // repository has evidence for.
+    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 2)).toEqual({
+      frequency: FrequencyType.EVERY2MONTHS,
+      approximate: false,
+    });
+    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 6)).toEqual({
       frequency: FrequencyType.SEMIANNUAL,
       approximate: false,
-    };
-    expect(mapFrequency(MNY_FREQUENCY.SEMIANNUAL)).toEqual(expected);
-    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 6)).toEqual(expected);
+    });
+  });
+
+  it("approximates an unrepresentable yearly interval", () => {
+    expect(mapFrequency(MNY_FREQUENCY.YEARLY, 2)).toEqual({
+      frequency: FrequencyType.YEARLY,
+      approximate: true,
+    });
+  });
+
+  it("approximates an unrepresentable daily interval", () => {
+    expect(mapFrequency(MNY_FREQUENCY.DAILY, 3)).toEqual({
+      frequency: FrequencyType.DAILY,
+      approximate: true,
+    });
+  });
+
+  it("ignores an interval on a one-off", () => {
+    expect(mapFrequency(MNY_FREQUENCY.ONCE, 4)).toEqual({
+      frequency: FrequencyType.ONCE,
+      approximate: false,
+    });
   });
 
   it("approximates an unrepresentable weekly interval", () => {
@@ -482,7 +502,12 @@ describe("mapFrequency", () => {
     },
   );
 
-  it.each([[8], [-1], [99]])(
+  // 4, 6 and 7 are on this list rather than mapped: PR #192's table claimed
+  // them, and the one claim above 3 that a bug report could check (4 = yearly)
+  // was wrong -- so the rest of that table is a guess, and a guess about how
+  // often money leaves an account is reported, never made. The bill mapper
+  // reads the cadence off the series' own instance dates first.
+  it.each([[4], [6], [7], [8], [-1], [99]])(
     "returns null for the unknown frq %p",
     (frequency) => {
       expect(mapFrequency(frequency)).toBeNull();

@@ -582,16 +582,14 @@ reduce each series to one representative before doing anything else.
 
 ### Frequency codes (`frq`)
 
-| frq | Meaning |
-|-----|---------|
-| 0 | Once |
-| 1 | Daily |
-| 2 | Weekly |
-| 3 | Monthly |
-| 4 | Yearly |
-| 5 | Every two months |
-| 6 | Quarterly |
-| 7 | Semiannually |
+| frq | Meaning | Evidence |
+|-----|---------|----------|
+| 0 | Once | Format reference only |
+| 1 | Daily | Format reference only |
+| 2 | Weekly | Format reference only |
+| 3 | Monthly | Issue #1150: the same file's monthly bills imported monthly |
+| 5 | Yearly | Issue #1150: yearly bills imported as `EXACT[5]`, then "every 2 months" |
+| 4, 6, 7 | **Unknown** | Claimed yearly / quarterly / semiannual by the original reference, which 5 refutes |
 
 The code alone is not the whole answer: `cFrqInst` multiplies it, and several
 combinations land exactly on a distinct recurrence (weekly x 2 is fortnightly,
@@ -602,6 +600,25 @@ missed payment.
 
 > **Correction.** The proof of concept mapped bimonthly (every two months) to
 > fortnightly and semiannual to yearly -- errors in both directions at once.
+
+> **Correction.** The original recorded 4 as yearly, 5 as every two months, 6 as
+> quarterly and 7 as semiannual. Issue #1150 reported a Money Plus Sunset file
+> whose **yearly** bills imported recurring every two months -- which is code 5
+> under that table -- while the same file's monthly bills were right. So 5 is
+> yearly, 3 is monthly, and the reference is wrong above 3; 4, 6 and 7 now map
+> to nothing and are reported (`unusableBill`, carrying `frq` and `cFrqInst`)
+> rather than guessed. The gap is narrower than it looks, because `cFrqInst` is
+> a real multiplier: every two months, quarterly and twice a year are `frq` 3
+> with an interval of 2, 3 and 6.
+
+**A series' own instance dates outrank its code.** `BILL` holds one row per
+occurrence, so the spacing between a series' `dt` values *is* its recurrence --
+measured on the file in hand, where `frq` is a table nobody has been able to
+check. `map/bill-cadence.ts` reads it (a strict majority of the recent gaps
+matching one cadence within 12%), and `map-bills.ts` prefers that answer to
+`frq`, falling back to the code only for a series too short to measure. Issue
+#1150 is the cost of the other order: every affected file stated "365 days
+apart" in data nothing was reading.
 
 ## Limitations of this reference
 

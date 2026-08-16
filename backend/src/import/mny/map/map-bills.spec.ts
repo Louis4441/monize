@@ -273,7 +273,7 @@ describe("mapBills", () => {
       const yearly = (handle: number, daysAgo: number) =>
         mnyBill({
           handle,
-          frequency: 6,
+          frequency: 5,
           nextDue: shiftIsoDate(AS_OF, -daysAgo),
           templateTransaction: 500 + handle,
         });
@@ -646,8 +646,120 @@ describe("mapBills", () => {
       expect(result.bills).toEqual([]);
       expect(result.skipped).toBe(1);
       expect(result.warnings).toEqual([
-        { code: "unusableBill", subject: "hbill=7", detail: "frq=99" },
+        { code: "unusableBill", subject: "hbill=7", detail: "frq=99 x1" },
       ]);
+    });
+
+    it("imports a yearly series as YEARLY, not every two months (issue #1150)", () => {
+      // The report: a Money Plus Sunset file's annual bills arrived recurring
+      // every two months, which is what `frq` 5 mapped to on PR #192's word.
+      const result = mapBills(
+        input({
+          bills: billData({
+            bills: [
+              mnyBill({
+                handle: 7,
+                frequency: 5,
+                nextDue: AS_OF,
+                templateTransaction: 500,
+              }),
+            ],
+          }),
+          transactions: transactionData({
+            transactions: [template({ handle: 500, account: 1 })],
+          }),
+        }),
+      );
+
+      expect(result.bills[0].frequency).toBe(FrequencyType.YEARLY);
+      expect(result.bills[0].approximate).toBe(false);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it("takes the cadence from the series' own instances over its code", () => {
+      // Instances a year apart are the file saying "yearly" in data. Whatever
+      // `BILL.frq` 3 is taken to mean, it does not outrank that.
+      const result = mapBills(
+        input({
+          bills: billData({
+            bills: [2022, 2023, 2024, 2025, 2026].map((year, index) =>
+              mnyBill({
+                handle: 7 + index,
+                series: 7,
+                instance: index,
+                frequency: 3,
+                nextDue: `${year}-07-30`,
+                templateTransaction: 500,
+              }),
+            ),
+          }),
+          transactions: transactionData({
+            transactions: [template({ handle: 500, account: 1 })],
+          }),
+        }),
+      );
+
+      expect(result.bills).toHaveLength(1);
+      expect(result.bills[0].frequency).toBe(FrequencyType.YEARLY);
+      expect(result.bills[0].approximate).toBe(false);
+    });
+
+    it("keeps a series whose code is unknown but whose instances are regular", () => {
+      const result = mapBills(
+        input({
+          bills: billData({
+            bills: ["2026-05-30", "2026-06-30", "2026-07-30"].map(
+              (nextDue, index) =>
+                mnyBill({
+                  handle: 7 + index,
+                  series: 7,
+                  instance: index,
+                  frequency: 4,
+                  nextDue,
+                  templateTransaction: 500,
+                }),
+            ),
+          }),
+          transactions: transactionData({
+            transactions: [template({ handle: 500, account: 1 })],
+          }),
+        }),
+      );
+
+      expect(result.bills).toHaveLength(1);
+      expect(result.bills[0].frequency).toBe(FrequencyType.MONTHLY);
+      expect(result.skipped).toBe(0);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it("keeps the approximation flag when the instances agree with the code", () => {
+      const result = mapBills(
+        input({
+          bills: billData({
+            bills: ["2026-06-18", "2026-07-09", "2026-07-30"].map(
+              (nextDue, index) =>
+                mnyBill({
+                  handle: 7 + index,
+                  series: 7,
+                  instance: index,
+                  frequency: 2,
+                  interval: 3,
+                  nextDue,
+                  templateTransaction: 500,
+                }),
+            ),
+          }),
+          transactions: transactionData({
+            transactions: [template({ handle: 500, account: 1 })],
+          }),
+          payees: [],
+        }),
+      );
+
+      // Three-weekly spacing matches no Monize type, so the inference declines
+      // and the code's downgrade -- WEEKLY, flagged -- stands.
+      expect(result.bills[0].frequency).toBe(FrequencyType.WEEKLY);
+      expect(result.bills[0].approximate).toBe(true);
     });
   });
 

@@ -535,28 +535,44 @@ export function isIncomeCategoryType(categoryType: number): boolean | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Money recurrence codes. **Unconfirmed** -- `BILL` is empty in every fixture.
- * From PR #192's format reference.
+ * Money recurrence codes.
+ *
+ * `BILL` is empty in every committed fixture, so none of these can be read out
+ * of a file this repository holds. The list PR #192 supplied claimed eight of
+ * them -- 4 yearly, 5 every two months, 6 quarterly, 7 semiannual -- and issue
+ * #1150 checked the only one a bug report can check: a Money Plus Sunset file
+ * whose **yearly** bills imported as "every 2 months", which is `EXACT[5]`
+ * under that list. So Money writes 5 for a yearly bill, and the same report
+ * confirms 3 for a monthly one, since the same file's monthly bills arrived
+ * monthly.
+ *
+ * That refutes the reference's 4, and leaves 6 and 7 as claims from a source
+ * now known to be wrong about the codes above 3. They are therefore **not**
+ * mapped: an unknown code is reported (`unusableBill`, with the raw `frq` and
+ * `cFrqInst`) rather than guessed, and `inferFrequencyFromDueDates` answers
+ * from the series' own instance dates first anyway -- a file's own spacing
+ * outranks any table in this file.
+ *
+ * The gap is smaller than the missing codes make it look, because `cFrqInst`
+ * is a real multiplier: every two months, quarterly and twice a year are all
+ * `frq` 3 with an interval of 2, 3 and 6.
  */
 export const MNY_FREQUENCY = {
   ONCE: 0,
   DAILY: 1,
   WEEKLY: 2,
   MONTHLY: 3,
-  YEARLY: 4,
-  EVERY_2_MONTHS: 5,
-  QUARTERLY: 6,
-  SEMIANNUAL: 7,
+  YEARLY: 5,
 } as const;
 
 export interface MnyFrequencyMapping {
   readonly frequency: FrequencyType;
   /**
    * True when Monize has no exact equivalent, so the mapping changes how often
-   * the bill falls due, and the mapper must warn per bill. Every Money
-   * recurrence *code* now maps exactly (Track B task B3 added `EVERY2MONTHS`
-   * and `SEMIANNUAL`); only an unrepresentable `cFrqInst` interval -- weekly
-   * every 3 weeks, monthly every 5 months -- still approximates.
+   * the bill falls due, and the mapper must warn per bill. Every *known* Money
+   * recurrence code maps exactly (Track B task B3 added `EVERY2MONTHS` and
+   * `SEMIANNUAL`); only an unrepresentable `cFrqInst` interval -- weekly every
+   * 3 weeks, monthly every 5 months, yearly every 2 years -- approximates.
    */
   readonly approximate: boolean;
 }
@@ -567,9 +583,6 @@ const EXACT: Record<number, FrequencyType> = {
   [MNY_FREQUENCY.WEEKLY]: FrequencyType.WEEKLY,
   [MNY_FREQUENCY.MONTHLY]: FrequencyType.MONTHLY,
   [MNY_FREQUENCY.YEARLY]: FrequencyType.YEARLY,
-  [MNY_FREQUENCY.EVERY_2_MONTHS]: FrequencyType.EVERY2MONTHS,
-  [MNY_FREQUENCY.QUARTERLY]: FrequencyType.QUARTERLY,
-  [MNY_FREQUENCY.SEMIANNUAL]: FrequencyType.SEMIANNUAL,
 };
 
 /** Weekly recurrences whose interval Monize expresses as its own type. */
@@ -586,45 +599,48 @@ const MONTHLY_BY_INTERVAL: Record<number, FrequencyType> = {
   12: FrequencyType.YEARLY,
 };
 
+/** Every code whose `cFrqInst` multiples land on a type of their own. */
+const BY_INTERVAL: Record<number, Record<number, FrequencyType>> = {
+  [MNY_FREQUENCY.WEEKLY]: WEEKLY_BY_INTERVAL,
+  [MNY_FREQUENCY.MONTHLY]: MONTHLY_BY_INTERVAL,
+};
+
 /**
  * Maps a Money recurrence onto a Monize frequency.
  *
  * `cFrqInst` is Money's interval multiplier: weekly with an interval of 2 is
- * exactly Monize's BIWEEKLY, monthly with 3 is QUARTERLY. Every Money
- * recurrence code has an exact Monize type since task B3 added `EVERY2MONTHS`
- * and `SEMIANNUAL`, so only an interval with no matching type (weekly every 3
- * weeks, monthly every 5 months) still falls to the next **shorter** period and
- * is flagged approximate. Shorter is the safer error: v1 imports bills with
+ * exactly Monize's BIWEEKLY, monthly with 3 is QUARTERLY. An interval with no
+ * matching type -- weekly every 3 weeks, monthly every 5 months, yearly every
+ * 2 years -- falls to the code's own **shorter** period and is flagged
+ * approximate. Shorter is the safer error: v1 imports bills with
  * `auto_post = false`, so an extra reminder is noise while a missed one is a
  * missed payment. (PR #192 erred in both directions, turning bimonthly bills
  * into biweekly ones and semiannual bills into yearly ones.)
  *
  * Returns null for an unknown code, which the mapper reports rather than
- * guesses.
+ * guesses -- see `MNY_FREQUENCY` for which codes are known and how. The bill
+ * mapper asks the series' instance dates before it asks this function, so an
+ * unmapped code only loses a series that has no spacing to read.
  */
 export function mapFrequency(
   frequency: number,
   interval = 1,
 ): MnyFrequencyMapping | null {
+  const base = EXACT[frequency];
+  if (base === undefined) {
+    return null;
+  }
+
   const steps =
     Number.isFinite(interval) && interval >= 1 ? Math.round(interval) : 1;
-
-  if (frequency === MNY_FREQUENCY.WEEKLY && steps > 1) {
-    const exact = WEEKLY_BY_INTERVAL[steps];
-    return exact
-      ? { frequency: exact, approximate: false }
-      : { frequency: FrequencyType.WEEKLY, approximate: true };
+  if (steps <= 1 || base === FrequencyType.ONCE) {
+    return { frequency: base, approximate: false };
   }
 
-  if (frequency === MNY_FREQUENCY.MONTHLY && steps > 1) {
-    const exact = MONTHLY_BY_INTERVAL[steps];
-    return exact
-      ? { frequency: exact, approximate: false }
-      : { frequency: FrequencyType.MONTHLY, approximate: true };
-  }
-
-  const exact = EXACT[frequency];
-  return exact ? { frequency: exact, approximate: false } : null;
+  const exact = BY_INTERVAL[frequency]?.[steps];
+  return exact
+    ? { frequency: exact, approximate: false }
+    : { frequency: base, approximate: true };
 }
 
 // ---------------------------------------------------------------------------

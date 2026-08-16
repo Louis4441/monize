@@ -250,7 +250,7 @@ export interface MnyBill {
   readonly handle: number | null;
   /** `st`: series status. Active semantics pinned by task M0.6. */
   readonly status: number;
-  /** `frq`: 0 once, 1 daily, 2 weekly, 3 monthly, 4 yearly, 6 quarterly. */
+  /** `frq`: 0 once, 1 daily, 2 weekly, 3 monthly, 5 yearly (`MNY_FREQUENCY`). */
   readonly frequency: number;
   /** `cFrqInst`: interval multiplier for `frequency`. */
   readonly interval: number;

@@ -388,8 +388,17 @@ is BIWEEKLY, weekly × 4 is EVERY4WEEKS (likewise monthly × 2 → EVERY2MONTHS,
 **shorter** period and returns `approximate: true`. Shorter is the safer error while v1 imports
 bills with `auto_post = false`: an extra reminder is noise, a missed one is a missed payment.
 PR #192 erred in both directions (bimonthly → BIWEEKLY, semiannual → YEARLY). Track B task B3
-has since added `EVERY2MONTHS` and `SEMIANNUAL`, so every recurrence *code* is now exact and only
-an unrepresentable interval (weekly × 3, monthly × 5) still approximates.
+has since added `EVERY2MONTHS` and `SEMIANNUAL`, so an unrepresentable interval (weekly × 3,
+monthly × 5, yearly × 2) is all that still approximates.
+
+**But the code table itself was a guess, and issue #1150 caught it.** A Money Plus Sunset file's
+yearly bills imported recurring every two months — `frq` 5 under PR #192's table — while its
+monthly bills were right, so 5 is yearly, 3 is monthly, and 4/6/7 are claims from a source now
+known to be wrong. They map to nothing and are reported with their raw `frq`/`cFrqInst`. The
+durable half of the fix is that `BILL` answers the question itself: it holds one row per
+occurrence, so `inferFrequencyFromDueDates` reads the cadence off the spacing of a series'
+instances and `map-bills.ts` prefers it to the code. A table nobody can check loses to the file
+in front of us.
 
 **Still unanswerable from the fixtures.** `BILL` is empty in all five files and the transactions
 exercise only `act` 0, 1 and 15, so `BILL.st` (question 12.3) and the `act` 5 / 14 semantics
@@ -580,10 +589,10 @@ real mappers and, in the integration spec, the real INSERT path.
 `BILL` + template `TRN` (`lHtrn`) -> `scheduled_transactions` with splits/transfer/investment
 template support. Active-series detection: `st` in the spike-confirmed active set, next-due date
 within a sanity horizon, deduped per series. Wizard selection is authoritative; selected bills
-import with `is_active = true`, `auto_post = false`. Frequency map: 0 ONCE, 1 DAILY, 2 WEEKLY,
-3 MONTHLY, 4 YEARLY, 5 EVERY2MONTHS, 6 QUARTERLY, 7 SEMIANNUAL;
-`cFrqInst` interval honored where representable, else downgrade + warning. (B3 has landed, so
-only intervals with no Monize type downgrade.)
+import with `is_active = true`, `auto_post = false`. Cadence comes from the series' own instance
+dates where they are regular enough to read (`map/bill-cadence.ts`), and from `frq` otherwise:
+0 ONCE, 1 DAILY, 2 WEEKLY, 3 MONTHLY, 5 YEARLY, with 4/6/7 unknown since issue #1150 refuted the
+reference above 3; `cFrqInst` interval honored where representable, else downgrade + warning.
 
 ### 8.4 Investments
 
