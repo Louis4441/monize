@@ -42,9 +42,11 @@ describe("cadenceForGap", () => {
     [61, FrequencyType.EVERY2MONTHS],
     [91, FrequencyType.QUARTERLY],
     [92, FrequencyType.QUARTERLY],
+    [122, FrequencyType.EVERY4MONTHS],
     [182, FrequencyType.SEMIANNUAL],
     [365, FrequencyType.YEARLY],
     [366, FrequencyType.YEARLY],
+    [730, FrequencyType.EVERY2YEARS],
   ])("reads a %p day gap as %s", (days, expected) => {
     expect(cadenceForGap(days)).toBe(expected);
   });
@@ -56,7 +58,9 @@ describe("cadenceForGap", () => {
     expect(cadenceForGap(31)).toBe(FrequencyType.MONTHLY);
   });
 
-  it.each([[45], [120], [250]])(
+  // 120 days used to be on this list and is now EVERY4MONTHS: adding a type
+  // for a cadence narrows the gaps that match nothing, which is the point.
+  it.each([[45], [220], [500]])(
     "refuses a %p day gap that matches nothing",
     (days) => {
       expect(cadenceForGap(days)).toBeNull();
@@ -90,7 +94,9 @@ describe("inferFrequencyFromDueDates", () => {
     [everyMonths("2024-01-31", 1, 14), FrequencyType.MONTHLY],
     [everyMonths("2024-01-15", 2, 8), FrequencyType.EVERY2MONTHS],
     [everyMonths("2024-01-15", 3, 8), FrequencyType.QUARTERLY],
+    [everyMonths("2024-01-15", 4, 8), FrequencyType.EVERY4MONTHS],
     [everyMonths("2024-01-15", 6, 6), FrequencyType.SEMIANNUAL],
+    [everyMonths("2024-01-15", 24, 5), FrequencyType.EVERY2YEARS],
     [everyDays("2024-01-15", 7, 10), FrequencyType.WEEKLY],
     [everyDays("2024-01-15", 14, 10), FrequencyType.BIWEEKLY],
     [everyDays("2024-01-15", 28, 10), FrequencyType.EVERY4WEEKS],

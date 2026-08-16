@@ -299,8 +299,10 @@
     "MONTHLY": "Ежемесячно",
     "EVERY2MONTHS": "Каждые 2 месяца",
     "QUARTERLY": "Ежеквартально",
+    "EVERY4MONTHS": "Каждые 4 месяца",
     "SEMIANNUAL": "Дважды в год",
-    "YEARLY": "Ежегодно"
+    "YEARLY": "Ежегодно",
+    "EVERY2YEARS": "Каждые 2 года"
   },
   "validation": {
     "nameRequired": "Имя обязательно",

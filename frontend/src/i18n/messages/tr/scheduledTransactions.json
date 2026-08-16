@@ -299,8 +299,10 @@
     "MONTHLY": "Aylık",
     "EVERY2MONTHS": "Her 2 Ayda Bir",
     "QUARTERLY": "Üç Aylık",
+    "EVERY4MONTHS": "Her 4 Ayda Bir",
     "SEMIANNUAL": "Yılda İki Kez",
-    "YEARLY": "Yıllık"
+    "YEARLY": "Yıllık",
+    "EVERY2YEARS": "Her 2 Yılda Bir"
   },
   "validation": {
     "nameRequired": "Ad zorunludur",

@@ -24,8 +24,10 @@ export const FREQUENCY_VALUES = [
   'MONTHLY',
   'EVERY2MONTHS',
   'QUARTERLY',
+  'EVERY4MONTHS',
   'SEMIANNUAL',
   'YEARLY',
+  'EVERY2YEARS',
 ] as const;
 
 export type FrequencyType = (typeof FREQUENCY_VALUES)[number];

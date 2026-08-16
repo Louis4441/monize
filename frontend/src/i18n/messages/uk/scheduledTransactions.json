@@ -299,8 +299,10 @@
     "MONTHLY": "Щомісяця",
     "EVERY2MONTHS": "Кожні 2 місяці",
     "QUARTERLY": "Щокварталу",
+    "EVERY4MONTHS": "Кожні 4 місяці",
     "SEMIANNUAL": "Двічі на рік",
-    "YEARLY": "Щороку"
+    "YEARLY": "Щороку",
+    "EVERY2YEARS": "Кожні 2 роки"
   },
   "validation": {
     "nameRequired": "Назва обов'язкова",

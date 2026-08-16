@@ -299,8 +299,10 @@
     "MONTHLY": "毎月",
     "EVERY2MONTHS": "2か月ごと",
     "QUARTERLY": "四半期ごと",
+    "EVERY4MONTHS": "4か月ごと",
     "SEMIANNUAL": "年2回",
-    "YEARLY": "毎年"
+    "YEARLY": "毎年",
+    "EVERY2YEARS": "2年ごと"
   },
   "validation": {
     "nameRequired": "名前は必須です",

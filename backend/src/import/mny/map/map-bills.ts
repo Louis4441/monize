@@ -404,18 +404,23 @@ function billName(
  * The cadence a series recurs at: what its own instances do, falling back to
  * what `BILL.frq` says they should do.
  *
- * The dates win a disagreement. `frq` is a code no fixture in this repository
- * has ever contained, and the one value a bug report could check was wrong
- * (issue #1150: yearly bills imported as every two months); the spacing
- * between a series' instances is the file stating its own cadence. Where the
- * two agree the code's mapping is kept as-is, so an approximated interval
- * still reports itself as approximate.
+ * The dates win a disagreement, and they still do now that `MNY_FREQUENCY` is
+ * read off a real file rather than guessed. A series' spacing is the file
+ * stating its own cadence, and it is the only thing that can catch a code
+ * table wrong again -- it is what issue #1150 (yearly bills imported as every
+ * two months) needed and did not have. Where the two agree the code's mapping
+ * is kept as-is, so an approximated cadence still reports itself as
+ * approximate.
+ *
+ * The dates cannot answer for a series Money has scheduled but never posted:
+ * one instance is no gaps, so a brand-new bill rests entirely on the code pair.
+ * That is the case the `(frq, cFrqInst)` decode has to get right on its own.
  */
 export function resolveSeriesFrequency(
   representative: MnyBill,
   instances: readonly MnyBill[],
 ): MnyFrequencyMapping | null {
-  const coded = mapFrequency(representative.frequency, representative.interval);
+  const coded = mapFrequency(representative.frequency, representative.occurrencesPerUnit);
   const observed = inferFrequencyFromDueDates(
     instances.map((instance) => instance.nextDue),
   );
@@ -463,13 +468,14 @@ function mapOne(
   }
 
   if (mapping === null) {
-    // The raw pair rides along: `BILL.frq` is still only partly known, and an
-    // unmapped code plus its interval is what a real file has to report for
-    // the rest of the table to ever be pinned down.
+    // The raw pair rides along. Money's picker offers five units and all five
+    // are mapped, so an unknown `frq` is a version or a dialog this repository
+    // has not seen -- and the pair is what a real file has to report for it to
+    // be pinned down without guessing.
     context.warnings.push({
       code: "unusableBill",
       subject: `hbill=${handle}`,
-      detail: `frq=${representative.frequency} x${representative.interval}`,
+      detail: `frq=${representative.frequency} cFrqInst=${representative.occurrencesPerUnit}`,
     });
     return null;
   }
@@ -479,7 +485,7 @@ function mapOne(
     context.warnings.push({
       code: "billFrequencyApproximated",
       subject: name,
-      detail: `frq=${representative.frequency} x${representative.interval}`,
+      detail: `frq=${representative.frequency} cFrqInst=${representative.occurrencesPerUnit}`,
     });
   }
 

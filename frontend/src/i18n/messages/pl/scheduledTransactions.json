@@ -299,8 +299,10 @@
     "MONTHLY": "Miesięczny",
     "EVERY2MONTHS": "Co 2 miesiące",
     "QUARTERLY": "Co kwartał",
+    "EVERY4MONTHS": "Co 4 miesiące",
     "SEMIANNUAL": "Dwa razy w roku",
-    "YEARLY": "Co rok"
+    "YEARLY": "Co rok",
+    "EVERY2YEARS": "Co 2 lata"
   },
   "validation": {
     "nameRequired": "Nazwa jest wymagana",

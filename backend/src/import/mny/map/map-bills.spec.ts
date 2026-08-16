@@ -567,15 +567,16 @@ describe("mapBills", () => {
   });
 
   describe("frequency mapping", () => {
-    it("maps an exact interval combination to its own type", () => {
+    it("maps an exact unit and rate combination to its own type", () => {
       const result = mapBills(
         input({
           bills: billData({
             bills: [
               mnyBill({
                 handle: 7,
-                frequency: 3,
-                interval: 3,
+                // Money's "Every three months": the quarterly unit, once each.
+                frequency: 4,
+                occurrencesPerUnit: 1,
                 nextDue: AS_OF,
                 templateTransaction: 500,
               }),
@@ -592,7 +593,7 @@ describe("mapBills", () => {
       expect(result.warnings).toEqual([]);
     });
 
-    it("downgrades an unrepresentable interval and warns per bill", () => {
+    it("downgrades an unrepresentable rate and warns per bill", () => {
       const result = mapBills(
         input({
           bills: billData({
@@ -600,7 +601,7 @@ describe("mapBills", () => {
               mnyBill({
                 handle: 7,
                 frequency: 2,
-                interval: 3,
+                occurrencesPerUnit: 3,
                 nextDue: AS_OF,
                 templateTransaction: 500,
               }),
@@ -613,13 +614,15 @@ describe("mapBills", () => {
         }),
       );
 
-      expect(result.bills[0].frequency).toBe(FrequencyType.WEEKLY);
+      // Three times a week is 2.3 days, which no Monize type expresses, so it
+      // rounds down to the nearest that still fires at least as often.
+      expect(result.bills[0].frequency).toBe(FrequencyType.DAILY);
       expect(result.bills[0].approximate).toBe(true);
       expect(result.warnings).toEqual([
         {
           code: "billFrequencyApproximated",
           subject: "Gym",
-          detail: "frq=2 x3",
+          detail: "frq=2 cFrqInst=3",
         },
       ]);
     });
@@ -646,7 +649,7 @@ describe("mapBills", () => {
       expect(result.bills).toEqual([]);
       expect(result.skipped).toBe(1);
       expect(result.warnings).toEqual([
-        { code: "unusableBill", subject: "hbill=7", detail: "frq=99 x1" },
+        { code: "unusableBill", subject: "hbill=7", detail: "frq=99 cFrqInst=1" },
       ]);
     });
 
@@ -743,7 +746,7 @@ describe("mapBills", () => {
                   series: 7,
                   instance: index,
                   frequency: 2,
-                  interval: 3,
+                  occurrencesPerUnit: 3,
                   nextDue,
                   templateTransaction: 500,
                 }),
@@ -757,8 +760,9 @@ describe("mapBills", () => {
       );
 
       // Three-weekly spacing matches no Monize type, so the inference declines
-      // and the code's downgrade -- WEEKLY, flagged -- stands.
-      expect(result.bills[0].frequency).toBe(FrequencyType.WEEKLY);
+      // and the code's downgrade -- three times a week, rounded down to DAILY
+      // and flagged -- stands.
+      expect(result.bills[0].frequency).toBe(FrequencyType.DAILY);
       expect(result.bills[0].approximate).toBe(true);
     });
   });
