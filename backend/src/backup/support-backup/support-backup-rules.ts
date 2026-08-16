@@ -401,6 +401,10 @@ export const RULES: Record<string, TableRules> = {
     total_amount: scale,
     exchange_rate: keep,
     description: drop,
+    // An enum flag, like transactions.status: it re-identifies nobody, and a
+    // support backup that dropped it could not reproduce a VOID row's
+    // exclusion from holdings and balances.
+    status: keep,
     created_at: keep,
     updated_at: keep,
   },
