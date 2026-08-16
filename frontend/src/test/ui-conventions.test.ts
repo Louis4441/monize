@@ -712,3 +712,34 @@ describe("a transfer's direction is decided in one place", () => {
     expect(DIRECTION_TERNARY.test(helper)).toBe(true);
   });
 });
+
+describe("a transaction status cell is the shared StatusCellButton", () => {
+  /** The one file allowed to render the dense status letters -- it IS the cell. */
+  const WRAPPER = "/src/components/transactions/StatusCellButton.tsx";
+  // The dense-label catalog keys fingerprint a hand-rolled status cell: any
+  // second copy has to read them to draw the C/R/V/pending letters.
+  const DENSE_LABEL_KEY =
+    /list\.status\.(?:reconciledDense|clearedDense|voidDense|pendingDense)/;
+
+  it("reads the dense status labels only inside the shared cell", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== WRAPPER)
+      .filter(([, content]) => DENSE_LABEL_KEY.test(content))
+      .map(([path]) => path);
+
+    // The cash register and the investment register share one status cell so
+    // the two cannot drift on colours, labels, or what a click means. A second
+    // inline copy is the mistake this rule was written after: the investment
+    // register would have grown its own near-copy of TransactionRow's cell.
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the shared cell, so the rule cannot pass by accident", () => {
+    const wrapper = sources[WRAPPER];
+    expect(
+      wrapper,
+      `${WRAPPER} not found -- update WRAPPER in this test`,
+    ).toBeTruthy();
+    expect(DENSE_LABEL_KEY.test(wrapper)).toBe(true);
+  });
+});

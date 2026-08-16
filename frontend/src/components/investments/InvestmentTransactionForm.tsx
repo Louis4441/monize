@@ -21,6 +21,7 @@ import {
   rememberTransactionDate,
 } from '@/lib/lastTransactionDate';
 import { Account } from '@/types/account';
+import { TransactionStatus } from '@/types/transaction';
 import {
   InvestmentAction,
   InvestmentTransaction,
@@ -69,6 +70,7 @@ export const buildInvestmentTransactionSchema = (t: (key: string) => string) => 
   commission: z.coerce.number().min(0).optional(),
   exchangeRate: z.coerce.number().gt(0).optional(),
   description: z.string().optional(),
+  status: z.nativeEnum(TransactionStatus).default(TransactionStatus.UNRECONCILED),
   // SPLIT-only fields, combined into `quantity` (the ratio) on submit.
   splitNewShares: z.coerce.number().gt(0).optional(),
   splitOldShares: z.coerce.number().gt(0).optional(),
@@ -188,6 +190,11 @@ function InvestmentTransactionFormFields({
   onCreateAnother,
 }: InvestmentTransactionFormFieldsProps) {
   const t = useTranslations('investments');
+  // Status strings are shared with the cash register's form.
+  const tStatus = useTranslations('transactions');
+  // Embedded inside a split transaction: the parent owns account, date and
+  // status; the backend refuses direct changes to them.
+  const isEmbedded = !!transaction?.transactionSplitId;
   const actionLabels: Record<InvestmentAction, string> = {
     BUY: t('transactionForm.actionBuy'),
     SELL: t('transactionForm.actionSell'),
@@ -293,6 +300,9 @@ function InvestmentTransactionFormFields({
           commission: transaction.commission ?? 0,
           exchangeRate: transaction.exchangeRate ?? 1,
           description: transaction.description || '',
+          // Rows from a backend that predates the column have no status;
+          // absent means "no information", shown as the default.
+          status: transaction.status || TransactionStatus.UNRECONCILED,
           // For SPLIT, only pre-fill the new/old shares from a stored ratio
           // when the ratio looks like a value the user (or the current QIF
           // parser) actually entered: a positive non-integer or one of a
@@ -322,6 +332,7 @@ function InvestmentTransactionFormFields({
           commission: undefined,
           exchangeRate: undefined,
           description: '',
+          status: TransactionStatus.UNRECONCILED,
           splitNewShares: undefined,
           splitOldShares: undefined,
         },
@@ -868,6 +879,7 @@ function InvestmentTransactionFormFields({
           price: costPerShare,
           transactionDate: data.transactionDate,
           description: data.description,
+          status: data.status,
         });
         toast.success(t('transactionForm.toastTransferUpdated'));
         onSuccess?.();
@@ -931,6 +943,7 @@ function InvestmentTransactionFormFields({
             ? data.exchangeRate
             : undefined,
         description: data.description,
+        status: data.status,
       };
 
       if (transaction) {
@@ -1349,6 +1362,29 @@ function InvestmentTransactionFormFields({
         error={errors.description?.message}
         {...register('description')}
       />
+
+      {/* Status selector -- same four options as the cash register's form (the
+          only place VOID can be set or cleared). An embedded split row's
+          status is owned by its parent split transaction, so the field is
+          disabled there and the hint points at the parent. */}
+      <div>
+        <Select
+          label={tStatus('form.fields.status')}
+          options={[
+            { value: TransactionStatus.UNRECONCILED, label: tStatus('form.statusOptions.unreconciled') },
+            { value: TransactionStatus.CLEARED, label: tStatus('form.statusOptions.cleared') },
+            { value: TransactionStatus.RECONCILED, label: tStatus('form.statusOptions.reconciled') },
+            { value: TransactionStatus.VOID, label: tStatus('form.statusOptions.void') },
+          ]}
+          disabled={isEmbedded}
+          {...register('status')}
+        />
+        {isEmbedded && (
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {t('transactionForm.statusLockedToParent')}
+          </p>
+        )}
+      </div>
 
       {/* Currency Conversion - when security currency differs from cash account currency */}
       {needsConversion && (needsQuantityPrice || isAmountOnly) && (

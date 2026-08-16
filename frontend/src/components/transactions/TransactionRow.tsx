@@ -6,6 +6,7 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 import { createPortal } from 'react-dom';
 import { getIconComponent } from '@/components/ui/IconPicker';
 import { Transaction, TransactionSplit, TransactionStatus } from '@/types/transaction';
+import { StatusCellButton } from '@/components/transactions/StatusCellButton';
 import { CategoryBudgetStatus } from '@/types/budget';
 import { DensityLevel } from '@/hooks/useTableDensity';
 import { HIGHLIGHT_FLASH, HIGHLIGHT_FLASH_CELL } from '@/hooks/useHighlightTarget';
@@ -595,21 +596,11 @@ export const TransactionRow = memo(function TransactionRow({
         </td>
       )}
       <td className={`${cellPadding} whitespace-nowrap text-center hidden min-[1400px]:table-cell`}>
-        <button
-          onClick={(e) => { e.stopPropagation(); onCycleStatus(transaction); }}
-          className="text-sm px-3 py-1.5 -my-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          title={t('list.status.cycleTitle')}
-        >
-          {transaction.status === TransactionStatus.RECONCILED ? (
-            <span className="text-blue-600 dark:text-blue-400">{density === 'dense' ? t('list.status.reconciledDense') : t('list.status.reconciled')}</span>
-          ) : transaction.status === TransactionStatus.CLEARED ? (
-            <span className="text-green-600 dark:text-green-400">{density === 'dense' ? t('list.status.clearedDense') : t('list.status.cleared')}</span>
-          ) : transaction.status === TransactionStatus.VOID ? (
-            <span className="text-red-600 dark:text-red-400">{density === 'dense' ? t('list.status.voidDense') : t('list.status.void').toUpperCase()}</span>
-          ) : (
-            <span className="text-gray-400 dark:text-gray-500">{density === 'dense' ? t('list.status.pendingDense') : t('list.status.pending')}</span>
-          )}
-        </button>
+        <StatusCellButton
+          status={transaction.status}
+          dense={density === 'dense'}
+          onCycle={() => onCycleStatus(transaction)}
+        />
       </td>
       <td className={`${cellPadding} whitespace-nowrap text-right text-sm font-medium space-x-2 hidden min-[480px]:table-cell sticky right-0 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'} group-hover:bg-gray-100 dark:group-hover:bg-gray-800 ${isHighlighted ? HIGHLIGHT_FLASH_CELL : ''}`}>
         {onEdit && (

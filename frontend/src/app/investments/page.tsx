@@ -275,6 +275,7 @@ function InvestmentsContent() {
                   onDelete={handleDeleteTransaction}
                   onEdit={data.handleEditTransaction}
                   onNewTransaction={data.handleNewTransaction}
+                  onStatusChanged={data.handleFormCreateAndNew}
                   density={listDensity}
                   onDensityChange={setListDensity}
                   filters={data.transactionFilters}
