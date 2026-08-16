@@ -1890,6 +1890,142 @@ describe('InvestmentTransactionForm', () => {
       expect(optionTexts).toContain('OLD - Old Corp (CAD)');
     });
   });
+
+  describe('status field', () => {
+    it('renders the status select with four options, defaulting to UNRECONCILED on create', async () => {
+      render(<InvestmentTransactionForm accounts={accounts} />);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Status')).toBeInTheDocument();
+      });
+      const select = screen.getByLabelText('Status') as HTMLSelectElement;
+      const options = Array.from(select.querySelectorAll('option'));
+      expect(options.map((o) => o.getAttribute('value'))).toEqual([
+        'UNRECONCILED',
+        'CLEARED',
+        'RECONCILED',
+        'VOID',
+      ]);
+      expect(options.map((o) => o.textContent)).toEqual([
+        'Unreconciled',
+        'Cleared',
+        'Reconciled',
+        'Void',
+      ]);
+      expect(select.value).toBe('UNRECONCILED');
+      expect(select).not.toBeDisabled();
+    });
+
+    it('shows the stored status selected when editing', async () => {
+      const transaction = {
+        id: 't1', accountId: 'a1', action: 'BUY' as const, transactionDate: '2024-01-01',
+        quantity: 10, price: 50, commission: 5, totalAmount: 505, description: '',
+        status: 'RECONCILED',
+      } as any;
+      render(<InvestmentTransactionForm accounts={accounts} transaction={transaction} />);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Status')).toHaveValue('RECONCILED');
+      });
+    });
+
+    it('disables the select and explains when the row is embedded in a split (transactionSplitId set)', async () => {
+      const embedded = {
+        id: 't1', accountId: 'a1', action: 'BUY' as const, transactionDate: '2024-01-01',
+        quantity: 10, price: 50, commission: 5, totalAmount: 505, description: '',
+        status: 'CLEARED',
+        transactionSplitId: 'split-1',
+      } as any;
+      render(<InvestmentTransactionForm accounts={accounts} transaction={embedded} />);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Status')).toBeDisabled();
+      });
+      expect(
+        screen.getByText(/This transaction is part of a split/),
+      ).toBeInTheDocument();
+    });
+
+    it('does not disable the select for an ordinary (non-embedded) edit', async () => {
+      const transaction = {
+        id: 't1', accountId: 'a1', action: 'BUY' as const, transactionDate: '2024-01-01',
+        quantity: 10, price: 50, commission: 5, totalAmount: 505, description: '',
+        status: 'CLEARED',
+      } as any;
+      render(<InvestmentTransactionForm accounts={accounts} transaction={transaction} />);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Status')).not.toBeDisabled();
+      });
+      expect(
+        screen.queryByText(/This transaction is part of a split/),
+      ).not.toBeInTheDocument();
+    });
+
+    it('sends the selected status in the create payload', async () => {
+      // sec-1 is USD and a1 is CAD, so this posts a cross-currency cash leg:
+      // give it a rate, or the form (correctly) refuses to commit an unpriced
+      // trade.
+      getMarketRateMock.mockReturnValue(1.35);
+      render(<InvestmentTransactionForm accounts={accounts} />);
+      await waitFor(() => {
+        expect(screen.getByText('Brokerage Account')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brokerage Account'), {
+          target: { value: 'a1' },
+        });
+      });
+      await waitFor(() => {
+        expect(screen.getByLabelText('Security')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Security'), {
+          target: { value: 'sec-1' },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Status'), {
+          target: { value: 'CLEARED' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Create Transaction'));
+      });
+      await waitFor(() => {
+        expect(investmentsApi.createTransaction).toHaveBeenCalled();
+      });
+      const payload = vi.mocked(investmentsApi.createTransaction).mock
+        .calls[0][0] as any;
+      expect(payload.status).toBe('CLEARED');
+    });
+
+    it('defaults the payload status to UNRECONCILED when the user leaves it alone', async () => {
+      getMarketRateMock.mockReturnValue(1.35);
+      render(<InvestmentTransactionForm accounts={accounts} />);
+      await waitFor(() => {
+        expect(screen.getByText('Brokerage Account')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brokerage Account'), {
+          target: { value: 'a1' },
+        });
+      });
+      await waitFor(() => {
+        expect(screen.getByLabelText('Security')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Security'), {
+          target: { value: 'sec-1' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Create Transaction'));
+      });
+      await waitFor(() => {
+        expect(investmentsApi.createTransaction).toHaveBeenCalled();
+      });
+      const payload = vi.mocked(investmentsApi.createTransaction).mock
+        .calls[0][0] as any;
+      expect(payload.status).toBe('UNRECONCILED');
+    });
+  });
 });
 
 describe('InvestmentTransactionForm - extra coverage', () => {

@@ -213,6 +213,7 @@
     "pricePerShare": "Giá mỗi cổ phiếu ({currency})",
     "commissionFees": "Hoa hồng / Phí ({currency})",
     "description": "Mô tả (tùy chọn)",
+    "statusLockedToParent": "Giao dịch này là một phần của giao dịch được chia nhỏ. Hãy thay đổi trạng thái của giao dịch được chia nhỏ, để cả hai bên thay đổi cùng nhau.",
     "descriptionPlaceholder": "Ghi chú tùy chọn",
     "splitRatio": "Tỷ lệ tách",
     "noSplitRatioWarning": "Không có tỷ lệ tách nào được đặt trong giao dịch này. Nhập tỷ lệ như đã công bố trước khi lưu — Monize sẽ không tự giả định cho bạn.",

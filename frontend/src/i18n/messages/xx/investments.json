@@ -213,6 +213,7 @@
     "pricePerShare": "[XX-Price per Share ({currency})-XX]",
     "commissionFees": "[XX-Commission / Fees ({currency})-XX]",
     "description": "[XX-Description (optional)-XX]",
+    "statusLockedToParent": "[XX-This transaction is part of a split. Change the split transaction's status instead, so both sides change together.-XX]",
     "descriptionPlaceholder": "[XX-Optional notes-XX]",
     "splitRatio": "[XX-Split ratio-XX]",
     "noSplitRatioWarning": "[XX-No split ratio is set on this transaction. Enter the ratio as it was announced before saving — Monize won't assume one for you.-XX]",

@@ -213,6 +213,7 @@
     "pricePerShare": "Prezzo per azione ({currency})",
     "commissionFees": "Commissione / Spese ({currency})",
     "description": "Descrizione (facoltativa)",
+    "statusLockedToParent": "Questa transazione fa parte di una transazione suddivisa. Modifica invece lo stato della transazione suddivisa, in modo che entrambi i lati cambino insieme.",
     "descriptionPlaceholder": "Note facoltative",
     "splitRatio": "Rapporto di suddivisione",
     "noSplitRatioWarning": "Nessun rapporto di suddivisione impostato per questa transazione. Inserisci il rapporto come annunciato prima di salvare — Monize non ne assumerà uno per te.",

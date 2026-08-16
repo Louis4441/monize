@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { DataSource, FindOptionsWhere, In, LessThanOrEqual } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Holding } from "./entities/holding.entity";
+import { NON_VOID_INVESTMENT_STATUS } from "./investment-row-effects.util";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -693,6 +694,7 @@ export class PortfolioCalculationService {
          WHERE user_id = $1
            AND account_id = ANY($2)
            AND transaction_date <= CURRENT_DATE
+           AND status != 'VOID'
          GROUP BY account_id`,
         [userId, accountIds],
       ),
@@ -795,6 +797,8 @@ export class PortfolioCalculationService {
           userId,
           accountId: In(holdingsAccountIds),
           transactionDate: LessThanOrEqual(today),
+          // Rows as effects: a VOID transaction moved no shares and no cost.
+          status: NON_VOID_INVESTMENT_STATUS,
         },
         order: { transactionDate: "ASC", createdAt: "ASC" },
       }),
@@ -1222,6 +1226,9 @@ export class PortfolioCalculationService {
       where.transactionDate = LessThanOrEqual(endDate);
     }
 
+    // Rows as effects: a VOID transaction moved no shares and no cost.
+    where.status = NON_VOID_INVESTMENT_STATUS;
+
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
         where,
@@ -1395,6 +1402,9 @@ export class PortfolioCalculationService {
       where.accountId = In(accountIds);
     }
     where.transactionDate = LessThanOrEqual(endDate);
+
+    // Rows as effects: a VOID transaction moved no shares and no cost.
+    where.status = NON_VOID_INVESTMENT_STATUS;
 
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
@@ -2496,7 +2506,8 @@ export class PortfolioCalculationService {
        FROM investment_transactions
        WHERE user_id = $1
          AND account_id = ANY($2)
-         AND transaction_date <= CURRENT_DATE`,
+         AND transaction_date <= CURRENT_DATE
+         AND status != 'VOID'`,
           [userId, allInvestmentAccountIds],
         ),
     );
@@ -2601,7 +2612,12 @@ export class PortfolioCalculationService {
     // Fetch all investment transactions for these accounts, ordered by date
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
-        where: { userId, accountId: In(holdingsAccountIds) },
+        // Rows as effects: a VOID transaction moved no shares and no cost.
+        where: {
+          userId,
+          accountId: In(holdingsAccountIds),
+          status: NON_VOID_INVESTMENT_STATUS,
+        },
         relations: ["security"],
         order: { transactionDate: "ASC", createdAt: "ASC" },
       }),

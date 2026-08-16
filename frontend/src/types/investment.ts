@@ -1,4 +1,5 @@
 import { Tag } from './tag';
+import { TransactionStatus } from './transaction';
 
 export type InvestmentAction =
   | 'BUY'
@@ -263,8 +264,15 @@ export interface InvestmentTransaction {
   totalAmount: number;
   exchangeRate: number;
   description: string | null;
+  // Same enum as regular transactions. A VOID row moves no shares and no
+  // cash; the register strikes it through and excludes it from balances.
+  status: TransactionStatus;
   // Set on security-transfer legs; points at the paired TRANSFER_IN/OUT leg.
   linkedTransactionId: string | null;
+  // Set when this row is embedded inside a split transaction. The parent
+  // split transaction owns the row's status; the form disables the status
+  // field and the backend refuses a direct change.
+  transactionSplitId?: string | null;
   security: Security | null;
   fundingAccount: {
     id: string;
@@ -292,6 +300,8 @@ export interface SecurityHistoryTransaction {
   commission: number;
   totalAmount: number;
   description: string | null;
+  // A VOID row is listed but moved no shares; the running balances skip it.
+  status: TransactionStatus;
   runningQuantityAccount: number;
   runningQuantityAll: number;
 }
@@ -462,6 +472,7 @@ export interface CreateInvestmentTransactionData {
   commission?: number;
   exchangeRate?: number;
   description?: string;
+  status?: TransactionStatus;
 }
 
 export interface TopMover {

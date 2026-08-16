@@ -213,6 +213,7 @@
     "pricePerShare": "Cena za udział ({currency})",
     "commissionFees": "Prowizja / Opłaty ({currency})",
     "description": "Opis (opcjonalnie)",
+    "statusLockedToParent": "Ta transakcja jest częścią transakcji podzielonej. Zamiast tego zmień status transakcji podzielonej, aby obie strony zmieniły się razem.",
     "descriptionPlaceholder": "Opcjonalne notatki",
     "splitRatio": "Współczynnik splitu",
     "noSplitRatioWarning": "Dla tej transakcji nie ustawiono współczynnika splitu. Wprowadź współczynnik zgodnie z ogłoszeniem przed zapisaniem — Monize nie założy go za Ciebie.",

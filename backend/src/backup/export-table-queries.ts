@@ -287,6 +287,7 @@ export function buildExportTableQueries(
             JOIN accounts a ON h.account_id = a.id
             WHERE a.user_id = $1`,
     },
+    // includes VOID rows: records read -- a backup keeps every row.
     {
       key: "investment_transactions",
       sql: "SELECT * FROM investment_transactions WHERE user_id = $1",

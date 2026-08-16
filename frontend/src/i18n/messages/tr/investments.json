@@ -213,6 +213,7 @@
     "pricePerShare": "Hisse Başı Fiyat ({currency})",
     "commissionFees": "Komisyon / Ücretler ({currency})",
     "description": "Açıklama (isteğe bağlı)",
+    "statusLockedToParent": "Bu işlem, bölünmüş bir işlemin parçasıdır. İki tarafın birlikte değişmesi için bunun yerine bölünmüş işlemin durumunu değiştirin.",
     "descriptionPlaceholder": "İsteğe bağlı notlar",
     "splitRatio": "Bölünme oranı",
     "noSplitRatioWarning": "Bu işlemde bölünme oranı belirlenmemiş. Kaydetmeden önce duyurulduğu şekilde oranı girin — Monize sizin için bir oran varsaymaz.",

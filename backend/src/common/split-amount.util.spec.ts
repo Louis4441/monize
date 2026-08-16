@@ -113,4 +113,5 @@ describe("validateSplitAmountSum", () => {
         ),
       ).toThrow(/must equal transaction amount/);
     });
-  });});
+  });
+});

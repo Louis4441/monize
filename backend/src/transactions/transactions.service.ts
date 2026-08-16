@@ -1943,6 +1943,8 @@ export class TransactionsService {
     const attachmentCountMap = new Map<string, number>();
 
     if (transactionIds.length > 0) {
+      // includes VOID rows: records read -- the register links a VOID cash
+      // leg to its investment row exactly as an active one.
       const linkedInvestmentTxs = await m
         .getRepository(InvestmentTransaction)
         .find({

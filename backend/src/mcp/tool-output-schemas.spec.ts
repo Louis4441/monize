@@ -583,6 +583,7 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
           totalAmount: 100,
           currency: "USD",
           description: null,
+          status: "CLEARED",
         },
       ],
       truncatedTransactionList: false,

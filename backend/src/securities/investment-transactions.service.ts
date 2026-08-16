@@ -10,7 +10,14 @@ import {
 import { tr } from "../i18n/translate";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
-import { lockTransactionRow, lockTransactionRows } from "../common/db/locks";
+import {
+  lockTransactionRow,
+  lockTransactionRows,
+  lockInvestmentTransactionRow,
+  LockedInvestmentTransactionRow,
+} from "../common/db/locks";
+import { applyVoidTransitionToMirrorLeg } from "../transactions/void-status-transition.util";
+import { investmentRowHasEffect } from "./investment-row-effects.util";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -53,6 +60,7 @@ import {
   TransactionStatus,
 } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { isTransactionInFuture } from "../common/date-utils";
 import { deletionBalanceEffect } from "../common/deletion-balance.util";
@@ -129,6 +137,11 @@ export interface LlmInvestmentTxRow {
   totalAmount: number;
   currency: string | null;
   description: string | null;
+  /**
+   * A VOID row is listed so the model can see the record exists, but it moved
+   * no money or shares and is excluded from every total and group sum.
+   */
+  status: string;
 }
 
 export interface LlmInvestmentTxGroup {
@@ -172,6 +185,8 @@ export interface SecurityHistoryTransaction {
   commission: number;
   totalAmount: number;
   description: string | null;
+  /** A VOID row is listed but moved no shares; the running balances skip it. */
+  status: TransactionStatus;
   /** Running share balance within this transaction's own account. */
   runningQuantityAccount: number;
   /** Running share balance across all accounts the security is held in. */
@@ -607,6 +622,13 @@ export class InvestmentTransactionsService {
       cashCurrency.decimalPlaces,
     );
 
+    // The cash leg is created with the investment row's status -- the two rows
+    // describe one event, and a VOID trade's cash leg saying CLEARED would be
+    // the pair describing two different events. Afterwards only the VOID
+    // boundary stays shared; reconciliation states are per-ledger.
+    const status =
+      investmentTransaction.status ?? TransactionStatus.UNRECONCILED;
+
     const cashTransaction = manager.create(Transaction, {
       userId,
       accountId: cashAccount.id,
@@ -617,7 +639,7 @@ export class InvestmentTransactionsService {
       payeeName,
       payeeId: null,
       description: investmentTransaction.description,
-      status: TransactionStatus.CLEARED,
+      status,
     });
 
     const saved = await manager.save(cashTransaction);
@@ -625,8 +647,12 @@ export class InvestmentTransactionsService {
     // Defer the live balance update for future-dated cash entries -- the
     // hourly applyDueTransactionBalances cron rolls them into currentBalance
     // when the user's local date catches up. Crediting now would double-count
-    // once the cron runs.
-    if (!isTransactionInFuture(investmentTransaction.transactionDate)) {
+    // once the cron runs. A VOID leg records a movement that did not happen,
+    // so it never moves the balance at all.
+    if (
+      status !== TransactionStatus.VOID &&
+      !isTransactionInFuture(investmentTransaction.transactionDate)
+    ) {
       await this.accountsService.updateBalance(cashAccount.id, cashAmount);
     }
 
@@ -789,6 +815,9 @@ export class InvestmentTransactionsService {
         totalAmount,
         exchangeRate,
         description: createDto.description,
+        // Part of what the row is created WITH, so no path can apply an
+        // active effect for a VOID event and fix the status up afterwards.
+        status: createDto.status ?? TransactionStatus.UNRECONCILED,
       });
 
       const saved = await manager.save(investmentTransaction);
@@ -820,8 +849,11 @@ export class InvestmentTransactionsService {
 
     if (
       createDto.securityId &&
+      createDto.status !== TransactionStatus.VOID &&
       InvestmentTransactionsService.PRICE_ACTIONS.has(createDto.action)
     ) {
+      // A VOID trade's price is not a settled observation, so it contributes
+      // no transaction-derived price row.
       this.securityPriceService
         .upsertTransactionPrice(createDto.securityId, createDto.transactionDate)
         .catch((err) =>
@@ -1737,7 +1769,13 @@ export class InvestmentTransactionsService {
     // cron rolls the cash balance forward when the date arrives; an explicit
     // backfill of holdings happens via update()/remove() reverse+reapply paths
     // when the user later edits the transaction.
+    //
+    // A VOID row is the same shape on the holdings axis, permanently: it still
+    // gets its cash leg (created VOID, moving no balance, so the event stays
+    // visible in the cash ledger) but never touches holdings.
     const isFuture = isTransactionInFuture(transaction.transactionDate);
+    const isVoid = transaction.status === TransactionStatus.VOID;
+    const movesShares = !isFuture && !isVoid;
 
     const {
       action,
@@ -1768,7 +1806,7 @@ export class InvestmentTransactionsService {
 
     switch (action) {
       case InvestmentAction.BUY:
-        if (!isFuture) {
+        if (movesShares) {
           await this.holdingsService.updateHolding(
             userId,
             accountId,
@@ -1795,7 +1833,7 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.SELL:
-        if (!isFuture) {
+        if (movesShares) {
           await this.holdingsService.updateHolding(
             userId,
             accountId,
@@ -1836,7 +1874,7 @@ export class InvestmentTransactionsService {
         // shares would be blended in at cost 0 and poison the average cost, so
         // keep the price guard here. Only TRANSFER_IN/OUT (whose carried cost
         // can legitimately be 0) drop it.
-        if (!isFuture && securityId && quantity && price) {
+        if (movesShares && securityId && quantity && price) {
           await this.holdingsService.updateHolding(
             userId,
             accountId,
@@ -1855,7 +1893,7 @@ export class InvestmentTransactionsService {
         // `price` carries the post-split per-share market price for
         // reporting; the cost basis comes from the existing holding, not
         // from `price`.
-        if (!isFuture && securityId && quantity) {
+        if (movesShares && securityId && quantity) {
           await this.holdingsService.applySplit(
             accountId,
             securityId,
@@ -1866,7 +1904,7 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.TRANSFER_IN:
-        if (!isFuture && securityId && quantity) {
+        if (movesShares && securityId && quantity) {
           await this.holdingsService.updateHolding(
             userId,
             accountId,
@@ -1882,7 +1920,7 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.TRANSFER_OUT:
-        if (!isFuture && securityId && quantity) {
+        if (movesShares && securityId && quantity) {
           await this.holdingsService.updateHolding(
             userId,
             accountId,
@@ -1896,7 +1934,7 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.ADD_SHARES:
-        if (!isFuture && securityId && quantity) {
+        if (movesShares && securityId && quantity) {
           await this.holdingsService.adjustQuantity(
             userId,
             accountId,
@@ -1908,7 +1946,7 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.REMOVE_SHARES:
-        if (!isFuture && securityId && quantity) {
+        if (movesShares && securityId && quantity) {
           await this.holdingsService.adjustQuantity(
             userId,
             accountId,
@@ -1960,6 +1998,12 @@ export class InvestmentTransactionsService {
      * Omitted by callers that have no split amount to check.
      */
     splitAmount?: number,
+    /**
+     * The parent transaction's status. The parent owns an embedded row's
+     * status: a VOID parent's investment row is created VOID and applies no
+     * holdings, for the same reason its transfer counterparts are created VOID.
+     */
+    parentStatus?: TransactionStatus,
   ): Promise<InvestmentTransaction> {
     if (!isInvestmentActionAllowedInSplit(dto.action)) {
       throw new BadRequestException(
@@ -2077,6 +2121,7 @@ export class InvestmentTransactionsService {
       totalAmount,
       exchangeRate,
       description: dto.description ?? null,
+      status: parentStatus ?? TransactionStatus.UNRECONCILED,
     });
 
     const saved = await manager.save(investmentTransaction);
@@ -2108,6 +2153,94 @@ export class InvestmentTransactionsService {
       investmentTransaction,
     );
     await manager.remove(investmentTransaction);
+  }
+
+  /**
+   * Carry a split parent's status onto its embedded investment rows. The
+   * parent owns an embedded row's status: only the VOID boundary moves
+   * anything, and a row crossing it applies or reverses its holdings effect
+   * (the parent's own amount is the cash side, handled by the caller's
+   * balance path). Returns the brokerage accounts whose holdings moved, for
+   * the caller's post-commit invalidation -- the recalculation is not
+   * dispatched from in here, because this runs inside the caller's
+   * transaction and a rollback must not leave a recompute queued.
+   *
+   * Called from TransactionSplitService.applyParentStatusToTransferCounterparts
+   * so every route a parent's status change takes (single update, dedicated
+   * status endpoint, bulk update) propagates through one place.
+   */
+  async applyParentStatusToEmbeddedRows(
+    manager: EntityManager,
+    userId: string,
+    parentTransactionId: string,
+    newStatus: TransactionStatus,
+  ): Promise<Set<string>> {
+    const affectedAccountIds = new Set<string>();
+
+    const splits = await manager.getRepository(TransactionSplit).find({
+      where: { transactionId: parentTransactionId },
+      select: ["id", "kind"],
+    });
+    const investmentSplitIds = splits
+      .filter((split) => split.kind === SplitKind.INVESTMENT)
+      .map((split) => split.id);
+    if (investmentSplitIds.length === 0) return affectedAccountIds;
+
+    const isVoid = newStatus === TransactionStatus.VOID;
+    const securityIds = new Set<string>();
+
+    for (const splitId of investmentSplitIds) {
+      const rows = await manager.getRepository(InvestmentTransaction).find({
+        // includes VOID rows: records read -- the boundary decision below is
+        // exactly about the rows already on the other side.
+        where: { userId, transactionSplitId: splitId },
+      });
+      for (const row of rows) {
+        const wasVoid = row.status === TransactionStatus.VOID;
+        if (wasVoid === isVoid) continue;
+
+        if (isVoid) {
+          // Reverse at the row's stored (active) status; the row has no cash
+          // side of its own (the parent's amount is the cash side).
+          await this.reverseTransactionEffectsInTransaction(
+            manager,
+            userId,
+            row,
+            undefined,
+            { keepCashSide: true },
+          );
+        }
+        await manager.update(InvestmentTransaction, row.id, {
+          status: newStatus,
+        });
+        if (!isVoid) {
+          row.status = newStatus;
+          await this.processTransactionEffectsInTransaction(
+            manager,
+            userId,
+            row,
+            true,
+            false,
+          );
+        }
+        affectedAccountIds.add(row.accountId);
+        if (row.securityId) securityIds.add(row.securityId);
+      }
+    }
+
+    if (affectedAccountIds.size > 0) {
+      // A crossing that would oversell -- voiding a BUY whose shares a later
+      // SELL disposed of, un-voiding a SELL the position cannot cover -- is
+      // refused here, rolling the parent's whole status change back.
+      await this.holdingsService.validateNoNegativeHoldingsHistory(
+        userId,
+        manager,
+        Array.from(affectedAccountIds),
+        securityIds.size > 0 ? Array.from(securityIds) : undefined,
+      );
+    }
+
+    return affectedAccountIds;
   }
 
   /**
@@ -2184,7 +2317,10 @@ export class InvestmentTransactionsService {
       amount: newParentAmount,
     });
 
-    if (delta !== 0) {
+    // A VOID parent contributed nothing to the balance, so a change to what it
+    // records moves nothing either -- the delta belongs only to a parent whose
+    // amount is actually in the balance.
+    if (delta !== 0 && parentTransaction.status !== TransactionStatus.VOID) {
       if (isTransactionInFuture(parentTransaction.transactionDate)) {
         await this.accountsService.recalculateCurrentBalance(
           userId,
@@ -2218,6 +2354,8 @@ export class InvestmentTransactionsService {
     // Count and page share one scoped transaction so the total cannot drift
     // from the rows returned beside it.
     return withScopedDb(this.dataSource, async (m) => {
+      // includes VOID rows: records read -- the register lists a VOID row,
+      // struck through, exactly as the cash register does.
       const query = m
         .getRepository(InvestmentTransaction)
         .createQueryBuilder("it")
@@ -2304,6 +2442,8 @@ export class InvestmentTransactionsService {
     // Validates ownership and existence (works for inactive securities too).
     const security = await this.securitiesService.findOne(userId, securityId);
 
+    // includes VOID rows: records read -- the history lists a VOID row,
+    // flagged; the running share balances below skip it.
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
         where: { userId, securityId },
@@ -2326,11 +2466,15 @@ export class InvestmentTransactionsService {
       }
 
       const prevBalance = balances.get(accountId) ?? 0;
-      const newBalance = this.applyQuantityToBalance(
-        prevBalance,
-        tx.action,
-        Number(tx.quantity) || 0,
-      );
+      // The row list is a record, so a VOID row stays visible -- but it moved
+      // no shares, so the running balances skip it.
+      const newBalance = investmentRowHasEffect(tx)
+        ? this.applyQuantityToBalance(
+            prevBalance,
+            tx.action,
+            Number(tx.quantity) || 0,
+          )
+        : prevBalance;
       balances.set(accountId, newBalance);
       // Delta keeps the cross-account total correct even for SPLIT, which
       // multiplies a single account's balance rather than adding to it.
@@ -2347,6 +2491,7 @@ export class InvestmentTransactionsService {
         commission: Number(tx.commission) || 0,
         totalAmount: Number(tx.totalAmount) || 0,
         description: tx.description,
+        status: tx.status,
         runningQuantityAccount: newBalance,
         runningQuantityAll: runningAll,
       };
@@ -2686,6 +2831,7 @@ export class InvestmentTransactionsService {
   }
 
   async findOne(userId: string, id: string): Promise<InvestmentTransaction> {
+    // includes VOID rows: records read -- a VOID row is still viewable.
     const transaction = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(InvestmentTransaction)
@@ -2834,6 +2980,22 @@ export class InvestmentTransactionsService {
         );
       }
 
+      // Status: applied to the edited leg; the pair shares only the VOID
+      // boundary (two rows describing one movement of shares), while
+      // reconciliation states stay per-leg. The reversal above keyed on each
+      // leg's OLD status and the reapplication below keys on the new one, so
+      // a crossing moves both legs' holdings and a non-crossing change moves
+      // neither.
+      if (updateDto.status !== undefined) {
+        const crossesVoid =
+          (editedLeg.status === TransactionStatus.VOID) !==
+          (updateDto.status === TransactionStatus.VOID);
+        editedLeg.status = updateDto.status;
+        if (crossesVoid) {
+          linkedLeg.status = updateDto.status;
+        }
+      }
+
       // Shared fields applied to both legs.
       const applyShared = (leg: InvestmentTransaction) => {
         if (updateDto.securityId !== undefined) {
@@ -2925,6 +3087,170 @@ export class InvestmentTransactionsService {
     return result;
   }
 
+  /**
+   * Change only the status, without touching the financial rows: the register's
+   * click-to-cycle path. UNRECONCILED/CLEARED/RECONCILED move nothing but the
+   * column; crossing the VOID boundary applies or reverses the row's holdings
+   * effect and carries the existing cash leg (and a linked transfer leg) across
+   * with it -- the leg is flipped in place, not deleted and recreated, because
+   * a status change is not an edit of the financial rows.
+   *
+   * Everything -- the status the transition is decided from, the refusals, the
+   * holdings move, the oversell validation -- runs inside one transaction under
+   * a row lock, so a refusal leaves nothing written (contract section 7).
+   */
+  async updateStatus(
+    userId: string,
+    id: string,
+    newStatus: TransactionStatus,
+  ): Promise<InvestmentTransaction> {
+    const outcome = await withScopedDb(this.dataSource, async (manager) => {
+      const locked = await lockInvestmentTransactionRow(manager, id, userId);
+      if (!locked) {
+        throw new NotFoundException(
+          tr(
+            "errors.securities.investmentTransactionNotFound",
+            `Investment transaction with ID ${id} not found`,
+            { id },
+          ),
+        );
+      }
+
+      if (locked.status === newStatus) {
+        return { affectedAccountIds: new Set<string>(), splitTouched: false };
+      }
+
+      // The parent split transaction owns an embedded row's status; see
+      // update() for the same refusal on the generic edit path.
+      if (locked.transactionSplitId) {
+        throw new BadRequestException(
+          tr(
+            "errors.securities.embeddedStatusLocked",
+            "This investment transaction is part of a split transaction. Change the split transaction's status instead, so both sides change together.",
+          ),
+        );
+      }
+
+      const wasVoid = locked.status === TransactionStatus.VOID;
+      const isVoid = newStatus === TransactionStatus.VOID;
+
+      if (wasVoid === isVoid) {
+        // Purely presentational: only crossing the VOID boundary moves money
+        // or shares.
+        await manager.update(InvestmentTransaction, id, { status: newStatus });
+        return { affectedAccountIds: new Set<string>(), splitTouched: false };
+      }
+
+      // Crossing. A linked transfer leg is the same movement of shares, so it
+      // crosses with this row; a leg already on the target side is left alone.
+      const legs: LockedInvestmentTransactionRow[] = [locked];
+      if (locked.linkedTransactionId) {
+        const linkedLeg = await lockInvestmentTransactionRow(
+          manager,
+          locked.linkedTransactionId,
+          userId,
+        );
+        if (
+          linkedLeg &&
+          (linkedLeg.status === TransactionStatus.VOID) !== isVoid
+        ) {
+          legs.push(linkedLeg);
+        }
+      }
+
+      const affectedAccountIds = new Set<string>();
+      const securityIds = new Set<string>();
+      let splitTouched = false;
+
+      for (const leg of legs) {
+        affectedAccountIds.add(leg.accountId);
+        if (leg.securityId) securityIds.add(leg.securityId);
+        // No quantity is folded here -- a crossing on a SPLIT row is followed
+        // by a full rebuildFromTransactions after commit, same as
+        // create()/update(); this only remembers that one was touched.
+        splitTouched =
+          splitTouched || leg.action === (InvestmentAction.SPLIT as string);
+
+        if (isVoid) {
+          // Reverse the holdings effect at the leg's stored (active) status,
+          // leaving the cash row in place -- it crosses the boundary below.
+          await this.reverseTransactionEffectsInTransaction(
+            manager,
+            userId,
+            leg as unknown as InvestmentTransaction,
+            undefined,
+            { keepCashSide: true },
+          );
+        }
+
+        await manager.update(InvestmentTransaction, leg.id, {
+          status: newStatus,
+        });
+
+        if (!isVoid) {
+          // Apply the holdings effect under the new (active) status; the cash
+          // row already exists, so no cash side is created here.
+          const activeLeg = {
+            ...leg,
+            status: newStatus,
+          } as unknown as InvestmentTransaction;
+          await this.processTransactionEffectsInTransaction(
+            manager,
+            userId,
+            activeLeg,
+            true,
+            false,
+          );
+        }
+
+        // The cash leg shares the VOID boundary: same helper, same rules
+        // (adjusted by its own amount; future-dated resolves by recalculation)
+        // as a transfer's mirror leg.
+        if (leg.transactionId) {
+          const cashAccountIds = await applyVoidTransitionToMirrorLeg(
+            manager,
+            this.accountsService,
+            userId,
+            { linkedTransactionId: leg.transactionId },
+            newStatus,
+          );
+          for (const accountId of cashAccountIds) {
+            affectedAccountIds.add(accountId);
+          }
+        }
+      }
+
+      // A crossing that would oversell is refused, rolling everything above
+      // back: a rejected command must not already have written.
+      await this.holdingsService.validateNoNegativeHoldingsHistory(
+        userId,
+        manager,
+        Array.from(affectedAccountIds),
+        securityIds.size > 0 ? Array.from(securityIds) : undefined,
+      );
+
+      return { affectedAccountIds, splitTouched };
+    });
+
+    // SPLIT mutations compound on holding state, so a boundary crossing on one
+    // is followed by a full rebuild -- same rule as create()/update().
+    if (outcome.splitTouched) {
+      await this.holdingsService
+        .rebuildFromTransactions(userId)
+        .catch((err) =>
+          this.logger.warn(
+            `Holdings rebuild after SPLIT status change failed: ${err.message}`,
+          ),
+        );
+    }
+
+    for (const accountId of outcome.affectedAccountIds) {
+      this.triggerRecalcWithCashAccount(accountId, userId);
+    }
+
+    return this.findOne(userId, id);
+  }
+
   async update(
     userId: string,
     id: string,
@@ -2940,6 +3266,8 @@ export class InvestmentTransactionsService {
         transaction.action === InvestmentAction.TRANSFER_OUT)
     ) {
       const linkedLeg = await withScopedDb(this.dataSource, (m) =>
+        // includes VOID rows: records read -- the paired leg is loaded
+        // whatever its status.
         m.getRepository(InvestmentTransaction).findOne({
           where: { id: transaction.linkedTransactionId!, userId },
         }),
@@ -3020,6 +3348,22 @@ export class InvestmentTransactionsService {
           ),
         );
       }
+      // The parent split transaction owns an embedded row's status: the
+      // parent's amount is the cash side of this event, so the row crossing
+      // the VOID boundary alone would leave the pair describing two different
+      // events. Keyed on the value differing, not on the field being present
+      // -- the form resends the current status on every save.
+      if (
+        updateDto.status !== undefined &&
+        updateDto.status !== transaction.status
+      ) {
+        throw new BadRequestException(
+          tr(
+            "errors.securities.embeddedStatusLocked",
+            "This investment transaction is part of a split transaction. Change the split transaction's status instead, so both sides change together.",
+          ),
+        );
+      }
     }
 
     // The row as stored, read before any assignment below moves it. The
@@ -3096,6 +3440,11 @@ export class InvestmentTransactionsService {
         transaction.commission = updateDto.commission;
       if (updateDto.description !== undefined)
         transaction.description = updateDto.description;
+      // The reversal above ran against the stored (old) status, so a VOID row
+      // undid nothing; the reapplication below runs against the new one, so an
+      // edit that crosses the boundary composes from the same two halves as
+      // every other edit.
+      if (updateDto.status !== undefined) transaction.status = updateDto.status;
 
       if (
         updateDto.quantity !== undefined ||
@@ -3258,8 +3607,10 @@ export class InvestmentTransactionsService {
     const newAction = transaction.action;
     if (
       newSecurityId &&
+      transaction.status !== TransactionStatus.VOID &&
       InvestmentTransactionsService.PRICE_ACTIONS.has(newAction)
     ) {
+      // A VOID trade's price is not a settled observation.
       this.securityPriceService
         .upsertTransactionPrice(newSecurityId, newTransactionDate)
         .catch((err) =>
@@ -3306,6 +3657,15 @@ export class InvestmentTransactionsService {
     userId: string,
     transaction: InvestmentTransaction,
     isFutureOverride?: boolean,
+    options?: {
+      /**
+       * Leave the linked cash Transaction row in place. Used by updateStatus,
+       * which flips the existing cash leg across the VOID boundary instead of
+       * deleting and recreating it -- a status change is not an edit of the
+       * financial rows.
+       */
+      keepCashSide?: boolean;
+    },
   ): Promise<void> {
     // Cash transactions are now created for future-dated investments too
     // (they show as projected entries in the cash account ledger), so always
@@ -3328,7 +3688,7 @@ export class InvestmentTransactionsService {
       transactionId,
     } = transaction;
 
-    if (transactionId) {
+    if (transactionId && !options?.keepCashSide) {
       // Clear the FK reference BEFORE deleting the cash transaction
       await manager.update(InvestmentTransaction, transaction.id, {
         transactionId: null,
@@ -3344,6 +3704,14 @@ export class InvestmentTransactionsService {
     if (isFuture) {
       // Holdings were never updated for this future-dated row, so nothing
       // to undo on that side.
+      return;
+    }
+
+    if (transaction.status === TransactionStatus.VOID) {
+      // A VOID row never touched holdings, so there is nothing to undo there
+      // either -- the cash teardown above already reversed only what the leg
+      // actually contributed (deletionBalanceEffect: a VOID leg moved nothing).
+      // A deletion reverses only what the row actually contributed.
       return;
     }
 
@@ -3503,6 +3871,8 @@ export class InvestmentTransactionsService {
     // left half-moved.
     const linkedLeg = transaction.linkedTransactionId
       ? await withScopedDb(this.dataSource, (m) =>
+          // includes VOID rows: records read -- the paired leg is loaded
+          // whatever its status.
           m.getRepository(InvestmentTransaction).findOne({
             where: { id: transaction.linkedTransactionId!, userId },
           }),
@@ -3620,6 +3990,8 @@ export class InvestmentTransactionsService {
       groupBy?: LlmInvestmentTxGroupBy;
     },
   ): Promise<LlmInvestmentTransactionsResult> {
+    // includes VOID rows: records read -- the model sees a VOID row, flagged;
+    // the sums and group folds below skip it.
     const rows = await withScopedDb(this.dataSource, async (m) => {
       const query = m
         .getRepository(InvestmentTransaction)
@@ -3680,6 +4052,9 @@ export class InvestmentTransactionsService {
     const actionCounts: Record<string, number> = {};
 
     for (const r of rows) {
+      // Rows as effects for the sums: a VOID row is listed below, flagged, but
+      // moved no money or shares, so it joins no total.
+      if (!investmentRowHasEffect(r)) continue;
       totalAmountScaled += Math.round(Number(r.totalAmount) * 10000);
       totalCommissionScaled += Math.round(Number(r.commission || 0) * 10000);
       if (r.quantity !== null && r.quantity !== undefined) {
@@ -3709,6 +4084,7 @@ export class InvestmentTransactionsService {
         totalAmount: roundMoney(Number(r.totalAmount)),
         currency: r.account?.currencyCode ?? null,
         description: r.description ?? null,
+        status: r.status,
       }));
 
     let groups: LlmInvestmentTxGroup[] | null = null;
@@ -3723,6 +4099,7 @@ export class InvestmentTransactionsService {
         }
       >();
       for (const r of rows) {
+        if (!investmentRowHasEffect(r)) continue;
         const key = this.getLlmInvestmentGroupKey(r, options.groupBy);
         const b = buckets.get(key) ?? {
           amountScaled: 0,
@@ -3784,10 +4161,13 @@ export class InvestmentTransactionsService {
 
   async getSummary(userId: string, accountIds?: string[]) {
     const transactions = await withScopedDb(this.dataSource, async (m) => {
+      // Rows as effects: the counts and money sums are what happened, and a
+      // VOID transaction did not happen.
       const query = m
         .getRepository(InvestmentTransaction)
         .createQueryBuilder("it")
-        .where("it.userId = :userId", { userId });
+        .where("it.userId = :userId", { userId })
+        .andWhere("it.status != 'VOID'");
 
       if (accountIds && accountIds.length > 0) {
         const resolvedIds = new Set<string>(accountIds);
@@ -3842,6 +4222,9 @@ export class InvestmentTransactionsService {
     accountsReset: number;
   }> {
     return withScopedDb(this.dataSource, async (manager) => {
+      // includes VOID rows: records read -- every row is being deleted, and
+      // the per-row balance reversal below already reverses only what each
+      // cash leg actually contributed.
       const transactions = await manager.find(InvestmentTransaction, {
         where: { userId },
       });

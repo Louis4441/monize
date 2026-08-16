@@ -36,9 +36,18 @@ export interface VoidTransitionBalanceWriter {
 }
 
 /**
- * Refuse a VOID-boundary transition applied to a split-transfer counterpart
- * leg on its own. Call inside the write transaction, after establishing the
- * transition actually crosses the boundary.
+ * Refuse a VOID-boundary transition applied to a row that is one half of an
+ * event another row owns, on its own. Call inside the write transaction, after
+ * establishing the transition actually crosses the boundary. Two cases:
+ *
+ * - a split-transfer counterpart leg (the parent's split row and total would
+ *   still record money that left the source and never arrived);
+ * - the linked cash leg of an investment transaction (the trade's shares would
+ *   stay counted while its cash claims not to have moved). The investment row
+ *   owns the pair's VOID boundary and has its own propagation path
+ *   (InvestmentTransactionsService.updateStatus).
+ *
+ * Reconciliation-state changes never reach this check -- those stay per-ledger.
  */
 export async function assertVoidTransitionAllowedOnRow(
   m: EntityManager,
@@ -53,6 +62,22 @@ export async function assertVoidTransitionAllowedOnRow(
       tr(
         "errors.transactions.splitTransferLegStatusLocked",
         "This transfer is part of a split transaction. Void or restore it by editing the split transaction it belongs to, so both sides change together.",
+      ),
+    );
+  }
+
+  // Raw EXISTS rather than the InvestmentTransaction repository: this util
+  // belongs to the transactions module and only asks whether an owner exists.
+  const owningInvestmentRows: { id: string }[] = await m.query(
+    // includes VOID rows: records read -- ownership, not effect.
+    `SELECT id FROM investment_transactions WHERE transaction_id = $1 LIMIT 1`,
+    [transactionId],
+  );
+  if (owningInvestmentRows.length > 0) {
+    throw new BadRequestException(
+      tr(
+        "errors.transactions.investmentCashLegStatusLocked",
+        "This transaction is the cash side of an investment transaction. Void or restore it by changing the investment transaction's status, so both sides change together.",
       ),
     );
   }

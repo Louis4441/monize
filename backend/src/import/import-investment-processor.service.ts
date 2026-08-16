@@ -1,3 +1,4 @@
+import { statusFromQifFlags } from "./qif-status.util";
 import { Injectable, Logger } from "@nestjs/common";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { Security } from "../securities/entities/security.entity";
@@ -174,6 +175,12 @@ export class ImportInvestmentProcessorService {
       totalAmount = 0;
     }
 
+    // The parsed cleared/reconciled/void state, through the same derivation
+    // the regular processor uses. This path used to hard-code CLEARED on both
+    // cash legs and carry nothing on the investment row, so a reconciled QIF
+    // trade imported downgraded and an unreconciled one imported cleared.
+    const status = statusFromQifFlags(qifTx);
+
     // Create investment transaction
     const investmentTx = new InvestmentTransaction();
     investmentTx.userId = ctx.userId;
@@ -186,6 +193,7 @@ export class ImportInvestmentProcessorService {
     investmentTx.commission = commission;
     investmentTx.totalAmount = totalAmount;
     investmentTx.description = qifTx.memo || qifTx.payee || null;
+    investmentTx.status = status;
 
     await ctx.manager.save(investmentTx);
 
@@ -200,15 +208,19 @@ export class ImportInvestmentProcessorService {
       securityId,
     );
 
-    // Update holdings
-    await this.processHoldings(
-      ctx,
-      action,
-      securityId,
-      quantity,
-      price,
-      commission,
-    );
+    // Update holdings. A VOID trade moved no shares: the row is imported so
+    // the record survives, but its effect is excluded exactly as the holdings
+    // rebuild excludes it.
+    if (status !== TransactionStatus.VOID) {
+      await this.processHoldings(
+        ctx,
+        action,
+        securityId,
+        quantity,
+        price,
+        commission,
+      );
+    }
 
     ctx.importResult.imported++;
   }
@@ -307,11 +319,9 @@ export class ImportInvestmentProcessorService {
     if (actionLower === "xout" && cashAmount > 0) {
       cashAmount = -cashAmount;
     }
-    const status = qifTx.reconciled
-      ? TransactionStatus.RECONCILED
-      : qifTx.cleared
-        ? TransactionStatus.CLEARED
-        : TransactionStatus.UNRECONCILED;
+    // Shared derivation -- unlike the old inline ternary this honours a
+    // source-flagged void, so a cancelled transfer never lands live.
+    const status = statusFromQifFlags(qifTx);
 
     let transferAccountId: string | null =
       qifTx.isTransfer && qifTx.transferAccount
@@ -548,7 +558,9 @@ export class ImportInvestmentProcessorService {
     cashTx.payeeName = payeeName;
     cashTx.payeeId = null;
     cashTx.description = investmentTx.description;
-    cashTx.status = TransactionStatus.CLEARED;
+    // The cash leg is the same event as the investment row, so it carries the
+    // row's own parsed status rather than a hard-coded CLEARED.
+    cashTx.status = investmentTx.status ?? TransactionStatus.UNRECONCILED;
     cashTx.isTransfer = isCrossAccountTransfer;
 
     const savedCashTx = await ctx.manager.save(cashTx);
@@ -590,7 +602,8 @@ export class ImportInvestmentProcessorService {
         brokerageTx.payeeName = payeeName;
         brokerageTx.payeeId = null;
         brokerageTx.description = investmentTx.description;
-        brokerageTx.status = TransactionStatus.CLEARED;
+        brokerageTx.status =
+          investmentTx.status ?? TransactionStatus.UNRECONCILED;
         brokerageTx.isTransfer = true;
         brokerageTx.linkedTransactionId = savedCashTx.id;
 

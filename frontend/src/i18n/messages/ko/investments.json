@@ -213,6 +213,7 @@
     "pricePerShare": "주당 가격 ({currency})",
     "commissionFees": "수수료 / 거래비용 ({currency})",
     "description": "설명 (선택사항)",
+    "statusLockedToParent": "이 거래는 분할 거래의 일부입니다. 양쪽이 함께 변경되도록 대신 분할 거래의 상태를 변경하세요.",
     "descriptionPlaceholder": "선택적 메모",
     "splitRatio": "분할 비율",
     "noSplitRatioWarning": "이 거래에 분할 비율이 설정되지 않았습니다. 저장하기 전에 공표된 비율을 입력하세요 — Monize가 자동으로 가정하지 않습니다.",

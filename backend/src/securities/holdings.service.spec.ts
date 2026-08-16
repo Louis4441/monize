@@ -5,6 +5,7 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
+import { NON_VOID_INVESTMENT_STATUS } from "./investment-row-effects.util";
 import {
   Account,
   AccountType,
@@ -2346,6 +2347,81 @@ describe("HoldingsService", () => {
       await service.applyMaturedInvestmentHoldings();
 
       expect(rebuildSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("VOID rows are excluded from every effects read", () => {
+    // Rows as effects: a VOID investment transaction moved no shares, so every
+    // replay/rebuild/validation query filters on NON_VOID_INVESTMENT_STATUS
+    // (docs/specs/investment-transaction-status.md invariant 4). The
+    // repositories are mocked, so the claim each test can make is that the
+    // query itself carries the filter -- a fixture fed past a mocked `where`
+    // would prove nothing.
+    const uid = "11111111-1111-1111-1111-111111111111";
+
+    it("getHoldingAt replays only non-VOID rows", async () => {
+      investmentTransactionsRepository.find.mockResolvedValue([]);
+
+      await service.getHoldingAt(uid, "acc-1", "sec-1", "2025-03-01");
+
+      expect(investmentTransactionsRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: NON_VOID_INVESTMENT_STATUS,
+          }),
+        }),
+      );
+    });
+
+    it("validateNoNegativeHoldingsHistory cannot be oversold by a VOID row", async () => {
+      accountsRepository.find.mockResolvedValue([mockAccount]);
+      investmentTransactionsRepository.find.mockResolvedValue([]);
+
+      await service.validateNoNegativeHoldingsHistory(uid);
+
+      expect(investmentTransactionsRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: NON_VOID_INVESTMENT_STATUS,
+          }),
+        }),
+      );
+    });
+
+    it("rebuildFromTransactions reads only non-VOID rows", async () => {
+      accountsRepository.find.mockResolvedValue([mockAccount]);
+      investmentTransactionsRepository.find.mockResolvedValue([]);
+
+      await service.rebuildFromTransactions(uid);
+
+      expect(investmentTransactionsRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: NON_VOID_INVESTMENT_STATUS,
+          }),
+        }),
+      );
+    });
+
+    it("rebuildAccountsFromTransactions reads only non-VOID rows", async () => {
+      mockQueryRunner.manager.find.mockImplementation(
+        async (entity: unknown) => (entity === Account ? [mockAccount] : []),
+      );
+
+      await service.rebuildAccountsFromTransactions(
+        uid,
+        ["acc-1"],
+        mockQueryRunner.manager as never,
+      );
+
+      expect(mockQueryRunner.manager.find).toHaveBeenCalledWith(
+        InvestmentTransaction,
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: NON_VOID_INVESTMENT_STATUS,
+          }),
+        }),
+      );
     });
   });
 });

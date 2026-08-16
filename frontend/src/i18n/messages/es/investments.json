@@ -213,6 +213,7 @@
     "pricePerShare": "Precio por Acción ({currency})",
     "commissionFees": "Comisión / Tarifas ({currency})",
     "description": "Descripción (opcional)",
+    "statusLockedToParent": "Esta transacción forma parte de una transacción dividida. Cambia el estado de la transacción dividida en su lugar, para que ambos lados cambien juntos.",
     "descriptionPlaceholder": "Notas opcionales",
     "splitRatio": "Ratio de división",
     "noSplitRatioWarning": "Esta transacción no tiene ratio de división establecido. Ingresa el ratio tal como fue anunciado antes de guardar — Monize no asumirá uno por ti.",

@@ -1038,6 +1038,7 @@ export class SecurityPriceService {
           `SELECT security_id, MIN(transaction_date)::TEXT as earliest
          FROM investment_transactions
          WHERE security_id IS NOT NULL
+           AND status != 'VOID'
          GROUP BY security_id`,
         ),
       );
@@ -1587,7 +1588,8 @@ export class SecurityPriceService {
         m.query(
           `SELECT MIN(transaction_date)::TEXT as earliest
          FROM investment_transactions
-         WHERE security_id = $1`,
+         WHERE security_id = $1
+           AND status != 'VOID'`,
           [securityId],
         ),
     );
@@ -1708,12 +1710,14 @@ export class SecurityPriceService {
                WHERE security_id = $1 AND transaction_date = $2
                  AND action IN ('BUY', 'SELL', 'REINVEST')
                  AND price IS NOT NULL
+                 AND status != 'VOID'
                ORDER BY created_at DESC LIMIT 1) as latest_action
        FROM investment_transactions
        WHERE security_id = $1
          AND transaction_date = $2
          AND action IN ('BUY', 'SELL', 'REINVEST')
-         AND price IS NOT NULL`,
+         AND price IS NOT NULL
+         AND status != 'VOID'`,
         [securityId, transactionDate],
       ),
     );
@@ -1770,11 +1774,13 @@ export class SecurityPriceService {
                  AND it2.transaction_date = it.transaction_date
                  AND it2.action IN ('BUY', 'SELL', 'REINVEST')
                  AND it2.price IS NOT NULL
+                 AND it2.status != 'VOID'
                ORDER BY it2.created_at DESC LIMIT 1) as latest_action
        FROM investment_transactions it
        WHERE it.security_id IS NOT NULL
          AND it.price IS NOT NULL
          AND it.action IN ('BUY', 'SELL', 'REINVEST')
+         AND it.status != 'VOID'
        GROUP BY it.security_id, it.transaction_date`,
       ),
     );

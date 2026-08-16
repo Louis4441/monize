@@ -213,6 +213,7 @@
     "pricePerShare": "Preis pro Anteil ({currency})",
     "commissionFees": "Provision / Gebühren ({currency})",
     "description": "Beschreibung (optional)",
+    "statusLockedToParent": "Diese Buchung ist Teil einer aufgeteilten Transaktion. Ändern Sie stattdessen den Status der aufgeteilten Transaktion, damit sich beide Seiten gemeinsam ändern.",
     "descriptionPlaceholder": "Optionale Notizen",
     "splitRatio": "Teilungsverhältnis",
     "noSplitRatioWarning": "Für diese Buchung ist kein Teilungsverhältnis festgelegt. Geben Sie das Verhältnis so ein, wie es angekündigt wurde, bevor Sie speichern – Monize nimmt keines an.",

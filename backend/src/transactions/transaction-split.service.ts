@@ -538,6 +538,9 @@ export class TransactionSplitService {
         // Checked against the resolved rate there: this amount and the
         // investment row have to describe the same money.
         Number(split.amount),
+        // A VOID parent's embedded investment row is created VOID (no
+        // holdings), for the same reason its transfer counterparts are.
+        options?.parentStatus,
       );
 
       savedSplits[index] = savedSplit;
@@ -680,6 +683,21 @@ export class TransactionSplitService {
     // runs inside the caller's transaction, and a rollback must not leave a
     // recompute queued for state that was never committed.
     const affectedAccountIds = new Set<string>();
+
+    // Embedded investment rows are the parent's event too: their holdings
+    // effect follows the parent across the VOID boundary exactly as a transfer
+    // counterpart's balance does. Same transaction, same rollback.
+    const embeddedAffected =
+      await this.investmentTransactionsService.applyParentStatusToEmbeddedRows(
+        m,
+        userId,
+        transactionId,
+        newStatus,
+      );
+    for (const accountId of embeddedAffected) {
+      affectedAccountIds.add(accountId);
+    }
+
     if (counterpartIds.length === 0) return affectedAccountIds;
 
     // The status the transition is decided from and the amount the balance
