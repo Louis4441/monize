@@ -2173,13 +2173,15 @@ export class ScheduledTransactionsService {
       // actually uses the base scheduled splits -- no inline splits and no
       // override splits -- re-read the set under the parent lock and refuse if it
       // changed, so a concurrently-retargeted split cannot post money to the old
-      // account (issue #1154 re-review). This re-read is the safety net on its
-      // own: it compares the committed child set against the pre-lock snapshot
-      // and refuses on any difference, so it does not depend on every writer
-      // taking the parent lock first. Writers that do serialize on that lock
-      // (the loan recalculator) simply never produce a mid-write generation for
-      // it to see; a writer that does not (a bulk category reassignment) is
-      // still caught, because what the guard checks is the value, not the lock.
+      // account (issue #1154 re-review). This is a point-in-time comparison, so
+      // what it protects against depends on when the other writer commits.
+      // Writers that serialize on the parent lock (the loan recalculator) cannot
+      // mutate the split set after this read at all -- the lock is held until the
+      // post commits. A writer that does NOT take the parent lock can still
+      // commit a change *after* this comparison and before the post commits; the
+      // only such known path is bulk category reassignment, whose residual
+      // effect is categorization-only (no amount or account routing changes), so
+      // it is accepted here rather than made to lock every affected parent.
       const usesScheduledSplits =
         useSplits &&
         !hasInlineSplits &&

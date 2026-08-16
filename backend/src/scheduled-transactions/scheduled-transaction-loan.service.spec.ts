@@ -3,7 +3,7 @@ import { DataSource } from "typeorm";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
-import { Account } from "../accounts/entities/account.entity";
+import { Account, AccountType } from "../accounts/entities/account.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -824,6 +824,56 @@ describe("ScheduledTransactionLoanService", () => {
       );
       // next_principal = 500 - 98 = 402
       expect(principalSave[0].amount).toBe(-402);
+    });
+
+    it("should recalculate a LINE_OF_CREDIT schedule (not only LOAN/MORTGAGE)", async () => {
+      // LoanPaymentSetupService accepts LINE_OF_CREDIT, so its scheduled payment
+      // must advance its next principal/interest split too (issue #1154
+      // re-review). balance=910, rate=12%, monthly, payment=100:
+      // periodicRate = 0.12/12 = 0.01
+      // next_interest  = 10 - 90 * 0.01 = 9.10
+      // next_principal = 100 - 9.10   = 90.90
+      const locAccount = makeLoanAccount({
+        accountType: AccountType.LINE_OF_CREDIT,
+        currentBalance: -910,
+        interestRate: 12,
+        paymentFrequency: "MONTHLY",
+        paymentAmount: 100,
+      });
+      accountsRepository.findOne.mockResolvedValue(locAccount);
+
+      const scheduledTx = makeScheduledTransaction({
+        amount: -100,
+        splits: [
+          {
+            id: "split-principal",
+            transferAccountId: loanAccountId,
+            categoryId: null,
+            amount: -90,
+            memo: "Principal",
+          },
+          {
+            id: "split-interest",
+            transferAccountId: null,
+            categoryId: "cat-interest",
+            amount: -10,
+            memo: "Interest",
+          },
+        ] as any,
+      });
+      scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      const interestSave = splitsRepository.save.mock.calls.find(
+        (call: any) => call[0].categoryId === "cat-interest",
+      );
+      expect(interestSave[0].amount).toBe(-9.1);
+
+      const principalSave = splitsRepository.save.mock.calls.find(
+        (call: any) => call[0].transferAccountId === loanAccountId,
+      );
+      expect(principalSave[0].amount).toBe(-90.9);
     });
 
     it("should use mortgage-specific rate calculation for MORTGAGE accounts", async () => {

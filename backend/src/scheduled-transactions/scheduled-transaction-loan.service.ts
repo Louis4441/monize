@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
-import { Account } from "../accounts/entities/account.entity";
+import { Account, AccountType } from "../accounts/entities/account.entity";
 import { PaymentFrequency } from "../accounts/loan-amortization.util";
 import {
   getPeriodicRate,
@@ -13,6 +13,18 @@ import { getPeriodsPerYear } from "../accounts/loan-amortization.util";
 import { roundMoney } from "../common/round.util";
 import { allocateLoanPayment } from "../accounts/loan-payment-waterfall.util";
 import { withScopedDb } from "../common/db/scoped-db";
+
+// The account types that carry a scheduled loan-payment structure and therefore
+// need their next principal/interest split advanced after each posting. This set
+// must stay in step with what `LoanPaymentSetupService` accepts when it creates
+// that structure -- it accepts LOAN, MORTGAGE and LINE_OF_CREDIT, so a LOC left
+// out of the recalculation would keep billing the first installment's split
+// forever (issue #1154 re-review).
+const LOAN_LIKE_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set([
+  AccountType.LOAN,
+  AccountType.MORTGAGE,
+  AccountType.LINE_OF_CREDIT,
+]);
 
 @Injectable()
 export class ScheduledTransactionLoanService {
@@ -53,11 +65,7 @@ export class ScheduledTransactionLoanService {
         const candidate = await m.getRepository(Account).findOne({
           where: { id: split.transferAccountId },
         });
-        if (
-          candidate &&
-          (candidate.accountType === "LOAN" ||
-            candidate.accountType === "MORTGAGE")
-        ) {
+        if (candidate && LOAN_LIKE_ACCOUNT_TYPES.has(candidate.accountType)) {
           loanAccount = candidate;
           break;
         }
@@ -280,11 +288,7 @@ export class ScheduledTransactionLoanService {
           const account = await m.getRepository(Account).findOne({
             where: { id: split.transferAccountId },
           });
-          if (
-            account &&
-            (account.accountType === "LOAN" ||
-              account.accountType === "MORTGAGE")
-          ) {
+          if (account && LOAN_LIKE_ACCOUNT_TYPES.has(account.accountType)) {
             return account.id;
           }
         }

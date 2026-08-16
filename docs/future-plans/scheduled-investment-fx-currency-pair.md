@@ -1,9 +1,16 @@
 # Scheduled-investment FX rate: currency-pair invalidation (follow-up to issue #1154)
 
-Status: deferred. Tracked here because it is a real gap, but it is a
-maintenance/consistency issue rather than a live money-misrouting defect, and it
-was out of scope for the #1154 posting-path fix. This document is the durable
-record until a GitHub issue is filed for it.
+Status: deferred. Tracked here because it is a real gap that was out of scope for
+the #1154 posting-path fix. It is ultimately a **financial-correctness** defect,
+not merely a consistency one: once a future occurrence posts with the stale
+scalar, the cash lands at the wrong converted amount and the account balance is
+wrong. What makes deferral reasonable is that nothing corrupts at the moment the
+security/account currency is edited -- the defect materializes only on a later
+scheduled posting, and no data is lost in the meantime. This document is the
+durable record until a GitHub issue is filed for it.
+
+If a GitHub issue is filed, the upstream review target is `kenlasko/monize`
+(where issue #1154 lives), not the mirror this branch is pushed to.
 
 ## The gap
 
@@ -59,8 +66,9 @@ scalar.
 ## Why it is safe to defer
 
 Changing a security's or an account's currency after scheduling an investment in
-it is rare, and the failure is a wrong conversion rate on a future posting, not
-an immediate incorrect balance or a data-loss event. The #1154 fix closes the
+it is rare, and the failure surfaces only on a future posting (a wrong converted
+cash amount and balance then), not at the moment of the currency edit and not as
+a data-loss event. The #1154 fix closes the
 misrouting and the settlement-basis staleness that were the reported defect; this
 residual is the remaining edge that needs a schema decision rather than a
 point fix, which is why it is written down here instead of rushed in.
