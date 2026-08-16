@@ -602,7 +602,8 @@ export class ImportInvestmentProcessorService {
         brokerageTx.payeeName = payeeName;
         brokerageTx.payeeId = null;
         brokerageTx.description = investmentTx.description;
-        brokerageTx.status = investmentTx.status ?? TransactionStatus.UNRECONCILED;
+        brokerageTx.status =
+          investmentTx.status ?? TransactionStatus.UNRECONCILED;
         brokerageTx.isTransfer = true;
         brokerageTx.linkedTransactionId = savedCashTx.id;
 

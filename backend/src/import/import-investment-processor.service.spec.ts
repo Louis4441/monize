@@ -5,6 +5,7 @@ import {
   InvestmentTransaction,
 } from "../securities/entities/investment-transaction.entity";
 import { AccountSubType } from "../accounts/entities/account.entity";
+import { TransactionStatus } from "../transactions/entities/transaction.entity";
 
 import { Security } from "../securities/entities/security.entity";
 import { Holding } from "../securities/entities/holding.entity";
@@ -2223,6 +2224,108 @@ describe("ImportInvestmentProcessorService", () => {
       expect(created.accountId).toBe("cash-1");
       expect(created.amount).toBe(-25);
       expect(ctx.importResult.imported).toBe(1);
+    });
+  });
+
+  describe("parsed status lands on the investment row and its cash leg", () => {
+    const withSecurity = (ctx: ImportContext) => {
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        return Promise.resolve(null);
+      });
+    };
+
+    const buyWith = (flags: Record<string, unknown>) => ({
+      action: "Buy",
+      security: "Test Stock",
+      quantity: 10,
+      price: 100,
+      commission: 0,
+      date: "2025-01-15",
+      ...flags,
+    });
+
+    const makeBuyContext = () => {
+      const securityMap = new Map<string, string | null>([
+        ["Test Stock", "sec-1"],
+      ]);
+      const ctx = makeContext({ securityMap });
+      withSecurity(ctx);
+      return ctx;
+    };
+
+    const cashTxOf = (ctx: ImportContext) =>
+      managerOf(ctx)
+        .save.mock.calls.map((call: any[]) => call[0])
+        .find(
+          (arg: any) =>
+            arg?.currencyCode !== undefined && arg?.amount !== undefined,
+        );
+
+    const holdingSaveOf = (ctx: ImportContext) =>
+      managerOf(ctx)
+        .save.mock.calls.map((call: any[]) => call[0])
+        .find(
+          (arg: any) =>
+            arg instanceof Holding || arg?.averageCost !== undefined,
+        );
+
+    it("a reconciled Buy imports RECONCILED on both the row and its cash leg", async () => {
+      const ctx = makeBuyContext();
+
+      await service.processTransaction(ctx, buyWith({ reconciled: true }));
+
+      const investmentTx = managerOf(ctx).save.mock.calls[0][0];
+      expect(investmentTx).toBeInstanceOf(InvestmentTransaction);
+      expect(investmentTx.status).toBe(TransactionStatus.RECONCILED);
+      expect(cashTxOf(ctx)?.status).toBe(TransactionStatus.RECONCILED);
+    });
+
+    it("a Buy with no flags imports UNRECONCILED on both sides", async () => {
+      // Adversarial against the old implementation, which hard-coded CLEARED
+      // on the cash leg and carried nothing on the investment row: this case
+      // fails there with status CLEARED.
+      const ctx = makeBuyContext();
+
+      await service.processTransaction(ctx, buyWith({}));
+
+      const investmentTx = managerOf(ctx).save.mock.calls[0][0];
+      expect(investmentTx.status).toBe(TransactionStatus.UNRECONCILED);
+      expect(cashTxOf(ctx)?.status).toBe(TransactionStatus.UNRECONCILED);
+    });
+
+    it("a voided Buy imports a VOID row and touches no holdings", async () => {
+      // Fails against the naive implementation that updates holdings
+      // unconditionally: a voided trade's shares must not enter the position.
+      const ctx = makeBuyContext();
+
+      await service.processTransaction(ctx, buyWith({ void: true }));
+
+      const investmentTx = managerOf(ctx).save.mock.calls[0][0];
+      expect(investmentTx.status).toBe(TransactionStatus.VOID);
+      // The cash leg is still recorded, VOID, so the event stays visible.
+      expect(cashTxOf(ctx)?.status).toBe(TransactionStatus.VOID);
+      expect(holdingSaveOf(ctx)).toBeUndefined();
+    });
+
+    it("a voided XIn cash transfer imports a VOID cash transaction", async () => {
+      // processCashTransfer used to ignore the void flag entirely, so a
+      // cancelled transfer landed live.
+      const ctx = makeContext();
+
+      await service.processTransaction(ctx, {
+        action: "XIn",
+        date: "2025-01-15",
+        amount: 500,
+        payee: "Transfer",
+        void: true,
+      });
+
+      const created = managerOf(ctx).create.mock.calls[0][1];
+      expect(created.amount).toBe(500);
+      expect(created.status).toBe(TransactionStatus.VOID);
     });
   });
 });

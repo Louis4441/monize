@@ -941,6 +941,79 @@ describe("TransactionBulkUpdateService", () => {
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
+    it("skips an investment cash leg asked to cross the VOID boundary and still updates the rest", async () => {
+      // The investment row owns the pair's VOID boundary
+      // (InvestmentTransactionsService.updateStatus is the propagation path).
+      // A bulk void reaching the cash leg directly would restore the cash
+      // balance while the trade's shares stayed counted -- the same divergent
+      // pair the single-edit route refuses, reached through the bulk path.
+      const cashLeg = makeTransaction({
+        id: "tx-1",
+        status: TransactionStatus.UNRECONCILED,
+      });
+      const plain = makeTransaction({
+        id: "tx-2",
+        status: TransactionStatus.UNRECONCILED,
+      });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }, { id: "tx-2" }]),
+      });
+      const classifyQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([cashLeg, plain]),
+      });
+      // Post-classify status pipeline over the surviving row only.
+      const transferLegsQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+      const splitParentsQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+      const balanceQb = createMockQueryBuilder({
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+      const accountIdsQb = createMockQueryBuilder({
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(classifyQb)
+        .mockReturnValueOnce(transferLegsQb)
+        .mockReturnValueOnce(splitParentsQb)
+        .mockReturnValueOnce(balanceQb)
+        .mockReturnValue(accountIdsQb);
+
+      // tx-1 is the cash side of an investment transaction; tx-2 is not.
+      mockManagerQuery.mockImplementation(async (sql: string) =>
+        String(sql).includes("investment_transactions")
+          ? [{ transaction_id: "tx-1" }]
+          : [],
+      );
+
+      const updateQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      mockManagerCreateQueryBuilder.mockReturnValue(updateQb);
+
+      const result = await service.bulkUpdate(userId, {
+        mode: "ids",
+        transactionIds: ["tx-1", "tx-2"],
+        status: TransactionStatus.VOID,
+      } as BulkUpdateDto);
+
+      expect(result.updated).toBe(1);
+      expect(result.skipped).toBe(1);
+      expect(result.skippedReasons).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("1 investment cash transaction was skipped"),
+        ]),
+      );
+      // The status UPDATE runs against the surviving row only.
+      expect(updateQb.where).toHaveBeenCalledWith("id IN (:...ids)", {
+        ids: ["tx-2"],
+      });
+    });
+
     it("propagates a bulk VOID on a split parent to its transfer counterparts (RR3-001)", async () => {
       // `expandTransferCounterparts` cannot reach these: a split parent is
       // `isSplit = true, isTransfer = false`, so it finds nothing. The batch then

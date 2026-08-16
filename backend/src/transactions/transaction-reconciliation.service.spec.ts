@@ -42,6 +42,7 @@ describe("TransactionReconciliationService", () => {
   let accountsService: Record<string, jest.Mock>;
   let splitService: Record<string, jest.Mock>;
   let splitsRepository: Record<string, jest.Mock>;
+  let managerQuery: jest.Mock;
   let dataSource: DataSourceMock;
 
   const mockFindOne = jest.fn();
@@ -135,6 +136,11 @@ describe("TransactionReconciliationService", () => {
     tenantMocks.manager.update.mockImplementation((_entity, id, payload) =>
       transactionsRepository.update(id, payload),
     );
+    // The VOID-crossing guard's second question -- is this row the cash leg of
+    // an investment transaction -- is a raw EXISTS through manager.query.
+    // Default: no owning investment row.
+    managerQuery = tenantMocks.manager.query;
+    managerQuery.mockResolvedValue([]);
 
     accountsService = {
       findOne: jest.fn().mockResolvedValue({
@@ -334,6 +340,68 @@ describe("TransactionReconciliationService", () => {
 
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       expect(transactionsRepository.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses to void an investment cash leg on its own", async () => {
+      // The investment row owns the pair's VOID boundary
+      // (InvestmentTransactionsService.updateStatus is the propagation path);
+      // voiding the cash leg alone would leave the trade's shares counted
+      // while its cash claims not to have moved.
+      const transaction = stageTransaction({
+        status: TransactionStatus.CLEARED,
+        amount: -1509.99,
+      });
+      managerQuery.mockImplementation(async (sql: string) =>
+        String(sql).includes("investment_transactions")
+          ? [{ id: "inv-tx-1" }]
+          : [],
+      );
+
+      await expect(
+        service.updateStatus(
+          userId,
+          transaction.id,
+          TransactionStatus.VOID,
+          mockTriggerNetWorthRecalc,
+          mockFindOne,
+        ),
+      ).rejects.toThrow(/investment transaction/);
+
+      // Refusal precedes the write: nothing stored, no balance moved.
+      expect(transactionsRepository.update).not.toHaveBeenCalled();
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it("allows reconciliation cycling on an investment cash leg (guard only fires on crossings)", async () => {
+      // The cash sleeve is reconciled against a bank statement independently
+      // of the brokerage, so CLEARED -> RECONCILED stays per-ledger even
+      // though the row IS an investment cash leg.
+      const transaction = stageTransaction({
+        status: TransactionStatus.CLEARED,
+        amount: -1509.99,
+      });
+      managerQuery.mockImplementation(async (sql: string) =>
+        String(sql).includes("investment_transactions")
+          ? [{ id: "inv-tx-1" }]
+          : [],
+      );
+      mockFindOne.mockResolvedValue(
+        makeTransaction({ status: TransactionStatus.RECONCILED }),
+      );
+
+      await service.updateStatus(
+        userId,
+        transaction.id,
+        TransactionStatus.RECONCILED,
+        mockTriggerNetWorthRecalc,
+        mockFindOne,
+      );
+
+      expect(transactionsRepository.update).toHaveBeenCalledWith(
+        "tx-1",
+        expect.objectContaining({ status: TransactionStatus.RECONCILED }),
+      );
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
     it("propagates a VOID on a split parent to its children's counterparts (FR-002)", async () => {

@@ -133,7 +133,7 @@ describe("fx-entry.util", () => {
       expect(precise).toBe(1365.234);
       expect(precise).not.toBe(rounded);
     });
-});
+  });
 
   describe("resolveFxRateOrNull", () => {
     it("resolves and rounds the dated rate, without a dead getLatestRate chase", async () => {
@@ -155,9 +155,9 @@ describe("fx-entry.util", () => {
         getRateForDate: jest.fn(),
         getLatestRate: jest.fn().mockResolvedValue(0.8),
       };
-      await expect(resolveFxRateOrNull(rates, "USD", "EUR", null)).resolves.toBe(
-        0.8,
-      );
+      await expect(
+        resolveFxRateOrNull(rates, "USD", "EUR", null),
+      ).resolves.toBe(0.8);
       expect(rates.getRateForDate).not.toHaveBeenCalled();
     });
 
