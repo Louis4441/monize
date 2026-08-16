@@ -2572,10 +2572,19 @@ describe("ScheduledTransactionsService", () => {
         investmentPrice: 480,
       } as any);
 
-      const fundingClear = mockQueryRunner.manager.update.mock.calls.find(
-        (c: any[]) => c[1] === stId && c[2].investmentFundingAccountId === null,
+      // A BUY edit that does not touch the funding account must not write the
+      // column at all -- neither cleared to null nor emptied -- so the stored
+      // value survives. Asserting the key is absent (not merely "not null")
+      // also catches a future `|| ''`-style clear.
+      const touchesFunding = mockQueryRunner.manager.update.mock.calls.some(
+        (c: any[]) =>
+          c[1] === stId &&
+          Object.prototype.hasOwnProperty.call(
+            c[2],
+            "investmentFundingAccountId",
+          ),
       );
-      expect(fundingClear).toBeUndefined();
+      expect(touchesFunding).toBe(false);
     });
 
     it("update() switching BUY to DIVIDEND nulls quantity/price/commission (issue #1154)", async () => {
