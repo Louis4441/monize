@@ -35,6 +35,12 @@ type InvestmentTxSortField = 'date' | 'action' | 'security' | 'account' | 'quant
 const ACTION_COLORS: Record<InvestmentAction, string> = {
   BUY: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   SELL: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  REDEEM: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  CAPITAL_GAIN_SHORT: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  CAPITAL_GAIN_LONG: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  REINVEST_INTEREST: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  REINVEST_CAPITAL_GAIN_SHORT: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  REINVEST_CAPITAL_GAIN_LONG: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
   DIVIDEND: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   INTEREST: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   CAPITAL_GAIN: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
@@ -82,6 +88,12 @@ export function InvestmentTransactionHistoryReport() {
     REINVEST: t('investmentTransactions.actionReinvest'),
     ADD_SHARES: t('investmentTransactions.actionAddShares'),
     REMOVE_SHARES: t('investmentTransactions.actionRemoveShares'),
+    REINVEST_INTEREST: t('investmentTransactions.actionReinvestInterest'),
+    REINVEST_CAPITAL_GAIN_SHORT: t('investmentTransactions.actionReinvestCapitalGainShort'),
+    REINVEST_CAPITAL_GAIN_LONG: t('investmentTransactions.actionReinvestCapitalGainLong'),
+    CAPITAL_GAIN_SHORT: t('investmentTransactions.actionCapitalGainShort'),
+    CAPITAL_GAIN_LONG: t('investmentTransactions.actionCapitalGainLong'),
+    REDEEM: t('investmentTransactions.actionRedeem'),
   }), [t]);
 
   const actionOptions = useMemo(

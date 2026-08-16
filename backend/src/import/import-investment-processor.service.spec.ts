@@ -304,13 +304,24 @@ describe("ImportInvestmentProcessorService", () => {
       expect(firstSaveArg.action).toBe(InvestmentAction.INTEREST);
     });
 
-    it("should map CGLong and CGShort to CAPITAL_GAIN", async () => {
-      const ctx = makeContext();
-      const qifTx1 = { action: "CGLong", amount: 100, date: "2025-03-01" };
-      await service.processTransaction(ctx, qifTx1);
-
-      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
-      expect(firstSaveArg.action).toBe(InvestmentAction.CAPITAL_GAIN);
+    it("should map CGLong and CGShort to the term'd capital-gain actions", async () => {
+      // Short- and long-term gains are taxed differently (issue #1149), so
+      // the term survives the import instead of collapsing to CAPITAL_GAIN.
+      const cases = [
+        { action: "CGLong", expected: InvestmentAction.CAPITAL_GAIN_LONG },
+        { action: "CGShort", expected: InvestmentAction.CAPITAL_GAIN_SHORT },
+        { action: "CGMid", expected: InvestmentAction.CAPITAL_GAIN },
+      ];
+      for (const { action, expected } of cases) {
+        const ctx = makeContext();
+        await service.processTransaction(ctx, {
+          action,
+          amount: 100,
+          date: "2025-03-01",
+        });
+        const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
+        expect(firstSaveArg.action).toBe(expected);
+      }
     });
 
     it("should map StkSplit to SPLIT", async () => {
@@ -354,9 +365,23 @@ describe("ImportInvestmentProcessorService", () => {
       expect(firstSaveArg.action).toBe(InvestmentAction.TRANSFER_OUT);
     });
 
-    it("should map ReinvDiv, ReinvInt, ReinvLg, ReinvSh to REINVEST", async () => {
-      const actions = ["ReinvDiv", "ReinvInt", "ReinvLg", "ReinvSh"];
-      for (const action of actions) {
+    it("should map the reinvestment actions, keeping the income kind", async () => {
+      // ReinvDiv stays the base REINVEST; the interest and term'd gain
+      // variants carry their kind through (issue #1149).
+      const cases = [
+        { action: "ReinvDiv", expected: InvestmentAction.REINVEST },
+        { action: "ReinvInt", expected: InvestmentAction.REINVEST_INTEREST },
+        {
+          action: "ReinvLg",
+          expected: InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+        },
+        {
+          action: "ReinvSh",
+          expected: InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+        },
+        { action: "ReinvMd", expected: InvestmentAction.REINVEST },
+      ];
+      for (const { action, expected } of cases) {
         const ctx = makeContext();
         const qifTx = {
           action,
@@ -366,7 +391,7 @@ describe("ImportInvestmentProcessorService", () => {
         };
         await service.processTransaction(ctx, qifTx);
         const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
-        expect(firstSaveArg.action).toBe(InvestmentAction.REINVEST);
+        expect(firstSaveArg.action).toBe(expected);
       }
     });
 

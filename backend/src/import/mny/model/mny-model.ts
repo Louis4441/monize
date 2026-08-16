@@ -419,8 +419,9 @@ export const MNY_ACTION = {
   /**
    * Money's "Redeem CD/Bond": a fixed-income instrument sold back, optionally
    * carrying accrued interest inside its cash figure. Issue #1149. Mapped to
-   * SELL, and `TRN.amt` wins as the total (see `totalAmountOf`), so the
-   * accrued-interest component is included the same way Money includes it.
+   * Monize's REDEEM (a sale in behaviour), and `TRN.amt` wins as the total
+   * (see `totalAmountOf`), so the accrued-interest component is included the
+   * same way Money includes it.
    */
   REDEEM_CD_BOND: 30,
   /** Opens lots with no cash: the receiving half of a share transfer. */
@@ -437,7 +438,12 @@ const ACTION_BY_CODE: ReadonlyMap<number, InvestmentAction> = new Map([
   [MNY_ACTION.INTEREST, InvestmentAction.INTEREST],
   [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
   [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
-  [MNY_ACTION.REINVEST_INTEREST, InvestmentAction.REINVEST],
+  // Money's activity vocabulary now exists 1:1 in Monize (issue #1149), so
+  // nothing is collapsed: the income kind -- interest versus short- versus
+  // long-term capital gain, paid out versus reinvested -- survives the import
+  // for tax reporting. Each of these behaves financially exactly as its base
+  // action does (see `baseInvestmentAction`).
+  [MNY_ACTION.REINVEST_INTEREST, InvestmentAction.REINVEST_INTEREST],
   // Value and quantity like a buy, cash like a reinvestment -- and REINVEST is
   // the only Monize action that is both, so the cost basis survives.
   [MNY_ACTION.CONTRIBUTION, InvestmentAction.REINVEST],
@@ -445,14 +451,17 @@ const ACTION_BY_CODE: ReadonlyMap<number, InvestmentAction> = new Map([
   [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
   [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
   [MNY_ACTION.REMOVE_SHARES_LEGACY, InvestmentAction.REMOVE_SHARES],
-  // Monize has one CAPITAL_GAIN action, so the short-versus-long distinction
-  // Money records is not preserved past the import -- both are capital-gain
-  // income paid into the cash sleeve.
-  [MNY_ACTION.ST_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN],
-  [MNY_ACTION.LT_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN],
-  [MNY_ACTION.REINVEST_ST_CAPITAL_GAINS, InvestmentAction.REINVEST],
-  [MNY_ACTION.REINVEST_LT_CAPITAL_GAINS, InvestmentAction.REINVEST],
-  [MNY_ACTION.REDEEM_CD_BOND, InvestmentAction.SELL],
+  [MNY_ACTION.ST_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN_SHORT],
+  [MNY_ACTION.LT_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN_LONG],
+  [
+    MNY_ACTION.REINVEST_ST_CAPITAL_GAINS,
+    InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+  ],
+  [
+    MNY_ACTION.REINVEST_LT_CAPITAL_GAINS,
+    InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+  ],
+  [MNY_ACTION.REDEEM_CD_BOND, InvestmentAction.REDEEM],
   [MNY_ACTION.TRANSFER_IN, InvestmentAction.TRANSFER_IN],
   [MNY_ACTION.TRANSFER_OUT, InvestmentAction.TRANSFER_OUT],
 ]);

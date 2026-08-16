@@ -131,6 +131,13 @@ const ACTION_COLORS: Record<string, string> = {
   REINVEST: 'text-indigo-600 dark:text-indigo-400',
   ADD_SHARES: 'text-teal-600 dark:text-teal-400',
   REMOVE_SHARES: 'text-orange-600 dark:text-orange-400',
+  // Money-vocabulary refinements share their base action's colour.
+  REINVEST_INTEREST: 'text-indigo-600 dark:text-indigo-400',
+  REINVEST_CAPITAL_GAIN_SHORT: 'text-indigo-600 dark:text-indigo-400',
+  REINVEST_CAPITAL_GAIN_LONG: 'text-indigo-600 dark:text-indigo-400',
+  CAPITAL_GAIN_SHORT: 'text-purple-600 dark:text-purple-400',
+  CAPITAL_GAIN_LONG: 'text-purple-600 dark:text-purple-400',
+  REDEEM: 'text-red-600 dark:text-red-400',
 };
 
 interface InvestmentTransactionRowProps {
@@ -180,6 +187,12 @@ const InvestmentTransactionRow = memo(function InvestmentTransactionRow({
     REINVEST: { label: t('transactionList.actionReinvest'), shortLabel: 'Reinv', color: ACTION_COLORS.REINVEST },
     ADD_SHARES: { label: t('transactionList.actionAddShares'), shortLabel: 'Add', color: ACTION_COLORS.ADD_SHARES },
     REMOVE_SHARES: { label: t('transactionList.actionRemoveShares'), shortLabel: 'Rem', color: ACTION_COLORS.REMOVE_SHARES },
+    REINVEST_INTEREST: { label: t('transactionList.actionReinvestInterest'), shortLabel: 'RInt', color: ACTION_COLORS.REINVEST_INTEREST },
+    REINVEST_CAPITAL_GAIN_SHORT: { label: t('transactionList.actionReinvestCapitalGainShort'), shortLabel: 'RScg', color: ACTION_COLORS.REINVEST_CAPITAL_GAIN_SHORT },
+    REINVEST_CAPITAL_GAIN_LONG: { label: t('transactionList.actionReinvestCapitalGainLong'), shortLabel: 'RLcg', color: ACTION_COLORS.REINVEST_CAPITAL_GAIN_LONG },
+    CAPITAL_GAIN_SHORT: { label: t('transactionList.actionCapitalGainShort'), shortLabel: 'SCap', color: ACTION_COLORS.CAPITAL_GAIN_SHORT },
+    CAPITAL_GAIN_LONG: { label: t('transactionList.actionCapitalGainLong'), shortLabel: 'LCap', color: ACTION_COLORS.CAPITAL_GAIN_LONG },
+    REDEEM: { label: t('transactionList.actionRedeem'), shortLabel: 'Rdm', color: ACTION_COLORS.REDEEM },
   };
   const actionInfo = ACTION_LABELS[tx.action] || {
     label: tx.action,
@@ -292,6 +305,12 @@ export function InvestmentTransactionList({
     { value: 'TRANSFER_OUT', label: t('transactionList.actionTransferOut') },
     { value: 'ADD_SHARES', label: t('transactionList.actionAddShares') },
     { value: 'REMOVE_SHARES', label: t('transactionList.actionRemoveShares') },
+    { value: 'REINVEST_INTEREST', label: t('transactionList.actionReinvestInterest') },
+    { value: 'REINVEST_CAPITAL_GAIN_SHORT', label: t('transactionList.actionReinvestCapitalGainShort') },
+    { value: 'REINVEST_CAPITAL_GAIN_LONG', label: t('transactionList.actionReinvestCapitalGainLong') },
+    { value: 'CAPITAL_GAIN_SHORT', label: t('transactionList.actionCapitalGainShort') },
+    { value: 'CAPITAL_GAIN_LONG', label: t('transactionList.actionCapitalGainLong') },
+    { value: 'REDEEM', label: t('transactionList.actionRedeem') },
   ];
   const { formatCurrency, formatQuantity } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -472,6 +491,12 @@ export function InvestmentTransactionList({
     REINVEST: t('transactionList.actionReinvest'),
     ADD_SHARES: t('transactionList.actionAddShares'),
     REMOVE_SHARES: t('transactionList.actionRemoveShares'),
+    REINVEST_INTEREST: t('transactionList.actionReinvestInterest'),
+    REINVEST_CAPITAL_GAIN_SHORT: t('transactionList.actionReinvestCapitalGainShort'),
+    REINVEST_CAPITAL_GAIN_LONG: t('transactionList.actionReinvestCapitalGainLong'),
+    CAPITAL_GAIN_SHORT: t('transactionList.actionCapitalGainShort'),
+    CAPITAL_GAIN_LONG: t('transactionList.actionCapitalGainLong'),
+    REDEEM: t('transactionList.actionRedeem'),
   };
 
   return (

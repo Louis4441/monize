@@ -28,6 +28,7 @@ import { accountsApi } from '@/lib/accounts';
 import { tagsApi } from '@/lib/tags';
 import { ScheduledTransaction, FrequencyType, FREQUENCY_VALUES } from '@/types/scheduled-transaction';
 import { InvestmentAction, Security } from '@/types/investment';
+import { baseInvestmentAction } from '@/lib/investment-actions';
 import { Transaction } from '@/types/transaction';
 import { Payee } from '@/types/payee';
 import { Category } from '@/types/category';
@@ -64,6 +65,9 @@ const FUNDING_ACCOUNT_ACTIONS: InvestmentAction[] = ['BUY', 'SELL'];
 
 const SCHEDULABLE_INVESTMENT_ACTIONS: InvestmentAction[] = [
   'BUY', 'SELL', 'DIVIDEND', 'INTEREST', 'CAPITAL_GAIN', 'REINVEST', 'ADD_SHARES', 'REMOVE_SHARES',
+  // Money's distribution vocabulary (issue #1149): schedulable like their base.
+  'REINVEST_INTEREST', 'REINVEST_CAPITAL_GAIN_SHORT', 'REINVEST_CAPITAL_GAIN_LONG',
+  'CAPITAL_GAIN_SHORT', 'CAPITAL_GAIN_LONG', 'REDEEM',
 ];
 
 const buildScheduledTransactionSchema = (t: (key: string) => string) => z.object({
@@ -189,7 +193,7 @@ export function ScheduledTransactionForm({
     const p = scheduledTransaction?.investmentPrice;
     const c = scheduledTransaction?.investmentCommission ?? 0;
     if (q != null && p != null) {
-      const sign = scheduledTransaction?.investmentAction === 'SELL' ? -1 : 1;
+      const sign = baseInvestmentAction(scheduledTransaction?.investmentAction as InvestmentAction ?? 'BUY') === 'SELL' ? -1 : 1;
       return totalFromQuantity(Number(q), Number(p), sign, Number(c));
     }
     return '';
@@ -541,7 +545,7 @@ export function ScheduledTransactionForm({
   // quantity-price set (BUY <-> SELL <-> REINVEST, same security) does not
   // re-issue the request -- the close is action-independent; only a flip in
   // price-field applicability changes what the fetch should do.
-  const isQuantityPriceAction = QUANTITY_PRICE_ACTIONS.includes(investmentAction);
+  const isQuantityPriceAction = QUANTITY_PRICE_ACTIONS.includes(baseInvestmentAction(investmentAction));
 
   // When the chosen security changes, fetch its most recent close price so we
   // can auto-fill the Price field and back-derive quantity from Total Value. Only
@@ -577,7 +581,7 @@ export function ScheduledTransactionForm({
     };
   }, [mode, investmentSecurityId, isQuantityPriceAction]);
 
-  const investmentSign = investmentAction === 'SELL' ? -1 : 1;
+  const investmentSign = baseInvestmentAction(investmentAction) === 'SELL' ? -1 : 1;
 
   // A close rounded for display (6dp). marketPrice is already null unless it is a
   // usable positive number (usableClose rejects zero/negative/NaN before it is
@@ -609,7 +613,7 @@ export function ScheduledTransactionForm({
     // dividend never stores a spurious price and a zero/NaN quote never cascades
     // into the fold.
     if (
-      QUANTITY_PRICE_ACTIONS.includes(investmentAction) &&
+      QUANTITY_PRICE_ACTIONS.includes(baseInvestmentAction(investmentAction)) &&
       roundedMarketPrice != null &&
       (investmentPrice === '' || investmentPrice === 0)
     ) {
@@ -699,11 +703,11 @@ export function ScheduledTransactionForm({
   const handleInvestmentActionChange = (nextAction: InvestmentAction) => {
     setInvestmentAction(nextAction);
     if (
-      QUANTITY_PRICE_ACTIONS.includes(nextAction) &&
+      QUANTITY_PRICE_ACTIONS.includes(baseInvestmentAction(nextAction)) &&
       investmentQuantity !== '' &&
       effectiveInvestmentPrice > 0
     ) {
-      const nextSign = nextAction === 'SELL' ? -1 : 1;
+      const nextSign = baseInvestmentAction(nextAction) === 'SELL' ? -1 : 1;
       const commission =
         investmentCommission === '' ? 0 : Number(investmentCommission);
       setInvestmentTotalValue(
@@ -993,11 +997,11 @@ export function ScheduledTransactionForm({
         toast.error(t('form.toasts.brokerageAccountRequired'));
         return;
       }
-      if (SECURITY_REQUIRED_ACTIONS.includes(investmentAction) && !investmentSecurityId) {
+      if (SECURITY_REQUIRED_ACTIONS.includes(baseInvestmentAction(investmentAction)) && !investmentSecurityId) {
         toast.error(t('form.toasts.securityRequired'));
         return;
       }
-      if (QUANTITY_PRICE_ACTIONS.includes(investmentAction)) {
+      if (QUANTITY_PRICE_ACTIONS.includes(baseInvestmentAction(investmentAction))) {
         if (!investmentQuantity || Number(investmentQuantity) <= 0) {
           toast.error(t('form.toasts.quantityRequired'));
           return;
@@ -1006,12 +1010,12 @@ export function ScheduledTransactionForm({
           toast.error(t('form.toasts.priceRequired'));
           return;
         }
-      } else if (QUANTITY_ONLY_ACTIONS.includes(investmentAction)) {
+      } else if (QUANTITY_ONLY_ACTIONS.includes(baseInvestmentAction(investmentAction))) {
         if (!investmentQuantity || Number(investmentQuantity) <= 0) {
           toast.error(t('form.toasts.quantityRequired'));
           return;
         }
-      } else if (AMOUNT_ONLY_ACTIONS.includes(investmentAction)) {
+      } else if (AMOUNT_ONLY_ACTIONS.includes(baseInvestmentAction(investmentAction))) {
         if (investmentTotalAmount === '' || investmentTotalAmount === undefined) {
           toast.error(t('form.toasts.totalAmountRequired'));
           return;
@@ -1062,10 +1066,10 @@ export function ScheduledTransactionForm({
         const estTotal = investmentTotalAmount === '' ? 0 : Number(investmentTotalAmount);
         const estCommission = investmentCommission === '' ? 0 : Number(investmentCommission);
         let displayAmount = formData.amount;
-        if (QUANTITY_PRICE_ACTIONS.includes(investmentAction)) {
-          const sign = investmentAction === 'SELL' ? 1 : -1;
+        if (QUANTITY_PRICE_ACTIONS.includes(baseInvestmentAction(investmentAction))) {
+          const sign = baseInvestmentAction(investmentAction) === 'SELL' ? 1 : -1;
           displayAmount = sign * (estQty * estPrice + (sign === -1 ? estCommission : -estCommission));
-        } else if (AMOUNT_ONLY_ACTIONS.includes(investmentAction)) {
+        } else if (AMOUNT_ONLY_ACTIONS.includes(baseInvestmentAction(investmentAction))) {
           displayAmount = estTotal;
         } else {
           displayAmount = 0;
@@ -1078,7 +1082,7 @@ export function ScheduledTransactionForm({
           isInvestment: true,
           investmentAction,
           investmentSecurityId: investmentSecurityId || undefined,
-          investmentFundingAccountId: FUNDING_ACCOUNT_ACTIONS.includes(investmentAction) && investmentFundingAccountId
+          investmentFundingAccountId: FUNDING_ACCOUNT_ACTIONS.includes(baseInvestmentAction(investmentAction)) && investmentFundingAccountId
             ? investmentFundingAccountId
             : undefined,
           investmentQuantity: investmentQuantity === '' ? undefined : Number(investmentQuantity),
@@ -1831,7 +1835,7 @@ export function ScheduledTransactionForm({
                 label: t(`form.investmentActionLabels.${a}` as Parameters<typeof t>[0]),
               }))}
             />
-            {SECURITY_REQUIRED_ACTIONS.includes(investmentAction) && (
+            {SECURITY_REQUIRED_ACTIONS.includes(baseInvestmentAction(investmentAction)) && (
               <Select
                 label={t('form.securityLabel')}
                 value={investmentSecurityId}
@@ -1845,7 +1849,7 @@ export function ScheduledTransactionForm({
           </div>
 
           {/* Row 4: Quantity / Price / Commission (action-conditional) */}
-          {QUANTITY_PRICE_ACTIONS.includes(investmentAction) && (
+          {QUANTITY_PRICE_ACTIONS.includes(baseInvestmentAction(investmentAction)) && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <NumericInput
@@ -1886,7 +1890,7 @@ export function ScheduledTransactionForm({
                   }
                   onChange={handleTotalValueChange}
                 />
-                {FUNDING_ACCOUNT_ACTIONS.includes(investmentAction) && (
+                {FUNDING_ACCOUNT_ACTIONS.includes(baseInvestmentAction(investmentAction)) && (
                   <div>
                     <Select
                       label={t('form.fundingAccountLabel')}
@@ -1911,7 +1915,7 @@ export function ScheduledTransactionForm({
             </>
           )}
 
-          {QUANTITY_ONLY_ACTIONS.includes(investmentAction) && (
+          {QUANTITY_ONLY_ACTIONS.includes(baseInvestmentAction(investmentAction)) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <NumericInput
                 label={t('form.quantityLabel')}
@@ -1923,7 +1927,7 @@ export function ScheduledTransactionForm({
             </div>
           )}
 
-          {AMOUNT_ONLY_ACTIONS.includes(investmentAction) && (
+          {AMOUNT_ONLY_ACTIONS.includes(baseInvestmentAction(investmentAction)) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <CurrencyInput
                 label={t('form.totalAmountLabel')}

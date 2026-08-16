@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { baseInvestmentAction } from '@/lib/investment-actions';
+import { InvestmentAction } from '@/types/investment';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -105,9 +107,8 @@ export function OverrideEditorDialog({
   const investmentAction = scheduledTransaction.investmentAction;
   const isInvestmentQuantityPrice =
     isInvestmentKind &&
-    (investmentAction === 'BUY' ||
-      investmentAction === 'SELL' ||
-      investmentAction === 'REINVEST');
+    investmentAction != null &&
+    ['BUY', 'SELL', 'REINVEST'].includes(baseInvestmentAction(investmentAction));
   const isInvestmentQuantityOnly =
     isInvestmentKind &&
     (investmentAction === 'ADD_SHARES' ||
@@ -115,9 +116,8 @@ export function OverrideEditorDialog({
       investmentAction === 'SPLIT');
   const isInvestmentAmountOnly =
     isInvestmentKind &&
-    (investmentAction === 'DIVIDEND' ||
-      investmentAction === 'INTEREST' ||
-      investmentAction === 'CAPITAL_GAIN');
+    investmentAction != null &&
+    ['DIVIDEND', 'INTEREST', 'CAPITAL_GAIN'].includes(baseInvestmentAction(investmentAction));
 
   // Initialize form with base transaction or existing override values
   useEffect(() => {
@@ -196,7 +196,7 @@ export function OverrideEditorDialog({
         typeof initialPrice === 'number' &&
         initialPrice > 0
       ) {
-        const sign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
+        const sign = baseInvestmentAction(scheduledTransaction.investmentAction as InvestmentAction) === 'SELL' ? -1 : 1;
         setInvestmentTotalValue(
           totalFromQuantity(
             initialQty,
@@ -251,7 +251,7 @@ export function OverrideEditorDialog({
     scheduledTransaction.investmentSecurityId,
   ]);
 
-  const investmentSign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
+  const investmentSign = baseInvestmentAction(scheduledTransaction.investmentAction as InvestmentAction) === 'SELL' ? -1 : 1;
   const investmentCommission = Number(scheduledTransaction.investmentCommission ?? 0);
 
   /**

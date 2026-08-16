@@ -18,6 +18,7 @@ import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import {
   applyActionToQuantity,
   acquisitionUnitCost,
+  baseInvestmentAction,
   isQuantityOnlyAction,
   SHARE_MOVING_ACTIONS,
 } from "../securities/investment-replay.util";
@@ -108,16 +109,20 @@ export class ImportInvestmentProcessorService {
       sell: InvestmentAction.SELL,
       div: InvestmentAction.DIVIDEND,
       intinc: InvestmentAction.INTEREST,
-      cglong: InvestmentAction.CAPITAL_GAIN,
-      cgshort: InvestmentAction.CAPITAL_GAIN,
+      // Quicken/Money distinguish the term of a capital-gain distribution and
+      // whether it was reinvested; Monize carries the full vocabulary (issue
+      // #1149), so nothing is collapsed. CGMid/ReinvMd have no Monize term
+      // refinement and keep the base action.
+      cglong: InvestmentAction.CAPITAL_GAIN_LONG,
+      cgshort: InvestmentAction.CAPITAL_GAIN_SHORT,
       cgmid: InvestmentAction.CAPITAL_GAIN,
       stksplit: InvestmentAction.SPLIT,
       shrsin: InvestmentAction.TRANSFER_IN,
       shrsout: InvestmentAction.TRANSFER_OUT,
       reinvdiv: InvestmentAction.REINVEST,
-      reinvint: InvestmentAction.REINVEST,
-      reinvlg: InvestmentAction.REINVEST,
-      reinvsh: InvestmentAction.REINVEST,
+      reinvint: InvestmentAction.REINVEST_INTEREST,
+      reinvlg: InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+      reinvsh: InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
       reinvmd: InvestmentAction.REINVEST,
       // Quicken-specific actions
       withdrw: InvestmentAction.SELL,
@@ -163,14 +168,16 @@ export class ImportInvestmentProcessorService {
       ? roundToDecimals(qifTx.amount, 2)
       : roundToDecimals(quantity * price + commission, 2);
 
-    if (action === InvestmentAction.BUY) {
+    const base = baseInvestmentAction(action);
+    if (base === InvestmentAction.BUY) {
       totalAmount = roundToDecimals(quantity * price + commission, 2);
-    } else if (action === InvestmentAction.SELL) {
+    } else if (base === InvestmentAction.SELL) {
+      // REDEEM included: a redemption's proceeds are a sale's.
       totalAmount = roundToDecimals(quantity * price - commission, 2);
     } else if (
-      action === InvestmentAction.SPLIT ||
-      action === InvestmentAction.ADD_SHARES ||
-      action === InvestmentAction.REMOVE_SHARES
+      base === InvestmentAction.SPLIT ||
+      base === InvestmentAction.ADD_SHARES ||
+      base === InvestmentAction.REMOVE_SHARES
     ) {
       totalAmount = 0;
     }
@@ -486,7 +493,13 @@ export class ImportInvestmentProcessorService {
       InvestmentAction.CAPITAL_GAIN,
     ];
 
-    if (!cashAffectingActions.includes(action)) {
+    // Base-normalized: REDEEM and the term'd gain distributions move cash as
+    // their base does, and the reinvest refinements stay cash-free.
+    if (
+      !cashAffectingActions.includes(
+        baseInvestmentAction(action) as InvestmentAction,
+      )
+    ) {
       return;
     }
 
@@ -516,7 +529,10 @@ export class ImportInvestmentProcessorService {
     const actionLabel = formatAction(action);
 
     let payeeName: string;
-    if (action === InvestmentAction.BUY || action === InvestmentAction.SELL) {
+    if (
+      baseInvestmentAction(action) === InvestmentAction.BUY ||
+      baseInvestmentAction(action) === InvestmentAction.SELL
+    ) {
       payeeName = `${actionLabel}: ${securitySymbol} ${quantity} @ $${price.toFixed(2)}`;
     } else if (action === InvestmentAction.INTEREST) {
       payeeName = `${actionLabel}: $${totalAmount.toFixed(2)}`;

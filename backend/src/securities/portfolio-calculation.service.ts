@@ -23,6 +23,8 @@ import { FxAggregate } from "../common/fx-aggregate";
 import {
   acquisitionCost,
   applyActionToQuantity,
+  baseInvestmentAction,
+  CASH_INCOME_ACTIONS,
 } from "./investment-replay.util";
 import { stripBrokerageSuffix } from "../accounts/account-name.util";
 
@@ -279,7 +281,7 @@ function applyTxToState(
 ): void {
   const quantity = Number(tx.quantity) || 0;
 
-  switch (tx.action) {
+  switch (baseInvestmentAction(tx.action)) {
     case InvestmentAction.BUY:
     case InvestmentAction.REINVEST:
     case InvestmentAction.TRANSFER_IN: {
@@ -688,15 +690,23 @@ export class PortfolioCalculationService {
       m.query(
         `SELECT account_id,
                 COALESCE(SUM(CASE WHEN action = 'BUY' THEN total_amount * exchange_rate ELSE 0 END), 0) as buys,
-                COALESCE(SUM(CASE WHEN action = 'SELL' THEN total_amount * exchange_rate ELSE 0 END), 0) as sells,
-                COALESCE(SUM(CASE WHEN action IN ('DIVIDEND','INTEREST','CAPITAL_GAIN') THEN total_amount * exchange_rate ELSE 0 END), 0) as income
+                COALESCE(SUM(CASE WHEN action = ANY($3) THEN total_amount * exchange_rate ELSE 0 END), 0) as sells,
+                COALESCE(SUM(CASE WHEN action = ANY($4) THEN total_amount * exchange_rate ELSE 0 END), 0) as income
          FROM investment_transactions
          WHERE user_id = $1
            AND account_id = ANY($2)
            AND transaction_date <= CURRENT_DATE
            AND status != 'VOID'
          GROUP BY account_id`,
-        [userId, accountIds],
+        [
+          userId,
+          accountIds,
+          // A CD/bond redemption's proceeds are a sale's; the term'd gain
+          // distributions are income. Lists come from the shared constants so
+          // a future refinement cannot fall out of this aggregate silently.
+          [InvestmentAction.SELL, InvestmentAction.REDEEM],
+          CASH_INCOME_ACTIONS,
+        ],
       ),
     );
     for (const row of flowRows) {
@@ -878,7 +888,7 @@ export class PortfolioCalculationService {
 
       const quantity = Number(tx.quantity) || 0;
 
-      switch (tx.action) {
+      switch (baseInvestmentAction(tx.action)) {
         // A transfer is neither a sale nor a purchase: the same shares change
         // custody and keep whatever they cost. Treated as an acquisition
         // priced at the carried average with `exchangeRate` 1 -- which is what
@@ -1254,7 +1264,7 @@ export class PortfolioCalculationService {
       const price = Number(tx.price) || 0;
       const exchangeRate = Number(tx.exchangeRate) || 1;
 
-      switch (tx.action) {
+      switch (baseInvestmentAction(tx.action)) {
         case InvestmentAction.BUY:
         case InvestmentAction.REINVEST:
         case InvestmentAction.TRANSFER_IN: {
@@ -1280,7 +1290,9 @@ export class PortfolioCalculationService {
           entry.costBasis -= costBasisSold;
           entry.quantity -= sellQty;
 
-          if (tx.action === InvestmentAction.SELL) {
+          // Base-normalized so a REDEEM's proceeds are realized like the sale
+          // it is; a TRANSFER_OUT still realizes nothing.
+          if (baseInvestmentAction(tx.action) === InvestmentAction.SELL) {
             // totalAmount is already stored in the security's currency and is
             // net of commission; multiply by exchangeRate to put both sides of
             // the gain calculation in the holding account's currency.
@@ -1530,7 +1542,7 @@ export class PortfolioCalculationService {
           const quantity = Number(tx.quantity) || 0;
           const exchangeRate = Number(tx.exchangeRate) || 1;
 
-          switch (tx.action) {
+          switch (baseInvestmentAction(tx.action)) {
             case InvestmentAction.BUY:
             case InvestmentAction.REINVEST:
             case InvestmentAction.TRANSFER_IN: {
@@ -1560,7 +1572,7 @@ export class PortfolioCalculationService {
               const costBasisSold = sellQty * avgCostPerShare;
               state.costBasis -= costBasisSold;
               state.quantity -= sellQty;
-              if (tx.action === InvestmentAction.SELL) {
+              if (baseInvestmentAction(tx.action) === InvestmentAction.SELL) {
                 const proceeds = Number(tx.totalAmount) * exchangeRate;
                 sells += proceeds;
                 realizedGain += proceeds - costBasisSold;

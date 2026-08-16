@@ -15,6 +15,10 @@ import {
 } from "../accounts/entities/account.entity";
 import { NON_VOID_INVESTMENT_STATUS } from "../securities/investment-row-effects.util";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
+import {
+  baseInvestmentAction,
+  MARKET_PRICED_TRADE_ACTIONS,
+} from "../securities/investment-replay.util";
 import { Security } from "../securities/entities/security.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
@@ -927,8 +931,8 @@ export class NetWorthService {
        WHERE it.account_id = ANY($1::UUID[])
          AND it.price IS NOT NULL AND it.price > 0
          AND it.status != 'VOID'
-         AND it.action IN ('BUY', 'SELL', 'REINVEST', 'TRANSFER_IN', 'TRANSFER_OUT')`,
-      [targetAccountIds],
+         AND (it.action = ANY($2) OR it.action IN ('TRANSFER_IN', 'TRANSFER_OUT'))`,
+      [targetAccountIds, MARKET_PRICED_TRADE_ACTIONS],
     );
 
     const adjCurrencies = new Set<string>();
@@ -953,7 +957,7 @@ export class NetWorthService {
       if (qty === 0 || price <= 0) continue;
 
       let signed: number;
-      switch (r.action) {
+      switch (baseInvestmentAction(r.action)) {
         case "BUY":
         case "REINVEST":
         case "TRANSFER_IN":
@@ -1198,11 +1202,11 @@ export class NetWorthService {
             `SELECT security_id, transaction_date, price
            FROM investment_transactions
            WHERE security_id = ANY($1::UUID[])
-             AND action IN ('BUY', 'SELL', 'REINVEST')
+             AND action = ANY($2)
              AND price IS NOT NULL AND price > 0
              AND status != 'VOID'
            ORDER BY security_id, transaction_date, created_at`,
-            [skipSecIds],
+            [skipSecIds, MARKET_PRICED_TRADE_ACTIONS],
           )
         : [];
 
@@ -1582,11 +1586,11 @@ export class NetWorthService {
           `SELECT security_id, transaction_date, price
              FROM investment_transactions
              WHERE security_id = ANY($1::UUID[])
-               AND action IN ('BUY', 'SELL', 'REINVEST')
+               AND action = ANY($2)
                AND price IS NOT NULL AND price > 0
                AND status != 'VOID'
              ORDER BY security_id, transaction_date, created_at`,
-          [skipSecIds],
+          [skipSecIds, MARKET_PRICED_TRADE_ACTIONS],
         );
         for (const r of txPriceRows) {
           const arr = txPricesBySec.get(r.security_id) ?? [];
@@ -2486,12 +2490,12 @@ export class NetWorthService {
       `SELECT security_id, transaction_date, price
        FROM investment_transactions
        WHERE security_id = ANY($1::UUID[])
-         AND action IN ('BUY', 'SELL', 'REINVEST')
+         AND action = ANY($2)
          AND price IS NOT NULL
          AND price > 0
          AND status != 'VOID'
        ORDER BY security_id, transaction_date, created_at`,
-      [skipSecIds],
+      [skipSecIds, MARKET_PRICED_TRADE_ACTIONS],
     );
 
     const bySecId = new Map<string, Array<{ date: string; price: number }>>();

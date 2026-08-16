@@ -759,7 +759,13 @@
     "actionTransferOut": "Transfer Out",
     "actionReinvest": "Reinvest",
     "actionAddShares": "Add Shares",
-    "actionRemoveShares": "Remove Shares"
+    "actionRemoveShares": "Remove Shares",
+    "actionReinvestInterest": "Reinvest Interest",
+    "actionReinvestCapitalGainShort": "Reinvest Short-Term Cap Gain",
+    "actionReinvestCapitalGainLong": "Reinvest Long-Term Cap Gain",
+    "actionCapitalGainShort": "Short-Term Capital Gain",
+    "actionCapitalGainLong": "Long-Term Capital Gain",
+    "actionRedeem": "Redeem CD/Bond"
   },
   "loanAmortization": {
     "empty": "No loan or mortgage accounts found. Add a loan account to see the payment history.",

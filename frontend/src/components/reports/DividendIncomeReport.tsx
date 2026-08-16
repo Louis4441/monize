@@ -22,6 +22,7 @@ import { investmentsApi } from '@/lib/investments';
 import { InvestmentTransaction, CapitalGainEntry } from '@/types/investment';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
+import { baseInvestmentAction } from '@/lib/investment-actions';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -194,12 +195,13 @@ export function DividendIncomeReport() {
       // Dividend / Interest / CAPITAL_GAIN income comes from the plain
       // transaction list; SELL realized + unrealized capital gains come from
       // the monthly capital gains endpoint.
-      const incomeTransactions = allTransactions.filter(
-        (tx) =>
-          tx.action === 'DIVIDEND' ||
-          tx.action === 'INTEREST' ||
-          tx.action === 'CAPITAL_GAIN',
-      );
+      const incomeTransactions = allTransactions.filter((tx) => {
+        // Base-normalized: CAPITAL_GAIN_SHORT/LONG are capital-gain income.
+        const base = baseInvestmentAction(tx.action);
+        return (
+          base === 'DIVIDEND' || base === 'INTEREST' || base === 'CAPITAL_GAIN'
+        );
+      });
 
       return {
         transactions: incomeTransactions,
@@ -416,7 +418,7 @@ export function DividendIncomeReport() {
     filteredTransactions.forEach((tx) => {
       const bucket = getOrCreateBucket(parseLocalDate(tx.transactionDate));
       const contribution = getTxAmount(tx);
-      switch (tx.action) {
+      switch (baseInvestmentAction(tx.action)) {
         case 'DIVIDEND':
           bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
@@ -481,7 +483,7 @@ export function DividendIncomeReport() {
       const txDate = parseLocalDate(tx.transactionDate);
       const bucket = getOrCreateBucket(tx.transactionDate, txDate);
       const contribution = getTxAmount(tx);
-      switch (tx.action) {
+      switch (baseInvestmentAction(tx.action)) {
         case 'DIVIDEND':
           bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
@@ -580,7 +582,7 @@ export function DividendIncomeReport() {
       const name = tx.security?.name || 'Unknown Security';
       const bucket = getOrCreateBucket(symbol, name);
       const contribution = getTxAmount(tx);
-      switch (tx.action) {
+      switch (baseInvestmentAction(tx.action)) {
         case 'DIVIDEND':
           bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
@@ -727,13 +729,13 @@ export function DividendIncomeReport() {
     // components could not be converted -- one missing rate makes the whole
     // figure unknown, the same rule the monthly and daily buckets follow.
     const dividends = filteredTransactions
-      .filter((t) => t.action === 'DIVIDEND')
+      .filter((t) => baseInvestmentAction(t.action) === 'DIVIDEND')
       .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const interest = filteredTransactions
-      .filter((t) => t.action === 'INTEREST')
+      .filter((t) => baseInvestmentAction(t.action) === 'INTEREST')
       .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const manualCapitalGains = filteredTransactions
-      .filter((t) => t.action === 'CAPITAL_GAIN')
+      .filter((t) => baseInvestmentAction(t.action) === 'CAPITAL_GAIN')
       .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const periodCapitalGains = filteredCapitalGains.reduce<number | null>(
       (sum, entry) => addOrUnknown(sum, convertCapitalGain(entry)),

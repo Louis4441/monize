@@ -649,7 +649,11 @@ describe("mapBills", () => {
       expect(result.bills).toEqual([]);
       expect(result.skipped).toBe(1);
       expect(result.warnings).toEqual([
-        { code: "unusableBill", subject: "hbill=7", detail: "frq=99 cFrqInst=1" },
+        {
+          code: "unusableBill",
+          subject: "hbill=7",
+          detail: "frq=99 cFrqInst=1",
+        },
       ]);
     });
 

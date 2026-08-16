@@ -179,7 +179,14 @@ describe('InvestmentTransactionForm', () => {
       expect(optionValues).not.toContain('TRANSFER_IN');
       expect(optionValues).not.toContain('TRANSFER_OUT');
       expect(optionValues).toContain('TRANSFER');
-      expect(optionValues.length).toBe(10);
+      // Money's full distribution vocabulary is offered too (issue #1149).
+      expect(optionValues).toContain('REINVEST_INTEREST');
+      expect(optionValues).toContain('REINVEST_CAPITAL_GAIN_SHORT');
+      expect(optionValues).toContain('REINVEST_CAPITAL_GAIN_LONG');
+      expect(optionValues).toContain('CAPITAL_GAIN_SHORT');
+      expect(optionValues).toContain('CAPITAL_GAIN_LONG');
+      expect(optionValues).toContain('REDEEM');
+      expect(optionValues.length).toBe(16);
     });
   });
 

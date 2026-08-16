@@ -294,7 +294,7 @@ describe("mapInvestments", () => {
      * and no cash leg -- charging it to the sleeve would double-count money
      * that never landed there.
      */
-    it("maps act=10 reinvested interest to REINVEST with no cash leg", () => {
+    it("maps act=10 reinvested interest to REINVEST_INTEREST with no cash leg", () => {
       const result = mapInvestments(
         input({
           transactions: transactionData({
@@ -319,7 +319,7 @@ describe("mapInvestments", () => {
       );
 
       expect(result.transactions[0]).toMatchObject({
-        action: InvestmentAction.REINVEST,
+        action: InvestmentAction.REINVEST_INTEREST,
         quantity: 125.5,
         totalAmount: 125.5,
         cashAmount: 0,
@@ -343,9 +343,9 @@ describe("mapInvestments", () => {
      * its absence is not a missing-detail defect.
      */
     it.each([
-      [MNY_ACTION.ST_CAPITAL_GAINS_DIST],
-      [MNY_ACTION.LT_CAPITAL_GAINS_DIST],
-    ])("maps the cash capital-gain distribution act=%p", (act) => {
+      [MNY_ACTION.ST_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN_SHORT],
+      [MNY_ACTION.LT_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN_LONG],
+    ])("maps the cash capital-gain distribution act=%p", (act, expected) => {
       const result = mapInvestments(
         input({
           transactions: transactionData({
@@ -355,7 +355,7 @@ describe("mapInvestments", () => {
       );
 
       expect(result.transactions[0]).toMatchObject({
-        action: InvestmentAction.CAPITAL_GAIN,
+        action: expected,
         quantity: null,
         totalAmount: 88.4,
         cashAmount: 88.4,
@@ -378,34 +378,43 @@ describe("mapInvestments", () => {
      * the security -- a value, a position, and no cash leg.
      */
     it.each([
-      [MNY_ACTION.REINVEST_ST_CAPITAL_GAINS],
-      [MNY_ACTION.REINVEST_LT_CAPITAL_GAINS],
-    ])("maps the reinvested capital-gain distribution act=%p", (act) => {
-      const result = mapInvestments(
-        input({
-          transactions: transactionData({
-            transactions: [invRow({ handle: 1, action: act, amount: 61.75 })],
+      [
+        MNY_ACTION.REINVEST_ST_CAPITAL_GAINS,
+        InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+      ],
+      [
+        MNY_ACTION.REINVEST_LT_CAPITAL_GAINS,
+        InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+      ],
+    ])(
+      "maps the reinvested capital-gain distribution act=%p",
+      (act, expected) => {
+        const result = mapInvestments(
+          input({
+            transactions: transactionData({
+              transactions: [invRow({ handle: 1, action: act, amount: 61.75 })],
+            }),
+            investments: investmentData({
+              investmentDetails: [
+                mnyInvestmentDetail({
+                  transaction: 1,
+                  quantity: 2.47,
+                  price: 25,
+                }),
+              ],
+            }),
           }),
-          investments: investmentData({
-            investmentDetails: [
-              mnyInvestmentDetail({
-                transaction: 1,
-                quantity: 2.47,
-                price: 25,
-              }),
-            ],
-          }),
-        }),
-      );
+        );
 
-      expect(result.transactions[0]).toMatchObject({
-        action: InvestmentAction.REINVEST,
-        quantity: 2.47,
-        totalAmount: 61.75,
-        cashAmount: 0,
-        cashAccountKey: null,
-      });
-    });
+        expect(result.transactions[0]).toMatchObject({
+          action: expected,
+          quantity: 2.47,
+          totalAmount: 61.75,
+          cashAmount: 0,
+          cashAccountKey: null,
+        });
+      },
+    );
 
     /**
      * Money's "Redeem CD/Bond" (issue #1149): a disposal whose cash figure may
@@ -413,7 +422,7 @@ describe("mapInvestments", () => {
      * total -- recomputing from the detail would drop the accrued component --
      * so the sleeve receives exactly what Money says the redemption paid.
      */
-    it("maps act=30 redeem CD/bond to SELL with TRN.amt as the proceeds", () => {
+    it("maps act=30 redeem CD/bond to REDEEM with TRN.amt as the proceeds", () => {
       const result = mapInvestments(
         input({
           transactions: transactionData({
@@ -439,7 +448,7 @@ describe("mapInvestments", () => {
       );
 
       expect(result.transactions[0]).toMatchObject({
-        action: InvestmentAction.SELL,
+        action: InvestmentAction.REDEEM,
         quantity: 10000,
         totalAmount: 10087.5,
         cashAmount: 10087.5,

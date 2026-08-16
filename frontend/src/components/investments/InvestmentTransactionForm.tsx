@@ -36,6 +36,7 @@ import {
   FX_RATE_DISPLAY_DECIMALS,
 } from '@/lib/format';
 import { getErrorMessage } from '@/lib/errors';
+import { baseInvestmentAction } from '@/lib/investment-actions';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateFormat } from '@/hooks/useDateFormat';
@@ -59,7 +60,13 @@ export const buildInvestmentTransactionSchema = (t: (key: string) => string) => 
   accountId: z.string().min(1, t('validation.accountRequired')),
   // 'TRANSFER' is a UI-only action that creates a TRANSFER_OUT + TRANSFER_IN
   // pair on the backend; it is offered only when creating, not editing.
-  action: z.enum(['BUY', 'SELL', 'DIVIDEND', 'INTEREST', 'CAPITAL_GAIN', 'SPLIT', 'TRANSFER_IN', 'TRANSFER_OUT', 'REINVEST', 'ADD_SHARES', 'REMOVE_SHARES', 'TRANSFER']),
+  action: z.enum([
+    'BUY', 'SELL', 'DIVIDEND', 'INTEREST', 'CAPITAL_GAIN', 'SPLIT',
+    'TRANSFER_IN', 'TRANSFER_OUT', 'REINVEST', 'ADD_SHARES', 'REMOVE_SHARES',
+    'REINVEST_INTEREST', 'REINVEST_CAPITAL_GAIN_SHORT', 'REINVEST_CAPITAL_GAIN_LONG',
+    'CAPITAL_GAIN_SHORT', 'CAPITAL_GAIN_LONG', 'REDEEM',
+    'TRANSFER',
+  ]),
   transactionDate: z.string().min(1, t('validation.dateRequired')),
   securityId: z.string().optional(),
   fundingAccountId: z.string().optional(),
@@ -83,7 +90,8 @@ export const buildInvestmentTransactionSchema = (t: (key: string) => string) => 
   // shared with actions that legitimately allow zero (a SPLIT's optional new
   // price, the amount-only actions that borrow the field), so the rule is keyed
   // on the action instead of tightened on the field.
-  if (data.action !== 'BUY' && data.action !== 'REINVEST') return;
+  const base = data.action === 'TRANSFER' ? 'TRANSFER' : baseInvestmentAction(data.action);
+  if (base !== 'BUY' && base !== 'REINVEST') return;
   if (data.price !== undefined && data.price > 0) return;
   ctx.addIssue({
     code: 'custom',
@@ -122,6 +130,13 @@ interface InvestmentTransactionFormFieldsProps
 // Actions that require a security selection. Transfers (the combined create
 // action and the TRANSFER_IN/TRANSFER_OUT edit legs) render their own security
 // + quantity + cost fields via `transferMode`, so they're excluded here.
+// Every list below is written over base actions and consulted through
+// `actionIn`, so a Money-vocabulary refinement (REDEEM, CAPITAL_GAIN_SHORT/
+// LONG, REINVEST_*) behaves exactly as its base without each list restating
+// the whole family.
+const actionIn = (action: InvestmentAction, list: InvestmentAction[]): boolean =>
+  list.includes(baseInvestmentAction(action));
+
 const securityRequiredActions: InvestmentAction[] = ['BUY', 'SELL', 'DIVIDEND', 'CAPITAL_GAIN', 'SPLIT', 'REINVEST', 'ADD_SHARES', 'REMOVE_SHARES'];
 
 // Actions that require quantity and price
@@ -207,6 +222,12 @@ function InvestmentTransactionFormFields({
     REINVEST: t('transactionForm.actionReinvest'),
     ADD_SHARES: t('transactionForm.actionAddShares'),
     REMOVE_SHARES: t('transactionForm.actionRemoveShares'),
+    REINVEST_INTEREST: t('transactionForm.actionReinvestInterest'),
+    REINVEST_CAPITAL_GAIN_SHORT: t('transactionForm.actionReinvestCapitalGainShort'),
+    REINVEST_CAPITAL_GAIN_LONG: t('transactionForm.actionReinvestCapitalGainLong'),
+    CAPITAL_GAIN_SHORT: t('transactionForm.actionCapitalGainShort'),
+    CAPITAL_GAIN_LONG: t('transactionForm.actionCapitalGainLong'),
+    REDEEM: t('transactionForm.actionRedeem'),
   };
   const { defaultCurrency, formatCurrency } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -294,7 +315,7 @@ function InvestmentTransactionFormFields({
           destinationAccountId: '',
           quantity: transaction.quantity ?? 0,
           // For amount-only actions, use totalAmount as the price field value
-          price: amountOnlyActions.includes(transaction.action)
+          price: actionIn(transaction.action, amountOnlyActions)
             ? (transaction.totalAmount ?? 0)
             : (transaction.price ?? 0),
           commission: transaction.commission ?? 0,
@@ -386,8 +407,8 @@ function InvestmentTransactionFormFields({
   // otherwise it's the brokerage's linked investment cash account.
   const cashAccount = useMemo(() => {
     if (
-      (fundingAccountActions.includes(watchedAction) ||
-        cashDestinationActions.includes(watchedAction)) &&
+      (actionIn(watchedAction, fundingAccountActions) ||
+        actionIn(watchedAction, cashDestinationActions)) &&
       watchedFundingAccountId
     ) {
       return allAccountsSource.find((a) => a.id === watchedFundingAccountId) ?? null;
@@ -418,7 +439,7 @@ function InvestmentTransactionFormFields({
   const cashCurrencySymbol = getCurrencySymbol(cashCurrency);
 
   const needsConversion =
-    cashPostingActions.includes(watchedAction) &&
+    actionIn(watchedAction, cashPostingActions) &&
     !!transactionCurrency &&
     !!cashCurrency &&
     transactionCurrency !== cashCurrency;
@@ -430,9 +451,9 @@ function InvestmentTransactionFormFields({
 
   // Calculate total amount
   const totalAmount = useMemo(() => {
-    if (quantityPriceActions.includes(watchedAction)) {
+    if (actionIn(watchedAction, quantityPriceActions)) {
       const subtotal = roundToDecimals(watchedQuantity * watchedPrice, 4);
-      if (watchedAction === 'BUY' || watchedAction === 'REINVEST') {
+      if (baseInvestmentAction(watchedAction) === 'BUY' || baseInvestmentAction(watchedAction) === 'REINVEST') {
         return roundToDecimals(subtotal + watchedCommission, 4);
       } else {
         return roundToDecimals(subtotal - watchedCommission, 4);
@@ -551,8 +572,8 @@ function InvestmentTransactionFormFields({
   // accept one, so the value doesn't silently carry over to a hidden field.
   useEffect(() => {
     if (
-      !fundingAccountActions.includes(watchedAction) &&
-      !cashDestinationActions.includes(watchedAction) &&
+      !actionIn(watchedAction, fundingAccountActions) &&
+      !actionIn(watchedAction, cashDestinationActions) &&
       watchedFundingAccountId
     ) {
       setValue('fundingAccountId', '', { shouldDirty: false });
@@ -887,7 +908,7 @@ function InvestmentTransactionFormFields({
       }
 
       const action = data.action as InvestmentAction;
-      const postsCash = cashPostingActions.includes(action);
+      const postsCash = actionIn(action, cashPostingActions);
       const isSplit = action === 'SPLIT';
       // For splits the new/old-shares inputs are the source of truth; the
       // hidden `quantity` field is kept in sync via effect, but we recompute
@@ -915,26 +936,26 @@ function InvestmentTransactionFormFields({
         accountId: data.accountId,
         action,
         transactionDate: data.transactionDate,
-        securityId: securityRequiredActions.includes(action)
+        securityId: actionIn(action, securityRequiredActions)
           ? data.securityId
           : undefined,
         fundingAccountId:
-          (fundingAccountActions.includes(action) ||
-            cashDestinationActions.includes(action)) &&
+          (actionIn(action, fundingAccountActions) ||
+            actionIn(action, cashDestinationActions)) &&
           data.fundingAccountId
             ? data.fundingAccountId
             : undefined,
         quantity: isSplit
           ? ratio
-          : (quantityPriceActions.includes(action) || quantityOnlyActions.includes(action))
+          : (actionIn(action, quantityPriceActions) || actionIn(action, quantityOnlyActions))
             ? data.quantity
             : undefined,
-        price: quantityOnlyActions.includes(action)
+        price: actionIn(action, quantityOnlyActions)
           ? undefined
           : isSplit
             ? (data.price && data.price > 0 ? data.price : undefined)
             : data.price,
-        commission: quantityOnlyActions.includes(action) || isSplit
+        commission: actionIn(action, quantityOnlyActions) || isSplit
           ? undefined
           : data.commission,
         // Only send the exchange rate for actions that post a cash transaction.
@@ -968,10 +989,10 @@ function InvestmentTransactionFormFields({
 
   useFormSubmitRef(submitRef, handleSubmit, onSubmit);
 
-  const needsSecurity = securityRequiredActions.includes(watchedAction);
-  const needsQuantityPrice = quantityPriceActions.includes(watchedAction);
-  const isQuantityOnly = quantityOnlyActions.includes(watchedAction);
-  const isAmountOnly = amountOnlyActions.includes(watchedAction);
+  const needsSecurity = actionIn(watchedAction, securityRequiredActions);
+  const needsQuantityPrice = actionIn(watchedAction, quantityPriceActions);
+  const isQuantityOnly = actionIn(watchedAction, quantityOnlyActions);
+  const isAmountOnly = actionIn(watchedAction, amountOnlyActions);
   const isSplit = watchedAction === 'SPLIT';
   // An individual posted transfer leg (TRANSFER_IN/TRANSFER_OUT). These only
   // appear when editing an existing transfer; the create flow uses the
@@ -981,8 +1002,8 @@ function InvestmentTransactionFormFields({
   // Either creating a transfer (combined action) or editing an existing leg.
   // Both render the From/To + security + quantity + cost-per-share UI.
   const transferMode = isTransfer || isTransferLeg;
-  const canHaveFundingAccount = fundingAccountActions.includes(watchedAction);
-  const canHaveCashDestination = cashDestinationActions.includes(watchedAction);
+  const canHaveFundingAccount = actionIn(watchedAction, fundingAccountActions);
+  const canHaveCashDestination = actionIn(watchedAction, cashDestinationActions);
 
   // When creating, offer a single "Transfer" option and hide the raw
   // TRANSFER_IN/TRANSFER_OUT legs (they are produced as a pair by the backend).
@@ -1059,7 +1080,7 @@ function InvestmentTransactionFormFields({
       {/* Funding Account - for Buy/Sell to specify where funds come from/go to */}
       {canHaveFundingAccount && (
         <Select
-          label={watchedAction === 'BUY' ? t('transactionForm.fundsFrom') : t('transactionForm.fundsTo')}
+          label={baseInvestmentAction(watchedAction) === 'BUY' ? t('transactionForm.fundsFrom') : t('transactionForm.fundsTo')}
           options={[
             { value: '', label: t('transactionForm.linkedCashDefault') },
             ...fundingAccounts.map((a) => ({
@@ -1461,7 +1482,7 @@ function InvestmentTransactionFormFields({
           {needsQuantityPrice && (
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {t('transactionForm.sharesAtPrice', { shares: watchedQuantity, symbol: currencySymbol, price: watchedPrice.toFixed(6) })}
-              {watchedCommission > 0 && ` ${watchedAction === 'SELL' ? '-' : '+'} ${formatCurrency(watchedCommission, transactionCurrency)} ${t('transactionForm.commissionSuffix')}`}
+              {watchedCommission > 0 && ` ${baseInvestmentAction(watchedAction) === 'SELL' ? '-' : '+'} ${formatCurrency(watchedCommission, transactionCurrency)} ${t('transactionForm.commissionSuffix')}`}
             </div>
           )}
           {needsConversion && (

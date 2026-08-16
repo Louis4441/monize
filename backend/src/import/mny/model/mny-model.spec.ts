@@ -199,15 +199,21 @@ describe("mapInvestmentAction", () => {
     [MNY_ACTION.DIVIDEND, InvestmentAction.DIVIDEND],
     [MNY_ACTION.INTEREST, InvestmentAction.INTEREST],
     [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
-    [MNY_ACTION.REINVEST_INTEREST, InvestmentAction.REINVEST],
+    [MNY_ACTION.REINVEST_INTEREST, InvestmentAction.REINVEST_INTEREST],
     [MNY_ACTION.CONTRIBUTION, InvestmentAction.REINVEST],
     [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
     [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
-    [MNY_ACTION.ST_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN],
-    [MNY_ACTION.LT_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN],
-    [MNY_ACTION.REINVEST_ST_CAPITAL_GAINS, InvestmentAction.REINVEST],
-    [MNY_ACTION.REINVEST_LT_CAPITAL_GAINS, InvestmentAction.REINVEST],
-    [MNY_ACTION.REDEEM_CD_BOND, InvestmentAction.SELL],
+    [MNY_ACTION.ST_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN_SHORT],
+    [MNY_ACTION.LT_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN_LONG],
+    [
+      MNY_ACTION.REINVEST_ST_CAPITAL_GAINS,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+    ],
+    [
+      MNY_ACTION.REINVEST_LT_CAPITAL_GAINS,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+    ],
+    [MNY_ACTION.REDEEM_CD_BOND, InvestmentAction.REDEEM],
     [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
     [MNY_ACTION.TRANSFER_IN, InvestmentAction.TRANSFER_IN],
     [MNY_ACTION.TRANSFER_OUT, InvestmentAction.TRANSFER_OUT],
@@ -227,12 +233,28 @@ describe("mapInvestmentAction", () => {
     );
   });
 
-  it("maps act 30 to SELL, never REMOVE_SHARES", () => {
+  it("preserves Money's income kind rather than collapsing onto a base action", () => {
+    // Issue #1149's point: short- and long-term capital gains are taxed
+    // differently, and reinvested interest is interest. Collapsing these onto
+    // REINVEST/CAPITAL_GAIN/SELL at import time would lose the distinction
+    // permanently -- the refinements behave like their base but keep the kind.
+    expect(mapInvestmentAction(MNY_ACTION.ST_CAPITAL_GAINS_DIST)).not.toBe(
+      InvestmentAction.CAPITAL_GAIN,
+    );
+    expect(mapInvestmentAction(MNY_ACTION.LT_CAPITAL_GAINS_DIST)).not.toBe(
+      InvestmentAction.CAPITAL_GAIN,
+    );
+    expect(mapInvestmentAction(MNY_ACTION.REINVEST_INTEREST)).not.toBe(
+      InvestmentAction.REINVEST,
+    );
+  });
+
+  it("maps act 30 to REDEEM, never REMOVE_SHARES", () => {
     // "Redeem CD/Bond" is a disposal with real proceeds -- the cash figure,
     // accrued interest included, has to reach the cash sleeve. REMOVE_SHARES
     // would zero the total and lose the proceeds (issue #1149).
     expect(mapInvestmentAction(MNY_ACTION.REDEEM_CD_BOND)).toBe(
-      InvestmentAction.SELL,
+      InvestmentAction.REDEEM,
     );
   });
 

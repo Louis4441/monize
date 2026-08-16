@@ -420,7 +420,10 @@ export function resolveSeriesFrequency(
   representative: MnyBill,
   instances: readonly MnyBill[],
 ): MnyFrequencyMapping | null {
-  const coded = mapFrequency(representative.frequency, representative.occurrencesPerUnit);
+  const coded = mapFrequency(
+    representative.frequency,
+    representative.occurrencesPerUnit,
+  );
   const observed = inferFrequencyFromDueDates(
     instances.map((instance) => instance.nextDue),
   );

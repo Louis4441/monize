@@ -18,6 +18,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { lockHoldingScope } from "../common/db/locks";
 import {
   applyActionToQuantity,
+  baseInvestmentAction,
   SHARE_MOVING_ACTIONS,
   acquisitionCost,
   isQuantityOnlyAction,
@@ -163,7 +164,7 @@ export class HoldingsService {
       if (tx.transactionDate >= asOfDate) break;
       if (excludeTransactionId && tx.id === excludeTransactionId) continue;
       const txQty = Number(tx.quantity) || 0;
-      switch (tx.action) {
+      switch (baseInvestmentAction(tx.action)) {
         case InvestmentAction.BUY:
         case InvestmentAction.REINVEST:
         case InvestmentAction.TRANSFER_IN: {

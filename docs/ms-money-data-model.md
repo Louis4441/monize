@@ -266,17 +266,17 @@ lot) and `TRN_XFER` (whether Money records a cash counterpart at all).
 | 4 | Interest paid to cash | **no** | — | INTEREST, amount from `TRN.amt` |
 | 5 | Reinvest (variant) | yes | — | REINVEST + warning |
 | 9 | Reinvested distribution | yes | **0 of 1,020** | REINVEST |
-| 10 | Reinvest Interest | ? | — | REINVEST + warning |
+| 10 | Reinvest Interest | ? | — | REINVEST_INTEREST + warning |
 | 12 | Add Shares: units credited to a plan account | yes | **0 of 92** | REINVEST + warning |
 | 13 | Remove shares / close lots | yes | — | REMOVE_SHARES |
 | 14 | Cash corporate action | **no** | — | CAPITAL_GAIN + warning |
 | 15 | Add shares / open lots | yes | — | ADD_SHARES, or TRANSFER_IN when paired |
 | 16 | Remove shares / close lots | yes | — | REMOVE_SHARES, or TRANSFER_OUT when paired |
-| 24 | S-Term Cap Gains Dist, paid to cash | ? | — | CAPITAL_GAIN + warning |
-| 26 | L-Term Cap Gains Dist, paid to cash | ? | — | CAPITAL_GAIN + warning |
-| 27 | Reinvest S-Term CG Dist | ? | — | REINVEST + warning |
-| 29 | Reinvest L-Term CG Dist | ? | — | REINVEST + warning |
-| 30 | Redeem CD/Bond | ? | — | SELL + warning, amount from `TRN.amt` |
+| 24 | S-Term Cap Gains Dist, paid to cash | ? | — | CAPITAL_GAIN_SHORT + warning |
+| 26 | L-Term Cap Gains Dist, paid to cash | ? | — | CAPITAL_GAIN_LONG + warning |
+| 27 | Reinvest S-Term CG Dist | ? | — | REINVEST_CAPITAL_GAIN_SHORT + warning |
+| 29 | Reinvest L-Term CG Dist | ? | — | REINVEST_CAPITAL_GAIN_LONG + warning |
+| 30 | Redeem CD/Bond | ? | — | REDEEM + warning, amount from `TRN.amt` |
 | 32 / 33 | Share transfer in / out | yes | — | TRANSFER_IN / TRANSFER_OUT |
 | -1 | Regular non-investment transaction | no | — | — |
 

@@ -105,13 +105,21 @@ const INVESTMENT_RELATIONS = [
   "splits.investmentSecurity",
 ];
 
+// Each Money-vocabulary refinement (REDEEM, CAPITAL_GAIN_SHORT/LONG,
+// REINVEST_*) validates exactly as its base action does.
 const SECURITY_REQUIRED_ACTIONS = new Set<InvestmentAction>([
   InvestmentAction.BUY,
   InvestmentAction.SELL,
+  InvestmentAction.REDEEM,
   InvestmentAction.DIVIDEND,
   InvestmentAction.CAPITAL_GAIN,
+  InvestmentAction.CAPITAL_GAIN_SHORT,
+  InvestmentAction.CAPITAL_GAIN_LONG,
   InvestmentAction.SPLIT,
   InvestmentAction.REINVEST,
+  InvestmentAction.REINVEST_INTEREST,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
   InvestmentAction.ADD_SHARES,
   InvestmentAction.REMOVE_SHARES,
 ]);
@@ -119,7 +127,11 @@ const SECURITY_REQUIRED_ACTIONS = new Set<InvestmentAction>([
 const QUANTITY_PRICE_ACTIONS = new Set<InvestmentAction>([
   InvestmentAction.BUY,
   InvestmentAction.SELL,
+  InvestmentAction.REDEEM,
   InvestmentAction.REINVEST,
+  InvestmentAction.REINVEST_INTEREST,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
 ]);
 
 const QUANTITY_ONLY_ACTIONS = new Set<InvestmentAction>([
@@ -132,6 +144,8 @@ const AMOUNT_ONLY_ACTIONS = new Set<InvestmentAction>([
   InvestmentAction.DIVIDEND,
   InvestmentAction.INTEREST,
   InvestmentAction.CAPITAL_GAIN,
+  InvestmentAction.CAPITAL_GAIN_SHORT,
+  InvestmentAction.CAPITAL_GAIN_LONG,
 ]);
 
 @Injectable()
