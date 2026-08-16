@@ -22,27 +22,51 @@ export class ScheduledTransactionLoanService {
 
   async recalculateLoanPaymentSplits(
     scheduledTransactionId: string,
-    loanAccountId: string,
   ): Promise<void> {
     return withScopedDb(this.dataSource, async (m) => {
-      const loanAccount = await m.getRepository(Account).findOne({
-        where: { id: loanAccountId },
-      });
-
-      if (!loanAccount) {
-        return;
-      }
-
+      // This writer mutates the child split set, so it must serialize through
+      // the same parent lock the posting path takes (issue #1154 re-review): a
+      // recalculation that changed principal/interest without the lock could
+      // land between a poster's split-set guard and its write, and because a
+      // P/I reallocation leaves the parent total unchanged, the poster's own
+      // parent lock would not have blocked it. Lock the parent, then read the
+      // current child set and derive the loan from it -- never from a loan id
+      // captured off a pre-lock snapshot.
       const scheduledTransaction = await m
         .getRepository(ScheduledTransaction)
         .findOne({
           where: { id: scheduledTransactionId },
-          relations: ["splits"],
+          lock: { mode: "pessimistic_write" },
         });
 
       if (!scheduledTransaction || !scheduledTransaction.isActive) {
         return;
       }
+
+      const splits = await m.getRepository(ScheduledTransactionSplit).find({
+        where: { scheduledTransactionId },
+      });
+
+      let loanAccount: Account | null = null;
+      for (const split of splits) {
+        if (!split.transferAccountId) continue;
+        const candidate = await m.getRepository(Account).findOne({
+          where: { id: split.transferAccountId },
+        });
+        if (
+          candidate &&
+          (candidate.accountType === "LOAN" ||
+            candidate.accountType === "MORTGAGE")
+        ) {
+          loanAccount = candidate;
+          break;
+        }
+      }
+
+      if (!loanAccount) {
+        return;
+      }
+      const loanAccountId = loanAccount.id;
 
       const currentBalance = Math.abs(Number(loanAccount.currentBalance));
 
@@ -57,8 +81,6 @@ export class ScheduledTransactionLoanService {
       const interestRate = Number(loanAccount.interestRate) || 0;
       const frequency = (loanAccount.paymentFrequency ||
         scheduledTransaction.frequency) as PaymentFrequency;
-
-      const splits = scheduledTransaction.splits || [];
 
       // Identify splits: there may be a regular principal transfer, an interest
       // category split, and optionally a separate extra principal transfer.

@@ -4006,15 +4006,27 @@ describe("ScheduledTransactionsService", () => {
   // ==================== recalculateLoanPaymentSplits ====================
   describe("recalculateLoanPaymentSplits", () => {
     it("should deactivate scheduled transaction when loan is paid off", async () => {
+      // The loan account is now derived from the current split set under the
+      // parent lock (issue #1154 re-review), so provide a transfer split
+      // pointing at it rather than relying on a caller-passed loan id.
       accountsRepo.findOne.mockResolvedValue({
         id: "loan-1",
+        accountType: "LOAN",
         currentBalance: 0,
       });
+      splitsRepo.find.mockResolvedValue([
+        {
+          id: "s1",
+          transferAccountId: "loan-1",
+          categoryId: null,
+          amount: -800,
+        },
+      ]);
       scheduledRepo.findOne.mockResolvedValue(
-        makeScheduled({ isActive: true, splits: [] }),
+        makeScheduled({ isActive: true }),
       );
 
-      await service.recalculateLoanPaymentSplits(stId, "loan-1");
+      await service.recalculateLoanPaymentSplits(stId);
 
       expect(scheduledRepo.update).toHaveBeenCalledWith(stId, {
         isActive: false,
@@ -4024,7 +4036,7 @@ describe("ScheduledTransactionsService", () => {
     it("should do nothing when loan account not found", async () => {
       accountsRepo.findOne.mockResolvedValue(null);
 
-      await service.recalculateLoanPaymentSplits(stId, "loan-missing");
+      await service.recalculateLoanPaymentSplits(stId);
 
       expect(scheduledRepo.update).not.toHaveBeenCalled();
     });
@@ -4037,7 +4049,7 @@ describe("ScheduledTransactionsService", () => {
       });
       scheduledRepo.findOne.mockResolvedValue(null);
 
-      await service.recalculateLoanPaymentSplits(stId, "loan-1");
+      await service.recalculateLoanPaymentSplits(stId);
 
       expect(splitsRepo.save).not.toHaveBeenCalled();
     });
@@ -4045,6 +4057,7 @@ describe("ScheduledTransactionsService", () => {
     it("should update principal and interest splits", async () => {
       const loanAccount = {
         id: "loan-1",
+        accountType: "LOAN",
         currentBalance: -50000,
         interestRate: 6,
         paymentFrequency: "MONTHLY",
@@ -4064,13 +4077,14 @@ describe("ScheduledTransactionsService", () => {
       const scheduled = makeScheduled({
         isActive: true,
         amount: -1200,
-        splits: [principalSplit, interestSplit] as any,
       });
 
       accountsRepo.findOne.mockResolvedValue(loanAccount);
+      // Splits are re-read under the parent lock (issue #1154 re-review).
+      splitsRepo.find.mockResolvedValue([principalSplit, interestSplit]);
       scheduledRepo.findOne.mockResolvedValue(scheduled);
 
-      await service.recalculateLoanPaymentSplits(stId, "loan-1");
+      await service.recalculateLoanPaymentSplits(stId);
 
       // Both splits should have been saved with updated amounts
       expect(splitsRepo.save).toHaveBeenCalledTimes(2);

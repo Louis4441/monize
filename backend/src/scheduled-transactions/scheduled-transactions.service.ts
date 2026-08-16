@@ -160,9 +160,14 @@ function sameNullableNumber(
  * scalar. `post()` and `update()` prepare their writes from a row read before
  * the row lock; if any of these changed by the time the lock is held, the
  * prepared write no longer describes the row and must be refused rather than
- * committing a stale operation (issue #1154 review). Presentation-only fields
- * (description, tags) are deliberately excluded so a cosmetic concurrent edit
- * does not force a needless retry.
+ * committing a stale operation (issue #1154 review). Presentation-only content
+ * (name/payee, description, memo, tags) is deliberately excluded: it does not
+ * change where money moves or how much, so a concurrent cosmetic edit does not
+ * force a needless retry. The accepted trade-off is that a post racing such an
+ * edit carries the pre-lock text -- the posted transaction may show the older
+ * name/description while the schedule already shows the newer one. That is a
+ * content-consistency gap, not a financial one, and is chosen over rejecting a
+ * post because someone renamed the payee at the same instant.
  */
 function sameScheduleMutationBasis(
   a: ScheduledTransaction,
@@ -2168,9 +2173,13 @@ export class ScheduledTransactionsService {
       // actually uses the base scheduled splits -- no inline splits and no
       // override splits -- re-read the set under the parent lock and refuse if it
       // changed, so a concurrently-retargeted split cannot post money to the old
-      // account (issue #1154 re-review). Scheduled split writers take the parent
-      // lock before replacing the child set, so this read sees one stable
-      // committed generation.
+      // account (issue #1154 re-review). This re-read is the safety net on its
+      // own: it compares the committed child set against the pre-lock snapshot
+      // and refuses on any difference, so it does not depend on every writer
+      // taking the parent lock first. Writers that do serialize on that lock
+      // (the loan recalculator) simply never produce a mid-write generation for
+      // it to see; a writer that does not (a bulk category reassignment) is
+      // still caught, because what the guard checks is the value, not the lock.
       const usesScheduledSplits =
         useSplits &&
         !hasInlineSplits &&
@@ -2311,12 +2320,11 @@ export class ScheduledTransactionsService {
     }
 
     if (scheduled.splits && scheduled.splits.length > 0) {
-      const loanAccountId = await this.loanService.findLoanAccountFromSplits(
-        scheduled.splits,
-      );
-      if (loanAccountId) {
-        await this.loanService.recalculateLoanPaymentSplits(id, loanAccountId);
-      }
+      // Do not pass a loan id captured off the pre-lock snapshot: the
+      // recalculation locks the parent and derives the loan from the current
+      // split set itself, so a concurrent retarget (Loan A -> Loan B) cannot
+      // recalculate the wrong loan (issue #1154 re-review).
+      await this.loanService.recalculateLoanPaymentSplits(id);
     }
 
     return this.findOne(userId, id);
@@ -2566,11 +2574,9 @@ export class ScheduledTransactionsService {
 
   async recalculateLoanPaymentSplits(
     scheduledTransactionId: string,
-    loanAccountId: string,
   ): Promise<void> {
     return this.loanService.recalculateLoanPaymentSplits(
       scheduledTransactionId,
-      loanAccountId,
     );
   }
 }
