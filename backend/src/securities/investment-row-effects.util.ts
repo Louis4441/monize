@@ -18,7 +18,7 @@ import { TransactionStatus } from "../transactions/entities/transaction-status.e
  * `investment-void-classification.guard.spec.ts` fails on a query site that
  * does neither, so a new reader cannot skip the decision.
  *
- * The column is NOT NULL (migration 156), so `!= 'VOID'` needs no NULL arm.
+ * The column is NOT NULL (migration 157), so `!= 'VOID'` needs no NULL arm.
  */
 export const NON_VOID_INVESTMENT_STATUS = Not(TransactionStatus.VOID);
 

@@ -76,7 +76,7 @@ balance; a future-dated one triggers recalculation.
 
 ## 4. Migration and backfill
 
-Migration `156_investment_transaction_status.sql` (idempotent, replayable on
+Migration `157_investment_transaction_status.sql` (idempotent, replayable on
 top of `schema.sql`):
 
 - `ADD COLUMN IF NOT EXISTS status VARCHAR(20)`.
