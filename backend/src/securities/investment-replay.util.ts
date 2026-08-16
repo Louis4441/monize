@@ -67,6 +67,22 @@ export const SHARE_MOVING_ACTIONS: readonly InvestmentAction[] = [
 ];
 
 /**
+ * Actions whose cash settles through an explicit funding account: a BUY draws
+ * the purchase cost from it, a SELL deposits the proceeds into it. Every other
+ * action settles against the brokerage's linked cash account, so a funding
+ * account stored on one is stale and must never route the money (issue #1154).
+ *
+ * Centralized so the scheduled-transaction service (which clears the column on
+ * write and ignores it on post) and the MNY import writer (which must not
+ * persist one on a non-funding action) share one authority rather than each
+ * spelling out `{BUY, SELL}` and drifting apart.
+ */
+export const FUNDING_ACCOUNT_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
+  InvestmentAction.BUY,
+  InvestmentAction.SELL,
+]);
+
+/**
  * Whether an action adds shares to a position without supplying a cost for
  * them. Basis-carrying replays must record that the basis they computed is
  * incomplete rather than treating the shares as free.

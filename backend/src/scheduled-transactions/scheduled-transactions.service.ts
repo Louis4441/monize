@@ -29,6 +29,7 @@ import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
+import { FUNDING_ACCOUNT_ACTIONS } from "../securities/investment-replay.util";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
@@ -132,16 +133,6 @@ const AMOUNT_ONLY_ACTIONS = new Set<InvestmentAction>([
   InvestmentAction.DIVIDEND,
   InvestmentAction.INTEREST,
   InvestmentAction.CAPITAL_GAIN,
-]);
-
-// The only scheduled investment actions that route cash through an explicit
-// funding account: a BUY draws from it, a SELL deposits into it. Every other
-// action settles against the brokerage's linked cash account, so a funding
-// account stored on one is stale (issue #1154) -- cleared on write and ignored
-// on post rather than trusted to misroute the money.
-const FUNDING_ACCOUNT_ACTIONS = new Set<InvestmentAction>([
-  InvestmentAction.BUY,
-  InvestmentAction.SELL,
 ]);
 
 @Injectable()

@@ -2176,6 +2176,29 @@ describe("ScheduledTransactionsService", () => {
       expect(dto.fundingAccountId).toBe("acc-checking");
     });
 
+    it("post() ignores a stale funding account on a REINVEST (issue #1154)", async () => {
+      // REINVEST moves shares but no external cash, so a funding account left on
+      // the row is stale like the cash-only actions and must not be forwarded.
+      const scheduled = makeScheduled({
+        isInvestment: true,
+        investmentAction: "REINVEST" as any,
+        investmentSecurityId: "sec-voo",
+        investmentFundingAccountId: "acc-checking",
+        investmentQuantity: 0.5,
+        investmentPrice: 200,
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      expect(dto.action).toBe("REINVEST");
+      expect(dto.fundingAccountId).toBeUndefined();
+    });
+
     it("post() honours inline quantity / price overrides", async () => {
       const scheduled = makeScheduled({
         isInvestment: true,
@@ -2390,6 +2413,10 @@ describe("ScheduledTransactionsService", () => {
         userId,
         "acc-funding",
       );
+      // A BUY keeps the funding account it was given (the gate's keep branch).
+      expect(
+        scheduledRepo.create.mock.calls[0][0].investmentFundingAccountId,
+      ).toBe("acc-funding");
     });
 
     it("update() rejects mixing isTransfer and isInvestment", async () => {
