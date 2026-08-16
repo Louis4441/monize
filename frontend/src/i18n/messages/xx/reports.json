@@ -330,7 +330,8 @@
     "tooltipUtilization": "[XX-Utilization-XX]",
     "tooltipUsed": "[XX-Used-XX]",
     "tooltipAvailable": "[XX-Available-XX]",
-    "pdfTitle": "[XX-Credit Utilization-XX]"
+    "pdfTitle": "[XX-Credit Utilization-XX]",
+    "noRate": "[XX-No rate-XX]"
   },
   "currencyExposure": {
     "empty": "[XX-No investment holdings found. Add securities to see currency exposure.-XX]",
@@ -1166,7 +1167,8 @@
     "csvColProceeds": "[XX-Proceeds-XX]",
     "csvColCostBasis": "[XX-Cost Basis-XX]",
     "csvColGainLoss": "[XX-Gain/Loss-XX]",
-    "csvColReturn": "[XX-Return %-XX]"
+    "csvColReturn": "[XX-Return %-XX]",
+    "csvNoRate": "[XX-No rate-XX]"
   },
   "recurringExpenses": {
     "recurringExpenses": "[XX-Recurring Expenses-XX]",
@@ -1374,7 +1376,8 @@
     "pdfTotalPortfolio": "[XX-Total Portfolio-XX]",
     "pdfAssetTypes": "[XX-Asset Types-XX]",
     "pdfTotalHoldings": "[XX-Total Holdings-XX]",
-    "pdfLargestType": "[XX-Largest Type-XX]"
+    "pdfLargestType": "[XX-Largest Type-XX]",
+    "unavailable": "[XX-Unavailable-XX]"
   },
   "spendingAnomalies": {
     "highPriority": "[XX-High Priority-XX]",

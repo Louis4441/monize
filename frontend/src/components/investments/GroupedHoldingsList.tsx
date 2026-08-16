@@ -77,8 +77,8 @@ export function GroupedHoldingsList({
   // A share of a known subtotal is not a share of the portfolio, and a value
   // whose pair has no rate cannot join the numerator: both read unknown ('-')
   // rather than a definitive-looking percentage of the wrong denominator
-  // (review #1133). getRate returns null for an unresolved pair where
-  // convertToDefault would pass the amount through as an implicit 1:1.
+  // (review #1133). getRate returns null for an unresolved pair, so the missing
+  // conversion surfaces here rather than being silently dropped.
   const getPortfolioPercent = (value: number | null, currencyCode?: string): string => {
     if (value === null || totalPortfolioValue === 0) return '-';
     if (valuationComplete === false) return '-';
@@ -92,10 +92,10 @@ export function GroupedHoldingsList({
   };
 
   // The "~ default currency" approximation under an account's total: unknown --
-  // and unrendered -- when the pair has no rate (an implicit 1:1 relabels the
-  // foreign number) or when the account's own valuation is incomplete (the
-  // total being approximated is a subtotal the marker beside it just called
-  // partial). The summary card suppresses its ~ line the same way.
+  // and unrendered -- when the pair has no rate (getRate returns null) or when
+  // the account's own valuation is incomplete (the total being approximated is a
+  // subtotal the marker beside it just called partial). The summary card
+  // suppresses its ~ line the same way.
   const accountDefaultApprox = (
     account: AccountHoldings,
     accountTotalValue: number,

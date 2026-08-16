@@ -144,9 +144,6 @@
     "defaultMessage": "加载报告数据失败。请重试。",
     "retry": "重试"
   },
-  "foreignCurrencyFees": {
-    "noEligibleAccounts": "没有账户配置了境外交易手续费。在账户上设置手续费百分比，即可在此追踪其外币手续费。"
-  },
   "accountBalances": {
     "totalAssets": "总资产",
     "totalLiabilities": "总负债",
@@ -333,7 +330,8 @@
     "tooltipUtilization": "使用率",
     "tooltipUsed": "已用",
     "tooltipAvailable": "可用",
-    "pdfTitle": "信用额度使用率"
+    "pdfTitle": "信用额度使用率",
+    "noRate": "无汇率"
   },
   "currencyExposure": {
     "empty": "未找到投资持仓。添加证券以查看货币风险敞口。",
@@ -575,20 +573,20 @@
     "topRegion": "最大地区",
     "viewByRegion": "按地区",
     "viewByExchange": "按交易所",
+    "viewByCountry": "按国家/地区",
     "regionalAllocation": "地区配置",
     "exchangeAllocation": "交易所配置",
+    "countryAllocation": "国家/地区配置（穿透）",
+    "countryLookThroughNote": "国家/地区敞口会使用每只证券上手动设置的国家/地区配置穿透 ETF 和基金。个股按上市交易所归类；未分类的部分显示为“其他”。",
     "colRegion": "地区",
     "colExchange": "交易所",
     "colCountry": "国家",
     "colHoldings": "持仓",
     "colMarketValue": "市值",
     "colPortfolioPct": "占组合 %",
+    "other": "其他",
     "total": "合计",
-    "holdingCount": "{count, plural, one {# 个持仓} other {# 个持仓}}",
-    "viewByCountry": "按国家/地区",
-    "countryAllocation": "国家/地区配置（穿透）",
-    "countryLookThroughNote": "国家/地区敞口会使用每只证券上手动设置的国家/地区配置穿透 ETF 和基金。个股按上市交易所归类；未分类的部分显示为“其他”。",
-    "other": "其他"
+    "holdingCount": "{count, plural, one {# 个持仓} other {# 个持仓}}"
   },
   "healthScoreHistory": {
     "pdfTitle": "健康评分历史",
@@ -1169,7 +1167,8 @@
     "csvColProceeds": "收益",
     "csvColCostBasis": "成本基础",
     "csvColGainLoss": "盈亏",
-    "csvColReturn": "回报率 %"
+    "csvColReturn": "回报率 %",
+    "csvNoRate": "无汇率"
   },
   "recurringExpenses": {
     "recurringExpenses": "定期支出",
@@ -1377,7 +1376,8 @@
     "pdfTotalPortfolio": "投资组合总计",
     "pdfAssetTypes": "资产类型",
     "pdfTotalHoldings": "总持仓",
-    "pdfLargestType": "最大类型"
+    "pdfLargestType": "最大类型",
+    "unavailable": "不可用"
   },
   "spendingAnomalies": {
     "highPriority": "高优先级",
@@ -1701,5 +1701,8 @@
     "labelSelectAccount": "选择贷款账户",
     "viewTransactions": "查看交易",
     "empty": "未找到贷款、抵押贷款或信用额度账户。"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "没有账户配置了境外交易手续费。在账户上设置手续费百分比，即可在此追踪其外币手续费。"
   }
 }

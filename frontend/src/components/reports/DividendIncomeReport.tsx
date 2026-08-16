@@ -53,8 +53,8 @@ interface MonthlyIncome {
   label: string;
   startValue: number | null;
   endValue: number | null;
-  dividends: number;
-  interest: number;
+  dividends: number | null;
+  interest: number | null;
   capitalGains: number | null;
   total: number | null;
 }
@@ -62,8 +62,8 @@ interface MonthlyIncome {
 interface SecurityIncome {
   symbol: string;
   name: string;
-  dividends: number;
-  interest: number;
+  dividends: number | null;
+  interest: number | null;
   capitalGains: number | null;
   total: number | null;
 }
@@ -73,8 +73,8 @@ interface DailyIncome {
   label: string;
   startValue: number | null;
   endValue: number | null;
-  dividends: number;
-  interest: number;
+  dividends: number | null;
+  interest: number | null;
   capitalGains: number | null;
   total: number | null;
 }
@@ -320,7 +320,7 @@ export function DividendIncomeReport() {
   const displayCurrency = selectedAccount?.currencyCode || defaultCurrency;
   const isForeign = displayCurrency !== defaultCurrency;
 
-  const getTxAmount = useCallback((tx: InvestmentTransaction): number => {
+  const getTxAmount = useCallback((tx: InvestmentTransaction): number | null => {
     const amount = Math.abs(tx.totalAmount);
     if (isSingleAccount) {
       // Single account selected: native currency, no conversion needed
@@ -418,10 +418,10 @@ export function DividendIncomeReport() {
       const contribution = getTxAmount(tx);
       switch (tx.action) {
         case 'DIVIDEND':
-          bucket.dividends += contribution;
+          bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
         case 'INTEREST':
-          bucket.interest += contribution;
+          bucket.interest = addOrUnknown(bucket.interest, contribution);
           break;
         case 'CAPITAL_GAIN':
           bucket.capitalGains = addOrUnknown(bucket.capitalGains, contribution);
@@ -483,10 +483,10 @@ export function DividendIncomeReport() {
       const contribution = getTxAmount(tx);
       switch (tx.action) {
         case 'DIVIDEND':
-          bucket.dividends += contribution;
+          bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
         case 'INTEREST':
-          bucket.interest += contribution;
+          bucket.interest = addOrUnknown(bucket.interest, contribution);
           break;
         case 'CAPITAL_GAIN':
           bucket.capitalGains = addOrUnknown(bucket.capitalGains, contribution);
@@ -582,10 +582,10 @@ export function DividendIncomeReport() {
       const contribution = getTxAmount(tx);
       switch (tx.action) {
         case 'DIVIDEND':
-          bucket.dividends += contribution;
+          bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
         case 'INTEREST':
-          bucket.interest += contribution;
+          bucket.interest = addOrUnknown(bucket.interest, contribution);
           break;
         case 'CAPITAL_GAIN':
           bucket.capitalGains = addOrUnknown(bucket.capitalGains, contribution);
@@ -611,15 +611,17 @@ export function DividendIncomeReport() {
   // total (sorted last by compareValues, rendered as the unknown marker).
   const visibleTotal = useCallback(
     (
-      dividends: number,
-      interest: number,
+      dividends: number | null,
+      interest: number | null,
       capitalGains: number | null,
     ): number | null => {
-      const known =
-        (visibleSeries.dividends ? dividends : 0) +
-        (visibleSeries.interest ? interest : 0);
-      if (!visibleSeries.capitalGains) return known;
-      return capitalGains === null ? null : known + capitalGains;
+      // Sum only the visible series, and let a single unknown component make the
+      // visible total unknown rather than a silent subtotal.
+      let sum: number | null = 0;
+      if (visibleSeries.dividends) sum = addOrUnknown(sum, dividends);
+      if (visibleSeries.interest) sum = addOrUnknown(sum, interest);
+      if (visibleSeries.capitalGains) sum = addOrUnknown(sum, capitalGains);
+      return sum;
     },
     [visibleSeries],
   );
@@ -721,15 +723,18 @@ export function DividendIncomeReport() {
   }, [securityData, securitySort.sortField, securitySort.sortDirection]);
 
   const totals = useMemo(() => {
+    // A headline figure goes unknown (null), not silently short, when any of its
+    // components could not be converted -- one missing rate makes the whole
+    // figure unknown, the same rule the monthly and daily buckets follow.
     const dividends = filteredTransactions
       .filter((t) => t.action === 'DIVIDEND')
-      .reduce((sum, t) => sum + getTxAmount(t), 0);
+      .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const interest = filteredTransactions
       .filter((t) => t.action === 'INTEREST')
-      .reduce((sum, t) => sum + getTxAmount(t), 0);
+      .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const manualCapitalGains = filteredTransactions
       .filter((t) => t.action === 'CAPITAL_GAIN')
-      .reduce((sum, t) => sum + getTxAmount(t), 0);
+      .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const periodCapitalGains = filteredCapitalGains.reduce<number | null>(
       (sum, entry) => addOrUnknown(sum, convertCapitalGain(entry)),
       0,
@@ -739,7 +744,7 @@ export function DividendIncomeReport() {
       dividends,
       interest,
       capitalGains: totalGains,
-      total: addOrUnknown(dividends + interest, totalGains),
+      total: addOrUnknown(addOrUnknown(dividends, interest), totalGains),
     };
   }, [filteredTransactions, filteredCapitalGains, getTxAmount, convertCapitalGain]);
 
@@ -886,13 +891,13 @@ export function DividendIncomeReport() {
       });
       const dailyTotals = displayedDailyData.reduce(
         (acc, row) => ({
-          dividends: acc.dividends + row.dividends,
-          interest: acc.interest + row.interest,
+          dividends: addOrUnknown(acc.dividends, row.dividends),
+          interest: addOrUnknown(acc.interest, row.interest),
           capitalGains: addOrUnknown(acc.capitalGains, row.capitalGains),
         }),
         {
-          dividends: 0,
-          interest: 0,
+          dividends: 0 as number | null,
+          interest: 0 as number | null,
           capitalGains: 0 as number | null,
         },
       );
@@ -1701,10 +1706,18 @@ export function DividendIncomeReport() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-green-600 dark:text-green-400">
-                      {security.dividends > 0 ? fmtValue(security.dividends) : '-'}
+                      {security.dividends === null
+                        ? fmtValue(null)
+                        : security.dividends > 0
+                          ? fmtValue(security.dividends)
+                          : '-'}
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-blue-600 dark:text-blue-400">
-                      {security.interest > 0 ? fmtValue(security.interest) : '-'}
+                      {security.interest === null
+                        ? fmtValue(null)
+                        : security.interest > 0
+                          ? fmtValue(security.interest)
+                          : '-'}
                     </td>
                     <td
                       className={`px-4 py-3 text-right text-sm ${
