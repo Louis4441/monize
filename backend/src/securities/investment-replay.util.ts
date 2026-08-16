@@ -67,10 +67,12 @@ export const SHARE_MOVING_ACTIONS: readonly InvestmentAction[] = [
 ];
 
 /**
- * Actions whose cash settles through an explicit funding account: a BUY draws
- * the purchase cost from it, a SELL deposits the proceeds into it. Every other
- * action settles against the brokerage's linked cash account, so a funding
- * account stored on one is stale and must never route the money (issue #1154).
+ * The only actions allowed to use an explicit funding account: a BUY draws the
+ * purchase cost from it, a SELL deposits the proceeds into it. Cash-bearing
+ * DIVIDEND / INTEREST / CAPITAL_GAIN settle against the brokerage's linked cash
+ * account; REINVEST and the share-only actions have no external cash leg at all.
+ * So a funding account stored on any non-BUY/SELL action is stale and must never
+ * route the money (issue #1154).
  *
  * Centralized so the scheduled-transaction service (which clears the column on
  * write and ignores it on post) and the MNY import writer (which must not
