@@ -2012,6 +2012,20 @@ export class ScheduledTransactionsService {
       }
     }
 
+    // Unlike the funding account above, the stored exchange rate is forwarded
+    // for every action rather than gated on FUNDING_ACCOUNT_ACTIONS. That is
+    // deliberate and asymmetric: a cross-currency DIVIDEND/INTEREST/CAPITAL_GAIN
+    // legitimately settles at a rate, so it cannot simply be dropped for
+    // non-BUY/SELL actions the way the funding account can. A known, separate
+    // gap remains -- a rate stored (only reachable via the direct API; no UI or
+    // MNY-import path ever sets investmentExchangeRate) for one settlement basis
+    // and then applied after the action switches settlement account -- because
+    // the column carries no record of the currency pair it was resolved for.
+    // Closing it needs the "account, currency, rate and amount are one tuple"
+    // spec (a value-difference clear on a settlement-basis change, not a
+    // presence check), tracked as a follow-up to issue #1154 rather than
+    // fixed by a naive mirror of the funding-account gate that would wipe a
+    // legitimate dividend rate on every unrelated edit.
     if (exchangeRate !== undefined) dto.exchangeRate = exchangeRate;
 
     await this.investmentTransactionsService.create(userId, dto);
