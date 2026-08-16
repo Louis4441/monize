@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Số lượng",
     "pricePlaceholder": "Giá",
     "commissionPlaceholder": "Hoa hồng",
-    "amountPlaceholder": "Số tiền ({currency})"
+    "amountPlaceholder": "Số tiền ({currency})",
+    "ratePlaceholder": "{to} cho 1 {from}",
+    "ariaRate": "Tỷ giá ({to} cho 1 {from})",
+    "rateHint": "Số lượng, giá và hoa hồng tính bằng {from}; tỷ giá này quy đổi tác động tiền mặt sang {to}.",
+    "rateUnresolved": "Không có tỷ giá {from} sang {to}. Hãy nhập — thiếu nó thì không tính được tác động tiền mặt, và hai loại tiền tệ không bằng nhau."
   },
   "charts": {
     "balanceHistory": {

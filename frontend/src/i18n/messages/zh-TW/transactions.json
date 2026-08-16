@@ -515,7 +515,11 @@
     "quantityPlaceholder": "數量",
     "pricePlaceholder": "價格",
     "commissionPlaceholder": "手續費",
-    "amountPlaceholder": "金額（{currency}）"
+    "amountPlaceholder": "金額（{currency}）",
+    "ratePlaceholder": "每 1 {from} 兌 {to}",
+    "ariaRate": "匯率（每 1 {from} 兌 {to}）",
+    "rateHint": "數量、價格和佣金均以 {from} 計；此匯率將現金影響換算為 {to}。",
+    "rateUnresolved": "沒有 {from} 兌 {to} 的匯率。請輸入——沒有它就無法計算現金影響，且兩種貨幣並不等值。"
   },
   "charts": {
     "balanceHistory": {

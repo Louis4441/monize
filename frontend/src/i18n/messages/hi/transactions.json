@@ -515,7 +515,11 @@
     "quantityPlaceholder": "मात्रा",
     "pricePlaceholder": "मूल्य",
     "commissionPlaceholder": "कमीशन",
-    "amountPlaceholder": "राशि ({currency})"
+    "amountPlaceholder": "राशि ({currency})",
+    "ratePlaceholder": "1 {from} पर {to}",
+    "ariaRate": "विनिमय दर (1 {from} पर {to})",
+    "rateHint": "मात्रा, कीमत और कमीशन {from} में हैं; यह दर नकदी प्रभाव को {to} में परिवर्तित करती है।",
+    "rateUnresolved": "{from} से {to} की कोई दर उपलब्ध नहीं है। एक दर्ज करें — इसके बिना नकदी प्रभाव की गणना नहीं हो सकती, और दोनों मुद्राएँ बराबर नहीं हैं।"
   },
   "charts": {
     "balanceHistory": {

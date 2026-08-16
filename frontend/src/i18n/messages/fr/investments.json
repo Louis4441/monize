@@ -52,9 +52,9 @@
     "netInvested": "Montant net investi",
     "netInvestedTooltip": "Le montant net de vos propres fonds déposés dans vos comptes d'investissement. Il s'agit du total des apports moins les retraits, hors gains, dividendes ou intérêts perçus.",
     "costBasis": "Prix de revient",
-    "costBasisTooltip": "Le montant total payé à l'origine pour acquérir vos investissements, y compris les prix d'achat et les frais de transaction. Utilisé pour calculer vos gains et pertes.",
+    "costBasisTooltip": "Ce que vos positions actuelles ont coûté à acquérir, reconstruit à partir de votre historique de transactions : prix d'achat plus la commission facturée à chaque achat, chacun converti au taux de l'opération qui l'a payé. Affiché dans votre devise d'affichage. Sert à calculer les gains et pertes.",
     "gainLoss": "Gain/Perte",
-    "gainLossTooltip": "Gain ou perte non réalisé sur vos positions actuelles : valeur de marché moins prix de revient. N'inclut pas les plus-values réalisées sur les ventes passées ni les revenus perçus.",
+    "gainLossTooltip": "Gain ou perte latent sur vos positions actuelles : valeur de marché aux prix du jour moins le prix de revient ci-dessus. N'inclut ni les gains réalisés sur des ventes passées, ni les dividendes et intérêts reçus.",
     "returns": "Rendements",
     "simpleReturn": "Rendement simple",
     "simpleReturnTooltip": "Pourcentage de gain ou de perte total sur vos positions, calculé comme (Valeur de marché − Prix de revient) ÷ Prix de revient. Ne tient pas compte du calendrier des apports ou des retraits.",
@@ -264,7 +264,10 @@
     "toastAvailableShares": "Seulement {available} parts disponibles au virement",
     "toastSplitRatioRequired": "Le ratio de division doit être supérieur à zéro",
     "toastPairedLegError": "Impossible de charger l'opération de virement liée ; rouvrez et réessayez",
-    "toastSaveFailed": "Échec de l'enregistrement de la transaction"
+    "toastSaveFailed": "Échec de l'enregistrement de la transaction",
+    "exchangeRateUnresolved": "Aucun taux de {from} vers {to} n'est disponible. Saisissez-en un, ou le total converti, avant d'enregistrer.",
+    "toastExchangeRateRequired": "Saisissez un taux de change avant d'enregistrer une opération entre devises.",
+    "notAvailable": "Non disponible"
   },
   "newTransactionButton": {
     "label": "+ Nouvelle transaction",

@@ -437,6 +437,7 @@
     "invalidTagKey": "एक टैग कुंजी (1-100 अक्षर) आवश्यक है",
     "assetOptionNameRequired": "एसेट क्लास का नाम आवश्यक है।",
     "documentNotFound": "दस्तावेज़ नहीं मिला",
+    "embeddedSplitAmountMismatch": "यह विभाजन {{ amount }} दर्ज करता है, लेकिन {{ action }} {{ quantity }} @ {{ price }} {{ rate }} की दर से {{ expected }} बनता है। वह राशि उपयोग करें, या वह विनिमय दर बताएँ जो आपका इरादा थी।",
     "selectionNotFound": "चयनित प्रतिभूतियों में से एक या अधिक नहीं मिलीं",
     "comparisonSelectionEmpty": "तुलना के लिए कम से कम एक प्रतिभूति या बाज़ार सूचकांक चुनें",
     "exchangeRateNotPositive": "विनिमय दर शून्य से अधिक होनी चाहिए"

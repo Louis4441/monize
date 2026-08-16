@@ -52,9 +52,9 @@
     "netInvested": "Nettoinvestition",
     "netInvestedTooltip": "Der Nettobetrag Ihres eigenen in Investitionskonten eingezahlten Geldes. Dies sind Gesamteinzahlungen abzüglich Abhebungen, ohne Investitionsgewinne, Dividenden oder Zinsen.",
     "costBasis": "Anschaffungskosten",
-    "costBasisTooltip": "Der Gesamtbetrag, den Sie ursprünglich für den Erwerb Ihrer Investitionen bezahlt haben, einschließlich Kaufpreisen und Buchungsgebühren. Wird zur Berechnung von Gewinnen und Verlusten verwendet.",
+    "costBasisTooltip": "Was Ihre aktuellen Bestände in der Anschaffung gekostet haben, aus Ihrer Buchungshistorie rekonstruiert: Kaufpreise plus die je Kauf berechnete Provision, jeweils zum Kurs des Handels umgerechnet, der sie bezahlt hat. In Ihrer Anzeigewährung. Grundlage der Gewinn- und Verlustberechnung.",
     "gainLoss": "Gewinn/Verlust",
-    "gainLossTooltip": "Nicht realisierter Gewinn oder Verlust auf Ihre aktuellen Bestände: Marktwert abzüglich Anschaffungskosten. Enthält keine realisierten Gewinne aus vergangenen Verkäufen oder erhaltenen Erträgen.",
+    "gainLossTooltip": "Nicht realisierter Gewinn oder Verlust Ihrer aktuellen Bestände: Marktwert zu heutigen Preisen minus die Anschaffungskosten oben. Realisierte Gewinne aus früheren Verkäufen sowie erhaltene Dividenden und Zinsen sind nicht enthalten.",
     "returns": "Renditen",
     "simpleReturn": "Einfache Rendite",
     "simpleReturnTooltip": "Gesamtprozentualer Gewinn oder Verlust auf Ihre Bestände, berechnet als (Marktwert − Anschaffungskosten) ÷ Anschaffungskosten. Berücksichtigt nicht den Zeitpunkt von Ein- oder Auszahlungen.",
@@ -264,7 +264,10 @@
     "toastAvailableShares": "Nur {available} Anteile für die Übertragung verfügbar",
     "toastSplitRatioRequired": "Teilungsverhältnis muss größer als null sein",
     "toastPairedLegError": "Verknüpfte Überweisungsseite konnte nicht geladen werden; erneut öffnen und versuchen",
-    "toastSaveFailed": "Buchung konnte nicht gespeichert werden"
+    "toastSaveFailed": "Buchung konnte nicht gespeichert werden",
+    "exchangeRateUnresolved": "Kein Kurs für {from} zu {to} verfügbar. Geben Sie vor dem Speichern einen Kurs oder den umgerechneten Gesamtbetrag ein.",
+    "toastExchangeRateRequired": "Geben Sie einen Wechselkurs ein, bevor Sie einen währungsübergreifenden Handel speichern.",
+    "notAvailable": "Nicht verfügbar"
   },
   "newTransactionButton": {
     "label": "+ Neue Buchung",

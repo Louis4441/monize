@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Miktar",
     "pricePlaceholder": "Fiyat",
     "commissionPlaceholder": "Komisyon",
-    "amountPlaceholder": "Tutar ({currency})"
+    "amountPlaceholder": "Tutar ({currency})",
+    "ratePlaceholder": "1 {from} için {to}",
+    "ariaRate": "Döviz kuru (1 {from} için {to})",
+    "rateHint": "Adet, fiyat ve komisyon {from} cinsindendir; bu kur nakit etkisini {to} para birimine çevirir.",
+    "rateUnresolved": "{from} → {to} kuru yok. Bir kur girin — onsuz nakit etkisi hesaplanamaz ve iki para birimi eşit değildir."
   },
   "charts": {
     "balanceHistory": {

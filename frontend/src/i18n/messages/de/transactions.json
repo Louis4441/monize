@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Menge",
     "pricePlaceholder": "Preis",
     "commissionPlaceholder": "Provision",
-    "amountPlaceholder": "Betrag ({currency})"
+    "amountPlaceholder": "Betrag ({currency})",
+    "ratePlaceholder": "{to} pro 1 {from}",
+    "ariaRate": "Wechselkurs ({to} pro 1 {from})",
+    "rateHint": "Stückzahl, Preis und Provision sind in {from}; dieser Kurs rechnet die Zahlungswirkung in {to} um.",
+    "rateUnresolved": "Kein Kurs für {from} zu {to} verfügbar. Geben Sie einen ein — ohne ihn lässt sich die Zahlungswirkung nicht ermitteln, und die beiden Währungen sind nicht gleichwertig."
   },
   "charts": {
     "balanceHistory": {

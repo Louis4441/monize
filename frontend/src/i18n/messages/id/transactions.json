@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Kuantitas",
     "pricePlaceholder": "Harga",
     "commissionPlaceholder": "Komisi",
-    "amountPlaceholder": "Jumlah ({currency})"
+    "amountPlaceholder": "Jumlah ({currency})",
+    "ratePlaceholder": "{to} per 1 {from}",
+    "ariaRate": "Nilai tukar ({to} per 1 {from})",
+    "rateHint": "Jumlah, harga, dan komisi dalam {from}; kurs ini mengonversi dampak kas ke {to}.",
+    "rateUnresolved": "Tidak ada kurs {from} ke {to}. Masukkan satu — tanpanya dampak kas tidak dapat dihitung, dan kedua mata uang tidak sama."
   },
   "charts": {
     "balanceHistory": {

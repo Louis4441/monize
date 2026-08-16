@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Quantità",
     "pricePlaceholder": "Prezzo",
     "commissionPlaceholder": "Commissione",
-    "amountPlaceholder": "Importo ({currency})"
+    "amountPlaceholder": "Importo ({currency})",
+    "ratePlaceholder": "{to} per 1 {from}",
+    "ariaRate": "Tasso di cambio ({to} per 1 {from})",
+    "rateHint": "Quantità, prezzo e commissione sono in {from}; questo tasso converte l'impatto di cassa in {to}.",
+    "rateUnresolved": "Nessun tasso da {from} a {to} disponibile. Inseriscine uno — senza non si può calcolare l'impatto di cassa, e le due valute non sono uguali."
   },
   "charts": {
     "balanceHistory": {

@@ -515,7 +515,11 @@
     "quantityPlaceholder": "수량",
     "pricePlaceholder": "가격",
     "commissionPlaceholder": "수수료",
-    "amountPlaceholder": "금액 ({currency})"
+    "amountPlaceholder": "금액 ({currency})",
+    "ratePlaceholder": "1 {from}당 {to}",
+    "ariaRate": "환율 (1 {from}당 {to})",
+    "rateHint": "수량, 가격, 수수료는 {from} 기준입니다. 이 환율이 현금 영향액을 {to}(으)로 환산합니다.",
+    "rateUnresolved": "{from}→{to} 환율이 없습니다. 입력하세요 — 없으면 현금 영향액을 계산할 수 없고, 두 통화는 같지 않습니다."
   },
   "charts": {
     "balanceHistory": {

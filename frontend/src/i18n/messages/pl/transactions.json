@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Ilość",
     "pricePlaceholder": "Cena",
     "commissionPlaceholder": "Prowizja",
-    "amountPlaceholder": "Kwota ({currency})"
+    "amountPlaceholder": "Kwota ({currency})",
+    "ratePlaceholder": "{to} za 1 {from}",
+    "ariaRate": "Kurs wymiany ({to} za 1 {from})",
+    "rateHint": "Ilość, cena i prowizja są w {from}; ten kurs przelicza wpływ gotówkowy na {to}.",
+    "rateUnresolved": "Brak kursu z {from} na {to}. Wprowadź go — bez niego nie da się wyliczyć wpływu gotówkowego, a obie waluty nie są równe."
   },
   "charts": {
     "balanceHistory": {

@@ -437,6 +437,7 @@
     "invalidTagKey": "Cần có khóa thẻ (1-100 ký tự)",
     "assetOptionNameRequired": "Cần có tên loại tài sản.",
     "documentNotFound": "Không tìm thấy tài liệu",
+    "embeddedSplitAmountMismatch": "Phần chia này ghi {{ amount }}, nhưng {{ action }} {{ quantity }} @ {{ price }} quy đổi theo tỷ giá {{ rate }} ra {{ expected }}. Hãy dùng số tiền đó, hoặc cho biết tỷ giá bạn muốn dùng.",
     "selectionNotFound": "Không tìm thấy một hoặc nhiều chứng khoán đã chọn",
     "comparisonSelectionEmpty": "Chọn ít nhất một chứng khoán hoặc chỉ số thị trường để so sánh",
     "exchangeRateNotPositive": "Tỷ giá phải lớn hơn không"

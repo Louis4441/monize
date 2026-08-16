@@ -437,6 +437,7 @@
     "invalidTagKey": "需要标签键（1-100 个字符）",
     "assetOptionNameRequired": "需要填写资产类别名称。",
     "documentNotFound": "未找到该文档",
+    "embeddedSplitAmountMismatch": "此拆分记录了 {{ amount }}，但 {{ action }} {{ quantity }} @ {{ price }} 按 {{ rate }} 的汇率换算应为 {{ expected }}。请使用该金额，或说明您想使用的汇率。",
     "selectionNotFound": "未找到所选证券中的一个或多个",
     "comparisonSelectionEmpty": "请至少选择一只证券或一个市场指数进行比较",
     "exchangeRateNotPositive": "汇率必须大于零"

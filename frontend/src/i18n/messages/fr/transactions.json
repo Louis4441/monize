@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Quantité",
     "pricePlaceholder": "Prix",
     "commissionPlaceholder": "Commission",
-    "amountPlaceholder": "Montant ({currency})"
+    "amountPlaceholder": "Montant ({currency})",
+    "ratePlaceholder": "{to} pour 1 {from}",
+    "ariaRate": "Taux de change ({to} pour 1 {from})",
+    "rateHint": "La quantité, le prix et la commission sont en {from} ; ce taux convertit l'impact de trésorerie en {to}.",
+    "rateUnresolved": "Aucun taux de {from} vers {to} n'est disponible. Saisissez-en un — sans lui, l'impact de trésorerie ne peut pas être calculé, et les deux devises ne sont pas égales."
   },
   "charts": {
     "balanceHistory": {

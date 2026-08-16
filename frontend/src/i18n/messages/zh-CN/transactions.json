@@ -515,7 +515,11 @@
     "quantityPlaceholder": "数量",
     "pricePlaceholder": "价格",
     "commissionPlaceholder": "佣金",
-    "amountPlaceholder": "金额（{currency}）"
+    "amountPlaceholder": "金额（{currency}）",
+    "ratePlaceholder": "每 1 {from} 兑 {to}",
+    "ariaRate": "汇率（每 1 {from} 兑 {to}）",
+    "rateHint": "数量、价格和佣金均以 {from} 计；此汇率将现金影响换算为 {to}。",
+    "rateUnresolved": "没有 {from} 兑 {to} 的汇率。请输入——没有它就无法计算现金影响，且两种货币并不等值。"
   },
   "charts": {
     "balanceHistory": {

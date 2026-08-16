@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Количество",
     "pricePlaceholder": "Цена",
     "commissionPlaceholder": "Комиссия",
-    "amountPlaceholder": "Сумма ({currency})"
+    "amountPlaceholder": "Сумма ({currency})",
+    "ratePlaceholder": "{to} за 1 {from}",
+    "ariaRate": "Курс обмена ({to} за 1 {from})",
+    "rateHint": "Количество, цена и комиссия указаны в {from}; этот курс переводит денежный результат в {to}.",
+    "rateUnresolved": "Нет курса {from} к {to}. Введите его — без него денежный результат не вычислить, а две валюты не равны."
   },
   "charts": {
     "balanceHistory": {

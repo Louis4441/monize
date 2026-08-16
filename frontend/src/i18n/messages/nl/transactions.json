@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Aantal",
     "pricePlaceholder": "Koers",
     "commissionPlaceholder": "Commissie",
-    "amountPlaceholder": "Bedrag ({currency})"
+    "amountPlaceholder": "Bedrag ({currency})",
+    "ratePlaceholder": "{to} per 1 {from}",
+    "ariaRate": "Wisselkoers ({to} per 1 {from})",
+    "rateHint": "Aantal, prijs en commissie zijn in {from}; deze koers rekent het kaseffect om naar {to}.",
+    "rateUnresolved": "Geen koers van {from} naar {to} beschikbaar. Voer er een in — zonder is het kaseffect niet te bepalen, en de twee valuta's zijn niet gelijk."
   },
   "charts": {
     "balanceHistory": {

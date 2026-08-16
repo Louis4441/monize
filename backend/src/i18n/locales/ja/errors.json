@@ -437,6 +437,7 @@
     "invalidTagKey": "タグキー（1〜100文字）が必要です",
     "assetOptionNameRequired": "資産クラス名が必要です。",
     "documentNotFound": "ドキュメントが見つかりません",
+    "embeddedSplitAmountMismatch": "この分割は {{ amount }} を記録していますが、{{ action }} {{ quantity }} @ {{ price }} はレート {{ rate }} で {{ expected }} になります。その金額を使うか、意図した為替レートを指定してください。",
     "selectionNotFound": "選択された銘柄のうち1つ以上が見つかりませんでした",
     "comparisonSelectionEmpty": "比較する銘柄または市場指数を1つ以上選択してください",
     "exchangeRateNotPositive": "為替レートはゼロより大きい値である必要があります"

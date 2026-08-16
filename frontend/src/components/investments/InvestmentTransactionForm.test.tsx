@@ -34,21 +34,13 @@ vi.mock('@/hooks/useExchangeRates', () => ({
   }),
 }));
 
-vi.mock('@/lib/format', () => ({
-  getCurrencySymbol: () => '$',
-  getDecimalPlacesForCurrency: () => 2,
-  roundToCents: (v: number) => Math.round(v * 100) / 100,
-  roundToDecimals: (v: number, dp: number) => {
-    const factor = Math.pow(10, dp);
-    return Math.round(v * factor) / factor;
-  },
-  formatAmountWithCommas: (v: number) => v?.toLocaleString() ?? '',
-  parseAmount: (v: string) => parseFloat(v) || 0,
-  filterCurrencyInput: (v: string) => v,
-  filterCalculatorInput: (v: string) => v,
-  hasCalculatorOperators: () => false,
-  evaluateExpression: (v: string) => parseFloat(v) || 0,
-}));
+// Real money and rate helpers: this form's subject is cross-currency
+// arithmetic, and a mock that rounds rates like money is the very defect being
+// fixed here.
+vi.mock('@/lib/format', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/format')>();
+  return { ...actual, getCurrencySymbol: () => '$' };
+});
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -430,6 +422,9 @@ describe('InvestmentTransactionForm', () => {
   });
 
   it('forwards the selected fundingAccountId when creating a DIVIDEND transaction', async () => {
+    // sec-1 is USD and a1 is CAD, so this posts a cross-currency cash leg: give
+    // it a rate, or the form (correctly) refuses to commit an unpriced trade.
+    getMarketRateMock.mockReturnValue(1.35);
     render(<InvestmentTransactionForm accounts={accounts} />);
     await waitFor(() => {
       expect(screen.getByText('Brokerage Account')).toBeInTheDocument();
@@ -533,6 +528,9 @@ describe('InvestmentTransactionForm', () => {
     });
 
     it('saves the entered date after creating a transaction', async () => {
+      // sec-1 is USD and a1 is CAD, so this posts a cross-currency cash leg: give
+      // it a rate, or the form (correctly) refuses to commit an unpriced trade.
+        getMarketRateMock.mockReturnValue(1.35);
       render(<InvestmentTransactionForm accounts={accounts} />);
       await waitFor(() => {
         expect(screen.getByText('Brokerage Account')).toBeInTheDocument();
@@ -553,7 +551,50 @@ describe('InvestmentTransactionForm', () => {
       expect(stored.date).toBe('2026-09-09');
     });
 
+    it('keeps the auto-filled 10dp rate when the rate field is only focused and blurred', async () => {
+      // The rate field shows 6dp but the market rate is stored at 10dp
+      // (roundFxRate). Tabbing through it without editing must not truncate the
+      // stored precision, nor dirty the form: NumericInput re-reports the 6dp
+      // rounding on blur, and its own finalValue !== value guard cannot catch it
+      // because the stored value carries more precision than the field displays.
+      getMarketRateMock.mockReturnValue(1.2345678); // more than 6 decimals
+      render(<InvestmentTransactionForm accounts={accounts} />);
+      await waitFor(() => {
+        expect(screen.getByText('Brokerage Account')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brokerage Account'), {
+          target: { value: 'a1' },
+        });
+      });
+      await waitFor(() => {
+        expect(screen.getByLabelText('Security')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Security'), {
+          target: { value: 'sec-1' },
+        });
+      });
+      const rateField = await screen.findByLabelText(/Exchange rate/i);
+      await act(async () => {
+        fireEvent.focus(rateField);
+        fireEvent.blur(rateField);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Create Transaction'));
+      });
+      await waitFor(() => {
+        expect(investmentsApi.createTransaction).toHaveBeenCalled();
+      });
+      const payload = vi.mocked(investmentsApi.createTransaction).mock
+        .calls[0][0] as any;
+      expect(payload.exchangeRate).toBe(1.2345678);
+    });
+
     it('does not write to the regular-transaction date key', async () => {
+      // sec-1 is USD and a1 is CAD, so this posts a cross-currency cash leg: give
+      // it a rate, or the form (correctly) refuses to commit an unpriced trade.
+        getMarketRateMock.mockReturnValue(1.35);
       render(<InvestmentTransactionForm accounts={accounts} />);
       await createBuy();
       expect(sessionStorage.getItem(REGULAR_DATE_KEY)).toBeNull();
@@ -1231,6 +1272,86 @@ describe('InvestmentTransactionForm', () => {
           /Exchange rate \(1 USD =\)/,
         ) as HTMLInputElement;
         expect(Number(rateInput.value)).toBeCloseTo(1.365, 3);
+      });
+    });
+
+    // The audit's reproduction. With no client-side rate the preview used to show
+    // 10 x 100.00 USD as 1,000.00 CAD (rate substituted as 1) while the request
+    // omitted `exchangeRate` entirely, so the server resolved its own dated or
+    // latest rate and persisted 1,350.00 CAD -- a 35% difference from the figure
+    // the user confirmed.
+    describe('when no rate can be resolved', () => {
+      const renderCrossCurrencyBuy = async () => {
+        getMarketRateMock.mockReturnValue(null);
+
+        render(
+          <InvestmentTransactionForm
+            accounts={crossCurrencyAccounts}
+            allAccounts={crossCurrencyAccounts}
+            defaultAccountId="cad-brokerage"
+          />,
+        );
+
+        await waitFor(() => {
+          expect(screen.getByLabelText('Security')).toBeInTheDocument();
+        });
+        fireEvent.change(screen.getByLabelText('Security'), {
+          target: { value: 'sec-usd' },
+        });
+        await waitFor(() => {
+          expect(screen.getByLabelText(/Quantity \(Shares\)/)).toBeInTheDocument();
+        });
+        fireEvent.change(screen.getByLabelText(/Quantity \(Shares\)/), {
+          target: { value: '10' },
+        });
+        fireEvent.change(screen.getByLabelText(/Price per Share/), {
+          target: { value: '100' },
+        });
+        await waitFor(() => {
+          expect(screen.getByText(/Currency conversion \(USD/)).toBeInTheDocument();
+        });
+      };
+
+      it('does not preview the trade at one to one', async () => {
+        await renderCrossCurrencyBuy();
+
+        const convertedInput = screen.getByLabelText(
+          /Converted total \(CAD\)/,
+        ) as HTMLInputElement;
+        expect(convertedInput.value).toBe('');
+        // and the figure is not printed anywhere as a complete CAD total
+        expect(screen.queryByText('$1,000.00')).not.toBeInTheDocument();
+      });
+
+      it('says the rate is missing and names the pair', async () => {
+        await renderCrossCurrencyBuy();
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'No USD to CAD rate is available',
+        );
+      });
+
+      it('blocks the commit', async () => {
+        await renderCrossCurrencyBuy();
+
+        const submit = screen.getByRole('button', { name: 'Create Transaction' });
+        expect(submit).toBeDisabled();
+        expect(investmentsApi.createTransaction).not.toHaveBeenCalled();
+      });
+
+      it('prices the trade once the user supplies a rate', async () => {
+        await renderCrossCurrencyBuy();
+
+        fireEvent.change(screen.getByLabelText(/Exchange rate \(1 USD =\)/), {
+          target: { value: '1.35' },
+        });
+
+        await waitFor(() => {
+          const convertedInput = screen.getByLabelText(
+            /Converted total \(CAD\)/,
+          ) as HTMLInputElement;
+          expect(Number(convertedInput.value)).toBeCloseTo(1350, 4);
+        });
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       });
     });
 
@@ -1983,6 +2104,10 @@ describe('InvestmentTransactionForm - extra coverage', () => {
     }
 
     async function submitBuy(buttonName: RegExp) {
+      // sec-1 is USD and a1 is CAD, so this posts a cross-currency cash leg:
+      // give it a resolved market rate, or the form (correctly) refuses to
+      // commit an unpriced trade and the submit never fires.
+      getMarketRateMock.mockReturnValue(1.35);
       await act(async () => {
         fireEvent.change(screen.getByLabelText('Brokerage Account'), {
           target: { value: 'a1' },

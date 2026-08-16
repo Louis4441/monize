@@ -437,6 +437,7 @@
     "invalidTagKey": "需要標籤鍵（1-100 個字元）",
     "assetOptionNameRequired": "需要填寫資產類別名稱。",
     "documentNotFound": "找不到該文件",
+    "embeddedSplitAmountMismatch": "此分割記錄了 {{ amount }}，但 {{ action }} {{ quantity }} @ {{ price }} 按 {{ rate }} 的匯率換算應為 {{ expected }}。請使用該金額，或說明您想使用的匯率。",
     "selectionNotFound": "找不到所選證券中的一檔或多檔",
     "comparisonSelectionEmpty": "請至少選擇一檔證券或一個市場指數進行比較",
     "exchangeRateNotPositive": "匯率必須大於零"

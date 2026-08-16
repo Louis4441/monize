@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Cantidad",
     "pricePlaceholder": "Precio",
     "commissionPlaceholder": "Comisión",
-    "amountPlaceholder": "Cantidad ({currency})"
+    "amountPlaceholder": "Cantidad ({currency})",
+    "ratePlaceholder": "{to} por 1 {from}",
+    "ariaRate": "Tipo de cambio ({to} por 1 {from})",
+    "rateHint": "La cantidad, el precio y la comisión están en {from}; este tipo convierte el impacto en efectivo a {to}.",
+    "rateUnresolved": "No hay tipo de {from} a {to} disponible. Introduce uno — sin él no se puede calcular el impacto en efectivo, y las dos monedas no son iguales."
   },
   "charts": {
     "balanceHistory": {

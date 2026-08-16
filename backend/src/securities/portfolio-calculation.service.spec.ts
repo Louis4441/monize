@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   CategorisedAccounts,
   PortfolioCalculationService,
@@ -11,6 +13,7 @@ import {
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { HoldingWithMarketValue } from "./portfolio.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { applyActionToQuantity } from "./investment-replay.util";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -2774,6 +2777,43 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
     expect(result.missingRatePairs).toContain("USD->PLN");
     expect(result.missingRatePairs).not.toContain("PLN->PLN");
   });
+
+  /**
+   * A holding carries two cost-basis figures with two different definitions, and
+   * they are labelled the same word on one screen: the portfolio card shows the
+   * replayed `costBasisAccountCurrency`, which includes each purchase's
+   * commission, while the holdings list's Cost Basis column shows the native
+   * `costBasis`, which is `quantity x averageCost` and carries none --
+   * `HoldingsService.updateHolding` blends only the price into the average.
+   *
+   * That is deliberate today, not an oversight, and the UI now says so in the
+   * column's tooltip. It is pinned here because the difference is otherwise
+   * invisible: both are plausible currency figures, and the gap is exactly the
+   * commission. If a product decision later makes the native basis
+   * commission-inclusive, this test is the one that has to change, and its
+   * failure is the prompt to update the tooltip with it.
+   */
+  it("reads costBasis from the stored average cost and costBasisAccountCurrency from the replay", async () => {
+    // Two cost-basis figures reach the holdings list from different sources and
+    // the projection must not conflate them. `costBasis` is quantity times the
+    // live `averageCost` -- which includes each purchase's commission
+    // (P5-006/FR-008), so it is not a commission-free figure -- expressed in the
+    // security's own currency. `costBasisAccountCurrency` is the replayed lot
+    // basis in the account's currency. Both include commission; they can still
+    // differ through currency conversion or the replay's lot handling versus a
+    // running average, so the mock gives them distinct values to prove each field
+    // is read from its own source rather than one overwriting the other. gainLoss
+    // follows the native figure.
+    const result = await valuation(lot({ costBasis: 305 }));
+    const holding = result.holdingsWithValues[0];
+
+    // 10 x stored averageCost 30.
+    expect(holding.costBasis).toBe(300);
+    // The replayed lot basis, surfaced as its own field.
+    expect(holding.costBasisAccountCurrency).toBe(305);
+    // Gain follows the native costBasis: 10 x 50 market - 300.
+    expect(holding.gainLoss).toBe(200);
+  });
 });
 
 describe("PortfolioCalculationService.calculateTWR", () => {
@@ -2848,5 +2888,171 @@ describe("PortfolioCalculationService.calculateTWR", () => {
     const twr = await runTwr("EUR", null);
 
     expect(twr).toBeNull();
+  });
+
+  const runSplitTwr = async (latestPrice: number) => {
+    const txRepo = {
+      find: jest.fn().mockResolvedValue([
+        {
+          id: "b1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.BUY,
+          transactionDate: "2024-01-01",
+          quantity: 100,
+          price: 10,
+          createdAt: new Date("2024-01-01"),
+        },
+        {
+          id: "s1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.SPLIT,
+          transactionDate: "2024-02-01",
+          quantity: 2,
+          createdAt: new Date("2024-02-01"),
+        },
+      ]),
+    };
+    const service = buildService([[InvestmentTransaction, txRepo]], {
+      getLatestRate: jest.fn().mockResolvedValue(1),
+    });
+    jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
+      new Map([
+        [
+          "sec-a",
+          [
+            { date: "2024-01-01", price: 10 },
+            { date: "2024-02-01", price: 10 },
+          ],
+        ],
+      ]),
+    );
+    return service.calculateTWR(
+      userId,
+      ["acct-1"],
+      "USD",
+      new Map(),
+      async () => new Map([["sec-a", latestPrice]]),
+    );
+  };
+
+  // The behavioural half. TWR chains price ratios and resets the running value
+  // after each date's transactions, so within every sub-period the share count
+  // is constant and divides out of V(t)/V(t-1) = P(t)/P(t-1): a correct walk
+  // returns the security's price return whatever the absolute count. That
+  // invariance is why an *ignored* split is not visible to a normal-holdings
+  // TWR -- 100 shares and 200 shares give the identical ratio -- and why the
+  // net-worth history, which reports absolute value, is where the 2-for-1 ->
+  // 200-share arithmetic is pinned (see net-worth.service.spec.ts). What this
+  // case does pin is the *timing*: the split has to fold in AFTER the factor for
+  // its own date is taken against the pre-split count. Fold it before, and the
+  // boundary factor doubles. BUY 100 @ 10, steady at 10 across the split, latest
+  // 12 -> a clean +20%; applying the split a step early would report +140%.
+  it("returns the price return through a split, not a share-count jump", async () => {
+    expect(await runSplitTwr(12)).toBeCloseTo(20, 5);
+  });
+
+  it("is flat when price is unchanged across the split", async () => {
+    expect(await runSplitTwr(10)).toBeCloseTo(0, 5);
+  });
+
+  // Where the ignored split DOES move a single-security TWR: a sale that only
+  // the post-split count can cover. BUY 100 @ 10, 2-for-1 split, SELL 150 @ 10
+  // -- valid against the 200 shares the split produces, an oversell against the
+  // 100 the old walk kept. Prices hold at 10 so no split-date price artifact
+  // enters, then the last close is 12. The correct walk holds 50 shares into
+  // that +20% final period; the old walk drives holdings to -50, whose negative
+  // value trips the `previousValue > 0` gate and drops the final factor, so it
+  // reports 0% and silently loses the gain. This is the arithmetic pin the
+  // value-invariant cases above cannot provide.
+  it("keeps the post-split count through an oversell so the final gain counts", async () => {
+    const txRepo = {
+      find: jest.fn().mockResolvedValue([
+        {
+          id: "b1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.BUY,
+          transactionDate: "2024-01-01",
+          quantity: 100,
+          price: 10,
+          createdAt: new Date("2024-01-01"),
+        },
+        {
+          id: "s1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.SPLIT,
+          transactionDate: "2024-02-01",
+          quantity: 2,
+          createdAt: new Date("2024-02-01"),
+        },
+        {
+          id: "sell1",
+          userId,
+          accountId: "acct-1",
+          securityId: "sec-a",
+          security: { id: "sec-a", currencyCode: "USD" },
+          action: InvestmentAction.SELL,
+          transactionDate: "2024-03-01",
+          quantity: 150,
+          price: 10,
+          createdAt: new Date("2024-03-01"),
+        },
+      ]),
+    };
+    const service = buildService([[InvestmentTransaction, txRepo]], {
+      getLatestRate: jest.fn().mockResolvedValue(1),
+    });
+    jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
+      new Map([
+        [
+          "sec-a",
+          [
+            { date: "2024-01-01", price: 10 },
+            { date: "2024-02-01", price: 10 },
+            { date: "2024-03-01", price: 10 },
+          ],
+        ],
+      ]),
+    );
+    const twr = await service.calculateTWR(
+      userId,
+      ["acct-1"],
+      "USD",
+      new Map(),
+      async () => new Map([["sec-a", 12]]),
+    );
+    // 50 shares x (12/10) over the final period; the old ignored-split walk
+    // reports 0% here.
+    expect(twr).toBeCloseTo(20, 5);
+  });
+
+  // The mechanical half, kept as a cheap secondary guard alongside the oversell
+  // case above: a source pin catches a re-introduction wherever a future price
+  // path happens not to cross a holdings sign change.
+  // `investment-replay.guard.spec.ts` only flags a hand-rolled SPLIT *case*;
+  // this walk omitted SPLIT through a comment instead.
+  it("folds the split through the shared reducer rather than deciding inline", () => {
+    expect(applyActionToQuantity(100, InvestmentAction.SPLIT, 2)).toBe(200);
+
+    const source = readFileSync(
+      join(__dirname, "portfolio-calculation.service.ts"),
+      "utf8",
+    );
+    const walk = source.slice(source.indexOf("async calculateTWR("));
+    expect(walk).toContain("applyActionToQuantity(current, tx.action, qty)");
+    expect(walk).not.toContain(
+      "DIVIDEND, INTEREST, CAPITAL_GAIN, SPLIT: no quantity change",
+    );
   });
 });

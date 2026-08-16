@@ -515,7 +515,11 @@
     "quantityPlaceholder": "Quantidade",
     "pricePlaceholder": "Preço",
     "commissionPlaceholder": "Comissão",
-    "amountPlaceholder": "Valor ({currency})"
+    "amountPlaceholder": "Valor ({currency})",
+    "ratePlaceholder": "{to} por 1 {from}",
+    "ariaRate": "Taxa de câmbio ({to} por 1 {from})",
+    "rateHint": "Quantidade, preço e corretagem estão em {from}; esta taxa converte o impacto de caixa para {to}.",
+    "rateUnresolved": "Não há taxa de {from} para {to} disponível. Insira uma — sem ela o impacto de caixa não pode ser calculado, e as duas moedas não são iguais."
   },
   "charts": {
     "balanceHistory": {

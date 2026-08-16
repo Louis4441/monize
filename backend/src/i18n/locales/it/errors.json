@@ -437,6 +437,7 @@
     "invalidTagKey": "È richiesta una chiave tag (1-100 caratteri)",
     "assetOptionNameRequired": "È richiesto un nome per la classe di attivo.",
     "documentNotFound": "Documento non trovato",
+    "embeddedSplitAmountMismatch": "Questa suddivisione registra {{ amount }}, ma {{ action }} {{ quantity }} @ {{ price }} convertito al tasso {{ rate }} dà {{ expected }}. Usa quell'importo, oppure indica il tasso di cambio che intendevi.",
     "selectionNotFound": "Uno o più titoli selezionati non sono stati trovati",
     "comparisonSelectionEmpty": "Seleziona almeno un titolo o un indice di mercato da confrontare",
     "exchangeRateNotPositive": "Il tasso di cambio deve essere maggiore di zero"

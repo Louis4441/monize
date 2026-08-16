@@ -515,7 +515,11 @@
     "quantityPlaceholder": "数量",
     "pricePlaceholder": "価格",
     "commissionPlaceholder": "手数料",
-    "amountPlaceholder": "金額（{currency}）"
+    "amountPlaceholder": "金額（{currency}）",
+    "ratePlaceholder": "1 {from} あたりの {to}",
+    "ariaRate": "為替レート（1 {from} あたりの {to}）",
+    "rateHint": "数量・価格・手数料は {from} 建てです。このレートで現金への影響を {to} に換算します。",
+    "rateUnresolved": "{from} から {to} へのレートがありません。入力してください — レートがないと現金への影響を計算できず、2 つの通貨は等価ではありません。"
   },
   "charts": {
     "balanceHistory": {

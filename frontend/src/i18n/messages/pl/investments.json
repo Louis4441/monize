@@ -52,9 +52,9 @@
     "netInvested": "Zainwestowane netto",
     "netInvestedTooltip": "Kwota netto Twoich własnych środków wpłaconych na konta inwestycyjne. To suma wpłat minus wypłaty, z wyłączeniem zysków z inwestycji, dywidend i odsetek.",
     "costBasis": "Koszt nabycia",
-    "costBasisTooltip": "Całkowita kwota pierwotnie zapłacona za nabycie inwestycji, w tym ceny zakupu i opłaty transakcyjne. Używana do obliczania zysków i strat.",
+    "costBasisTooltip": "Ile kosztowało nabycie obecnych pozycji, odtworzone z historii transakcji: ceny zakupu plus prowizja naliczona przy każdym zakupie, każda przeliczona po kursie transakcji, która za nią zapłaciła. Wyświetlane w Twojej walucie prezentacji. Służy do obliczania zysków i strat.",
     "gainLoss": "Zysk/Strata",
-    "gainLossTooltip": "Niezrealizowany zysk lub strata na bieżących pozycjach: wartość rynkowa minus koszt nabycia. Nie obejmuje zysków zrealizowanych z przeszłych sprzedaży ani otrzymanych przychodów.",
+    "gainLossTooltip": "Niezrealizowany zysk lub strata na obecnych pozycjach: wartość rynkowa po dzisiejszych cenach minus koszt nabycia powyżej. Nie obejmuje zysków zrealizowanych na wcześniejszych sprzedażach ani otrzymanych dywidend i odsetek.",
     "returns": "Stopy zwrotu",
     "simpleReturn": "Prosta stopa zwrotu",
     "simpleReturnTooltip": "Całkowity procentowy zysk lub strata na pozycjach, obliczony jako (wartość rynkowa − koszt nabycia) ÷ koszt nabycia. Nie uwzględnia momentu wpłat ani wypłat.",
@@ -264,7 +264,10 @@
     "toastAvailableShares": "Tylko {available} udziałów dostępnych do przeniesienia",
     "toastSplitRatioRequired": "Współczynnik splitu musi być większy od zera",
     "toastPairedLegError": "Nie udało się załadować powiązanej części przeniesienia; otwórz ponownie i spróbuj jeszcze raz",
-    "toastSaveFailed": "Nie udało się zapisać transakcji"
+    "toastSaveFailed": "Nie udało się zapisać transakcji",
+    "exchangeRateUnresolved": "Brak kursu z {from} na {to}. Przed zapisaniem wprowadź kurs lub przeliczoną kwotę łączną.",
+    "toastExchangeRateRequired": "Wprowadź kurs wymiany przed zapisaniem transakcji między walutami.",
+    "notAvailable": "Niedostępne"
   },
   "newTransactionButton": {
     "label": "+ Nowa transakcja",
