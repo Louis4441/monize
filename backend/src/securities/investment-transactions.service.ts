@@ -17,10 +17,7 @@ import {
   LockedInvestmentTransactionRow,
 } from "../common/db/locks";
 import { applyVoidTransitionToMirrorLeg } from "../transactions/void-status-transition.util";
-import {
-  NON_VOID_INVESTMENT_STATUS,
-  investmentRowHasEffect,
-} from "./investment-row-effects.util";
+import { investmentRowHasEffect } from "./investment-row-effects.util";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -629,7 +626,8 @@ export class InvestmentTransactionsService {
     // describe one event, and a VOID trade's cash leg saying CLEARED would be
     // the pair describing two different events. Afterwards only the VOID
     // boundary stays shared; reconciliation states are per-ledger.
-    const status = investmentTransaction.status ?? TransactionStatus.UNRECONCILED;
+    const status =
+      investmentTransaction.status ?? TransactionStatus.UNRECONCILED;
 
     const cashTransaction = manager.create(Transaction, {
       userId,
@@ -3870,8 +3868,8 @@ export class InvestmentTransactionsService {
     const linkedLeg = transaction.linkedTransactionId
       ? await withScopedDb(this.dataSource, (m) =>
           // includes VOID rows: records read -- the paired leg is loaded
-        // whatever its status.
-        m.getRepository(InvestmentTransaction).findOne({
+          // whatever its status.
+          m.getRepository(InvestmentTransaction).findOne({
             where: { id: transaction.linkedTransactionId!, userId },
           }),
         )

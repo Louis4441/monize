@@ -287,10 +287,10 @@ export function buildExportTableQueries(
             JOIN accounts a ON h.account_id = a.id
             WHERE a.user_id = $1`,
     },
+    // includes VOID rows: records read -- a backup keeps every row.
     {
       key: "investment_transactions",
-      // includes VOID rows: records read -- a backup keeps every row.
-    sql: "SELECT * FROM investment_transactions WHERE user_id = $1",
+      sql: "SELECT * FROM investment_transactions WHERE user_id = $1",
     },
     {
       // Join tags between securities and tags. Owned transitively via the

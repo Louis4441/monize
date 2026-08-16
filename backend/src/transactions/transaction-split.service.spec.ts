@@ -235,6 +235,9 @@ describe("TransactionSplitService", () => {
     const investmentTransactionsService = {
       createEmbeddedForSplit: jest.fn().mockResolvedValue({}),
       reverseAndRemoveEmbedded: jest.fn().mockResolvedValue(undefined),
+      // The parent's status propagation asks the investment service to carry
+      // the boundary onto embedded rows; an empty set means none were touched.
+      applyParentStatusToEmbeddedRows: jest.fn().mockResolvedValue(new Set()),
     };
 
     netWorthService = {
