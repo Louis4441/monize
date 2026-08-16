@@ -197,16 +197,43 @@ describe("mapInvestmentAction", () => {
     [MNY_ACTION.BUY, InvestmentAction.BUY],
     [MNY_ACTION.SELL, InvestmentAction.SELL],
     [MNY_ACTION.DIVIDEND, InvestmentAction.DIVIDEND],
-    [MNY_ACTION.DISTRIBUTION, InvestmentAction.DIVIDEND],
+    [MNY_ACTION.INTEREST, InvestmentAction.INTEREST],
     [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
+    [MNY_ACTION.REINVEST_INTEREST, InvestmentAction.REINVEST],
     [MNY_ACTION.CONTRIBUTION, InvestmentAction.REINVEST],
     [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
     [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
+    [MNY_ACTION.ST_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN],
+    [MNY_ACTION.LT_CAPITAL_GAINS_DIST, InvestmentAction.CAPITAL_GAIN],
+    [MNY_ACTION.REINVEST_ST_CAPITAL_GAINS, InvestmentAction.REINVEST],
+    [MNY_ACTION.REINVEST_LT_CAPITAL_GAINS, InvestmentAction.REINVEST],
+    [MNY_ACTION.REDEEM_CD_BOND, InvestmentAction.SELL],
     [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
     [MNY_ACTION.TRANSFER_IN, InvestmentAction.TRANSFER_IN],
     [MNY_ACTION.TRANSFER_OUT, InvestmentAction.TRANSFER_OUT],
   ])("maps act %p to %s", (act, expected) => {
     expect(mapInvestmentAction(act)).toBe(expected);
+  });
+
+  it("maps act 4 to INTEREST, never DIVIDEND", () => {
+    // Money's "Interest" activity lands on tax reports as interest income
+    // (issue #1149); while the code's name was unknown it imported as
+    // DIVIDEND, which misfiled every fixed-income interest payment.
+    expect(mapInvestmentAction(MNY_ACTION.INTEREST)).toBe(
+      InvestmentAction.INTEREST,
+    );
+    expect(mapInvestmentAction(MNY_ACTION.INTEREST)).not.toBe(
+      InvestmentAction.DIVIDEND,
+    );
+  });
+
+  it("maps act 30 to SELL, never REMOVE_SHARES", () => {
+    // "Redeem CD/Bond" is a disposal with real proceeds -- the cash figure,
+    // accrued interest included, has to reach the cash sleeve. REMOVE_SHARES
+    // would zero the total and lose the proceeds (issue #1149).
+    expect(mapInvestmentAction(MNY_ACTION.REDEEM_CD_BOND)).toBe(
+      InvestmentAction.SELL,
+    );
   });
 
   it("maps act 16 to REMOVE_SHARES, never SELL", () => {
@@ -220,12 +247,13 @@ describe("mapInvestmentAction", () => {
     );
   });
 
-  it.each([[6], [10], [17], [18], [20], [99]])(
+  it.each([[6], [17], [18], [20], [99]])(
     "returns null for the unknown act %p",
     (act) => {
-      // 10, 17, 18 and 20 all occur in real Money Plus files but open and
-      // close no lot, so nothing says what they do to a position. They are
-      // skipped and warned about rather than guessed at.
+      // 17, 18 and 20 occur in real Money Plus files but open and close no
+      // lot, and nothing names them, so nothing says what they do to a
+      // position. They are skipped and warned about rather than guessed at.
+      // (10 sat in this list until issue #1149 named it "Reinvest Interest".)
       expect(mapInvestmentAction(act)).toBeNull();
     },
   );
@@ -272,20 +300,34 @@ describe("mapInvestmentAction", () => {
   });
 
   it("flags the inferred action codes so mappers can warn", () => {
+    // act 4 is deliberately absent: its cash-only behaviour was measured on
+    // both Money Plus files and issue #1149 supplied Money's name for it, so
+    // nothing about it is assumed any more. The issue-#1149 family (10, 24,
+    // 26, 27, 29, 30) stays flagged until a file measures its TRN_INV shape.
     expect([...MNY_UNCONFIRMED_ACTIONS].sort((a, b) => a - b)).toEqual([
-      MNY_ACTION.DISTRIBUTION,
       MNY_ACTION.REINVEST_ALT,
+      MNY_ACTION.REINVEST_INTEREST,
       MNY_ACTION.CONTRIBUTION,
       MNY_ACTION.CAPITAL_GAIN,
+      MNY_ACTION.ST_CAPITAL_GAINS_DIST,
+      MNY_ACTION.LT_CAPITAL_GAINS_DIST,
+      MNY_ACTION.REINVEST_ST_CAPITAL_GAINS,
+      MNY_ACTION.REINVEST_LT_CAPITAL_GAINS,
+      MNY_ACTION.REDEEM_CD_BOND,
     ]);
   });
 
-  it("knows that dividends carry no TRN_INV row", () => {
+  it("knows that cash distributions carry no TRN_INV row", () => {
     // Iterating TRN_INV instead of TRN drops every cash dividend.
     expect(hasInvestmentDetail(MNY_ACTION.DIVIDEND)).toBe(false);
-    expect(hasInvestmentDetail(MNY_ACTION.DISTRIBUTION)).toBe(false);
+    expect(hasInvestmentDetail(MNY_ACTION.INTEREST)).toBe(false);
+    expect(hasInvestmentDetail(MNY_ACTION.ST_CAPITAL_GAINS_DIST)).toBe(false);
+    expect(hasInvestmentDetail(MNY_ACTION.LT_CAPITAL_GAINS_DIST)).toBe(false);
     expect(hasInvestmentDetail(MNY_ACTION.BUY)).toBe(true);
     expect(hasInvestmentDetail(MNY_ACTION.SELL)).toBe(true);
+    // The reinvested distributions buy shares, so their detail is expected.
+    expect(hasInvestmentDetail(MNY_ACTION.REINVEST_INTEREST)).toBe(true);
+    expect(hasInvestmentDetail(MNY_ACTION.REDEEM_CD_BOND)).toBe(true);
   });
 });
 

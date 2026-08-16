@@ -46,7 +46,8 @@ import { MnyTransactionData } from "../tables/read-transactions";
  *
  * Nothing here touches the database, and no code is guessed: an action outside
  * the known set is skipped and counted, and an action whose meaning is inferred
- * rather than observed (`act` 5 and 14) carries a warning on every row it maps.
+ * or reported rather than measured here (`MNY_UNCONFIRMED_ACTIONS`) carries a
+ * warning on every row it maps.
  */
 
 /** Quantities are `decimal(20,8)`; ratios and share counts round to match. */
