@@ -1696,6 +1696,37 @@ export class TransactionTransferService {
         await this.accountsService.updateBalance(oldToAccountId, -oldToAmount);
       }
 
+      // The reconciliation status is per-leg unless the transition crosses
+      // VOID. The edit form shows one status control for "the transfer" and used
+      // to write it onto both rows, but CLEARED and RECONCILED record whether
+      // *this* account's statement has recognised *this* leg, and the two
+      // statements arrive separately -- copying RECONCILED onto the counterpart
+      // removes the transfer from the other account's reconciliation candidates
+      // before its own statement contains it, and copying UNRECONCILED over the
+      // counterpart discards a reconciliation the user had already completed
+      // there (audit P6-RECHECK-004). So for a non-VOID edit the status stays on
+      // the leg the user opened and is stripped from the counterpart.
+      //
+      // A VOID crossing is the exception, and it PAIRS the status onto both
+      // legs: VOID decides balance inclusion, and a same-owner pair must be VOID
+      // on both legs or neither or its balances diverge. This matches the bulk
+      // path exactly -- `expandTransferCounterparts` drags the counterpart in on
+      // a VOID crossing only, and the same UPDATE stamps the submitted status
+      // onto it -- so the same action reads the same way whether done in the
+      // register or in bulk. Keeping the two surfaces in step is deliberate; the
+      // un-void sub-status question (a reactivated counterpart inheriting the
+      // opened leg's CLEARED/RECONCILED) is a platform-wide decision that must
+      // move both surfaces together, not something for one edit path to answer
+      // alone. `voidChanged` is read from the locked row above, so the
+      // strip-versus-pair choice here is made on the committed status rather
+      // than a stale snapshot -- this scopes only that choice, not the wider
+      // concurrency guard, which compares amount/account/date.
+      if (!voidChanged) {
+        // `isFromTransaction` already names which leg the user opened, so the
+        // counterpart is the other one.
+        delete (isFromTransaction ? toUpdateData : fromUpdateData).status;
+      }
+
       if (Object.keys(fromUpdateData).length > 0) {
         await m.update(Transaction, fromTransaction.id, fromUpdateData);
       }

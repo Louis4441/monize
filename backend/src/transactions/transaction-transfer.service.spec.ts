@@ -1788,6 +1788,213 @@ describe("TransactionTransferService", () => {
       });
     });
 
+    describe("per-leg reconciliation on same-owner edit (P6-RECHECK-004)", () => {
+      // CLEARED / RECONCILED record whether THIS account's statement has
+      // recognised THIS leg, and the two statements arrive separately. The edit
+      // form shows one status control for the transfer and used to write it onto
+      // both rows, so opening the form on one leg and saving rewrote the other
+      // account's reconciliation state. A non-VOID status change now stays on
+      // the leg the user opened; VOID still pairs because it moves both balances.
+      it("writes a reconciliation status only to the edited leg, leaving the counterpart untouched", async () => {
+        const activeFrom = {
+          ...fromTransaction,
+          status: TransactionStatus.UNRECONCILED,
+        } as unknown as Transaction;
+        const reconciledTo = {
+          ...toTransaction,
+          status: TransactionStatus.RECONCILED,
+        } as unknown as Transaction;
+
+        mockFindOne
+          .mockResolvedValueOnce(activeFrom)
+          .mockResolvedValueOnce(reconciledTo)
+          .mockResolvedValueOnce({
+            ...activeFrom,
+            status: TransactionStatus.CLEARED,
+          })
+          .mockResolvedValueOnce(reconciledTo);
+
+        // A description rides along so the counterpart IS updated (description
+        // mirrors to both legs) -- this distinguishes "status stripped from the
+        // counterpart update" from "counterpart never updated".
+        await service.updateTransfer(
+          "user-1",
+          "from-tx",
+          { status: TransactionStatus.CLEARED, description: "groceries" },
+          mockFindOne,
+        );
+
+        const updateCalls = transactionsRepository.update.mock.calls;
+        const fromUpdate = updateCalls.find((c) => c[0] === "from-tx")?.[1];
+        const toUpdate = updateCalls.find((c) => c[0] === "to-tx")?.[1];
+
+        // The edited leg takes the new status...
+        expect(fromUpdate).toMatchObject({ status: TransactionStatus.CLEARED });
+        // ...and the counterpart is written (its description mirrors) but its
+        // RECONCILED state is never rewritten. On the old behaviour toUpdate
+        // carried status: CLEARED and clobbered it.
+        expect(toUpdate).toMatchObject({ description: "groceries" });
+        expect(toUpdate.status).toBeUndefined();
+        // A non-VOID status change moves no balance.
+        expect(accountsService.updateBalance).not.toHaveBeenCalled();
+      });
+
+      it("issues no counterpart update at all for a status-only edit", async () => {
+        const activeFrom = {
+          ...fromTransaction,
+          status: TransactionStatus.UNRECONCILED,
+        } as unknown as Transaction;
+        const reconciledTo = {
+          ...toTransaction,
+          status: TransactionStatus.RECONCILED,
+        } as unknown as Transaction;
+
+        mockFindOne
+          .mockResolvedValueOnce(activeFrom)
+          .mockResolvedValueOnce(reconciledTo)
+          .mockResolvedValueOnce({
+            ...activeFrom,
+            status: TransactionStatus.CLEARED,
+          })
+          .mockResolvedValueOnce(reconciledTo);
+
+        await service.updateTransfer(
+          "user-1",
+          "from-tx",
+          { status: TransactionStatus.CLEARED },
+          mockFindOne,
+        );
+
+        // With status the only changed field, stripping it leaves the
+        // counterpart's update data empty, so `Object.keys(...).length > 0` is
+        // false and no write is issued for the counterpart at all.
+        const updateCalls = transactionsRepository.update.mock.calls;
+        expect(updateCalls.some((c) => c[0] === "to-tx")).toBe(false);
+        expect(updateCalls.find((c) => c[0] === "from-tx")?.[1]).toMatchObject({
+          status: TransactionStatus.CLEARED,
+        });
+      });
+
+      it("strips the status from the from-leg when the user opened the to-leg", async () => {
+        const reconciledFrom = {
+          ...fromTransaction,
+          status: TransactionStatus.RECONCILED,
+        } as unknown as Transaction;
+        const activeTo = {
+          ...toTransaction,
+          status: TransactionStatus.UNRECONCILED,
+        } as unknown as Transaction;
+
+        // The user opened the TO leg, so findOne returns it first and its
+        // counterpart second.
+        mockFindOne
+          .mockResolvedValueOnce(activeTo)
+          .mockResolvedValueOnce(reconciledFrom)
+          .mockResolvedValueOnce(reconciledFrom)
+          .mockResolvedValueOnce({
+            ...activeTo,
+            status: TransactionStatus.CLEARED,
+          });
+
+        await service.updateTransfer(
+          "user-1",
+          "to-tx",
+          { status: TransactionStatus.CLEARED },
+          mockFindOne,
+        );
+
+        const updateCalls = transactionsRepository.update.mock.calls;
+        const fromUpdate = updateCalls.find((c) => c[0] === "from-tx")?.[1];
+        const toUpdate = updateCalls.find((c) => c[0] === "to-tx")?.[1];
+
+        expect(toUpdate).toMatchObject({ status: TransactionStatus.CLEARED });
+        expect(fromUpdate?.status).toBeUndefined();
+      });
+
+      it("still pairs the status across both legs when the transition crosses VOID", async () => {
+        const activeFrom = {
+          ...fromTransaction,
+          status: TransactionStatus.UNRECONCILED,
+        } as unknown as Transaction;
+        const activeTo = {
+          ...toTransaction,
+          status: TransactionStatus.UNRECONCILED,
+        } as unknown as Transaction;
+
+        mockFindOne
+          .mockResolvedValueOnce(activeFrom)
+          .mockResolvedValueOnce(activeTo)
+          .mockResolvedValueOnce({
+            ...activeFrom,
+            status: TransactionStatus.VOID,
+          })
+          .mockResolvedValueOnce({
+            ...activeTo,
+            status: TransactionStatus.VOID,
+          });
+
+        await service.updateTransfer(
+          "user-1",
+          "from-tx",
+          { status: TransactionStatus.VOID },
+          mockFindOne,
+        );
+
+        const updateCalls = transactionsRepository.update.mock.calls;
+        const fromUpdate = updateCalls.find((c) => c[0] === "from-tx")?.[1];
+        const toUpdate = updateCalls.find((c) => c[0] === "to-tx")?.[1];
+
+        // VOID moves both balances, so the status belongs to both legs.
+        expect(fromUpdate).toMatchObject({ status: TransactionStatus.VOID });
+        expect(toUpdate).toMatchObject({ status: TransactionStatus.VOID });
+      });
+
+      it("pairs the submitted status onto both legs when un-voiding directly to CLEARED, matching the bulk path", async () => {
+        const voidFrom = {
+          ...fromTransaction,
+          status: TransactionStatus.VOID,
+        } as unknown as Transaction;
+        const voidTo = {
+          ...toTransaction,
+          status: TransactionStatus.VOID,
+        } as unknown as Transaction;
+
+        // Un-void the FROM leg straight to CLEARED (VOID -> CLEARED). Leaving
+        // VOID crosses the boundary, so the status is NOT stripped and both legs
+        // reactivate carrying the submitted CLEARED -- identical to a bulk
+        // un-void through `expandTransferCounterparts`. A non-UNRECONCILED
+        // target is the case that distinguishes "pair the submitted status" from
+        // "reset the counterpart to UNRECONCILED"; this pins the former.
+        mockFindOne
+          .mockResolvedValueOnce(voidFrom)
+          .mockResolvedValueOnce(voidTo)
+          .mockResolvedValueOnce({
+            ...voidFrom,
+            status: TransactionStatus.CLEARED,
+          })
+          .mockResolvedValueOnce({
+            ...voidTo,
+            status: TransactionStatus.CLEARED,
+          });
+
+        await service.updateTransfer(
+          "user-1",
+          "from-tx",
+          { status: TransactionStatus.CLEARED },
+          mockFindOne,
+        );
+
+        const updateCalls = transactionsRepository.update.mock.calls;
+        const fromUpdate = updateCalls.find((c) => c[0] === "from-tx")?.[1];
+        const toUpdate = updateCalls.find((c) => c[0] === "to-tx")?.[1];
+
+        // Both legs leave VOID together and both carry CLEARED -- the counterpart
+        // is neither stripped nor reset to UNRECONCILED.
+        expect(fromUpdate).toMatchObject({ status: TransactionStatus.CLEARED });
+        expect(toUpdate).toMatchObject({ status: TransactionStatus.CLEARED });
+      });
+    });
+
     it("updates amount for both sides of the transfer", async () => {
       mockFindOne
         .mockResolvedValueOnce(fromTransaction)
