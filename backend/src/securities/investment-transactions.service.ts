@@ -3165,7 +3165,11 @@ export class InvestmentTransactionsService {
       for (const leg of legs) {
         affectedAccountIds.add(leg.accountId);
         if (leg.securityId) securityIds.add(leg.securityId);
-        if (leg.action === InvestmentAction.SPLIT) splitTouched = true;
+        // No quantity is folded here -- a crossing on a SPLIT row is followed
+        // by a full rebuildFromTransactions after commit, same as
+        // create()/update(); this only remembers that one was touched.
+        splitTouched =
+          splitTouched || leg.action === (InvestmentAction.SPLIT as string);
 
         if (isVoid) {
           // Reverse the holdings effect at the leg's stored (active) status,
