@@ -1603,7 +1603,8 @@ describe('ScheduledTransactionForm', () => {
   it('clears the hidden security (and funding) when editing BUY to INTEREST', async () => {
     // INTEREST has no security field in the scheduled UI; a security carried in
     // from the prior BUY would settle the interest in the security's currency,
-    // so the form must send an explicit null (issue #1154 review).
+    // so the form omits the key and lets the backend clear it on the
+    // BUY -> INTEREST transition (issue #1154 review).
     const existingBuy = {
       id: 's-inv',
       accountId: 'acc-4', // Brokerage

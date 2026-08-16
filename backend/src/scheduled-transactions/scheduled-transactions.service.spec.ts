@@ -280,6 +280,10 @@ describe("ScheduledTransactionsService", () => {
   // Helper: stub findOne to return a scheduled transaction for internal calls
   const stubFindOne = (scheduled: ScheduledTransaction) => {
     scheduledRepo.findOne.mockResolvedValue(scheduled);
+    // post() re-reads the split set under the parent lock to guard against a
+    // concurrent split retarget (issue #1154 re-review); default it to the same
+    // splits the schedule carries so the guard passes unless a test overrides it.
+    splitsRepo.find.mockResolvedValue(scheduled.splits ?? []);
   };
 
   // ==================== create ====================
@@ -1469,15 +1473,17 @@ describe("ScheduledTransactionsService", () => {
         amount: -1200,
       });
       stubFindOne(scheduled);
-      const overrideQb = mockQueryBuilder(null);
-      overrideQb.getOne.mockResolvedValue({
+      const storedOverride = {
         amount: -750,
         description: null,
         isSplit: null,
         categoryId: null,
         splits: null,
-      });
+      };
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
 
       await service.post(userId, stId);
@@ -1541,15 +1547,17 @@ describe("ScheduledTransactionsService", () => {
         description: "base desc",
       });
       stubFindOne(scheduled);
-      const overrideQb = mockQueryBuilder(null);
-      overrideQb.getOne.mockResolvedValue({
+      const storedOverride = {
         amount: null,
         description: "override desc",
         isSplit: null,
         categoryId: null,
         splits: null,
-      });
+      };
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
 
       await service.post(userId, stId);
@@ -1565,12 +1573,14 @@ describe("ScheduledTransactionsService", () => {
     it("should apply inline values with highest priority", async () => {
       const scheduled = makeScheduled({ amount: -1200 });
       stubFindOne(scheduled);
-      const overrideQb = mockQueryBuilder(null);
-      overrideQb.getOne.mockResolvedValue({
+      const storedOverride = {
         amount: -999,
         description: "override desc",
-      });
+      };
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
 
       await service.post(userId, stId, {
@@ -1590,15 +1600,17 @@ describe("ScheduledTransactionsService", () => {
         description: "base desc",
       });
       stubFindOne(scheduled);
-      const overrideQb = mockQueryBuilder(null);
-      overrideQb.getOne.mockResolvedValue({
+      const storedOverride = {
         amount: -999,
         description: "override desc",
         isSplit: null,
         categoryId: null,
         splits: null,
-      });
+      };
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
 
       await service.post(userId, stId);
@@ -2300,6 +2312,99 @@ describe("ScheduledTransactionsService", () => {
         ConflictException,
       );
       expect(investmentTransactionsService.create).not.toHaveBeenCalled();
+    });
+
+    it("post() rejects when a base scheduled split was retargeted concurrently (issue #1154 re-review)", async () => {
+      // Parent scalars are identical, but the transfer split's target account
+      // changed between the pre-lock read and the parent lock. Posting the
+      // pre-lock payload would credit the old account, so it is refused.
+      const scheduled = makeScheduled({
+        amount: -100,
+        isSplit: true,
+        frequency: "ONCE",
+        splits: [
+          {
+            id: "ss-1",
+            kind: "transfer" as any,
+            amount: -100,
+            memo: null,
+            categoryId: null,
+            transferAccountId: "acc-A",
+            tags: [],
+          } as any,
+        ],
+      });
+      stubFindOne(scheduled);
+      // The locked split re-read observes the retargeted split (acc-B).
+      splitsRepo.find.mockResolvedValue([
+        {
+          id: "ss-1",
+          kind: "transfer",
+          amount: -100,
+          memo: null,
+          categoryId: null,
+          transferAccountId: "acc-B",
+          tags: [],
+        } as any,
+      ]);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(service.post(userId, stId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(transactionsService.create).not.toHaveBeenCalled();
+    });
+
+    it("post() rejects when the foreign-currency original amount changed concurrently (issue #1154 re-review)", async () => {
+      // amount (account currency) is unchanged, but originalAmount moved, so the
+      // guard must still refuse -- otherwise a stale converted total posts.
+      const beforeLock = makeScheduled({
+        amount: -110,
+        currencyCode: "USD",
+        originalAmount: -100,
+        originalCurrencyCode: "EUR",
+        exchangeRate: 1.1,
+      });
+      const locked = makeScheduled({
+        amount: -110,
+        currencyCode: "USD",
+        originalAmount: -200,
+        originalCurrencyCode: "EUR",
+        exchangeRate: 1.1,
+      });
+      scheduledRepo.findOne
+        .mockResolvedValueOnce(beforeLock)
+        .mockResolvedValue(locked);
+      // The FX resolution runs above the transaction; give it a rate so the post
+      // reaches the in-transaction guard rather than failing on a missing rate.
+      mockExchangeRateService.getRateForDate.mockResolvedValue(1.1);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(service.post(userId, stId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(transactionsService.create).not.toHaveBeenCalled();
+    });
+
+    it("post({requireActiveAutoPost}) refuses a schedule turned off after cron selected it (issue #1154 re-review)", async () => {
+      const scheduled = makeScheduled({ isActive: true, autoPost: false });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(
+        service.post(userId, stId, undefined, { requireActiveAutoPost: true }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(transactionsService.create).not.toHaveBeenCalled();
+
+      // A manual post (no option) of the same row still works.
+      await service.post(userId, stId);
+      expect(transactionsService.create).toHaveBeenCalledTimes(1);
     });
 
     it("post() honours inline quantity / price overrides", async () => {
@@ -3873,16 +3978,18 @@ describe("ScheduledTransactionsService", () => {
       });
       scheduledRepo.findOne.mockResolvedValue(scheduled);
 
-      const overrideQb = mockQueryBuilder(null);
-      overrideQb.getOne.mockResolvedValue({
+      const storedOverride = {
         overrideDate: "2025-03-12",
         amount: null,
         categoryId: null,
         description: null,
         isSplit: null,
         splits: null,
-      });
+      };
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
 
       await service.post(userId, stId);
@@ -4126,6 +4233,8 @@ describe("ScheduledTransactionsService", () => {
         frequency: "ONCE",
       });
       scheduledRepo.findOne.mockResolvedValue(scheduled);
+      // The locked split re-read (issue #1154 re-review) returns the same set.
+      splitsRepo.find.mockResolvedValue(scheduled.splits);
       overridesRepo.createQueryBuilder = jest.fn().mockReturnValue({
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -4226,6 +4335,7 @@ describe("ScheduledTransactionsService", () => {
         andWhere: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue(storedOverride),
       });
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       mockQueryRunner.manager.delete = jest
         .fn()
         .mockResolvedValue({ affected: 1 });
@@ -4266,6 +4376,7 @@ describe("ScheduledTransactionsService", () => {
         frequency: "ONCE",
       });
       scheduledRepo.findOne.mockResolvedValue(scheduled);
+      splitsRepo.find.mockResolvedValue(scheduled.splits);
       overridesRepo.createQueryBuilder = jest.fn().mockReturnValue({
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),

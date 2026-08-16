@@ -180,6 +180,13 @@ function sameScheduleMutationBasis(
       a.amount as unknown as number,
       b.amount as unknown as number,
     ) &&
+    // The foreign-currency tuple is mutable independently of `amount`
+    // (`update()` merges it partially, and normalizeFxEntry does not touch the
+    // account-currency amount), so a concurrent originalAmount edit would post a
+    // stale converted total otherwise (issue #1154 re-review).
+    sameNullableNumber(a.originalAmount, b.originalAmount) &&
+    a.originalCurrencyCode === b.originalCurrencyCode &&
+    sameNullableNumber(a.exchangeRate, b.exchangeRate) &&
     a.investmentAction === b.investmentAction &&
     a.investmentSecurityId === b.investmentSecurityId &&
     a.investmentFundingAccountId === b.investmentFundingAccountId &&
@@ -188,6 +195,83 @@ function sameScheduleMutationBasis(
     sameNullableNumber(a.investmentCommission, b.investmentCommission) &&
     sameNullableNumber(a.investmentTotalAmount, b.investmentTotalAmount) &&
     sameNullableNumber(a.investmentExchangeRate, b.investmentExchangeRate)
+  );
+}
+
+/**
+ * The money-shaping fields of one scheduled split. A split is not presentation
+ * metadata: a transfer split creates a counterpart transaction and moves the
+ * target account, and an investment split creates an embedded investment. So a
+ * post that builds its lines from the base scheduled splits must verify the set
+ * did not change under the parent lock (issue #1154 re-review).
+ */
+function scheduledSplitBasis(split: ScheduledTransactionSplit): string {
+  return JSON.stringify({
+    id: split.id,
+    kind: split.kind,
+    categoryId: split.categoryId ?? null,
+    transferAccountId: split.transferAccountId ?? null,
+    amount: Number(split.amount),
+    memo: split.memo ?? null,
+    investmentAction: split.investmentAction ?? null,
+    investmentSecurityId: split.investmentSecurityId ?? null,
+    investmentQuantity:
+      split.investmentQuantity == null
+        ? null
+        : Number(split.investmentQuantity),
+    investmentPrice:
+      split.investmentPrice == null ? null : Number(split.investmentPrice),
+    investmentCommission:
+      split.investmentCommission == null
+        ? null
+        : Number(split.investmentCommission),
+    investmentExchangeRate:
+      split.investmentExchangeRate == null
+        ? null
+        : Number(split.investmentExchangeRate),
+    tagIds: (split.tags ?? []).map((t) => t.id).sort(),
+  });
+}
+
+function sameScheduledSplitBasis(
+  before: ScheduledTransactionSplit[],
+  current: ScheduledTransactionSplit[],
+): boolean {
+  if (before.length !== current.length) return false;
+  const norm = (rows: ScheduledTransactionSplit[]) =>
+    rows.map(scheduledSplitBasis).sort();
+  const a = norm(before);
+  const b = norm(current);
+  return a.every((row, i) => row === b[i]);
+}
+
+/**
+ * Whether two occurrence-override snapshots describe the same effective posting
+ * state. Compared alongside `updatedAt` so a same-millisecond timestamp
+ * collision is harmless when the values actually differ (issue #1154 re-review).
+ */
+function sameOverrideMutationBasis(
+  before: ScheduledTransactionOverride | null,
+  current: ScheduledTransactionOverride | null,
+): boolean {
+  // null and undefined both mean "no override"; treat them as equal so an
+  // override-less post is not falsely flagged as changed.
+  if (!before || !current) return !before && !current;
+  return (
+    before.id === current.id &&
+    String(before.overrideDate) === String(current.overrideDate) &&
+    sameNullableNumber(before.amount, current.amount) &&
+    (before.categoryId ?? null) === (current.categoryId ?? null) &&
+    (before.description ?? null) === (current.description ?? null) &&
+    (before.isSplit ?? null) === (current.isSplit ?? null) &&
+    sameNullableNumber(before.investmentQuantity, current.investmentQuantity) &&
+    sameNullableNumber(before.investmentPrice, current.investmentPrice) &&
+    sameNullableNumber(
+      before.investmentTotalAmount,
+      current.investmentTotalAmount,
+    ) &&
+    JSON.stringify(before.splits ?? null) ===
+      JSON.stringify(current.splits ?? null)
   );
 }
 
@@ -296,7 +380,13 @@ export class ScheduledTransactionsService {
         for (const scheduled of dueTransactions) {
           try {
             await withUserContext(scheduled.userId, () =>
-              this.post(scheduled.userId, scheduled.id),
+              // Auto-post: refuse under the lock if the user turned the schedule
+              // inactive or off auto-post after cron selected it (issue #1154
+              // re-review). The ConflictException is treated as "claimed
+              // elsewhere" and skipped below.
+              this.post(scheduled.userId, scheduled.id, undefined, {
+                requireActiveAutoPost: true,
+              }),
             );
             totalSuccess++;
           } catch (error) {
@@ -1765,6 +1855,7 @@ export class ScheduledTransactionsService {
     userId: string,
     id: string,
     postDto?: PostScheduledTransactionDto,
+    options: { requireActiveAutoPost?: boolean } = {},
   ): Promise<ScheduledTransaction | null> {
     const scheduled = await this.findOne(userId, id);
 
@@ -2014,6 +2105,22 @@ export class ScheduledTransactionsService {
         );
       }
 
+      // Cron selected this row when it was active and auto-posting; if the user
+      // turned either off after selection but before the lock, the automatic
+      // post must not fire (issue #1154 re-review). Manual posts do not pass this
+      // option, so an explicit user post of an inactive schedule still works.
+      if (
+        options.requireActiveAutoPost &&
+        (!current.isActive || !current.autoPost)
+      ) {
+        throw new ConflictException(
+          tr(
+            "errors.scheduled.changedConcurrently",
+            "The scheduled transaction changed during the operation. Reload it and retry.",
+          ),
+        );
+      }
+
       // The transfer/plain payloads (preparedTransfer, transactionPayload) and
       // the FX amount were prepared from the pre-lock `scheduled` snapshot. If a
       // concurrent edit changed what the schedule *is* -- kind, accounts, amount,
@@ -2043,7 +2150,7 @@ export class ScheduledTransactionsService {
           lock: { mode: "pessimistic_write" },
         });
       if (
-        (storedOverride?.id ?? null) !== (lockedOverride?.id ?? null) ||
+        !sameOverrideMutationBasis(storedOverride, lockedOverride) ||
         (storedOverride?.updatedAt?.getTime() ?? null) !==
           (lockedOverride?.updatedAt?.getTime() ?? null)
       ) {
@@ -2053,6 +2160,33 @@ export class ScheduledTransactionsService {
             "The scheduled transaction changed during the operation. Reload it and retry.",
           ),
         );
+      }
+
+      // Split lines are money-shaping, not metadata (a transfer split moves the
+      // target account; an investment split creates an embedded trade), and the
+      // payload built them from the pre-lock `scheduled.splits`. When the post
+      // actually uses the base scheduled splits -- no inline splits and no
+      // override splits -- re-read the set under the parent lock and refuse if it
+      // changed, so a concurrently-retargeted split cannot post money to the old
+      // account (issue #1154 re-review). Scheduled split writers take the parent
+      // lock before replacing the child set, so this read sees one stable
+      // committed generation.
+      const usesScheduledSplits =
+        useSplits &&
+        !hasInlineSplits &&
+        !(lockedOverride?.splits && lockedOverride.splits.length > 0);
+      if (usesScheduledSplits) {
+        const currentSplits = await m
+          .getRepository(ScheduledTransactionSplit)
+          .find({ where: { scheduledTransactionId: id }, relations: ["tags"] });
+        if (!sameScheduledSplitBasis(scheduled.splits ?? [], currentSplits)) {
+          throw new ConflictException(
+            tr(
+              "errors.scheduled.changedConcurrently",
+              "The scheduled transaction changed during the operation. Reload it and retry.",
+            ),
+          );
+        }
       }
 
       // Claim the occurrence. The unique key on
