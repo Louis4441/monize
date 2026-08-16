@@ -1,3 +1,4 @@
+import { statusFromQifFlags } from "./qif-status.util";
 import { Injectable, Logger } from "@nestjs/common";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import {
@@ -52,16 +53,9 @@ export class ImportRegularProcessorService {
     const baseTime = new Date();
     baseTime.setMilliseconds(baseTime.getMilliseconds() + counter);
 
-    // Determine status. VOID (from CSV reconciliation-status mapping) takes
-    // precedence so a source-flagged cancelled row never materializes as a
-    // live balance-affecting transaction.
-    const status = qifTx.void
-      ? TransactionStatus.VOID
-      : qifTx.reconciled
-        ? TransactionStatus.RECONCILED
-        : qifTx.cleared
-          ? TransactionStatus.CLEARED
-          : TransactionStatus.UNRECONCILED;
+    // Determine status through the one shared derivation, so the regular and
+    // investment import paths cannot disagree on what the same flags mean.
+    const status = statusFromQifFlags(qifTx);
 
     // Create transaction (use canonical payee name if alias-matched)
     const isTransfer = !isSplit && (qifTx.isTransfer || isLoanPaymentTx);

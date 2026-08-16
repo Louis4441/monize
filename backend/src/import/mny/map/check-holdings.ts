@@ -1,4 +1,5 @@
 import { InvestmentAction } from "../../../securities/entities/investment-transaction.entity";
+import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
 import {
   applyActionToQuantity,
   SHARE_MOVING_ACTIONS,
@@ -71,7 +72,12 @@ export function replayPositions(
   for (const transaction of transactions) {
     if (
       !HOLDING_ACTIONS.has(transaction.action) ||
-      transaction.quantity === null
+      transaction.quantity === null ||
+      // A voided trade moved no shares: the holdings rebuild excludes VOID
+      // rows, and Money's own open lots never contain a voided trade's shares,
+      // so the projection must skip them or every account with a voided trade
+      // reports a share discrepancy the import itself created.
+      transaction.status === TransactionStatus.VOID
     ) {
       continue;
     }

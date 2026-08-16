@@ -10,10 +10,10 @@ import {
 } from "typeorm";
 import { ApiProperty } from "@nestjs/swagger";
 import { Account } from "../../accounts/entities/account.entity";
-import {
-  Transaction,
-  TransactionStatus,
-} from "../../transactions/entities/transaction.entity";
+import { Transaction } from "../../transactions/entities/transaction.entity";
+// From the enum's own module, not transaction.entity: the entity import
+// closes a require cycle that leaves the enum undefined at decoration time.
+import { TransactionStatus } from "../../transactions/entities/transaction-status.enum";
 import { TransactionSplit } from "../../transactions/entities/transaction-split.entity";
 import { Security } from "./security.entity";
 import { User } from "../../users/entities/user.entity";

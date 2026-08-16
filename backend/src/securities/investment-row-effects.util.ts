@@ -1,5 +1,5 @@
 import { Not } from "typeorm";
-import { TransactionStatus } from "../transactions/entities/transaction.entity";
+import { TransactionStatus } from "../transactions/entities/transaction-status.enum";
 
 /**
  * The one predicate for "does this investment row's effect count".

@@ -224,6 +224,12 @@ export async function writeInvestments(
         totalAmount: transaction.totalAmount,
         exchangeRate: 1,
         description,
+        // Money's own cleared/void state, mapped by mapTransactionStatus. A
+        // voided trade imports as a VOID row on BOTH sides -- previously only
+        // the cash leg carried it, so the shares stayed counted while the cash
+        // claimed not to have moved. Rows with no cash leg (splits, share
+        // transfers) keep their status here too instead of dropping it.
+        status: transaction.status,
         // Set by the back-patch pass: the column is a self-referencing FK, so
         // the partner leg may not exist yet.
         linkedTransactionId: null,
