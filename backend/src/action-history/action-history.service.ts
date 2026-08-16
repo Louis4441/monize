@@ -1370,6 +1370,7 @@ export class ActionHistoryService {
     const invTransactions = await manager.query(
       `SELECT * FROM investment_transactions
        WHERE account_id = $1 AND user_id = $2 AND transaction_date <= CURRENT_DATE
+         AND status != 'VOID'
        ORDER BY transaction_date ASC, created_at ASC`,
       [accountId, userId],
     );

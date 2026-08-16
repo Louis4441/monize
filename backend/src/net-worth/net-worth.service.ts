@@ -13,6 +13,7 @@ import {
   AccountType,
   AccountSubType,
 } from "../accounts/entities/account.entity";
+import { NON_VOID_INVESTMENT_STATUS } from "../securities/investment-row-effects.util";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { Security } from "../securities/entities/security.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -925,6 +926,7 @@ export class NetWorthService {
        LEFT JOIN securities s ON s.id = it.security_id
        WHERE it.account_id = ANY($1::UUID[])
          AND it.price IS NOT NULL AND it.price > 0
+         AND it.status != 'VOID'
          AND it.action IN ('BUY', 'SELL', 'REINVEST', 'TRANSFER_IN', 'TRANSFER_OUT')`,
       [targetAccountIds],
     );
@@ -1032,6 +1034,7 @@ export class NetWorthService {
                   JOIN accounts a ON a.id = it.account_id
                  WHERE a.user_id = $1
                    AND it.security_id IS NOT NULL
+                   AND it.status != 'VOID'
                    AND it.transaction_date <= $2::DATE
                    ${accountFilter}
               )`,
@@ -1131,6 +1134,7 @@ export class NetWorthService {
            FROM investment_transactions
            WHERE account_id = ANY($1::UUID[])
              AND transaction_date <= $2
+             AND status != 'VOID'
            ORDER BY transaction_date ASC, created_at ASC`,
             [brokerageIds, end],
           )
@@ -1196,6 +1200,7 @@ export class NetWorthService {
            WHERE security_id = ANY($1::UUID[])
              AND action IN ('BUY', 'SELL', 'REINVEST')
              AND price IS NOT NULL AND price > 0
+             AND status != 'VOID'
            ORDER BY security_id, transaction_date, created_at`,
             [skipSecIds],
           )
@@ -1501,6 +1506,7 @@ export class NetWorthService {
              FROM investment_transactions
              WHERE account_id = ANY($1::UUID[])
                AND transaction_date <= $2
+               AND status != 'VOID'
              ORDER BY transaction_date ASC, created_at ASC`,
             [brokerageIds, end],
           )
@@ -1578,6 +1584,7 @@ export class NetWorthService {
              WHERE security_id = ANY($1::UUID[])
                AND action IN ('BUY', 'SELL', 'REINVEST')
                AND price IS NOT NULL AND price > 0
+               AND status != 'VOID'
              ORDER BY security_id, transaction_date, created_at`,
           [skipSecIds],
         );
@@ -1851,6 +1858,7 @@ export class NetWorthService {
             SELECT it.account_id, MIN(it.transaction_date) AS d
               FROM investment_transactions it
              WHERE it.account_id = ANY($1::UUID[])
+               AND it.status != 'VOID'
              GROUP BY it.account_id
           )
           SELECT MIN(
@@ -2215,7 +2223,8 @@ export class NetWorthService {
     const [{ inv_earliest }] = await this.scopedQuery(
       `SELECT MIN(transaction_date) as inv_earliest
        FROM investment_transactions
-       WHERE account_id = $1`,
+       WHERE account_id = $1
+         AND status != 'VOID'`,
       [account.id],
     );
 
@@ -2269,6 +2278,8 @@ export class NetWorthService {
         where: {
           accountId: account.id,
           transactionDate: LessThanOrEqual(today),
+          // Rows as effects: a VOID transaction moved no shares.
+          status: NON_VOID_INVESTMENT_STATUS,
         },
         order: { transactionDate: "ASC", createdAt: "ASC" },
       }),
@@ -2478,6 +2489,7 @@ export class NetWorthService {
          AND action IN ('BUY', 'SELL', 'REINVEST')
          AND price IS NOT NULL
          AND price > 0
+         AND status != 'VOID'
        ORDER BY security_id, transaction_date, created_at`,
       [skipSecIds],
     );

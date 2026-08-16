@@ -443,6 +443,8 @@ export const listInvestmentTransactionsOutput = {
       totalAmount: num,
       currency: strNull,
       description: strNull,
+      // A VOID row is listed but excluded from every total and group sum.
+      status: str,
     }),
   ),
   truncatedTransactionList: bool,

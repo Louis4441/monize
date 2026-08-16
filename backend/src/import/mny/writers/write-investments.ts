@@ -139,6 +139,8 @@ export async function writeInvestments(
   userId: string,
   input: WriteInvestmentsInput,
 ): Promise<WrittenInvestments> {
+  // includes VOID rows: a writer, not a read -- VOID trades are imported
+  // as rows so the record survives, and every effects reader excludes them.
   const investmentRepo = manager.getRepository(InvestmentTransaction);
   const transactionRepo = manager.getRepository(Transaction);
   const affectedAccountIds = new Set<string>();

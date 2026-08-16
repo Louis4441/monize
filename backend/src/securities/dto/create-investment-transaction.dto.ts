@@ -11,6 +11,7 @@ import {
   MaxLength,
 } from "class-validator";
 import { InvestmentAction } from "../entities/investment-transaction.entity";
+import { TransactionStatus } from "../../transactions/entities/transaction.entity";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 
 export class CreateInvestmentTransactionDto {
@@ -85,4 +86,14 @@ export class CreateInvestmentTransactionDto {
   @MaxLength(500)
   @SanitizeHtml()
   description?: string;
+
+  @ApiProperty({
+    enum: TransactionStatus,
+    required: false,
+    description:
+      "Reconciliation status. Defaults to UNRECONCILED. A VOID transaction moves no shares and no cash.",
+  })
+  @IsOptional()
+  @IsEnum(TransactionStatus)
+  status?: TransactionStatus;
 }

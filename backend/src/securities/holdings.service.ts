@@ -27,6 +27,7 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
+import { NON_VOID_INVESTMENT_STATUS } from "./investment-row-effects.util";
 import {
   Account,
   AccountType,
@@ -137,11 +138,14 @@ export class HoldingsService {
     // Verify the user owns the account before exposing transaction history.
     await this.accountsService.findOne(userId, accountId);
 
-    const where: {
-      userId: string;
-      accountId: string;
-      securityId: string;
-    } = { userId, accountId, securityId };
+    // Rows as effects: a VOID transaction moved no shares, so the replay
+    // skips it (docs/specs/investment-transaction-status.md).
+    const where = {
+      userId,
+      accountId,
+      securityId,
+      status: NON_VOID_INVESTMENT_STATUS,
+    };
 
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
@@ -554,6 +558,9 @@ export class HoldingsService {
       const where: Record<string, unknown> = {
         userId,
         accountId: In(eligibleAccountIds),
+        // Rows as effects: a VOID transaction moved no shares, so it cannot
+        // be what oversells a position.
+        status: NON_VOID_INVESTMENT_STATUS,
       };
       if (securityIds && securityIds.length > 0) {
         where.securityId = In(securityIds);
@@ -746,6 +753,8 @@ export class HoldingsService {
         userId,
         accountId: In(eligibleIds),
         transactionDate: LessThanOrEqual(cutoff),
+        // Rows as effects: a VOID transaction moved no shares.
+        status: NON_VOID_INVESTMENT_STATUS,
       },
       order: {
         transactionDate: "ASC",
@@ -846,6 +855,8 @@ export class HoldingsService {
           userId,
           accountId: In(brokerageAccountIds),
           transactionDate: LessThanOrEqual(cutoff),
+          // Rows as effects: a VOID transaction moved no shares.
+          status: NON_VOID_INVESTMENT_STATUS,
         },
         order: {
           transactionDate: "ASC",
@@ -936,7 +947,8 @@ export class HoldingsService {
               `SELECT DISTINCT user_id
              FROM investment_transactions
              WHERE user_id = ANY($1)
-               AND transaction_date = $2`,
+               AND transaction_date = $2
+               AND status != 'VOID'`,
               [userIds, today],
             ),
         );

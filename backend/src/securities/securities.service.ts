@@ -724,6 +724,8 @@ export class SecuritiesService {
     }
 
     // Check for any investment transactions referencing this security
+    // includes VOID rows: records read -- a VOID row still references the
+    // security and would be orphaned by the delete.
     const transactionsCount = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(InvestmentTransaction)
@@ -846,6 +848,7 @@ export class SecuritiesService {
   }
 
   async getSecurityIdsWithTransactions(userId: string): Promise<string[]> {
+    // includes VOID rows: records read -- "referenced anywhere", not an effect.
     const results = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(InvestmentTransaction)

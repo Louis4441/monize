@@ -864,11 +864,13 @@ CREATE TABLE investment_transactions (
     total_amount NUMERIC(20, 4) NOT NULL,
     exchange_rate NUMERIC(20, 10) NOT NULL DEFAULT 1,
     description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'UNRECONCILED', -- 'UNRECONCILED', 'CLEARED', 'RECONCILED', 'VOID'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_investment_transactions_user ON investment_transactions(user_id);
+CREATE INDEX idx_investment_transactions_status ON investment_transactions(status);
 CREATE INDEX idx_investment_transactions_account ON investment_transactions(account_id);
 CREATE INDEX idx_investment_transactions_security ON investment_transactions(security_id);
 CREATE INDEX idx_investment_transactions_date ON investment_transactions(transaction_date DESC);

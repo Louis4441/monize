@@ -7,6 +7,7 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "../securities/entities/investment-transaction.entity";
+import { NON_VOID_INVESTMENT_STATUS } from "../securities/investment-row-effects.util";
 import {
   acquisitionCost,
   applyActionToQuantity,
@@ -177,6 +178,7 @@ export class InvestmentReportDataService {
           UNION
           SELECT security_id FROM investment_transactions
             WHERE user_id = $2 AND account_id = ANY($1) AND security_id IS NOT NULL
+              AND status != 'VOID'
         )`,
           [accountIds, userId],
         ),
@@ -229,7 +231,12 @@ export class InvestmentReportDataService {
     // Replay transactions up to the as-of date, grouped by (account, security).
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
-        where: { userId, accountId: In(accountIds) },
+        // Rows as effects: a VOID transaction moved no shares and no cost.
+        where: {
+          userId,
+          accountId: In(accountIds),
+          status: NON_VOID_INVESTMENT_STATUS,
+        },
         order: { transactionDate: "ASC", createdAt: "ASC" },
       }),
     );

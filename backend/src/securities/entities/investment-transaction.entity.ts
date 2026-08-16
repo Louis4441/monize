@@ -10,7 +10,10 @@ import {
 } from "typeorm";
 import { ApiProperty } from "@nestjs/swagger";
 import { Account } from "../../accounts/entities/account.entity";
-import { Transaction } from "../../transactions/entities/transaction.entity";
+import {
+  Transaction,
+  TransactionStatus,
+} from "../../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../../transactions/entities/transaction-split.entity";
 import { Security } from "./security.entity";
 import { User } from "../../users/entities/user.entity";
@@ -172,6 +175,17 @@ export class InvestmentTransaction {
   @ApiProperty({ required: false })
   @Column({ type: "text", nullable: true })
   description: string | null;
+
+  // Same enum as transactions.status, never forked. A VOID investment row
+  // moves no shares and no cash, and its linked cash transaction shares the
+  // VOID boundary with it. Spec: docs/specs/investment-transaction-status.md.
+  @ApiProperty({ enum: TransactionStatus })
+  @Column({
+    type: "varchar",
+    length: 20,
+    default: TransactionStatus.UNRECONCILED,
+  })
+  status: TransactionStatus;
 
   @ManyToOne(() => Account)
   @JoinColumn({ name: "account_id" })

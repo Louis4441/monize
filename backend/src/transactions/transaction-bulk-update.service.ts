@@ -756,17 +756,43 @@ export class TransactionBulkUpdateService {
       }
     }
 
+    // Which of the selected rows are the cash leg of an investment
+    // transaction. Same shape as the split-leg rule: the investment row owns
+    // the pair's VOID boundary, so a cash leg cannot cross it alone -- its
+    // trade's shares would stay counted while its cash claims not to have
+    // moved. Only asked when a status change could cross the boundary.
+    const investmentLegIds = new Set<string>();
+    if (newStatus !== undefined && transactions.length > 0) {
+      const owningRows: { transaction_id: string }[] = await withScopedDb(
+        this.dataSource,
+        (m) =>
+          m.query(
+            // includes VOID rows: records read -- ownership, not effect.
+            `SELECT transaction_id FROM investment_transactions
+              WHERE transaction_id = ANY($1)`,
+            [transactions.map((t) => t.id)],
+          ),
+      );
+      for (const row of owningRows) {
+        investmentLegIds.add(row.transaction_id);
+      }
+    }
+
     const skippedReasons: string[] = [];
     let splitLegVoidCount = 0;
+    let investmentLegVoidCount = 0;
 
     const eligible = transactions.filter((t) => {
-      if (
+      const crossesVoid =
         newStatus !== undefined &&
-        splitLegIds.has(t.id) &&
         (t.status === TransactionStatus.VOID) !==
-          (newStatus === TransactionStatus.VOID)
-      ) {
+          (newStatus === TransactionStatus.VOID);
+      if (crossesVoid && splitLegIds.has(t.id)) {
         splitLegVoidCount++;
+        return false;
+      }
+      if (crossesVoid && investmentLegIds.has(t.id)) {
+        investmentLegVoidCount++;
         return false;
       }
       return true;
@@ -789,10 +815,27 @@ export class TransactionBulkUpdateService {
       );
     }
 
+    if (investmentLegVoidCount === 1) {
+      skippedReasons.push(
+        tr(
+          "errors.transactions.bulkInvestmentCashLegSkippedOne",
+          "1 investment cash transaction was skipped (void or restore it by changing the investment transaction's status, so both sides change together)",
+        ),
+      );
+    } else if (investmentLegVoidCount > 1) {
+      skippedReasons.push(
+        tr(
+          "errors.transactions.bulkInvestmentCashLegSkippedMany",
+          `${investmentLegVoidCount} investment cash transactions were skipped (void or restore them by changing the investment transactions' status, so both sides change together)`,
+          { count: investmentLegVoidCount },
+        ),
+      );
+    }
+
     return {
       eligibleIds: eligible.map((t) => t.id),
       splitParentIds: eligible.filter((t) => t.isSplit).map((t) => t.id),
-      skipped: splitLegVoidCount,
+      skipped: splitLegVoidCount + investmentLegVoidCount,
       skippedReasons,
     };
   }
