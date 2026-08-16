@@ -213,6 +213,7 @@
     "pricePerShare": "Koers per aandeel ({currency})",
     "commissionFees": "Commissie / kosten ({currency})",
     "description": "Omschrijving (optioneel)",
+    "statusLockedToParent": "Deze transactie maakt deel uit van een gesplitste transactie. Wijzig in plaats daarvan de status van de gesplitste transactie, zodat beide zijden samen wijzigen.",
     "descriptionPlaceholder": "Optionele notities",
     "splitRatio": "Splitsingsverhouding",
     "noSplitRatioWarning": "Voor deze transactie is geen splitsingsverhouding ingesteld. Voer de verhouding in zoals aangekondigd vóór het opslaan — Monize neemt er geen aan.",

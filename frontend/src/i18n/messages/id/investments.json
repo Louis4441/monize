@@ -213,6 +213,7 @@
     "pricePerShare": "Harga per Lembar ({currency})",
     "commissionFees": "Komisi / Biaya ({currency})",
     "description": "Deskripsi (opsional)",
+    "statusLockedToParent": "Transaksi ini merupakan bagian dari transaksi terpisah. Ubah status transaksi terpisah tersebut, agar kedua sisi berubah bersama-sama.",
     "descriptionPlaceholder": "Catatan opsional",
     "splitRatio": "Rasio pemecahan saham",
     "noSplitRatioWarning": "Tidak ada rasio pemecahan saham yang ditetapkan pada transaksi ini. Masukkan rasio seperti yang diumumkan sebelum menyimpan — Monize tidak akan menganggap satu untuk Anda.",

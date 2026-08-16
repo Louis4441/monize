@@ -213,6 +213,7 @@
     "pricePerShare": "Prix par part ({currency})",
     "commissionFees": "Commission / Frais ({currency})",
     "description": "Description (facultatif)",
+    "statusLockedToParent": "Cette transaction fait partie d'une transaction fractionnée. Modifiez plutôt le statut de la transaction fractionnée, afin que les deux côtés changent ensemble.",
     "descriptionPlaceholder": "Notes facultatives",
     "splitRatio": "Ratio de division",
     "noSplitRatioWarning": "Aucun ratio de division n'est défini pour cette transaction. Saisissez le ratio tel qu'il a été annoncé avant d'enregistrer — Monize n'en supposera pas un pour vous.",

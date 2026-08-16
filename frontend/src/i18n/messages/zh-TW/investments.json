@@ -213,6 +213,7 @@
     "pricePerShare": "每股價格（{currency}）",
     "commissionFees": "手續費（{currency}）",
     "description": "描述（選填）",
+    "statusLockedToParent": "此交易屬於拆分交易的一部分。請改為變更拆分交易的狀態，使兩側一併變更。",
     "descriptionPlaceholder": "選填備註",
     "splitRatio": "分割比例",
     "noSplitRatioWarning": "此交易未設定分割比例。請在儲存前按公告輸入比例，Monize 不會自動假設。",
