@@ -1780,8 +1780,14 @@ export class ScheduledTransactionsService {
     // 0.00 instead of 50.00 (audit P4-004).
     //
     // Nested service calls join this transaction, so a refusal below rolls the
-    // money back with it. Everything that reaches outside PostgreSQL -- the FX
-    // rate lookup in particular -- has already run above.
+    // money back with it. The schedule's own account-currency FX lookup
+    // (resolveFxForPosting) has already run above. One external call is NOT
+    // hoisted: an investment's cash-settlement FX is resolved inside
+    // postInvestment -> InvestmentTransactionsService.create, which can fetch a
+    // cross-currency rate from the quote provider while this lock is held. That
+    // is a pre-existing cost (a network round-trip inside the transaction), not
+    // a correctness bug -- rollback still unwinds cleanly -- and is tracked as a
+    // follow-up rather than reshaped here.
     let writtenTransfer: { savedFromId: string; savedToId: string } | undefined;
     const removedAfterOnce = await withScopedDb(this.dataSource, async (m) => {
       // Lock the schedule and confirm this occurrence is still the due one. A
