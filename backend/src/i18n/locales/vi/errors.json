@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Giao tác đầu tư theo lịch yêu cầu tài khoản môi giới",
     "notFound": "Không tìm thấy giao tác theo lịch với ID {{ id }}",
     "occurrenceAlreadyPosted": "Lần này đã được ghi nhận.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Chỉ có thể dùng đơn vị tiền tệ khác trên giao tác theo lịch thông thường, không dùng được cho giao tác chia nhỏ, chuyển tiền hoặc đầu tư",
     "fxRateUnavailable": "Không có tỷ giá từ {{ from }} sang {{ to }} vào {{ date }}. Hãy nhập số tiền bằng {{ to }} để đăng.",
     "investmentActionRequired": "Hành động đầu tư là bắt buộc cho giao tác đầu tư theo lịch",

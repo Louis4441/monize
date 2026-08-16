@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Las transacciones de inversión planificadas requieren una cuenta de corretaje",
     "notFound": "Transacción planificada con ID {{ id }} no encontrada",
     "occurrenceAlreadyPosted": "Esta ocurrencia ya se ha registrado.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Solo se puede usar otra moneda en una transacción planificada simple, no en un desglose, una transferencia ni una inversión",
     "fxRateUnavailable": "No hay un tipo de cambio disponible de {{ from }} a {{ to }} el {{ date }}. Introduce el importe en {{ to }} para registrarlo.",
     "investmentActionRequired": "Se requiere acción de inversión para las transacciones de inversión planificadas",

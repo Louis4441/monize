@@ -1654,8 +1654,67 @@ describe('ScheduledTransactionForm', () => {
     expect(toast.error).not.toHaveBeenCalled();
     const [, payload] = mockUpdate.mock.calls[0];
     expect(payload.investmentAction).toBe('INTEREST');
-    expect(payload.investmentSecurityId).toBeNull();
+    // The key is omitted (undefined), not null: the backend clears the hidden
+    // security on the action transition. Sending null unconditionally would also
+    // destroy a deliberate security-specific INTEREST on a later unrelated edit.
+    expect(payload.investmentSecurityId).toBeUndefined();
     expect(payload.investmentFundingAccountId).toBeNull();
+  });
+
+  it('does not clear a deliberate INTEREST security on a name-only edit (issue #1154 re-review)', async () => {
+    // An existing security-specific INTEREST (e.g. created via the API) must
+    // survive a presentation-only edit: the form omits the security key rather
+    // than sending null, so the backend leaves the stored value untouched
+    // because the action did not change.
+    const existingInterest = {
+      id: 's-int',
+      accountId: 'acc-4', // Brokerage
+      name: 'Bond interest',
+      amount: 100,
+      currencyCode: 'CAD',
+      frequency: 'MONTHLY' as const,
+      nextDueDate: '2026-06-15',
+      isActive: true,
+      autoPost: false,
+      reminderDaysBefore: 3,
+      isTransfer: false,
+      isSplit: false,
+      isInvestment: true,
+      investmentAction: 'INTEREST' as const,
+      investmentSecurityId: 'sec-voo',
+      investmentTotalAmount: 100,
+    } as any;
+
+    const { container } = render(
+      <ScheduledTransactionForm scheduledTransaction={existingInterest} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Name'), {
+        target: { value: 'Bond interest (renamed)' },
+      });
+    });
+
+    const submitButton = container.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
+    await act(async () => {});
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled();
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+    const [, payload] = mockUpdate.mock.calls[0];
+    expect(payload.investmentAction).toBe('INTEREST');
+    // Omitted, not null -> backend preserves the deliberate security.
+    expect(payload.investmentSecurityId).toBeUndefined();
   });
 
   // ============================================================

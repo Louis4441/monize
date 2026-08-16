@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Zamanlanmış yatırım işlemleri için aracı kurum hesabı gereklidir",
     "notFound": "{{ id }} kimliğine sahip zamanlanmış işlem bulunamadı",
     "occurrenceAlreadyPosted": "Bu tekrar zaten kaydedildi.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Farklı bir para birimi yalnızca sade bir zamanlanmış işlemde kullanılabilir; bölünmüş işlem, transfer veya yatırımda kullanılamaz",
     "fxRateUnavailable": "{{ date }} tarihinde {{ from }} biriminden {{ to }} birimine döviz kuru yok. Kaydetmek için tutarı {{ to }} cinsinden girin.",
     "investmentActionRequired": "Zamanlanmış yatırım işlemleri için yatırım eylemi gereklidir",

@@ -1623,6 +1623,9 @@ describe("ScheduledTransactionsService", () => {
       const overrideQb = mockQueryBuilder(null);
       overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      // The locked re-read returns the same override revision (issue #1154
+      // re-review): same id, same (absent) updatedAt, so the change-guard passes.
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
 
       await service.post(userId, stId);
@@ -1687,6 +1690,7 @@ describe("ScheduledTransactionsService", () => {
       const overrideQb = mockQueryBuilder(null);
       overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
       mockQueryRunner.manager.delete = jest
         .fn()
@@ -2236,12 +2240,11 @@ describe("ScheduledTransactionsService", () => {
       expect(investmentTransactionsService.create).not.toHaveBeenCalled();
     });
 
-    it("post() posts the locked row, not a pre-lock BUY snapshot (issue #1154 review)", async () => {
-      // A concurrent edit switched BUY -> DIVIDEND (clearing the funding
-      // account) between the pre-lock read and the row lock. The post must use
-      // the locked DIVIDEND -- not forward the stale BUY through the old funding
-      // account. Both the pre-lock read and the locked read go through
-      // scheduledRepo.findOne (see the manager.findOne alias in beforeEach).
+    it("post() rejects when the schedule changed between the pre-lock read and the lock (issue #1154 re-review)", async () => {
+      // A concurrent edit switched BUY -> DIVIDEND between the pre-lock read and
+      // the row lock. The prepared (pre-lock) payload no longer describes the
+      // row, so the post is refused rather than committing a stale operation.
+      // Both reads go through scheduledRepo.findOne (manager.findOne alias).
       const beforeLock = makeScheduled({
         isInvestment: true,
         investmentAction: "BUY" as any,
@@ -2261,17 +2264,42 @@ describe("ScheduledTransactionsService", () => {
       });
       scheduledRepo.findOne
         .mockResolvedValueOnce(beforeLock)
-        .mockResolvedValueOnce(locked)
         .mockResolvedValue(locked);
       const overrideQb = mockQueryBuilder();
       overrideQb.getOne.mockResolvedValue(null);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
 
-      await service.post(userId, stId);
+      await expect(service.post(userId, stId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(investmentTransactionsService.create).not.toHaveBeenCalled();
+    });
 
-      const dto = investmentTransactionsService.create.mock.calls[0][1];
-      expect(dto.action).toBe("DIVIDEND");
-      expect(dto.fundingAccountId).toBeUndefined();
+    it("post() rejects when the occurrence override changed after the pre-lock read (issue #1154 re-review)", async () => {
+      const scheduled = makeScheduled({
+        isInvestment: true,
+        investmentAction: "DIVIDEND" as any,
+        investmentSecurityId: "sec-voo",
+        investmentTotalAmount: 75,
+      });
+      stubFindOne(scheduled);
+      // Pre-lock override read (createQueryBuilder.getOne) returns one revision;
+      // the locked re-read (overridesRepo.findOne) returns a newer one.
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue({
+        id: "ovr-1",
+        updatedAt: new Date("2026-06-01T00:00:00Z"),
+      });
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue({
+        id: "ovr-1",
+        updatedAt: new Date("2026-06-02T00:00:00Z"),
+      });
+
+      await expect(service.post(userId, stId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(investmentTransactionsService.create).not.toHaveBeenCalled();
     });
 
     it("post() honours inline quantity / price overrides", async () => {
@@ -2905,6 +2933,40 @@ describe("ScheduledTransactionsService", () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it("update() rejects when the action changed concurrently (issue #1154 re-review)", async () => {
+      // The request read a DIVIDEND and derived DIVIDEND cleanup, but a
+      // concurrent edit switched the locked row to BUY. Writing the stale
+      // cleanup would null the quantity/price the BUY just set, so the update is
+      // refused. The pre-mutation read and the locked read both go through
+      // scheduledRepo.findOne.
+      const preEdit = makeScheduled({
+        isInvestment: true,
+        investmentAction: "DIVIDEND" as any,
+        investmentSecurityId: "sec-voo",
+        investmentTotalAmount: 100,
+      });
+      const lockedDifferent = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-voo",
+        investmentQuantity: 2,
+        investmentPrice: 50,
+      });
+      scheduledRepo.findOne
+        .mockResolvedValueOnce(preEdit)
+        .mockResolvedValue(lockedDifferent);
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await expect(
+        service.update(userId, stId, { name: "Renamed" } as any),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+    });
+
     it("create() drops a funding account supplied for a non-funding action (issue #1154)", async () => {
       accountsService.findOne.mockImplementation(
         async (uid: string, id: string) => {
@@ -3237,14 +3299,16 @@ describe("ScheduledTransactionsService", () => {
           } as any,
         }),
       );
-      const overrideQb = mockQueryBuilder(null);
-      overrideQb.getOne.mockResolvedValue({
+      const storedOverride = {
         id: "ovr-1",
         originalDate: "2025-02-15",
         overrideDate: "2025-02-15",
         amount: -60,
-      });
+      };
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(storedOverride);
       overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
       accountsRepo.findOne.mockResolvedValue(null);
 
       await service.post(userId, stId);

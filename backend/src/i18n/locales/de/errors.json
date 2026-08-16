@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Terminierte Investmentbuchungen erfordern ein Maklerkonto",
     "notFound": "Terminierte Buchung mit ID {{ id }} nicht gefunden",
     "occurrenceAlreadyPosted": "Dieser Vorgang wurde bereits gebucht.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Eine abweichende Währung ist nur bei einer einfachen terminierten Buchung möglich, nicht bei einer Aufteilung, Überweisung oder Investition",
     "fxRateUnavailable": "Für {{ from }} zu {{ to }} ist am {{ date }} kein Wechselkurs verfügbar. Geben Sie den Betrag in {{ to }} ein, um ihn zu buchen.",
     "investmentActionRequired": "Investmentaktion ist für terminierte Investmentbuchungen erforderlich",

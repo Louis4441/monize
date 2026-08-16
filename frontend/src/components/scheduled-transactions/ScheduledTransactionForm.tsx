@@ -1091,13 +1091,15 @@ export function ScheduledTransactionForm({
           transferAccountId: undefined,
           isInvestment: true,
           investmentAction,
-          // Send an explicit null (not undefined) when the action's UI has no
-          // security field, so an edit clears a security hidden by an earlier
-          // BUY/SELL/etc. rather than leaving it stored (issue #1154 review).
-          investmentSecurityId:
-            SECURITY_REQUIRED_ACTIONS.includes(investmentAction) && investmentSecurityId
-              ? investmentSecurityId
-              : null,
+          // For an action whose UI has no security field, omit the key rather
+          // than sending null. The backend clears a hidden security on the
+          // action transition (BUY -> INTEREST with the key omitted), so a
+          // fresh switch is still cleaned -- but a deliberately-stored
+          // security-specific INTEREST survives a later presentation-only edit
+          // instead of being destroyed by every save (issue #1154 re-review).
+          investmentSecurityId: SECURITY_REQUIRED_ACTIONS.includes(investmentAction)
+            ? investmentSecurityId || undefined
+            : undefined,
           // Send an explicit null (not undefined) when the action does not use a
           // funding account, so editing an existing schedule away from BUY/SELL
           // clears the stored account. Omitting the key would leave the stale

@@ -146,6 +146,51 @@ function suppliedOrStored<T>(supplied: T | undefined, stored: T): T {
   return supplied === undefined ? stored : supplied;
 }
 
+function sameNullableNumber(
+  left: number | null | undefined,
+  right: number | null | undefined,
+): boolean {
+  if (left == null || right == null) return left == null && right == null;
+  return Number(left) === Number(right);
+}
+
+/**
+ * The fields that decide what a post/edit will actually write -- the kind, the
+ * accounts money moves between, the amount and currency, and every investment
+ * scalar. `post()` and `update()` prepare their writes from a row read before
+ * the row lock; if any of these changed by the time the lock is held, the
+ * prepared write no longer describes the row and must be refused rather than
+ * committing a stale operation (issue #1154 review). Presentation-only fields
+ * (description, tags) are deliberately excluded so a cosmetic concurrent edit
+ * does not force a needless retry.
+ */
+function sameScheduleMutationBasis(
+  a: ScheduledTransaction,
+  b: ScheduledTransaction,
+): boolean {
+  return (
+    a.isInvestment === b.isInvestment &&
+    a.isTransfer === b.isTransfer &&
+    a.isSplit === b.isSplit &&
+    a.accountId === b.accountId &&
+    a.transferAccountId === b.transferAccountId &&
+    a.categoryId === b.categoryId &&
+    a.currencyCode === b.currencyCode &&
+    sameNullableNumber(
+      a.amount as unknown as number,
+      b.amount as unknown as number,
+    ) &&
+    a.investmentAction === b.investmentAction &&
+    a.investmentSecurityId === b.investmentSecurityId &&
+    a.investmentFundingAccountId === b.investmentFundingAccountId &&
+    sameNullableNumber(a.investmentQuantity, b.investmentQuantity) &&
+    sameNullableNumber(a.investmentPrice, b.investmentPrice) &&
+    sameNullableNumber(a.investmentCommission, b.investmentCommission) &&
+    sameNullableNumber(a.investmentTotalAmount, b.investmentTotalAmount) &&
+    sameNullableNumber(a.investmentExchangeRate, b.investmentExchangeRate)
+  );
+}
+
 @Injectable()
 export class ScheduledTransactionsService {
   private readonly logger = new Logger(ScheduledTransactionsService.name);
@@ -1448,6 +1493,34 @@ export class ScheduledTransactionsService {
     // row update atomically so a partial failure cannot leave the row and its
     // splits in an inconsistent state.
     await withScopedDb(this.dataSource, async (m) => {
+      // The effective action, validation and the action-dependent clears above
+      // were derived from `scheduled`, read before this transaction. Re-read the
+      // row under the lock and refuse if the mutation basis changed in between:
+      // otherwise a concurrent action switch that committed first would be
+      // overwritten by this request's stale derived clears (e.g. nulling the
+      // quantity/price a concurrent BUY just set) (issue #1154 review).
+      const current = await m.findOne(ScheduledTransaction, {
+        where: { id, userId },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!current) {
+        throw new NotFoundException(
+          tr(
+            "errors.scheduled.notFound",
+            `Scheduled transaction with ID ${id} not found`,
+            { id },
+          ),
+        );
+      }
+      if (!sameScheduleMutationBasis(scheduled, current)) {
+        throw new ConflictException(
+          tr(
+            "errors.scheduled.changedConcurrently",
+            "The scheduled transaction changed during the operation. Reload it and retry.",
+          ),
+        );
+      }
+
       if (splits !== undefined) {
         if (Array.isArray(splits) && splits.length > 0) {
           await m.delete(ScheduledTransactionSplit, {
@@ -1941,6 +2014,47 @@ export class ScheduledTransactionsService {
         );
       }
 
+      // The transfer/plain payloads (preparedTransfer, transactionPayload) and
+      // the FX amount were prepared from the pre-lock `scheduled` snapshot. If a
+      // concurrent edit changed what the schedule *is* -- kind, accounts, amount,
+      // currency, or any investment scalar -- committing the prepared write would
+      // post a different operation than the row now describes (e.g. a plain
+      // expense edited to a transfer, so money leaves but nothing arrives). Refuse
+      // and let the caller reload (issue #1154 review). The occurrence-claim and
+      // the row lock guarantee no double-post; this guards against a stale-shape
+      // post. Cron treats the ConflictException as "claimed elsewhere" and skips.
+      if (!sameScheduleMutationBasis(scheduled, current)) {
+        throw new ConflictException(
+          tr(
+            "errors.scheduled.changedConcurrently",
+            "The scheduled transaction changed during the operation. Reload it and retry.",
+          ),
+        );
+      }
+
+      // The occurrence override is a mutable row of its own, read before this
+      // lock. Re-read it under the lock and refuse if it changed, so a
+      // concurrently-edited override is neither posted stale nor deleted
+      // unread (issue #1154 review).
+      const lockedOverride = await m
+        .getRepository(ScheduledTransactionOverride)
+        .findOne({
+          where: { scheduledTransactionId: id, originalDate: nextDueDateStr },
+          lock: { mode: "pessimistic_write" },
+        });
+      if (
+        (storedOverride?.id ?? null) !== (lockedOverride?.id ?? null) ||
+        (storedOverride?.updatedAt?.getTime() ?? null) !==
+          (lockedOverride?.updatedAt?.getTime() ?? null)
+      ) {
+        throw new ConflictException(
+          tr(
+            "errors.scheduled.changedConcurrently",
+            "The scheduled transaction changed during the operation. Reload it and retry.",
+          ),
+        );
+      }
+
       // Claim the occurrence. The unique key on
       // (scheduled_transaction_id, original_due_date) is what makes the claim
       // the serialization point rather than the lock alone: it survives a
@@ -1974,7 +2088,7 @@ export class ScheduledTransactionsService {
           current,
           postDto,
           postDate,
-          storedOverride,
+          lockedOverride,
         );
       } else if (preparedTransfer) {
         // Already validated and authorized above; only the writes join this
@@ -1988,8 +2102,8 @@ export class ScheduledTransactionsService {
         await this.transactionsService.create(userId, transactionPayload);
       }
 
-      if (storedOverride) {
-        await m.remove(storedOverride);
+      if (lockedOverride) {
+        await m.remove(lockedOverride);
       }
 
       if (current.frequency === "ONCE") {

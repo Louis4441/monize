@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Плановые инвестиционные проводки требуют брокерский счёт",
     "notFound": "Плановая проводка с ID {{ id }} не найдена",
     "occurrenceAlreadyPosted": "Это событие уже проведено.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Другую валюту можно использовать только в обычной плановой проводке, но не в разделении, переводе или инвестиционной",
     "fxRateUnavailable": "На {{ date }} курс обмена {{ from }} в {{ to }} недоступен. Введите сумму в {{ to }}, чтобы провести её.",
     "investmentActionRequired": "Для плановых инвестиционных проводок необходимо инвестиционное действие",

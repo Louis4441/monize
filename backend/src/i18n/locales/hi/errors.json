@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "अनुसूचित निवेश लेनदेन के लिए ब्रोकरेज खाता आवश्यक है",
     "notFound": "ID {{ id }} वाला अनुसूचित लेनदेन नहीं मिला",
     "occurrenceAlreadyPosted": "यह घटना पहले ही दर्ज की जा चुकी है।",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "अलग मुद्रा केवल सामान्य अनुसूचित लेनदेन पर उपयोग की जा सकती है, विभाजन, स्थानांतरण या निवेश पर नहीं",
     "fxRateUnavailable": "{{ date }} को {{ from }} से {{ to }} के लिए कोई विनिमय दर उपलब्ध नहीं है। इसे पोस्ट करने के लिए राशि {{ to }} में दर्ज करें।",
     "investmentActionRequired": "अनुसूचित निवेश लेनदेन के लिए निवेश क्रिया आवश्यक है",

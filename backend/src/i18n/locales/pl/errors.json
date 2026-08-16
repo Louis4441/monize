@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Zaplanowane transakcje inwestycyjne wymagają konta maklerskiego",
     "notFound": "Nie znaleziono zaplanowanej transakcji o ID {{ id }}",
     "occurrenceAlreadyPosted": "Ta rata została już zaksięgowana.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Innej waluty można użyć tylko w zwykłej zaplanowanej transakcji, a nie w podziale, przelewie ani inwestycji",
     "fxRateUnavailable": "Dla {{ date }} nie ma dostępnego kursu wymiany z {{ from }} na {{ to }}. Wprowadź kwotę w {{ to }}, aby ją zaksięgować.",
     "investmentActionRequired": "Operacja inwestycyjna jest wymagana dla zaplanowanych transakcji inwestycyjnych",

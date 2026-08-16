@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Le transazioni di investimento pianificate richiedono un conto di intermediazione",
     "notFound": "Transazione pianificata con ID {{ id }} non trovata",
     "occurrenceAlreadyPosted": "Questa occorrenza è già stata registrata.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Una valuta diversa può essere usata solo su una transazione pianificata semplice, non su una suddivisione, un trasferimento o un investimento",
     "fxRateUnavailable": "Non è disponibile alcun tasso di cambio da {{ from }} a {{ to }} il {{ date }}. Inserisci l'importo in {{ to }} per registrarla.",
     "investmentActionRequired": "L'azione di investimento è obbligatoria per le transazioni di investimento pianificate",
