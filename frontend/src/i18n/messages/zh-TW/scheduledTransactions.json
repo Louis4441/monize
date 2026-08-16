@@ -299,8 +299,10 @@
     "MONTHLY": "每月",
     "EVERY2MONTHS": "每兩個月",
     "QUARTERLY": "每季",
+    "EVERY4MONTHS": "每 4 個月",
     "SEMIANNUAL": "每年兩次",
-    "YEARLY": "每年"
+    "YEARLY": "每年",
+    "EVERY2YEARS": "每兩年"
   },
   "validation": {
     "nameRequired": "名稱為必填",

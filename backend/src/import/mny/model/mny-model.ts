@@ -1,4 +1,5 @@
 import { AccountType } from "../../../accounts/entities/account.entity";
+import { FREQUENCY_CYCLE_DAYS } from "../../../common/recurrence";
 import { FrequencyType } from "../../../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { InvestmentAction } from "../../../securities/entities/investment-transaction.entity";
 import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
@@ -535,112 +536,133 @@ export function isIncomeCategoryType(categoryType: number): boolean | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Money recurrence codes.
+ * `BILL.frq` -- the **unit** a Money recurrence is counted in, not the
+ * recurrence itself. The recurrence is the pair `(frq, cFrqInst)`.
  *
- * `BILL` is empty in every committed fixture, so none of these can be read out
- * of a file this repository holds. The list PR #192 supplied claimed eight of
- * them -- 4 yearly, 5 every two months, 6 quarterly, 7 semiannual -- and issue
- * #1150 checked the only one a bug report can check: a Money Plus Sunset file
- * whose **yearly** bills imported as "every 2 months", which is `EXACT[5]`
- * under that list. So Money writes 5 for a yearly bill, and the same report
- * confirms 3 for a monthly one, since the same file's monthly bills arrived
- * monthly.
+ * `cFrqInst` is how many times the bill falls due **per unit**, so the cycle is
+ * `unit / cFrqInst`. It is a rate, not an interval multiplier, and reading it
+ * as the latter inverts every non-unit cadence in the file: `frq` 3 with
+ * `cFrqInst` 2 is twice a *month* (a semi-monthly payroll), and the old table
+ * imported it as every two months -- while `frq` 3 with `cFrqInst` 0.5, the
+ * real every-other-month, rounded to 1 and imported as monthly. The values are
+ * fractional (0.5, 0.25) precisely because they are a rate; an interval
+ * multiplier has no reason to be.
  *
- * That refutes the reference's 4, and leaves 6 and 7 as claims from a source
- * now known to be wrong about the codes above 3. They are therefore **not**
- * mapped: an unknown code is reported (`unusableBill`, with the raw `frq` and
- * `cFrqInst`) rather than guessed, and `inferFrequencyFromDueDates` answers
- * from the series' own instance dates first anyway -- a file's own spacing
- * outranks any table in this file.
+ * Every code and every rate below is read off `klasko.mny`, a Money Plus Sunset
+ * file in which the frequency of each series was written into the payee memo
+ * and matched against the stored pair, and cross-checked against the spacing of
+ * the series' own instance dates (a `frq` 4 series is 3 months apart, `frq` 2
+ * with 0.5 is 14 days apart, and so on). That replaces the guessed table issue
+ * #1150 was about -- PR #192's list claimed 4 = yearly, and 4 is quarterly.
  *
- * The gap is smaller than the missing codes make it look, because `cFrqInst`
- * is a real multiplier: every two months, quarterly and twice a year are all
- * `frq` 3 with an interval of 2, 3 and 6.
+ * Money's picker offers thirteen cadences and all thirteen are `(unit, rate)`
+ * pairs over these five units; `MONEY_CADENCES` in the spec enumerates them.
  */
 export const MNY_FREQUENCY = {
   ONCE: 0,
   DAILY: 1,
   WEEKLY: 2,
   MONTHLY: 3,
+  QUARTERLY: 4,
   YEARLY: 5,
 } as const;
+
+/**
+ * Mean length of one `frq` unit, in days.
+ *
+ * Spelled as fractions of `365.25` so that `unit / cFrqInst` lands exactly on a
+ * `FREQUENCY_CYCLE_DAYS` entry for each of Money's thirteen cadences -- which
+ * is what lets the match below be an equality rather than a tolerance, and what
+ * makes an unrepresentable cadence detectable instead of merely near-miss.
+ */
+const UNIT_DAYS: Record<number, number> = {
+  [MNY_FREQUENCY.DAILY]: 1,
+  [MNY_FREQUENCY.WEEKLY]: 7,
+  [MNY_FREQUENCY.MONTHLY]: 365.25 / 12,
+  [MNY_FREQUENCY.QUARTERLY]: 365.25 / 4,
+  [MNY_FREQUENCY.YEARLY]: 365.25,
+};
 
 export interface MnyFrequencyMapping {
   readonly frequency: FrequencyType;
   /**
-   * True when Monize has no exact equivalent, so the mapping changes how often
-   * the bill falls due, and the mapper must warn per bill. Every *known* Money
-   * recurrence code maps exactly (Track B task B3 added `EVERY2MONTHS` and
-   * `SEMIANNUAL`); only an unrepresentable `cFrqInst` interval -- weekly every
-   * 3 weeks, monthly every 5 months, yearly every 2 years -- approximates.
+   * True when Monize has no type for the cadence Money recorded, so the mapping
+   * changes how often the bill falls due and the mapper must warn per bill.
+   * Every cadence Money's own picker offers maps exactly -- `EVERY4MONTHS` and
+   * `EVERY2YEARS` were added for the last two of them -- so this is reserved
+   * for a `(frq, cFrqInst)` pair the picker cannot produce, such as every three
+   * weeks or every five months.
    */
   readonly approximate: boolean;
 }
 
-const EXACT: Record<number, FrequencyType> = {
-  [MNY_FREQUENCY.ONCE]: FrequencyType.ONCE,
-  [MNY_FREQUENCY.DAILY]: FrequencyType.DAILY,
-  [MNY_FREQUENCY.WEEKLY]: FrequencyType.WEEKLY,
-  [MNY_FREQUENCY.MONTHLY]: FrequencyType.MONTHLY,
-  [MNY_FREQUENCY.YEARLY]: FrequencyType.YEARLY,
-};
+/** How close two cycle lengths must be to count as the same cadence. */
+const CYCLE_EPSILON = 1e-9;
 
-/** Weekly recurrences whose interval Monize expresses as its own type. */
-const WEEKLY_BY_INTERVAL: Record<number, FrequencyType> = {
-  2: FrequencyType.BIWEEKLY,
-  4: FrequencyType.EVERY4WEEKS,
-};
+/** The frequency whose cycle is exactly `days`, or null. */
+function frequencyForCycleDays(days: number): FrequencyType | null {
+  for (const [frequency, cycle] of Object.entries(FREQUENCY_CYCLE_DAYS)) {
+    if (cycle > 0 && Math.abs(cycle - days) <= CYCLE_EPSILON * cycle) {
+      return frequency as FrequencyType;
+    }
+  }
+  return null;
+}
 
-/** Monthly recurrences whose interval Monize expresses as its own type. */
-const MONTHLY_BY_INTERVAL: Record<number, FrequencyType> = {
-  2: FrequencyType.EVERY2MONTHS,
-  3: FrequencyType.QUARTERLY,
-  6: FrequencyType.SEMIANNUAL,
-  12: FrequencyType.YEARLY,
-};
-
-/** Every code whose `cFrqInst` multiples land on a type of their own. */
-const BY_INTERVAL: Record<number, Record<number, FrequencyType>> = {
-  [MNY_FREQUENCY.WEEKLY]: WEEKLY_BY_INTERVAL,
-  [MNY_FREQUENCY.MONTHLY]: MONTHLY_BY_INTERVAL,
-};
+/**
+ * The longest frequency whose cycle does not exceed `days`.
+ *
+ * Rounding *down* is the safe direction: v1 imports bills with
+ * `auto_post = false`, so an extra reminder is noise while a missed one is a
+ * missed payment. Nothing is shorter than `DAILY`, so a sub-daily cadence lands
+ * there.
+ */
+function nearestShorterFrequency(days: number): FrequencyType {
+  return Object.entries(FREQUENCY_CYCLE_DAYS)
+    .filter(([, cycle]) => cycle > 0 && cycle <= days)
+    .reduce<[FrequencyType, number]>(
+      (best, entry) =>
+        entry[1] > best[1] ? [entry[0] as FrequencyType, entry[1]] : best,
+      [FrequencyType.DAILY, 0],
+    )[0];
+}
 
 /**
  * Maps a Money recurrence onto a Monize frequency.
  *
- * `cFrqInst` is Money's interval multiplier: weekly with an interval of 2 is
- * exactly Monize's BIWEEKLY, monthly with 3 is QUARTERLY. An interval with no
- * matching type -- weekly every 3 weeks, monthly every 5 months, yearly every
- * 2 years -- falls to the code's own **shorter** period and is flagged
- * approximate. Shorter is the safer error: v1 imports bills with
- * `auto_post = false`, so an extra reminder is noise while a missed one is a
- * missed payment. (PR #192 erred in both directions, turning bimonthly bills
- * into biweekly ones and semiannual bills into yearly ones.)
+ * Returns null for an unknown `frq`, which the mapper reports (`unusableBill`,
+ * with the raw pair) rather than guesses. The bill mapper asks the series' own
+ * instance dates before it asks this function, so an unmapped code only loses a
+ * series that has no spacing to read.
  *
- * Returns null for an unknown code, which the mapper reports rather than
- * guesses -- see `MNY_FREQUENCY` for which codes are known and how. The bill
- * mapper asks the series' instance dates before it asks this function, so an
- * unmapped code only loses a series that has no spacing to read.
+ * @param frequency `BILL.frq` -- the unit, see `MNY_FREQUENCY`
+ * @param occurrencesPerUnit `BILL.cFrqInst` -- occurrences per unit, so 2 on a
+ *   monthly unit is twice a month and 0.5 is every other month
  */
 export function mapFrequency(
   frequency: number,
-  interval = 1,
+  occurrencesPerUnit = 1,
 ): MnyFrequencyMapping | null {
-  const base = EXACT[frequency];
-  if (base === undefined) {
+  if (frequency === MNY_FREQUENCY.ONCE) {
+    // A one-off recurs no times; whatever rate sits beside it says nothing.
+    return { frequency: FrequencyType.ONCE, approximate: false };
+  }
+
+  const unit = UNIT_DAYS[frequency];
+  if (unit === undefined) {
     return null;
   }
 
-  const steps =
-    Number.isFinite(interval) && interval >= 1 ? Math.round(interval) : 1;
-  if (steps <= 1 || base === FrequencyType.ONCE) {
-    return { frequency: base, approximate: false };
-  }
+  const rate =
+    Number.isFinite(occurrencesPerUnit) && occurrencesPerUnit > 0
+      ? occurrencesPerUnit
+      : 1;
+  const cycleDays = unit / rate;
 
-  const exact = BY_INTERVAL[frequency]?.[steps];
-  return exact
+  const exact = frequencyForCycleDays(cycleDays);
+  return exact !== null
     ? { frequency: exact, approximate: false }
-    : { frequency: base, approximate: true };
+    : { frequency: nearestShorterFrequency(cycleDays), approximate: true };
 }
 
 // ---------------------------------------------------------------------------

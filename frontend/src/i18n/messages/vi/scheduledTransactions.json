@@ -299,8 +299,10 @@
     "MONTHLY": "Hàng tháng",
     "EVERY2MONTHS": "Mỗi 2 tháng",
     "QUARTERLY": "Hàng quý",
+    "EVERY4MONTHS": "Mỗi 4 tháng",
     "SEMIANNUAL": "Hai lần một năm",
-    "YEARLY": "Hàng năm"
+    "YEARLY": "Hàng năm",
+    "EVERY2YEARS": "Mỗi 2 năm"
   },
   "validation": {
     "nameRequired": "Tên là bắt buộc",

@@ -29,8 +29,10 @@ export enum FrequencyType {
   MONTHLY = "MONTHLY",
   EVERY2MONTHS = "EVERY2MONTHS",
   QUARTERLY = "QUARTERLY",
+  EVERY4MONTHS = "EVERY4MONTHS",
   SEMIANNUAL = "SEMIANNUAL",
   YEARLY = "YEARLY",
+  EVERY2YEARS = "EVERY2YEARS",
 }
 
 export class CreateScheduledTransactionDto {

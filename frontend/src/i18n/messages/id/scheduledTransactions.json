@@ -299,8 +299,10 @@
     "MONTHLY": "Bulanan",
     "EVERY2MONTHS": "Setiap 2 Bulan",
     "QUARTERLY": "Kuartalan",
+    "EVERY4MONTHS": "Setiap 4 Bulan",
     "SEMIANNUAL": "Dua Kali Setahun",
-    "YEARLY": "Tahunan"
+    "YEARLY": "Tahunan",
+    "EVERY2YEARS": "Setiap 2 Tahun"
   },
   "validation": {
     "nameRequired": "Nama wajib diisi",

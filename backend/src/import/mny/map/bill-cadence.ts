@@ -1,4 +1,5 @@
 import { FrequencyType } from "../../../scheduled-transactions/dto/create-scheduled-transaction.dto";
+import { FREQUENCY_CYCLE_DAYS } from "../../../common/recurrence";
 
 /**
  * A bill series' cadence read from its own instance dates.
@@ -18,24 +19,14 @@ import { FrequencyType } from "../../../scheduled-transactions/dto/create-schedu
  */
 
 /**
- * Mean days in one cycle of each frequency. Means, not whole cycles: these are
- * matched against observed spacing, so February and a 31-day month have to
- * average out rather than round up. `map-bills.ts` derives its activity
- * horizon from the same table -- one list of cycle lengths, not two.
+ * Mean days in one cycle of each frequency.
+ *
+ * An alias for `FREQUENCY_CYCLE_DAYS`, not a copy: `map-bills.ts` derives its
+ * activity horizon from it, `mny-model.ts` matches Money's recurrence codes
+ * against it, and this module matches observed instance spacing against it --
+ * three readers, one list of cycle lengths.
  */
-export const CADENCE_DAYS: Record<FrequencyType, number> = {
-  ONCE: 0,
-  DAILY: 1,
-  WEEKLY: 7,
-  BIWEEKLY: 14,
-  SEMIMONTHLY: 365.25 / 24,
-  EVERY4WEEKS: 28,
-  MONTHLY: 365.25 / 12,
-  EVERY2MONTHS: 365.25 / 6,
-  QUARTERLY: 365.25 / 4,
-  SEMIANNUAL: 365.25 / 2,
-  YEARLY: 365.25,
-};
+export const CADENCE_DAYS: Record<FrequencyType, number> = FREQUENCY_CYCLE_DAYS;
 
 /**
  * How far an observed gap may sit from a cadence and still be read as it.

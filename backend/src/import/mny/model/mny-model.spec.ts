@@ -1,4 +1,5 @@
 import { AccountType } from "../../../accounts/entities/account.entity";
+import { FREQUENCY_CYCLE_DAYS } from "../../../common/recurrence";
 import { FrequencyType } from "../../../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { InvestmentAction } from "../../../securities/entities/investment-transaction.entity";
 import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
@@ -390,47 +391,98 @@ describe("isIncomeCategoryType", () => {
   });
 });
 
+/**
+ * Every cadence Microsoft Money's bill frequency picker offers, with the
+ * `(BILL.frq, BILL.cFrqInst)` pair it stores and the Monize frequency it is.
+ *
+ * This is evidence, not a reference table. Each row was read out of a Money
+ * Plus Sunset file in which one bill per cadence was created with the picker's
+ * own wording written into the payee memo, then cross-checked against the
+ * spacing of the instance dates of that file's own long-running series -- a
+ * `frq` 4 series is 3 months apart, `frq` 2 at 0.5 is 14 days apart, `frq` 3
+ * at 2 is a semi-monthly payroll on the 15th and the last day.
+ *
+ * What it shows is that `cFrqInst` is a **rate** -- occurrences per unit --
+ * and not an interval multiplier. Read the other way round, `frq` 3 at 2 (a
+ * payroll paid twice a month) imports as every two months, and `frq` 3 at 0.5
+ * (the real every-other-month) rounds to 1 and imports as monthly. Both were
+ * live defects; the fractional values are the tell.
+ */
+const MONEY_CADENCES: readonly [string, number, number, FrequencyType][] = [
+  ["Only once", MNY_FREQUENCY.ONCE, 1, FrequencyType.ONCE],
+  ["Daily", MNY_FREQUENCY.DAILY, 1, FrequencyType.DAILY],
+  ["Weekly", MNY_FREQUENCY.WEEKLY, 1, FrequencyType.WEEKLY],
+  ["Every two weeks", MNY_FREQUENCY.WEEKLY, 0.5, FrequencyType.BIWEEKLY],
+  ["Every four weeks", MNY_FREQUENCY.WEEKLY, 0.25, FrequencyType.EVERY4WEEKS],
+  ["Twice a month", MNY_FREQUENCY.MONTHLY, 2, FrequencyType.SEMIMONTHLY],
+  ["Monthly", MNY_FREQUENCY.MONTHLY, 1, FrequencyType.MONTHLY],
+  ["Every other month", MNY_FREQUENCY.MONTHLY, 0.5, FrequencyType.EVERY2MONTHS],
+  ["Every three months", MNY_FREQUENCY.QUARTERLY, 1, FrequencyType.QUARTERLY],
+  [
+    "Every four months",
+    MNY_FREQUENCY.MONTHLY,
+    0.25,
+    FrequencyType.EVERY4MONTHS,
+  ],
+  ["Twice a year", MNY_FREQUENCY.YEARLY, 2, FrequencyType.SEMIANNUAL],
+  ["Yearly", MNY_FREQUENCY.YEARLY, 1, FrequencyType.YEARLY],
+  ["Every other year", MNY_FREQUENCY.YEARLY, 0.5, FrequencyType.EVERY2YEARS],
+];
+
 describe("mapFrequency", () => {
-  it.each([
-    [MNY_FREQUENCY.ONCE, FrequencyType.ONCE],
-    [MNY_FREQUENCY.DAILY, FrequencyType.DAILY],
-    [MNY_FREQUENCY.WEEKLY, FrequencyType.WEEKLY],
-    [MNY_FREQUENCY.MONTHLY, FrequencyType.MONTHLY],
-    [MNY_FREQUENCY.YEARLY, FrequencyType.YEARLY],
-  ])("maps frq %p to %s exactly", (frequency, expected) => {
-    expect(mapFrequency(frequency)).toEqual({
-      frequency: expected,
-      approximate: false,
-    });
+  it.each(MONEY_CADENCES)(
+    "maps Money's %s (frq=%p cFrqInst=%p) to %s exactly",
+    (_label, frequency, rate, expected) => {
+      expect(mapFrequency(frequency, rate)).toEqual({
+        frequency: expected,
+        approximate: false,
+      });
+    },
+  );
+
+  it("covers every Monize frequency exactly once", () => {
+    // The two lists are the same length on purpose: EVERY4MONTHS and
+    // EVERY2YEARS were added for the last two picker entries that had no type.
+    // A frequency added here without a Money cadence, or a cadence that starts
+    // sharing a type with another, shows up as a duplicate or a gap.
+    expect(MONEY_CADENCES.map((row) => row[3]).sort()).toEqual(
+      Object.keys(FREQUENCY_CYCLE_DAYS).sort(),
+    );
+  });
+
+  it("reads cFrqInst as a rate, not as an interval (twice a month)", () => {
+    // The defect this replaces: a semi-monthly payroll -- `frq` 3 with two
+    // occurrences per month -- imported as EVERY2MONTHS, a quarter as often.
+    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 2)?.frequency).toBe(
+      FrequencyType.SEMIMONTHLY,
+    );
   });
 
   it.each([
-    [2, FrequencyType.BIWEEKLY],
-    [4, FrequencyType.EVERY4WEEKS],
+    [MNY_FREQUENCY.WEEKLY, 0.5, FrequencyType.BIWEEKLY],
+    [MNY_FREQUENCY.WEEKLY, 0.25, FrequencyType.EVERY4WEEKS],
+    [MNY_FREQUENCY.MONTHLY, 0.5, FrequencyType.EVERY2MONTHS],
+    [MNY_FREQUENCY.MONTHLY, 0.25, FrequencyType.EVERY4MONTHS],
+    [MNY_FREQUENCY.YEARLY, 0.5, FrequencyType.EVERY2YEARS],
   ])(
-    "turns a weekly recurrence every %p weeks into %s",
-    (interval, expected) => {
-      expect(mapFrequency(MNY_FREQUENCY.WEEKLY, interval)).toEqual({
-        frequency: expected,
-        approximate: false,
-      });
+    "keeps the fractional rate frq=%p cFrqInst=%p as %s",
+    (frequency, rate, expected) => {
+      // Rounding a fractional rate to 1 -- which is what an interval reading
+      // does with it -- collapsed all five of these onto their unit, so every
+      // one of them fell due several times more often than the user asked.
+      expect(mapFrequency(frequency, rate)?.frequency).toBe(expected);
     },
   );
 
-  it.each([
-    [2, FrequencyType.EVERY2MONTHS],
-    [3, FrequencyType.QUARTERLY],
-    [6, FrequencyType.SEMIANNUAL],
-    [12, FrequencyType.YEARLY],
-  ])(
-    "turns a monthly recurrence every %p months into %s",
-    (interval, expected) => {
-      expect(mapFrequency(MNY_FREQUENCY.MONTHLY, interval)).toEqual({
-        frequency: expected,
-        approximate: false,
-      });
-    },
-  );
+  it("maps the quarterly unit rather than reporting frq=4 as unknown", () => {
+    // PR #192's table claimed 4 = yearly; issue #1150 refuted that, and the
+    // code was then left unmapped, so every "every three months" bill in a
+    // single-instance series was dropped with an `unusableBill` warning.
+    expect(mapFrequency(MNY_FREQUENCY.QUARTERLY, 1)).toEqual({
+      frequency: FrequencyType.QUARTERLY,
+      approximate: false,
+    });
+  });
 
   it("maps a yearly bill to YEARLY, not to every two months (issue #1150)", () => {
     // The regression: `frq` 5 was mapped to EVERY2MONTHS on PR #192's word,
@@ -441,73 +493,52 @@ describe("mapFrequency", () => {
     });
   });
 
-  it("maps every-two-months and semiannual by interval", () => {
-    // PR #192 mapped the first to BIWEEKLY -- every two weeks, not every two
-    // months -- and stretched the second to YEARLY, halving the reminders.
-    // Before task B3 Monize had no type for either. Money expresses both as a
-    // monthly code with a multiplier, which is the only spelling of them this
-    // repository has evidence for.
-    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 2)).toEqual({
-      frequency: FrequencyType.EVERY2MONTHS,
-      approximate: false,
-    });
-    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 6)).toEqual({
-      frequency: FrequencyType.SEMIANNUAL,
-      approximate: false,
-    });
-  });
+  it.each([
+    // Every three weeks: 21 days. The longest cycle that does not exceed it is
+    // SEMIMONTHLY's 15.22, not BIWEEKLY's 14 -- the rule is purely "longest
+    // that still fires at least as often", and no cadence here is exempt from
+    // it on the grounds of stepping by calendar day rather than by days.
+    [MNY_FREQUENCY.WEEKLY, 1 / 3, FrequencyType.SEMIMONTHLY],
+    // Every five months: between EVERY4MONTHS and SEMIANNUAL.
+    [MNY_FREQUENCY.MONTHLY, 1 / 5, FrequencyType.EVERY4MONTHS],
+    // Every three years: beyond the longest type.
+    [MNY_FREQUENCY.YEARLY, 1 / 3, FrequencyType.EVERY2YEARS],
+    // Twice a day: shorter than the shortest type.
+    [MNY_FREQUENCY.DAILY, 2, FrequencyType.DAILY],
+  ])(
+    "approximates the unrepresentable frq=%p cFrqInst=%p down to %s",
+    (frequency, rate, expected) => {
+      // Down, never up: v1 imports bills with `auto_post = false`, so an extra
+      // reminder is noise where a missed one is a missed payment.
+      expect(mapFrequency(frequency, rate)).toEqual({
+        frequency: expected,
+        approximate: true,
+      });
+    },
+  );
 
-  it("approximates an unrepresentable yearly interval", () => {
-    expect(mapFrequency(MNY_FREQUENCY.YEARLY, 2)).toEqual({
-      frequency: FrequencyType.YEARLY,
-      approximate: true,
-    });
-  });
-
-  it("approximates an unrepresentable daily interval", () => {
-    expect(mapFrequency(MNY_FREQUENCY.DAILY, 3)).toEqual({
-      frequency: FrequencyType.DAILY,
-      approximate: true,
-    });
-  });
-
-  it("ignores an interval on a one-off", () => {
+  it("ignores the rate on a one-off", () => {
     expect(mapFrequency(MNY_FREQUENCY.ONCE, 4)).toEqual({
       frequency: FrequencyType.ONCE,
       approximate: false,
     });
   });
 
-  it("approximates an unrepresentable weekly interval", () => {
-    expect(mapFrequency(MNY_FREQUENCY.WEEKLY, 3)).toEqual({
-      frequency: FrequencyType.WEEKLY,
-      approximate: true,
-    });
-  });
-
-  it("approximates an unrepresentable monthly interval", () => {
-    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 5)).toEqual({
-      frequency: FrequencyType.MONTHLY,
-      approximate: true,
-    });
-  });
-
   it.each([[0], [-4], [Number.NaN]])(
-    "treats the nonsensical interval %p as one",
-    (interval) => {
-      expect(mapFrequency(MNY_FREQUENCY.WEEKLY, interval)).toEqual({
+    "treats the nonsensical rate %p as one",
+    (rate) => {
+      expect(mapFrequency(MNY_FREQUENCY.WEEKLY, rate)).toEqual({
         frequency: FrequencyType.WEEKLY,
         approximate: false,
       });
     },
   );
 
-  // 4, 6 and 7 are on this list rather than mapped: PR #192's table claimed
-  // them, and the one claim above 3 that a bug report could check (4 = yearly)
-  // was wrong -- so the rest of that table is a guess, and a guess about how
-  // often money leaves an account is reported, never made. The bill mapper
-  // reads the cadence off the series' own instance dates first.
-  it.each([[4], [6], [7], [8], [-1], [99]])(
+  // Money's picker is exhausted by the five units above, so a code outside
+  // them is a version or a dialog this repository has not seen. It is reported
+  // (`unusableBill`, with the raw pair) rather than guessed -- and the bill
+  // mapper reads the cadence off the series' own instance dates first.
+  it.each([[6], [7], [8], [-1], [99]])(
     "returns null for the unknown frq %p",
     (frequency) => {
       expect(mapFrequency(frequency)).toBeNull();

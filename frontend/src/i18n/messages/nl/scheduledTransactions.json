@@ -299,8 +299,10 @@
     "MONTHLY": "Maandelijks",
     "EVERY2MONTHS": "Elke 2 maanden",
     "QUARTERLY": "Kwartaal",
+    "EVERY4MONTHS": "Elke 4 maanden",
     "SEMIANNUAL": "Twee keer per jaar",
-    "YEARLY": "Jaarlijks"
+    "YEARLY": "Jaarlijks",
+    "EVERY2YEARS": "Elke 2 jaar"
   },
   "validation": {
     "nameRequired": "Naam is verplicht",

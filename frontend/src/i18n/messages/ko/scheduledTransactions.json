@@ -299,8 +299,10 @@
     "MONTHLY": "매월",
     "EVERY2MONTHS": "2개월마다",
     "QUARTERLY": "분기별",
+    "EVERY4MONTHS": "4개월마다",
     "SEMIANNUAL": "연 2회",
-    "YEARLY": "매년"
+    "YEARLY": "매년",
+    "EVERY2YEARS": "2년마다"
   },
   "validation": {
     "nameRequired": "이름은 필수입니다",

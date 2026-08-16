@@ -299,8 +299,10 @@
     "MONTHLY": "मासिक",
     "EVERY2MONTHS": "हर 2 महीने",
     "QUARTERLY": "त्रैमासिक",
+    "EVERY4MONTHS": "हर 4 महीने",
     "SEMIANNUAL": "साल में दो बार",
-    "YEARLY": "वार्षिक"
+    "YEARLY": "वार्षिक",
+    "EVERY2YEARS": "हर 2 साल"
   },
   "validation": {
     "nameRequired": "नाम आवश्यक है",

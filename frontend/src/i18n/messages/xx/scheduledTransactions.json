@@ -299,8 +299,10 @@
     "MONTHLY": "[XX-Monthly-XX]",
     "EVERY2MONTHS": "[XX-Every 2 Months-XX]",
     "QUARTERLY": "[XX-Quarterly-XX]",
+    "EVERY4MONTHS": "[XX-Every 4 Months-XX]",
     "SEMIANNUAL": "[XX-Twice a Year-XX]",
-    "YEARLY": "[XX-Yearly-XX]"
+    "YEARLY": "[XX-Yearly-XX]",
+    "EVERY2YEARS": "[XX-Every 2 Years-XX]"
   },
   "validation": {
     "nameRequired": "[XX-Name is required-XX]",

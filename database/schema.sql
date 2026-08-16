@@ -606,7 +606,8 @@ CREATE TABLE scheduled_transactions (
     exchange_rate NUMERIC(20, 10) NOT NULL DEFAULT 1,
     description TEXT,
     -- 'ONCE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'EVERY4WEEKS', 'SEMIMONTHLY',
-    -- 'MONTHLY', 'EVERY2MONTHS', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY'
+    -- 'MONTHLY', 'EVERY2MONTHS', 'QUARTERLY', 'EVERY4MONTHS', 'SEMIANNUAL',
+    -- 'YEARLY', 'EVERY2YEARS'
     -- (backend/src/scheduled-transactions/dto: FrequencyType)
     frequency VARCHAR(20) NOT NULL,
     next_due_date DATE NOT NULL,
