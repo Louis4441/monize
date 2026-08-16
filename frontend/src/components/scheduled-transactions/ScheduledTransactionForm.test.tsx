@@ -1600,6 +1600,64 @@ describe('ScheduledTransactionForm', () => {
     expect(payload.investmentFundingAccountId).toBe('acc-1');
   });
 
+  it('clears the hidden security (and funding) when editing BUY to INTEREST', async () => {
+    // INTEREST has no security field in the scheduled UI; a security carried in
+    // from the prior BUY would settle the interest in the security's currency,
+    // so the form must send an explicit null (issue #1154 review).
+    const existingBuy = {
+      id: 's-inv',
+      accountId: 'acc-4', // Brokerage
+      name: 'Bond interest',
+      amount: -500,
+      currencyCode: 'CAD',
+      frequency: 'MONTHLY' as const,
+      nextDueDate: '2026-06-15',
+      isActive: true,
+      autoPost: false,
+      reminderDaysBefore: 3,
+      isTransfer: false,
+      isSplit: false,
+      isInvestment: true,
+      investmentAction: 'BUY' as const,
+      investmentSecurityId: 'sec-voo',
+      investmentFundingAccountId: 'acc-1',
+      investmentQuantity: 1,
+      investmentPrice: 500,
+      investmentTotalAmount: 25,
+    } as any;
+
+    const { container } = render(
+      <ScheduledTransactionForm scheduledTransaction={existingBuy} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Action')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Action'), {
+        target: { value: 'INTEREST' },
+      });
+    });
+
+    const submitButton = container.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
+    await act(async () => {});
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled();
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+    const [, payload] = mockUpdate.mock.calls[0];
+    expect(payload.investmentAction).toBe('INTEREST');
+    expect(payload.investmentSecurityId).toBeNull();
+    expect(payload.investmentFundingAccountId).toBeNull();
+  });
+
   // ============================================================
   // NEW TESTS: templateTransaction prop initialization
   // ============================================================

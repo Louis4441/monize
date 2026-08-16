@@ -135,6 +135,17 @@ const AMOUNT_ONLY_ACTIONS = new Set<InvestmentAction>([
   InvestmentAction.CAPITAL_GAIN,
 ]);
 
+/**
+ * On an update, an omitted key means "leave the stored value"; an explicit null
+ * means "clear it". `??` collapses the two, which let a `{ field: null }` PATCH
+ * pass validation against the stored value and then persist the null anyway
+ * (issue #1154 review). Use this so validation sees the value that will be
+ * written.
+ */
+function suppliedOrStored<T>(supplied: T | undefined, stored: T): T {
+  return supplied === undefined ? stored : supplied;
+}
+
 @Injectable()
 export class ScheduledTransactionsService {
   private readonly logger = new Logger(ScheduledTransactionsService.name);
@@ -432,7 +443,14 @@ export class ScheduledTransactionsService {
         );
       }
       this.validateInvestmentFields(createDto);
-      if (createDto.investmentFundingAccountId) {
+      // Only validate a funding account the action will actually use; a value
+      // supplied for a non-BUY/SELL action is dropped at persist time, so
+      // rejecting it here would refuse a request the write would have cleaned.
+      if (
+        createDto.investmentAction &&
+        FUNDING_ACCOUNT_ACTIONS.has(createDto.investmentAction) &&
+        createDto.investmentFundingAccountId
+      ) {
         await this.accountsService.findOne(
           userId,
           createDto.investmentFundingAccountId,
@@ -596,11 +614,12 @@ export class ScheduledTransactionsService {
   }
 
   private validateInvestmentFields(dto: {
-    investmentAction?: InvestmentAction;
+    investmentAction?: InvestmentAction | null;
     investmentSecurityId?: string | null;
     investmentQuantity?: number | null;
     investmentPrice?: number | null;
     investmentTotalAmount?: number | null;
+    investmentExchangeRate?: number | null;
   }): void {
     const action = dto.investmentAction;
     if (!action) {
@@ -664,7 +683,8 @@ export class ScheduledTransactionsService {
     } else if (AMOUNT_ONLY_ACTIONS.has(action)) {
       if (
         dto.investmentTotalAmount === undefined ||
-        dto.investmentTotalAmount === null
+        dto.investmentTotalAmount === null ||
+        Number(dto.investmentTotalAmount) <= 0
       ) {
         throw new BadRequestException(
           tr(
@@ -674,6 +694,24 @@ export class ScheduledTransactionsService {
           ),
         );
       }
+    }
+
+    // An exchange rate, when present, must be a real rate on every action --
+    // zero or negative can never settle (issue #1154 review). A missing rate is
+    // fine here: it is resolved for the posting date at post time. Reuses the
+    // securities catalog key rather than adding a new one.
+    if (
+      dto.investmentExchangeRate !== undefined &&
+      dto.investmentExchangeRate !== null &&
+      (!Number.isFinite(Number(dto.investmentExchangeRate)) ||
+        Number(dto.investmentExchangeRate) <= 0)
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.securities.exchangeRateNotPositive",
+          "Exchange rate must be greater than zero",
+        ),
+      );
     }
   }
 
@@ -1085,24 +1123,50 @@ export class ScheduledTransactionsService {
           ),
         );
       }
+      // Validate the values that will actually be written. `suppliedOrStored`
+      // keeps an explicit null distinct from an omitted key, so a
+      // `{ investmentTotalAmount: null }` PATCH is validated as null (and
+      // rejected for an amount-only action) rather than passing against the
+      // stored value and then persisting the null (issue #1154 review).
       const merged = {
-        investmentAction:
-          updateDto.investmentAction ??
-          (scheduled.investmentAction as InvestmentAction | undefined),
-        investmentSecurityId:
-          updateDto.investmentSecurityId ?? scheduled.investmentSecurityId,
-        investmentQuantity:
-          updateDto.investmentQuantity ?? scheduled.investmentQuantity,
-        investmentPrice: updateDto.investmentPrice ?? scheduled.investmentPrice,
-        investmentTotalAmount:
-          updateDto.investmentTotalAmount ?? scheduled.investmentTotalAmount,
+        investmentAction: suppliedOrStored(
+          updateDto.investmentAction as InvestmentAction | null | undefined,
+          scheduled.investmentAction as InvestmentAction | null,
+        ),
+        investmentSecurityId: suppliedOrStored(
+          updateDto.investmentSecurityId as string | null | undefined,
+          scheduled.investmentSecurityId,
+        ),
+        investmentQuantity: suppliedOrStored(
+          updateDto.investmentQuantity as number | null | undefined,
+          scheduled.investmentQuantity,
+        ),
+        investmentPrice: suppliedOrStored(
+          updateDto.investmentPrice as number | null | undefined,
+          scheduled.investmentPrice,
+        ),
+        investmentTotalAmount: suppliedOrStored(
+          updateDto.investmentTotalAmount as number | null | undefined,
+          scheduled.investmentTotalAmount,
+        ),
+        investmentExchangeRate: suppliedOrStored(
+          updateDto.investmentExchangeRate as number | null | undefined,
+          scheduled.investmentExchangeRate,
+        ),
       };
       this.validateInvestmentFields(merged);
-      if (updateDto.investmentFundingAccountId) {
-        await this.accountsService.findOne(
-          userId,
-          updateDto.investmentFundingAccountId,
-        );
+      // Only validate a funding account that will actually be used: a stale one
+      // on a non-BUY/SELL action is cleared below, so it need not resolve.
+      const effectiveFundingAccountId = suppliedOrStored(
+        updateDto.investmentFundingAccountId as string | null | undefined,
+        scheduled.investmentFundingAccountId,
+      );
+      if (
+        merged.investmentAction &&
+        FUNDING_ACCOUNT_ACTIONS.has(merged.investmentAction) &&
+        effectiveFundingAccountId
+      ) {
+        await this.accountsService.findOne(userId, effectiveFundingAccountId);
       }
     }
 
@@ -1315,6 +1379,69 @@ export class ScheduledTransactionsService {
         fieldsToUpdate.investmentCommission = null;
       }
       if (!usesTotalAmount) fieldsToUpdate.investmentTotalAmount = null;
+
+      const actionChanged =
+        updateData.investmentAction !== undefined &&
+        updateData.investmentAction !== scheduled.investmentAction;
+
+      // The scheduled UI has no security field for INTEREST, so switching to it
+      // must not keep the previous action's security -- the cash-settlement
+      // currency is derived from the security, so a stale one converts the
+      // interest in the wrong currency (issue #1154 review). Clear it only on
+      // the transition and only when the caller did not explicitly supply one,
+      // leaving a deliberate API value for a future product decision.
+      if (
+        actionChanged &&
+        effectiveInvestmentAction === InvestmentAction.INTEREST &&
+        updateData.investmentSecurityId === undefined
+      ) {
+        fieldsToUpdate.investmentSecurityId = null;
+      }
+
+      // A stored exchange rate describes a settlement tuple (account + security
+      // + cash destination), not just an action, and the column does not record
+      // the currency pair it was resolved for. If any part of that tuple changes
+      // and no replacement rate is supplied, force post-time re-resolution
+      // rather than applying a rate for the old pair (issue #1154 review). This
+      // is the value-difference guard the earlier deferral asked for -- a
+      // presentation-only edit (e.g. the name) does not touch the tuple, so a
+      // legitimate cross-currency dividend rate is preserved.
+      const effectiveSecurityIdForFx =
+        fieldsToUpdate.investmentSecurityId !== undefined
+          ? (fieldsToUpdate.investmentSecurityId as string | null)
+          : suppliedOrStored(
+              updateData.investmentSecurityId as string | null | undefined,
+              scheduled.investmentSecurityId,
+            );
+      const effectiveFundingForFx =
+        effectiveInvestmentAction &&
+        FUNDING_ACCOUNT_ACTIONS.has(effectiveInvestmentAction)
+          ? suppliedOrStored(
+              updateData.investmentFundingAccountId as
+                | string
+                | null
+                | undefined,
+              scheduled.investmentFundingAccountId,
+            )
+          : null;
+      const storedFundingForFx =
+        scheduled.investmentAction &&
+        FUNDING_ACCOUNT_ACTIONS.has(
+          scheduled.investmentAction as InvestmentAction,
+        )
+          ? scheduled.investmentFundingAccountId
+          : null;
+      const settlementBasisChanged =
+        (updateData.accountId !== undefined &&
+          updateData.accountId !== scheduled.accountId) ||
+        effectiveSecurityIdForFx !== scheduled.investmentSecurityId ||
+        effectiveFundingForFx !== storedFundingForFx;
+      if (
+        settlementBasisChanged &&
+        updateData.investmentExchangeRate === undefined
+      ) {
+        fieldsToUpdate.investmentExchangeRate = null;
+      }
     }
 
     // Apply the split rewrite, any mode-switch split clearing, and the main
@@ -1835,10 +1962,16 @@ export class ScheduledTransactionsService {
         );
       }
 
-      if (scheduled.isInvestment) {
+      if (current.isInvestment) {
+        // Post from the locked row, not the pre-lock `scheduled` snapshot: a
+        // concurrent edit that switched the action/funding/security between the
+        // snapshot read and this lock would otherwise post the stale action to
+        // the stale account (issue #1154 review). `current` carries the
+        // authoritative scalar investment fields; postInvestment reads only
+        // those, and the nested create resolves its own settlement account.
         await this.postInvestment(
           userId,
-          scheduled,
+          current,
           postDto,
           postDate,
           storedOverride,
@@ -2006,6 +2139,27 @@ export class ScheduledTransactionsService {
       postDto?.description !== undefined
         ? postDto.description || undefined
         : scheduled.description || undefined;
+
+    // Post-time overrides (inline > occurrence override > schedule) are another
+    // write boundary that create/update validation does not cover, and internal
+    // callers (cron, MCP) bypass the controller DTO. Revalidate the resolved
+    // values before creating money, so an override cannot post a zero BUY
+    // quantity or a negative dividend total (issue #1154 review). Amount-only
+    // actions may express the total as quantity*price, so mirror that here.
+    const effectiveAmountOnlyTotal =
+      totalAmount !== undefined
+        ? totalAmount
+        : quantity !== undefined && price !== undefined
+          ? quantity * price
+          : undefined;
+    this.validateInvestmentFields({
+      investmentAction: action,
+      investmentSecurityId: scheduled.investmentSecurityId,
+      investmentQuantity: quantity,
+      investmentPrice: price,
+      investmentTotalAmount: effectiveAmountOnlyTotal,
+      investmentExchangeRate: exchangeRate,
+    });
 
     const dto: any = {
       accountId: scheduled.accountId,

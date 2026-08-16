@@ -143,7 +143,9 @@ export interface CreateScheduledTransactionData {
   transferAccountId?: string;
   isInvestment?: boolean;
   investmentAction?: InvestmentAction;
-  investmentSecurityId?: string;
+  // Nullable so an action whose UI has no security field (INTEREST) can send an
+  // explicit null to clear a security hidden by an earlier edit (issue #1154).
+  investmentSecurityId?: string | null;
   // Nullable so an edit away from BUY/SELL can send an explicit null that clears
   // the stored funding account, rather than omitting the key and leaving the
   // stale value in place (issue #1154).

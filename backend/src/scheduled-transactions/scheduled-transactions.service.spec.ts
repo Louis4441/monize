@@ -2199,6 +2199,81 @@ describe("ScheduledTransactionsService", () => {
       expect(dto.fundingAccountId).toBeUndefined();
     });
 
+    it("post() rejects a negative amount-only override before creating money (issue #1154 review)", async () => {
+      const dividend = makeScheduled({
+        isInvestment: true,
+        investmentAction: "DIVIDEND" as any,
+        investmentSecurityId: "sec-voo",
+        investmentTotalAmount: 100,
+      });
+      stubFindOne(dividend);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(
+        service.post(userId, stId, { investmentTotalAmount: -25 } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(investmentTransactionsService.create).not.toHaveBeenCalled();
+    });
+
+    it("post() rejects a zero-quantity BUY override before creating money (issue #1154 review)", async () => {
+      const buy = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-voo",
+        investmentQuantity: 1,
+        investmentPrice: 500,
+      });
+      stubFindOne(buy);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(
+        service.post(userId, stId, { investmentQuantity: 0 } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(investmentTransactionsService.create).not.toHaveBeenCalled();
+    });
+
+    it("post() posts the locked row, not a pre-lock BUY snapshot (issue #1154 review)", async () => {
+      // A concurrent edit switched BUY -> DIVIDEND (clearing the funding
+      // account) between the pre-lock read and the row lock. The post must use
+      // the locked DIVIDEND -- not forward the stale BUY through the old funding
+      // account. Both the pre-lock read and the locked read go through
+      // scheduledRepo.findOne (see the manager.findOne alias in beforeEach).
+      const beforeLock = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-voo",
+        investmentFundingAccountId: "acc-old",
+        investmentQuantity: 1,
+        investmentPrice: 100,
+      });
+      const locked = makeScheduled({
+        isInvestment: true,
+        investmentAction: "DIVIDEND" as any,
+        investmentSecurityId: "sec-voo",
+        investmentFundingAccountId: null,
+        investmentQuantity: null,
+        investmentPrice: null,
+        investmentTotalAmount: 75,
+      });
+      scheduledRepo.findOne
+        .mockResolvedValueOnce(beforeLock)
+        .mockResolvedValueOnce(locked)
+        .mockResolvedValue(locked);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      expect(dto.action).toBe("DIVIDEND");
+      expect(dto.fundingAccountId).toBeUndefined();
+    });
+
     it("post() honours inline quantity / price overrides", async () => {
       const scheduled = makeScheduled({
         isInvestment: true,
@@ -2683,6 +2758,151 @@ describe("ScheduledTransactionsService", () => {
       expect(fields.investmentPrice).toBeNull();
       expect(fields.investmentCommission).toBeNull();
       expect(fields.investmentTotalAmount).toBeNull();
+    });
+
+    it("update() rejects an explicit null total instead of validating the stored one (issue #1154 review)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "DIVIDEND" as any,
+          investmentSecurityId: "sec-voo",
+          investmentTotalAmount: 100,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await expect(
+        service.update(userId, stId, { investmentTotalAmount: null } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // Rejected before the write opens.
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+    });
+
+    it("update() rejects a zero stored investment exchange rate (issue #1154 review)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-voo",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.1,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await expect(
+        service.update(userId, stId, { investmentExchangeRate: 0 } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("update() clears a stored rate when the settlement basis changes (issue #1154 review)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-voo",
+          investmentFundingAccountId: "acc-usd",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.1,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentAction: "DIVIDEND" as any,
+        investmentTotalAmount: 100,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) => c[1] === stId && c[2].investmentAction !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentExchangeRate).toBeNull();
+    });
+
+    it("update() keeps a stored rate on a presentation-only edit (issue #1154 review)", async () => {
+      // The settlement tuple is unchanged, so a name edit must not re-resolve or
+      // wipe a legitimate cross-currency rate (the over-clear guard).
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-voo",
+          investmentFundingAccountId: "acc-usd",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.1,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, { name: "Renamed" } as any);
+
+      const clearedRate = mockQueryRunner.manager.update.mock.calls.some(
+        (c: any[]) => c[1] === stId && c[2].investmentExchangeRate === null,
+      );
+      expect(clearedRate).toBe(false);
+    });
+
+    it("update() clears a hidden security when switching to INTEREST with the key omitted (issue #1154 review)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-eur",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentAction: "INTEREST" as any,
+        investmentTotalAmount: 50,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) => c[1] === stId && c[2].investmentAction !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentSecurityId).toBeNull();
+    });
+
+    it("create() rejects a non-positive investment exchange rate (issue #1154 review)", async () => {
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-inv",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await expect(
+        service.create(userId, {
+          ...investmentBaseDto,
+          investmentExchangeRate: 0,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it("create() drops a funding account supplied for a non-funding action (issue #1154)", async () => {

@@ -140,7 +140,17 @@ export function PostTransactionDialog({
     // paired INVESTMENT_CASH account. Fall back to the brokerage only if no
     // pair exists, so we still show *something* useful.
     if (scheduledTransaction.isInvestment) {
-      if (scheduledTransaction.investmentFundingAccountId) {
+      // Only a BUY/SELL settles through the funding account; for any other
+      // action the backend routes cash to the brokerage's linked cash account
+      // and ignores a stale stored funding account, so the preview must too or
+      // a legacy DIVIDEND projects a balance for the wrong account (issue #1154).
+      const usesExplicitFunding =
+        scheduledTransaction.investmentAction === 'BUY' ||
+        scheduledTransaction.investmentAction === 'SELL';
+      if (
+        usesExplicitFunding &&
+        scheduledTransaction.investmentFundingAccountId
+      ) {
         return (
           accounts.find(
             (a) => a.id === scheduledTransaction.investmentFundingAccountId,
@@ -169,6 +179,7 @@ export function PostTransactionDialog({
     scheduledTransaction.account,
     scheduledTransaction.accountId,
     scheduledTransaction.isInvestment,
+    scheduledTransaction.investmentAction,
     scheduledTransaction.investmentFundingAccountId,
     scheduledTransaction.investmentFundingAccount,
   ]);
@@ -629,7 +640,10 @@ export function PostTransactionDialog({
         }
       }
       if (isInvestmentAmountOnly) {
-        if (investmentTotalAmount === '') {
+        if (
+          investmentTotalAmount === '' ||
+          Number(investmentTotalAmount) <= 0
+        ) {
           toast.error(t('postDialog.toasts.totalAmountRequired'));
           return;
         }
@@ -923,6 +937,7 @@ export function PostTransactionDialog({
                 prefix={getCurrencySymbol(scheduledTransaction.currencyCode)}
                 value={typeof investmentTotalAmount === 'number' ? investmentTotalAmount : undefined}
                 onChange={(value) => setInvestmentTotalAmount(value ?? '')}
+                allowNegative={false}
               />
             )}
             <div>

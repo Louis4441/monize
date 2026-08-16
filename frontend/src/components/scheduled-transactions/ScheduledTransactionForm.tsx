@@ -698,6 +698,16 @@ export function ScheduledTransactionForm({
   // will persist.
   const handleInvestmentActionChange = (nextAction: InvestmentAction) => {
     setInvestmentAction(nextAction);
+    // Clear fields the new action's UI does not show, so a hidden stale value is
+    // not submitted: a security carried into INTEREST would settle the cash in
+    // the security's currency, and a funding account carried out of BUY/SELL
+    // would misroute it (issue #1154 review).
+    if (!SECURITY_REQUIRED_ACTIONS.includes(nextAction)) {
+      setInvestmentSecurityId('');
+    }
+    if (!FUNDING_ACCOUNT_ACTIONS.includes(nextAction)) {
+      setInvestmentFundingAccountId('');
+    }
     if (
       QUANTITY_PRICE_ACTIONS.includes(nextAction) &&
       investmentQuantity !== '' &&
@@ -1012,7 +1022,11 @@ export function ScheduledTransactionForm({
           return;
         }
       } else if (AMOUNT_ONLY_ACTIONS.includes(investmentAction)) {
-        if (investmentTotalAmount === '' || investmentTotalAmount === undefined) {
+        if (
+          investmentTotalAmount === '' ||
+          investmentTotalAmount === undefined ||
+          Number(investmentTotalAmount) <= 0
+        ) {
           toast.error(t('form.toasts.totalAmountRequired'));
           return;
         }
@@ -1077,7 +1091,13 @@ export function ScheduledTransactionForm({
           transferAccountId: undefined,
           isInvestment: true,
           investmentAction,
-          investmentSecurityId: investmentSecurityId || undefined,
+          // Send an explicit null (not undefined) when the action's UI has no
+          // security field, so an edit clears a security hidden by an earlier
+          // BUY/SELL/etc. rather than leaving it stored (issue #1154 review).
+          investmentSecurityId:
+            SECURITY_REQUIRED_ACTIONS.includes(investmentAction) && investmentSecurityId
+              ? investmentSecurityId
+              : null,
           // Send an explicit null (not undefined) when the action does not use a
           // funding account, so editing an existing schedule away from BUY/SELL
           // clears the stored account. Omitting the key would leave the stale
@@ -1934,6 +1954,7 @@ export function ScheduledTransactionForm({
                 prefix={currencySymbol}
                 value={typeof investmentTotalAmount === 'number' ? investmentTotalAmount : undefined}
                 onChange={(value) => setInvestmentTotalAmount(value ?? '')}
+                allowNegative={false}
               />
             </div>
           )}
