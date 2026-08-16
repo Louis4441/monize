@@ -2131,6 +2131,51 @@ describe("ScheduledTransactionsService", () => {
       expect(dto.fundingAccountId).toBe("acc-checking");
     });
 
+    it("post() ignores a stale funding account on a DIVIDEND (issue #1154)", async () => {
+      // A row edited from BUY to DIVIDEND may still carry the old funding
+      // account. The dividend cash must settle in the brokerage's linked cash
+      // account, so the funding account is not forwarded regardless of what the
+      // row stored.
+      const scheduled = makeScheduled({
+        isInvestment: true,
+        investmentAction: "DIVIDEND" as any,
+        investmentSecurityId: "sec-voo",
+        investmentFundingAccountId: "acc-checking",
+        investmentTotalAmount: 75,
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      expect(dto.action).toBe("DIVIDEND");
+      expect(dto.fundingAccountId).toBeUndefined();
+    });
+
+    it("post() still forwards a funding account on a SELL", async () => {
+      const scheduled = makeScheduled({
+        isInvestment: true,
+        investmentAction: "SELL" as any,
+        investmentSecurityId: "sec-voo",
+        investmentFundingAccountId: "acc-checking",
+        investmentQuantity: 2,
+        investmentPrice: 100,
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      expect(dto.action).toBe("SELL");
+      expect(dto.fundingAccountId).toBe("acc-checking");
+    });
+
     it("post() honours inline quantity / price overrides", async () => {
       const scheduled = makeScheduled({
         isInvestment: true,
@@ -2413,6 +2458,126 @@ describe("ScheduledTransactionsService", () => {
       expect(fields.investmentQuantity).toBe(2);
       expect(fields.investmentPrice).toBe(480);
       expect(fields.investmentCommission).toBe(5);
+    });
+
+    it("update() changing the action to DIVIDEND nulls the funding account (issue #1154)", async () => {
+      // The user switches a BUY (with a funding account) to a DIVIDEND. The
+      // funding account no longer applies and must be cleared, even though the
+      // client sent an explicit account earlier.
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-voo",
+          investmentFundingAccountId: "acc-checking",
+          investmentQuantity: 1,
+          investmentPrice: 500,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentAction: "DIVIDEND" as any,
+        investmentTotalAmount: 75,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) =>
+          c[1] === stId && c[2].investmentFundingAccountId !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentFundingAccountId).toBeNull();
+    });
+
+    it("update() nulls a stale funding account even when the client omits the key (issue #1154)", async () => {
+      // The exact reported path: the schedule is already a DIVIDEND carrying a
+      // stale funding account, and the edit touches only the amount. The absent
+      // key must not be read as "leave the stale account in place".
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "DIVIDEND" as any,
+          investmentSecurityId: "sec-voo",
+          investmentFundingAccountId: "acc-checking",
+          investmentTotalAmount: 50,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentTotalAmount: 90,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) =>
+          c[1] === stId && c[2].investmentFundingAccountId !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentFundingAccountId).toBeNull();
+    });
+
+    it("update() keeps the funding account on a BUY", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-voo",
+          investmentFundingAccountId: "acc-checking",
+          investmentQuantity: 1,
+          investmentPrice: 500,
+        }),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      await service.update(userId, stId, {
+        investmentPrice: 480,
+      } as any);
+
+      const fundingClear = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) => c[1] === stId && c[2].investmentFundingAccountId === null,
+      );
+      expect(fundingClear).toBeUndefined();
+    });
+
+    it("create() drops a funding account supplied for a non-funding action (issue #1154)", async () => {
+      accountsService.findOne.mockImplementation(
+        async (uid: string, id: string) => {
+          if (id === "acc-checking")
+            return { id, userId: uid, accountType: "CHECKING" } as any;
+          return {
+            id,
+            userId: uid,
+            accountSubType: "INVESTMENT_BROKERAGE",
+          } as any;
+        },
+      );
+      const saved = makeScheduled({ isInvestment: true });
+      scheduledRepo.save.mockResolvedValue(saved);
+      stubFindOne(saved);
+
+      await service.create(userId, {
+        ...investmentBaseDto,
+        investmentAction: "DIVIDEND" as any,
+        investmentQuantity: undefined as any,
+        investmentPrice: undefined as any,
+        investmentTotalAmount: 75,
+        investmentFundingAccountId: "acc-checking",
+      });
+
+      const created = scheduledRepo.create.mock.calls[0][0];
+      expect(created.investmentFundingAccountId).toBeNull();
     });
 
     it("update() switching to isInvestment=true wipes split/transfer remnants", async () => {

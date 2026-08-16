@@ -1078,9 +1078,13 @@ export function ScheduledTransactionForm({
           isInvestment: true,
           investmentAction,
           investmentSecurityId: investmentSecurityId || undefined,
+          // Send an explicit null (not undefined) when the action does not use a
+          // funding account, so editing an existing schedule away from BUY/SELL
+          // clears the stored account. Omitting the key would leave the stale
+          // value in place and misroute the posted cash (issue #1154).
           investmentFundingAccountId: FUNDING_ACCOUNT_ACTIONS.includes(investmentAction) && investmentFundingAccountId
             ? investmentFundingAccountId
-            : undefined,
+            : null,
           investmentQuantity: investmentQuantity === '' ? undefined : Number(investmentQuantity),
           investmentPrice: investmentPrice === '' ? undefined : Number(investmentPrice),
           investmentCommission: investmentCommission === '' ? undefined : Number(investmentCommission),

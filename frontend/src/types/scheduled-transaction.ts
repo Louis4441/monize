@@ -144,7 +144,10 @@ export interface CreateScheduledTransactionData {
   isInvestment?: boolean;
   investmentAction?: InvestmentAction;
   investmentSecurityId?: string;
-  investmentFundingAccountId?: string;
+  // Nullable so an edit away from BUY/SELL can send an explicit null that clears
+  // the stored funding account, rather than omitting the key and leaving the
+  // stale value in place (issue #1154).
+  investmentFundingAccountId?: string | null;
   investmentQuantity?: number;
   investmentPrice?: number;
   investmentCommission?: number;

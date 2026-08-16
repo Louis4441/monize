@@ -1494,6 +1494,113 @@ describe('ScheduledTransactionForm', () => {
   });
 
   // ============================================================
+  // Investment funding account clearing (issue #1154)
+  // ============================================================
+
+  it('sends an explicit null funding account when editing BUY to DIVIDEND', async () => {
+    const existingBuy = {
+      id: 's-inv',
+      accountId: 'acc-4', // Brokerage
+      name: 'Quarterly holding',
+      amount: -500,
+      currencyCode: 'CAD',
+      frequency: 'QUARTERLY' as const,
+      nextDueDate: '2026-06-15',
+      isActive: true,
+      autoPost: false,
+      reminderDaysBefore: 3,
+      isTransfer: false,
+      isSplit: false,
+      isInvestment: true,
+      investmentAction: 'BUY' as const,
+      investmentSecurityId: 'sec-voo',
+      // The stale funding account that must be cleared once the action no longer
+      // uses one.
+      investmentFundingAccountId: 'acc-1',
+      investmentQuantity: 1,
+      investmentPrice: 500,
+      // Carried so the DIVIDEND branch's total-amount validation passes on save.
+      investmentTotalAmount: 75,
+    } as any;
+
+    const { container } = render(
+      <ScheduledTransactionForm scheduledTransaction={existingBuy} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Action')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Action'), {
+        target: { value: 'DIVIDEND' },
+      });
+    });
+
+    const submitButton = container.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
+    await act(async () => {}); // flush the async submit handler
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled();
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+    const [, payload] = mockUpdate.mock.calls[0];
+    expect(payload.investmentAction).toBe('DIVIDEND');
+    expect(payload.investmentFundingAccountId).toBeNull();
+  });
+
+  it('keeps the funding account when saving a BUY unchanged', async () => {
+    const existingBuy = {
+      id: 's-inv',
+      accountId: 'acc-4',
+      name: 'Quarterly holding',
+      amount: -500,
+      currencyCode: 'CAD',
+      frequency: 'QUARTERLY' as const,
+      nextDueDate: '2026-06-15',
+      isActive: true,
+      autoPost: false,
+      reminderDaysBefore: 3,
+      isTransfer: false,
+      isSplit: false,
+      isInvestment: true,
+      investmentAction: 'BUY' as const,
+      investmentSecurityId: 'sec-voo',
+      investmentFundingAccountId: 'acc-1',
+      investmentQuantity: 1,
+      investmentPrice: 500,
+    } as any;
+
+    const { container } = render(
+      <ScheduledTransactionForm scheduledTransaction={existingBuy} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Action')).toBeInTheDocument();
+    });
+
+    const submitButton = container.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
+    await act(async () => {});
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled();
+    });
+    const [, payload] = mockUpdate.mock.calls[0];
+    expect(payload.investmentAction).toBe('BUY');
+    expect(payload.investmentFundingAccountId).toBe('acc-1');
+  });
+
+  // ============================================================
   // NEW TESTS: templateTransaction prop initialization
   // ============================================================
 

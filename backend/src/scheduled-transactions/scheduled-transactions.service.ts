@@ -134,6 +134,16 @@ const AMOUNT_ONLY_ACTIONS = new Set<InvestmentAction>([
   InvestmentAction.CAPITAL_GAIN,
 ]);
 
+// The only scheduled investment actions that route cash through an explicit
+// funding account: a BUY draws from it, a SELL deposits into it. Every other
+// action settles against the brokerage's linked cash account, so a funding
+// account stored on one is stale (issue #1154) -- cleared on write and ignored
+// on post rather than trusted to misroute the money.
+const FUNDING_ACCOUNT_ACTIONS = new Set<InvestmentAction>([
+  InvestmentAction.BUY,
+  InvestmentAction.SELL,
+]);
+
 @Injectable()
 export class ScheduledTransactionsService {
   private readonly logger = new Logger(ScheduledTransactionsService.name);
@@ -484,9 +494,15 @@ export class ScheduledTransactionsService {
         investmentSecurityId: isInvestment
           ? transactionData.investmentSecurityId || null
           : null,
-        investmentFundingAccountId: isInvestment
-          ? transactionData.investmentFundingAccountId || null
-          : null,
+        // A funding account only belongs on a BUY/SELL; storing one on any other
+        // action is what later misroutes the posted cash (issue #1154).
+        investmentFundingAccountId:
+          isInvestment &&
+          FUNDING_ACCOUNT_ACTIONS.has(
+            transactionData.investmentAction as InvestmentAction,
+          )
+            ? transactionData.investmentFundingAccountId || null
+            : null,
         investmentQuantity:
           isInvestment && transactionData.investmentQuantity !== undefined
             ? transactionData.investmentQuantity
@@ -1267,6 +1283,19 @@ export class ScheduledTransactionsService {
       if (updateData.investmentExchangeRate !== undefined)
         fieldsToUpdate.investmentExchangeRate =
           updateData.investmentExchangeRate ?? null;
+
+      // Editing an investment away from BUY/SELL must drop any funding account
+      // the row was carrying, even when the client omits the key rather than
+      // sending an explicit null (issue #1154). The effective action is the one
+      // being written, or the stored one when the edit leaves it untouched.
+      const effectiveInvestmentAction = (updateData.investmentAction ??
+        scheduled.investmentAction) as InvestmentAction | null;
+      if (
+        !effectiveInvestmentAction ||
+        !FUNDING_ACCOUNT_ACTIONS.has(effectiveInvestmentAction)
+      ) {
+        fieldsToUpdate.investmentFundingAccountId = null;
+      }
     }
 
     // Apply the split rewrite, any mode-switch split clearing, and the main
@@ -1958,7 +1987,14 @@ export class ScheduledTransactionsService {
       action,
       transactionDate: postDate,
       securityId: scheduled.investmentSecurityId || undefined,
-      fundingAccountId: scheduled.investmentFundingAccountId || undefined,
+      // Only a BUY/SELL settles through the funding account; for any other
+      // action the cash belongs in the brokerage's linked cash account, so a
+      // stale funding account left on the row is ignored rather than allowed to
+      // misroute the money (issue #1154). This also repairs rows that were
+      // already stored with a stale funding account before the write-path fix.
+      fundingAccountId: FUNDING_ACCOUNT_ACTIONS.has(action)
+        ? scheduled.investmentFundingAccountId || undefined
+        : undefined,
       description,
     };
 
