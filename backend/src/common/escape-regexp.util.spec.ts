@@ -60,9 +60,13 @@ describe("escapeRegExp", () => {
 
 describe("buildPlainRootedPathPattern escapes its prefixes", () => {
   it("reads a metacharacter in a prefix as a literal", () => {
-    // A dots-only escape leaves `\d` intact, so this prefix would match
-    // `c5/main.ts` -- a path claim nobody wrote, resolved against a file that
-    // does not exist. `a+b` is the same mistake without a backslash.
+    // A dots-only escape leaves `\d` intact, so the prefix is read as the digit
+    // class and the pattern matches c5/main.ts -- a path claim nobody wrote.
+    // That fixture is named here in plain prose rather than in a backticked
+    // span, because a backticked span is the idiom for "this file is here" and
+    // this one deliberately is not: source-comment-paths.spec.ts reads every
+    // comment in this file as a claim about the tree. `a+b/` is the same
+    // mistake without a backslash.
     const pattern = buildPlainRootedPathPattern(["c\\d/", "a+b/"]);
     expect("c5/main.ts".match(pattern)).toBeNull();
     expect("aab/main.ts".match(pattern)).toBeNull();
