@@ -765,6 +765,32 @@ untidy: every toggle on it is one whose save cannot succeed.
 The converse is not true. An account the caller owns and has shared *out*
 carries `jointGranteeCount`, is still theirs, and stays assignable.
 
+### On a joint row, *every* picker reads the owner's list -- and creation is off
+
+A joint row belongs to the sharing owner and may only carry the owner's
+reference ids, so `TransactionForm` derives `effectiveCategories` /
+`effectivePayees` from the grant-gated reference-data endpoint. The rule is that
+**everything** downstream reads those, not the caller's own `categories`: the
+option list, the income/expense sign lookups, and the split editor. Three sites
+still read `categories`, and each failed differently and quietly -- the sign
+lookup could not resolve an owner id, so choosing an income category left the
+amount negative; `SplitEditor` was handed the caller's list, so the owner's
+split lines resolved to nothing and any pick wrote one of the caller's ids onto
+the owner's row. Split mode is blocked on the *mode button* for a joint account,
+which is not the same as being unreachable: opening a split row that already
+lives there puts the form straight into it.
+
+Creation is a separate question with a blunter answer: **do not offer it.**
+`categoriesApi.create` writes to the caller's ledger and there is no client path
+that creates on someone else's, so "+ Create" on a joint account made the
+category in the wrong place and put an id the owner does not own on the form.
+The delegation carries a `categoriesCanCreate` capability with nothing on the
+client to drive yet; until an owner-scoped create exists, withhold the creator
+(`jointSafeCategoryCreator`) rather than gate the button on a flag the code
+cannot honour. Withholding it is also what makes the rule hold everywhere at
+once -- the Category field, the transfer form's, and every split line take the
+same optional prop, so there is one decision rather than four.
+
 ## Form Patterns
 
 `useFormModal<T>` (`hooks/useFormModal.ts`) manages create/edit modal state with browser-history integration (back button closes), unsaved-changes detection via `UnsavedChangesDialog`, and form submit exposed via ref. Returns `showForm`, `editingItem`, `openCreate()`, `openEdit(item)`, `close()`, `modalProps`, `unsavedChangesDialog`.

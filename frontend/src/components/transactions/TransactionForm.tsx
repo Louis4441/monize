@@ -718,7 +718,10 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
       // "amount must be positive" check. Mirrors the mode guard in
       // handleAmountChange. Re-signs the foreign amount when entering a foreign
       // currency, so the behaviour matches account-currency entry.
-      const category = categories.find(c => c.id === categoryId);
+      // `effectiveCategories`, not `categories`: on a joint account the picker
+      // offers the OWNER's list, so the caller's own list cannot resolve the id
+      // and the income/expense sign was never applied there.
+      const category = effectiveCategories.find(c => c.id === categoryId);
       if (category && mode === 'normal') {
         resignActiveAmount(category);
       }
@@ -735,11 +738,11 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   const activeSigningCategory = (): Category | undefined => {
     if (mode === 'split') {
       return splits.length > 0 && splits[0].categoryId
-        ? categories.find((c) => c.id === splits[0].categoryId)
+        ? effectiveCategories.find((c) => c.id === splits[0].categoryId)
         : undefined;
     }
     return selectedCategoryId
-      ? categories.find((c) => c.id === selectedCategoryId)
+      ? effectiveCategories.find((c) => c.id === selectedCategoryId)
       : undefined;
   };
 
@@ -967,13 +970,31 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
 
   // Handle creating a new category - called when user clicks "Create" in dropdown
   // Supports "Parent: Child" format to create subcategories
-  const handleCategoryCreate = async (name: string) => {
-    const newCategory = await createCategoryFromTypedName(name);
-    if (!newCategory) return;
-    setSelectedCategoryId(newCategory.id);
-    setValue('categoryId', newCategory.id, { shouldDirty: true, shouldValidate: true });
-    categoryWasAutoSetRef.current = false;
-  };
+  // A joint row belongs to the sharing owner and may only carry the owner's
+  // category ids, but `categoriesApi.create` writes to the CALLER's ledger --
+  // there is no client path that creates a category on someone else's, so the
+  // delegation's `categoriesCanCreate` capability has nothing to drive here
+  // yet. Offering "+ Create" on a joint account therefore created the category
+  // in the wrong place and put an id the owner does not own on the form. Until
+  // an owner-scoped create exists, joint accounts select from the owner's list
+  // and nothing more; withholding the creator is what removes the option from
+  // every one of this form's category pickers at once.
+  const jointSafeCategoryCreator = selectedIsJoint
+    ? undefined
+    : createCategoryFromTypedName;
+
+  // Undefined on a joint account, for the reason above -- which is what takes
+  // "+ Create" out of the Category field and the transfer form's, exactly as it
+  // does out of the split lines.
+  const handleCategoryCreate = jointSafeCategoryCreator
+    ? async (name: string) => {
+        const newCategory = await jointSafeCategoryCreator(name);
+        if (!newCategory) return;
+        setSelectedCategoryId(newCategory.id);
+        setValue('categoryId', newCategory.id, { shouldDirty: true, shouldValidate: true });
+        categoryWasAutoSetRef.current = false;
+      }
+    : undefined;
 
   // Created At override (only when editing and preference is enabled)
   const userTimezone = resolveTimezone(timezonePref);
@@ -1541,7 +1562,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
           <SplitEditor
             splits={splits}
             onChange={setSplits}
-            categories={categories}
+            categories={effectiveCategories}
             tags={tags}
             accounts={accounts}
             sourceAccountId={watchedAccountId || ''}
@@ -1555,7 +1576,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
             onConvertToRegular={handleConvertToRegular}
             displayCurrencyCode={isForeign ? entryCurrency : undefined}
             displayRate={isForeign ? (fxRate ?? undefined) : undefined}
-            onCreateCategory={createCategoryFromTypedName}
+            onCreateCategory={jointSafeCategoryCreator}
           />
         </div>
       )}
