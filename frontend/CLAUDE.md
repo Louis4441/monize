@@ -161,6 +161,18 @@ one level in. Two bare chevrons a few pixels apart are indistinguishable, so
 `EntitySwitcher` takes `triggerText` and the scenario one reads "Scenario ⌄".
 The bare caret stays the default -- it is unambiguous when it is the only one.
 
+**A detail page's actions sit on the title row, not in a row above the body.**
+`AccountDetailShell` takes `headerActions` for the type-specific ones, beside
+the standard Export/View Transactions/Reconcile/Edit set; the investment view
+had grown its own `flex justify-end` row instead, so that page had two action
+rows and neither was where every other detail page puts one. Type-specific
+actions therefore live in a small component the page passes as `headerActions`
+(`InvestmentDetailActions`), and any signal they need to send the body -- a
+price refresh that the body must re-fetch after -- travels down as a prop
+(`refreshKey`) rather than keeping the button in the body to stay near its own
+state. A button that is `size="sm"` in a report toolbar takes `size="md"` in
+that header, or it stands a few pixels short of everything beside it.
+
 A switcher list too long to scan takes `group` on its items
 (`ReportSwitcher` groups by the section the Reports page files each report
 under, in `REPORT_CATEGORIES` order). Sections follow the order their first
