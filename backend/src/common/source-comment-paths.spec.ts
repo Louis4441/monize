@@ -102,6 +102,20 @@ describe("TypeScript comment extraction", () => {
     expect(joined).toContain("real2.ts");
     expect(joined).not.toContain("x.ts");
   });
+
+  it("reads a comment inside a template interpolation, not just outside", () => {
+    // An interpolation body is code, so a block comment in one is a real claim.
+    // A nested object literal must not end the interpolation early.
+    const src = [
+      "const q = `SELECT ${build({ from: 1 }) /* see backend/src/interp.ts */}`;",
+      "// backend/src/tail.ts",
+    ].join("\n");
+    const joined = extractTsComments(src).join("\n");
+    expect(joined).toContain("backend/src/interp.ts");
+    expect(joined).toContain("backend/src/tail.ts");
+    // Template text around the interpolation is still not a comment.
+    expect(joined).not.toContain("SELECT");
+  });
 });
 
 describe("SQL comment extraction", () => {
@@ -159,6 +173,15 @@ describe("SQL comment extraction", () => {
     expect(joined).toContain("backend/src/nested.ts");
     expect(joined).toContain("still-outer");
   });
+
+  it("treats a backslash-escaped quote in an E'...' string as content", () => {
+    // In E'...' a `\'` is an escaped quote, so the string does not end there;
+    // reading it as an ending would leak the tail and misread the `--` in it.
+    const sql = `SELECT E'a\\' -- backend/src/in-estring.ts'; -- backend/src/real.ts`;
+    const joined = extractSqlComments(sql).join("\n");
+    expect(joined).toContain("backend/src/real.ts");
+    expect(joined).not.toContain("in-estring.ts");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -189,6 +212,15 @@ describe("comment path claims", () => {
     expect(
       commentPathSpans("lives in backend/src/common/db/app-role.ts, alongside"),
     ).toContain("backend/src/common/db/app-role.ts");
+  });
+
+  it("resolves a .js reference to its .ts source only under compiledJs", () => {
+    // A comment naming the compiled runtime (`main.js`) resolves against
+    // `main.ts` -- but only for the source-comment scan. Docs stay strict, so a
+    // doc naming a genuinely-missing `.js` is not excused by a `.ts` sibling.
+    const idx = buildIndex(["backend/src/main.ts"]);
+    expect(strictProblem("main.js", idx, { compiledJs: true })).toBeNull();
+    expect(strictProblem("main.js", idx)).toContain("does not resolve");
   });
 });
 
@@ -251,7 +283,7 @@ describe("the corrected PR #1077 claims fail when reverted", () => {
 
   const pathProblems = (comment: string): string[] =>
     commentPathSpans(comment)
-      .map((span) => strictProblem(span, index))
+      .map((span) => strictProblem(span, index, { compiledJs: true }))
       .filter((p): p is string => p !== null);
 
   const numberProblems = (comment: string): string[] =>
@@ -347,7 +379,7 @@ describeTree("source and migration comments name things that exist", () => {
       const source = readFileSync(join(REPO_ROOT as string, file), "utf8");
       for (const comment of extract(source)) {
         for (const span of commentPathSpans(comment)) {
-          const problem = strictProblem(span, index);
+          const problem = strictProblem(span, index, { compiledJs: true });
           if (problem) found.push(`${file}: ${problem}`);
         }
         for (const ref of migrationRefs(comment)) {
@@ -373,5 +405,52 @@ describeTree("source and migration comments name things that exist", () => {
 
   it("finds no stale path or migration number in a migration comment", () => {
     expect(problemsIn(load().sqlFiles, extractSqlComments)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The reach of an existence guard on a literal #1077 revert, asserted against
+// the live tree rather than a fixture -- the boundary the review asked to see
+// made explicit. Existence checking flags a dead reference; it cannot flag a
+// reference that still resolves to a real-but-wrong target.
+// ---------------------------------------------------------------------------
+
+describeTree("a literal PR #1077 revert against the live tree", () => {
+  const realTree = (): { index: FileIndex; migrations: Set<number> } => {
+    const root = requireRepoRoot(REPO_ROOT);
+    const all = gitListFiles(root, "--cached --others --exclude-standard");
+    return {
+      index: buildIndex(all),
+      migrations: buildMigrationIndex(
+        all.filter((f) => /^database\/migrations\/[^/]+\.sql$/.test(f)),
+      ),
+    };
+  };
+
+  it("catches correction #1, whose target is genuinely gone today", () => {
+    // currency-reference-columns.spec.ts was renamed to
+    // currency-references.spec.ts, so the old name resolves nowhere -- a literal
+    // revert of this comment fails the guard on the real tree, no fixture needed.
+    const { index } = realTree();
+    expect(
+      strictProblem("currency-reference-columns.spec.ts", index, {
+        compiledJs: true,
+      }),
+    ).toContain("does not resolve");
+  });
+
+  it("cannot catch corrections #2-#4, whose targets still exist (named blind spot)", () => {
+    // 133 and 134 are now the joint-account migrations, and
+    // backend/src/db-init.ts still exists (its grant moved to app-role.ts), so a
+    // literal revert to any of them resolves. An existence guard cannot tell that
+    // they mean something different now; catching that needs content-level
+    // verification this guard deliberately does not attempt. This asserts the
+    // limit so it is a known, tested boundary rather than a surprise.
+    const { index, migrations } = realTree();
+    expect(migrationProblem(133, migrations)).toBeNull();
+    expect(migrationProblem(134, migrations)).toBeNull();
+    expect(
+      strictProblem("backend/src/db-init.ts", index, { compiledJs: true }),
+    ).toBeNull();
   });
 });

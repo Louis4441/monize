@@ -129,13 +129,20 @@ const pathPresent = (
     : // relative and bare: some file's path suffix.
       index.set.has(path) || index.list.some((f) => f.endsWith(`/${path}`));
 
-const resolves = (claim: PathClaim, index: FileIndex): boolean => {
+const resolves = (
+  claim: PathClaim,
+  index: FileIndex,
+  compiledJs: boolean,
+): boolean => {
   if (pathPresent(claim.path, claim.kind, index)) return true;
-  // A `.js` reference is satisfied by its TypeScript source: comments name the
-  // compiled runtime the deployment actually executes (`node dist/db-migrate.js`,
-  // then `main.js`), whose source in this tree is `.ts`. This never masks a real
-  // gap -- a `.js` with no `.ts` sibling still fails.
-  if (/\.js$/.test(claim.path)) {
+  // A `.js` reference is satisfied by its TypeScript source: source comments
+  // name the compiled runtime the deployment actually executes
+  // (`node dist/db-migrate.js`, then `main.js`), whose source in this tree is
+  // `.ts`. This is scoped to the comment scan (`compiledJs`) and off for docs,
+  // whose exact-path rule must not be loosened -- every `.js` a doc names is a
+  // real `.js` file (`next.config.js`), so docs never need it. It never masks a
+  // real gap either: a `.js` with no `.ts` sibling still fails.
+  if (compiledJs && /\.js$/.test(claim.path)) {
     return [".ts", ".tsx"].some((ext) =>
       pathPresent(claim.path.replace(/\.js$/, ext), claim.kind, index),
     );
@@ -144,13 +151,19 @@ const resolves = (claim: PathClaim, index: FileIndex): boolean => {
 };
 
 /**
- * The strict check, for binding contracts: every claim must resolve.
- * Returns a problem description, or null.
+ * The strict check, for binding contracts: every claim must resolve. Returns a
+ * problem description, or null. Docs call it plain; the source-comment scan
+ * passes `{ compiledJs: true }` so a comment may name the compiled `.js`
+ * runtime of a `.ts` source.
  */
-export function strictProblem(span: string, index: FileIndex): string | null {
+export function strictProblem(
+  span: string,
+  index: FileIndex,
+  opts: { compiledJs?: boolean } = {},
+): string | null {
   const claim = classifySpan(span);
   if (!isPathClaim(claim)) return null;
-  if (resolves(claim, index)) return null;
+  if (resolves(claim, index, opts.compiledJs ?? false)) return null;
   const elsewhere = index.byBasename.get(basename(claim.path));
   return elsewhere
     ? `${span} does not resolve (a file with that name lives at ${elsewhere.join(", ")})`
@@ -165,7 +178,7 @@ export function strictProblem(span: string, index: FileIndex): string | null {
 export function planProblem(span: string, index: FileIndex): string | null {
   const claim = classifySpan(span);
   if (!isPathClaim(claim)) return null;
-  if (resolves(claim, index)) return null;
+  if (resolves(claim, index, false)) return null;
   const elsewhere = index.byBasename.get(basename(claim.path));
   if (!elsewhere) return null; // exists nowhere: a planned file
   return `${span} names a moved or renamed file (it lives at ${elsewhere.join(", ")})`;
@@ -224,8 +237,15 @@ function skipQuoted(src: string, i: number, quote: string): number {
   return i;
 }
 
-/** From an opening backtick, return the index just past the closing backtick. */
-function skipTemplate(src: string, i: number): number {
+/**
+ * From an opening backtick, scan a template literal, collecting comments from
+ * its `${...}` interpolations, and return the index just past the closing
+ * backtick. Template text between the interpolations is not code, so a path in
+ * it is never a claim -- but an interpolation body *is* code (a block comment
+ * can sit inside a `${ }`), so it is scanned rather than skipped (issue #1093
+ * review).
+ */
+function scanTemplate(src: string, i: number, comments: string[]): number {
   i++;
   const n = src.length;
   while (i < n) {
@@ -236,7 +256,7 @@ function skipTemplate(src: string, i: number): number {
     }
     if (c === "`") return i + 1;
     if (c === "$" && src[i + 1] === "{") {
-      i = skipInterpolation(src, i + 2);
+      i = scanCode(src, i + 2, comments, true);
       continue;
     }
     i++;
@@ -245,77 +265,27 @@ function skipTemplate(src: string, i: number): number {
 }
 
 /**
- * From just past a `${`, return the index of the matching `}`'s successor,
- * respecting nested braces, strings, templates and comments. Interpolation
- * bodies are skipped, not scanned: a comment inside one is a rare blind spot,
- * and skipping it cannot manufacture a false claim.
+ * Scan `src` from `i` as code, pushing every `//` and block comment body onto
+ * `comments`, with string and template literals and regexes skipped. When
+ * `interp` is set the scan is inside a `${...}`: it tracks brace depth and
+ * returns the index just past the `}` that closes the interpolation, so a nested
+ * object literal does not end it early. Mutually recursive with `scanTemplate`.
  */
-function skipInterpolation(src: string, i: number): number {
+function scanCode(
+  src: string,
+  i: number,
+  comments: string[],
+  interp: boolean,
+): number {
   const n = src.length;
-  let depth = 1;
-  while (i < n && depth > 0) {
-    const c = src[i];
-    const next = src[i + 1];
-    if (c === "{") depth++;
-    else if (c === "}") depth--;
-    else if (c === "'" || c === '"') {
-      i = skipQuoted(src, i, c);
-      continue;
-    } else if (c === "`") {
-      i = skipTemplate(src, i);
-      continue;
-    } else if (c === "/" && next === "/") {
-      const nl = src.indexOf("\n", i);
-      i = nl < 0 ? n : nl;
-      continue;
-    } else if (c === "/" && next === "*") {
-      const end = src.indexOf("*/", i + 2);
-      i = end < 0 ? n : end + 2;
-      continue;
-    }
-    i++;
-  }
-  return i;
-}
-
-/** From a `/` that begins a regex literal, return the index past its flags. */
-function skipRegex(src: string, i: number): number {
-  const n = src.length;
-  i++;
-  let inClass = false;
-  while (i < n) {
-    const c = src[i];
-    if (c === "\\") {
-      i += 2;
-      continue;
-    }
-    if (c === "\n") return i; // unterminated -- bail without consuming the line
-    if (c === "[") inClass = true;
-    else if (c === "]") inClass = false;
-    else if (c === "/" && !inClass) {
-      i++;
-      break;
-    }
-    i++;
-  }
-  while (i < n && /[a-z]/.test(src[i])) i++; // flags
-  return i;
-}
-
-/**
- * Every `//` and block comment body in a TypeScript/JavaScript source, with
- * string and template literals and regexes skipped. Pure, unit-tested.
- */
-export function extractTsComments(src: string): string[] {
-  const comments: string[] = [];
-  const n = src.length;
-  let i = 0;
   let prevSignificant = "";
   let word = "";
   let lastWord = "";
+  let depth = 0;
   while (i < n) {
     const ch = src[i];
     const next = src[i + 1];
+    if (interp && ch === "}" && depth === 0) return i + 1;
     if (ch === "/" && next === "/") {
       let j = i + 2;
       while (j < n && src[j] !== "\n") j++;
@@ -351,9 +321,23 @@ export function extractTsComments(src: string): string[] {
       continue;
     }
     if (ch === "`") {
-      i = skipTemplate(src, i);
+      i = scanTemplate(src, i, comments);
       prevSignificant = "`";
       word = "";
+      continue;
+    }
+    if (ch === "{") {
+      depth++;
+      prevSignificant = ch;
+      word = "";
+      i++;
+      continue;
+    }
+    if (ch === "}") {
+      depth--;
+      prevSignificant = ch;
+      word = "";
+      i++;
       continue;
     }
     if (isIdentChar(ch)) {
@@ -367,6 +351,41 @@ export function extractTsComments(src: string): string[] {
     word = "";
     i++;
   }
+  return i;
+}
+
+/** From a `/` that begins a regex literal, return the index past its flags. */
+function skipRegex(src: string, i: number): number {
+  const n = src.length;
+  i++;
+  let inClass = false;
+  while (i < n) {
+    const c = src[i];
+    if (c === "\\") {
+      i += 2;
+      continue;
+    }
+    if (c === "\n") return i; // unterminated -- bail without consuming the line
+    if (c === "[") inClass = true;
+    else if (c === "]") inClass = false;
+    else if (c === "/" && !inClass) {
+      i++;
+      break;
+    }
+    i++;
+  }
+  while (i < n && /[a-z]/.test(src[i])) i++; // flags
+  return i;
+}
+
+/**
+ * Every `//` and block comment body in a TypeScript/JavaScript source --
+ * including comments inside `${...}` template interpolations -- with string and
+ * template literals and regexes skipped. Pure, unit-tested.
+ */
+export function extractTsComments(src: string): string[] {
+  const comments: string[] = [];
+  scanCode(src, 0, comments, false);
   return comments;
 }
 
@@ -390,8 +409,21 @@ export function extractSqlComments(sql: string): string[] {
     const ch = sql[i];
     const next = sql[i + 1];
     if (ch === "'") {
+      // An `E'...'` escape string processes backslash escapes, so `\'` is a
+      // quote, not the string's end. A standard string does not: there `\` is a
+      // literal and only `''` escapes a quote. Both allow `''`. Reading `\'` as
+      // an ending in an E-string would leak the rest as code and misread a `--`
+      // after it as a comment (issue #1093 review).
+      const prev = sql[i - 1];
+      const prev2 = sql[i - 2] ?? "";
+      const eString =
+        (prev === "E" || prev === "e") && !/[A-Za-z0-9_]/.test(prev2);
       i++;
       while (i < n) {
+        if (eString && sql[i] === "\\") {
+          i += 2;
+          continue;
+        }
         if (sql[i] === "'" && sql[i + 1] === "'") {
           i += 2;
           continue;
