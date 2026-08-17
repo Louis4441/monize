@@ -743,3 +743,35 @@ describe("a transaction status cell is the shared StatusCellButton", () => {
     expect(DENSE_LABEL_KEY.test(wrapper)).toBe(true);
   });
 });
+
+describe("a category typed into a picker is created by one helper", () => {
+  /** The one module allowed to turn typed picker text into a category. */
+  const HELPER = "/src/lib/category-create.ts";
+  /**
+   * The Categories page's own create form is a different thing: it collects a
+   * name, parent, colour and icon from real fields, so there is no typed text
+   * to parse and no `Parent: Child` shorthand to honour.
+   */
+  const FULL_FORM = "/src/app/categories/page.tsx";
+  const CREATE_CALL = /categoriesApi\.create\(/;
+
+  it("has no second inline category-creation path", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== HELPER && path !== FULL_FORM)
+      .filter(([, content]) => CREATE_CALL.test(content))
+      .map(([path]) => path);
+
+    // Three copies of this existed -- the transaction form, the account form's
+    // asset category, and the scheduled transaction form -- and the third had
+    // neither title casing nor the `Parent: Child` shorthand, so `travel:
+    // hotels` became a child of Travel in two fields and a single flat category
+    // named "Travel: Hotels" in the other. Use `createCategoryFromInput`.
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the helper, so the rule cannot pass by accident", () => {
+    const helper = sources[HELPER];
+    expect(helper, `${HELPER} not found -- update HELPER in this test`).toBeTruthy();
+    expect(/export async function createCategoryFromInput\(/.test(helper)).toBe(true);
+  });
+});

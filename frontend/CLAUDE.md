@@ -189,6 +189,28 @@ selectable, parents included**. A bare leaf name is ambiguous once two parents
 own the same leaf, and a picker shaped differently from the transaction form's
 reads as a second component. `CategorySwitcher` carries the regression tests.
 
+**A picker the user types into creates through `createCategoryFromInput`
+(`lib/category-create.ts`), and never inline.** It owns title casing and the
+`Parent: Child` shorthand -- create or reuse the parent, then the child under
+it -- and returns every row it created so the caller can append all of them to
+its own list, not only the leaf. Three inline copies of that parsing existed
+and the scheduled transaction form's had none of it, so `travel: hotels` became
+a child of Travel in two fields and one flat category named "Travel: Hotels" in
+the third. The guard in `src/test/ui-conventions.test.ts` fails on a second
+`categoriesApi.create` call site outside the helper and the Categories page's
+own full create form.
+
+Whether a picker *offers* to create is a property of the surface, not of the
+field: a form that can create passes the creator to **every** category picker it
+renders, its split lines included. `SplitEditor`'s lines silently discarded text
+matching no category while the Category field beside them offered "+ Create"
+(issue #1187) -- the split copy was the same `Combobox` missing
+`allowCustomValue` and `onCreateNew`. An asynchronous create addresses the row
+it came from **by id**: rows can be added, removed or reordered while the
+request is in flight, and the new category's `isIncome` comes from what the
+creator returned, since the parent's appended list has not re-rendered the
+editor yet.
+
 ### An account balance is coloured by its sign -- `balanceColor`, never by account type
 
 `balanceColor` (`lib/format.ts`) is the one rule: negative is red, everything
@@ -742,6 +764,32 @@ untidy: every toggle on it is one whose save cannot succeed.
 
 The converse is not true. An account the caller owns and has shared *out*
 carries `jointGranteeCount`, is still theirs, and stays assignable.
+
+### On a joint row, *every* picker reads the owner's list -- and creation is off
+
+A joint row belongs to the sharing owner and may only carry the owner's
+reference ids, so `TransactionForm` derives `effectiveCategories` /
+`effectivePayees` from the grant-gated reference-data endpoint. The rule is that
+**everything** downstream reads those, not the caller's own `categories`: the
+option list, the income/expense sign lookups, and the split editor. Three sites
+still read `categories`, and each failed differently and quietly -- the sign
+lookup could not resolve an owner id, so choosing an income category left the
+amount negative; `SplitEditor` was handed the caller's list, so the owner's
+split lines resolved to nothing and any pick wrote one of the caller's ids onto
+the owner's row. Split mode is blocked on the *mode button* for a joint account,
+which is not the same as being unreachable: opening a split row that already
+lives there puts the form straight into it.
+
+Creation is a separate question with a blunter answer: **do not offer it.**
+`categoriesApi.create` writes to the caller's ledger and there is no client path
+that creates on someone else's, so "+ Create" on a joint account made the
+category in the wrong place and put an id the owner does not own on the form.
+The delegation carries a `categoriesCanCreate` capability with nothing on the
+client to drive yet; until an owner-scoped create exists, withhold the creator
+(`jointSafeCategoryCreator`) rather than gate the button on a flag the code
+cannot honour. Withholding it is also what makes the rule hold everywhere at
+once -- the Category field, the transfer form's, and every split line take the
+same optional prop, so there is one decision rather than four.
 
 ## Form Patterns
 
