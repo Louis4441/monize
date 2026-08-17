@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Заплановані інвестиційні операції вимагають брокерського рахунку",
     "notFound": "Заплановану операцію з ідентифікатором {{ id }} не знайдено",
     "occurrenceAlreadyPosted": "Цю подію вже проведено.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Іншу валюту можна використати лише у звичайній запланованій операції, але не в розбитті, переказі чи інвестиції",
     "fxRateUnavailable": "На {{ date }} курс обміну {{ from }} на {{ to }} недоступний. Введіть суму в {{ to }}, щоб провести її.",
     "investmentActionRequired": "Для запланованих інвестиційних операцій необхідна інвестиційна дія",

@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Transaksi investasi terjadwal memerlukan akun pialang",
     "notFound": "Transaksi terjadwal dengan ID {{ id }} tidak ditemukan",
     "occurrenceAlreadyPosted": "Kejadian ini sudah dicatat.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Mata uang lain hanya dapat dipakai pada transaksi terjadwal biasa, bukan pada transaksi terbagi, transfer, atau investasi",
     "fxRateUnavailable": "Tidak ada nilai tukar yang tersedia untuk {{ from }} ke {{ to }} pada {{ date }}. Masukkan jumlah dalam {{ to }} untuk mempostingnya.",
     "investmentActionRequired": "Tindakan investasi diperlukan untuk transaksi investasi terjadwal",

@@ -3,6 +3,7 @@ import {
   acquisitionCost,
   acquisitionUnitCost,
   applyActionToQuantity,
+  FUNDING_ACCOUNT_ACTIONS,
   isQuantityOnlyAction,
   SHARE_MOVING_ACTIONS,
 } from "./investment-replay.util";
@@ -109,6 +110,28 @@ describe("applyActionToQuantity", () => {
       (action) => applyActionToQuantity(10, action, 2) !== 10,
     );
     expect([...SHARE_MOVING_ACTIONS].sort()).toEqual(moving.sort());
+  });
+});
+
+describe("FUNDING_ACCOUNT_ACTIONS", () => {
+  it("is exactly BUY and SELL", () => {
+    expect([...FUNDING_ACCOUNT_ACTIONS].sort()).toEqual(
+      [InvestmentAction.BUY, InvestmentAction.SELL].sort(),
+    );
+  });
+
+  it("excludes cash-only and share-only actions", () => {
+    for (const action of [
+      InvestmentAction.DIVIDEND,
+      InvestmentAction.INTEREST,
+      InvestmentAction.CAPITAL_GAIN,
+      InvestmentAction.REINVEST,
+      InvestmentAction.ADD_SHARES,
+      InvestmentAction.REMOVE_SHARES,
+      InvestmentAction.SPLIT,
+    ]) {
+      expect(FUNDING_ACCOUNT_ACTIONS.has(action)).toBe(false);
+    }
   });
 });
 

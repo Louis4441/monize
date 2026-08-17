@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "スケジュール投資取引には証券口座が必要です",
     "notFound": "ID {{ id }} のスケジュール取引が見つかりません",
     "occurrenceAlreadyPosted": "この回はすでに記帳されています。",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "別の通貨を使用できるのは通常のスケジュール取引のみで、分割、振替、投資では使用できません",
     "fxRateUnavailable": "{{ date }} の {{ from }} から {{ to }} への為替レートが利用できません。投稿するには金額を {{ to }} で入力してください。",
     "investmentActionRequired": "スケジュール投資取引には投資アクションが必要です",

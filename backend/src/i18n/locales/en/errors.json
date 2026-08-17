@@ -372,6 +372,7 @@
     "requiresBrokerageAccount": "Scheduled investment transactions require a brokerage account",
     "notFound": "Scheduled transaction with ID {{ id }} not found",
     "occurrenceAlreadyPosted": "This occurrence has already been posted.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "A different currency can only be used on a plain scheduled transaction, not a split, transfer or investment",
     "fxRateUnavailable": "No exchange rate is available for {{ from }} to {{ to }} on {{ date }}. Enter the amount in {{ to }} to post it.",
     "investmentActionRequired": "Investment action is required for scheduled investment transactions",
