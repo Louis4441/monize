@@ -759,7 +759,13 @@
     "actionTransferOut": "Transferência de Saída",
     "actionReinvest": "Reinvestir",
     "actionAddShares": "Adicionar Ações",
-    "actionRemoveShares": "Remover Ações"
+    "actionRemoveShares": "Remover Ações",
+    "actionReinvestInterest": "Reinvestimento de juros",
+    "actionReinvestCapitalGainShort": "Reinvestimento de rendimento de curto prazo",
+    "actionReinvestCapitalGainLong": "Reinvestimento de rendimento de longo prazo",
+    "actionCapitalGainShort": "Rendimento de capital de curto prazo",
+    "actionCapitalGainLong": "Rendimento de capital de longo prazo",
+    "actionRedeem": "Resgate de CD/obrigação"
   },
   "loanAmortization": {
     "empty": "Nenhuma conta de empréstimo ou crédito habitação encontrada. Adicione uma conta de empréstimo para ver o histórico de pagamentos.",

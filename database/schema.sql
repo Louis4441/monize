@@ -844,7 +844,16 @@ CREATE TYPE investment_action AS ENUM (
     'TRANSFER_OUT',
     'REINVEST',
     'ADD_SHARES',
-    'REMOVE_SHARES'
+    'REMOVE_SHARES',
+    -- Money's full distribution vocabulary (issue #1149, migration 158). Each
+    -- is a refinement of a base action: same share/cash behaviour, distinct
+    -- income kind for tax reporting.
+    'REINVEST_INTEREST',
+    'REINVEST_CAPITAL_GAIN_SHORT',
+    'REINVEST_CAPITAL_GAIN_LONG',
+    'CAPITAL_GAIN_SHORT',
+    'CAPITAL_GAIN_LONG',
+    'REDEEM'
 );
 
 CREATE TABLE investment_transactions (

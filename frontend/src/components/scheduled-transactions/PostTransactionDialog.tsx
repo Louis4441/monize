@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
+import { baseInvestmentAction } from '@/lib/investment-actions';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline';
@@ -125,11 +126,13 @@ export function PostTransactionDialog({
   const isInvestmentKind = scheduledTransaction.isInvestment;
   const investmentAction = scheduledTransaction.investmentAction;
   const isInvestmentQuantityPrice = isInvestmentKind &&
-    (investmentAction === 'BUY' || investmentAction === 'SELL' || investmentAction === 'REINVEST');
+    investmentAction != null &&
+    ['BUY', 'SELL', 'REINVEST'].includes(baseInvestmentAction(investmentAction));
   const isInvestmentQuantityOnly = isInvestmentKind &&
     (investmentAction === 'ADD_SHARES' || investmentAction === 'REMOVE_SHARES' || investmentAction === 'SPLIT');
   const isInvestmentAmountOnly = isInvestmentKind &&
-    (investmentAction === 'DIVIDEND' || investmentAction === 'INTEREST' || investmentAction === 'CAPITAL_GAIN');
+    investmentAction != null &&
+    ['DIVIDEND', 'INTEREST', 'CAPITAL_GAIN'].includes(baseInvestmentAction(investmentAction));
 
   const todayStr = useMemo(() => getLocalDateString(), []);
 
@@ -475,7 +478,7 @@ export function PostTransactionDialog({
         initialPrice > 0
       ) {
         const commission = Number(scheduledTransaction.investmentCommission ?? 0);
-        const sign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
+        const sign = baseInvestmentAction(scheduledTransaction.investmentAction as InvestmentAction) === 'SELL' ? -1 : 1;
         setInvestmentTotalValue(totalFromQuantity(initialQty, initialPrice, sign, commission));
       } else {
         setInvestmentTotalValue('');
@@ -534,7 +537,7 @@ export function PostTransactionDialog({
   //   editor enforces on its side).
   // - `userEditedInvestment`: a value the user typed after the dialog opened but
   //   before this fetch resolved is theirs, not something to clobber on arrival.
-  const investmentSign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
+  const investmentSign = baseInvestmentAction(scheduledTransaction.investmentAction as InvestmentAction) === 'SELL' ? -1 : 1;
   const investmentCommission = Number(scheduledTransaction.investmentCommission ?? 0);
 
   const [lastSeenMarketPrice, setLastSeenMarketPrice] = useState<number | null>(null);

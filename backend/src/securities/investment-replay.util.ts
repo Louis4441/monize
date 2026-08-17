@@ -1,6 +1,39 @@
 import { InvestmentAction } from "./entities/investment-transaction.entity";
 
 /**
+ * The base action each Money-vocabulary refinement behaves as (issue #1149).
+ *
+ * A refinement moves shares and cash exactly like its base -- REINVEST_INTEREST
+ * buys shares with money that never lands as cash, REDEEM is a disposal with
+ * proceeds -- and differs only in the kind of income it records, which is what
+ * tax reporting needs. Every financial fold (share replay, cash impact, cost
+ * basis, balance effects) normalizes through `baseInvestmentAction` first, so a
+ * refinement cannot drift from its base one switch at a time; only surfaces
+ * that classify income read the raw action.
+ */
+const BASE_ACTION_BY_REFINEMENT: ReadonlyMap<
+  InvestmentAction | string,
+  InvestmentAction
+> = new Map([
+  [InvestmentAction.REINVEST_INTEREST, InvestmentAction.REINVEST],
+  [InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT, InvestmentAction.REINVEST],
+  [InvestmentAction.REINVEST_CAPITAL_GAIN_LONG, InvestmentAction.REINVEST],
+  [InvestmentAction.CAPITAL_GAIN_SHORT, InvestmentAction.CAPITAL_GAIN],
+  [InvestmentAction.CAPITAL_GAIN_LONG, InvestmentAction.CAPITAL_GAIN],
+  [InvestmentAction.REDEEM, InvestmentAction.SELL],
+]);
+
+/**
+ * The action whose financial behaviour governs `action` -- itself, unless it is
+ * one of the Money-vocabulary refinements above.
+ */
+export function baseInvestmentAction(
+  action: InvestmentAction | string,
+): InvestmentAction | string {
+  return BASE_ACTION_BY_REFINEMENT.get(action) ?? action;
+}
+
+/**
  * The canonical share-count effect of one investment action.
  *
  * Every surface that reconstructs a position from its transaction history --
@@ -32,7 +65,7 @@ export function applyActionToQuantity(
   action: InvestmentAction | string,
   quantity: number,
 ): number {
-  switch (action) {
+  switch (baseInvestmentAction(action)) {
     case InvestmentAction.BUY:
     case InvestmentAction.REINVEST:
     case InvestmentAction.TRANSFER_IN:
@@ -64,6 +97,44 @@ export const SHARE_MOVING_ACTIONS: readonly InvestmentAction[] = [
   InvestmentAction.ADD_SHARES,
   InvestmentAction.REMOVE_SHARES,
   InvestmentAction.SPLIT,
+  // Money-vocabulary refinements that move shares, exactly as their base does.
+  InvestmentAction.REINVEST_INTEREST,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+  InvestmentAction.REDEEM,
+];
+
+/**
+ * Trades executed at a market price: the actions whose stored `price` can
+ * stand in for a quote on a day the catalogue has none, and whose value moves
+ * a portfolio's cash-flow series. TRANSFER_IN/OUT legs carry a carried cost
+ * basis rather than the market price on the transfer date, so they are
+ * deliberately absent. Raw-SQL readers pass this through `= ANY($n)` instead
+ * of restating the list as string literals -- the restated copies are how the
+ * Money refinements would silently fall out of the price-derivation and
+ * net-worth queries.
+ */
+export const MARKET_PRICED_TRADE_ACTIONS: readonly InvestmentAction[] = [
+  InvestmentAction.BUY,
+  InvestmentAction.SELL,
+  InvestmentAction.REINVEST,
+  InvestmentAction.REINVEST_INTEREST,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+  InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+  InvestmentAction.REDEEM,
+];
+
+/**
+ * Actions whose `totalAmount` is cash income paid into the sleeve. The raw
+ * value keeps the income kind (interest versus short- versus long-term gain);
+ * the base collapses the kinds for surfaces that only need "income".
+ */
+export const CASH_INCOME_ACTIONS: readonly InvestmentAction[] = [
+  InvestmentAction.DIVIDEND,
+  InvestmentAction.INTEREST,
+  InvestmentAction.CAPITAL_GAIN,
+  InvestmentAction.CAPITAL_GAIN_SHORT,
+  InvestmentAction.CAPITAL_GAIN_LONG,
 ];
 
 /**
@@ -78,10 +149,16 @@ export const SHARE_MOVING_ACTIONS: readonly InvestmentAction[] = [
  * write and ignores it on post) and the MNY import writer (which must not
  * persist one on a non-funding action) share one authority rather than each
  * spelling out `{BUY, SELL}` and drifting apart.
+ *
+ * REDEEM is a sale in behaviour (`baseInvestmentAction`), so its proceeds
+ * route to a funding account exactly as a SELL's do -- the transaction form
+ * offers the field for it, and a set without it would silently clear what the
+ * form stored.
  */
 export const FUNDING_ACCOUNT_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
   InvestmentAction.BUY,
   InvestmentAction.SELL,
+  InvestmentAction.REDEEM,
 ]);
 
 /**

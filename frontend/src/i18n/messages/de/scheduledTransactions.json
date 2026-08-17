@@ -199,7 +199,13 @@
       "TRANSFER_OUT": "Ausgehende Überweisung",
       "REINVEST": "Dividende reinvestieren",
       "ADD_SHARES": "Anteile hinzufügen",
-      "REMOVE_SHARES": "Anteile entfernen"
+      "REMOVE_SHARES": "Anteile entfernen",
+      "REINVEST_INTEREST": "Wiederanlage von Zinsen",
+      "REINVEST_CAPITAL_GAIN_SHORT": "Wiederanlage kurzfristiger Kapitalerträge",
+      "REINVEST_CAPITAL_GAIN_LONG": "Wiederanlage langfristiger Kapitalerträge",
+      "CAPITAL_GAIN_SHORT": "Kurzfristiger Kapitalertrag",
+      "CAPITAL_GAIN_LONG": "Langfristiger Kapitalertrag",
+      "REDEEM": "CD/Anleihe einlösen"
     },
     "submitCreate": "Erstellen",
     "submitUpdate": "Aktualisieren",

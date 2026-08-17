@@ -34,12 +34,12 @@ Concurrency scope   account, user, holding, occurrence, token, provider key, glo
 Retry semantics     which retries are safe, and what prevents duplication
 Crash semantics     expected state before commit, after commit, mid-finalization
 Failure response    409, 404, null, reconcile, refuse, partial
-Required tests      per docs/verification-contract.md
+Required tests      per the planned verification contract (not yet committed)
 Status              enforced | partial | unenforced
 ```
 
 Two fields a reader might expect are deliberately absent. **CI owner** lives in
-`docs/verification-contract.md` section 4 instead, so the job names appear once
+the planned verification contract's section 4 instead, so the job names appear once
 rather than in thirty entries that would drift independently of the workflow.
 **Subsystem owner** is omitted because this project does not have per-subsystem
 owners; adding a column that would read "maintainer" throughout would be
@@ -271,7 +271,7 @@ Required tests      A source-scanning guard failing on any SPLIT branch outside
 Status              unenforced
 ```
 
-`docs/financial-semantics.md` FIN-003 has the arithmetic: 90 shares at ratio 2.0
+The planned financial-semantics catalog's FIN-003 has the arithmetic: 90 shares at ratio 2.0
 is 180, and the additive form gives 92. This invariant is separate from
 INV-HOLDING-001 on purpose -- that one is about concurrency, this one about two
 implementations of the same rule, and fixing either leaves the other.
@@ -489,8 +489,8 @@ Status              unenforced
 
 Note that the sentinel string is *asserted by tests* in both the frontend and
 backend suites. Those tests are green and protect the defect --
-`docs/verification-contract.md` section on known-wrong tests covers what to do
-with them.
+the planned verification contract's section on known-wrong tests covers what to
+do with them.
 
 ### INV-ACTIVITY-001 -- activity is attributed to whoever acted
 
@@ -735,7 +735,7 @@ Required tests      A workflow self-test asserting the bump commit's parent is t
 Status              partial
 ```
 
-`docs/release-integrity.md` has the full rules and gap register, including the
+The planned release-integrity document has the full rules and gap register, including the
 unconditional `--passWithNoTests` on the integration suite.
 
 ## Candidates not yet admitted

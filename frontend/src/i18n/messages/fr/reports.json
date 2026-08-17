@@ -759,7 +759,13 @@
     "actionTransferOut": "Transfert sortant",
     "actionReinvest": "Réinvestissement",
     "actionAddShares": "Ajout de parts",
-    "actionRemoveShares": "Retrait de parts"
+    "actionRemoveShares": "Retrait de parts",
+    "actionReinvestInterest": "Réinvestissement des intérêts",
+    "actionReinvestCapitalGainShort": "Réinvestissement de plus-value à court terme",
+    "actionReinvestCapitalGainLong": "Réinvestissement de plus-value à long terme",
+    "actionCapitalGainShort": "Plus-value à court terme",
+    "actionCapitalGainLong": "Plus-value à long terme",
+    "actionRedeem": "Remboursement CD/obligation"
   },
   "loanAmortization": {
     "empty": "Aucun compte de prêt ou de prêt hypothécaire trouvé. Ajoutez un compte de prêt pour voir l'historique des paiements.",

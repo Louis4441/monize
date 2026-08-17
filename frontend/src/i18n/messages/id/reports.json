@@ -759,7 +759,13 @@
     "actionTransferOut": "Transfer Keluar",
     "actionReinvest": "Investasi Ulang",
     "actionAddShares": "Tambah Saham",
-    "actionRemoveShares": "Hapus Saham"
+    "actionRemoveShares": "Hapus Saham",
+    "actionReinvestInterest": "Reinvestasi Bunga",
+    "actionReinvestCapitalGainShort": "Reinvestasi Keuntungan Modal Jangka Pendek",
+    "actionReinvestCapitalGainLong": "Reinvestasi Keuntungan Modal Jangka Panjang",
+    "actionCapitalGainShort": "Keuntungan Modal Jangka Pendek",
+    "actionCapitalGainLong": "Keuntungan Modal Jangka Panjang",
+    "actionRedeem": "Pencairan CD/Obligasi"
   },
   "loanAmortization": {
     "empty": "Tidak ada akun pinjaman atau hipotek ditemukan. Tambah akun pinjaman untuk melihat riwayat pembayaran.",

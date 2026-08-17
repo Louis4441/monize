@@ -393,6 +393,6 @@ ordering, partial-index arbitration, one-winner CAS -- needs a test that opens
 two real connections and interleaves them.
 `backend/test/integration/mny-import-job.integration.spec.ts` is the pattern to
 copy; it states its own rationale: these are "properties of Postgres, not of the
-service". `docs/verification-contract.md` records which invariant requires which
-kind of test, and `docs/testing-contract.md` section on asynchronous and
+service". The planned verification contract records which invariant requires
+which kind of test, and `docs/testing-contract.md` section on asynchronous and
 concurrent operations lists the interleavings to pick from.

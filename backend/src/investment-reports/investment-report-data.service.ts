@@ -11,6 +11,8 @@ import { NON_VOID_INVESTMENT_STATUS } from "../securities/investment-row-effects
 import {
   acquisitionCost,
   applyActionToQuantity,
+  baseInvestmentAction,
+  CASH_INCOME_ACTIONS,
 } from "../securities/investment-replay.util";
 import { Account } from "../accounts/entities/account.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -596,7 +598,7 @@ export class InvestmentReportDataService {
     state.commissions += commission;
     state.lastTransactionDate = tx.transactionDate;
 
-    switch (tx.action) {
+    switch (baseInvestmentAction(tx.action)) {
       case InvestmentAction.BUY:
       case InvestmentAction.TRANSFER_IN:
       case InvestmentAction.REINVEST: {
@@ -612,7 +614,7 @@ export class InvestmentReportDataService {
           quantity,
         );
         if (tx.action === InvestmentAction.BUY) state.purchases += totalAmount;
-        if (tx.action === InvestmentAction.REINVEST) {
+        if (baseInvestmentAction(tx.action) === InvestmentAction.REINVEST) {
           state.reinvestments += totalAmount;
         }
         break;
@@ -625,7 +627,8 @@ export class InvestmentReportDataService {
         const costSold = sellQty * avgCost;
         state.costBasis -= costSold;
         state.quantity -= sellQty;
-        if (tx.action === InvestmentAction.SELL) {
+        // Base-normalized: a REDEEM realizes its proceeds like the sale it is.
+        if (baseInvestmentAction(tx.action) === InvestmentAction.SELL) {
           state.sales += totalAmount;
           state.realizedGains += totalAmount - costSold;
         }
@@ -734,11 +737,7 @@ export class InvestmentReportDataService {
     let income = 0;
     for (const tx of group.txs) {
       if (tx.transactionDate <= after || tx.transactionDate > upto) continue;
-      if (
-        tx.action === InvestmentAction.DIVIDEND ||
-        tx.action === InvestmentAction.INTEREST ||
-        tx.action === InvestmentAction.CAPITAL_GAIN
-      ) {
+      if (CASH_INCOME_ACTIONS.includes(tx.action)) {
         income += Number(tx.totalAmount) || 0;
       }
     }

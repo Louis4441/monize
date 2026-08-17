@@ -18,6 +18,7 @@ import {
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { InvestmentAction, Security } from '@/types/investment';
 import { InvestmentSplitDetails } from '@/types/transaction';
+import { baseInvestmentAction } from '@/lib/investment-actions';
 
 interface InvestmentSplitFieldsProps {
   value: InvestmentSplitDetails | undefined;
@@ -38,6 +39,12 @@ const ACTION_LABELS: Record<InvestmentAction, string> = {
   TRANSFER_OUT: 'Transfer Out',
   ADD_SHARES: 'Add Shares',
   REMOVE_SHARES: 'Remove Shares',
+  REINVEST_INTEREST: 'Reinvest Interest',
+  REINVEST_CAPITAL_GAIN_SHORT: 'Reinvest Short-Term Cap Gain',
+  REINVEST_CAPITAL_GAIN_LONG: 'Reinvest Long-Term Cap Gain',
+  CAPITAL_GAIN_SHORT: 'Short-Term Capital Gain',
+  CAPITAL_GAIN_LONG: 'Long-Term Capital Gain',
+  REDEEM: 'Redeem CD/Bond',
 };
 
 const ACTIONS_NEEDING_SECURITY: ReadonlySet<InvestmentAction> = new Set([
@@ -147,8 +154,9 @@ export function InvestmentSplitFields({
     onChange(next, amount);
   };
 
-  const needsSecurity = ACTIONS_NEEDING_SECURITY.has(action);
-  const needsQtyPrice = ACTIONS_NEEDING_QUANTITY_PRICE.has(action);
+  // Base-normalized so the Money-vocabulary refinements behave as their base.
+  const needsSecurity = ACTIONS_NEEDING_SECURITY.has(baseInvestmentAction(action));
+  const needsQtyPrice = ACTIONS_NEEDING_QUANTITY_PRICE.has(baseInvestmentAction(action));
 
   return (
     <div className="space-y-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">

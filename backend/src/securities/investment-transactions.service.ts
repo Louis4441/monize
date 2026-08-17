@@ -26,6 +26,7 @@ import { Security } from "./entities/security.entity";
 import {
   acquisitionUnitCost,
   applyActionToQuantity,
+  baseInvestmentAction,
 } from "./investment-replay.util";
 import { CreateInvestmentTransactionDto } from "./dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
@@ -368,7 +369,13 @@ export class InvestmentTransactionsService {
    * own. Neither belongs here.
    */
   private static readonly PRICED_ACQUISITIONS: ReadonlySet<InvestmentAction> =
-    new Set([InvestmentAction.BUY, InvestmentAction.REINVEST]);
+    new Set([
+      InvestmentAction.BUY,
+      InvestmentAction.REINVEST,
+      InvestmentAction.REINVEST_INTEREST,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+    ]);
 
   private static readonly PRICE_ACTIONS: ReadonlySet<InvestmentAction> =
     new Set([
@@ -377,6 +384,10 @@ export class InvestmentTransactionsService {
       InvestmentAction.REINVEST,
       InvestmentAction.TRANSFER_IN,
       InvestmentAction.TRANSFER_OUT,
+      InvestmentAction.REDEEM,
+      InvestmentAction.REINVEST_INTEREST,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
     ]);
 
   /**
@@ -556,7 +567,9 @@ export class InvestmentTransactionsService {
 
     const actionLabel = formatAction(action);
 
-    switch (action) {
+    // The label keeps the raw action's name (a redemption reads "Redeem", not
+    // "Sell"); only the shape of the line follows the base action.
+    switch (baseInvestmentAction(action)) {
       case InvestmentAction.BUY:
       case InvestmentAction.SELL:
         return `${actionLabel}: ${symbol || "Unknown"} ${formatQuantity(quantity || 0)} @ ${formatPrice(price || 0)}`;
@@ -755,7 +768,7 @@ export class InvestmentTransactionsService {
         InvestmentAction.REINVEST,
         InvestmentAction.ADD_SHARES,
         InvestmentAction.REMOVE_SHARES,
-      ].includes(createDto.action) &&
+      ].includes(baseInvestmentAction(createDto.action) as InvestmentAction) &&
       !createDto.securityId
     ) {
       throw new BadRequestException(
@@ -1727,7 +1740,7 @@ export class InvestmentTransactionsService {
     const { action, quantity, price, commission } = dto;
 
     let result: number;
-    switch (action) {
+    switch (baseInvestmentAction(action)) {
       case InvestmentAction.BUY:
         result = (quantity || 0) * (price || 0) + (commission || 0);
         break;
@@ -1804,7 +1817,7 @@ export class InvestmentTransactionsService {
     }
     let cashTransactionId: string | null = null;
 
-    switch (action) {
+    switch (baseInvestmentAction(action)) {
       case InvestmentAction.BUY:
         if (movesShares) {
           await this.holdingsService.updateHolding(
@@ -3721,7 +3734,7 @@ export class InvestmentTransactionsService {
     // callers validate the full transaction history before commit.
     const allowNegative = true;
 
-    switch (action) {
+    switch (baseInvestmentAction(action)) {
       case InvestmentAction.BUY:
         if (securityId) {
           await this.holdingsService.updateHolding(
@@ -4191,8 +4204,11 @@ export class InvestmentTransactionsService {
       totalTransactions: transactions.length,
       totalBuys: transactions.filter((t) => t.action === InvestmentAction.BUY)
         .length,
-      totalSells: transactions.filter((t) => t.action === InvestmentAction.SELL)
-        .length,
+      // Base-normalized so a CD/bond redemption counts as the sale it is, and
+      // the short/long-term gain distributions land in the gains total.
+      totalSells: transactions.filter(
+        (t) => baseInvestmentAction(t.action) === InvestmentAction.SELL,
+      ).length,
       totalDividends: sumMoney(
         transactions
           .filter((t) => t.action === InvestmentAction.DIVIDEND)
@@ -4205,7 +4221,10 @@ export class InvestmentTransactionsService {
       ),
       totalCapitalGains: sumMoney(
         transactions
-          .filter((t) => t.action === InvestmentAction.CAPITAL_GAIN)
+          .filter(
+            (t) =>
+              baseInvestmentAction(t.action) === InvestmentAction.CAPITAL_GAIN,
+          )
           .map((t) => Number(t.totalAmount)),
       ),
       totalCommissions: sumMoney(

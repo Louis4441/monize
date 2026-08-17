@@ -759,7 +759,13 @@
     "actionTransferOut": "Transfer Çıkışı",
     "actionReinvest": "Yeniden Yatır",
     "actionAddShares": "Hisse Ekle",
-    "actionRemoveShares": "Hisse Çıkar"
+    "actionRemoveShares": "Hisse Çıkar",
+    "actionReinvestInterest": "Faizi Yeniden Yatır",
+    "actionReinvestCapitalGainShort": "Kısa Vadeli Kazancı Yeniden Yatır",
+    "actionReinvestCapitalGainLong": "Uzun Vadeli Kazancı Yeniden Yatır",
+    "actionCapitalGainShort": "Kısa Vadeli Sermaye Kazancı",
+    "actionCapitalGainLong": "Uzun Vadeli Sermaye Kazancı",
+    "actionRedeem": "CD/Tahvil İtfası"
   },
   "loanAmortization": {
     "empty": "Kredi veya ipotek hesabı bulunamadı. Ödeme geçmişini görmek için kredi hesabı ekleyin.",

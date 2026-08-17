@@ -759,7 +759,13 @@
     "actionTransferOut": "转出",
     "actionReinvest": "再投资",
     "actionAddShares": "增加股份",
-    "actionRemoveShares": "减少股份"
+    "actionRemoveShares": "减少股份",
+    "actionReinvestInterest": "利息再投资",
+    "actionReinvestCapitalGainShort": "短期资本收益再投资",
+    "actionReinvestCapitalGainLong": "长期资本收益再投资",
+    "actionCapitalGainShort": "短期资本收益",
+    "actionCapitalGainLong": "长期资本收益",
+    "actionRedeem": "赎回存单/债券"
   },
   "loanAmortization": {
     "empty": "未找到贷款或抵押贷款账户。添加贷款账户以查看还款历史。",

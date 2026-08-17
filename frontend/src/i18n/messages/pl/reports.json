@@ -759,7 +759,13 @@
     "actionTransferOut": "Przeniesienie wychodzące",
     "actionReinvest": "Reinwestycja",
     "actionAddShares": "Dodaj udziały",
-    "actionRemoveShares": "Usuń udziały"
+    "actionRemoveShares": "Usuń udziały",
+    "actionReinvestInterest": "Reinwestycja odsetek",
+    "actionReinvestCapitalGainShort": "Reinwestycja krótkoterminowych zysków kapitałowych",
+    "actionReinvestCapitalGainLong": "Reinwestycja długoterminowych zysków kapitałowych",
+    "actionCapitalGainShort": "Krótkoterminowy zysk kapitałowy",
+    "actionCapitalGainLong": "Długoterminowy zysk kapitałowy",
+    "actionRedeem": "Wykup CD/obligacji"
   },
   "loanAmortization": {
     "empty": "Nie znaleziono kont pożyczek ani kredytów hipotecznych. Dodaj konto pożyczki, aby zobaczyć historię spłat.",

@@ -3,10 +3,87 @@ import {
   acquisitionCost,
   acquisitionUnitCost,
   applyActionToQuantity,
+  baseInvestmentAction,
+  CASH_INCOME_ACTIONS,
   FUNDING_ACCOUNT_ACTIONS,
   isQuantityOnlyAction,
+  MARKET_PRICED_TRADE_ACTIONS,
   SHARE_MOVING_ACTIONS,
 } from "./investment-replay.util";
+
+describe("baseInvestmentAction", () => {
+  it.each([
+    [InvestmentAction.REINVEST_INTEREST, InvestmentAction.REINVEST],
+    [InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT, InvestmentAction.REINVEST],
+    [InvestmentAction.REINVEST_CAPITAL_GAIN_LONG, InvestmentAction.REINVEST],
+    [InvestmentAction.CAPITAL_GAIN_SHORT, InvestmentAction.CAPITAL_GAIN],
+    [InvestmentAction.CAPITAL_GAIN_LONG, InvestmentAction.CAPITAL_GAIN],
+    [InvestmentAction.REDEEM, InvestmentAction.SELL],
+  ])("normalizes the refinement %s to %s", (refinement, base) => {
+    expect(baseInvestmentAction(refinement)).toBe(base);
+  });
+
+  it("returns every base action unchanged", () => {
+    for (const action of Object.values(InvestmentAction)) {
+      const base = baseInvestmentAction(action);
+      // A base is a fixed point: normalizing twice changes nothing, so no
+      // refinement can point at another refinement.
+      expect(baseInvestmentAction(base)).toBe(base);
+    }
+  });
+
+  it("covers every enum value: nothing maps outside the enum", () => {
+    const values = new Set<string>(Object.values(InvestmentAction));
+    for (const action of Object.values(InvestmentAction)) {
+      expect(values.has(baseInvestmentAction(action) as string)).toBe(true);
+    }
+  });
+
+  it("moves shares for every refinement exactly as its base does", () => {
+    // The point of the normalizer: a refinement cannot drift from its base
+    // one replay at a time. 40% -light history charts came from exactly that
+    // kind of per-surface drift (see the applyActionToQuantity comment).
+    for (const action of Object.values(InvestmentAction)) {
+      expect(applyActionToQuantity(10, action, 4)).toBe(
+        applyActionToQuantity(10, baseInvestmentAction(action), 4),
+      );
+    }
+  });
+
+  it("lists the share-moving refinements in SHARE_MOVING_ACTIONS", () => {
+    // A replay that filters by this list would otherwise silently drop every
+    // reinvested-interest and redemption row from history.
+    for (const action of [
+      InvestmentAction.REINVEST_INTEREST,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+      InvestmentAction.REDEEM,
+    ]) {
+      expect(SHARE_MOVING_ACTIONS).toContain(action);
+    }
+    expect(SHARE_MOVING_ACTIONS).not.toContain(
+      InvestmentAction.CAPITAL_GAIN_SHORT,
+    );
+    expect(SHARE_MOVING_ACTIONS).not.toContain(
+      InvestmentAction.CAPITAL_GAIN_LONG,
+    );
+  });
+
+  it("classifies the cash income refinements and the traded refinements", () => {
+    expect(CASH_INCOME_ACTIONS).toContain(InvestmentAction.CAPITAL_GAIN_SHORT);
+    expect(CASH_INCOME_ACTIONS).toContain(InvestmentAction.CAPITAL_GAIN_LONG);
+    expect(CASH_INCOME_ACTIONS).not.toContain(
+      InvestmentAction.REINVEST_INTEREST,
+    );
+    expect(MARKET_PRICED_TRADE_ACTIONS).toContain(InvestmentAction.REDEEM);
+    expect(MARKET_PRICED_TRADE_ACTIONS).toContain(
+      InvestmentAction.REINVEST_INTEREST,
+    );
+    expect(MARKET_PRICED_TRADE_ACTIONS).not.toContain(
+      InvestmentAction.TRANSFER_IN,
+    );
+  });
+});
 
 describe("applyActionToQuantity", () => {
   describe("acquisitions add shares", () => {
@@ -114,9 +191,16 @@ describe("applyActionToQuantity", () => {
 });
 
 describe("FUNDING_ACCOUNT_ACTIONS", () => {
-  it("is exactly BUY and SELL", () => {
+  it("is exactly BUY, SELL and the sale-like REDEEM", () => {
+    // REDEEM's base is SELL, so its proceeds route to a funding account the
+    // same way -- the form offers the field for it, and a set without it
+    // would silently clear what the form stored (issues #1149 + #1154).
     expect([...FUNDING_ACCOUNT_ACTIONS].sort()).toEqual(
-      [InvestmentAction.BUY, InvestmentAction.SELL].sort(),
+      [
+        InvestmentAction.BUY,
+        InvestmentAction.SELL,
+        InvestmentAction.REDEEM,
+      ].sort(),
     );
   });
 
@@ -125,7 +209,12 @@ describe("FUNDING_ACCOUNT_ACTIONS", () => {
       InvestmentAction.DIVIDEND,
       InvestmentAction.INTEREST,
       InvestmentAction.CAPITAL_GAIN,
+      InvestmentAction.CAPITAL_GAIN_SHORT,
+      InvestmentAction.CAPITAL_GAIN_LONG,
       InvestmentAction.REINVEST,
+      InvestmentAction.REINVEST_INTEREST,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
       InvestmentAction.ADD_SHARES,
       InvestmentAction.REMOVE_SHARES,
       InvestmentAction.SPLIT,

@@ -759,7 +759,13 @@
     "actionTransferOut": "Overboeking uit",
     "actionReinvest": "Herbeleggen",
     "actionAddShares": "Aandelen toevoegen",
-    "actionRemoveShares": "Aandelen verwijderen"
+    "actionRemoveShares": "Aandelen verwijderen",
+    "actionReinvestInterest": "Rente herbeleggen",
+    "actionReinvestCapitalGainShort": "Kortetermijnwinst herbeleggen",
+    "actionReinvestCapitalGainLong": "Langetermijnwinst herbeleggen",
+    "actionCapitalGainShort": "Kortetermijnkapitaalwinst",
+    "actionCapitalGainLong": "Langetermijnkapitaalwinst",
+    "actionRedeem": "CD/obligatie aflossen"
   },
   "loanAmortization": {
     "empty": "Geen lening- of hypotheekrekeningen gevonden. Voeg een leningrekening toe om de betalingsgeschiedenis te zien.",

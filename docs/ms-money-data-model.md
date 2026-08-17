@@ -90,10 +90,11 @@ DHD (hcrncDef) ───────> CRNC (hcrnc)            the file's base cu
 ACCT (hacctRel) ──────> ACCT (hacct)            investment/cash pairs
 ```
 
-Not every investment-related `TRN` row has a `TRN_INV` row. Cash dividends
-(`act` 4) and cash corporate actions (`act` 14) exist only in `TRN`. **Drive an
-investment importer from `TRN`, never from `TRN_INV`** -- iterating `TRN_INV`
-drops every dividend, which is exactly what the proof of concept did.
+Not every investment-related `TRN` row has a `TRN_INV` row. Cash dividends and
+interest (`act` 3 and 4) and cash corporate actions (`act` 14) exist only in
+`TRN`. **Drive an investment importer from `TRN`, never from `TRN_INV`** --
+iterating `TRN_INV` drops every dividend, which is exactly what the proof of
+concept did.
 
 ### `TRN.hpay` is `TRN.lHpay` in Money Plus
 
@@ -262,23 +263,43 @@ lot) and `TRN_XFER` (whether Money records a cash counterpart at all).
 | 1 | Buy | yes | 2,015 of 2,029 | BUY |
 | 2 | Sell | yes | 165 of 180 | SELL |
 | 3 | Cash dividend | **no** | 1,090 of 1,090 | DIVIDEND, amount from `TRN.amt` |
-| 4 | Second cash distribution | **no** | — | DIVIDEND + warning |
+| 4 | Interest paid to cash | **no** | — | INTEREST, amount from `TRN.amt` |
 | 5 | Reinvest (variant) | yes | — | REINVEST + warning |
 | 9 | Reinvested distribution | yes | **0 of 1,020** | REINVEST |
-| 12 | Units credited to a plan account | yes | **0 of 92** | REINVEST + warning |
+| 10 | Reinvest Interest | ? | — | REINVEST_INTEREST + warning |
+| 12 | Add Shares: units credited to a plan account | yes | **0 of 92** | REINVEST + warning |
 | 13 | Remove shares / close lots | yes | — | REMOVE_SHARES |
 | 14 | Cash corporate action | **no** | — | CAPITAL_GAIN + warning |
 | 15 | Add shares / open lots | yes | — | ADD_SHARES, or TRANSFER_IN when paired |
 | 16 | Remove shares / close lots | yes | — | REMOVE_SHARES, or TRANSFER_OUT when paired |
+| 24 | S-Term Cap Gains Dist, paid to cash | ? | — | CAPITAL_GAIN_SHORT + warning |
+| 26 | L-Term Cap Gains Dist, paid to cash | ? | — | CAPITAL_GAIN_LONG + warning |
+| 27 | Reinvest S-Term CG Dist | ? | — | REINVEST_CAPITAL_GAIN_SHORT + warning |
+| 29 | Reinvest L-Term CG Dist | ? | — | REINVEST_CAPITAL_GAIN_LONG + warning |
+| 30 | Redeem CD/Bond | ? | — | REDEEM + warning, amount from `TRN.amt` |
 | 32 / 33 | Share transfer in / out | yes | — | TRANSFER_IN / TRANSFER_OUT |
 | -1 | Regular non-investment transaction | no | — | — |
 
-`act` 5 and 14 have never been observed in any available file; 4 and 12 have been
-observed but Money's own name for them has not. All four are listed in
-`MNY_UNCONFIRMED_ACTIONS`, so every transaction mapped through them carries a
-warning rather than a silent mapping. `act` 10, 17, 18 and 20 occur in real files
-but open and close no lot, so nothing says what they do to a position: they stay
-unmapped and their rows are skipped and counted.
+`act` 5 and 14 have never been observed in any available file; 12 has been
+observed, and issue #1149 supplies Money's own name for it ("Add Shares") --
+Monize keeps mapping it to REINVEST so the stated value survives as cost basis.
+The `act` 10 / 24 / 26 / 27 / 29 / 30 family was named by issue #1149's reporter
+against Money's own register (the labels match Money's QIF vocabulary --
+`ReinvInt`, `CGShort`, `CGLong`, `ReinvSh`, `ReinvLg`), but no file measured
+here carries one, so their `TRN_INV` shape is marked `?` above. All of these are
+listed in `MNY_UNCONFIRMED_ACTIONS`, so every transaction mapped through them
+carries a warning rather than a silent mapping. `act` 4 is the code that
+graduated: its cash-only shape was measured on both Money Plus files, issue
+#1149 named it (Money's "Interest" activity, `IntInc` in QIF), and it now maps
+to INTEREST -- it imported as DIVIDEND while the name was unknown, which
+misfiled it for tax purposes. `act` 17, 18 and 20 occur in real files but open
+and close no lot and have no name, so nothing says what they do to a position:
+they stay unmapped and their rows are skipped and counted.
+
+Money's register displays these cash distributions positive while `TRN.amt`
+stores them with the file-side sign convention (the one that stores a BUY
+positive), so the raw amounts on flagged preview rows can read negative. The
+mapper discards the sign and takes direction from the action.
 
 > **Correction.** The original gives `0` Buy, `1` Sell, `3` Reinvest and `5`
 > Reinvest (variant). `LOT` disagrees at the first two: `act` 1 opens 3,520 lots
@@ -300,6 +321,14 @@ plan contribution, credited without passing through the member's cash.
 
 REINVEST is the Monize action that matches: a value and a position, no cash leg,
 cost basis preserved.
+
+Issue #1149 supplied Money's own name for the code: it is the "Add Shares"
+activity, which Money also uses for zero-quantity account true-ups and
+sub-account transfers that leave the parent account unchanged (those rows
+carry a price and a memo but move nothing, and import as valueless REINVEST
+rows). The REINVEST mapping is kept deliberately -- Monize's ADD_SHARES
+records shares with no cost, so mapping to it would discard the stated value
+that Money's Add Shares preserves as basis.
 
 #### `act` 16 closes lots; it is not a sale
 

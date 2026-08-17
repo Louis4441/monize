@@ -759,7 +759,13 @@
     "actionTransferOut": "Trasferimento in uscita",
     "actionReinvest": "Reinvestimento",
     "actionAddShares": "Aggiungi azioni",
-    "actionRemoveShares": "Rimuovi azioni"
+    "actionRemoveShares": "Rimuovi azioni",
+    "actionReinvestInterest": "Reinvestimento interessi",
+    "actionReinvestCapitalGainShort": "Reinvestimento plusvalenza a breve termine",
+    "actionReinvestCapitalGainLong": "Reinvestimento plusvalenza a lungo termine",
+    "actionCapitalGainShort": "Plusvalenza a breve termine",
+    "actionCapitalGainLong": "Plusvalenza a lungo termine",
+    "actionRedeem": "Rimborso CD/obbligazione"
   },
   "loanAmortization": {
     "empty": "Nessun conto di prestito o mutuo trovato. Aggiungi un conto di prestito per vedere lo storico pagamenti.",

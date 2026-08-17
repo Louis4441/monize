@@ -12,7 +12,17 @@ export type InvestmentAction =
   | 'TRANSFER_OUT'
   | 'REINVEST'
   | 'ADD_SHARES'
-  | 'REMOVE_SHARES';
+  | 'REMOVE_SHARES'
+  // Microsoft Money's full distribution vocabulary (issue #1149). Each is a
+  // refinement of a base action -- same share and cash behaviour, distinct
+  // income kind -- normalized through `baseInvestmentAction`
+  // (@/lib/investment-actions) wherever behaviour, not labelling, is decided.
+  | 'REINVEST_INTEREST'
+  | 'REINVEST_CAPITAL_GAIN_SHORT'
+  | 'REINVEST_CAPITAL_GAIN_LONG'
+  | 'CAPITAL_GAIN_SHORT'
+  | 'CAPITAL_GAIN_LONG'
+  | 'REDEEM';
 
 export type QuoteProviderName = 'yahoo' | 'msn';
 
