@@ -822,5 +822,6 @@ Colour themes are pure CSS variable overrides in `src/app/themes.css` (`html[dat
 
 - **Zod:** Configured with `jitless: true` (`zodConfig.ts`) for CSP compliance -- no `new Function()`
 - **Auth tokens:** Stored in httpOnly cookies (backend-managed), never in JS-accessible storage
+- **localStorage is readable by any XSS, and by any scanner pointed at a public page.** A store that persists there must be listed in `src/store/persisted-storage.guard.test.ts` with the reason its contents may sit in storage, and the pre-login footprint (`auth-storage` and `monize-preferences`, both empty envelopes) is pinned there byte for byte -- the ZAP baseline's rule 120000 is silenced in `.github/zap/rules.tsv` on exactly that claim, so widening a `partialize` fails the guard rather than shipping under an IGNORE written for a smaller footprint.
 - **CSP:** Per-request nonce generated in proxy, `strict-dynamic` for script-src
 - **ESLint:** `no-new-func: error` enforced to prevent CSP violations
