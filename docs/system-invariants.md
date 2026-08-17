@@ -34,12 +34,12 @@ Concurrency scope   account, user, holding, occurrence, token, provider key, glo
 Retry semantics     which retries are safe, and what prevents duplication
 Crash semantics     expected state before commit, after commit, mid-finalization
 Failure response    409, 404, null, reconcile, refuse, partial
-Required tests      per the planned verification contract (not yet committed)
+Required tests      per docs/verification-contract.md
 Status              enforced | partial | unenforced
 ```
 
 Two fields a reader might expect are deliberately absent. **CI owner** lives in
-the planned verification contract's section 4 instead, so the job names appear once
+`docs/verification-contract.md` section 4 instead, so the job names appear once
 rather than in thirty entries that would drift independently of the workflow.
 **Subsystem owner** is omitted because this project does not have per-subsystem
 owners; adding a column that would read "maintainer" throughout would be
@@ -489,8 +489,8 @@ Status              unenforced
 
 Note that the sentinel string is *asserted by tests* in both the frontend and
 backend suites. Those tests are green and protect the defect --
-the planned verification contract's section on known-wrong tests covers what to
-do with them.
+`docs/verification-contract.md` section 5, known-wrong tests, covers what to do
+with them.
 
 ### INV-ACTIVITY-001 -- activity is attributed to whoever acted
 
@@ -735,7 +735,7 @@ Required tests      A workflow self-test asserting the bump commit's parent is t
 Status              partial
 ```
 
-The planned release-integrity document has the full rules and gap register, including the
+`docs/release-integrity.md` has the full rules and gap register, including the
 unconditional `--passWithNoTests` on the integration suite.
 
 ## Candidates not yet admitted

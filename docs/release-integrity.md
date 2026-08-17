@@ -161,7 +161,11 @@ be verified by anyone without administrator access.
 
 **Current state:** no in-repo policy exists. `.github/` contains workflows plus
 `lighthouse/`, `zap/`, `zizmor.yml`, a PR template and a discussion template --
-no `settings.yml`, no ruleset export, no `CODEOWNERS`. Branch protection is
+no settings.yml, no ruleset export, no CODEOWNERS. Those three names are
+deliberately not written as inline paths: an inline span is this repository's
+idiom for "this file is here" (`backend/src/common/doc-paths.spec.ts` reads it
+that way and fails on a path that does not resolve), and the whole point of
+this section is that they are absent. Branch protection is
 described only in workflow comments, including a comment asserting that "Do not
 allow bypassing the above settings" is unchecked on the `main` rule. That
 assertion may be true, but nothing in the repository can confirm it, and
@@ -207,7 +211,7 @@ fail, not when a document describes it.
 | REL-004 post-gate commit proven or verified | **not enforced** | nothing checks the bump commit's parent or diff scope |
 | REL-005 no `[skip ci]` without that proof | **not enforced** | bump commit carries `[skip ci]` |
 | REL-006 bypass is exceptional | **not enforced** | admin PAT bypass is the standard release path |
-| REL-007 protection policy in-repo | **not enforced** | no `settings.yml` or ruleset export exists |
+| REL-007 protection policy in-repo | **not enforced** | no settings.yml or ruleset export exists |
 
 ## 7. Definition of done for a change to the release path
 
