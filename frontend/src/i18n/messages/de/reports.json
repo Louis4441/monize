@@ -759,7 +759,13 @@
     "actionTransferOut": "Überweisung aus",
     "actionReinvest": "Wiederanlage",
     "actionAddShares": "Anteile hinzufügen",
-    "actionRemoveShares": "Anteile entfernen"
+    "actionRemoveShares": "Anteile entfernen",
+    "actionReinvestInterest": "Wiederanlage von Zinsen",
+    "actionReinvestCapitalGainShort": "Wiederanlage kurzfristiger Kapitalerträge",
+    "actionReinvestCapitalGainLong": "Wiederanlage langfristiger Kapitalerträge",
+    "actionCapitalGainShort": "Kurzfristiger Kapitalertrag",
+    "actionCapitalGainLong": "Langfristiger Kapitalertrag",
+    "actionRedeem": "CD/Anleihe einlösen"
   },
   "loanAmortization": {
     "empty": "Keine Darlehens- oder Hypothekenkonten gefunden. Fügen Sie ein Darlehensskonto hinzu, um die Zahlungshistorie zu sehen.",

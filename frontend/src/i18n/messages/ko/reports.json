@@ -759,7 +759,13 @@
     "actionTransferOut": "이체 출금",
     "actionReinvest": "재투자",
     "actionAddShares": "수량 추가",
-    "actionRemoveShares": "수량 제거"
+    "actionRemoveShares": "수량 제거",
+    "actionReinvestInterest": "이자 재투자",
+    "actionReinvestCapitalGainShort": "단기 자본이득 재투자",
+    "actionReinvestCapitalGainLong": "장기 자본이득 재투자",
+    "actionCapitalGainShort": "단기 자본이득",
+    "actionCapitalGainLong": "장기 자본이득",
+    "actionRedeem": "CD/채권 상환"
   },
   "loanAmortization": {
     "empty": "대출 또는 주택 담보 대출 계정을 찾을 수 없습니다. 납부 이력을 보려면 대출 계정을 추가하세요.",

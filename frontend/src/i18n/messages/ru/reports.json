@@ -759,7 +759,13 @@
     "actionTransferOut": "Перевод исходящий",
     "actionReinvest": "Реинвестирование",
     "actionAddShares": "Добавить акции",
-    "actionRemoveShares": "Удалить акции"
+    "actionRemoveShares": "Удалить акции",
+    "actionReinvestInterest": "Реинвестирование процентов",
+    "actionReinvestCapitalGainShort": "Реинвестирование краткосрочного прироста капитала",
+    "actionReinvestCapitalGainLong": "Реинвестирование долгосрочного прироста капитала",
+    "actionCapitalGainShort": "Краткосрочный прирост капитала",
+    "actionCapitalGainLong": "Долгосрочный прирост капитала",
+    "actionRedeem": "Погашение CD/облигации"
   },
   "loanAmortization": {
     "empty": "Счета займов или ипотек не найдены. Добавьте счёт займа для просмотра истории платежей.",

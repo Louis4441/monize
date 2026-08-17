@@ -759,7 +759,13 @@
     "actionTransferOut": "Chuyển ra",
     "actionReinvest": "Tái đầu tư",
     "actionAddShares": "Thêm cổ phiếu",
-    "actionRemoveShares": "Xóa cổ phiếu"
+    "actionRemoveShares": "Xóa cổ phiếu",
+    "actionReinvestInterest": "Tái đầu tư lãi",
+    "actionReinvestCapitalGainShort": "Tái đầu tư lãi vốn ngắn hạn",
+    "actionReinvestCapitalGainLong": "Tái đầu tư lãi vốn dài hạn",
+    "actionCapitalGainShort": "Lãi vốn ngắn hạn",
+    "actionCapitalGainLong": "Lãi vốn dài hạn",
+    "actionRedeem": "Đáo hạn CD/trái phiếu"
   },
   "loanAmortization": {
     "empty": "Không tìm thấy tài khoản vay hoặc thế chấp. Thêm tài khoản vay để xem lịch sử thanh toán.",

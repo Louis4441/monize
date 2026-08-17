@@ -759,7 +759,13 @@
     "actionTransferOut": "Переказ з рахунку",
     "actionReinvest": "Реінвестувати",
     "actionAddShares": "Додати акції",
-    "actionRemoveShares": "Вилучити акції"
+    "actionRemoveShares": "Вилучити акції",
+    "actionReinvestInterest": "Реінвестування відсотків",
+    "actionReinvestCapitalGainShort": "Реінвестування короткострокового приросту капіталу",
+    "actionReinvestCapitalGainLong": "Реінвестування довгострокового приросту капіталу",
+    "actionCapitalGainShort": "Короткостроковий приріст капіталу",
+    "actionCapitalGainLong": "Довгостроковий приріст капіталу",
+    "actionRedeem": "Погашення CD/облігації"
   },
   "loanAmortization": {
     "empty": "Рахунків позики або іпотеки не знайдено. Додайте рахунок позики, щоб побачити історію платежів.",

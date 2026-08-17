@@ -759,7 +759,13 @@
     "actionTransferOut": "轉出",
     "actionReinvest": "再投資",
     "actionAddShares": "增加股數",
-    "actionRemoveShares": "減少股數"
+    "actionRemoveShares": "減少股數",
+    "actionReinvestInterest": "利息再投資",
+    "actionReinvestCapitalGainShort": "短期資本利得再投資",
+    "actionReinvestCapitalGainLong": "長期資本利得再投資",
+    "actionCapitalGainShort": "短期資本利得",
+    "actionCapitalGainLong": "長期資本利得",
+    "actionRedeem": "贖回定存單/債券"
   },
   "loanAmortization": {
     "empty": "找不到貸款或抵押貸款科目。請新增貸款科目以查看付款記錄。",

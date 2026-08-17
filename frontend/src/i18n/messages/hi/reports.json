@@ -759,7 +759,13 @@
     "actionTransferOut": "स्थानांतरण बाहर",
     "actionReinvest": "पुनः निवेश",
     "actionAddShares": "शेयर जोड़ें",
-    "actionRemoveShares": "शेयर हटाएँ"
+    "actionRemoveShares": "शेयर हटाएँ",
+    "actionReinvestInterest": "ब्याज का पुनर्निवेश",
+    "actionReinvestCapitalGainShort": "अल्पकालिक पूंजी लाभ का पुनर्निवेश",
+    "actionReinvestCapitalGainLong": "दीर्घकालिक पूंजी लाभ का पुनर्निवेश",
+    "actionCapitalGainShort": "अल्पकालिक पूंजी लाभ",
+    "actionCapitalGainLong": "दीर्घकालिक पूंजी लाभ",
+    "actionRedeem": "सीडी/बॉन्ड रिडीम करें"
   },
   "loanAmortization": {
     "empty": "कोई ऋण या बंधक खाता नहीं मिला। भुगतान इतिहास देखने के लिए एक ऋण खाता जोड़ें।",
