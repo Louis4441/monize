@@ -631,6 +631,29 @@ month's bars in a month-to-date chart, where they can become its high or low.
 A guard test asserts every member of `INTRADAY_RANGES` maps onto a range the
 endpoint accepts, so a fourth one cannot be added without a mapping.
 
+### A loan's payment, payoff and remaining interest are decided once -- `deriveLoanFigures`
+
+Three figures appear on every amortizing-debt surface (the loan detail page's
+summary cards, the transactions Details sidebar), and each one has a state that
+is neither a number nor "unknown":
+
+- A **settled** debt owes nothing, so its remaining interest is a known **zero**
+  and its payoff is "Paid off" -- not `null`, which reports a finished mortgage
+  as one that could not be worked out. Settled means *nothing outstanding*
+  (`-balance <= 0.01`), so an overpaid loan sitting in credit is settled too;
+  `Math.abs(balance) <= 0.01` read that credit as debt of the same size.
+- A projection that hits its horizon without paying off (`paidOff` false) has no
+  payoff date, and its accumulated interest is the interest over that horizon --
+  a subtotal. Both figures are unknown; printing the horizon's number under
+  "Est. Remaining Interest" is a total's label over a partial sum.
+
+`lib/loan-figures.ts` makes that decision once and both surfaces render its
+output. The data behind it comes from `hooks/useLoanProjection.ts` (which fetches
+the account's history) or from a `baseline` the caller already has -- but never
+from a second copy of the branching. A failed history load is `status: 'error'`
+with every figure unknown, never an empty history, which would project a
+plausible payoff date from no payments at all.
+
 ### An unknown value must not render as a measured zero
 
 The server goes to real trouble to send `null` rather than `0` for anything it
