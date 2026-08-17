@@ -332,6 +332,44 @@ the field is non-empty. A NaN or zero close is not a usable price -- gate the
 "Latest:" placeholder on a positive `roundedMarketPrice`, never a bare
 `marketPrice != null`, so it never renders as "Latest: NaN".
 
+### Two transaction lists, two opposite delete contracts -- read the tense
+
+`InvestmentTransactionList`'s `onDelete` **asks the parent to delete**: the list
+raises a confirmation and hands back an id. `TransactionList`'s `onDeleted`
+**reports a delete it already performed** -- it owns the confirmation, the
+`transactionsApi.delete`/`deleteTransfer` call and the toast. The two are a few
+lines apart in `InvestmentRegisterPanel`, and a handler written for the first
+shape and wired to the second deleted every cash row twice: the second request
+404'd on the row the first had removed, so the user got "Transaction deleted"
+and "not found" side by side (issue #1192). Worse for a transfer, where the list
+correctly calls `deleteTransfer` and the parent then calls the plain `delete`.
+
+Reach for `onRefresh` to reload after a delete, and for `onDeleted` only when
+you need the id itself (an optimistic removal, a counterpart to drop) -- never to
+perform the delete. `ui-conventions.test.ts` scans every `<TransactionList` for
+an `onDeleted` handler that deletes, in both the named and inline forms.
+
+**The signal has to reach whatever else is derived from those rows.** The panel's
+own reload is not the page: the account detail view draws the portfolio summary,
+the allocation and the Holdings by Account list -- cash row included -- above it,
+and a cash deposit that only reloaded the register left all three at their
+pre-write figures until the page was reloaded by hand (issue #1190). Dropping the
+caches is half of it; `invalidateBalanceCaches` only makes the *next* fetch
+honest, and nothing mounted refetches on its own. `InvestmentRegisterPanel` raises
+`onDataChanged` after every write for exactly this, and `InvestmentDetailView`
+re-runs its load from it.
+
+**A form's account list is a property of the form, not of the page that opened
+it.** The same `InvestmentTransactionForm` is mounted from the Investments page
+and from an account's detail page, and only the first passed `allAccounts` -- so
+"Funds From (optional)" on the detail page offered nothing but the account's own
+linked cash, which is the one option the field exists to replace (issue #1191).
+When a surface mounts a shared form against a narrower scope, narrow the *scope*
+props (`accounts`, `defaultAccountId`) and keep supplying the wide ones. A failed
+lookup there stays `undefined`, never `[]`: the form reads undefined as "not
+supplied" and falls back, while an empty array is a claim that the user has no
+other accounts.
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 Two patterns, depending on where it lives:

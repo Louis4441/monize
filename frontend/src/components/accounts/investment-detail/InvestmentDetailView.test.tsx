@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor } from '@/test/render';
+import { render, screen, act, waitFor, fireEvent } from '@/test/render';
 import { InvestmentDetailView } from './InvestmentDetailView';
 import type { Account } from '@/types/account';
 
@@ -22,6 +22,17 @@ vi.mock('@/components/investments/GroupedHoldingsList', () => ({
 }));
 vi.mock('@/components/investments/InvestmentTransactionList', () => ({
   InvestmentTransactionList: () => <div data-testid="inv-tx-list" />,
+}));
+// The register panel raises `onDataChanged` after any write on either ledger.
+// The stub exposes that signal as a button so the wiring above it can be tested
+// without driving a whole delete or form submission through the real panel --
+// which has its own tests for when the signal is raised.
+vi.mock('@/components/investments/InvestmentRegisterPanel', () => ({
+  InvestmentRegisterPanel: ({ onDataChanged }: { onDataChanged?: () => void }) => (
+    <button type="button" onClick={onDataChanged}>
+      register wrote
+    </button>
+  ),
 }));
 vi.mock('@/components/reports/RefreshPricesButton', () => ({
   RefreshPricesButton: () => <button type="button">Refresh Prices</button>,
@@ -145,6 +156,22 @@ describe('InvestmentDetailView', () => {
     });
 
     await waitFor(() => expect(mockGetPortfolioSummary).toHaveBeenCalledTimes(2));
+  });
+
+  // Issue #1190: a cash deposit changed the cash balance the Holdings by Account
+  // list draws, and only the register below it reloaded -- the holdings, the
+  // summary card and the allocation kept their pre-write figures until the page
+  // was reloaded by hand.
+  it('re-fetches the holdings and summary when the register reports a write', async () => {
+    await renderView();
+    await waitFor(() => expect(mockGetPortfolioSummary).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'register wrote' }));
+    });
+
+    await waitFor(() => expect(mockGetPortfolioSummary).toHaveBeenCalledTimes(2));
+    expect(mockGetInvestmentPair).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to a standalone brokerage when there is no pair', async () => {
