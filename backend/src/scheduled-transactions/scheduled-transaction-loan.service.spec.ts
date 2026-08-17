@@ -3,7 +3,7 @@ import { DataSource } from "typeorm";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
-import { Account } from "../accounts/entities/account.entity";
+import { Account, AccountType } from "../accounts/entities/account.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -73,6 +73,13 @@ describe("ScheduledTransactionLoanService", () => {
       save: jest
         .fn()
         .mockImplementation((entity: any) => Promise.resolve(entity)),
+      // recalculateLoanPaymentSplits now re-reads the child set under the parent
+      // lock (issue #1154 re-review) instead of using the entity's relation;
+      // mirror whatever splits the mocked scheduled transaction carries.
+      find: jest.fn(async () => {
+        const st = await scheduledTransactionsRepository.findOne();
+        return (st && st.splits) || [];
+      }),
     };
 
     accountsRepository = {
@@ -105,10 +112,7 @@ describe("ScheduledTransactionLoanService", () => {
       const scheduledTx = makeScheduledTransaction();
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       // Should save both splits with updated amounts
       expect(splitsRepository.save).toHaveBeenCalledTimes(2);
@@ -165,10 +169,7 @@ describe("ScheduledTransactionLoanService", () => {
         } as never);
         scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const principalSave = splitsRepository.save.mock.calls.find(
           (call: any) => call[0].transferAccountId === loanAccountId,
@@ -195,10 +196,7 @@ describe("ScheduledTransactionLoanService", () => {
           makeScheduledTransaction(),
         );
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         expect(scheduledTransactionsRepository.update).not.toHaveBeenCalled();
       });
@@ -239,10 +237,7 @@ describe("ScheduledTransactionLoanService", () => {
         } as never);
         scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const saved = Object.fromEntries(
           splitsRepository.save.mock.calls.map((call: any) => [
@@ -300,10 +295,7 @@ describe("ScheduledTransactionLoanService", () => {
         } as never);
         scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const saved = Object.fromEntries(
           splitsRepository.save.mock.calls.map((call: any) => [
@@ -361,10 +353,7 @@ describe("ScheduledTransactionLoanService", () => {
         } as never);
         scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const saved = splitsRepository.save.mock.calls.map((call: any) => [
           call[0].id,
@@ -425,10 +414,7 @@ describe("ScheduledTransactionLoanService", () => {
           } as never),
         );
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const extraSave = splitsRepository.save.mock.calls.find(
           (call: any) => call[0].id === "split-extra",
@@ -476,10 +462,7 @@ describe("ScheduledTransactionLoanService", () => {
           } as never),
         );
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const saved = splitsRepository.save.mock.calls.map((call: any) => [
           call[0].id,
@@ -512,10 +495,7 @@ describe("ScheduledTransactionLoanService", () => {
           makeScheduledTransaction({ amount: -500 }),
         );
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const principalSave = splitsRepository.save.mock.calls.find(
           (call: any) => call[0].transferAccountId === loanAccountId,
@@ -567,10 +547,7 @@ describe("ScheduledTransactionLoanService", () => {
           } as never),
         );
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const update = scheduledTransactionsRepository.update.mock.calls.find(
           (call: any) => call[1]?.amount !== undefined,
@@ -625,10 +602,7 @@ describe("ScheduledTransactionLoanService", () => {
           } as never),
         );
 
-        await service.recalculateLoanPaymentSplits(
-          scheduledTransactionId,
-          loanAccountId,
-        );
+        await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
         const extraSave = splitsRepository.save.mock.calls.find(
           (call: any) => call[0].id === "split-extra",
@@ -652,10 +626,7 @@ describe("ScheduledTransactionLoanService", () => {
       const scheduledTx = makeScheduledTransaction();
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       expect(scheduledTransactionsRepository.update).toHaveBeenCalledWith(
         scheduledTransactionId,
@@ -670,10 +641,7 @@ describe("ScheduledTransactionLoanService", () => {
       const scheduledTx = makeScheduledTransaction();
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       expect(scheduledTransactionsRepository.update).toHaveBeenCalledWith(
         scheduledTransactionId,
@@ -681,26 +649,26 @@ describe("ScheduledTransactionLoanService", () => {
       );
     });
 
-    it("should return early when loan account is not found", async () => {
+    it("should return early when no loan account is found among the splits", async () => {
+      // The scheduled transaction and its splits exist, but none of the
+      // transfer targets is a LOAN/MORTGAGE account (issue #1154 re-review:
+      // the loan is derived from the current split set, not a passed id).
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction(),
+      );
       accountsRepository.findOne.mockResolvedValue(null);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
-      expect(scheduledTransactionsRepository.findOne).not.toHaveBeenCalled();
       expect(splitsRepository.save).not.toHaveBeenCalled();
+      expect(scheduledTransactionsRepository.update).not.toHaveBeenCalled();
     });
 
     it("should return early when scheduled transaction is not found", async () => {
       accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
       scheduledTransactionsRepository.findOne.mockResolvedValue(null);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       expect(splitsRepository.save).not.toHaveBeenCalled();
     });
@@ -711,10 +679,7 @@ describe("ScheduledTransactionLoanService", () => {
         makeScheduledTransaction({ isActive: false }),
       );
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       expect(splitsRepository.save).not.toHaveBeenCalled();
     });
@@ -731,10 +696,7 @@ describe("ScheduledTransactionLoanService", () => {
       });
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       // Should have called save - we verify the calculation used BIWEEKLY rate
       // by checking the interest amount is different from monthly
@@ -750,10 +712,7 @@ describe("ScheduledTransactionLoanService", () => {
       const scheduledTx = makeScheduledTransaction();
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       expect(splitsRepository.save).toHaveBeenCalledTimes(2);
     });
@@ -768,10 +727,7 @@ describe("ScheduledTransactionLoanService", () => {
       const scheduledTx = makeScheduledTransaction();
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       // With 0% interest, all payment goes to principal
       const interestSave = splitsRepository.save.mock.calls.find(
@@ -788,10 +744,7 @@ describe("ScheduledTransactionLoanService", () => {
       const scheduledTx = makeScheduledTransaction({ splits: null as any });
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       // principalSplit and interestSplit will be undefined
       // So save should not be called
@@ -805,26 +758,22 @@ describe("ScheduledTransactionLoanService", () => {
       const scheduledTx = makeScheduledTransaction({ splits: [] as any });
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       expect(splitsRepository.save).not.toHaveBeenCalled();
     });
 
-    it("should load scheduled transaction with splits relation", async () => {
+    it("should lock the parent scheduled transaction before recalculating", async () => {
       accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
       scheduledTransactionsRepository.findOne.mockResolvedValue(null);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
+      // The recalculation mutates the child split set, so it must serialize on
+      // the same parent lock the posting path takes (issue #1154 re-review).
       expect(scheduledTransactionsRepository.findOne).toHaveBeenCalledWith({
         where: { id: scheduledTransactionId },
-        relations: ["splits"],
+        lock: { mode: "pessimistic_write" },
       });
     });
 
@@ -862,10 +811,7 @@ describe("ScheduledTransactionLoanService", () => {
       });
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       const interestSave = splitsRepository.save.mock.calls.find(
         (call: any) => call[0].categoryId === "cat-interest",
@@ -878,6 +824,56 @@ describe("ScheduledTransactionLoanService", () => {
       );
       // next_principal = 500 - 98 = 402
       expect(principalSave[0].amount).toBe(-402);
+    });
+
+    it("should recalculate a LINE_OF_CREDIT schedule (not only LOAN/MORTGAGE)", async () => {
+      // LoanPaymentSetupService accepts LINE_OF_CREDIT, so its scheduled payment
+      // must advance its next principal/interest split too (issue #1154
+      // re-review). balance=910, rate=12%, monthly, payment=100:
+      // periodicRate = 0.12/12 = 0.01
+      // next_interest  = 10 - 90 * 0.01 = 9.10
+      // next_principal = 100 - 9.10   = 90.90
+      const locAccount = makeLoanAccount({
+        accountType: AccountType.LINE_OF_CREDIT,
+        currentBalance: -910,
+        interestRate: 12,
+        paymentFrequency: "MONTHLY",
+        paymentAmount: 100,
+      });
+      accountsRepository.findOne.mockResolvedValue(locAccount);
+
+      const scheduledTx = makeScheduledTransaction({
+        amount: -100,
+        splits: [
+          {
+            id: "split-principal",
+            transferAccountId: loanAccountId,
+            categoryId: null,
+            amount: -90,
+            memo: "Principal",
+          },
+          {
+            id: "split-interest",
+            transferAccountId: null,
+            categoryId: "cat-interest",
+            amount: -10,
+            memo: "Interest",
+          },
+        ] as any,
+      });
+      scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      const interestSave = splitsRepository.save.mock.calls.find(
+        (call: any) => call[0].categoryId === "cat-interest",
+      );
+      expect(interestSave[0].amount).toBe(-9.1);
+
+      const principalSave = splitsRepository.save.mock.calls.find(
+        (call: any) => call[0].transferAccountId === loanAccountId,
+      );
+      expect(principalSave[0].amount).toBe(-90.9);
     });
 
     it("should use mortgage-specific rate calculation for MORTGAGE accounts", async () => {
@@ -917,10 +913,7 @@ describe("ScheduledTransactionLoanService", () => {
       });
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       expect(splitsRepository.save).toHaveBeenCalledTimes(2);
 
@@ -971,10 +964,7 @@ describe("ScheduledTransactionLoanService", () => {
       });
       scheduledTransactionsRepository.findOne.mockResolvedValue(scheduledTx);
 
-      await service.recalculateLoanPaymentSplits(
-        scheduledTransactionId,
-        loanAccountId,
-      );
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
 
       const interestSave = splitsRepository.save.mock.calls.find(
         (call: any) => call[0].categoryId === "cat-interest",

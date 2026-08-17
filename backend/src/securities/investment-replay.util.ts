@@ -138,6 +138,30 @@ export const CASH_INCOME_ACTIONS: readonly InvestmentAction[] = [
 ];
 
 /**
+ * The only actions allowed to use an explicit funding account: a BUY draws the
+ * purchase cost from it, a SELL deposits the proceeds into it. Cash-bearing
+ * DIVIDEND / INTEREST / CAPITAL_GAIN settle against the brokerage's linked cash
+ * account; REINVEST and the share-only actions have no external cash leg at all.
+ * So a funding account stored on any non-BUY/SELL action is stale and must never
+ * route the money (issue #1154).
+ *
+ * Centralized so the scheduled-transaction service (which clears the column on
+ * write and ignores it on post) and the MNY import writer (which must not
+ * persist one on a non-funding action) share one authority rather than each
+ * spelling out `{BUY, SELL}` and drifting apart.
+ *
+ * REDEEM is a sale in behaviour (`baseInvestmentAction`), so its proceeds
+ * route to a funding account exactly as a SELL's do -- the transaction form
+ * offers the field for it, and a set without it would silently clear what the
+ * form stored.
+ */
+export const FUNDING_ACCOUNT_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
+  InvestmentAction.BUY,
+  InvestmentAction.SELL,
+  InvestmentAction.REDEEM,
+]);
+
+/**
  * Whether an action adds shares to a position without supplying a cost for
  * them. Basis-carrying replays must record that the basis they computed is
  * incomplete rather than treating the shares as free.

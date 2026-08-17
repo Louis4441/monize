@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "As transações de investimento agendadas requerem uma conta de corretagem",
     "notFound": "Transação agendada com ID {{ id }} não encontrada",
     "occurrenceAlreadyPosted": "Esta ocorrência já foi lançada.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Só é possível usar outra moeda numa transação agendada simples, não numa divisão, transferência ou investimento",
     "fxRateUnavailable": "Não há uma taxa de câmbio disponível de {{ from }} para {{ to }} em {{ date }}. Introduza o montante em {{ to }} para a lançar.",
     "investmentActionRequired": "A ação de investimento é obrigatória para transações de investimento agendadas",

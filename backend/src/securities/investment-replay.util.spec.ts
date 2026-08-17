@@ -5,6 +5,7 @@ import {
   applyActionToQuantity,
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
+  FUNDING_ACCOUNT_ACTIONS,
   isQuantityOnlyAction,
   MARKET_PRICED_TRADE_ACTIONS,
   SHARE_MOVING_ACTIONS,
@@ -186,6 +187,40 @@ describe("applyActionToQuantity", () => {
       (action) => applyActionToQuantity(10, action, 2) !== 10,
     );
     expect([...SHARE_MOVING_ACTIONS].sort()).toEqual(moving.sort());
+  });
+});
+
+describe("FUNDING_ACCOUNT_ACTIONS", () => {
+  it("is exactly BUY, SELL and the sale-like REDEEM", () => {
+    // REDEEM's base is SELL, so its proceeds route to a funding account the
+    // same way -- the form offers the field for it, and a set without it
+    // would silently clear what the form stored (issues #1149 + #1154).
+    expect([...FUNDING_ACCOUNT_ACTIONS].sort()).toEqual(
+      [
+        InvestmentAction.BUY,
+        InvestmentAction.SELL,
+        InvestmentAction.REDEEM,
+      ].sort(),
+    );
+  });
+
+  it("excludes cash-only and share-only actions", () => {
+    for (const action of [
+      InvestmentAction.DIVIDEND,
+      InvestmentAction.INTEREST,
+      InvestmentAction.CAPITAL_GAIN,
+      InvestmentAction.CAPITAL_GAIN_SHORT,
+      InvestmentAction.CAPITAL_GAIN_LONG,
+      InvestmentAction.REINVEST,
+      InvestmentAction.REINVEST_INTEREST,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+      InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+      InvestmentAction.ADD_SHARES,
+      InvestmentAction.REMOVE_SHARES,
+      InvestmentAction.SPLIT,
+    ]) {
+      expect(FUNDING_ACCOUNT_ACTIONS.has(action)).toBe(false);
+    }
   });
 });
 

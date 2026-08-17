@@ -12,6 +12,7 @@ import {
   Min,
   Max,
   MaxLength,
+  IsPositive,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { CreateScheduledTransactionSplitDto } from "./create-scheduled-transaction-split.dto";
@@ -170,7 +171,7 @@ export class CreateScheduledTransactionDto {
 
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 10 })
-  @Min(0)
+  @IsPositive()
   investmentExchangeRate?: number;
 
   @IsOptional()

@@ -363,6 +363,7 @@
     "requiresBrokerageAccount": "Geplande beleggingstransacties vereisen een brokerage-rekening",
     "notFound": "Geplande transactie met ID {{ id }} niet gevonden",
     "occurrenceAlreadyPosted": "Deze keer is al geboekt.",
+    "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
     "fxPlainOnly": "Een andere valuta kan alleen bij een gewone geplande transactie, niet bij een splitsing, overboeking of belegging",
     "fxRateUnavailable": "Er is voor {{ date }} geen wisselkoers beschikbaar voor {{ from }} naar {{ to }}. Voer het bedrag in {{ to }} in om te boeken.",
     "investmentActionRequired": "Beleggingsactie is vereist voor geplande beleggingstransacties",

@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
-import { Account } from "../accounts/entities/account.entity";
+import { Account, AccountType } from "../accounts/entities/account.entity";
 import { PaymentFrequency } from "../accounts/loan-amortization.util";
 import {
   getPeriodicRate,
@@ -14,6 +14,18 @@ import { roundMoney } from "../common/round.util";
 import { allocateLoanPayment } from "../accounts/loan-payment-waterfall.util";
 import { withScopedDb } from "../common/db/scoped-db";
 
+// The account types that carry a scheduled loan-payment structure and therefore
+// need their next principal/interest split advanced after each posting. This set
+// must stay in step with what `LoanPaymentSetupService` accepts when it creates
+// that structure -- it accepts LOAN, MORTGAGE and LINE_OF_CREDIT, so a LOC left
+// out of the recalculation would keep billing the first installment's split
+// forever (issue #1154 re-review).
+const LOAN_LIKE_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set([
+  AccountType.LOAN,
+  AccountType.MORTGAGE,
+  AccountType.LINE_OF_CREDIT,
+]);
+
 @Injectable()
 export class ScheduledTransactionLoanService {
   private readonly logger = new Logger(ScheduledTransactionLoanService.name);
@@ -22,27 +34,47 @@ export class ScheduledTransactionLoanService {
 
   async recalculateLoanPaymentSplits(
     scheduledTransactionId: string,
-    loanAccountId: string,
   ): Promise<void> {
     return withScopedDb(this.dataSource, async (m) => {
-      const loanAccount = await m.getRepository(Account).findOne({
-        where: { id: loanAccountId },
-      });
-
-      if (!loanAccount) {
-        return;
-      }
-
+      // This writer mutates the child split set, so it must serialize through
+      // the same parent lock the posting path takes (issue #1154 re-review): a
+      // recalculation that changed principal/interest without the lock could
+      // land between a poster's split-set guard and its write, and because a
+      // P/I reallocation leaves the parent total unchanged, the poster's own
+      // parent lock would not have blocked it. Lock the parent, then read the
+      // current child set and derive the loan from it -- never from a loan id
+      // captured off a pre-lock snapshot.
       const scheduledTransaction = await m
         .getRepository(ScheduledTransaction)
         .findOne({
           where: { id: scheduledTransactionId },
-          relations: ["splits"],
+          lock: { mode: "pessimistic_write" },
         });
 
       if (!scheduledTransaction || !scheduledTransaction.isActive) {
         return;
       }
+
+      const splits = await m.getRepository(ScheduledTransactionSplit).find({
+        where: { scheduledTransactionId },
+      });
+
+      let loanAccount: Account | null = null;
+      for (const split of splits) {
+        if (!split.transferAccountId) continue;
+        const candidate = await m.getRepository(Account).findOne({
+          where: { id: split.transferAccountId },
+        });
+        if (candidate && LOAN_LIKE_ACCOUNT_TYPES.has(candidate.accountType)) {
+          loanAccount = candidate;
+          break;
+        }
+      }
+
+      if (!loanAccount) {
+        return;
+      }
+      const loanAccountId = loanAccount.id;
 
       const currentBalance = Math.abs(Number(loanAccount.currentBalance));
 
@@ -57,8 +89,6 @@ export class ScheduledTransactionLoanService {
       const interestRate = Number(loanAccount.interestRate) || 0;
       const frequency = (loanAccount.paymentFrequency ||
         scheduledTransaction.frequency) as PaymentFrequency;
-
-      const splits = scheduledTransaction.splits || [];
 
       // Identify splits: there may be a regular principal transfer, an interest
       // category split, and optionally a separate extra principal transfer.
@@ -258,11 +288,7 @@ export class ScheduledTransactionLoanService {
           const account = await m.getRepository(Account).findOne({
             where: { id: split.transferAccountId },
           });
-          if (
-            account &&
-            (account.accountType === "LOAN" ||
-              account.accountType === "MORTGAGE")
-          ) {
+          if (account && LOAN_LIKE_ACCOUNT_TYPES.has(account.accountType)) {
             return account.id;
           }
         }
