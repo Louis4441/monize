@@ -15,7 +15,9 @@ vi.mock('@/components/investments/AssetAllocationChart', () => ({
   AssetAllocationChart: () => <div data-testid="allocation" />,
 }));
 vi.mock('@/components/investments/InvestmentValueChart', () => ({
-  InvestmentValueChart: () => <div data-testid="value-chart" />,
+  InvestmentValueChart: ({ refreshKey }: { refreshKey?: number }) => (
+    <div data-testid="value-chart">{refreshKey}</div>
+  ),
 }));
 vi.mock('@/components/investments/GroupedHoldingsList', () => ({
   GroupedHoldingsList: () => <div data-testid="holdings" />,
@@ -172,6 +174,22 @@ describe('InvestmentDetailView', () => {
 
     await waitFor(() => expect(mockGetPortfolioSummary).toHaveBeenCalledTimes(2));
     expect(mockGetInvestmentPair).toHaveBeenCalledTimes(2);
+  });
+
+  // The value chart fetches its own series and has its own sessionStorage cache,
+  // so re-running this component's load says nothing to it -- the write has to
+  // reach it as a prop.
+  it('passes the write through to the value chart', async () => {
+    await renderView();
+    expect(screen.getByTestId('value-chart')).toHaveTextContent('0');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'register wrote' }));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('value-chart')).toHaveTextContent('1'),
+    );
   });
 
   it('falls back to a standalone brokerage when there is no pair', async () => {

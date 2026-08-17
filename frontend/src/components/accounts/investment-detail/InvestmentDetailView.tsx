@@ -117,7 +117,11 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
           accountIds={accountIds}
           valuationComplete={summary?.valuationComplete}
         />
-        <InvestmentValueChart accountIds={accountIds} displayCurrency={currency} />
+        <InvestmentValueChart
+          accountIds={accountIds}
+          displayCurrency={currency}
+          refreshKey={writeKey}
+        />
       </div>
 
       <GroupedHoldingsList

@@ -359,6 +359,18 @@ honest, and nothing mounted refetches on its own. `InvestmentRegisterPanel` rais
 `onDataChanged` after every write for exactly this, and `InvestmentDetailView`
 re-runs its load from it.
 
+**A sibling that fetches for itself needs the signal as a prop, not as a
+re-render.** Re-running the parent's load refreshes what the parent fetched, and
+`InvestmentValueChart` fetches its own series -- so the write reaches it as
+`refreshKey`, the same convention the header's price refresh uses. Two details it
+cannot skip: the intraday series is served from `sessionStorage`, so a re-fetch
+that trusted the cache hands back the pre-write points (drop it with
+`clearAllIntradayCache` and pass `skipCache`), and the effect must gate on the
+key it has already **acted on** rather than on running -- `loadData` changes
+identity on every range, account and currency change, and the load effect already
+covers those, so an ungated second effect fetches twice for each of them and
+again on any mount under a non-zero key.
+
 **A form's account list is a property of the form, not of the page that opened
 it.** The same `InvestmentTransactionForm` is mounted from the Investments page
 and from an account's detail page, and only the first passed `allAccounts` -- so
