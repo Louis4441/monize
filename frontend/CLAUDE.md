@@ -189,6 +189,28 @@ selectable, parents included**. A bare leaf name is ambiguous once two parents
 own the same leaf, and a picker shaped differently from the transaction form's
 reads as a second component. `CategorySwitcher` carries the regression tests.
 
+**A picker the user types into creates through `createCategoryFromInput`
+(`lib/category-create.ts`), and never inline.** It owns title casing and the
+`Parent: Child` shorthand -- create or reuse the parent, then the child under
+it -- and returns every row it created so the caller can append all of them to
+its own list, not only the leaf. Three inline copies of that parsing existed
+and the scheduled transaction form's had none of it, so `travel: hotels` became
+a child of Travel in two fields and one flat category named "Travel: Hotels" in
+the third. The guard in `src/test/ui-conventions.test.ts` fails on a second
+`categoriesApi.create` call site outside the helper and the Categories page's
+own full create form.
+
+Whether a picker *offers* to create is a property of the surface, not of the
+field: a form that can create passes the creator to **every** category picker it
+renders, its split lines included. `SplitEditor`'s lines silently discarded text
+matching no category while the Category field beside them offered "+ Create"
+(issue #1187) -- the split copy was the same `Combobox` missing
+`allowCustomValue` and `onCreateNew`. An asynchronous create addresses the row
+it came from **by id**: rows can be added, removed or reordered while the
+request is in flight, and the new category's `isIncome` comes from what the
+creator returned, since the parent's appended list has not re-rendered the
+editor yet.
+
 ### An account balance is coloured by its sign -- `balanceColor`, never by account type
 
 `balanceColor` (`lib/format.ts`) is the one rule: negative is red, everything
