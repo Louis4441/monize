@@ -145,10 +145,10 @@ export interface OverrideSplit {
     commission?: number;
     exchangeRate?: number;
     // Currency pair the stored `exchangeRate` was resolved for (issue #1167).
-    // Derived server-side when the rate is stored; posting reuses the rate only
-    // when this pair still matches the current settlement pair. Absent on
-    // override payloads written before this change (those keep the old
-    // trust-the-scalar behaviour).
+    // Derived server-side when the rate is freshly resolved (override create);
+    // posting reuses the rate only when this pair still matches the current
+    // settlement pair. Absent means unknown -- an unknown pair is re-resolved at
+    // posting, not trusted.
     exchangeRateFromCurrency?: string;
     exchangeRateToCurrency?: string;
   };

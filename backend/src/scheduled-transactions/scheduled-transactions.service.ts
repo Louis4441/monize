@@ -589,11 +589,16 @@ export class ScheduledTransactionsService {
 
   /**
    * Whether a stored FX rate may be reused for the current settlement pair
-   * (issue #1167). A rate with no recorded pair (a row written before the
-   * provenance change) is trusted as before; a rate whose recorded pair still
-   * matches the current one is reused; a rate whose recorded pair no longer
-   * matches is stale and must be re-resolved, so this returns false and the
-   * caller forwards no rate.
+   * (issue #1167). A rate is reused only when its recorded pair still matches
+   * the current settlement pair; a rate whose recorded pair no longer matches --
+   * or that carries no recorded pair at all -- is not proven to belong to the
+   * current pair, so this returns false and the caller forwards no rate, letting
+   * the posting resolver re-resolve (and fail loudly if no current rate exists)
+   * rather than posting a rate for an unknown pair.
+   *
+   * A missing pair is "unknown", not "current": every rate the app writes after
+   * #1167 carries its pair, so the only rows without one predate the migration,
+   * and an unprovable scalar must never be applied to a pair it may not describe.
    */
   private async storedInvestmentRateIsCurrent(
     userId: string,
@@ -606,8 +611,8 @@ export class ScheduledTransactionsService {
     },
   ): Promise<boolean> {
     if (!storedFrom || !storedTo) {
-      // No provenance: keep the pre-#1167 behaviour of trusting the scalar.
-      return true;
+      // No recorded pair: unknown, not current -- re-resolve rather than trust.
+      return false;
     }
     const pair =
       await this.investmentTransactionsService.resolveSettlementCurrencyPair(
@@ -799,7 +804,15 @@ export class ScheduledTransactionsService {
       const savedRow = await repo.save(scheduledTransaction);
 
       if (hasSplits && !isTransfer) {
-        await this.createSplits(savedRow.id, splits, m, userId, account.id);
+        // Create: the split rates are freshly supplied, so stamp their pair.
+        await this.createSplits(
+          savedRow.id,
+          splits,
+          m,
+          userId,
+          account.id,
+          true,
+        );
       }
 
       return savedRow;
@@ -1000,6 +1013,13 @@ export class ScheduledTransactionsService {
     // account, so there is no separate funding account.
     userId: string,
     accountId: string,
+    // Whether to stamp the current settlement pair onto each split rate. True
+    // only when the rate is genuinely fresh (schedule create). On an update the
+    // form resends the stored scalar unchanged, so stamping the current pair
+    // would relabel a since-stale rate as belonging to the new pair (issue #1167
+    // review); those rows are written with a null pair instead, so posting
+    // re-resolves rather than trusting an unprovable scalar.
+    stampProvenance: boolean,
   ): Promise<ScheduledTransactionSplit[]> {
     const savedSplits: ScheduledTransactionSplit[] = [];
 
@@ -1029,7 +1049,9 @@ export class ScheduledTransactionsService {
             : SplitKind.CATEGORY;
 
       const investmentRateProvenance =
-        inferredKind === SplitKind.INVESTMENT && split.investment
+        stampProvenance &&
+        inferredKind === SplitKind.INVESTMENT &&
+        split.investment
           ? await this.resolveInvestmentRateProvenance(
               userId,
               split.investment.exchangeRate ?? null,
@@ -1733,22 +1755,48 @@ export class ScheduledTransactionsService {
       }
 
       // Keep the rate's currency-pair provenance in lockstep with the rate
-      // itself (issue #1167). Whenever this edit writes the rate -- to a value
-      // or to null -- record (or clear) the pair for the effective settlement
-      // tuple being written; an edit that leaves the rate untouched leaves the
-      // pair untouched too.
+      // itself (issue #1167), and stamp a *fresh* pair only for a *fresh* rate.
+      // The scheduled form resends the stored scalar on every save, so a field
+      // being present is not the same as its value changing -- restamping the
+      // current pair onto an unchanged scalar would relabel a since-stale rate
+      // as belonging to the new pair and destroy the evidence that made it
+      // detectable as stale (issue #1167 review). So:
+      //   - rate cleared  -> clear the pair;
+      //   - rate unchanged -> preserve the stored pair (a since-changed currency
+      //     is then still caught at posting, because the old pair no longer
+      //     matches the current one);
+      //   - rate genuinely changed -> it was just resolved for the current pair,
+      //     so record the current pair.
       if (fieldsToUpdate.investmentExchangeRate !== undefined) {
-        const provenance = await this.resolveInvestmentRateProvenance(
-          userId,
-          fieldsToUpdate.investmentExchangeRate as number | null,
-          {
-            accountId: updateData.accountId ?? scheduled.accountId,
-            fundingAccountId: effectiveFundingForFx,
-            securityId: effectiveSecurityIdForFx,
-          },
-        );
-        fieldsToUpdate.investmentExchangeRateFromCurrency = provenance.from;
-        fieldsToUpdate.investmentExchangeRateToCurrency = provenance.to;
+        const writtenRate = fieldsToUpdate.investmentExchangeRate as
+          | number
+          | null;
+        const rateUnchanged =
+          writtenRate !== null &&
+          scheduled.investmentExchangeRate !== null &&
+          scheduled.investmentExchangeRate !== undefined &&
+          Number(writtenRate) === Number(scheduled.investmentExchangeRate);
+        if (writtenRate === null) {
+          fieldsToUpdate.investmentExchangeRateFromCurrency = null;
+          fieldsToUpdate.investmentExchangeRateToCurrency = null;
+        } else if (rateUnchanged) {
+          fieldsToUpdate.investmentExchangeRateFromCurrency =
+            scheduled.investmentExchangeRateFromCurrency ?? null;
+          fieldsToUpdate.investmentExchangeRateToCurrency =
+            scheduled.investmentExchangeRateToCurrency ?? null;
+        } else {
+          const provenance = await this.resolveInvestmentRateProvenance(
+            userId,
+            writtenRate,
+            {
+              accountId: updateData.accountId ?? scheduled.accountId,
+              fundingAccountId: effectiveFundingForFx,
+              securityId: effectiveSecurityIdForFx,
+            },
+          );
+          fieldsToUpdate.investmentExchangeRateFromCurrency = provenance.from;
+          fieldsToUpdate.investmentExchangeRateToCurrency = provenance.to;
+        }
       }
     }
 
@@ -1795,6 +1843,10 @@ export class ScheduledTransactionsService {
             m,
             userId,
             updateData.accountId ?? current.accountId,
+            // Update: the form resends stored split rates unchanged, so do not
+            // stamp the current pair onto them (issue #1167 review). They are
+            // written with a null pair and re-resolved at posting.
+            false,
           );
           await m.update(ScheduledTransaction, id, {
             isSplit: true,
@@ -2800,17 +2852,15 @@ export class ScheduledTransactionsService {
     overrideId: string,
     updateDto: UpdateScheduledTransactionOverrideDto,
   ): Promise<ScheduledTransactionOverride> {
-    const scheduled = await this.findOne(userId, scheduledTransactionId);
-    const investmentProvenance = await this.resolveOverrideSplitProvenance(
-      userId,
-      scheduled.accountId,
-      updateDto.splits,
-    );
+    await this.findOne(userId, scheduledTransactionId);
+    // Deliberately no provenance derivation here (issue #1167 review): an
+    // override edit resends the stored split rate unchanged, so stamping the
+    // current pair onto it would relabel a since-stale rate. The override's
+    // split rates are written with no pair on update and re-resolved at posting.
     return this.overrideService.updateOverride(
       scheduledTransactionId,
       overrideId,
       updateDto,
-      investmentProvenance,
     );
   }
 

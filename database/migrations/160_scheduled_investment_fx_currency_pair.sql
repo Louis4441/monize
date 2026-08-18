@@ -11,9 +11,10 @@
 -- These columns make the rate self-describing: the posting path re-derives the
 -- current (source currency, settlement currency) pair and reuses the stored
 -- rate only when it still matches, otherwise re-resolves. Nullable and derived
--- server-side whenever a rate is stored; a NULL pair on a pre-existing row keeps
--- the old trust-the-scalar behaviour (no backfill -- deriving the pair in SQL
--- would be a second copy of the derivation the contract keeps in one place).
+-- server-side whenever a rate is stored; a NULL pair (a pre-existing row, or a
+-- rate round-tripped through an edit) is treated as unknown, so the stored
+-- scalar is re-resolved rather than trusted (no backfill -- deriving the pair in
+-- SQL would be a second copy of the derivation the contract keeps in one place).
 -- The override surface stores its pair inside the splits jsonb, so it needs no
 -- column here.
 

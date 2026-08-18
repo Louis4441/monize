@@ -71,16 +71,16 @@ For each surface, before forwarding a stored rate into the posting resolver:
   as absent and forward nothing, so `resolveCashExchangeRate` re-resolves a fresh
   rate for the current pair.
 - If the stored rate has **no provenance** (a row written before this change) ->
-  forward it unchanged. This is deliberate backward compatibility: a pre-existing
-  stored rate keeps working exactly as it did (a stored scalar was the only
-  fallback guaranteeing that posting could succeed when a market rate is
-  unavailable, and silently dropping it could turn a working schedule into a
-  posting failure). Every rate the system writes *after* this change carries
-  provenance and is therefore protected; the unprotected window is only rows that
-  predate the migration, and no UI or `.mny`-import path ever stored a rate, so
-  in practice there are none. No backfill is attempted, because backfilling the
-  pair in SQL would be a second, drift-prone copy of the pair derivation the
-  contract insists lives in one place.
+  it is *unknown*, not *current*, so it is also treated as absent and
+  re-resolved. A scalar that cannot be proven to describe the current pair must
+  never be applied to it -- consistent with the codebase rule that `null`/unknown
+  is never silently substituted for a settled value. If no current rate can be
+  resolved, the posting fails loudly (the resolver throws `exchangeRateUnavailable`)
+  rather than committing a rate for an unknown pair. Every rate the app writes
+  *after* this change carries its pair, so the only unprovenanced rows are ones
+  that predate the migration; no backfill is attempted, because deriving the pair
+  in SQL would be a second, drift-prone copy of the derivation this contract keeps
+  in one place.
 
 ## Invariants
 

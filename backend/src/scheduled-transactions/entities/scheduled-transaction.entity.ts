@@ -267,9 +267,11 @@ export class ScheduledTransaction {
   investmentExchangeRate: number | null;
 
   // Currency pair the stored `investmentExchangeRate` was resolved for (issue
-  // #1167). Written whenever a rate is stored, cleared with it; posting reuses
-  // the rate only when this pair still matches the current settlement pair. NULL
-  // on rows written before this column existed (those keep the old behaviour).
+  // #1167). Written whenever a rate is freshly resolved, cleared with the rate;
+  // posting reuses the rate only when this pair still matches the current
+  // settlement pair. NULL means the pair is unknown (a pre-#1167 row, or a rate
+  // round-tripped through an edit), and an unknown pair is re-resolved, not
+  // trusted.
   @Column({
     type: "varchar",
     length: 3,
