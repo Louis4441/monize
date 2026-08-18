@@ -40,20 +40,20 @@ export function useCashFilterOptions(
   useEffect(() => {
     if (!enabled || loadedKeyRef.current === key) return;
     loadedKeyRef.current = key;
-    let cancelled = false;
     transactionsApi
       .getRegisterFilterOptions(accountIds)
       .then((next) => {
-        if (!cancelled) setOptions(next);
+        // The ref decides whether this answer is still the one being asked
+        // for -- a cleanup flag cannot, because React's development StrictMode
+        // mounts, unmounts and remounts, so the flag discards the only request
+        // that ever ran and the pickers stay empty for the session.
+        if (loadedKeyRef.current === key) setOptions(next);
       })
       .catch((error) => {
         logger.error('Failed to load cash filter options:', error);
         // Not an empty ledger: let the next attempt through.
         if (loadedKeyRef.current === key) loadedKeyRef.current = null;
       });
-    return () => {
-      cancelled = true;
-    };
     // `accountIds` is a fresh array on every render; `key` is its identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, key]);

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@/test/render';
 import { renderHook } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
@@ -171,6 +172,19 @@ describe('useCashFilterOptions', () => {
     rerender({ ids: ['cash-1', 'cash-2'] });
     await waitFor(() => expect(getOptions).toHaveBeenCalledTimes(2));
     expect(getOptions).toHaveBeenLastCalledWith(['cash-1', 'cash-2']);
+  });
+
+  it('still lands its options under a double-invoked effect', async () => {
+    // React's development StrictMode mounts, unmounts and remounts, so a
+    // cleanup flag that discards the response throws away the only request
+    // that ever ran -- the second pass finds the key already claimed and starts
+    // none. Both pickers then read "No options found" for the whole session,
+    // which is exactly what dev showed while the tests were green.
+    const { result } = renderHook(() => useCashFilterOptions(true, ['cash-1']), {
+      wrapper: StrictMode,
+    });
+
+    await waitFor(() => expect(result.current.payees).toHaveLength(1));
   });
 
   it('leaves a failed lookup retryable rather than reporting an empty ledger', async () => {

@@ -287,12 +287,13 @@ vi.mock('@/components/investments/GroupedHoldingsList', () => ({
 vi.mock('@/components/investments/InvestmentTransactionList', () => ({
   // The pager and the density toggle live in the list's own strip now, so the
   // stub reports the paging it was handed rather than the page drawing one.
-  InvestmentTransactionList: ({ transactions, onDelete, onEdit, onNewTransaction, onFiltersChange, filters, viewToggle, currentPage, totalPages, totalItems, availableActions }: any) => (
+  InvestmentTransactionList: ({ transactions, onDelete, onEdit, onNewTransaction, onFiltersChange, filters, viewToggle, currentPage, totalPages, totalItems, availableActions, availableSymbols }: any) => (
     <div data-testid="transaction-list">
       {viewToggle}
       <span>{transactions.length} transactions</span>
       <span data-testid="brokerage-paging">{`${currentPage ?? ''}/${totalPages ?? ''} of ${totalItems ?? ''}`}</span>
       <span data-testid="brokerage-actions">{(availableActions ?? []).join(',')}</span>
+      <span data-testid="brokerage-symbols">{(availableSymbols ?? []).join(',')}</span>
       {transactions.map((t: any) => (
         <div key={t.id} data-testid={`itx-${t.id}`}>
           <button data-testid={`delete-${t.id}`} onClick={() => onDelete(t.id)}>Delete</button>
@@ -402,7 +403,7 @@ describe('InvestmentsPage', () => {
     mockGetAllCategories.mockResolvedValue([]);
     mockGetAllPayees.mockResolvedValue([]);
     mockGetFilterOptions.mockResolvedValue({ payees: [], categories: [] });
-    mockGetInvestmentFilterOptions.mockResolvedValue({ actions: [] });
+    mockGetInvestmentFilterOptions.mockResolvedValue({ actions: [], symbols: [] });
   });
 
   describe('Rendering', () => {
@@ -804,6 +805,24 @@ describe('InvestmentsPage', () => {
       await waitFor(() => {
         expect(screen.getByTestId('brokerage-actions')).toHaveTextContent('BUY,SELL');
       });
+    });
+
+    it('offers the symbols the rows use, not the ones still held', async () => {
+      // The picker was built from `portfolioSummary.holdings`, so a position
+      // sold in full was not offered -- and its trades are exactly the rows
+      // somebody filtering by symbol is looking for. The summary here holds
+      // AAPL and GOOG; the register's own rows are what the picker follows.
+      mockGetInvestmentFilterOptions.mockResolvedValue({
+        actions: ['SELL'],
+        symbols: ['TSLA'],
+      });
+
+      await renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('brokerage-symbols')).toHaveTextContent('TSLA');
+      });
+      expect(screen.getByTestId('brokerage-symbols')).not.toHaveTextContent('AAPL');
     });
 
     it('draws no second pager of its own below the register', async () => {

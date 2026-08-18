@@ -148,7 +148,6 @@ async function renderPanel(
   holdingsAccount: Account,
   cashAccount: Account | null,
   onDataChanged?: () => void,
-  availableSymbols?: string[],
 ) {
   await act(async () => {
     render(
@@ -164,7 +163,6 @@ async function renderPanel(
         <InvestmentRegisterPanel
           holdingsAccount={holdingsAccount}
           cashAccount={cashAccount}
-          availableSymbols={availableSymbols}
           onDataChanged={onDataChanged}
         />
       </NextIntlClientProvider>,
@@ -220,7 +218,7 @@ describe('InvestmentRegisterPanel', () => {
     ).mockResolvedValue({ payees: [], categories: [] });
     (
       investmentsApi.getRegisterFilterOptions as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({ actions: [] });
+    ).mockResolvedValue({ actions: [], symbols: [] });
     (accountsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue([
       brokerage,
       cash,
@@ -530,6 +528,14 @@ describe('InvestmentRegisterPanel', () => {
         payees: [{ id: 'payee-1', name: 'Payroll' }],
         categories: [{ id: 'cat-1', name: 'Investments', parentId: null }],
       });
+      (
+        investmentsApi.getRegisterFilterOptions as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        // XEQT is not held any more; its trades are still in the register, and
+        // are exactly what somebody filtering by symbol tends to be after.
+        actions: ['BUY', 'SELL'],
+        symbols: ['VTI', 'XEQT'],
+      });
     });
 
     /** Open the filter row of whichever register is on screen. */
@@ -540,15 +546,15 @@ describe('InvestmentRegisterPanel', () => {
     };
 
     it('offers the brokerage register a filter row', async () => {
-      await renderPanel(brokerage, cash, undefined, ['VTI', 'XEQT']);
+      await renderPanel(brokerage, cash);
       await openFilters();
 
       expect(screen.getByLabelText('Symbol')).toBeInTheDocument();
       expect(screen.getByLabelText('Action')).toBeInTheDocument();
     });
 
-    it('offers the symbols the account holds, not every symbol in the catalog', async () => {
-      await renderPanel(brokerage, cash, undefined, ['VTI', 'XEQT']);
+    it('offers the symbols the rows use, sold-out positions included', async () => {
+      await renderPanel(brokerage, cash);
       await openFilters();
 
       const symbolPicker = screen.getByLabelText('Symbol');
@@ -560,7 +566,7 @@ describe('InvestmentRegisterPanel', () => {
     });
 
     it('narrows the trades to the chosen symbol', async () => {
-      await renderPanel(brokerage, cash, undefined, ['VTI', 'XEQT']);
+      await renderPanel(brokerage, cash);
       await openFilters();
 
       await act(async () => {
@@ -596,6 +602,41 @@ describe('InvestmentRegisterPanel', () => {
         expect(transactionsApi.getRegisterFilterOptions).toHaveBeenCalledWith([
           'cash',
         ]);
+      });
+    });
+
+    it('keeps the rows on screen while a filter reload runs', async () => {
+      // Swapping the table for three skeleton lines shortens the page under the
+      // reader, and the browser answers by scrolling to the top -- which is
+      // what applying a filter here used to do. The rows stay until the next
+      // payload lands.
+      let resolveSecond!: (value: unknown) => void;
+      await renderPanel(brokerage, cash);
+      // The table is what the skeleton branch replaces, so the table is what
+      // has to survive the reload.
+      const rowCount = () => document.querySelectorAll('tbody tr').length;
+      await waitFor(() => expect(rowCount()).toBeGreaterThan(0));
+
+      (investmentsApi.getTransactions as ReturnType<typeof vi.fn>).mockReturnValue(
+        new Promise((res) => {
+          resolveSecond = res;
+        }),
+      );
+      await openFilters();
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Symbol'), {
+          target: { value: 'VTI' },
+        });
+      });
+
+      // Mid-flight: the previous page's rows are still drawn.
+      expect(rowCount()).toBeGreaterThan(0);
+
+      await act(async () => {
+        resolveSecond({
+          data: [trade],
+          pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+        });
       });
     });
 

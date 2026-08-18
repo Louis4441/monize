@@ -99,11 +99,6 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
 
   const accountIds = cash ? [brokerage.id, cash.id] : [brokerage.id];
   const currency = brokerage.currencyCode;
-  // The register's Symbol filter offers what this account holds. The summary
-  // above already carries them, so the picker costs no second request.
-  const heldSymbols = [
-    ...new Set((summary?.holdings ?? []).map((h) => h.symbol)),
-  ].sort();
 
   return (
     <div className="space-y-6">
@@ -148,7 +143,6 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
       <InvestmentRegisterPanel
         holdingsAccount={brokerage}
         cashAccount={cash}
-        availableSymbols={heldSymbols}
         onDataChanged={handleRegisterWrite}
       />
     </div>

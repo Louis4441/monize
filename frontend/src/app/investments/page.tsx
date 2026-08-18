@@ -79,9 +79,9 @@ function InvestmentsContent() {
   // ledgers actually use. Keyed off the view being on screen rather than the
   // click that reaches it -- the view is remembered, so it is reachable
   // without one.
-  // The brokerage filter's Action picker offers what these accounts have
-  // actually done, the same way the cash filter's pickers do.
-  const brokerageActions = useBrokerageFilterOptions(data.selectedAccountIds);
+  // The brokerage filter offers what these accounts have actually traded, the
+  // same way the cash filter's pickers do.
+  const brokerageOptions = useBrokerageFilterOptions(data.selectedAccountIds);
 
   const cashFilterOptions = useCashFilterOptions(
     transactionView === 'cash',
@@ -262,8 +262,8 @@ function InvestmentsContent() {
                   onStatusChanged={data.handleFormCreateAndNew}
                   filters={data.transactionFilters}
                   onFiltersChange={data.handleFiltersChange}
-                  availableSymbols={[...new Set(data.portfolioSummary?.holdings.map(h => h.symbol) || [])].sort()}
-                  availableActions={brokerageActions}
+                  availableSymbols={brokerageOptions.symbols}
+                  availableActions={brokerageOptions.actions}
                   viewToggle={
                     <InvestmentViewToggle
                       value={transactionView}

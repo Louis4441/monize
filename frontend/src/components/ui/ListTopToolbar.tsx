@@ -10,7 +10,12 @@ interface ListTopToolbarProps {
   /**
    * Paging state. Supply all five or none: with them the bar carries the
    * pager and the buttons ride on its right, without them it is the buttons
-   * alone. A single page needs no pager, so the bar drops it below two.
+   * alone.
+   *
+   * A single page keeps the pager too. Its buttons are inert there, but the
+   * line beside them -- "Showing 1-7 of 7 transactions" -- is the answer to
+   * "did that filter work?", and hiding it exactly when a filter has narrowed
+   * the list to one page takes the count away at the moment it is being read.
    */
   currentPage?: number;
   totalPages?: number;
@@ -55,7 +60,6 @@ export function ListTopToolbar({
   const showPagination =
     currentPage !== undefined &&
     totalPages !== undefined &&
-    totalPages > 1 &&
     totalItems !== undefined &&
     pageSize !== undefined &&
     onPageChange !== undefined;

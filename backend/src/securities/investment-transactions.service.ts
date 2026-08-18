@@ -2325,28 +2325,37 @@ export class InvestmentTransactionsService {
   }
 
   /**
-   * The actions the register's rows actually use, for its Action picker.
+   * The actions and symbols the register's rows actually use, for its filter.
    *
-   * The vocabulary is twenty-odd actions wide -- reinvested short-term capital
+   * The action vocabulary is twenty-odd wide -- reinvested short-term capital
    * gains, redemptions, share transfers -- and a household brokerage uses four
    * of them. Offering all twenty as ways to narrow six rows is a list to read
    * rather than a filter to use.
    *
-   * Returned in the enum's own order, so the picker's order is a property of
-   * the vocabulary rather than of whichever action happened to be traded first.
+   * Symbols come from the rows for a sharper reason than length: the picker used
+   * to be built from *current holdings*, so a position sold in full was not
+   * offered -- and its trades are exactly the rows somebody filtering by symbol
+   * is usually looking for. A filter offers what the list contains, not what the
+   * portfolio still holds.
+   *
+   * Actions are returned in the enum's own order, so the picker's order is a
+   * property of the vocabulary rather than of whichever action happened to be
+   * traded first; symbols are alphabetical, having no such order of their own.
    */
   async getRegisterFilterOptions(
     userId: string,
     accountIds?: string[],
-  ): Promise<{ actions: InvestmentAction[] }> {
+  ): Promise<{ actions: InvestmentAction[]; symbols: string[] }> {
     return withScopedDb(this.dataSource, async (m) => {
       // includes VOID rows: the register lists them, struck through, so the
-      // picker has to offer the action of a voided row or the filter cannot
-      // find it.
+      // picker has to offer the action and symbol of a voided row or the filter
+      // cannot find it.
       const query = m
         .getRepository(InvestmentTransaction)
         .createQueryBuilder("it")
+        .leftJoin("it.security", "security")
         .select("it.action", "action")
+        .addSelect("security.symbol", "symbol")
         .distinct(true)
         .where("it.userId = :userId", { userId });
 
@@ -2355,10 +2364,21 @@ export class InvestmentTransactionsService {
         query.andWhere("it.accountId IN (:...allIds)", { allIds });
       }
 
-      const rows = await query.getRawMany<{ action: InvestmentAction }>();
-      const used = new Set(rows.map((r) => r.action));
+      const rows = await query.getRawMany<{
+        action: InvestmentAction;
+        symbol: string | null;
+      }>();
+      const usedActions = new Set(rows.map((r) => r.action));
+      // A row can have no security at all -- an interest posting against the
+      // cash ledger -- and a blank option is not a symbol to filter by.
+      const usedSymbols = new Set(
+        rows.map((r) => r.symbol).filter((s): s is string => !!s),
+      );
       return {
-        actions: Object.values(InvestmentAction).filter((a) => used.has(a)),
+        actions: Object.values(InvestmentAction).filter((a) =>
+          usedActions.has(a),
+        ),
+        symbols: [...usedSymbols].sort(),
       };
     });
   }

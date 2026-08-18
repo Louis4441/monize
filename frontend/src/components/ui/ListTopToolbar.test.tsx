@@ -57,8 +57,10 @@ describe('ListTopToolbar', () => {
     expect(screen.getByTitle('Toggle row density')).toBeInTheDocument();
   });
 
-  it('draws no pager for a single page', () => {
-    // One page is not a place to be lost in.
+  it('keeps the count on a single page, which is where a filter lands', () => {
+    // "Showing 1-7 of 7" is the answer to "did that filter work?", so hiding it
+    // exactly when a filter has narrowed the list to one page takes the count
+    // away at the moment it is being read.
     renderToolbar(
       <ListTopToolbar
         densityView="transactions"
@@ -67,10 +69,15 @@ describe('ListTopToolbar', () => {
         totalItems={7}
         pageSize={25}
         onPageChange={vi.fn()}
+        itemName="transactions"
       />,
     );
 
-    expect(screen.queryByTitle('Next page')).not.toBeInTheDocument();
+    // The line is assembled from several nodes, so it is matched as text.
+    expect(document.body.textContent).toContain('Showing');
+    expect(document.body.textContent).toContain('of');
+    expect(screen.getAllByText('7').length).toBeGreaterThan(0);
+    expect(screen.getByTitle('Next page')).toBeDisabled();
   });
 
   it('draws no pager when the paging props are not supplied', () => {

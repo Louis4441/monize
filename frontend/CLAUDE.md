@@ -470,11 +470,41 @@ for the users who live there.
 
 The brokerage side asks the same question of its own vocabulary:
 `useBrokerageFilterOptions` (`hooks/useBrokerageFilterOptions.ts`) fetches the
-actions those accounts have actually used, and the picker offers those rather
-than all twenty-odd. Absent or empty is "no information" -- still loading, or the
-lookup failed -- so the list keeps offering everything; and whatever is currently
-selected stays in the control even when the rows no longer use it, or the list is
-narrowed by something the user can neither see nor undo.
+actions and symbols those accounts have actually used, and the pickers offer
+those rather than all twenty-odd actions. Absent or empty is "no information" --
+still loading, or the lookup failed -- so the action list keeps offering
+everything; and whatever is currently selected stays in the control even when the
+rows no longer use it, or the list is narrowed by something the user can neither
+see nor undo. **Symbols come from the rows, never from current holdings**: the
+picker was built from `portfolioSummary.holdings`, so a position sold in full was
+not offered, and its trades are exactly the rows somebody filtering by symbol is
+looking for.
+
+**A one-shot fetch guarded by a ref cannot also be cancelled in its cleanup.**
+Both option hooks latch a `loadedKeyRef` so a re-render does not re-ask, and both
+originally set a `cancelled` flag in the effect's cleanup. Under React's
+development StrictMode -- which Next.js has on -- an effect runs, is cleaned up,
+and runs again: the first pass claims the key and starts the only request, the
+cleanup marks it cancelled, and the second pass finds the key already claimed and
+starts nothing. The response is then discarded and the pickers sit empty for the
+whole session, which is what "No options found" and an Action picker still
+offering all twenty were. Let the ref decide instead -- adopt the response while
+`loadedKeyRef.current === key` -- which also drops an answer a newer selection has
+overtaken. Testing Library does not double-invoke effects, so this class of defect
+is only caught by a test that renders the hook inside `<StrictMode>`; both hooks
+carry one.
+
+**A register that has rows keeps them while the next page loads.** Answering a
+filter or page change with a skeleton swaps a table for three lines, the page
+shortens under the reader, and the browser scrolls to the top -- which is what
+applying a filter on the account detail page used to do. Gate the skeleton on
+there being nothing to show yet (`loadedKey === null`), not on a request being in
+flight; the Investments page's `hasLoadedRef` is the same decision.
+
+**A pager stays drawn when a filter narrows the list to one page.** The buttons
+are inert there, but the line beside them -- "Showing 1-7 of 7 transactions" --
+is the answer to "did that filter work?", and hiding it exactly when a filter has
+just been applied takes the count away at the moment it is being read.
 
 **A nav tab is lit by the section a page belongs to, not by an exact path.**
 `isNavSectionActive` (`lib/nav-section.ts`) is that one predicate, used by the

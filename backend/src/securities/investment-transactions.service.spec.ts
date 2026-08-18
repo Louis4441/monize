@@ -195,6 +195,8 @@ describe("InvestmentTransactionsService", () => {
       ),
     getCount: jest.fn().mockResolvedValue(count),
     select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
     distinct: jest.fn().mockReturnThis(),
     getRawMany: jest
       .fn()
@@ -1398,14 +1400,22 @@ describe("InvestmentTransactionsService", () => {
   });
 
   describe("getRegisterFilterOptions", () => {
-    const optionsFor = (actions: InvestmentAction[]) => {
-      const qb = createMockQueryBuilder(actions.map((action) => ({ action })));
+    /** The distinct (action, symbol) pairs the register's rows hold. */
+    const optionsFor = (
+      rows: Array<{ action: InvestmentAction; symbol?: string | null }>,
+    ) => {
+      const qb = createMockQueryBuilder(
+        rows.map((r) => ({ action: r.action, symbol: r.symbol ?? null })),
+      );
       investmentTransactionsRepository.createQueryBuilder.mockReturnValue(qb);
       return qb;
     };
 
     it("returns only the actions the rows use", async () => {
-      optionsFor([InvestmentAction.SELL, InvestmentAction.BUY]);
+      optionsFor([
+        { action: InvestmentAction.SELL, symbol: "XEQT" },
+        { action: InvestmentAction.BUY, symbol: "VTI" },
+      ]);
 
       const result = await service.getRegisterFilterOptions(userId);
 
@@ -1418,7 +1428,10 @@ describe("InvestmentTransactionsService", () => {
     it("orders them by the vocabulary, not by what was traded first", async () => {
       // The picker's order is a property of the action list; deriving it from
       // the rows would reshuffle the control as the ledger grows.
-      optionsFor([InvestmentAction.SELL, InvestmentAction.BUY]);
+      optionsFor([
+        { action: InvestmentAction.SELL, symbol: "XEQT" },
+        { action: InvestmentAction.BUY, symbol: "VTI" },
+      ]);
 
       const result = await service.getRegisterFilterOptions(userId);
       const vocabulary = Object.values(InvestmentAction);
@@ -1428,6 +1441,33 @@ describe("InvestmentTransactionsService", () => {
           [InvestmentAction.BUY, InvestmentAction.SELL].includes(a),
         ),
       );
+    });
+
+    it("offers the symbols the rows use, sold-out positions included", async () => {
+      // The picker used to be built from current holdings, so a position sold
+      // in full was not offered -- and its trades are exactly what somebody
+      // filtering by symbol is looking for.
+      optionsFor([
+        { action: InvestmentAction.SELL, symbol: "XEQT" },
+        { action: InvestmentAction.BUY, symbol: "VTI" },
+      ]);
+
+      const result = await service.getRegisterFilterOptions(userId);
+
+      expect(result.symbols).toEqual(["VTI", "XEQT"]);
+    });
+
+    it("offers no blank symbol for a row that has no security", async () => {
+      // An interest posting against the cash ledger carries none, and a blank
+      // option is not a symbol to filter by.
+      optionsFor([
+        { action: InvestmentAction.INTEREST, symbol: null },
+        { action: InvestmentAction.BUY, symbol: "VTI" },
+      ]);
+
+      const result = await service.getRegisterFilterOptions(userId);
+
+      expect(result.symbols).toEqual(["VTI"]);
     });
 
     it("offers nothing for an account with no trades", async () => {
@@ -1447,7 +1487,7 @@ describe("InvestmentTransactionsService", () => {
       accountsService.findByIds.mockResolvedValue([
         { id: accountId, linkedAccountId: "cash-account-id" },
       ]);
-      const qb = optionsFor([InvestmentAction.BUY]);
+      const qb = optionsFor([{ action: InvestmentAction.BUY, symbol: "VTI" }]);
 
       await service.getRegisterFilterOptions(userId, [accountId]);
 
@@ -1457,7 +1497,7 @@ describe("InvestmentTransactionsService", () => {
     });
 
     it("asks about every account when none is named", async () => {
-      const qb = optionsFor([InvestmentAction.BUY]);
+      const qb = optionsFor([{ action: InvestmentAction.BUY, symbol: "VTI" }]);
 
       await service.getRegisterFilterOptions(userId);
 

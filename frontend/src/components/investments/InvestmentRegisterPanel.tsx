@@ -48,14 +48,6 @@ interface InvestmentRegisterPanelProps {
    */
   cashAccount: Account | null;
   /**
-   * The symbols this account holds, for the brokerage filter's Symbol picker.
-   * The detail view already has them on the portfolio summary it fetched, so
-   * they come in rather than being fetched again here. Absent while that
-   * summary is still loading -- an empty list is a picker with nothing in it,
-   * which is the right thing to show until it arrives.
-   */
-  availableSymbols?: string[];
-  /**
    * Raised after any write on either ledger, so the surrounding view can
    * re-fetch what it derives from these rows. A cash deposit moves the cash
    * balance the Holdings by Account list is showing, and reloading this panel
@@ -78,7 +70,6 @@ interface InvestmentRegisterPanelProps {
 export function InvestmentRegisterPanel({
   holdingsAccount,
   cashAccount,
-  availableSymbols = [],
   onDataChanged,
 }: InvestmentRegisterPanelProps) {
   const t = useTranslations('accountDetail-investment');
@@ -141,7 +132,12 @@ export function InvestmentRegisterPanel({
     JSON.stringify(brokerageFilters),
     JSON.stringify(cashFilters),
   ].join('|');
-  const isLoading = loadedKey !== requestKey;
+  // Skeletons only before there is anything to show. Once the register has
+  // rows, a filter or a page change keeps them on screen while the next
+  // request runs: swapping a table for three skeleton lines shortens the page
+  // under the reader, and the browser answers by scrolling them to the top --
+  // which is what applying a filter here used to do.
+  const isFirstLoad = loadedKey === null;
 
   useEffect(() => {
     let cancelled = false;
@@ -270,10 +266,10 @@ export function InvestmentRegisterPanel({
   // register is simply the register.
   const activeView: InvestmentTransactionView = cashAccount ? view : 'brokerage';
 
-  // What the brokerage filter's Action picker offers: what this account has
-  // actually done. Asked for whichever ledger is showing, because the register
-  // query resolves the pair either way.
-  const brokerageActions = useBrokerageFilterOptions([holdingsAccountId]);
+  // What the brokerage filter offers: what this account has actually traded.
+  // Asked for whichever ledger is showing, because the register query resolves
+  // the pair either way.
+  const brokerageOptions = useBrokerageFilterOptions([holdingsAccountId]);
 
   // What the cash filter's pickers offer: this ledger's own payees and
   // categories, fetched while its register is the one on screen.
@@ -292,7 +288,7 @@ export function InvestmentRegisterPanel({
             densityView="accountRegister"
             transactions={brokerageTx}
             accounts={accountsForForm}
-            isLoading={isLoading}
+            isLoading={isFirstLoad}
             onDelete={handleDeleteBrokerage}
             onEdit={brokerageForm.openEdit}
             onNewTransaction={brokerageForm.openCreate}
@@ -300,8 +296,8 @@ export function InvestmentRegisterPanel({
             viewToggle={toggle}
             filters={brokerageFilters}
             onFiltersChange={handleBrokerageFiltersChange}
-            availableSymbols={availableSymbols}
-            availableActions={brokerageActions}
+            availableSymbols={brokerageOptions.symbols}
+            availableActions={brokerageOptions.actions}
             currentPage={brokeragePage}
             totalPages={Math.ceil(brokerageTotal / PAGE_SIZE) || 1}
             totalItems={brokerageTotal}

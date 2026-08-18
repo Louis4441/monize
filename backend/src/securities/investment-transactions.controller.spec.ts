@@ -33,7 +33,9 @@ describe("InvestmentTransactionsController", () => {
       transferSecurity: jest.fn(),
       getSecurityTransactionHistory: jest.fn(),
       findAll: jest.fn(),
-      getRegisterFilterOptions: jest.fn().mockResolvedValue({ actions: [] }),
+      getRegisterFilterOptions: jest
+        .fn()
+        .mockResolvedValue({ actions: [], symbols: [] }),
       getSummary: jest.fn(),
       getRealizedGains: jest.fn(),
       getCapitalGainsByMonth: jest.fn(),
