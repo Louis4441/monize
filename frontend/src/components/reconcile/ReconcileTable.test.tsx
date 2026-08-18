@@ -5,7 +5,7 @@ import type { ComponentProps } from 'react';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 
 vi.mock('@/hooks/useDateFormat', () => ({
-  useDateFormat: () => ({ formatDate: (d: string) => String(d) }),
+  useDateFormat: () => ({ dateFormat: 'browser', datePattern: 'YYYY-MM-DD', formatDate: (d: string) => String(d) }),
 }));
 
 function row(overrides: Partial<Transaction> & { id: string }): Transaction {
