@@ -322,6 +322,23 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           </p>
         </div>
 
+        <div className="flex items-center">
+          <label
+            htmlFor="lockReconciledTransactions"
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <ToggleSwitch
+              checked={lockReconciledTransactions}
+              onChange={setLockReconciledTransactions}
+              label={t('lockReconciledLabel')}
+            />
+            <span className="text-sm text-gray-900 dark:text-gray-100">
+              {t('lockReconciledLabel')}
+            </span>
+          </label>
+          <InfoTooltip text={t('lockReconciledTooltip')} />
+        </div>
+
         <div
           {...tourAnchor(TOUR_ANCHORS.settingsWhatsNewToggle)}
           className="flex items-center"
@@ -340,23 +357,6 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
             </span>
           </label>
           <InfoTooltip text={t('showWhatsNewTooltip')} />
-        </div>
-
-        <div className="flex items-center">
-          <label
-            htmlFor="lockReconciledTransactions"
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <ToggleSwitch
-              checked={lockReconciledTransactions}
-              onChange={setLockReconciledTransactions}
-              label={t('lockReconciledLabel')}
-            />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {t('lockReconciledLabel')}
-            </span>
-          </label>
-          <InfoTooltip text={t('lockReconciledTooltip')} />
         </div>
       </div>
 
