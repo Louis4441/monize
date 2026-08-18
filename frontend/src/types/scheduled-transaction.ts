@@ -51,6 +51,9 @@ export interface ScheduledTransactionSplit {
   investmentPrice?: number | null;
   investmentCommission?: number | null;
   investmentExchangeRate?: number | null;
+  // Currency pair the stored rate was resolved for (issue #1167), server-derived.
+  investmentExchangeRateFromCurrency?: string | null;
+  investmentExchangeRateToCurrency?: string | null;
   createdAt: string;
 }
 
@@ -100,6 +103,9 @@ export interface ScheduledTransaction {
   investmentCommission: number | null;
   investmentTotalAmount: number | null;
   investmentExchangeRate: number | null;
+  // Currency pair the stored rate was resolved for (issue #1167), server-derived.
+  investmentExchangeRateFromCurrency?: string | null;
+  investmentExchangeRateToCurrency?: string | null;
   tagIds?: string[];
   splits?: ScheduledTransactionSplit[];
   overrideCount?: number;

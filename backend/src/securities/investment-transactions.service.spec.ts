@@ -4142,6 +4142,69 @@ describe("InvestmentTransactionsService", () => {
     });
   });
 
+  describe("resolveSettlementCurrencyPair (issue #1167)", () => {
+    it("pairs the security currency with the linked cash account currency", async () => {
+      accountsService.findOne.mockImplementation((_u: string, id: string) =>
+        id === accountId
+          ? Promise.resolve({ ...mockInvestmentAccount })
+          : id === cashAccountId
+            ? Promise.resolve({ ...mockCashAccount, currencyCode: "CAD" })
+            : Promise.resolve(null),
+      );
+      securitiesService.findOne.mockResolvedValue({
+        ...mockSecurity,
+        currencyCode: "EUR",
+      });
+
+      const pair = await service.resolveSettlementCurrencyPair(
+        userId,
+        accountId,
+        null,
+        securityId,
+      );
+      expect(pair).toEqual({ from: "EUR", to: "CAD" });
+    });
+
+    it("uses the funding account currency as the settlement target", async () => {
+      accountsService.findOne.mockImplementation((_u: string, id: string) =>
+        id === fundingAccountId
+          ? Promise.resolve({ ...mockFundingAccount, currencyCode: "GBP" })
+          : Promise.resolve({ ...mockInvestmentAccount }),
+      );
+      securitiesService.findOne.mockResolvedValue({
+        ...mockSecurity,
+        currencyCode: "EUR",
+      });
+
+      const pair = await service.resolveSettlementCurrencyPair(
+        userId,
+        accountId,
+        fundingAccountId,
+        securityId,
+      );
+      expect(pair).toEqual({ from: "EUR", to: "GBP" });
+    });
+
+    it("falls back to the account currency when there is no security", async () => {
+      accountsService.findOne.mockImplementation((_u: string, id: string) =>
+        id === accountId
+          ? Promise.resolve({ ...mockInvestmentAccount, currencyCode: "JPY" })
+          : id === cashAccountId
+            ? Promise.resolve({ ...mockCashAccount, currencyCode: "JPY" })
+            : Promise.resolve(null),
+      );
+
+      const pair = await service.resolveSettlementCurrencyPair(
+        userId,
+        accountId,
+        null,
+        null,
+      );
+      expect(pair).toEqual({ from: "JPY", to: "JPY" });
+      expect(securitiesService.findOne).not.toHaveBeenCalled();
+    });
+  });
+
   describe("findCashAccount (via create)", () => {
     beforeEach(() => {
       const findOneQB = createMockQueryBuilder(mockBuyTransaction);

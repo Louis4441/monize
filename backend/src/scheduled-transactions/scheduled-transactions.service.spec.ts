@@ -182,6 +182,12 @@ describe("ScheduledTransactionsService", () => {
 
     investmentTransactionsService = {
       create: jest.fn().mockResolvedValue({ id: "inv-tx-1" }),
+      // Issue #1167: the settlement currency pair a stored rate is validated
+      // against. Defaults to a same-currency pair (no cross-currency FX); the
+      // provenance tests below override it per case.
+      resolveSettlementCurrencyPair: jest
+        .fn()
+        .mockResolvedValue({ from: "USD", to: "USD" }),
     };
 
     mockActionHistoryService = {
@@ -4408,6 +4414,330 @@ describe("ScheduledTransactionsService", () => {
         expect(s.investment).toBeUndefined();
         expect(s.splitKind).toBe("category");
       });
+    });
+  });
+
+  // Issue #1167: a stored investment FX rate carries the currency pair it was
+  // resolved for, and is only reused when that pair still matches the current
+  // settlement pair (security currency -> settlement account currency).
+  describe("investment FX rate currency-pair provenance (issue #1167)", () => {
+    const setupOverrideQuery = () => {
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+    };
+
+    // ---- Surface 1: the parent scheduled investment rate ----
+
+    it("create() records the currency pair a stored rate was resolved for", async () => {
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-inv",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      scheduledRepo.save.mockResolvedValue(makeScheduled());
+      stubFindOne(makeScheduled());
+
+      await service.create(userId, {
+        accountId: "acc-inv",
+        name: "Cross-currency BUY",
+        amount: -500,
+        currencyCode: "CAD",
+        frequency: "MONTHLY" as any,
+        nextDueDate: "2026-06-15",
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-usd",
+        investmentQuantity: 1,
+        investmentPrice: 500,
+        investmentExchangeRate: 1.35,
+      } as any);
+
+      const created = scheduledRepo.create.mock.calls[0][0];
+      expect(created.investmentExchangeRate).toBe(1.35);
+      expect(created.investmentExchangeRateFromCurrency).toBe("USD");
+      expect(created.investmentExchangeRateToCurrency).toBe("CAD");
+    });
+
+    it("post() reuses a stored rate whose pair still matches", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentQuantity: 1,
+          investmentPrice: 500,
+          investmentExchangeRate: 1.35,
+          investmentExchangeRateFromCurrency: "USD",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      setupOverrideQuery();
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      expect(dto.exchangeRate).toBe(1.35);
+    });
+
+    it("post() drops a stored rate whose pair no longer matches (re-resolves)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentFundingAccountId: null,
+          investmentQuantity: 1,
+          investmentPrice: 500,
+          investmentExchangeRate: 1.35,
+          investmentExchangeRateFromCurrency: "USD",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      setupOverrideQuery();
+      // The security's currency changed from USD to EUR after the rate was
+      // stored, so the stored USD->CAD scalar is stale.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "EUR", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      // The stale scalar is not forwarded, so the resolver re-resolves.
+      expect(dto.exchangeRate).toBeUndefined();
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).toHaveBeenCalledWith(userId, "acc-1", null, "sec-usd");
+    });
+
+    it("post() trusts a stored rate with no recorded pair (pre-#1167 row)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentQuantity: 1,
+          investmentPrice: 500,
+          investmentExchangeRate: 1.35,
+          investmentExchangeRateFromCurrency: null,
+          investmentExchangeRateToCurrency: null,
+        } as any),
+      );
+      setupOverrideQuery();
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      expect(dto.exchangeRate).toBe(1.35);
+      // A rate without provenance is trusted without re-deriving the pair.
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("update() clears the recorded pair when it clears the rate", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentFundingAccountId: "acc-usd",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.35,
+          investmentExchangeRateFromCurrency: "USD",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+
+      // Switching action changes the settlement basis, which clears the rate.
+      await service.update(userId, stId, {
+        investmentAction: "DIVIDEND" as any,
+        investmentTotalAmount: 100,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) => c[1] === stId && c[2].investmentAction !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentExchangeRate).toBeNull();
+      expect(fields.investmentExchangeRateFromCurrency).toBeNull();
+      expect(fields.investmentExchangeRateToCurrency).toBeNull();
+    });
+
+    // ---- Surface 2: an embedded scheduled investment split ----
+
+    const investmentSplitSchedule = (
+      exchangeRate: number | null,
+      from: string | null,
+      to: string | null,
+    ) =>
+      makeScheduled({
+        isSplit: true,
+        accountId: "acc-cash",
+        splits: [
+          {
+            id: "s1",
+            scheduledTransactionId: stId,
+            kind: "investment",
+            categoryId: null,
+            transferAccountId: null,
+            amount: -675,
+            memo: null,
+            investmentAction: "BUY",
+            investmentSecurityId: "sec-usd",
+            investmentQuantity: 5,
+            investmentPrice: 100,
+            investmentCommission: 0,
+            investmentExchangeRate: exchangeRate,
+            investmentExchangeRateFromCurrency: from,
+            investmentExchangeRateToCurrency: to,
+          } as any,
+        ],
+      } as any);
+
+    it("post() drops a stale embedded split rate", async () => {
+      stubFindOne(investmentSplitSchedule(1.35, "USD", "CAD"));
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "EUR", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      expect(payload.splits[0].investment.exchangeRate).toBeUndefined();
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).toHaveBeenCalledWith(userId, "acc-cash", null, "sec-usd");
+    });
+
+    it("post() reuses an embedded split rate whose pair still matches", async () => {
+      stubFindOne(investmentSplitSchedule(1.35, "USD", "CAD"));
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      expect(payload.splits[0].investment.exchangeRate).toBe(1.35);
+    });
+
+    // ---- Surface 3: an occurrence-override embedded split ----
+
+    it("post() drops a stale override split rate", async () => {
+      const storedOverride = {
+        id: "ovr-1",
+        scheduledTransactionId: stId,
+        originalDate: "2025-03-01",
+        overrideDate: "2025-03-01",
+        isSplit: true,
+        amount: -675,
+        splits: [
+          {
+            splitKind: "investment",
+            categoryId: null,
+            amount: -675,
+            investment: {
+              action: "BUY",
+              securityId: "sec-usd",
+              quantity: 5,
+              price: 100,
+              exchangeRate: 1.35,
+              exchangeRateFromCurrency: "USD",
+              exchangeRateToCurrency: "CAD",
+            },
+          },
+        ],
+      };
+      const scheduled = makeScheduled({
+        isSplit: true,
+        accountId: "acc-cash",
+        nextDueDate: "2025-03-01",
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(storedOverride);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.findOne.mockResolvedValue(storedOverride);
+      accountsRepo.findOne.mockResolvedValue(null);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "EUR", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      expect(payload.splits[0].investment.exchangeRate).toBeUndefined();
+    });
+
+    it("createOverride() records provenance for an override split rate", async () => {
+      stubFindOne(makeScheduled({ isSplit: true, accountId: "acc-cash" }));
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.create.mockImplementation((data: any) => data);
+      overridesRepo.save.mockImplementation((data: any) =>
+        Promise.resolve(data),
+      );
+
+      const result = await service.createOverride(userId, stId, {
+        originalDate: "2025-03-01",
+        overrideDate: "2025-03-01",
+        isSplit: true,
+        amount: -675,
+        splits: [
+          {
+            splitKind: "investment" as any,
+            categoryId: null,
+            amount: -600,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 5,
+              price: 100,
+              exchangeRate: 1.35,
+            },
+          },
+          {
+            splitKind: "category" as any,
+            categoryId: "cat-fees",
+            amount: -75,
+          },
+        ],
+      } as any);
+
+      const savedInvestment = (result.splits as any[])[0].investment;
+      expect(savedInvestment.exchangeRateFromCurrency).toBe("USD");
+      expect(savedInvestment.exchangeRateToCurrency).toBe("CAD");
+      expect(savedInvestment.exchangeRate).toBe(1.35);
     });
   });
 });

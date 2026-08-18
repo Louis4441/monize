@@ -144,6 +144,13 @@ export interface OverrideSplit {
     price?: number;
     commission?: number;
     exchangeRate?: number;
+    // Currency pair the stored `exchangeRate` was resolved for (issue #1167).
+    // Derived server-side when the rate is stored; posting reuses the rate only
+    // when this pair still matches the current settlement pair. Absent on
+    // override payloads written before this change (those keep the old
+    // trust-the-scalar behaviour).
+    exchangeRateFromCurrency?: string;
+    exchangeRateToCurrency?: string;
   };
   amount: number;
   memo?: string | null;

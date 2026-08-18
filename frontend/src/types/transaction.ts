@@ -20,6 +20,11 @@ export interface InvestmentSplitDetails {
   price?: number;
   commission?: number;
   exchangeRate?: number;
+  // Currency pair a stored exchangeRate was resolved for, populated by the
+  // server on scheduled-transaction override responses (issue #1167). Read-only
+  // and derived server-side; the client never sends these.
+  exchangeRateFromCurrency?: string;
+  exchangeRateToCurrency?: string;
   description?: string;
 }
 

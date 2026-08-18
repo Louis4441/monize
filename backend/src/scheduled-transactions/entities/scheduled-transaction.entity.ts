@@ -266,6 +266,26 @@ export class ScheduledTransaction {
   })
   investmentExchangeRate: number | null;
 
+  // Currency pair the stored `investmentExchangeRate` was resolved for (issue
+  // #1167). Written whenever a rate is stored, cleared with it; posting reuses
+  // the rate only when this pair still matches the current settlement pair. NULL
+  // on rows written before this column existed (those keep the old behaviour).
+  @Column({
+    type: "varchar",
+    length: 3,
+    name: "investment_exchange_rate_from_currency",
+    nullable: true,
+  })
+  investmentExchangeRateFromCurrency: string | null;
+
+  @Column({
+    type: "varchar",
+    length: 3,
+    name: "investment_exchange_rate_to_currency",
+    nullable: true,
+  })
+  investmentExchangeRateToCurrency: string | null;
+
   @Column({ type: "jsonb", name: "tag_ids", default: [] })
   tagIds: string[];
 

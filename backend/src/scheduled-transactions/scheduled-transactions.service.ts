@@ -557,6 +557,93 @@ export class ScheduledTransactionsService {
     return new Set(rows.map((r) => r.id as string));
   }
 
+  /**
+   * The currency-pair provenance to persist beside a scheduled investment's FX
+   * rate (issue #1167). When there is no rate, the pair is null too -- the pair
+   * travels with the rate as one tuple. When there is a rate, the pair is
+   * derived through the very resolver the posting path uses
+   * (`resolveSettlementCurrencyPair`), so the pair a stored rate is later
+   * validated against is the pair it would be resolved for.
+   */
+  private async resolveInvestmentRateProvenance(
+    userId: string,
+    rate: number | null | undefined,
+    settlement: {
+      accountId: string;
+      fundingAccountId: string | null | undefined;
+      securityId: string | null | undefined;
+    },
+  ): Promise<{ from: string | null; to: string | null }> {
+    if (rate === null || rate === undefined) {
+      return { from: null, to: null };
+    }
+    const pair =
+      await this.investmentTransactionsService.resolveSettlementCurrencyPair(
+        userId,
+        settlement.accountId,
+        settlement.fundingAccountId,
+        settlement.securityId,
+      );
+    return { from: pair.from, to: pair.to };
+  }
+
+  /**
+   * Whether a stored FX rate may be reused for the current settlement pair
+   * (issue #1167). A rate with no recorded pair (a row written before the
+   * provenance change) is trusted as before; a rate whose recorded pair still
+   * matches the current one is reused; a rate whose recorded pair no longer
+   * matches is stale and must be re-resolved, so this returns false and the
+   * caller forwards no rate.
+   */
+  private async storedInvestmentRateIsCurrent(
+    userId: string,
+    storedFrom: string | null | undefined,
+    storedTo: string | null | undefined,
+    settlement: {
+      accountId: string;
+      fundingAccountId: string | null | undefined;
+      securityId: string | null | undefined;
+    },
+  ): Promise<boolean> {
+    if (!storedFrom || !storedTo) {
+      // No provenance: keep the pre-#1167 behaviour of trusting the scalar.
+      return true;
+    }
+    const pair =
+      await this.investmentTransactionsService.resolveSettlementCurrencyPair(
+        userId,
+        settlement.accountId,
+        settlement.fundingAccountId,
+        settlement.securityId,
+      );
+    return pair.from === storedFrom && pair.to === storedTo;
+  }
+
+  /**
+   * The investment cash rate to forward for an embedded/override split at
+   * posting (issue #1167): the stored rate when its recorded currency pair still
+   * matches the current settlement pair, otherwise undefined so the posting
+   * resolver re-resolves for the current pair. A split settles through the
+   * parent's INVESTMENT_CASH account, so there is no separate funding account.
+   */
+  private async forwardableSplitInvestmentRate(
+    userId: string,
+    accountId: string,
+    securityId: string | null | undefined,
+    storedRate: number | null | undefined,
+    storedFrom: string | null | undefined,
+    storedTo: string | null | undefined,
+  ): Promise<number | undefined> {
+    if (storedRate === null || storedRate === undefined) return undefined;
+    const isCurrent = await this.storedInvestmentRateIsCurrent(
+      userId,
+      storedFrom,
+      storedTo,
+      { accountId, fundingAccountId: null, securityId: securityId ?? null },
+    );
+    return isCurrent ? Number(storedRate) : undefined;
+  }
+
   async create(
     userId: string,
     createDto: CreateScheduledTransactionDto,
@@ -631,6 +718,25 @@ export class ScheduledTransactionsService {
       isInvestment: !!isInvestment,
     });
 
+    // Record the currency pair a stored investment rate belongs to (issue
+    // #1167). Only resolved when a rate is actually supplied, so a rateless
+    // investment schedule adds no reads and no new failure modes.
+    const investmentRateProvenance = isInvestment
+      ? await this.resolveInvestmentRateProvenance(
+          userId,
+          transactionData.investmentExchangeRate,
+          {
+            accountId: transactionData.accountId,
+            fundingAccountId: FUNDING_ACCOUNT_ACTIONS.has(
+              transactionData.investmentAction as InvestmentAction,
+            )
+              ? transactionData.investmentFundingAccountId
+              : null,
+            securityId: transactionData.investmentSecurityId,
+          },
+        )
+      : { from: null, to: null };
+
     const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(ScheduledTransaction);
       const scheduledTransaction = repo.create({
@@ -686,12 +792,14 @@ export class ScheduledTransactionsService {
           isInvestment && transactionData.investmentExchangeRate !== undefined
             ? transactionData.investmentExchangeRate
             : null,
+        investmentExchangeRateFromCurrency: investmentRateProvenance.from,
+        investmentExchangeRateToCurrency: investmentRateProvenance.to,
       });
 
       const savedRow = await repo.save(scheduledTransaction);
 
       if (hasSplits && !isTransfer) {
-        await this.createSplits(savedRow.id, splits, m);
+        await this.createSplits(savedRow.id, splits, m, userId, account.id);
       }
 
       return savedRow;
@@ -886,6 +994,12 @@ export class ScheduledTransactionsService {
     scheduledTransactionId: string,
     splits: CreateScheduledTransactionSplitDto[],
     manager: EntityManager,
+    // The owner and the parent schedule's account, needed to record the
+    // currency-pair provenance of any per-split investment rate (issue #1167).
+    // An embedded investment split settles through the parent INVESTMENT_CASH
+    // account, so there is no separate funding account.
+    userId: string,
+    accountId: string,
   ): Promise<ScheduledTransactionSplit[]> {
     const savedSplits: ScheduledTransactionSplit[] = [];
 
@@ -913,6 +1027,19 @@ export class ScheduledTransactionsService {
           : split.transferAccountId
             ? SplitKind.TRANSFER
             : SplitKind.CATEGORY;
+
+      const investmentRateProvenance =
+        inferredKind === SplitKind.INVESTMENT && split.investment
+          ? await this.resolveInvestmentRateProvenance(
+              userId,
+              split.investment.exchangeRate ?? null,
+              {
+                accountId,
+                fundingAccountId: null,
+                securityId: split.investment.securityId ?? null,
+              },
+            )
+          : { from: null, to: null };
 
       const entity = manager.create(ScheduledTransactionSplit, {
         scheduledTransactionId,
@@ -949,6 +1076,8 @@ export class ScheduledTransactionsService {
           inferredKind === SplitKind.INVESTMENT && split.investment
             ? (split.investment.exchangeRate ?? null)
             : null,
+        investmentExchangeRateFromCurrency: investmentRateProvenance.from,
+        investmentExchangeRateToCurrency: investmentRateProvenance.to,
       });
 
       const saved = await manager.save(entity);
@@ -1443,6 +1572,9 @@ export class ScheduledTransactionsService {
         fieldsToUpdate.investmentCommission = null;
         fieldsToUpdate.investmentTotalAmount = null;
         fieldsToUpdate.investmentExchangeRate = null;
+        // The rate's currency pair travels with the rate (issue #1167).
+        fieldsToUpdate.investmentExchangeRateFromCurrency = null;
+        fieldsToUpdate.investmentExchangeRateToCurrency = null;
         clearSplitsForModeSwitch = true;
       }
     }
@@ -1467,6 +1599,9 @@ export class ScheduledTransactionsService {
         fieldsToUpdate.investmentCommission = null;
         fieldsToUpdate.investmentTotalAmount = null;
         fieldsToUpdate.investmentExchangeRate = null;
+        // The rate's currency pair travels with the rate (issue #1167).
+        fieldsToUpdate.investmentExchangeRateFromCurrency = null;
+        fieldsToUpdate.investmentExchangeRateToCurrency = null;
       }
     }
     if (effectiveIsInvestment) {
@@ -1596,6 +1731,25 @@ export class ScheduledTransactionsService {
       ) {
         fieldsToUpdate.investmentExchangeRate = null;
       }
+
+      // Keep the rate's currency-pair provenance in lockstep with the rate
+      // itself (issue #1167). Whenever this edit writes the rate -- to a value
+      // or to null -- record (or clear) the pair for the effective settlement
+      // tuple being written; an edit that leaves the rate untouched leaves the
+      // pair untouched too.
+      if (fieldsToUpdate.investmentExchangeRate !== undefined) {
+        const provenance = await this.resolveInvestmentRateProvenance(
+          userId,
+          fieldsToUpdate.investmentExchangeRate as number | null,
+          {
+            accountId: updateData.accountId ?? scheduled.accountId,
+            fundingAccountId: effectiveFundingForFx,
+            securityId: effectiveSecurityIdForFx,
+          },
+        );
+        fieldsToUpdate.investmentExchangeRateFromCurrency = provenance.from;
+        fieldsToUpdate.investmentExchangeRateToCurrency = provenance.to;
+      }
     }
 
     // Apply the split rewrite, any mode-switch split clearing, and the main
@@ -1635,7 +1789,13 @@ export class ScheduledTransactionsService {
           await m.delete(ScheduledTransactionSplit, {
             scheduledTransactionId: id,
           });
-          await this.createSplits(id, splits, m);
+          await this.createSplits(
+            id,
+            splits,
+            m,
+            userId,
+            updateData.accountId ?? current.accountId,
+          );
           await m.update(ScheduledTransaction, id, {
             isSplit: true,
             categoryId: null,
@@ -1970,53 +2130,77 @@ export class ScheduledTransactionsService {
           memo: split.memo || undefined,
         }));
       } else if (storedOverride?.splits && storedOverride.splits.length > 0) {
-        transactionPayload.splits = storedOverride.splits.map((split: any) => ({
-          splitKind: split.splitKind,
-          categoryId: split.categoryId || undefined,
-          transferAccountId: split.transferAccountId || undefined,
-          investment: split.investment,
-          amount: Number(split.amount),
-          memo: split.memo || undefined,
-        }));
-      } else if (scheduled.splits && scheduled.splits.length > 0) {
-        transactionPayload.splits = scheduled.splits.map((split) => ({
-          splitKind: split.kind,
-          categoryId: split.categoryId || undefined,
-          transferAccountId: split.transferAccountId || undefined,
-          investment:
-            split.kind === SplitKind.INVESTMENT && split.investmentAction
+        transactionPayload.splits = await Promise.all(
+          storedOverride.splits.map(async (split: any) => ({
+            splitKind: split.splitKind,
+            categoryId: split.categoryId || undefined,
+            transferAccountId: split.transferAccountId || undefined,
+            // Drop a stored override rate whose recorded pair no longer matches
+            // the current settlement pair, so the resolver re-resolves it
+            // (issue #1167). Other investment fields pass through unchanged.
+            investment: split.investment
               ? {
-                  action: split.investmentAction,
-                  securityId: split.investmentSecurityId || undefined,
-                  quantity:
-                    split.investmentQuantity !== null &&
-                    split.investmentQuantity !== undefined
-                      ? Number(split.investmentQuantity)
-                      : undefined,
-                  price:
-                    split.investmentPrice !== null &&
-                    split.investmentPrice !== undefined
-                      ? Number(split.investmentPrice)
-                      : undefined,
-                  commission:
-                    split.investmentCommission !== null &&
-                    split.investmentCommission !== undefined
-                      ? Number(split.investmentCommission)
-                      : undefined,
-                  exchangeRate:
-                    split.investmentExchangeRate !== null &&
-                    split.investmentExchangeRate !== undefined
-                      ? Number(split.investmentExchangeRate)
-                      : undefined,
+                  ...split.investment,
+                  exchangeRate: await this.forwardableSplitInvestmentRate(
+                    userId,
+                    scheduled.accountId,
+                    split.investment.securityId,
+                    split.investment.exchangeRate,
+                    split.investment.exchangeRateFromCurrency,
+                    split.investment.exchangeRateToCurrency,
+                  ),
                 }
-              : undefined,
-          amount: Number(split.amount),
-          memo: split.memo || undefined,
-          tagIds:
-            split.tags && split.tags.length > 0
-              ? split.tags.map((t) => t.id)
-              : undefined,
-        }));
+              : split.investment,
+            amount: Number(split.amount),
+            memo: split.memo || undefined,
+          })),
+        );
+      } else if (scheduled.splits && scheduled.splits.length > 0) {
+        transactionPayload.splits = await Promise.all(
+          scheduled.splits.map(async (split) => ({
+            splitKind: split.kind,
+            categoryId: split.categoryId || undefined,
+            transferAccountId: split.transferAccountId || undefined,
+            investment:
+              split.kind === SplitKind.INVESTMENT && split.investmentAction
+                ? {
+                    action: split.investmentAction,
+                    securityId: split.investmentSecurityId || undefined,
+                    quantity:
+                      split.investmentQuantity !== null &&
+                      split.investmentQuantity !== undefined
+                        ? Number(split.investmentQuantity)
+                        : undefined,
+                    price:
+                      split.investmentPrice !== null &&
+                      split.investmentPrice !== undefined
+                        ? Number(split.investmentPrice)
+                        : undefined,
+                    commission:
+                      split.investmentCommission !== null &&
+                      split.investmentCommission !== undefined
+                        ? Number(split.investmentCommission)
+                        : undefined,
+                    // Reuse the stored rate only when its recorded pair still
+                    // matches the current settlement pair (issue #1167).
+                    exchangeRate: await this.forwardableSplitInvestmentRate(
+                      userId,
+                      scheduled.accountId,
+                      split.investmentSecurityId,
+                      split.investmentExchangeRate,
+                      split.investmentExchangeRateFromCurrency,
+                      split.investmentExchangeRateToCurrency,
+                    ),
+                  }
+                : undefined,
+            amount: Number(split.amount),
+            memo: split.memo || undefined,
+            tagIds:
+              split.tags && split.tags.length > 0
+                ? split.tags.map((t) => t.id)
+                : undefined,
+          })),
+        );
       }
     } else {
       const finalCategoryId = hasInlineCategoryId
@@ -2401,11 +2585,36 @@ export class ScheduledTransactionsService {
         ? Number(scheduled.investmentCommission)
         : undefined;
 
-    const exchangeRate =
+    let exchangeRate =
       scheduled.investmentExchangeRate !== null &&
       scheduled.investmentExchangeRate !== undefined
         ? Number(scheduled.investmentExchangeRate)
         : undefined;
+
+    // Issue #1167: a stored rate is only reused when its recorded currency pair
+    // still matches the current settlement pair (security currency -> settlement
+    // account currency). If the referenced security or account changed currency
+    // since the rate was stored, the pair no longer matches, so drop the scalar
+    // and let the posting resolver re-resolve a fresh rate for the current pair.
+    // A rate with no recorded pair (a row written before this change) is trusted
+    // as before.
+    if (
+      exchangeRate !== undefined &&
+      !(await this.storedInvestmentRateIsCurrent(
+        userId,
+        scheduled.investmentExchangeRateFromCurrency,
+        scheduled.investmentExchangeRateToCurrency,
+        {
+          accountId: scheduled.accountId,
+          fundingAccountId: FUNDING_ACCOUNT_ACTIONS.has(action)
+            ? scheduled.investmentFundingAccountId
+            : null,
+          securityId: scheduled.investmentSecurityId,
+        },
+      ))
+    ) {
+      exchangeRate = undefined;
+    }
 
     const description =
       postDto?.description !== undefined
@@ -2476,16 +2685,11 @@ export class ScheduledTransactionsService {
     // for every action rather than gated on FUNDING_ACCOUNT_ACTIONS. That is
     // deliberate and asymmetric: a cross-currency DIVIDEND/INTEREST/CAPITAL_GAIN
     // legitimately settles at a rate, so it cannot simply be dropped for
-    // non-BUY/SELL actions the way the funding account can. A known, separate
-    // gap remains -- a rate stored (only reachable via the direct API; no UI or
-    // MNY-import path ever sets investmentExchangeRate) for one settlement basis
-    // and then applied after the action switches settlement account -- because
-    // the column carries no record of the currency pair it was resolved for.
-    // Closing it needs the "account, currency, rate and amount are one tuple"
-    // spec (a value-difference clear on a settlement-basis change, not a
-    // presence check), tracked as a follow-up to issue #1154 rather than
-    // fixed by a naive mirror of the funding-account gate that would wipe a
-    // legitimate dividend rate on every unrelated edit.
+    // non-BUY/SELL actions the way the funding account can. The rate is only
+    // forwarded when its stored currency pair still matches the current
+    // settlement pair -- the staleness check above already reset `exchangeRate`
+    // to undefined otherwise, so a rate for a pair that no longer applies falls
+    // through to fresh resolution in the posting resolver (issue #1167).
     if (exchangeRate !== undefined) dto.exchangeRate = exchangeRate;
 
     await this.investmentTransactionsService.create(userId, dto);
@@ -2502,15 +2706,59 @@ export class ScheduledTransactionsService {
 
   // Delegated override methods
 
+  /**
+   * The currency-pair provenance for each override investment split that
+   * carries a rate (issue #1167), keyed by split index. An override split
+   * settles through the parent's INVESTMENT_CASH account with no separate
+   * funding account, exactly like an embedded scheduled split. Only indices
+   * whose investment supplies a rate get an entry; the rest re-resolve at
+   * posting as before.
+   */
+  private async resolveOverrideSplitProvenance(
+    userId: string,
+    accountId: string,
+    splits:
+      | Array<{
+          investment?: {
+            securityId?: string | null;
+            exchangeRate?: number | null;
+          } | null;
+        }>
+      | null
+      | undefined,
+  ): Promise<Map<number, { from: string; to: string }>> {
+    const provenance = new Map<number, { from: string; to: string }>();
+    if (!splits) return provenance;
+    for (const [index, split] of splits.entries()) {
+      const rate = split.investment?.exchangeRate;
+      if (rate === undefined || rate === null) continue;
+      const pair =
+        await this.investmentTransactionsService.resolveSettlementCurrencyPair(
+          userId,
+          accountId,
+          null,
+          split.investment?.securityId ?? null,
+        );
+      provenance.set(index, pair);
+    }
+    return provenance;
+  }
+
   async createOverride(
     userId: string,
     scheduledTransactionId: string,
     createDto: CreateScheduledTransactionOverrideDto,
   ): Promise<ScheduledTransactionOverride> {
-    await this.findOne(userId, scheduledTransactionId);
+    const scheduled = await this.findOne(userId, scheduledTransactionId);
+    const investmentProvenance = await this.resolveOverrideSplitProvenance(
+      userId,
+      scheduled.accountId,
+      createDto.splits,
+    );
     return this.overrideService.createOverride(
       scheduledTransactionId,
       createDto,
+      investmentProvenance,
     );
   }
 
@@ -2552,11 +2800,17 @@ export class ScheduledTransactionsService {
     overrideId: string,
     updateDto: UpdateScheduledTransactionOverrideDto,
   ): Promise<ScheduledTransactionOverride> {
-    await this.findOne(userId, scheduledTransactionId);
+    const scheduled = await this.findOne(userId, scheduledTransactionId);
+    const investmentProvenance = await this.resolveOverrideSplitProvenance(
+      userId,
+      scheduled.accountId,
+      updateDto.splits,
+    );
     return this.overrideService.updateOverride(
       scheduledTransactionId,
       overrideId,
       updateDto,
+      investmentProvenance,
     );
   }
 

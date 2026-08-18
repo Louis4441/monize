@@ -5,11 +5,25 @@ import {
   Logger,
 } from "@nestjs/common";
 import { DataSource } from "typeorm";
-import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
+import {
+  ScheduledTransactionOverride,
+  OverrideSplit,
+} from "./entities/scheduled-transaction-override.entity";
 import {
   CreateScheduledTransactionOverrideDto,
   UpdateScheduledTransactionOverrideDto,
+  OverrideSplitDto,
 } from "./dto/scheduled-transaction-override.dto";
+
+/**
+ * Currency-pair provenance for an override's investment splits (issue #1167),
+ * keyed by split index. Derived by the scheduled service, which owns the
+ * settlement account; the override service just merges it into the stored jsonb.
+ */
+export type OverrideInvestmentProvenance = Map<
+  number,
+  { from: string; to: string }
+>;
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { withScopedDb } from "../common/db/scoped-db";
 import { tr } from "../i18n/translate";
@@ -22,9 +36,43 @@ export class ScheduledTransactionOverrideService {
 
   constructor(private dataSource: DataSource) {}
 
+  /**
+   * Reshape override split DTOs into the stored jsonb, merging in the
+   * currency-pair provenance for any investment split that carries a rate
+   * (issue #1167). The pair travels inside the split's `investment` object so
+   * the posting path can tell a still-valid stored rate from a stale one.
+   */
+  private buildOverrideSplits(
+    splits: OverrideSplitDto[] | null | undefined,
+    investmentProvenance?: OverrideInvestmentProvenance,
+  ): OverrideSplit[] | null {
+    return (
+      splits?.map((s, index) => {
+        const pair = investmentProvenance?.get(index);
+        const investment =
+          s.investment && pair
+            ? {
+                ...s.investment,
+                exchangeRateFromCurrency: pair.from,
+                exchangeRateToCurrency: pair.to,
+              }
+            : s.investment;
+        return {
+          splitKind: s.splitKind,
+          categoryId: s.categoryId ?? null,
+          transferAccountId: s.transferAccountId ?? null,
+          investment,
+          amount: s.amount,
+          memo: s.memo ?? null,
+        };
+      }) ?? null
+    );
+  }
+
   async createOverride(
     scheduledTransactionId: string,
     createDto: CreateScheduledTransactionOverrideDto,
+    investmentProvenance?: OverrideInvestmentProvenance,
   ): Promise<ScheduledTransactionOverride> {
     return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(ScheduledTransactionOverride);
@@ -72,15 +120,10 @@ export class ScheduledTransactionOverrideService {
         categoryId: createDto.categoryId ?? null,
         description: createDto.description ?? null,
         isSplit: createDto.isSplit ?? null,
-        splits:
-          createDto.splits?.map((s) => ({
-            splitKind: s.splitKind,
-            categoryId: s.categoryId ?? null,
-            transferAccountId: s.transferAccountId ?? null,
-            investment: s.investment,
-            amount: s.amount,
-            memo: s.memo ?? null,
-          })) ?? null,
+        splits: this.buildOverrideSplits(
+          createDto.splits,
+          investmentProvenance,
+        ),
         investmentQuantity: createDto.investmentQuantity ?? null,
         investmentPrice: createDto.investmentPrice ?? null,
         investmentTotalAmount: createDto.investmentTotalAmount ?? null,
@@ -166,6 +209,7 @@ export class ScheduledTransactionOverrideService {
     scheduledTransactionId: string,
     overrideId: string,
     updateDto: UpdateScheduledTransactionOverrideDto,
+    investmentProvenance?: OverrideInvestmentProvenance,
   ): Promise<ScheduledTransactionOverride> {
     const override = await this.findOverride(
       scheduledTransactionId,
@@ -192,15 +236,10 @@ export class ScheduledTransactionOverrideService {
       override.description = updateDto.description;
     if (updateDto.isSplit !== undefined) override.isSplit = updateDto.isSplit;
     if (updateDto.splits !== undefined) {
-      override.splits =
-        updateDto.splits?.map((s) => ({
-          splitKind: s.splitKind,
-          categoryId: s.categoryId ?? null,
-          transferAccountId: s.transferAccountId ?? null,
-          investment: s.investment,
-          amount: s.amount,
-          memo: s.memo ?? null,
-        })) ?? null;
+      override.splits = this.buildOverrideSplits(
+        updateDto.splits,
+        investmentProvenance,
+      );
     }
     if (updateDto.investmentQuantity !== undefined)
       override.investmentQuantity = updateDto.investmentQuantity;

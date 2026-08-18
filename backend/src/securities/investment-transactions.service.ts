@@ -456,6 +456,44 @@ export class InvestmentTransactionsService {
   }
 
   /**
+   * The currency pair an investment cash posting converts across:
+   * `from` = the source currency (the security's currency, or -- for a
+   * security-less action -- the investment account's currency); `to` = the
+   * settlement/cash account's currency (the explicit funding account when one is
+   * named, otherwise the brokerage's linked cash account).
+   *
+   * This is the single definition of that pair. `resolveCashExchangeRate` below
+   * consumes it so the rate it fetches and the pair a stored rate is validated
+   * against (the scheduled-investment provenance check, issue #1167) can never
+   * drift apart. Same-currency pairs are reported as `{ X, X }`; the caller
+   * decides what that means (a rate of 1, or a trivially-matching provenance).
+   */
+  async resolveSettlementCurrencyPair(
+    userId: string,
+    accountId: string,
+    fundingAccountId: string | null | undefined,
+    securityId: string | null | undefined,
+  ): Promise<{ from: string; to: string }> {
+    const cashAccount = fundingAccountId
+      ? await this.accountsService.findOne(userId, fundingAccountId)
+      : await this.findCashAccount(userId, accountId);
+
+    let from: string;
+    if (securityId) {
+      const security = await this.securitiesService.findOne(userId, securityId);
+      from = security.currencyCode;
+    } else {
+      const investmentAccount = await this.accountsService.findOne(
+        userId,
+        accountId,
+      );
+      from = investmentAccount.currencyCode;
+    }
+
+    return { from, to: cashAccount.currencyCode };
+  }
+
+  /**
    * Resolve the exchange rate used to convert a transaction's total amount
    * (expressed in the security's currency) into the cash account's currency.
    *
@@ -498,23 +536,16 @@ export class InvestmentTransactionsService {
       return supplied;
     }
 
-    const cashAccount = fundingAccountId
-      ? await this.accountsService.findOne(userId, fundingAccountId)
-      : await this.findCashAccount(userId, accountId);
-
-    let sourceCurrency: string;
-    if (securityId) {
-      const security = await this.securitiesService.findOne(userId, securityId);
-      sourceCurrency = security.currencyCode;
-    } else {
-      const investmentAccount = await this.accountsService.findOne(
+    // One derivation of the pair, shared with the provenance check (issue #1167).
+    const { from: sourceCurrency, to: cashCurrency } =
+      await this.resolveSettlementCurrencyPair(
         userId,
         accountId,
+        fundingAccountId,
+        securityId,
       );
-      sourceCurrency = investmentAccount.currencyCode;
-    }
 
-    if (sourceCurrency === cashAccount.currencyCode) {
+    if (sourceCurrency === cashCurrency) {
       return 1;
     }
 
@@ -524,14 +555,14 @@ export class InvestmentTransactionsService {
     if (transactionDate) {
       rate = await this.exchangeRateService.getRateForDate(
         sourceCurrency,
-        cashAccount.currencyCode,
+        cashCurrency,
         transactionDate,
       );
     }
     if (rate === null) {
       rate = await this.exchangeRateService.getLatestRate(
         sourceCurrency,
-        cashAccount.currencyCode,
+        cashCurrency,
       );
     }
 
@@ -539,8 +570,8 @@ export class InvestmentTransactionsService {
       throw new BadRequestException(
         tr(
           "errors.securities.exchangeRateUnavailable",
-          `Could not determine an exchange rate for ${sourceCurrency} -> ${cashAccount.currencyCode} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.`,
-          { from: sourceCurrency, to: cashAccount.currencyCode },
+          `Could not determine an exchange rate for ${sourceCurrency} -> ${cashCurrency} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.`,
+          { from: sourceCurrency, to: cashCurrency },
         ),
       );
     }
