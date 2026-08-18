@@ -24,6 +24,7 @@ vi.mock('@/lib/investments', () => ({
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getAll: vi.fn(),
+    getRegisterFilterOptions: vi.fn(),
     delete: vi.fn(),
     deleteTransfer: vi.fn(),
     updateStatus: vi.fn(),
@@ -146,6 +147,7 @@ async function renderPanel(
   holdingsAccount: Account,
   cashAccount: Account | null,
   onDataChanged?: () => void,
+  availableSymbols?: string[],
 ) {
   await act(async () => {
     render(
@@ -161,6 +163,7 @@ async function renderPanel(
         <InvestmentRegisterPanel
           holdingsAccount={holdingsAccount}
           cashAccount={cashAccount}
+          availableSymbols={availableSymbols}
           onDataChanged={onDataChanged}
         />
       </NextIntlClientProvider>,
@@ -211,6 +214,9 @@ describe('InvestmentRegisterPanel', () => {
       pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
     });
     (transactionsApi.delete as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (
+      transactionsApi.getRegisterFilterOptions as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({ payees: [], categories: [] });
     (accountsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue([
       brokerage,
       cash,
@@ -495,6 +501,205 @@ describe('InvestmentRegisterPanel', () => {
   // passed no density props, so the list fell through to its own
   // `useState('normal')` and the level reset on every remount -- which is what
   // a page refresh, a tab switch, or navigating away and back all are.
+  describe('filters', () => {
+    const trade = {
+      id: 'tx-1',
+      accountId: 'brok',
+      action: 'BUY',
+      transactionDate: '2026-01-05',
+      quantity: 1,
+      price: 10,
+      totalAmount: 10,
+      security: { symbol: 'VTI', name: 'Vanguard', currencyCode: 'CAD' },
+    };
+
+    beforeEach(() => {
+      (investmentsApi.getTransactions as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [trade],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+      });
+      (
+        transactionsApi.getRegisterFilterOptions as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        // Deliberately not the register row's own payee: the option has to be
+        // found in the picker, not in the list behind it.
+        payees: [{ id: 'payee-1', name: 'Payroll' }],
+        categories: [{ id: 'cat-1', name: 'Investments', parentId: null }],
+      });
+    });
+
+    /** Open the filter row of whichever register is on screen. */
+    const openFilters = async () => {
+      await act(async () => {
+        fireEvent.click(screen.getByText('Filter'));
+      });
+    };
+
+    it('offers the brokerage register a filter row', async () => {
+      await renderPanel(brokerage, cash, undefined, ['VTI', 'XEQT']);
+      await openFilters();
+
+      expect(screen.getByLabelText('Symbol')).toBeInTheDocument();
+      expect(screen.getByLabelText('Action')).toBeInTheDocument();
+    });
+
+    it('offers the symbols the account holds, not every symbol in the catalog', async () => {
+      await renderPanel(brokerage, cash, undefined, ['VTI', 'XEQT']);
+      await openFilters();
+
+      const symbolPicker = screen.getByLabelText('Symbol');
+      const offered = Array.from(symbolPicker.querySelectorAll('option')).map(
+        (o) => o.textContent,
+      );
+      expect(offered).toContain('VTI');
+      expect(offered).toContain('XEQT');
+    });
+
+    it('narrows the trades to the chosen symbol', async () => {
+      await renderPanel(brokerage, cash, undefined, ['VTI', 'XEQT']);
+      await openFilters();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Symbol'), {
+          target: { value: 'VTI' },
+        });
+      });
+
+      await waitFor(() => {
+        expect(investmentsApi.getTransactions).toHaveBeenLastCalledWith(
+          expect.objectContaining({ symbol: 'VTI', page: 1 }),
+        );
+      });
+    });
+
+    it('offers the cash register its own kind of filter', async () => {
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+      await openFilters();
+
+      // Payees and categories, which is what a cash row is filed under -- the
+      // brokerage side's symbol and action mean nothing here.
+      expect(screen.getByText('Payees')).toBeInTheDocument();
+      expect(screen.getByText('Categories')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Symbol')).not.toBeInTheDocument();
+    });
+
+    it("asks for the filter options of this account's cash ledger", async () => {
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+
+      await waitFor(() => {
+        expect(transactionsApi.getRegisterFilterOptions).toHaveBeenCalledWith([
+          'cash',
+        ]);
+      });
+    });
+
+    it('narrows the cash rows to the chosen payee', async () => {
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+      await openFilters();
+
+      // The picker is a dropdown: open it, then choose.
+      await act(async () => {
+        fireEvent.click(screen.getByText('All payees'));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Payroll'));
+      });
+
+      await waitFor(() => {
+        expect(transactionsApi.getAll).toHaveBeenLastCalledWith(
+          expect.objectContaining({ payeeIds: ['payee-1'], page: 1 }),
+        );
+      });
+    });
+  });
+
+  describe('paging', () => {
+    // Two pages of trades, so the pager is drawn at all.
+    const manyTrades = {
+      data: [
+        {
+          id: 'tx-1',
+          accountId: 'brok',
+          action: 'BUY',
+          transactionDate: '2026-01-05',
+          quantity: 1,
+          price: 10,
+          totalAmount: 10,
+          security: { symbol: 'VTI', name: 'Vanguard', currencyCode: 'CAD' },
+        },
+      ],
+      pagination: { total: 60, page: 1, limit: 25, totalPages: 3 },
+    };
+
+    /**
+     * Where the pager sits relative to the rows it pages.
+     *
+     * The claim is about reading order, not about which component rendered it:
+     * a pager below the table is one the user meets only after scrolling past
+     * everything it could have helped them skip.
+     */
+    const pagerIsAboveTheTable = () => {
+      const pager = screen.getByTitle('Next page');
+      const table = document.querySelector('table')!;
+      // Node.DOCUMENT_POSITION_FOLLOWING: the table comes after the pager.
+      return Boolean(
+        pager.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    };
+
+    beforeEach(() => {
+      (investmentsApi.getTransactions as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyTrades,
+      );
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [cashTransaction],
+        pagination: { total: 60, page: 1, limit: 25, totalPages: 3 },
+      });
+    });
+
+    it('pages the brokerage register from above its rows', async () => {
+      await renderPanel(brokerage, cash);
+
+      expect(pagerIsAboveTheTable()).toBe(true);
+    });
+
+    it("puts the cash register's pager in the same place", async () => {
+      // The point of the change: one account's two ledgers, one toggle apart,
+      // page from the same row of controls.
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+
+      expect(pagerIsAboveTheTable()).toBe(true);
+    });
+
+    it('draws exactly one brokerage pager, not one above and one below', async () => {
+      await renderPanel(brokerage, cash);
+
+      expect(screen.getAllByTitle('Next page')).toHaveLength(1);
+    });
+
+    it('asks for the next page of trades when the pager advances', async () => {
+      await renderPanel(brokerage, cash);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Next page'));
+      });
+
+      expect(investmentsApi.getTransactions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ accountIds: 'brok', page: 2 }),
+      );
+    });
+
+    it('keeps one density toggle when the pager moves into the strip', async () => {
+      await renderPanel(brokerage, cash);
+
+      expect(screen.getAllByTitle('Toggle row density')).toHaveLength(1);
+    });
+  });
+
   describe('row density', () => {
     // The toolbar carrying the toggle only renders once the register has rows.
     beforeEach(() => {

@@ -12,8 +12,18 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useFormModal } from '@/hooks/useFormModal';
 import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
-import { Pagination } from '@/components/ui/Pagination';
-import { InvestmentTransactionList } from '@/components/investments/InvestmentTransactionList';
+import {
+  InvestmentTransactionList,
+  type TransactionFilters,
+} from '@/components/investments/InvestmentTransactionList';
+import {
+  CashFilterBar,
+  CashFilterToggleButton,
+  countActiveCashFilters,
+  EMPTY_CASH_FILTERS,
+  useCashFilterOptions,
+  type CashFilterValues,
+} from '@/components/investments/CashRegisterFilters';
 import { InvestmentTransactionForm } from '@/components/investments/InvestmentTransactionForm';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
@@ -37,6 +47,14 @@ interface InvestmentRegisterPanelProps {
    */
   cashAccount: Account | null;
   /**
+   * The symbols this account holds, for the brokerage filter's Symbol picker.
+   * The detail view already has them on the portfolio summary it fetched, so
+   * they come in rather than being fetched again here. Absent while that
+   * summary is still loading -- an empty list is a picker with nothing in it,
+   * which is the right thing to show until it arrives.
+   */
+  availableSymbols?: string[];
+  /**
    * Raised after any write on either ledger, so the surrounding view can
    * re-fetch what it derives from these rows. A cash deposit moves the cash
    * balance the Holdings by Account list is showing, and reloading this panel
@@ -59,6 +77,7 @@ interface InvestmentRegisterPanelProps {
 export function InvestmentRegisterPanel({
   holdingsAccount,
   cashAccount,
+  availableSymbols = [],
   onDataChanged,
 }: InvestmentRegisterPanelProps) {
   const t = useTranslations('accountDetail-investment');
@@ -81,6 +100,12 @@ export function InvestmentRegisterPanel({
     number | undefined
   >(undefined);
   const [reloadKey, setReloadKey] = useState(0);
+  // Each register is narrowed by its own kind of question -- a trade by symbol
+  // and action, a cash row by payee and category -- so the two filters are
+  // separate state, and each one's page returns to 1 when it changes.
+  const [brokerageFilters, setBrokerageFilters] = useState<TransactionFilters>({});
+  const [cashFilters, setCashFilters] = useState<CashFilterValues>(EMPTY_CASH_FILTERS);
+  const [showCashFilters, setShowCashFilters] = useState(false);
   // Every account the user can fund a trade from, for the brokerage form's
   // "Funds From" / "Deposit To" pickers. Undefined until it loads and after a
   // failure, because the form reads undefined as "not supplied" and falls back
@@ -100,8 +125,18 @@ export function InvestmentRegisterPanel({
   // on the other side -- into a register the user reads as their cash account.
   const cashAccountId = cashAccount?.id ?? null;
   const holdingsAccountId = holdingsAccount.id;
-  // Everything that changes which rows belong on screen.
-  const requestKey = `${holdingsAccountId}|${cashAccountId ?? ''}|${brokeragePage}|${cashPage}|${reloadKey}`;
+  // Everything that changes which rows belong on screen -- the filters
+  // included, or the register would answer a question nobody asked until the
+  // next page change.
+  const requestKey = [
+    holdingsAccountId,
+    cashAccountId ?? '',
+    brokeragePage,
+    cashPage,
+    reloadKey,
+    JSON.stringify(brokerageFilters),
+    JSON.stringify(cashFilters),
+  ].join('|');
   const isLoading = loadedKey !== requestKey;
 
   useEffect(() => {
@@ -113,6 +148,10 @@ export function InvestmentRegisterPanel({
             accountIds: holdingsAccountId,
             page: brokeragePage,
             limit: PAGE_SIZE,
+            symbol: brokerageFilters.symbol,
+            action: brokerageFilters.action,
+            startDate: brokerageFilters.startDate,
+            endDate: brokerageFilters.endDate,
           })
           .catch(() => null),
         cashAccountId
@@ -121,6 +160,10 @@ export function InvestmentRegisterPanel({
                 accountIds: [cashAccountId],
                 page: cashPage,
                 limit: PAGE_SIZE,
+                payeeIds: cashFilters.payeeIds.length ? cashFilters.payeeIds : undefined,
+                categoryIds: cashFilters.categoryIds.length ? cashFilters.categoryIds : undefined,
+                startDate: cashFilters.startDate || undefined,
+                endDate: cashFilters.endDate || undefined,
               })
               .catch(() => null)
           : Promise.resolve(null),
@@ -142,6 +185,9 @@ export function InvestmentRegisterPanel({
     return () => {
       cancelled = true;
     };
+    // `requestKey` carries the filters; listing them again would re-run the
+    // effect on an object identity that says nothing new.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestKey, holdingsAccountId, cashAccountId, brokeragePage, cashPage]);
 
   // The pair alone is not the set of accounts a trade can be funded from -- a
@@ -176,6 +222,18 @@ export function InvestmentRegisterPanel({
     onDataChanged?.();
   }, [reload, onDataChanged]);
 
+  // Narrowing a register changes which rows page 1 holds, so both filters take
+  // their list back to it.
+  const handleBrokerageFiltersChange = useCallback((next: TransactionFilters) => {
+    setBrokerageFilters(next);
+    setBrokeragePage(1);
+  }, []);
+
+  const handleCashFiltersChange = useCallback((next: CashFilterValues) => {
+    setCashFilters(next);
+    setCashPage(1);
+  }, []);
+
   const brokerageForm = useFormModal<InvestmentTransaction>();
   const cashForm = useFormModal<Transaction>();
 
@@ -208,10 +266,19 @@ export function InvestmentRegisterPanel({
   // register is simply the register.
   const activeView: InvestmentTransactionView = cashAccount ? view : 'brokerage';
 
+  // What the cash filter's pickers offer: this ledger's own payees and
+  // categories, fetched while its register is the one on screen.
+  const cashFilterOptions = useCashFilterOptions(
+    activeView === 'cash',
+    cashAccountId ? [cashAccountId] : [],
+  );
+
   return (
     <div className="space-y-4">
       {activeView === 'brokerage' ? (
         <>
+          {/* Paging goes to the list, which draws it in the strip above the
+              table -- where the cash register beside it draws its own. */}
           <InvestmentTransactionList
             densityView="accountRegister"
             transactions={brokerageTx}
@@ -222,17 +289,15 @@ export function InvestmentRegisterPanel({
             onNewTransaction={brokerageForm.openCreate}
             onStatusChanged={reload}
             viewToggle={toggle}
+            filters={brokerageFilters}
+            onFiltersChange={handleBrokerageFiltersChange}
+            availableSymbols={availableSymbols}
+            currentPage={brokeragePage}
+            totalPages={Math.ceil(brokerageTotal / PAGE_SIZE) || 1}
+            totalItems={brokerageTotal}
+            pageSize={PAGE_SIZE}
+            onPageChange={setBrokeragePage}
           />
-          {brokerageTotal > PAGE_SIZE && (
-            <Pagination
-              currentPage={brokeragePage}
-              totalPages={Math.ceil(brokerageTotal / PAGE_SIZE)}
-              totalItems={brokerageTotal}
-              pageSize={PAGE_SIZE}
-              onPageChange={setBrokeragePage}
-              itemName="transactions"
-            />
-          )}
         </>
       ) : (
         <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg">
@@ -243,13 +308,26 @@ export function InvestmentRegisterPanel({
               </h3>
               {toggle}
             </div>
-            <button
-              onClick={cashForm.openCreate}
-              className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-            >
-              {t('register.newCashTransaction')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={cashForm.openCreate}
+                className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                {t('register.newCashTransaction')}
+              </button>
+              <CashFilterToggleButton
+                activeCount={countActiveCashFilters(cashFilters)}
+                onClick={() => setShowCashFilters((open) => !open)}
+              />
+            </div>
           </div>
+          {showCashFilters && (
+            <CashFilterBar
+              options={cashFilterOptions}
+              value={cashFilters}
+              onChange={handleCashFiltersChange}
+            />
+          )}
           <TransactionList
             densityView="accountRegister"
             transactions={cashTx}

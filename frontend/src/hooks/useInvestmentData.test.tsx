@@ -505,10 +505,12 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
     const { result } = renderHook(() => useInvestmentData(), { wrapper });
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
-      result.current.setCashFilterPayeeIds(['p1']);
-      result.current.setCashFilterCategoryIds(['c1']);
-      result.current.setCashFilterStartDate('2024-01-01');
-      result.current.setCashFilterEndDate('2024-12-31');
+      result.current.setCashFilters({
+        payeeIds: ['p1'],
+        categoryIds: ['c1'],
+        startDate: '2024-01-01',
+        endDate: '2024-12-31',
+      });
     });
     expect(result.current.hasActiveCashFilters).toBe(true);
     expect(result.current.activeCashFilterCount).toBe(4);

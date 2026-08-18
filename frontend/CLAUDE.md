@@ -425,6 +425,46 @@ identity on every range, account and currency change, and the load effect alread
 covers those, so an ungated second effect fetches twice for each of them and
 again on any mount under a non-zero key.
 
+**Both registers of one account are paged, filtered and drawn the same way.**
+They are one account's two ledgers a toggle apart, so a difference between them
+reads as a bug even when each half is defensible on its own. The bar above the
+rows is `ListTopToolbar` (`components/ui/ListTopToolbar.tsx`) -- where you are in
+the list on the left, the density toggle and the list's own buttons on the right
+-- and both `TransactionList` and `InvestmentTransactionList` compose it rather
+than rebuilding the markup; `ui-conventions.test.ts` fails on a second call site
+handing `Pagination` an `infoRight`. A pager below the table is one the reader
+meets only after scrolling past everything it could have helped them skip, which
+is what the brokerage register had while the cash register beside it paged from
+above.
+
+Filtering follows the same rule with different questions: a trade is narrowed by
+symbol and action (the brokerage list's own filter row), a cash row by payee and
+category (`CashFilterBar`, shared by the Investments page and the account detail
+page). Each register's page returns to 1 when its filter changes, and the filters
+belong in the register's request key -- otherwise the rows keep answering the
+previous question until something else triggers a fetch.
+
+**A filter picker offers what the rows use, and it loads because the register is
+on screen.** `useCashFilterOptions` asks
+`transactionsApi.getRegisterFilterOptions` for the payees and categories the
+selected accounts' rows actually reference -- a brokerage cash ledger has a dozen
+payees, and offering the household's whole address book to narrow it buries them.
+The endpoint reads split lines as well as parent rows (a split parent's own
+`categoryId` is NULL, and the register's category filter matches split lines), and
+returns the **ancestors** of every used category, because `MultiSelect` builds its
+top level from `parentId == null` and drops a child whose parent is absent.
+Trigger the load from the view being displayed, never from the click that reaches
+it: the Investments page remembers its view, so the cash register is reachable
+without that click, and gating on it left both pickers reading "No options found"
+for the users who live there.
+
+**A modal this page already mounts is opened, not navigated to.** Clicking an
+investment-linked row in the cash register pushed `/investments?edit=<id>`, which
+remounted the page, scrolled it to the top and refetched every section before the
+dialogue appeared -- to reach a form that was mounted the whole time. Fetch the
+row and call the modal's own `openEdit`; keep the URL parameter for arrivals from
+another page.
+
 **A form's account list is a property of the form, not of the page that opened
 it.** The same `InvestmentTransactionForm` is mounted from the Investments page
 and from an account's detail page, and only the first passed `allAccounts` -- so

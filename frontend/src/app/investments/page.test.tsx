@@ -114,11 +114,13 @@ vi.mock('@/lib/accounts', () => ({
 
 const mockGetAllTransactions = vi.fn();
 const mockGetTransactionById = vi.fn();
+const mockGetFilterOptions = vi.fn();
 
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getAll: (...args: any[]) => mockGetAllTransactions(...args),
     getById: (...args: any[]) => mockGetTransactionById(...args),
+    getRegisterFilterOptions: (...args: any[]) => mockGetFilterOptions(...args),
     delete: vi.fn(),
     deleteTransfer: vi.fn(),
     updateStatus: vi.fn(),
@@ -393,6 +395,7 @@ describe('InvestmentsPage', () => {
     mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { page: 1, totalPages: 1, total: 0 } });
     mockGetAllCategories.mockResolvedValue([]);
     mockGetAllPayees.mockResolvedValue([]);
+    mockGetFilterOptions.mockResolvedValue({ payees: [], categories: [] });
   });
 
   describe('Rendering', () => {
@@ -1116,7 +1119,9 @@ describe('InvestmentsPage', () => {
       });
     });
 
-    it('loads categories and payees on first switch to cash', async () => {
+    it('asks for the filter options of the cash ledgers on screen', async () => {
+      // Not every payee and category in the ledger: a filter is a way through
+      // the rows in front of you.
       mockGetAllTransactions.mockResolvedValue({
         data: [],
         pagination: { page: 1, totalPages: 1, total: 0 },
@@ -1125,9 +1130,75 @@ describe('InvestmentsPage', () => {
       await switchToCashView();
 
       await waitFor(() => {
-        expect(mockGetAllCategories).toHaveBeenCalled();
-        expect(mockGetAllPayees).toHaveBeenCalled();
+        expect(mockGetFilterOptions).toHaveBeenCalledWith(
+          expect.arrayContaining(['cash-1', 'cash-2']),
+        );
       });
+    });
+
+    it('loads the filter options for a remembered cash view, with no click', async () => {
+      // The view is persisted, so returning to the page lands on the cash
+      // register without passing through the toggle. Loading the options only
+      // on that click left both pickers reading "No options found" for exactly
+      // the users who use the cash view most.
+      mockLocalStorageState['monize-investments-transaction-view'] = {
+        value: 'cash',
+        setter: vi.fn(),
+      };
+      mockGetAllTransactions.mockResolvedValue({
+        data: [],
+        pagination: { page: 1, totalPages: 1, total: 0 },
+      });
+
+      await renderPage();
+
+      await waitFor(() => {
+        expect(mockGetFilterOptions).toHaveBeenCalled();
+      });
+    });
+
+    it('opens an investment-linked cash row in place, without navigating', async () => {
+      // Routing to `?edit=<id>` reached the same modal by reloading the page:
+      // it jumped to the top and every section refetched before the dialogue
+      // appeared.
+      mockGetAllTransactions.mockResolvedValue({
+        data: [
+          {
+            id: 'cash-tx-1',
+            transactionDate: '2026-01-15',
+            amount: -1000,
+            linkedInvestmentTransactionId: 'itx-9',
+          },
+        ],
+        pagination: { page: 1, totalPages: 1, total: 1 },
+      });
+      mockGetTransaction.mockResolvedValue({ id: 'itx-9', action: 'BUY' });
+
+      await switchToCashView();
+      await waitFor(() => {
+        expect(screen.getByTestId('cash-edit-cash-tx-1')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('cash-edit-cash-tx-1'));
+      });
+
+      await waitFor(() => {
+        expect(mockGetTransaction).toHaveBeenCalledWith('itx-9');
+        expect(mockOpenEdit).toHaveBeenCalledWith({ id: 'itx-9', action: 'BUY' });
+      });
+      expect(mockRouterPush).not.toHaveBeenCalledWith(
+        expect.stringContaining('edit=itx-9'),
+      );
+    });
+
+    it('does not ask for filter options while the brokerage register is on screen', async () => {
+      await renderPage();
+      await waitFor(() => {
+        expect(screen.getByTestId('transaction-list')).toBeInTheDocument();
+      });
+
+      expect(mockGetFilterOptions).not.toHaveBeenCalled();
     });
 
     it('shows filter panel when Filter button is clicked', async () => {

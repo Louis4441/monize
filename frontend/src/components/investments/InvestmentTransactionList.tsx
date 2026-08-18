@@ -23,6 +23,7 @@ import { RowActions } from '@/components/ui/row-actions/RowActions';
 import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 import { DensityToggle } from '@/components/ui/DensityToggle';
+import { ListTopToolbar } from '@/components/ui/ListTopToolbar';
 
 /**
  * Builds the standard row actions for an investment transaction. Shared by the
@@ -79,6 +80,20 @@ interface InvestmentTransactionListProps {
   /** Which surface's remembered row density this register reads. */
   densityView?: DensityView;
   viewToggle?: React.ReactNode;
+  /**
+   * Paging, when this list owns it. Supplied together, they put the pager in
+   * the strip above the table -- the same strip, in the same place, as the cash
+   * register beside it (`ListTopToolbar`), and the density toggle moves into it
+   * so the two registers of one account read identically. Left out, the list
+   * keeps the toggle in its heading and the surrounding page draws whatever
+   * pager it draws; the Investments page pages both of its registers below the
+   * table, and is consistent with itself that way.
+   */
+  currentPage?: number;
+  totalPages?: number;
+  totalItems?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
 }
 
 /**
@@ -291,8 +306,18 @@ export function InvestmentTransactionList({
   availableSymbols = [],
   densityView = 'investments',
   viewToggle,
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
 }: InvestmentTransactionListProps) {
   const t = useTranslations('investments');
+  // Whether paging is this list's to draw. All five props travel together, so
+  // one of them is the question -- and the answer also decides where the
+  // density toggle lives, because the strip is where it belongs once there is
+  // a strip.
+  const ownsPaging = onPageChange !== undefined;
   const ACTION_OPTIONS = [
     { value: '', label: t('transactionList.allActions') },
     { value: 'BUY', label: t('transactionList.actionBuy') },
@@ -518,7 +543,9 @@ export function InvestmentTransactionList({
             )}
           </button>
         )}
-        <DensityToggle view={densityView} size="md" className="ml-auto" />
+        {!ownsPaging && (
+          <DensityToggle view={densityView} size="md" className="ml-auto" />
+        )}
         </div>
       </div>
 
@@ -600,6 +627,18 @@ export function InvestmentTransactionList({
 
       {/* Spacer between controls and table */}
       <div className="mt-3 sm:mt-4" />
+
+      {ownsPaging && (
+        <ListTopToolbar
+          densityView={densityView}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          itemName={t('transactionList.itemNamePlural')}
+        />
+      )}
 
       {/* Brokerage Transactions Table */}
       <div className="overflow-x-auto">

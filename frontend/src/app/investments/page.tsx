@@ -8,8 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect';
-import { DateInput } from '@/components/ui/DateInput';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { PortfolioSummaryCard } from '@/components/investments/PortfolioSummaryCard';
 import { GroupedHoldingsList } from '@/components/investments/GroupedHoldingsList';
@@ -18,6 +17,11 @@ import { InvestmentTransactionList } from '@/components/investments/InvestmentTr
 import { NewTransactionButton } from '@/components/investments/NewTransactionButton';
 import { RefreshPricesButton } from '@/components/investments/RefreshPricesButton';
 import { InvestmentTransactionForm } from '@/components/investments/InvestmentTransactionForm';
+import {
+  CashFilterBar,
+  CashFilterToggleButton,
+  useCashFilterOptions,
+} from '@/components/investments/CashRegisterFilters';
 import {
   InvestmentValueChart,
   INVESTMENT_CHART_REFRESH_EVENT,
@@ -72,6 +76,15 @@ function InvestmentsContent() {
     data.loadCashTransactionsIfNeeded(transactionView);
   }, [transactionView, data.loadCashTransactionsIfNeeded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // What the cash filter pickers offer: the payees and categories these cash
+  // ledgers actually use. Keyed off the view being on screen rather than the
+  // click that reaches it -- the view is remembered, so it is reachable
+  // without one.
+  const cashFilterOptions = useCashFilterOptions(
+    transactionView === 'cash',
+    data.cashAccountIds,
+  );
+
   // Reset the modal-width tracking whenever the investment transaction modal
   // closes (via cancel, success, escape, backdrop, or back button) so reopening
   // it starts at the default width without a flicker.
@@ -115,36 +128,8 @@ function InvestmentsContent() {
     setTransactionView(view);
     if (view === 'cash') {
       data.setCashCurrentPage(1);
-      if (data.cashPayees.length === 0 && data.cashCategories.length === 0) {
-        data.loadCashFilterData();
-      }
     }
   };
-
-  // Build filter dropdown options
-  const cashCategoryFilterOptions = useMemo((): MultiSelectOption[] => {
-    const buildOptions = (parentId: string | null = null): MultiSelectOption[] => {
-      return data.cashCategories
-        .filter(c => c.parentId === parentId)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .flatMap(cat => {
-          const children = buildOptions(cat.id);
-          return [{
-            value: cat.id,
-            label: cat.name,
-            parentId: cat.parentId,
-            children: children.length > 0 ? children : undefined,
-          }];
-        });
-    };
-    return buildOptions();
-  }, [data.cashCategories]);
-
-  const cashPayeeFilterOptions = useMemo((): MultiSelectOption[] => {
-    return data.cashPayees
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(payee => ({ value: payee.id, label: payee.name }));
-  }, [data.cashPayees]);
 
   const { handleDeleteTransaction: deleteTransaction } = data;
   const handleDeleteTransaction = useCallback((id: string) => {
@@ -326,51 +311,21 @@ function InvestmentsContent() {
                     <span className="sm:hidden">{t('page.newCashTransactionShort')}</span>
                     <span className="hidden sm:inline">{t('page.newCashTransaction')}</span>
                   </button>
-                  <button
+                  <CashFilterToggleButton
+                    activeCount={data.activeCashFilterCount}
                     onClick={() => data.setShowCashFilters(!data.showCashFilters)}
-                    className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md ${
-                      data.hasActiveCashFilters
-                        ? 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                    {t('page.filter')}
-                    {data.hasActiveCashFilters && (
-                      <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 rounded-full">{data.activeCashFilterCount}</span>
-                    )}
-                  </button>
+                  />
                   <DensityToggle view="investments" size="md" className="ml-auto" />
                 </div>
               </div>
 
               {/* Cash Filter Bar */}
               {data.showCashFilters && (
-                <div className="px-3 sm:px-4 py-3 bg-gray-50 dark:bg-gray-700/30 border-b border-gray-200 dark:border-gray-700">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <MultiSelect label={t('page.cashFilterPayees')} options={cashPayeeFilterOptions} value={data.cashFilterPayeeIds} onChange={(values) => { data.setCashFilterPayeeIds(values); data.setCashCurrentPage(1); }} placeholder={t('page.allPayees')} />
-                    <MultiSelect label={t('page.cashFilterCategories')} options={cashCategoryFilterOptions} value={data.cashFilterCategoryIds} onChange={(values) => { data.setCashFilterCategoryIds(values); data.setCashCurrentPage(1); }} placeholder={t('page.allCategories')} />
-                    <DateInput
-                      label={t('page.cashFilterFrom')}
-                      value={data.cashFilterStartDate}
-                      onDateChange={(date) => { data.setCashFilterStartDate(date); data.setCashCurrentPage(1); }}
-                      onChange={(e) => { data.setCashFilterStartDate(e.target.value); data.setCashCurrentPage(1); }}
-                    />
-                    <DateInput
-                      label={t('page.cashFilterTo')}
-                      value={data.cashFilterEndDate}
-                      onDateChange={(date) => { data.setCashFilterEndDate(date); data.setCashCurrentPage(1); }}
-                      onChange={(e) => { data.setCashFilterEndDate(e.target.value); data.setCashCurrentPage(1); }}
-                    />
-                  </div>
-                  {data.hasActiveCashFilters && (
-                    <div className="mt-3 flex justify-end">
-                      <button onClick={data.clearCashFilters} className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium">{t('page.clearFilters')}</button>
-                    </div>
-                  )}
-                </div>
+                <CashFilterBar
+                  options={cashFilterOptions}
+                  value={data.cashFilters}
+                  onChange={data.setCashFilters}
+                />
               )}
 
               <div className="mt-3 sm:mt-4" />
