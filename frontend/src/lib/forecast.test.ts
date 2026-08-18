@@ -853,6 +853,89 @@ describe('buildForecast', () => {
       expect(result.points).toEqual([]);
       expect(result.missingCurrencies).toContain('USD');
     });
+
+    // Issue #1167 F-rev3.2: an embedded split-investment schedule (isSplit with
+    // an investment split line) projects the server's effective total, not the
+    // stale stored `amount`.
+    it('projects the effective total for a split-investment schedule, not the stale amount', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'split-inv-1',
+        name: 'Buy USD security (split)',
+        accountId: 'cash-1',
+        // Stale stored parent amount, computed at the old rate (1.50).
+        amount: -1500,
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isSplit: true,
+        splits: [
+          {
+            id: 's1',
+            kind: 'investment',
+            amount: -1500,
+            investmentAction: 'BUY',
+            investmentSecurityId: 'sec-usd',
+          },
+        ],
+        // Server re-summed the base splits at the current rate (1.35) -> -1350.
+        investmentForecastAmount: -1350,
+      } as any)];
+      const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
+      const jan20 = result.find(dp => dp.date === '2025-01-20');
+      expect(jan20?.transactions[0].amount).toBe(-1350);
+      // 10000 - 1350, never the stale 1500.
+      expect(jan20?.balance).toBe(8650);
+    });
+
+    it('withholds the forecast for a split-investment schedule whose effective total is unknown', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'split-inv-1',
+        name: 'Buy unpriceable security (split)',
+        accountId: 'cash-1',
+        amount: -1500, // stale scalar must not be used as a fallback
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isSplit: true,
+        splits: [
+          {
+            id: 's1',
+            kind: 'investment',
+            amount: -1500,
+            investmentAction: 'BUY',
+            investmentSecurityId: 'sec-usd',
+          },
+        ],
+        // Current rate for at least one investment line is unknown.
+        investmentForecastAmount: null,
+      } as any)];
+      const result = buildForecast([cashAccount], transactions, 'month', 'cash-1');
+      expect(result.points).toEqual([]);
+      expect(result.missingCurrencies.length).toBeGreaterThan(0);
+    });
+
+    it('leaves an ordinary (non-investment) split schedule on its stored amount', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'split-plain-1',
+        name: 'Grocery split',
+        accountId: 'cash-1',
+        amount: -100,
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isSplit: true,
+        splits: [
+          { id: 's1', kind: 'category', amount: -60 },
+          { id: 's2', kind: 'category', amount: -40 },
+        ],
+        // A plain split schedule carries no effective investment total.
+        investmentForecastAmount: null,
+      } as any)];
+      const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
+      const jan20 = result.find(dp => dp.date === '2025-01-20');
+      expect(jan20?.transactions[0].amount).toBe(-100);
+      expect(jan20?.balance).toBe(9900);
+    });
   });
 
   describe('multiple accounts and transactions', () => {

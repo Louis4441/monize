@@ -75,6 +75,7 @@ import { deletionBalanceEffect } from "../common/deletion-balance.util";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import {
   computeInvestmentCashImpact,
+  investmentSplitCashAmount,
   isInvestmentActionAllowedInSplit,
 } from "./cash-impact.util";
 import {
@@ -2350,13 +2351,13 @@ export class InvestmentTransactionsService {
     // stops the split's cash side and its investment side describing different
     // amounts of money.
     if (splitAmount !== undefined) {
-      const signedCashImpact = computeInvestmentCashImpact(
+      const expected = investmentSplitCashAmount(
         dto.action,
         Number(dto.quantity ?? 0),
         Number(dto.price ?? 0),
         Number(dto.commission ?? 0),
+        exchangeRate,
       );
-      const expected = roundMoney(signedCashImpact * exchangeRate);
       if (expected !== roundMoney(Number(splitAmount))) {
         throw new BadRequestException(
           tr(

@@ -116,6 +116,42 @@ forecast projects `1,350` and posting commits `1,350`, never `1,500`; and when
 `USD->CAD` is unavailable, the forecast shows the projection as unavailable while
 posting refuses -- neither surface uses the stale `1.50` or a `1` fallback.
 
+### Embedded investment splits settle end-to-end at the effective rate
+
+An embedded split-investment schedule (an ordinary split parent carrying an
+investment split line) has no single settlement rate -- each investment line
+settles its own security's currency -- so the read model exposes an effective
+*total* rather than a rate, and posting recomputes each split's cash amount:
+
+- **Posting** (`postOccurrence`, all three surfaces -- inline, override, base
+  scheduled splits) resolves each investment split's cash amount through
+  `resolveEffectiveSplitCash`: the stored rate when its recorded pair still
+  matches, otherwise a freshly resolved one, and the split's cash `amount` is
+  `investmentSplitCashAmount(action, qty, price, commission, effectiveRate)` --
+  the single definition of that figure, shared with
+  `createEmbeddedForSplit`'s consistency check. The parent amount is then
+  re-summed from the recomputed split amounts (`validateSplitAmountSum` would
+  otherwise refuse the post). An unresolvable cross-currency pair throws
+  `exchangeRateUnavailable`, so posting refuses rather than committing a stale
+  amount or throwing `embeddedSplitAmountMismatch`.
+- **The read model** (`findAll`) attaches a read-only
+  `investmentForecastAmount: number | null` for split-investment schedules: the
+  base splits re-summed with each investment line's current effective rate
+  (`resolveInvestmentForecastSplitAmount`), or `null` when any line's current
+  rate is unknown. Non-split and non-investment-split schedules get `null` and
+  are unaffected.
+- **The forecast** (`frontend/src/lib/forecast.ts`) projects
+  `investmentForecastAmount` for a split-investment schedule instead of the stale
+  stored `amount`; a `null` withholds the whole cumulative series through
+  `missingCurrencies`, the same treatment as an unknown parent-investment rate.
+
+Because posting emits `investmentSplitCashAmount(..., effectiveRate)` and
+`createEmbeddedForSplit` recomputes `expected` from the same function against the
+same forwarded rate, the two halves of the split cannot disagree by construction;
+`test/integration/scheduled-investment-split-fx.integration.spec.ts` proves it
+across `create -> createSplits -> createEmbeddedForSplit` and proves a stale
+amount is refused there rather than written.
+
 ## Invariants
 
 - **A stored rate that carries provenance is reused only for its own pair.** A
@@ -146,6 +182,14 @@ For each of the three surfaces:
    pair unchanged preserves the existing provenance (parent: value-difference;
    split/override: the old pair is carried forward per security), so a still-valid
    stored rate keeps working while a since-changed pair is still caught at posting.
+
+5. **Embedded split re-resolves end-to-end.** For an embedded split-investment
+   schedule with a stale-provenance rate, post; assert the split's forwarded rate
+   and cash amount are the re-resolved (effective) ones, the parent amount is the
+   re-summed total, and an unresolvable pair refuses the post before any write.
+   The forecast half: assert the read model's `investmentForecastAmount` is the
+   effective total (not the stale stored `amount`), and `null` for an unresolvable
+   line, and that `forecast.ts` projects the effective total / withholds on `null`.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

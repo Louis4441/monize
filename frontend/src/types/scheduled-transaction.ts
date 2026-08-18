@@ -113,6 +113,14 @@ export interface ScheduledTransaction {
   // when the current rate is unknown (forecast then shows the projection as
   // unavailable rather than inventing a rate). Absent/`null` for non-investment.
   investmentForecastExchangeRate?: number | null;
+  // Read-only, server-resolved effective *total* the cash-flow forecast must use
+  // for a split-investment schedule (issue #1167) -- the base splits re-summed
+  // with each investment split's current FX rate, so the forecast matches what
+  // posting would book rather than the stale stored `amount`. A number when every
+  // investment split's current rate is known, `null` when any is unknown (forecast
+  // then shows the projection as unavailable). Absent/`null` for schedules that
+  // carry no investment splits.
+  investmentForecastAmount?: number | null;
   tagIds?: string[];
   splits?: ScheduledTransactionSplit[];
   overrideCount?: number;

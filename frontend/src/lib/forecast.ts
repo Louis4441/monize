@@ -228,11 +228,40 @@ function isTransfer(transaction: ScheduledTransaction): boolean {
  * affected account, with the amount converted into that account's currency
  * via the recorded exchange rate.
  */
+/**
+ * A split-investment schedule: an ordinary split parent (`isSplit`) carrying at
+ * least one embedded investment split line. Its cash impact is FX-sensitive the
+ * same way a parent investment schedule is (issue #1167), but it has no single
+ * settlement rate -- each investment line settles its own security's currency --
+ * so the server sends one recomputed effective total (`investmentForecastAmount`)
+ * rather than a rate.
+ */
+function hasEmbeddedInvestmentSplits(transaction: ScheduledTransaction): boolean {
+  return (
+    transaction.isSplit === true &&
+    (transaction.splits?.some(
+      s => s.investmentAction != null || s.kind === 'investment',
+    ) ?? false)
+  );
+}
+
 function normalizeInvestmentForForecast(
   transaction: ScheduledTransaction,
   accountsById: Map<string, Account>,
 ): ScheduledTransaction {
   if (!transaction.isInvestment) {
+    // Issue #1167: a split-investment schedule projects the server's effective
+    // total (its base splits re-summed at current FX), never the stale stored
+    // `amount`. When any investment line's current rate is unknown the server
+    // sends `null`; the amount is then left as-is because the builders detect
+    // the unknown case (`hasUnknownForecastRate`) and withhold the whole series
+    // rather than projecting a figure.
+    if (
+      hasEmbeddedInvestmentSplits(transaction) &&
+      transaction.investmentForecastAmount != null
+    ) {
+      return { ...transaction, amount: transaction.investmentForecastAmount };
+    }
     return transaction;
   }
   let cashAccountId = transaction.investmentFundingAccountId;
@@ -290,9 +319,15 @@ function normalizeInvestmentForForecast(
  * back to the settlement account's currency.
  */
 function hasUnknownForecastRate(transaction: ScheduledTransaction): boolean {
-  return (
-    transaction.isInvestment && transaction.investmentForecastExchangeRate == null
-  );
+  if (transaction.isInvestment) {
+    return transaction.investmentForecastExchangeRate == null;
+  }
+  // A split-investment schedule whose effective total could not be resolved (any
+  // investment line's current rate unknown) is withheld the same way (#1167).
+  if (hasEmbeddedInvestmentSplits(transaction)) {
+    return transaction.investmentForecastAmount == null;
+  }
+  return false;
 }
 
 /**
