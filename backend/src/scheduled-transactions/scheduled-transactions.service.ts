@@ -30,7 +30,10 @@ import { TransactionsService } from "../transactions/transactions.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
 import { FUNDING_ACCOUNT_ACTIONS } from "../securities/investment-replay.util";
-import { investmentSplitCashAmount } from "../securities/cash-impact.util";
+import {
+  investmentSplitCashAmount,
+  computeInvestmentCashImpact,
+} from "../securities/cash-impact.util";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
@@ -1278,20 +1281,23 @@ export class ScheduledTransactionsService {
   }
 
   /**
-   * The effective FX rate a cash-flow *forecast* should apply to a scheduled
+   * The *effective* FX rate a cash-flow forecast should apply to a scheduled
    * investment's projected cash impact (issue #1167). This is a read-only,
-   * server-resolved value, deliberately distinct from the persisted
-   * `investmentExchangeRate`: the stored scalar records the rate a past caller
-   * supplied and may be stale for the current settlement pair, whereas the
-   * forecast needs a rate that is safe to project with *now*. It goes through
-   * the same settlement-pair + FX resolution path as posting
-   * (`resolveCashExchangeRateOrNull`, no supplied rate):
+   * server-resolved value that must equal what {@link postInvestment} will use,
+   * so the forecast agrees with the posting it predicts. That means the same
+   * stored-if-current-else-resolve decision the posting makes -- NOT
+   * unconditionally the current market rate (Round 6 F1): a valid persisted rate
+   * whose recorded pair still matches the current settlement pair is *reused* by
+   * posting, so the forecast must reuse it too, or a schedule pinned at 1.50
+   * forecasts 1.35 and posts 1.50.
+   *
+   *   - stored rate present AND its pair still current -> that stored rate;
+   *   - stored rate stale / absent provenance / no stored rate -> a fresh rate
+   *     for the current pair (`resolveCashExchangeRateOrNull`, no supplied rate);
    *   - same currency -> `1`;
-   *   - a determinable current rate -> that rate;
-   *   - a genuine cross-currency pair with no rate -> `null` (unknown), which the
-   *     forecast renders as an unavailable projection rather than inventing a
-   *     rate. `null` is never returned for a same-currency pair, so the forecast
-   *     cannot mistake "1:1" for "missing".
+   *   - a genuine cross-currency pair with no determinable rate -> `null`
+   *     (unknown), rendered as an unavailable projection. `null` is never a
+   *     same-currency pair, so the forecast cannot mistake "1:1" for "missing".
    * Returns `null` for a non-investment schedule (the forecast ignores it there).
    *
    * `asOf` is today: the forecast's occurrences are future-dated, and
@@ -1301,6 +1307,49 @@ export class ScheduledTransactionsService {
    * could resolve. Because that path can perform an external fetch (and persist
    * the result), the caller runs this *outside* the `findAll` transaction.
    */
+  /**
+   * The effective FX rate for an investment settlement (Round 6 F1): the stored
+   * rate when its recorded pair still matches the current settlement pair (posting
+   * reuses it), otherwise a freshly resolved one; `null` for an unresolvable
+   * cross-currency pair, `1` for same-currency. The single definition of "the rate
+   * posting will use", shared by the parent forecast rate and the top-level
+   * investment override amount.
+   */
+  private async resolveEffectiveInvestmentRate(
+    userId: string,
+    settlement: {
+      accountId: string;
+      fundingAccountId: string | null | undefined;
+      securityId: string | null | undefined;
+    },
+    stored: {
+      rate: number | null;
+      from: string | null | undefined;
+      to: string | null | undefined;
+    },
+    asOf: Date,
+  ): Promise<number | null> {
+    if (
+      stored.rate !== null &&
+      (await this.storedInvestmentRateIsCurrent(
+        userId,
+        stored.from,
+        stored.to,
+        settlement,
+      ))
+    ) {
+      return stored.rate;
+    }
+    return this.investmentTransactionsService.resolveCashExchangeRateOrNull(
+      userId,
+      settlement.accountId,
+      settlement.fundingAccountId,
+      settlement.securityId,
+      undefined,
+      asOf,
+    );
+  }
+
   private async resolveInvestmentForecastRate(
     userId: string,
     transaction: ScheduledTransaction,
@@ -1310,14 +1359,24 @@ export class ScheduledTransactionsService {
       return null;
     }
     const action = transaction.investmentAction as InvestmentAction;
-    return this.investmentTransactionsService.resolveCashExchangeRateOrNull(
+    return this.resolveEffectiveInvestmentRate(
       userId,
-      transaction.accountId,
-      FUNDING_ACCOUNT_ACTIONS.has(action)
-        ? transaction.investmentFundingAccountId
-        : null,
-      transaction.investmentSecurityId,
-      undefined,
+      {
+        accountId: transaction.accountId,
+        fundingAccountId: FUNDING_ACCOUNT_ACTIONS.has(action)
+          ? transaction.investmentFundingAccountId
+          : null,
+        securityId: transaction.investmentSecurityId,
+      },
+      {
+        rate:
+          transaction.investmentExchangeRate !== null &&
+          transaction.investmentExchangeRate !== undefined
+            ? Number(transaction.investmentExchangeRate)
+            : null,
+        from: transaction.investmentExchangeRateFromCurrency,
+        to: transaction.investmentExchangeRateToCurrency,
+      },
       asOf,
     );
   }
@@ -1396,30 +1455,81 @@ export class ScheduledTransactionsService {
   }
 
   /**
-   * The effective total a *per-occurrence override* would post today for its own
-   * investment splits (issue #1167 F5-2). An override's stored `amount` is a
-   * snapshot at the rate current when it was created, so the forecast must not
-   * project it once a referenced security's currency has changed -- posting
-   * re-resolves the override's splits, and the forecast has to agree.
+   * The effective cash total a *per-occurrence override* would post today (issue
+   * #1167, F5-2 + Round 6 F3). An override's stored `amount` is a snapshot at the
+   * rate current when it was created, and a top-level investment override stores
+   * quantity/price/total rather than an amount at all -- so the forecast must
+   * recompute what posting will do, not read the stale scalar.
    *
-   * Returns `null` when the override carries no investment split (so the forecast
-   * uses the override's own stored `amount` as before), and also `null` when any
-   * investment line's current rate is unknown (the forecast then withholds this
-   * occurrence). The override settles through the same account as the base
-   * schedule, so the pair derivation is identical.
+   * Three shapes:
+   *   - **top-level investment override** (parent schedule is an investment): the
+   *     signed cash impact of the override-or-base quantity/price/total at the
+   *     effective rate. Computed for *every* override of an investment schedule,
+   *     even a date-only one, so `null` stays reserved for a genuinely unknown FX
+   *     rate rather than "no investment override".
+   *   - **split-investment override**: its base splits re-summed at current FX.
+   *   - **anything else**: `undefined`, so the forecast keeps using the override's
+   *     own stored `amount`.
+   * `null` means investment-related but the current rate is unknown -- the forecast
+   * withholds that occurrence.
    */
   private async resolveOverrideInvestmentForecastAmount(
     userId: string,
     scheduled: ScheduledTransaction,
     override: ScheduledTransactionOverride,
     asOf: Date,
-  ): Promise<number | null> {
+  ): Promise<number | null | undefined> {
+    // Top-level investment override: same precedence as postInvestment
+    // (override value -> base fallback) at the effective (stored-or-resolved) rate.
+    if (scheduled.isInvestment && scheduled.investmentAction) {
+      const action = scheduled.investmentAction as InvestmentAction;
+      const rate = await this.resolveEffectiveInvestmentRate(
+        userId,
+        {
+          accountId: scheduled.accountId,
+          fundingAccountId: FUNDING_ACCOUNT_ACTIONS.has(action)
+            ? scheduled.investmentFundingAccountId
+            : null,
+          securityId: scheduled.investmentSecurityId,
+        },
+        {
+          rate:
+            scheduled.investmentExchangeRate !== null &&
+            scheduled.investmentExchangeRate !== undefined
+              ? Number(scheduled.investmentExchangeRate)
+              : null,
+          from: scheduled.investmentExchangeRateFromCurrency,
+          to: scheduled.investmentExchangeRateToCurrency,
+        },
+        asOf,
+      );
+      if (rate === null) {
+        return null;
+      }
+      const quantity = Number(
+        override.investmentQuantity ?? scheduled.investmentQuantity ?? 0,
+      );
+      const price = Number(
+        override.investmentPrice ?? scheduled.investmentPrice ?? 0,
+      );
+      const commission = Number(scheduled.investmentCommission ?? 0);
+      const total =
+        override.investmentTotalAmount ?? scheduled.investmentTotalAmount;
+      // Amount-only income actions carry their cash directly (positive); every
+      // other action derives it from quantity/price/commission, signed by side.
+      const cashSecurity = AMOUNT_ONLY_ACTIONS.has(action)
+        ? Number(total ?? 0)
+        : computeInvestmentCashImpact(action, quantity, price, commission);
+      return roundMoney(cashSecurity * rate);
+    }
+
+    // Split-investment override: re-sum its base splits at current FX.
     if (!override.isSplit || !override.splits?.length) {
-      return null;
+      return undefined;
     }
     const hasInvestmentSplit = override.splits.some((s) => s.investment);
     if (!hasInvestmentSplit) {
-      return null;
+      return undefined;
     }
     const amounts: number[] = [];
     for (const split of override.splits) {

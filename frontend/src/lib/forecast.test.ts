@@ -1028,6 +1028,59 @@ describe('buildForecast', () => {
       expect(result.points).toEqual([]);
       expect(result.missingCurrencies.length).toBeGreaterThan(0);
     });
+
+    // Issue #1167 Round 6 F3: a top-level investment override (quantity/price/total,
+    // not embedded splits) projects its server-resolved effective amount.
+    it('projects a top-level investment override quantity change, not the base amount', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'inv-topovr',
+        name: 'DCA buy',
+        accountId: 'cash-1',
+        amount: -1000, // security-currency base cash impact (10 x 100)
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isInvestment: true,
+        investmentFundingAccountId: 'cash-1',
+        investmentForecastExchangeRate: 1.35,
+        // Override doubled the quantity; the server resolved the effective cash.
+        nextOverride: {
+          overrideDate: '2025-01-20',
+          amount: null, // top-level investment overrides store qty/price/total
+          investmentQuantity: 20,
+          investmentForecastAmount: -2700, // 20 x 100 x 1.35
+        },
+      } as any)];
+      const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
+      const jan20 = result.find(dp => dp.date === '2025-01-20');
+      // -2700 (override) posted, never the base -1350.
+      expect(jan20?.transactions[0].amount).toBe(-2700);
+      expect(jan20?.balance).toBe(7300);
+    });
+
+    it('withholds when a top-level investment override has an unknown effective amount', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'inv-topovr-unknown',
+        name: 'DCA buy',
+        accountId: 'cash-1',
+        amount: -1000,
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isInvestment: true,
+        investmentFundingAccountId: 'cash-1',
+        investmentForecastExchangeRate: 1.35,
+        nextOverride: {
+          overrideDate: '2025-01-20',
+          amount: null,
+          investmentQuantity: 20,
+          investmentForecastAmount: null, // current rate unknown for this occurrence
+        },
+      } as any)];
+      const result = buildForecast([cashAccount], transactions, 'month', 'cash-1');
+      expect(result.points).toEqual([]);
+      expect(result.missingCurrencies.length).toBeGreaterThan(0);
+    });
   });
 
   describe('multiple accounts and transactions', () => {

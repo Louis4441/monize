@@ -617,6 +617,43 @@ describe("ScheduledTransactionsService", () => {
       );
     });
 
+    it("reuses a still-valid pinned rate the way posting does, not the current market rate (Round 6 F1)", async () => {
+      const st = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-usd",
+        investmentFundingAccountId: null,
+        investmentQuantity: 10,
+        investmentPrice: 100,
+        // A valid pinned rate whose recorded pair still matches the current one.
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateFromCurrency: "USD",
+        investmentExchangeRateToCurrency: "CAD",
+      });
+      const qb = mockQueryBuilder([st]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      // Current pair still USD->CAD -> the stored rate is valid; market is 1.35.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+
+      const result = await service.findAll(userId);
+
+      // Posting would reuse the pinned 1.50, so the forecast must too -- never the
+      // 1.35 market rate, or the forecast disagrees with the posting it predicts.
+      expect(result[0].investmentForecastExchangeRate).toBe(1.5);
+      // The stored rate was validated, not re-fetched.
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).not.toHaveBeenCalled();
+    });
+
     it("attaches a null investmentForecastExchangeRate when the current rate is unavailable (issue #1167)", async () => {
       const st = makeScheduled({
         isInvestment: true,
@@ -637,6 +674,50 @@ describe("ScheduledTransactionsService", () => {
       const result = await service.findAll(userId);
 
       expect(result[0].investmentForecastExchangeRate).toBeNull();
+    });
+
+    it("attaches a top-level investment override's effective cash amount (Round 6 F3)", async () => {
+      const st = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-usd",
+        investmentFundingAccountId: null,
+        investmentQuantity: 10,
+        investmentPrice: 100,
+        investmentCommission: 0,
+        investmentExchangeRate: 1.35,
+        investmentExchangeRateFromCurrency: "USD",
+        investmentExchangeRateToCurrency: "CAD",
+      });
+      const override = {
+        id: "ovr-1",
+        scheduledTransactionId: st.id,
+        originalDate: st.nextDueDate,
+        overrideDate: st.nextDueDate,
+        amount: null,
+        isSplit: null,
+        splits: null,
+        // A per-occurrence quantity change posting would honour: 20 shares.
+        investmentQuantity: 20,
+        investmentPrice: null,
+        investmentTotalAmount: null,
+      };
+      const qb = mockQueryBuilder([st]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([override]))
+        .mockReturnValueOnce(mockQueryBuilder([override]));
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      const result = await service.findAll(userId);
+
+      // cashImpact BUY 20 @ 100 = -2000, effective rate 1.35 -> -2700, never the
+      // base -1350. Posting uses the override quantity, so the forecast must too.
+      expect((result[0].nextOverride as any).investmentForecastAmount).toBe(
+        -2700,
+      );
     });
 
     it("leaves investmentForecastExchangeRate null for a non-investment schedule", async () => {

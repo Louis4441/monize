@@ -193,13 +193,16 @@ function generateOccurrences(
   }
 
   // Resolve the effective amount and unknown flag for one occurrence, given the
-  // override that applies to it (if any). An override carrying investment splits
-  // projects its own server-resolved effective total (#1167 F5-2); one without
-  // uses its stored scalar; a base occurrence uses the base amount.
+  // override that applies to it (if any). An investment override -- one carrying
+  // investment splits (#1167 F5-2), OR any override of a top-level investment
+  // schedule whose quantity/price/total posting honours (#1167 R6 F3) -- projects
+  // its server-resolved effective total; a non-investment override uses its stored
+  // scalar; a base occurrence uses the base amount.
+  const baseIsInvestment = transaction.isInvestment === true;
   const resolveOccurrence = (
     override: OverrideLookup | undefined,
   ): { amount: number; unknown: boolean } => {
-    if (override?.hasInvestmentSplits) {
+    if (override && (baseIsInvestment || override.hasInvestmentSplits)) {
       if (override.investmentForecastAmount == null) {
         return { amount: 0, unknown: true };
       }
