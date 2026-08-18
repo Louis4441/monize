@@ -185,12 +185,18 @@ export interface UpdateScheduledTransactionData extends Partial<CreateScheduledT
 // ==================== Override Types ====================
 
 export interface OverrideSplit {
+  // Stable id of this override split, server-generated (issue #1167 F4). Returned
+  // in the read model and echoed back as `sourceSplitId` on edit/post so the
+  // server correlates FX-rate provenance by identity, not by matching values.
+  id?: string;
   splitKind?: SplitKind;
   categoryId: string | null;
   transferAccountId?: string | null;
   investment?: InvestmentSplitDetails;
   amount: number;
   memo?: string | null;
+  // Set by the client on write to name the source split this row continues.
+  sourceSplitId?: string;
 }
 
 export interface ScheduledTransactionOverride {

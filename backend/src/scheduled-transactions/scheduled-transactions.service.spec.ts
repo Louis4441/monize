@@ -5477,5 +5477,153 @@ describe("ScheduledTransactionsService", () => {
         investmentTransactionsService.resolveSettlementCurrencyPair,
       ).not.toHaveBeenCalled();
     });
+
+    it("update() uses stable split id so a rate changed to another split's old value is not mislabelled (F4)", async () => {
+      // Split A stays 1.50; split B changes 1.55 -> 1.50, colliding with A's OLD
+      // rate. A value key would hand B split A's EUR->CAD pair; stable identity
+      // (sourceSplitId) keeps them apart: A carries EUR->CAD, B stamps current.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1500,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          id: "split-A",
+          kind: "investment",
+          investmentSecurityId: "sec-1",
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        },
+        {
+          id: "split-B",
+          kind: "investment",
+          investmentSecurityId: "sec-1",
+          investmentExchangeRate: 1.55,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "split-A",
+            amount: -750,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-1",
+              quantity: 5,
+              price: 100,
+              exchangeRate: 1.5, // unchanged
+            },
+          },
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "split-B",
+            amount: -750,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-1",
+              quantity: 5,
+              price: 100,
+              exchangeRate: 1.5, // changed from 1.55, collides with A's old 1.50
+            },
+          },
+        ],
+      } as any);
+
+      const createdSplits = mockQueryRunner.manager.create.mock.calls
+        .filter(
+          (c: any[]) =>
+            c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+        )
+        .map((c: any[]) => c[1]);
+      expect(createdSplits).toHaveLength(2);
+      // A (unchanged) keeps its recorded EUR->CAD; B (changed) stamps current
+      // USD->CAD -- never the other way round, which the value key would do.
+      expect(createdSplits[0].investmentExchangeRateFromCurrency).toBe("EUR");
+      expect(createdSplits[0].investmentExchangeRateToCurrency).toBe("CAD");
+      expect(createdSplits[1].investmentExchangeRateFromCurrency).toBe("USD");
+      expect(createdSplits[1].investmentExchangeRateToCurrency).toBe("CAD");
+    });
+
+    it("post() honours a user-edited INLINE split rate via stable identity, not re-resolving it (F2)", async () => {
+      // The source split settles USD->CAD at 1.35; the user edits the Post dialog
+      // rate to 1.37. Correlated by id, the edit is recognised and honoured for the
+      // current pair -- not discarded as unknown and re-resolved to the market.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          splits: [
+            {
+              id: "split-S",
+              kind: "investment",
+              investmentSecurityId: "sec-usd",
+              investmentAction: "BUY",
+              investmentQuantity: 10,
+              investmentPrice: 100,
+              investmentCommission: 0,
+              investmentExchangeRate: 1.35,
+              investmentExchangeRateFromCurrency: "USD",
+              investmentExchangeRateToCurrency: "CAD",
+            },
+          ],
+        } as any),
+      );
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      // If the edit were NOT recognised, the rate would be re-resolved to this.
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+
+      await service.post(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "split-S",
+            amount: -1370,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              commission: 0,
+              // User edited from 1.35; the rate editor drops provenance, so the
+              // inline line arrives with NO from/to (the real F2 shape). Without
+              // id correlation this would be re-resolved to the 1.35 market rate.
+              exchangeRate: 1.37,
+            },
+          },
+        ],
+      } as any);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      // The edit is recognised by id and honoured for the current pair: 1.37, not
+      // the 1.35 the market resolver would have returned.
+      expect(payload.splits[0].investment.exchangeRate).toBe(1.37);
+      expect(payload.splits[0].amount).toBe(-1370);
+      expect(payload.amount).toBe(-1370);
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).not.toHaveBeenCalled();
+    });
   });
 });

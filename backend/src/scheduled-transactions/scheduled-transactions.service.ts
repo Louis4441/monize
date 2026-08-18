@@ -1111,10 +1111,23 @@ export class ScheduledTransactionsService {
     return `${securityId}::${rate}`;
   }
 
-  private splitProvenanceBySecurityAndRate(
-    splits: ScheduledTransactionSplit[],
-  ): Map<string, { from: string; to: string }> {
-    const map = new Map<string, { from: string; to: string }>();
+  /**
+   * Provenance carry-forward source (issue #1167 F4). Indexed two ways:
+   *   - `byId`: the split's stable id -> its recorded {rate, pair}. This is the
+   *     authoritative correlation -- the client echoes the source split's id so a
+   *     user-changed rate is distinguished from an unchanged one by *identity*,
+   *     not by matching rate values (two same-security splits swapping rates
+   *     collide under a value key).
+   *   - `byKey`: `provenanceKey(securityId, rate)` -> pair. The fallback for a
+   *     client that sends no `sourceSplitId` (older UI, or the general form),
+   *     which still carries an unchanged rate's pair the way F5-3 did.
+   */
+  private buildSplitProvenanceSource(splits: ScheduledTransactionSplit[]): {
+    byId: Map<string, { rate: number; from: string; to: string }>;
+    byKey: Map<string, { from: string; to: string }>;
+  } {
+    const byId = new Map<string, { rate: number; from: string; to: string }>();
+    const byKey = new Map<string, { from: string; to: string }>();
     for (const s of splits) {
       if (
         s.kind === SplitKind.INVESTMENT &&
@@ -1124,19 +1137,17 @@ export class ScheduledTransactionsService {
         s.investmentExchangeRateFromCurrency &&
         s.investmentExchangeRateToCurrency
       ) {
-        map.set(
-          this.provenanceKey(
-            s.investmentSecurityId,
-            Number(s.investmentExchangeRate),
-          ),
-          {
-            from: s.investmentExchangeRateFromCurrency,
-            to: s.investmentExchangeRateToCurrency,
-          },
-        );
+        const rate = Number(s.investmentExchangeRate);
+        const from = s.investmentExchangeRateFromCurrency;
+        const to = s.investmentExchangeRateToCurrency;
+        byKey.set(this.provenanceKey(s.investmentSecurityId, rate), {
+          from,
+          to,
+        });
+        if (s.id) byId.set(s.id, { rate, from, to });
       }
     }
-    return map;
+    return { byId, byKey };
   }
 
   private async createSplits(
@@ -1153,15 +1164,20 @@ export class ScheduledTransactionsService {
     // rate (issue #1167):
     //   - "fresh" (schedule create): the rate is genuinely new, so stamp the
     //     current settlement pair.
-    //   - a map keyed by `provenanceKey(securityId, rate)` -> the existing
-    //     split's pair (schedule update): provenance belongs to the rate+pair
-    //     tuple, so only a *resent-unchanged* rate carries the old pair forward
-    //     -- a rate whose pair is unchanged keeps working, and one whose currency
-    //     has since changed is caught at posting because its old pair no longer
-    //     matches. A *changed* rate (the user re-entered it for the new pair) or
-    //     a new security is genuinely fresh, so it stamps the current pair --
-    //     never the old one, which would reject a rate the user just entered.
-    provenanceSource: "fresh" | Map<string, { from: string; to: string }>,
+    //   - a `SplitProvenanceSource` (schedule update): provenance belongs to the
+    //     rate+pair tuple, so only a *resent-unchanged* rate carries the old pair
+    //     forward -- a rate whose pair is unchanged keeps working, and one whose
+    //     currency has since changed is caught at posting because its old pair no
+    //     longer matches. A *changed* rate (the user re-entered it) or a new
+    //     security is fresh, so it stamps the current pair. Which incoming split
+    //     "is" which old split is decided by `sourceSplitId` identity (F4), with a
+    //     value-key fallback for a client that sends none.
+    provenanceSource:
+      | "fresh"
+      | {
+          byId: Map<string, { rate: number; from: string; to: string }>;
+          byKey: Map<string, { from: string; to: string }>;
+        },
   ): Promise<ScheduledTransactionSplit[]> {
     const savedSplits: ScheduledTransactionSplit[] = [];
 
@@ -1200,18 +1216,34 @@ export class ScheduledTransactionsService {
       } = { from: null, to: null };
       if (splitHasRate) {
         const incomingRate = Number(split.investment!.exchangeRate);
-        const carried =
-          provenanceSource !== "fresh" && split.investment!.securityId
-            ? provenanceSource.get(
-                this.provenanceKey(split.investment!.securityId, incomingRate),
-              )
+        const securityId = split.investment!.securityId;
+        let carried: { from: string; to: string } | undefined;
+        if (provenanceSource !== "fresh" && securityId) {
+          const src = split.sourceSplitId
+            ? provenanceSource.byId.get(split.sourceSplitId)
             : undefined;
+          if (src) {
+            // Stable identity (F4): carry the old pair only when THIS source
+            // split's rate is unchanged; a changed rate is fresh for the current
+            // pair (stamped below), so it is never mislabelled by colliding with
+            // another split's old rate.
+            if (src.rate === incomingRate) {
+              carried = { from: src.from, to: src.to };
+            }
+          } else {
+            // No stable-identity match (client sent no sourceSplitId, or a new
+            // split): fall back to the value key so an unchanged rate still
+            // carries its pair.
+            carried = provenanceSource.byKey.get(
+              this.provenanceKey(securityId, incomingRate),
+            );
+          }
+        }
         if (carried) {
-          // Resent-unchanged rate (same security AND same rate): carry its
-          // recorded pair forward so posting can reuse a still-valid rate or
-          // catch a since-stale one.
+          // Resent-unchanged rate: carry its recorded pair forward so posting can
+          // reuse a still-valid rate or catch a since-stale one.
           investmentRateProvenance = { from: carried.from, to: carried.to };
-        } else if (split.investment!.securityId) {
+        } else if (securityId) {
           // Fresh create, a genuinely changed rate, or a new security: the rate
           // is for the current pair, so stamp it.
           investmentRateProvenance = await this.resolveInvestmentRateProvenance(
@@ -2339,14 +2371,15 @@ export class ScheduledTransactionsService {
         if (Array.isArray(splits) && splits.length > 0) {
           // Capture the existing splits' recorded pairs before deleting them, so
           // a resent-unchanged rate keeps its provenance rather than being
-          // relabelled with the current pair (issue #1167 re-review). Keyed by
-          // security AND rate, so two splits for one security with different
-          // stored rates do not collide (F5-3).
+          // relabelled with the current pair (issue #1167 re-review). Correlated
+          // by stable split id (F4) with a value-key fallback, so two splits for
+          // one security cannot swap provenance when one's rate changes to the
+          // other's old value.
           const oldSplits = await m.find(ScheduledTransactionSplit, {
             where: { scheduledTransactionId: id },
           });
           const oldProvenanceBySecurityId =
-            this.splitProvenanceBySecurityAndRate(oldSplits);
+            this.buildSplitProvenanceSource(oldSplits);
           await m.delete(ScheduledTransactionSplit, {
             scheduledTransactionId: id,
           });
@@ -2689,13 +2722,67 @@ export class ScheduledTransactionsService {
         // -- that is the exact #1167 bypass (F5-1): the dialog round-trips the
         // persisted rate, and without re-resolution a since-changed pair commits
         // the stale figure. So each investment line is resolved through the same
-        // effective-rate path as the stored surfaces, using the provenance the
-        // client echoes back: a rate whose recorded pair still matches is reused,
-        // otherwise it is re-resolved for the current pair. A line with no
-        // provenance is re-resolved, never trusted.
+        // effective-rate path as the stored surfaces: a rate whose recorded pair
+        // still matches is reused, otherwise it is re-resolved for the current
+        // pair. A line with no provenance is re-resolved, never trusted.
+        //
+        // The one case the echoed provenance cannot express is a rate the user
+        // *edited* in the dialog (F2): its recorded pair is still the stale one, so
+        // it would be re-resolved and the user's figure lost. Correlating each
+        // inline line to its source split by id lets us tell an edited rate (its
+        // value differs from the source's) from an unchanged echoed one, and honour
+        // the edit against the current pair.
+        const postSourceRate = new Map<string, number>();
+        for (const s of scheduled.splits ?? []) {
+          if (
+            s.id &&
+            s.investmentExchangeRate !== null &&
+            s.investmentExchangeRate !== undefined
+          ) {
+            postSourceRate.set(s.id, Number(s.investmentExchangeRate));
+          }
+        }
+        for (const s of storedOverride?.splits ?? []) {
+          if (
+            s.id &&
+            s.investment?.exchangeRate !== null &&
+            s.investment?.exchangeRate !== undefined
+          ) {
+            postSourceRate.set(s.id, Number(s.investment.exchangeRate));
+          }
+        }
         transactionPayload.splits = await Promise.all(
           postDto.splits.map(async (split) => {
             if (split.investment) {
+              let fromCur = split.investment.exchangeRateFromCurrency;
+              let toCur = split.investment.exchangeRateToCurrency;
+              const incomingRate =
+                split.investment.exchangeRate !== null &&
+                split.investment.exchangeRate !== undefined
+                  ? Number(split.investment.exchangeRate)
+                  : null;
+              const srcRate = split.sourceSplitId
+                ? postSourceRate.get(split.sourceSplitId)
+                : undefined;
+              const userEdited =
+                srcRate !== undefined &&
+                incomingRate !== null &&
+                incomingRate > 0 &&
+                incomingRate !== srcRate;
+              if (userEdited && split.investment.securityId) {
+                // A rate the user changed from the source is a fresh rate for the
+                // current settlement pair, so stamp that pair -- reused (honoured),
+                // not re-resolved.
+                const pair =
+                  await this.investmentTransactionsService.resolveSettlementCurrencyPair(
+                    userId,
+                    scheduled.accountId,
+                    null,
+                    split.investment.securityId,
+                  );
+                fromCur = pair.from;
+                toCur = pair.to;
+              }
               const eff = await this.resolveEffectiveSplitCash(
                 userId,
                 scheduled.accountId,
@@ -2705,8 +2792,8 @@ export class ScheduledTransactionsService {
                 Number(split.investment.price ?? 0),
                 Number(split.investment.commission ?? 0),
                 split.investment.exchangeRate,
-                split.investment.exchangeRateFromCurrency,
-                split.investment.exchangeRateToCurrency,
+                fromCur,
+                toCur,
                 postDate,
               );
               return {
@@ -3462,12 +3549,14 @@ export class ScheduledTransactionsService {
       scheduledTransactionId,
       overrideId,
     );
-    // Keyed by security id AND stored rate, so two override splits for one
-    // security with different rates do not collide (issue #1167 F5-3).
-    const oldBySecurityAndRate = new Map<
+    // Correlated by the override split's stable id (issue #1167 F4), with a
+    // value-key fallback for a client that echoes none: two override splits for
+    // one security cannot swap provenance when one's rate changes to the other's.
+    const oldById = new Map<
       string,
-      { from: string; to: string }
+      { rate: number; from: string; to: string }
     >();
+    const oldByKey = new Map<string, { from: string; to: string }>();
     for (const s of existing.splits ?? []) {
       const inv = s.investment;
       if (
@@ -3477,13 +3566,13 @@ export class ScheduledTransactionsService {
         inv.exchangeRateFromCurrency &&
         inv.exchangeRateToCurrency
       ) {
-        oldBySecurityAndRate.set(
-          this.provenanceKey(inv.securityId, Number(inv.exchangeRate)),
-          {
-            from: inv.exchangeRateFromCurrency,
-            to: inv.exchangeRateToCurrency,
-          },
-        );
+        const rate = Number(inv.exchangeRate);
+        const entry = {
+          from: inv.exchangeRateFromCurrency,
+          to: inv.exchangeRateToCurrency,
+        };
+        oldByKey.set(this.provenanceKey(inv.securityId, rate), entry);
+        if (s.id) oldById.set(s.id, { rate, ...entry });
       }
     }
     const investmentProvenance = new Map<
@@ -3494,14 +3583,22 @@ export class ScheduledTransactionsService {
       const inv = s.investment;
       if (inv?.exchangeRate === undefined || inv?.exchangeRate === null)
         continue;
-      const carried = inv.securityId
-        ? oldBySecurityAndRate.get(
-            this.provenanceKey(inv.securityId, Number(inv.exchangeRate)),
-          )
-        : undefined;
+      if (!inv.securityId) continue;
+      const incomingRate = Number(inv.exchangeRate);
+      let carried: { from: string; to: string } | undefined;
+      const src = s.sourceSplitId ? oldById.get(s.sourceSplitId) : undefined;
+      if (src) {
+        // Stable identity: carry only when THIS source split's rate is unchanged.
+        if (src.rate === incomingRate) carried = { from: src.from, to: src.to };
+      } else {
+        // Fallback: value key (unchanged rate carries its pair).
+        carried = oldByKey.get(
+          this.provenanceKey(inv.securityId, incomingRate),
+        );
+      }
       if (carried) {
-        investmentProvenance.set(index, { from: carried.from, to: carried.to });
-      } else if (inv.securityId) {
+        investmentProvenance.set(index, carried);
+      } else {
         const pair =
           await this.investmentTransactionsService.resolveSettlementCurrencyPair(
             userId,

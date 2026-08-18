@@ -109,6 +109,10 @@ export interface CreateSplitData {
   amount: number;
   memo?: string;
   tagIds?: string[];
+  // Id of the source split this row continues (issue #1167 F4). Sent on a
+  // scheduled-transaction update so the server decides FX-rate provenance by
+  // stable identity; absent for a newly added split.
+  sourceSplitId?: string;
 }
 
 export interface CreateTransactionData {

@@ -174,6 +174,20 @@ amount is refused there rather than written.
   security alone the second overwrites the first, so a resent-unchanged rate that
   lost the collision is mis-stamped with the current pair. `provenanceKey(securityId,
   rate)` keys both the store and the lookup, so each tuple keeps its own pair.
+- **A split's FX provenance is decided by stable identity, not by value (F4).** The
+  value key still collides when a rate is *changed* to exactly another split's old
+  value. Every split carries a stable id (scheduled splits from the DB, override
+  splits server-generated), the client echoes it as `sourceSplitId` on edit/post,
+  and the server correlates the incoming split to its source row by id: an unchanged
+  rate carries the source's pair, a changed one stamps the current pair. The value
+  key remains only as the fallback for a client that echoes no id.
+- **A user-edited inline rate is honoured, an echoed one is not trusted (F2).** At
+  the manual Post dialog, a rate whose value differs from its source split's is a
+  fresh rate for the current pair -- reused, not re-resolved -- while an unchanged
+  echoed rate goes through the stale-check. The two are told apart by `sourceSplitId`
+  identity, so dropping the echoed provenance in the rate editor no longer loses the
+  user's figure. The rate editor also preserves the recorded pair across field edits
+  as defence in depth.
 - **Overrides forecast their own effective total (F5-2).** A per-occurrence override
   carrying investment splits is FX-sensitive too; its stored `amount` is a stale
   snapshot. The read model attaches `investmentForecastAmount` to each override, and
@@ -226,6 +240,23 @@ For each of the three surfaces:
    assert the forecast projects the override's `investmentForecastAmount` (not its
    stale scalar, not the base), and withholds the series when the override's rate is
    unknown.
+
+9. **Stable identity, changed-to-collide rate (F4).** Two same-security splits; change
+   one's rate to exactly the other's old value; assert -- correlating by `sourceSplitId`
+   -- the unchanged one keeps its pair and the changed one stamps the current pair.
+
+10. **User-edited inline rate honoured (F2).** Post an inline split whose rate differs
+    from its source split's, with the echoed provenance dropped; assert the edited rate
+    is honoured for the current pair (not re-resolved to the market), recognised by
+    `sourceSplitId`. A frontend test asserts the source id round-trips through
+    `toSplitRows` -> `toOverrideSplits`.
+
+11. **Parent forecast reuses a valid pinned rate (F1).** A schedule with a valid pinned
+    rate whose pair still matches forecasts that rate (what posting reuses), not the
+    current market rate; a stale one falls back to the resolved rate.
+
+12. **Top-level investment override forecast (F3).** An override changing
+    quantity/price/total projects the override's effective cash amount, not the base.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

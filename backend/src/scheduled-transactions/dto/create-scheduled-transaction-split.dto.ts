@@ -18,6 +18,18 @@ import { InvestmentSplitDto } from "../../transactions/dto/create-transaction-sp
 import { SplitKind } from "../../transactions/entities/split-kind.enum";
 
 export class CreateScheduledTransactionSplitDto {
+  // The id of the split row this one continues from (issue #1167 F4). On an
+  // update, the client echoes the existing split's id so the server can decide
+  // FX-rate provenance by stable identity -- not by matching rate values, which
+  // collides when two same-security splits swap rates. Absent means a new split.
+  @ApiPropertyOptional({
+    description:
+      "Id of the source split this row continues (for FX provenance)",
+  })
+  @IsOptional()
+  @IsUUID()
+  sourceSplitId?: string;
+
   @ApiPropertyOptional({ enum: SplitKind })
   @IsOptional()
   @IsEnum(SplitKind)

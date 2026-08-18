@@ -19,6 +19,16 @@ import { InvestmentSplitDto } from "../../transactions/dto/create-transaction-sp
 import { SplitKind } from "../../transactions/entities/split-kind.enum";
 
 export class OverrideSplitDto {
+  // Stable id of the override split this row continues (issue #1167 F4). Echoed
+  // by the client on update so FX-rate provenance is decided by identity, not by
+  // matching rate values; persisted so future edits keep the same identity.
+  @ApiPropertyOptional({
+    description: "Id of the source override split this row continues",
+  })
+  @IsOptional()
+  @IsUUID()
+  sourceSplitId?: string;
+
   @ApiPropertyOptional({ enum: SplitKind })
   @IsOptional()
   @IsEnum(SplitKind)

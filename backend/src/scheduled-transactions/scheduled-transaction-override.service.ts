@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
+import { randomUUID } from "crypto";
 import { DataSource } from "typeorm";
 import {
   ScheduledTransactionOverride,
@@ -58,6 +59,9 @@ export class ScheduledTransactionOverrideService {
               }
             : s.investment;
         return {
+          // Preserve the stable id a continuing split echoes (sourceSplitId), or
+          // mint one for a new split, so identity survives across edits (#1167 F4).
+          id: s.sourceSplitId ?? randomUUID(),
           splitKind: s.splitKind,
           categoryId: s.categoryId ?? null,
           transferAccountId: s.transferAccountId ?? null,

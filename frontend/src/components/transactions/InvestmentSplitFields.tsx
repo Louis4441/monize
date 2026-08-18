@@ -128,6 +128,13 @@ export function InvestmentSplitFields({
       // computed amount was derived from rather than leaving the server to
       // resolve a possibly different one.
       exchangeRate: effectiveRate,
+      // Preserve the server-recorded currency pair across every field edit
+      // (issue #1167 F2): dropping it made an edited rate arrive with no
+      // provenance, so the server treated it as unknown and re-resolved -- losing
+      // the user's figure. Kept here, an unchanged rate still reads as still-valid
+      // and only a genuinely edited one is re-derived (by id, server-side).
+      exchangeRateFromCurrency: value?.exchangeRateFromCurrency,
+      exchangeRateToCurrency: value?.exchangeRateToCurrency,
       description: value?.description,
       ...(field === 'action' ? { action: fieldValue as InvestmentAction } : {}),
       [field]: fieldValue,

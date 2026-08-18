@@ -1046,6 +1046,10 @@ export function toSplitRows(splits: {
     }
     return {
       id: split.id || `temp-${Date.now()}-${index}`,
+      // The source split's real id (undefined for a row the user just added), so
+      // an edit/post can name it as `sourceSplitId` and the server decides FX
+      // provenance by identity (issue #1167 F4).
+      sourceSplitId: split.id || undefined,
       splitType: kind,
       categoryId: split.categoryId || undefined,
       transferAccountId: split.transferAccountId || undefined,
@@ -1067,5 +1071,8 @@ export function toCreateSplitData(splits: SplitRow[]): CreateSplitData[] {
     amount: split.amount,
     memo: split.memo || undefined,
     tagIds: split.tagIds && split.tagIds.length > 0 ? split.tagIds : undefined,
+    // Carry the source split id so the server decides FX provenance by identity
+    // (issue #1167 F4); undefined for a row the user added.
+    sourceSplitId: split.sourceSplitId,
   }));
 }

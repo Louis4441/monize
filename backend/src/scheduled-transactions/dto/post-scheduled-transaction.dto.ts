@@ -19,6 +19,17 @@ import { InvestmentSplitDto } from "../../transactions/dto/create-transaction-sp
 import { SplitKind } from "../../transactions/entities/split-kind.enum";
 
 class InlineSplitDto {
+  // Id of the scheduled/override split this inline row came from (issue #1167
+  // F2/F4). The manual Post dialog echoes it so the server can tell a user-edited
+  // rate (honour it) from an unchanged echoed one (reuse-if-current, else
+  // re-resolve) by stable identity rather than by matching rate values.
+  @ApiPropertyOptional({
+    description: "Id of the source split this inline row came from",
+  })
+  @IsOptional()
+  @IsUUID()
+  sourceSplitId?: string;
+
   @ApiPropertyOptional({ enum: SplitKind })
   @IsOptional()
   @IsEnum(SplitKind)

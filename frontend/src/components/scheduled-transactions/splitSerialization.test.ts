@@ -138,6 +138,41 @@ describe('toOverrideSplits', () => {
     });
   });
 
+  // Issue #1167 F4: the source split's id round-trips as sourceSplitId so the
+  // server correlates FX provenance by identity, not by matching rate values.
+  it('round-trips the source split id as sourceSplitId', () => {
+    const rows = toSplitRows([
+      {
+        id: 'ovr-split-1',
+        kind: 'investment',
+        amount: -750,
+        investmentAction: 'BUY',
+        investmentSecurityId: 'sec-1',
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateFromCurrency: 'EUR',
+        investmentExchangeRateToCurrency: 'CAD',
+      },
+    ]);
+    const out = toOverrideSplits(rows);
+    expect(out[0].sourceSplitId).toBe('ovr-split-1');
+  });
+
+  it('leaves sourceSplitId undefined for a newly added row', () => {
+    const rows: SplitRow[] = [
+      {
+        id: 'temp-123',
+        splitType: 'category',
+        categoryId: 'cat-1',
+        amount: -10,
+        memo: '',
+        // A freshly-added row carries no source id.
+        sourceSplitId: undefined,
+      },
+    ];
+    const out = toOverrideSplits(rows);
+    expect(out[0].sourceSplitId).toBeUndefined();
+  });
+
   it('omits investment payload on non-investment rows', () => {
     const rows: SplitRow[] = [
       {

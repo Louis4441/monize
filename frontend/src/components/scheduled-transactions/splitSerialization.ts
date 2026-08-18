@@ -16,5 +16,8 @@ export function toOverrideSplits(splits: SplitRow[]): OverrideSplit[] {
     investment: s.splitType === 'investment' ? s.investment : undefined,
     amount: s.amount,
     memo: s.memo ?? null,
+    // Name the source split so the server decides FX provenance by identity and
+    // preserves this split's stable id across the edit (issue #1167 F4).
+    sourceSplitId: s.sourceSplitId,
   }));
 }

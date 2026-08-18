@@ -134,6 +134,11 @@ export class ScheduledTransactionOverride {
  * scheduled transaction lives on an INVESTMENT_CASH account.
  */
 export interface OverrideSplit {
+  // Stable identity for this override split (issue #1167 F4). Generated when the
+  // override is written and returned in the read model, so a later edit can echo
+  // it as `sourceSplitId` and the server correlates FX-rate provenance by identity
+  // rather than by matching rate values (which collide across same-security lines).
+  id?: string;
   splitKind?: "category" | "transfer" | "investment";
   categoryId: string | null;
   transferAccountId?: string | null;
