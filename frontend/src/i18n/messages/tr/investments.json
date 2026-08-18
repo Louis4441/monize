@@ -25,7 +25,6 @@
     "cashFilterTo": "Bitiş",
     "loadingCashTransactions": "Nakit işlemler yükleniyor...",
     "today": "Bugün",
-    "transactionCount": "{count} işlem",
     "allPayees": "Tüm alacaklılar",
     "allCategories": "Tüm kategoriler",
     "toastDeleteFailed": "İşlem silinemedi",

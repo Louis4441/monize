@@ -25,7 +25,6 @@
     "cashFilterTo": "Até",
     "loadingCashTransactions": "Carregando transações de numerário...",
     "today": "Hoje",
-    "transactionCount": "{count} transação{plural}",
     "allPayees": "Todos os beneficiários",
     "allCategories": "Todas as categorias",
     "toastDeleteFailed": "Falha ao excluir a transação",

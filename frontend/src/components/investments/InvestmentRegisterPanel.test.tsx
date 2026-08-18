@@ -17,6 +17,7 @@ import commonNs from '@/i18n/messages/en/common.json';
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getTransactions: vi.fn(),
+    getRegisterFilterOptions: vi.fn(),
     deleteTransaction: vi.fn(),
   },
 }));
@@ -217,6 +218,9 @@ describe('InvestmentRegisterPanel', () => {
     (
       transactionsApi.getRegisterFilterOptions as ReturnType<typeof vi.fn>
     ).mockResolvedValue({ payees: [], categories: [] });
+    (
+      investmentsApi.getRegisterFilterOptions as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({ actions: [] });
     (accountsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue([
       brokerage,
       cash,
@@ -616,6 +620,61 @@ describe('InvestmentRegisterPanel', () => {
     });
   });
 
+  describe('the two registers read as one', () => {
+    // A toggle is a change of ledger, not a change of page: a heading that
+    // renames itself, a button that gains a plus, or a gap that appears on one
+    // side make the switch look like a navigation.
+    const headingText = 'Recent Transactions';
+
+    // Both sides hold rows, so both draw a table -- an empty register is a
+    // different layout on either side, and not the one being compared here.
+    beforeEach(() => {
+      (investmentsApi.getTransactions as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [
+          {
+            id: 'tx-1',
+            accountId: 'brok',
+            action: 'BUY',
+            transactionDate: '2026-01-05',
+            quantity: 1,
+            price: 10,
+            totalAmount: 10,
+            security: { symbol: 'VTI', name: 'Vanguard', currencyCode: 'CAD' },
+          },
+        ],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+      });
+    });
+
+    it('gives both ledgers the same heading', async () => {
+      await renderPanel(brokerage, cash);
+      expect(screen.getByText(headingText)).toBeInTheDocument();
+
+      await switchToCash();
+      expect(screen.getByText(headingText)).toBeInTheDocument();
+    });
+
+    it('marks the new-row button the same way on both', async () => {
+      await renderPanel(brokerage, cash);
+      expect(screen.getByText('+ New Brokerage Transaction')).toBeInTheDocument();
+
+      await switchToCash();
+      expect(screen.getByText('+ New Cash Transaction')).toBeInTheDocument();
+    });
+
+    it('keeps the same gap between the heading and the strip below it', async () => {
+      // The spacer is what that gap is; without it the cash register's rows sat
+      // higher than the brokerage register's and the page jumped on the toggle.
+      await renderPanel(brokerage, cash);
+      const SPACER = '[class="mt-3 sm:mt-4"]';
+      const brokerageSpacers = document.querySelectorAll(SPACER).length;
+
+      await switchToCash();
+      expect(document.querySelectorAll(SPACER)).toHaveLength(brokerageSpacers);
+      expect(brokerageSpacers).toBeGreaterThan(0);
+    });
+  });
+
   describe('paging', () => {
     // Two pages of trades, so the pager is drawn at all.
     const manyTrades = {
@@ -748,7 +807,9 @@ describe('InvestmentRegisterPanel', () => {
       await act(async () => {
         fireEvent.click(screen.getByText('Cash'));
       });
-      expect(screen.getByText('Cash transactions')).toBeInTheDocument();
+      // The cash ledger is on screen -- its own New button says so, since both
+      // registers now share the heading.
+      expect(screen.getByText('+ New Cash Transaction')).toBeInTheDocument();
 
       await act(async () => {
         fireEvent.click(screen.getByText('Brokerage'));

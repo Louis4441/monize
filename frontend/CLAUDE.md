@@ -444,6 +444,16 @@ page). Each register's page returns to 1 when its filter changes, and the filter
 belong in the register's request key -- otherwise the rows keep answering the
 previous question until something else triggers a fetch.
 
+The chrome around them is part of "the same way": one heading (*Recent
+Transactions* on both -- the toggle beside it already says which ledger), a
+new-row button marked the same way on both, and the same gap between the header
+and the strip. A heading that renames itself and a spacer present on one side
+only made the toggle read as a navigation rather than a change of ledger. The
+Investments page and the account detail page draw the same two registers, so
+they take the same treatment: both page from the strip, neither draws a second
+pager below the table, and neither page puts a density toggle in its own heading
+beside the register's.
+
 **A filter picker offers what the rows use, and it loads because the register is
 on screen.** `useCashFilterOptions` asks
 `transactionsApi.getRegisterFilterOptions` for the payees and categories the
@@ -457,6 +467,21 @@ Trigger the load from the view being displayed, never from the click that reache
 it: the Investments page remembers its view, so the cash register is reachable
 without that click, and gating on it left both pickers reading "No options found"
 for the users who live there.
+
+The brokerage side asks the same question of its own vocabulary:
+`useBrokerageFilterOptions` (`hooks/useBrokerageFilterOptions.ts`) fetches the
+actions those accounts have actually used, and the picker offers those rather
+than all twenty-odd. Absent or empty is "no information" -- still loading, or the
+lookup failed -- so the list keeps offering everything; and whatever is currently
+selected stays in the control even when the rows no longer use it, or the list is
+narrowed by something the user can neither see nor undo.
+
+**A nav tab is lit by the section a page belongs to, not by an exact path.**
+`isNavSectionActive` (`lib/nav-section.ts`) is that one predicate, used by the
+header and the mobile drawer: `/accounts/<id>` is Accounts, `/securities/<id>` is
+Tools. Comparing the pathname to the href unlit the tab the user had just come
+through, so the bar said nothing about where they were. The boundary is a slash,
+so `/accounts` never claims `/accounts-archive`.
 
 **A modal this page already mounts is opened, not navigated to.** Clicking an
 investment-linked row in the cash register pushed `/investments?edit=<id>`, which

@@ -8,8 +8,6 @@
     "empty": "Tidak ada pendapatan investasi tahun ini"
   },
   "register": {
-    "cashHeading": "Transaksi kas",
-    "newCashTransaction": "Transaksi Kas Baru",
     "deleteFailed": "Gagal menghapus transaksi"
   }
 }

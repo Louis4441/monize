@@ -25,7 +25,6 @@
     "cashFilterTo": "По",
     "loadingCashTransactions": "Загрузка кассовых проводок...",
     "today": "Сегодня",
-    "transactionCount": "{count} проводк{plural}",
     "allPayees": "Все получатели",
     "allCategories": "Все категории",
     "toastDeleteFailed": "Не удалось удалить проводку",

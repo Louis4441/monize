@@ -8,8 +8,6 @@
     "empty": "Sem rendimento de investimentos este ano"
   },
   "register": {
-    "cashHeading": "Movimentos de numerário",
-    "newCashTransaction": "Novo movimento de numerário",
     "deleteFailed": "Não foi possível eliminar o movimento"
   }
 }

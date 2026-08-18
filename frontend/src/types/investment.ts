@@ -591,6 +591,17 @@ export interface PaginatedInvestmentTransactions {
   pagination: InvestmentTransactionPaginationInfo;
 }
 
+/**
+ * What a brokerage register's filter pickers offer: the actions its own rows
+ * use, in the vocabulary's order.
+ *
+ * A household brokerage uses four of the twenty-odd actions, so offering all of
+ * them to narrow a handful of rows is a list to read rather than a filter.
+ */
+export interface InvestmentRegisterFilterOptions {
+  actions: string[];
+}
+
 export interface RealizedGainEntry {
   transactionId: string;
   transactionDate: string;

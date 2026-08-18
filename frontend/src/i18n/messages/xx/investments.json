@@ -25,7 +25,6 @@
     "cashFilterTo": "[XX-To-XX]",
     "loadingCashTransactions": "[XX-Loading cash transactions...-XX]",
     "today": "[XX-Today-XX]",
-    "transactionCount": "[XX-{count} transaction{plural}-XX]",
     "allPayees": "[XX-All payees-XX]",
     "allCategories": "[XX-All categories-XX]",
     "toastDeleteFailed": "[XX-Failed to delete transaction-XX]",

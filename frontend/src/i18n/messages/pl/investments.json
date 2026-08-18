@@ -25,7 +25,6 @@
     "cashFilterTo": "Do",
     "loadingCashTransactions": "Ładowanie transakcji gotówkowych...",
     "today": "Dzisiaj",
-    "transactionCount": "{count, plural, one {# transakcja} few {# transakcje} many {# transakcji} other {# transakcji}}",
     "allPayees": "Wszyscy odbiorcy",
     "allCategories": "Wszystkie kategorie",
     "toastDeleteFailed": "Nie udało się usunąć transakcji",

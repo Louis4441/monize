@@ -194,6 +194,11 @@ describe("InvestmentTransactionsService", () => {
         Array.isArray(result) ? result : result ? [result] : [],
       ),
     getCount: jest.fn().mockResolvedValue(count),
+    select: jest.fn().mockReturnThis(),
+    distinct: jest.fn().mockReturnThis(),
+    getRawMany: jest
+      .fn()
+      .mockResolvedValue(Array.isArray(result) ? result : []),
   });
 
   beforeEach(async () => {
@@ -1389,6 +1394,74 @@ describe("InvestmentTransactionsService", () => {
           }),
         }),
       );
+    });
+  });
+
+  describe("getRegisterFilterOptions", () => {
+    const optionsFor = (actions: InvestmentAction[]) => {
+      const qb = createMockQueryBuilder(actions.map((action) => ({ action })));
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(qb);
+      return qb;
+    };
+
+    it("returns only the actions the rows use", async () => {
+      optionsFor([InvestmentAction.SELL, InvestmentAction.BUY]);
+
+      const result = await service.getRegisterFilterOptions(userId);
+
+      expect(result.actions).toEqual([
+        InvestmentAction.BUY,
+        InvestmentAction.SELL,
+      ]);
+    });
+
+    it("orders them by the vocabulary, not by what was traded first", async () => {
+      // The picker's order is a property of the action list; deriving it from
+      // the rows would reshuffle the control as the ledger grows.
+      optionsFor([InvestmentAction.SELL, InvestmentAction.BUY]);
+
+      const result = await service.getRegisterFilterOptions(userId);
+      const vocabulary = Object.values(InvestmentAction);
+
+      expect(result.actions).toEqual(
+        vocabulary.filter((a) =>
+          [InvestmentAction.BUY, InvestmentAction.SELL].includes(a),
+        ),
+      );
+    });
+
+    it("offers nothing for an account with no trades", async () => {
+      // Known and empty: this account has done nothing, and the picker says so.
+      optionsFor([]);
+
+      const result = await service.getRegisterFilterOptions(userId, [
+        accountId,
+      ]);
+
+      expect(result.actions).toEqual([]);
+    });
+
+    it("reads the whole pair, as the register itself does", async () => {
+      // A register scoped to the brokerage half alone answers with part of what
+      // the user is looking at, so the picker must not be narrower either.
+      accountsService.findByIds.mockResolvedValue([
+        { id: accountId, linkedAccountId: "cash-account-id" },
+      ]);
+      const qb = optionsFor([InvestmentAction.BUY]);
+
+      await service.getRegisterFilterOptions(userId, [accountId]);
+
+      expect(qb.andWhere).toHaveBeenCalledWith("it.accountId IN (:...allIds)", {
+        allIds: [accountId, "cash-account-id"],
+      });
+    });
+
+    it("asks about every account when none is named", async () => {
+      const qb = optionsFor([InvestmentAction.BUY]);
+
+      await service.getRegisterFilterOptions(userId);
+
+      expect(qb.andWhere).not.toHaveBeenCalled();
     });
   });
 

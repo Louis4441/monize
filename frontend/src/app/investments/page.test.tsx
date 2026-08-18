@@ -93,6 +93,7 @@ const mockGetPriceStatus = vi.fn();
 const mockRefreshSelectedPrices = vi.fn();
 const mockDeleteTransaction = vi.fn();
 const mockGetTransaction = vi.fn();
+const mockGetInvestmentFilterOptions = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -103,6 +104,7 @@ vi.mock('@/lib/investments', () => ({
     refreshSelectedPrices: (...args: any[]) => mockRefreshSelectedPrices(...args),
     getTransaction: (...args: any[]) => mockGetTransaction(...args),
     deleteTransaction: (...args: any[]) => mockDeleteTransaction(...args),
+    getRegisterFilterOptions: (...args: any[]) => mockGetInvestmentFilterOptions(...args),
   },
 }));
 
@@ -283,10 +285,14 @@ vi.mock('@/components/investments/GroupedHoldingsList', () => ({
 }));
 
 vi.mock('@/components/investments/InvestmentTransactionList', () => ({
-  InvestmentTransactionList: ({ transactions, onDelete, onEdit, onNewTransaction, onFiltersChange, filters, viewToggle }: any) => (
+  // The pager and the density toggle live in the list's own strip now, so the
+  // stub reports the paging it was handed rather than the page drawing one.
+  InvestmentTransactionList: ({ transactions, onDelete, onEdit, onNewTransaction, onFiltersChange, filters, viewToggle, currentPage, totalPages, totalItems, availableActions }: any) => (
     <div data-testid="transaction-list">
       {viewToggle}
       <span>{transactions.length} transactions</span>
+      <span data-testid="brokerage-paging">{`${currentPage ?? ''}/${totalPages ?? ''} of ${totalItems ?? ''}`}</span>
+      <span data-testid="brokerage-actions">{(availableActions ?? []).join(',')}</span>
       {transactions.map((t: any) => (
         <div key={t.id} data-testid={`itx-${t.id}`}>
           <button data-testid={`delete-${t.id}`} onClick={() => onDelete(t.id)}>Delete</button>
@@ -396,6 +402,7 @@ describe('InvestmentsPage', () => {
     mockGetAllCategories.mockResolvedValue([]);
     mockGetAllPayees.mockResolvedValue([]);
     mockGetFilterOptions.mockResolvedValue({ payees: [], categories: [] });
+    mockGetInvestmentFilterOptions.mockResolvedValue({ actions: [] });
   });
 
   describe('Rendering', () => {
@@ -772,41 +779,44 @@ describe('InvestmentsPage', () => {
   });
 
   describe('Pagination', () => {
-    it('shows single page count when only one page', async () => {
-      await renderPage();
-      await waitFor(() => {
-        expect(screen.getByText('1 transaction')).toBeInTheDocument();
-      });
-    });
-
-    it('shows pagination when multiple pages exist', async () => {
+    it('hands the register its paging, which it draws above its rows', async () => {
+      // The detail page's registers page from the strip above the table; this
+      // one used to page from below it, so switching between the two pages
+      // moved the control.
       mockGetTransactions.mockResolvedValue({
         data: Array.from({ length: 25 }, (_, i) => ({ id: `tx-${i}`, action: 'BUY' })),
         pagination: { page: 1, totalPages: 3, total: 75 },
       });
       await renderPage();
+
       await waitFor(() => {
-        expect(screen.getByTestId('pagination')).toBeInTheDocument();
-        expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+        expect(screen.getByTestId('brokerage-paging')).toHaveTextContent('1/3 of 75');
       });
     });
 
-    it('shows plural transactions label for multiple', async () => {
+    it('offers the register only the actions its accounts have used', async () => {
+      // Twenty-odd actions exist; a household brokerage uses four, and the
+      // picker is a way through the rows rather than a tour of the vocabulary.
+      mockGetInvestmentFilterOptions.mockResolvedValue({ actions: ['BUY', 'SELL'] });
+
+      await renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('brokerage-actions')).toHaveTextContent('BUY,SELL');
+      });
+    });
+
+    it('draws no second pager of its own below the register', async () => {
       mockGetTransactions.mockResolvedValue({
-        data: [
-          { id: 'itx-1', action: 'BUY' },
-          { id: 'itx-2', action: 'SELL' },
-        ],
-        pagination: { page: 1, totalPages: 1, total: 2 },
+        data: Array.from({ length: 25 }, (_, i) => ({ id: `tx-${i}`, action: 'BUY' })),
+        pagination: { page: 1, totalPages: 3, total: 75 },
       });
       await renderPage();
+
       await waitFor(() => {
-        // The page renders a total count div separate from the mock transaction list.
-        // Match the page's own total count div specifically (the one with the class for styling).
-        const totalCountDiv = document.querySelector('.mt-4.text-sm.text-gray-500');
-        expect(totalCountDiv).toBeInTheDocument();
-        expect(totalCountDiv?.textContent).toBe('2 transactions');
+        expect(screen.getByTestId('transaction-list')).toBeInTheDocument();
       });
+      expect(screen.queryByTestId('pagination')).not.toBeInTheDocument();
     });
   });
 
@@ -1001,7 +1011,10 @@ describe('InvestmentsPage', () => {
       });
     });
 
-    it('passes showToolbar={false} to TransactionList', async () => {
+    it('lets the cash register draw its own strip, as the detail page does', async () => {
+      // It was suppressed here and the page drew a density toggle in the
+      // heading instead, which put the two pages' cash registers one control
+      // apart.
       mockGetAllTransactions.mockResolvedValue({
         data: [{ id: 'cash-tx-1', transactionDate: '2024-01-15', amount: 100 }],
         pagination: { page: 1, totalPages: 1, total: 1 },
@@ -1010,7 +1023,7 @@ describe('InvestmentsPage', () => {
       await switchToCashView();
 
       await waitFor(() => {
-        expect(screen.getByTestId('cash-show-toolbar')).toHaveTextContent('false');
+        expect(screen.getByTestId('cash-show-toolbar')).not.toHaveTextContent('false');
       });
     });
 
@@ -1106,17 +1119,20 @@ describe('InvestmentsPage', () => {
       });
     });
 
-    it('shows density toggle in cash view', async () => {
+    it('leaves the density toggle to the register, not the page heading', async () => {
       mockGetAllTransactions.mockResolvedValue({
         data: [],
         pagination: { page: 1, totalPages: 1, total: 0 },
       });
 
       await switchToCashView();
-
       await waitFor(() => {
-        expect(screen.getByTitle('Toggle row density')).toBeInTheDocument();
+        expect(screen.getByTestId('cash-transaction-list')).toBeInTheDocument();
       });
+
+      // The stub draws no strip, so a toggle on screen here would be a second
+      // one the page had drawn itself.
+      expect(screen.queryByTitle('Toggle row density')).not.toBeInTheDocument();
     });
 
     it('asks for the filter options of the cash ledgers on screen', async () => {

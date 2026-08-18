@@ -25,7 +25,6 @@
     "cashFilterTo": "종료",
     "loadingCashTransactions": "현금 거래 불러오는 중...",
     "today": "오늘",
-    "transactionCount": "{count}건의 거래{plural}",
     "allPayees": "모든 수취인",
     "allCategories": "모든 카테고리",
     "toastDeleteFailed": "거래 삭제에 실패했습니다",

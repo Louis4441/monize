@@ -25,7 +25,6 @@
     "cashFilterTo": "Bis",
     "loadingCashTransactions": "Barmittelbuchungen werden geladen...",
     "today": "Heute",
-    "transactionCount": "{count} Buchung{plural}",
     "allPayees": "Alle Zahlungsempfänger",
     "allCategories": "Alle Kategorien",
     "toastDeleteFailed": "Buchung konnte nicht gelöscht werden",

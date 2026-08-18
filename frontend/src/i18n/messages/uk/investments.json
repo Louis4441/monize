@@ -25,7 +25,6 @@
     "cashFilterTo": "По",
     "loadingCashTransactions": "Завантаження готівкових транзакцій...",
     "today": "Сьогодні",
-    "transactionCount": "{count} транзакцій{plural}",
     "allPayees": "Всі одержувачі",
     "allCategories": "Всі категорії",
     "toastDeleteFailed": "Не вдалося видалити транзакцію",

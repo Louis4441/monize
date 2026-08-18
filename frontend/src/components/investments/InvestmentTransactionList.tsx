@@ -77,6 +77,14 @@ interface InvestmentTransactionListProps {
   filters?: TransactionFilters;
   onFiltersChange?: (filters: TransactionFilters) => void;
   availableSymbols?: string[];
+  /**
+   * The actions the rows on this register actually use. The Action picker
+   * offers these instead of the full vocabulary, which is twenty-odd wide while
+   * a household brokerage uses four. Empty or absent -- still loading, or the
+   * lookup failed -- means "no information", so the picker keeps offering
+   * everything rather than emptying itself.
+   */
+  availableActions?: string[];
   /** Which surface's remembered row density this register reads. */
   densityView?: DensityView;
   viewToggle?: React.ReactNode;
@@ -304,6 +312,7 @@ export function InvestmentTransactionList({
   filters,
   onFiltersChange,
   availableSymbols = [],
+  availableActions,
   densityView = 'investments',
   viewToggle,
   currentPage,
@@ -338,6 +347,20 @@ export function InvestmentTransactionList({
     { value: 'CAPITAL_GAIN_LONG', label: t('transactionList.actionCapitalGainLong') },
     { value: 'REDEEM', label: t('transactionList.actionRedeem') },
   ];
+  // "All actions" always stands, and so does whatever is currently selected --
+  // a filter set before the rows changed must stay visible in the control that
+  // set it, or the user cannot see what is narrowing the list, let alone undo
+  // it.
+  const actionOptions = useMemo(() => {
+    if (!availableActions || availableActions.length === 0) return ACTION_OPTIONS;
+    const offered = new Set(availableActions);
+    return ACTION_OPTIONS.filter(
+      (opt) => opt.value === '' || offered.has(opt.value) || opt.value === filters?.action,
+    );
+    // ACTION_OPTIONS is rebuilt each render from the translator; the values are
+    // what this depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableActions, filters?.action, t]);
   const { formatCurrency, formatQuantity } = useNumberFormat();
   const { formatDate } = useDateFormat();
   const { defaultCurrency } = useExchangeRates();
@@ -590,7 +613,7 @@ export function InvestmentTransactionList({
                 onChange={(e) => handleFilterChange('action', e.target.value)}
                 className="w-full text-sm font-sans border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
               >
-                {ACTION_OPTIONS.map((opt) => (
+                {actionOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>

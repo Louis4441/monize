@@ -10,6 +10,7 @@ import { invalidateBalanceCaches } from '@/lib/apiCache';
 import { getErrorMessage } from '@/lib/errors';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useFormModal } from '@/hooks/useFormModal';
+import { useBrokerageFilterOptions } from '@/hooks/useBrokerageFilterOptions';
 import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import {
@@ -81,6 +82,9 @@ export function InvestmentRegisterPanel({
   onDataChanged,
 }: InvestmentRegisterPanelProps) {
   const t = useTranslations('accountDetail-investment');
+  // The cash register's own chrome is the Investments page's, word for word:
+  // one heading, one button label, translated once.
+  const tInv = useTranslations('investments');
   const [view, setView] = useLocalStorage<InvestmentTransactionView>(
     'monize-account-detail-register-view',
     'brokerage',
@@ -266,6 +270,11 @@ export function InvestmentRegisterPanel({
   // register is simply the register.
   const activeView: InvestmentTransactionView = cashAccount ? view : 'brokerage';
 
+  // What the brokerage filter's Action picker offers: what this account has
+  // actually done. Asked for whichever ledger is showing, because the register
+  // query resolves the pair either way.
+  const brokerageActions = useBrokerageFilterOptions([holdingsAccountId]);
+
   // What the cash filter's pickers offer: this ledger's own payees and
   // categories, fetched while its register is the one on screen.
   const cashFilterOptions = useCashFilterOptions(
@@ -292,6 +301,7 @@ export function InvestmentRegisterPanel({
             filters={brokerageFilters}
             onFiltersChange={handleBrokerageFiltersChange}
             availableSymbols={availableSymbols}
+            availableActions={brokerageActions}
             currentPage={brokeragePage}
             totalPages={Math.ceil(brokerageTotal / PAGE_SIZE) || 1}
             totalItems={brokerageTotal}
@@ -300,11 +310,14 @@ export function InvestmentRegisterPanel({
           />
         </>
       ) : (
-        <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg">
+        <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg overflow-hidden">
           <div className="px-3 pt-3 sm:px-4 sm:pt-4 flex flex-wrap justify-between items-center gap-2">
             <div className="flex items-center gap-3">
+              {/* Both registers are "Recent Transactions": the toggle beside it
+                  says which ledger is on screen, so a second heading naming the
+                  ledger only made the title jump on the way. */}
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {t('register.cashHeading')}
+                {tInv('transactionList.title')}
               </h3>
               {toggle}
             </div>
@@ -313,7 +326,8 @@ export function InvestmentRegisterPanel({
                 onClick={cashForm.openCreate}
                 className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
-                {t('register.newCashTransaction')}
+                <span className="sm:hidden">{tInv('page.newCashTransactionShort')}</span>
+                <span className="hidden sm:inline">{tInv('page.newCashTransaction')}</span>
               </button>
               <CashFilterToggleButton
                 activeCount={countActiveCashFilters(cashFilters)}
@@ -328,6 +342,9 @@ export function InvestmentRegisterPanel({
               onChange={handleCashFiltersChange}
             />
           )}
+          {/* The same gap the brokerage list keeps between its header and the
+              strip below, so switching ledgers moves nothing. */}
+          <div className="mt-3 sm:mt-4" />
           <TransactionList
             densityView="accountRegister"
             transactions={cashTx}

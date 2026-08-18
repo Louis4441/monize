@@ -25,7 +25,6 @@
     "cashFilterTo": "Tot",
     "loadingCashTransactions": "Kastransacties laden...",
     "today": "Vandaag",
-    "transactionCount": "{count} transactie{plural}",
     "allPayees": "Alle begunstigden",
     "allCategories": "Alle categorieën",
     "toastDeleteFailed": "Verwijderen van transactie mislukt",

@@ -9,7 +9,6 @@ import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { MultiSelect } from '@/components/ui/MultiSelect';
-import { Pagination } from '@/components/ui/Pagination';
 import { PortfolioSummaryCard } from '@/components/investments/PortfolioSummaryCard';
 import { GroupedHoldingsList } from '@/components/investments/GroupedHoldingsList';
 import { AssetAllocationChart } from '@/components/investments/AssetAllocationChart';
@@ -29,6 +28,7 @@ import {
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useInvestmentData } from '@/hooks/useInvestmentData';
+import { useBrokerageFilterOptions } from '@/hooks/useBrokerageFilterOptions';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
@@ -40,7 +40,6 @@ import {
   type InvestmentTransactionView,
 } from '@/components/investments/InvestmentViewToggle';
 import { PAGE_SIZE } from '@/lib/constants';
-import { DensityToggle } from '@/components/ui/DensityToggle';
 
 const TransactionForm = dynamic(() => import('@/components/transactions/TransactionForm').then(m => m.TransactionForm), { ssr: false });
 
@@ -80,6 +79,10 @@ function InvestmentsContent() {
   // ledgers actually use. Keyed off the view being on screen rather than the
   // click that reaches it -- the view is remembered, so it is reachable
   // without one.
+  // The brokerage filter's Action picker offers what these accounts have
+  // actually done, the same way the cash filter's pickers do.
+  const brokerageActions = useBrokerageFilterOptions(data.selectedAccountIds);
+
   const cashFilterOptions = useCashFilterOptions(
     transactionView === 'cash',
     data.cashAccountIds,
@@ -260,32 +263,20 @@ function InvestmentsContent() {
                   filters={data.transactionFilters}
                   onFiltersChange={data.handleFiltersChange}
                   availableSymbols={[...new Set(data.portfolioSummary?.holdings.map(h => h.symbol) || [])].sort()}
+                  availableActions={brokerageActions}
                   viewToggle={
                     <InvestmentViewToggle
                       value={transactionView}
                       onChange={handleTransactionViewChange}
                     />
                   }
+                  currentPage={data.currentPage}
+                  totalPages={data.pagination?.totalPages ?? 1}
+                  totalItems={data.pagination?.total ?? 0}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={data.goToPage}
                 />
               </div>
-
-              {data.pagination && data.pagination.totalPages > 1 && (
-                <div className="mt-4">
-                  <Pagination
-                    currentPage={data.currentPage}
-                    totalPages={data.pagination.totalPages}
-                    totalItems={data.pagination.total}
-                    pageSize={PAGE_SIZE}
-                    onPageChange={data.goToPage}
-                    itemName="transactions"
-                  />
-                </div>
-              )}
-              {data.pagination && data.pagination.totalPages <= 1 && data.pagination.total > 0 && (
-                <div className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                  {t('page.transactionCount', { count: data.pagination.total, plural: data.pagination.total !== 1 ? 's' : '' })}
-                </div>
-              )}
             </>
           )}
 
@@ -315,7 +306,6 @@ function InvestmentsContent() {
                     activeCount={data.activeCashFilterCount}
                     onClick={() => data.setShowCashFilters(!data.showCashFilters)}
                   />
-                  <DensityToggle view="investments" size="md" className="ml-auto" />
                 </div>
               </div>
 
@@ -345,21 +335,10 @@ function InvestmentsContent() {
                   onPageChange={data.goToCashPage}
                   startingBalance={data.cashAccountIds.length === 1 ? (data.cashStartingBalance ?? 0) : undefined}
                   isSingleAccountView={data.cashAccountIds.length === 1}
-                  showToolbar={false}
                 />
               )}
             </div>
 
-              {data.cashPagination && data.cashPagination.totalPages > 1 && (
-                <div className="mt-4">
-                  <Pagination currentPage={data.cashCurrentPage} totalPages={data.cashPagination.totalPages} totalItems={data.cashPagination.total} pageSize={PAGE_SIZE} onPageChange={data.goToCashPage} itemName="transactions" />
-                </div>
-              )}
-              {data.cashPagination && data.cashPagination.totalPages <= 1 && data.cashPagination.total > 0 && (
-                <div className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                  {t('page.transactionCount', { count: data.cashPagination.total, plural: data.cashPagination.total !== 1 ? 's' : '' })}
-                </div>
-              )}
             </>
           )}
 

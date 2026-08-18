@@ -2298,6 +2298,71 @@ export class InvestmentTransactionsService {
     }
   }
 
+  /**
+   * The account ids a register query runs over: the ones asked for, plus each
+   * one's linked ledger.
+   *
+   * An investment account is a pair, and its trades live on the brokerage half
+   * while the cash they settle into lives on the other -- so a register scoped
+   * to one half alone answers with part of what the user is looking at.
+   * Undefined means "every account", which is what an unfiltered register asks
+   * for. It is one function because the filter pickers must offer values from
+   * exactly the rows the list will show.
+   */
+  private async resolveRegisterAccountIds(
+    userId: string,
+    accountIds?: string[],
+  ): Promise<string[] | undefined> {
+    if (!accountIds || accountIds.length === 0) return undefined;
+    const resolvedIds = new Set<string>(accountIds);
+    const accounts = await this.accountsService.findByIds(userId, accountIds);
+    for (const acct of accounts) {
+      if (acct.linkedAccountId) {
+        resolvedIds.add(acct.linkedAccountId);
+      }
+    }
+    return [...resolvedIds];
+  }
+
+  /**
+   * The actions the register's rows actually use, for its Action picker.
+   *
+   * The vocabulary is twenty-odd actions wide -- reinvested short-term capital
+   * gains, redemptions, share transfers -- and a household brokerage uses four
+   * of them. Offering all twenty as ways to narrow six rows is a list to read
+   * rather than a filter to use.
+   *
+   * Returned in the enum's own order, so the picker's order is a property of
+   * the vocabulary rather than of whichever action happened to be traded first.
+   */
+  async getRegisterFilterOptions(
+    userId: string,
+    accountIds?: string[],
+  ): Promise<{ actions: InvestmentAction[] }> {
+    return withScopedDb(this.dataSource, async (m) => {
+      // includes VOID rows: the register lists them, struck through, so the
+      // picker has to offer the action of a voided row or the filter cannot
+      // find it.
+      const query = m
+        .getRepository(InvestmentTransaction)
+        .createQueryBuilder("it")
+        .select("it.action", "action")
+        .distinct(true)
+        .where("it.userId = :userId", { userId });
+
+      const allIds = await this.resolveRegisterAccountIds(userId, accountIds);
+      if (allIds) {
+        query.andWhere("it.accountId IN (:...allIds)", { allIds });
+      }
+
+      const rows = await query.getRawMany<{ action: InvestmentAction }>();
+      const used = new Set(rows.map((r) => r.action));
+      return {
+        actions: Object.values(InvestmentAction).filter((a) => used.has(a)),
+      };
+    });
+  }
+
   async findAll(
     userId: string,
     accountIds?: string[],
@@ -2327,19 +2392,8 @@ export class InvestmentTransactionsService {
         .leftJoinAndSelect("it.fundingAccount", "fundingAccount")
         .where("it.userId = :userId", { userId });
 
-      if (accountIds && accountIds.length > 0) {
-        const resolvedIds = new Set<string>(accountIds);
-        // Batch-fetch accounts to resolve linked account IDs
-        const accounts = await this.accountsService.findByIds(
-          userId,
-          accountIds,
-        );
-        for (const acct of accounts) {
-          if (acct.linkedAccountId) {
-            resolvedIds.add(acct.linkedAccountId);
-          }
-        }
-        const allIds = [...resolvedIds];
+      const allIds = await this.resolveRegisterAccountIds(userId, accountIds);
+      if (allIds) {
         query.andWhere("it.accountId IN (:...allIds)", { allIds });
       }
 

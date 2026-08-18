@@ -25,7 +25,6 @@
     "cashFilterTo": "Au",
     "loadingCashTransactions": "Chargement des transactions de trésorerie…",
     "today": "Aujourd'hui",
-    "transactionCount": "{count} transaction{plural}",
     "allPayees": "Tous les bénéficiaires",
     "allCategories": "Toutes les catégories",
     "toastDeleteFailed": "Échec de la suppression de la transaction",

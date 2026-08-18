@@ -25,7 +25,6 @@
     "cashFilterTo": "结束日期",
     "loadingCashTransactions": "正在加载现金交易...",
     "today": "今天",
-    "transactionCount": "{count} 笔交易{plural}",
     "allPayees": "所有收款人",
     "allCategories": "所有分类",
     "toastDeleteFailed": "删除交易失败",

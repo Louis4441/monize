@@ -25,7 +25,6 @@
     "cashFilterTo": "結束",
     "loadingCashTransactions": "載入現金交易中...",
     "today": "今天",
-    "transactionCount": "{count} 筆交易",
     "allPayees": "所有收款人",
     "allCategories": "所有類別",
     "toastDeleteFailed": "刪除交易失敗",

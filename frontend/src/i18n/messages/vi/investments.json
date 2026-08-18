@@ -25,7 +25,6 @@
     "cashFilterTo": "Đến",
     "loadingCashTransactions": "Đang tải giao dịch tiền mặt...",
     "today": "Hôm nay",
-    "transactionCount": "{count} giao dịch{plural}",
     "allPayees": "Tất cả người nhận",
     "allCategories": "Tất cả danh mục",
     "toastDeleteFailed": "Xóa giao dịch thất bại",

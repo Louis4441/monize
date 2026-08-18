@@ -25,7 +25,6 @@
     "cashFilterTo": "तक",
     "loadingCashTransactions": "नकद लेनदेन लोड हो रहे हैं...",
     "today": "आज",
-    "transactionCount": "{count} लेनदेन{plural}",
     "allPayees": "सभी भुगतानकर्ता",
     "allCategories": "सभी श्रेणियां",
     "toastDeleteFailed": "लेनदेन हटाने में विफल",
