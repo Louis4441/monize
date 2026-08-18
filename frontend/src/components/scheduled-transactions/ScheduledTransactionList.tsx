@@ -25,7 +25,6 @@ import {
 } from '@/hooks/useHighlightTarget';
 import { useTableDensity, type DensityLevel } from '@/hooks/useTableDensity';
 import { useDensityPreference } from '@/store/densityStore';
-import { DensityToggleBar } from '@/components/ui/DensityToggle';
 
 interface ScheduledActionLabels {
   post: string;
@@ -598,59 +597,56 @@ export function ScheduledTransactionList({
   }
 
   return (
-    <div>
-      <DensityToggleBar view="bills" />
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
-            <tr>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
-                {t('list.columns.namePayee')}
-              </th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell`}>
-                {t('list.columns.account')}
-              </th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell`}>
-                {t('list.columns.category')}
-              </th>
-              <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
-                {t('list.columns.amount')}
-              </th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell`}>
-                {t('list.columns.schedule')}
-              </th>
-              <th className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell`}>
-                {t('list.columns.auto')}
-              </th>
-              <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[480px]:table-cell sticky right-0 bg-gray-50 dark:bg-gray-800`}>
-                {t('list.columns.actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-            {transactions.map((transaction, index) => (
-              <ScheduledTransactionRow
-                key={transaction.id}
-                transaction={transaction}
-                isProcessing={actionInProgress === transaction.id}
-                density={density}
-                cellPadding={cellPadding}
-                index={index}
-                formatDate={formatDate}
-                formatAmount={formatAmount}
-                getDueDateStatus={getDueDateStatus}
-                getRowHandlers={getRowHandlers}
-                onPost={onPost}
-                onOpenConfirm={openConfirm}
-                onEdit={onEdit}
-                onEditOccurrence={onEditOccurrence}
-                categoryColorMap={categoryColorMap}
-                isHighlighted={!!highlightId && transaction.id === highlightId}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className="bg-gray-50 dark:bg-gray-800">
+          <tr>
+            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
+              {t('list.columns.namePayee')}
+            </th>
+            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell`}>
+              {t('list.columns.account')}
+            </th>
+            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell`}>
+              {t('list.columns.category')}
+            </th>
+            <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
+              {t('list.columns.amount')}
+            </th>
+            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell`}>
+              {t('list.columns.schedule')}
+            </th>
+            <th className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell`}>
+              {t('list.columns.auto')}
+            </th>
+            <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[480px]:table-cell sticky right-0 bg-gray-50 dark:bg-gray-800`}>
+              {t('list.columns.actions')}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+          {transactions.map((transaction, index) => (
+            <ScheduledTransactionRow
+              key={transaction.id}
+              transaction={transaction}
+              isProcessing={actionInProgress === transaction.id}
+              density={density}
+              cellPadding={cellPadding}
+              index={index}
+              formatDate={formatDate}
+              formatAmount={formatAmount}
+              getDueDateStatus={getDueDateStatus}
+              getRowHandlers={getRowHandlers}
+              onPost={onPost}
+              onOpenConfirm={openConfirm}
+              onEdit={onEdit}
+              onEditOccurrence={onEditOccurrence}
+              categoryColorMap={categoryColorMap}
+              isHighlighted={!!highlightId && transaction.id === highlightId}
+            />
+          ))}
+        </tbody>
+      </table>
 
       {/* Long-press action sheet */}
       <RowActionSheet

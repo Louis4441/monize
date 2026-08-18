@@ -1093,11 +1093,10 @@ describe('ScheduledTransactionList - foreign currency', () => {
 
 /**
  * Issue #1203: the list had no density control at all, so every bill occupied
- * roughly three lines and nothing could be done about it. It reads its level
- * from the one store like every other table, which means two things worth
- * pinning: the padding that reaches the DOM comes from the shared scale, and
- * the level is written to the `bills` bucket rather than sharing the
- * register's.
+ * roughly three lines and nothing could be done about it. The control itself
+ * lives on the Bills page, beside the List/Calendar and All/Bills/Deposits
+ * selectors (its tests are there); what belongs here is that the level the
+ * store holds for `bills` is what reaches the DOM.
  */
 describe('ScheduledTransactionList - row density', () => {
   beforeEach(() => {
@@ -1117,36 +1116,6 @@ describe('ScheduledTransactionList - row density', () => {
     for (const cls of expected.split(' ')) {
       expect(cell?.className, `${level}: ${cls}`).toContain(cls);
     }
-  });
-
-  it('cycles the level through the shared toggle', () => {
-    render(<ScheduledTransactionList transactions={[createTransaction()]} />);
-
-    const toggle = screen.getByTitle('Toggle row density');
-    expect(toggle).toHaveTextContent('Normal');
-
-    fireEvent.click(toggle);
-    expect(toggle).toHaveTextContent('Compact');
-    fireEvent.click(toggle);
-    expect(toggle).toHaveTextContent('Dense');
-    fireEvent.click(toggle);
-    expect(toggle).toHaveTextContent('Normal');
-  });
-
-  it('remembers the level under its own bills view, not the transactions register', () => {
-    render(<ScheduledTransactionList transactions={[createTransaction()]} />);
-
-    fireEvent.click(screen.getByTitle('Toggle row density'));
-
-    expect(useDensityStore.getState().densities.bills).toBe('compact');
-    expect(useDensityStore.getState().densities.transactions).toBeUndefined();
-  });
-
-  it('reads a level another surface already stored for bills', () => {
-    useDensityStore.setState({ densities: { bills: 'dense' } });
-    render(<ScheduledTransactionList transactions={[createTransaction()]} />);
-
-    expect(screen.getByTitle('Toggle row density')).toHaveTextContent('Dense');
   });
 
   it('puts the payee beside the name at dense instead of under it', () => {
