@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "즐겨찾기를 변경하려면 계정 업데이트 엔드포인트를 사용하세요",
     "startDateFormat": "startDate는 YYYY-MM-DD 형식이어야 합니다",
     "endDateFormat": "endDate는 YYYY-MM-DD 형식이어야 합니다",
+    "asOfDateFormat": "asOfDate는 YYYY-MM-DD 형식이어야 합니다",
     "invalidExportFormat": "형식은 csv 또는 qif여야 합니다",
     "loanRequiredFields": "대출 계정에는 paymentAmount, paymentFrequency, paymentStartDate, sourceAccountId가 필요합니다",
     "loanRequiresInterestRate": "대출 계정에는 이자율이 필요합니다",

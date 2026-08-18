@@ -29,6 +29,7 @@
     "useFavouriteUpdateEndpoint": "[XX-Use the account update endpoint to change favourites-XX]",
     "startDateFormat": "[XX-startDate must be YYYY-MM-DD-XX]",
     "endDateFormat": "[XX-endDate must be YYYY-MM-DD-XX]",
+    "asOfDateFormat": "[XX-asOfDate must be YYYY-MM-DD-XX]",
     "invalidExportFormat": "[XX-Format must be csv or qif-XX]",
     "loanRequiredFields": "[XX-Loan accounts require paymentAmount, paymentFrequency, paymentStartDate, and sourceAccountId-XX]",
     "loanRequiresInterestRate": "[XX-Loan accounts require an interest rate-XX]",

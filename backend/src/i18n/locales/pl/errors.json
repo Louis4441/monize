@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "Użyj punktu końcowego aktualizacji konta, aby zmienić ulubione",
     "startDateFormat": "startDate musi mieć format YYYY-MM-DD",
     "endDateFormat": "endDate musi mieć format YYYY-MM-DD",
+    "asOfDateFormat": "asOfDate musi mieć format YYYY-MM-DD",
     "invalidExportFormat": "Format musi być csv lub qif",
     "loanRequiredFields": "Konta pożyczek wymagają paymentAmount, paymentFrequency, paymentStartDate oraz sourceAccountId",
     "loanRequiresInterestRate": "Konta pożyczek wymagają oprocentowania",

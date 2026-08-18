@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "Gebruik het rekeningbijwerkeindpunt om favorieten te wijzigen",
     "startDateFormat": "startDate moet JJJJ-MM-DD zijn",
     "endDateFormat": "endDate moet JJJJ-MM-DD zijn",
+    "asOfDateFormat": "asOfDate moet JJJJ-MM-DD zijn",
     "invalidExportFormat": "Formaat moet csv of qif zijn",
     "loanRequiredFields": "Leningrekeningen vereisen paymentAmount, paymentFrequency, paymentStartDate en sourceAccountId",
     "loanRequiresInterestRate": "Leningrekeningen vereisen een rentepercentage",

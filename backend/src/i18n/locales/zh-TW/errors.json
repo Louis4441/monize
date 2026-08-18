@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "請使用科目更新端點來變更我的最愛",
     "startDateFormat": "startDate 必須為 YYYY-MM-DD 格式",
     "endDateFormat": "endDate 必須為 YYYY-MM-DD 格式",
+    "asOfDateFormat": "asOfDate 必須為 YYYY-MM-DD 格式",
     "invalidExportFormat": "格式必須為 csv 或 qif",
     "loanRequiredFields": "貸款科目需要 paymentAmount、paymentFrequency、paymentStartDate 和 sourceAccountId",
     "loanRequiresInterestRate": "貸款科目需要利率",

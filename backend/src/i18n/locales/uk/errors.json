@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "Використовуйте кінцеву точку оновлення рахунку для зміни вибраного",
     "startDateFormat": "startDate має бути у форматі YYYY-MM-DD",
     "endDateFormat": "endDate має бути у форматі YYYY-MM-DD",
+    "asOfDateFormat": "asOfDate має бути у форматі YYYY-MM-DD",
     "invalidExportFormat": "Формат має бути csv або qif",
     "loanRequiredFields": "Рахунки позик вимагають paymentAmount, paymentFrequency, paymentStartDate та sourceAccountId",
     "loanRequiresInterestRate": "Рахунки позик вимагають відсоткову ставку",

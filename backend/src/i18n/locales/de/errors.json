@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "Verwenden Sie den Konto-Aktualisierungsendpunkt, um Favoriten zu ändern",
     "startDateFormat": "startDate muss im Format YYYY-MM-DD sein",
     "endDateFormat": "endDate muss im Format YYYY-MM-DD sein",
+    "asOfDateFormat": "asOfDate muss im Format YYYY-MM-DD sein",
     "invalidExportFormat": "Format muss csv oder qif sein",
     "loanRequiredFields": "Darlehenskonten erfordern paymentAmount, paymentFrequency, paymentStartDate und sourceAccountId",
     "loanRequiresInterestRate": "Darlehenskonten erfordern einen Zinssatz",
