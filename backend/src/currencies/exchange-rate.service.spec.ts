@@ -934,7 +934,7 @@ describe("ExchangeRateService", () => {
       expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
         1,
       );
-      const [sym, fromDate, toDate] =
+      const [sym, , fromDate, toDate] =
         yahooFinanceService.fetchHistoricalWindow.mock.calls[0];
       expect(sym).toBe("EURPLN=X");
       // Window brackets the target date, and is wide enough to be worth
@@ -1438,7 +1438,7 @@ describe("ExchangeRateService", () => {
       expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
         1,
       );
-      const [symbol, start, end] =
+      const [symbol, , start, end] =
         yahooFinanceService.fetchHistoricalWindow.mock.calls[0];
       expect(symbol).toBe("USDCAD=X");
       expect(ymd(start)).toBe("2017-07-18");
@@ -1568,7 +1568,7 @@ describe("ExchangeRateService", () => {
         "2026-08-18",
       );
 
-      const [, start, end] =
+      const [, , start, end] =
         yahooFinanceService.fetchHistoricalWindow.mock.calls[0];
       expect(ymd(start)).toBe("2026-07-18");
       expect(ymd(end)).toBe("2026-08-18");

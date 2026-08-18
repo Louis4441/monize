@@ -22,37 +22,15 @@ import { roundFxRate } from "../common/fx-entry.util";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
-import { getMonthEndYMD, todayYMD } from "../common/date-utils";
 import {
-  BOUNDARY_LAG_DAYS,
-  withLeadDays,
-} from "../common/time-series/price-boundary.util";
+  EmptyWindowMemory,
+  monthFetchWindow,
+} from "../common/time-series/history-fill";
 
 // Cap concurrent Yahoo FX fetches so the daily refresh does not burst every
 // currency pair at once (this cron also runs alongside the security price
 // refresh, so the combined load on Yahoo needs to stay bounded).
 const FX_FETCH_CONCURRENCY = 6;
-
-/**
- * How long a "the provider has nothing for this pair in this month" answer is
- * trusted before it is asked again.
- *
- * Without it, a report dated before a pair's history begins re-asks the
- * provider on every page load and every refresh -- the one case where the fetch
- * can never succeed is the one that would repeat forever.
- *
- * Half an hour rather than a day because **this layer cannot tell an absence
- * from a failure**: the provider returns null for "no such history" and for a
- * 429 or a timeout alike, so every entry here might be a transient error
- * remembered as a permanent fact. The number is therefore the answer to "how
- * long may a rate-limited fetch keep a pair off the report", not "how long is a
- * missing pair missing" -- short enough that a user who reloads gets a real
- * retry, long enough that reloading cannot hammer the provider.
- */
-const EMPTY_WINDOW_TTL_MS = 30 * 60 * 1000;
-
-/** Bound on the negative cache, so a long-lived process cannot grow it forever. */
-const EMPTY_WINDOW_CACHE_MAX = 2000;
 
 /**
  * A pair key that does not distinguish direction, because a fetch does not
@@ -61,20 +39,6 @@ const EMPTY_WINDOW_CACHE_MAX = 2000;
  */
 function directionlessPairKey(from: string, to: string): string {
   return [from, to].sort().join("|");
-}
-
-/**
- * The window one on-demand fetch covers for a report dated `date`: the whole
- * calendar month, with `BOUNDARY_LAG_DAYS` of lead so the first of the month is
- * answerable, and never running past today because the market has not been
- * there yet.
- */
-function monthFetchWindow(date: string): [string, string] {
-  const [year, month] = date.split("-").map(Number);
-  const start = withLeadDays(`${date.slice(0, 7)}-01`, BOUNDARY_LAG_DAYS);
-  const monthEnd = getMonthEndYMD(year, month);
-  const today = todayYMD();
-  return [start, monthEnd > today ? today : monthEnd];
 }
 
 export interface RateUpdateResult {
@@ -111,11 +75,8 @@ export interface HistoricalRateBackfillSummary {
 export class ExchangeRateService implements OnModuleInit {
   private readonly logger = new Logger(ExchangeRateService.name);
 
-  /**
-   * Pair-month windows the provider answered with nothing, and when that answer
-   * expires. See `EMPTY_WINDOW_TTL_MS`.
-   */
-  private readonly emptyRateWindows = new Map<string, number>();
+  /** Pair-months the provider answered with nothing. See `EmptyWindowMemory`. */
+  private readonly emptyRateWindows = new EmptyWindowMemory();
 
   constructor(
     private dataSource: DataSource,
@@ -249,6 +210,7 @@ export class ExchangeRateService implements OnModuleInit {
     const symbol = `${from}${to}=X`;
     const prices = await this.yahooFinanceService.fetchHistoricalWindow(
       symbol,
+      null,
       fromDate,
       toDate,
     );
@@ -769,7 +731,7 @@ export class ExchangeRateService implements OnModuleInit {
 
     const month = date.slice(0, 7);
     const due = [...wanted.entries()].filter(
-      ([key]) => !this.hasEmptyWindowCached(key, month),
+      ([key]) => !this.emptyRateWindows.has(key, month),
     );
     if (due.length === 0) return 0;
 
@@ -793,7 +755,7 @@ export class ExchangeRateService implements OnModuleInit {
             // Nothing exists for this pair in this era -- a currency that
             // predates the provider's history, or one it does not carry. Note
             // it, so a report reloaded on the same date does not re-ask.
-            this.rememberEmptyWindow(key, month);
+            this.emptyRateWindows.remember(key, month);
             this.logger.warn(
               `No historical rates available for ${pair.from}/${pair.to} over ${start} to ${end}`,
             );
@@ -851,34 +813,6 @@ export class ExchangeRateService implements OnModuleInit {
     }
 
     return 0;
-  }
-
-  private hasEmptyWindowCached(pairKey: string, month: string): boolean {
-    const expiry = this.emptyRateWindows.get(`${pairKey}@${month}`);
-    if (expiry === undefined) return false;
-    if (expiry > Date.now()) return true;
-    this.emptyRateWindows.delete(`${pairKey}@${month}`);
-    return false;
-  }
-
-  private rememberEmptyWindow(pairKey: string, month: string): void {
-    if (this.emptyRateWindows.size >= EMPTY_WINDOW_CACHE_MAX) {
-      const now = Date.now();
-      for (const [key, expiry] of this.emptyRateWindows) {
-        if (expiry <= now) this.emptyRateWindows.delete(key);
-      }
-      // Still full of live entries: drop the oldest insertions rather than let
-      // the map grow without bound. A dropped entry costs one extra fetch.
-      while (this.emptyRateWindows.size >= EMPTY_WINDOW_CACHE_MAX) {
-        const oldest = this.emptyRateWindows.keys().next();
-        if (oldest.done) break;
-        this.emptyRateWindows.delete(oldest.value);
-      }
-    }
-    this.emptyRateWindows.set(
-      `${pairKey}@${month}`,
-      Date.now() + EMPTY_WINDOW_TTL_MS,
-    );
   }
 
   /**

@@ -4,6 +4,7 @@ import { AccountBalancesReportService } from "./account-balances-report.service"
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { SecurityPriceService } from "../securities/security-price.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -58,6 +59,7 @@ describe("AccountBalancesReportService", () => {
   let query: jest.Mock;
   let preferencesRepo: { findOne: jest.Mock };
   let exchangeRates: { ensureRatesForDate: jest.Mock };
+  let securityPrices: { ensurePricesForDate: jest.Mock };
 
   const program = (fixture: Fixture) => {
     query.mockImplementation(async (sql: string) => {
@@ -102,12 +104,14 @@ describe("AccountBalancesReportService", () => {
     // database cannot answer, and most fixtures either supply the rate or are
     // asserting what happens when nobody can.
     exchangeRates = { ensureRatesForDate: jest.fn().mockResolvedValue(0) };
+    securityPrices = { ensurePricesForDate: jest.fn().mockResolvedValue(0) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AccountBalancesReportService,
         { provide: DataSource, useValue: mocks.dataSource },
         { provide: ExchangeRateService, useValue: exchangeRates },
+        { provide: SecurityPriceService, useValue: securityPrices },
       ],
     }).compile();
 
@@ -1287,6 +1291,182 @@ describe("AccountBalancesReportService", () => {
       });
       await service.getBalancesAsOf("user-1", "2017-08-18");
       expect(exchangeRates.ensureRatesForDate).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The price half of the same absence. A security backfilled with one year of
+   * history from the day it was created has no close at all for 2017, so
+   * `closeAt` answers null, the position is unpriced, and the account's market
+   * value is null -- "Total unavailable" again, for a different missing series.
+   */
+  describe("a date the database has no price for", () => {
+    const held = {
+      accounts: [brokerage],
+      balances: [{ id: "acc-b", balance: "0" }],
+      investmentTransactions: [
+        {
+          account_id: "acc-b",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+        },
+      ],
+      securities: [{ id: "sec-1", currency_code: "CAD" }],
+    };
+
+    it("asks the provider for the securities it cannot price", async () => {
+      program({ ...held, prices: [] });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(securityPrices.ensurePricesForDate).toHaveBeenCalledWith(
+        ["sec-1"],
+        "2017-08-18",
+      );
+    });
+
+    it("values the position once the fetched close lands", async () => {
+      const fixture: Fixture = { ...held, prices: [] };
+      program(fixture);
+      securityPrices.ensurePricesForDate.mockImplementation(async () => {
+        fixture.prices = [
+          {
+            security_id: "sec-1",
+            price_date: "2017-08-17",
+            close_price: "20",
+          },
+        ];
+        return 22;
+      });
+
+      const result = await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: 200,
+        unpricedHoldingsCount: 0,
+        pricesComplete: true,
+        valuationComplete: true,
+      });
+    });
+
+    // "The last close is from 2016" and "there are no closes" are the same
+    // absence from a 2017 report's point of view, and only the fetch tells them
+    // apart -- so a close refused by the staleness bound is asked for too.
+    it("asks for a security whose only close is outside the boundary window", async () => {
+      program({
+        ...held,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2017-06-30",
+            close_price: "20",
+          },
+        ],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(securityPrices.ensurePricesForDate).toHaveBeenCalledWith(
+        ["sec-1"],
+        "2017-08-18",
+      );
+    });
+
+    it("does not ask for a security the date already has a close for", async () => {
+      program({
+        ...held,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2017-08-17",
+            close_price: "20",
+          },
+        ],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(securityPrices.ensurePricesForDate).not.toHaveBeenCalled();
+    });
+
+    it("does not ask for a security sold down to nothing", async () => {
+      program({
+        ...held,
+        investmentTransactions: [
+          {
+            account_id: "acc-b",
+            security_id: "sec-1",
+            action: "BUY",
+            quantity: "10",
+          },
+          {
+            account_id: "acc-b",
+            security_id: "sec-1",
+            action: "SELL",
+            quantity: "10",
+          },
+        ],
+        prices: [],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(securityPrices.ensurePricesForDate).not.toHaveBeenCalled();
+    });
+
+    it("re-reads the stored prices rather than trusting the fetch", async () => {
+      program({ ...held, prices: [] });
+      securityPrices.ensurePricesForDate.mockResolvedValue(22);
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      const priceReads = query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes("FROM security_prices"),
+      );
+      expect(priceReads).toHaveLength(2);
+    });
+
+    it("does not re-read when the provider had nothing to add", async () => {
+      program({ ...held, prices: [] });
+      securityPrices.ensurePricesForDate.mockResolvedValue(0);
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      const priceReads = query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes("FROM security_prices"),
+      );
+      expect(priceReads).toHaveLength(1);
+    });
+
+    it("leaves the position unpriced when the fetch finds nothing", async () => {
+      program({ ...held, prices: [] });
+      securityPrices.ensurePricesForDate.mockResolvedValue(0);
+      const result = await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: null,
+        unpricedHoldingsCount: 1,
+        pricesComplete: false,
+      });
+    });
+
+    it("leaves the report standing when the fetch throws", async () => {
+      program({ ...held, prices: [] });
+      securityPrices.ensurePricesForDate.mockRejectedValue(
+        new Error("provider unreachable"),
+      );
+      const result = await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: null,
+        unpricedHoldingsCount: 1,
+      });
+    });
+
+    // Prices cannot run ahead of today any more than rates can.
+    it("fetches at the market date, not a future report date", async () => {
+      program({ ...held, prices: [] });
+      await service.getBalancesAsOf("user-1", "2027-05-04");
+      expect(securityPrices.ensurePricesForDate).toHaveBeenCalledWith(
+        ["sec-1"],
+        "2026-08-18",
+      );
+    });
+
+    it("asks for nothing when the account holds no securities", async () => {
+      program({
+        accounts: [brokerage],
+        balances: [{ id: "acc-b", balance: "0" }],
+        investmentTransactions: [],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(securityPrices.ensurePricesForDate).not.toHaveBeenCalled();
     });
   });
 });

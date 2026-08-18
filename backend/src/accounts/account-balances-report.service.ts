@@ -14,6 +14,7 @@ import {
 import { todayYMD } from "../common/date-utils";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { SecurityPriceService } from "../securities/security-price.service";
 
 /**
  * One account's worth at the end of a single day.
@@ -176,6 +177,8 @@ export class AccountBalancesReportService {
     private dataSource: DataSource,
     @Inject(forwardRef(() => ExchangeRateService))
     private readonly exchangeRates: ExchangeRateService,
+    @Inject(forwardRef(() => SecurityPriceService))
+    private readonly securityPrices: SecurityPriceService,
   ) {}
 
   private scopedQuery<T = any>(sql: string, params?: any[]): Promise<T> {
@@ -263,25 +266,33 @@ export class AccountBalancesReportService {
       asOfDate,
     );
     const heldSecurityIds = heldSecuritiesIn(positions);
-    const [prices, securityCurrencies] = await Promise.all([
+    const [storedPrices, securityCurrencies] = await Promise.all([
       this.closingPricesAsOf(heldSecurityIds, marketDate),
       this.securityCurrencies(heldSecurityIds),
     ]);
 
-    // One rate read serves both jobs: pricing a foreign holding into its own
-    // account's currency, and presenting every account in the user's. Reading
-    // them twice would be two chances for the two halves of one report to be
-    // converted at different vintages.
-    const rates = await this.ratesForReport(
-      requiredRatePairs({
-        accountCurrencies: accounts.map((a) => a.currency_code),
-        displayCurrency,
-        holdingsAccounts,
-        positions,
-        securityCurrencies,
-      }),
-      marketDate,
-    );
+    // Two independent gaps, filled concurrently because neither answer feeds
+    // the other: a rate the database never fetched, and a close it never
+    // fetched. Both are absences rather than unknowables, and both make this
+    // report's totals null when left alone.
+    //
+    // One rate read serves both of the rate's jobs -- pricing a foreign holding
+    // into its own account's currency, and presenting every account in the
+    // user's. Reading them twice would be two chances for the two halves of one
+    // report to be converted at different vintages.
+    const [rates, prices] = await Promise.all([
+      this.ratesForReport(
+        requiredRatePairs({
+          accountCurrencies: accounts.map((a) => a.currency_code),
+          displayCurrency,
+          holdingsAccounts,
+          positions,
+          securityCurrencies,
+        }),
+        marketDate,
+      ),
+      this.pricesForReport(heldSecurityIds, storedPrices, marketDate),
+    ]);
 
     const marketValues = this.valuePositions(
       holdingsAccounts,
@@ -622,6 +633,52 @@ export class AccountBalancesReportService {
     if (loaded === 0) return rates;
 
     return this.storedRatesAsOf(marketDate);
+  }
+
+  /**
+   * The closes the report values with, after giving the provider a chance to
+   * supply the history nobody has stored yet.
+   *
+   * The exact counterpart of `ratesForReport`, and deliberately shaped the
+   * same: only securities `closeAt` cannot answer for `marketDate` are asked
+   * for, the fetch is best-effort, and what it returns is re-read from the
+   * database rather than patched into the map -- so the valuation uses what a
+   * second request would find.
+   *
+   * A security refused by the *staleness bound* is asked for as well as one
+   * with no rows at all, and it has to be: "the last close is from 2016" and
+   * "there are no closes" are the same absence from a 2017 report's point of
+   * view, and the fill is what tells them apart.
+   */
+  private async pricesForReport(
+    heldSecurityIds: string[],
+    stored: Map<string, number>,
+    marketDate: string,
+  ): Promise<Map<string, number>> {
+    const missing = heldSecurityIds.filter((id) => !stored.has(id));
+    if (missing.length === 0) return stored;
+
+    this.logger.log(
+      `No accepted close at ${marketDate} for ${missing.length} held securities; fetching historical prices`,
+    );
+
+    let loaded = 0;
+    try {
+      loaded = await this.securityPrices.ensurePricesForDate(
+        missing,
+        marketDate,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Historical price fetch for ${marketDate} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return stored;
+    }
+    if (loaded === 0) return stored;
+
+    return this.closingPricesAsOf(heldSecurityIds, marketDate);
   }
 
   /** The currency the user reads their totals in. */

@@ -484,9 +484,9 @@ export class YahooFinanceService implements QuoteProvider {
    */
   async fetchHistoricalWindow(
     symbol: string,
+    exchange: string | null,
     fromDate: Date,
     toDate: Date,
-    exchange: string | null = null,
   ): Promise<HistoricalPrice[] | null> {
     const period1 = Math.floor(fromDate.getTime() / 1000);
     const period2 = Math.floor(toDate.getTime() / 1000);

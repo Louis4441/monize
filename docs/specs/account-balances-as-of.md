@@ -140,6 +140,41 @@ existence on different days (a cash sleeve funded before the first trade
 settles). The client therefore drops an entity only when **every** member
 account is `existsAsOf: false`.
 
+### 4.1 A price that is absent rather than unknowable
+
+`unpricedHoldingsCount > 0` says the *database* has no accepted close for `d`,
+which -- like a missing rate (section 7.1) -- is usually a fact about what has
+been fetched rather than about the world. `backfillSecurity` fetches a year from
+the day the security was created and nothing goes deeper on its own, so a report
+asked about 2017 finds no close inside the boundary window and every position in
+the account is unpriced.
+
+So the report asks for those too, through
+`SecurityPriceService.ensurePricesForDate`, with the same contract as the rate
+fill point for point:
+
+- **Only the securities `closeAt` could not answer for** the market date are
+  asked for -- and a close refused by the *staleness bound* counts, because "the
+  last close is from 2016" and "there are no closes" are the same absence from a
+  2017 report's point of view.
+- **The unit is the same calendar month** (`monthFetchWindow`), through the
+  user's own provider order. A provider whose chart API takes only a named
+  timeframe (MSN) gets the narrowest range that reaches the date instead, and
+  everything it returns is stored -- discarding bars already downloaded to
+  honour a window nobody needs enforced would be the more expensive choice.
+- **`skipPriceUpdates` is honoured.** An import that auto-generated a symbol set
+  that flag precisely because fetching against it can only fail.
+- **Best-effort, never invented.** A provider that is down, rate-limited or has
+  no history leaves the position unpriced and the total `null`, exactly as
+  section 4 says. What is fetched is re-read from the database.
+- **A security-month that came back empty is remembered** for half an hour, on
+  the same reasoning and with the same `EmptyWindowMemory`.
+- **The fill is bounded by wall clock, not by count.** A report can hold dozens
+  of securities and this runs inside a request, so once
+  `PRICE_FILL_BUDGET_MS` is spent no further fetches are started. What was not
+  reached stays unpriced -- a state the report already renders -- and the number
+  left is logged rather than dropped quietly.
+
 ## 5. Shape
 
 ```typescript
@@ -220,6 +255,9 @@ same-currency is 1:1 by definition and has to stay distinguishable from missing.
 
 ### 7.1 A rate that is absent rather than unknowable
 
+(Section 4.1 is the same argument for prices; the two fills are deliberately
+the same shape and run concurrently, because neither answer feeds the other.)
+
 A pair being missing from `displayRates` says the *database* has no accepted
 rate for `d`. That is usually not a fact about the world -- it is a fact about
 what has been fetched. The daily refresh only ever writes today, and
@@ -292,6 +330,13 @@ The backend spec must cover, at minimum:
 10. `displayRates` carries the reporting currency at 1, resolves a foreign
    currency at the date's rate (including a pair stored only in reverse), and
    omits a currency it has no accepted rate for.
+6a. Section 4.1: a held security with no accepted close for the date is asked
+   of the provider and valued once it lands, at the *market* date; a close
+   refused by the staleness bound is asked for as well as one that is absent
+   entirely; a security already priced for the date, and one sold down to
+   nothing, are not asked for; a fetch that finds nothing or throws leaves the
+   position unpriced per section 4; and the price map is re-read from the
+   database only when the fetch actually added rows.
 10a. Section 7.1: a pair with no stored rate for the date is asked of the
    provider and presented once it lands, at the *market* date rather than a
    future report date; a held security's currency is asked for against its
