@@ -218,6 +218,48 @@ the totals through `sumConverted` and are marked by `PartialTotal` rather than
 being folded in unconverted. `displayCurrency` itself is present at 1, because
 same-currency is 1:1 by definition and has to stay distinguishable from missing.
 
+### 7.1 A rate that is absent rather than unknowable
+
+A pair being missing from `displayRates` says the *database* has no accepted
+rate for `d`. That is usually not a fact about the world -- it is a fact about
+what has been fetched. The daily refresh only ever writes today, and
+`backfillHistoricalRates` skips a pair the moment it has any row at all, so a
+user whose USD/CAD history begins at their import has nothing whatsoever for
+2017: every USD account reads "Total unavailable" as the report's date moves
+back through years nobody ever loaded, with the backend log naming the pair.
+
+So before it converts anything, the report asks the provider for the pairs the
+date cannot answer. `ExchangeRateService.ensureRatesForDate` is that request:
+
+- **The pairs are exactly the ones the report would fail on.** Both jobs
+  contribute -- each account currency against the reporting currency, and each
+  *held* security's currency against the currency of the account holding it --
+  and a pair is asked for only when `convertWithRateLookup` cannot already
+  answer it from a stored rate in either direction. A position sold down to
+  nothing contributes no pair.
+- **The unit is a calendar month, not a day.** One provider call returns the
+  whole daily series for whatever period it is asked for and costs the same
+  either way, so the window is the month containing `d` plus `BOUNDARY_LAG_DAYS`
+  of lead (so the first days of the month have something to carry forward from),
+  clamped at today. Stepping the report through that month is then database
+  reads.
+- **It is best-effort, and it never invents a rate.** A provider that is down,
+  rate-limited, or simply has no history for a pair leaves the report exactly
+  where section 4 leaves it: the pair named in `missingRatePairs`, the total
+  `null`. The read does not fail because an outbound fetch did.
+- **What is fetched is re-read from the database**, not patched into the map in
+  memory, so the report converts with exactly what a second request would find.
+- **A pair-month the provider had nothing for is remembered** for half an hour,
+  because that is the one case which can never succeed and would otherwise
+  repeat on every page load. The interval is short because the provider layer
+  cannot tell "no such history" from a 429 -- so the memory has to expire before
+  a transient failure turns into a pair the report stops asking for. It is per
+  process and gates nothing: a replica that has not seen the miss makes one
+  extra fetch and writes the same idempotent upsert.
+
+`d` here is the **market date** of section 3 -- `min(d, today)` -- because a
+rate cannot be fetched for a day that has not happened.
+
 Shipping the rates with the figures is also what keeps the two from drifting:
 while a new date is in flight the client still holds the previous response, and
 converting it with a live rate map would present one date's balances at another
@@ -250,6 +292,14 @@ The backend spec must cover, at minimum:
 10. `displayRates` carries the reporting currency at 1, resolves a foreign
    currency at the date's rate (including a pair stored only in reverse), and
    omits a currency it has no accepted rate for.
+10a. Section 7.1: a pair with no stored rate for the date is asked of the
+   provider and presented once it lands, at the *market* date rather than a
+   future report date; a held security's currency is asked for against its
+   account's currency as well as the reporting currency; a pair already stored
+   (in either direction), a currency equal to the reporting currency, and a
+   security sold down to nothing are not asked for; a fetch that finds nothing
+   or throws leaves the report exactly as section 4 leaves it; and the map is
+   re-read from the database only when the fetch actually added rows.
 11. A future date sums the ledger to that date while reading prices and rates at
    today, and its positions are valued rather than reported unpriced.
 12. Inception (section 3): an asset is `existsAsOf: false` with `balance: 0`

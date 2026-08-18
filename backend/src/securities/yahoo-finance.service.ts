@@ -847,6 +847,12 @@ export class YahooFinanceService implements QuoteProvider {
     // round trips per miss and can only ever fail.
     if (symbol.startsWith("^")) return alternates;
 
+    // Same argument for a currency pair (`USDCAD=X`): it is not listed on an
+    // exchange, so `USDCAD=X.TO` is three guaranteed misses. That cost lands on
+    // the on-demand historical FX fetch, which asks for a pair precisely when
+    // nothing is stored for it, so the miss path is the one it walks.
+    if (symbol.endsWith("=X")) return alternates;
+
     if (!symbol.includes(".")) {
       alternates.push(`${symbol}.TO`);
       alternates.push(`${symbol}.V`);

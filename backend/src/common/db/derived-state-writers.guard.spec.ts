@@ -182,6 +182,16 @@ describe("derived financial state has one set of writers", () => {
           "sweepStaleSnapshots, which derives the staleness from accounts.updated_at " +
           "rather than from anything held in memory",
       ],
+      [
+        "currencies/exchange-rate.service.ts",
+        "emptyRateWindows is a negative cache on an on-demand read path, not a " +
+          "guard over the cron beside it: it records that the provider had no " +
+          "history for a pair in a month so a report reloaded on that date does " +
+          "not re-ask. It gates nothing -- a replica that has not seen the miss " +
+          "makes one extra fetch, and the write it would perform is an " +
+          "idempotent upsert, so duplicating it costs a round trip and changes " +
+          "no row",
+      ],
     ]);
 
     const offenders = sourceFiles()

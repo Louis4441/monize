@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, forwardRef } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { FxAggregate } from "../common/fx-aggregate";
@@ -13,6 +13,7 @@ import {
 } from "../common/time-series/price-boundary.util";
 import { todayYMD } from "../common/date-utils";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 
 /**
  * One account's worth at the end of a single day.
@@ -76,6 +77,71 @@ export interface AccountBalancesAsOfResponse {
 /** A share position is treated as closed below this, matching HoldingsService. */
 const QUANTITY_EPSILON = 0.00000001;
 
+/** accountId -> securityId -> share count at the report's date. */
+type AccountPositions = Map<string, Map<string, number>>;
+
+/** The market-value half of one account's row -- everything but the ledger sum. */
+type AccountValuation = Omit<
+  AccountBalanceAsOf,
+  "accountId" | "currencyCode" | "balance" | "existsAsOf"
+>;
+
+/** The securities still held (non-zero) anywhere in a replay. */
+function heldSecuritiesIn(positions: AccountPositions): string[] {
+  return [
+    ...new Set(
+      [...positions.values()].flatMap((bySecurity) =>
+        [...bySecurity.entries()]
+          .filter(([, qty]) => Math.abs(qty) > QUANTITY_EPSILON)
+          .map(([securityId]) => securityId),
+      ),
+    ),
+  ];
+}
+
+/**
+ * Every currency pair this report has to convert, deduplicated.
+ *
+ * Two jobs need rates and they are not the same pairs: presenting each
+ * account's figures in the user's reporting currency, and pricing a foreign
+ * security into the currency of the account that holds it. A USD holding in a
+ * CAD brokerage read in CAD needs `USD->CAD` for both reasons; a USD holding in
+ * a USD brokerage read in CAD needs only the second. Collecting both here is
+ * what lets one fetch settle the whole report -- and what keeps the report from
+ * asking the provider for a pair it was never going to convert.
+ *
+ * A position with no quantity left is not a currency the report needs, and a
+ * security whose currency is unknown is valued in its account's currency (the
+ * valuation's own fallback), so neither contributes a pair.
+ */
+function requiredRatePairs(input: {
+  accountCurrencies: string[];
+  displayCurrency: string;
+  holdingsAccounts: Array<{ id: string; currencyCode: string }>;
+  positions: AccountPositions;
+  securityCurrencies: Map<string, string>;
+}): Array<{ from: string; to: string }> {
+  const pairs = new Map<string, { from: string; to: string }>();
+  const want = (from: string, to: string) => {
+    if (!from || !to || from === to) return;
+    pairs.set(`${from}->${to}`, { from, to });
+  };
+
+  for (const currency of input.accountCurrencies) {
+    want(currency, input.displayCurrency);
+  }
+  for (const account of input.holdingsAccounts) {
+    for (const [securityId, quantity] of input.positions.get(account.id) ??
+      []) {
+      if (Math.abs(quantity) <= QUANTITY_EPSILON) continue;
+      const securityCurrency = input.securityCurrencies.get(securityId);
+      if (securityCurrency) want(securityCurrency, account.currencyCode);
+    }
+  }
+
+  return [...pairs.values()];
+}
+
 /**
  * The date the *market* is read at, for a report asked about `asOfDate`.
  *
@@ -106,7 +172,11 @@ function marketDateFor(asOfDate: string): string {
 export class AccountBalancesReportService {
   private readonly logger = new Logger(AccountBalancesReportService.name);
 
-  constructor(private dataSource: DataSource) {}
+  constructor(
+    private dataSource: DataSource,
+    @Inject(forwardRef(() => ExchangeRateService))
+    private readonly exchangeRates: ExchangeRateService,
+  ) {}
 
   private scopedQuery<T = any>(sql: string, params?: any[]): Promise<T> {
     return withScopedDb(this.dataSource, (m) => m.query(sql, params));
@@ -169,27 +239,57 @@ export class AccountBalancesReportService {
       this.firstActivityDates(userId, jointAccountIds, restriction),
     ]);
 
-    // One rate read serves both jobs: pricing a foreign holding into its own
-    // account's currency, and presenting every account in the user's. Reading
-    // them twice would be two chances for the two halves of one report to be
-    // converted at different vintages.
-    const rates = await this.storedRatesAsOf(marketDateFor(asOfDate));
+    const marketDate = marketDateFor(asOfDate);
 
     // Only these hold securities. The cash sleeve of a linked pair is an
     // ordinary ledger account and is excluded here, exactly as it is everywhere
     // else -- counting it twice is the double-count the pairing exists to avoid.
-    const holdingsAccounts = accounts.filter(
-      (a) =>
-        a.account_type === "INVESTMENT" &&
-        (a.account_sub_type === "INVESTMENT_BROKERAGE" || !a.account_sub_type),
-    );
-    const marketValues = await this.marketValuesAsOf(
-      holdingsAccounts.map((a) => ({
-        id: a.id,
-        currencyCode: a.currency_code,
-      })),
+    const holdingsAccounts = accounts
+      .filter(
+        (a) =>
+          a.account_type === "INVESTMENT" &&
+          (a.account_sub_type === "INVESTMENT_BROKERAGE" ||
+            !a.account_sub_type),
+      )
+      .map((a) => ({ id: a.id, currencyCode: a.currency_code }));
+
+    // The replay runs before the rates are read because it is what says which
+    // pairs the report needs: a security's currency only matters once something
+    // holds it, and asking the provider for a pair nobody is waiting on is a
+    // round trip spent on nothing. Prices come alongside -- a different source
+    // answering a different question, and neither depends on a rate.
+    const positions = await this.positionsAsOf(
+      holdingsAccounts.map((a) => a.id),
       asOfDate,
+    );
+    const heldSecurityIds = heldSecuritiesIn(positions);
+    const [prices, securityCurrencies] = await Promise.all([
+      this.closingPricesAsOf(heldSecurityIds, marketDate),
+      this.securityCurrencies(heldSecurityIds),
+    ]);
+
+    // One rate read serves both jobs: pricing a foreign holding into its own
+    // account's currency, and presenting every account in the user's. Reading
+    // them twice would be two chances for the two halves of one report to be
+    // converted at different vintages.
+    const rates = await this.ratesForReport(
+      requiredRatePairs({
+        accountCurrencies: accounts.map((a) => a.currency_code),
+        displayCurrency,
+        holdingsAccounts,
+        positions,
+        securityCurrencies,
+      }),
+      marketDate,
+    );
+
+    const marketValues = this.valuePositions(
+      holdingsAccounts,
+      positions,
+      prices,
+      securityCurrencies,
       rates,
+      asOfDate,
     );
 
     return {
@@ -347,47 +447,20 @@ export class AccountBalancesReportService {
   }
 
   /**
-   * Replay each holdings account to `asOfDate` and value what it held.
+   * Replay each holdings account's investment ledger to `asOfDate` and return
+   * what it held at the end of it.
    *
-   * The price used is the security's last close **on or before** the date, and
-   * the rate is the last stored rate on or before it. That is what makes a
-   * future date meaningful: the position is carried at the most recent figure
-   * anybody knows, which is the only honest answer about a day that has not
-   * happened yet. It is not a forecast, and nothing here extrapolates.
+   * Split out from the valuation beside it because the two answer different
+   * questions at different times: this one says which securities -- and so
+   * which currencies -- the report is about, and the report has to know that
+   * before it can tell which exchange rates it is missing.
    */
-  private async marketValuesAsOf(
-    holdingsAccounts: Array<{ id: string; currencyCode: string }>,
+  private async positionsAsOf(
+    accountIds: string[],
     asOfDate: string,
-    rates: Map<string, number>,
-  ): Promise<
-    Map<
-      string,
-      {
-        marketValue: number | null;
-        knownMarketValueSubtotal: number;
-        unpricedHoldingsCount: number;
-        missingRatePairs: string[];
-        pricesComplete: boolean;
-        fxComplete: boolean;
-        valuationComplete: boolean;
-      }
-    >
-  > {
-    const result = new Map<
-      string,
-      {
-        marketValue: number | null;
-        knownMarketValueSubtotal: number;
-        unpricedHoldingsCount: number;
-        missingRatePairs: string[];
-        pricesComplete: boolean;
-        fxComplete: boolean;
-        valuationComplete: boolean;
-      }
-    >();
-    if (holdingsAccounts.length === 0) return result;
+  ): Promise<AccountPositions> {
+    if (accountIds.length === 0) return new Map();
 
-    const accountIds = holdingsAccounts.map((a) => a.id);
     const transactions: Array<{
       account_id: string;
       security_id: string;
@@ -406,7 +479,7 @@ export class AccountBalancesReportService {
 
     // accountId -> securityId -> quantity, folded through the one reducer every
     // other replay in the codebase uses (a SPLIT's quantity is a ratio).
-    const positions = new Map<string, Map<string, number>>();
+    const positions: AccountPositions = new Map();
     for (const tx of transactions) {
       let bySecurity = positions.get(tx.account_id);
       if (!bySecurity) {
@@ -422,21 +495,26 @@ export class AccountBalancesReportService {
         ),
       );
     }
+    return positions;
+  }
 
-    const heldSecurityIds = [
-      ...new Set(
-        [...positions.values()].flatMap((bySecurity) =>
-          [...bySecurity.entries()]
-            .filter(([, qty]) => Math.abs(qty) > QUANTITY_EPSILON)
-            .map(([securityId]) => securityId),
-        ),
-      ),
-    ];
-
-    const [prices, securityCurrencies] = await Promise.all([
-      this.closingPricesAsOf(heldSecurityIds, marketDateFor(asOfDate)),
-      this.securityCurrencies(heldSecurityIds),
-    ]);
+  /**
+   * Value each account's replayed positions at the prices and rates standing
+   * for the report's date.
+   *
+   * Deliberately synchronous: everything it needs has already been read, which
+   * is what lets the caller settle the rate map -- fetching the pairs nobody
+   * stored yet -- before a single figure is computed from it.
+   */
+  private valuePositions(
+    holdingsAccounts: Array<{ id: string; currencyCode: string }>,
+    positions: AccountPositions,
+    prices: Map<string, number>,
+    securityCurrencies: Map<string, string>,
+    rates: Map<string, number>,
+    asOfDate: string,
+  ): Map<string, AccountValuation> {
+    const result = new Map<string, AccountValuation>();
 
     for (const account of holdingsAccounts) {
       const bySecurity = positions.get(account.id);
@@ -489,6 +567,61 @@ export class AccountBalancesReportService {
     }
 
     return result;
+  }
+
+  /**
+   * The rate map the report converts with, after giving the provider a chance
+   * to supply what nobody has stored yet.
+   *
+   * A stored rate is preferred without qualification -- this only ever runs for
+   * pairs the database cannot answer at all for `marketDate`. When the fetch
+   * comes back with something, the map is re-read from the database rather than
+   * patched in memory, so what the report converts with is exactly what a
+   * second request would find: one source of truth, not two that agree today.
+   *
+   * The fetch is best-effort. A provider that is down, rate-limited, or simply
+   * has no history for a pair leaves the report exactly where it was before
+   * this existed -- the pair named in `missingRatePairs` and the total null --
+   * rather than failing a read the database could answer for everything else.
+   */
+  private async ratesForReport(
+    required: Array<{ from: string; to: string }>,
+    marketDate: string,
+  ): Promise<Map<string, number>> {
+    const rates = await this.storedRatesAsOf(marketDate);
+
+    // `convertWithRateLookup` is the one place that decides a pair is
+    // answerable -- direct rate, else the reciprocal of the reverse. Asking it
+    // means the set fetched is exactly the set the valuation would fail on.
+    const missing = required.filter(
+      (pair) =>
+        convertWithRateLookup(1, pair.from, pair.to, (f, t) =>
+          rates.get(`${f}->${t}`),
+        ) === null,
+    );
+    if (missing.length === 0) return rates;
+
+    this.logger.log(
+      `No stored rate at ${marketDate} for ${missing
+        .map((p) => `${p.from}->${p.to}`)
+        .sort()
+        .join(", ")}; fetching historical rates`,
+    );
+
+    let loaded = 0;
+    try {
+      loaded = await this.exchangeRates.ensureRatesForDate(missing, marketDate);
+    } catch (error) {
+      this.logger.warn(
+        `Historical rate fetch for ${marketDate} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return rates;
+    }
+    if (loaded === 0) return rates;
+
+    return this.storedRatesAsOf(marketDate);
   }
 
   /** The currency the user reads their totals in. */

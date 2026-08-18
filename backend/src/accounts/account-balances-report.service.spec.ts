@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 import { AccountBalancesReportService } from "./account-balances-report.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -56,6 +57,7 @@ describe("AccountBalancesReportService", () => {
   let service: AccountBalancesReportService;
   let query: jest.Mock;
   let preferencesRepo: { findOne: jest.Mock };
+  let exchangeRates: { ensureRatesForDate: jest.Mock };
 
   const program = (fixture: Fixture) => {
     query.mockImplementation(async (sql: string) => {
@@ -96,10 +98,16 @@ describe("AccountBalancesReportService", () => {
     const mocks = createScopedDbMocks([[UserPreference, preferencesRepo]]);
     query = mocks.manager.query;
 
+    // Nothing to fetch by default: the provider is only reached for a pair the
+    // database cannot answer, and most fixtures either supply the rate or are
+    // asserting what happens when nobody can.
+    exchangeRates = { ensureRatesForDate: jest.fn().mockResolvedValue(0) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AccountBalancesReportService,
         { provide: DataSource, useValue: mocks.dataSource },
+        { provide: ExchangeRateService, useValue: exchangeRates },
       ],
     }).compile();
 
@@ -1020,5 +1028,265 @@ describe("AccountBalancesReportService", () => {
       expect(params).toContain("user-1");
       expect(params).toContainEqual(["joint-1"]);
     }
+  });
+  /**
+   * The daily refresh writes today and `backfillHistoricalRates` skips a pair
+   * that already has any row at all, so a user whose USD/CAD history begins at
+   * their import has nothing whatsoever for 2017 -- and the report, correctly
+   * refusing to convert at a rate nobody quoted, showed "Total unavailable" for
+   * accounts that plainly existed and held money (the warning in the backend
+   * log named the pair). The rate is not wrong, it is absent, so the report
+   * asks for it.
+   */
+  describe("a date the database has no rate for", () => {
+    const usdSavings = {
+      id: "acc-usd",
+      currency_code: "USD",
+      account_type: "SAVINGS",
+      account_sub_type: null,
+    };
+    const usdBrokerage = {
+      id: "acc-ub",
+      currency_code: "USD",
+      account_type: "INVESTMENT",
+      account_sub_type: "INVESTMENT_BROKERAGE",
+    };
+    const twoAccounts = {
+      accounts: [cheque, usdSavings],
+      balances: [
+        { id: "acc-1", balance: "100" },
+        { id: "acc-usd", balance: "50" },
+      ],
+    };
+
+    it("asks the provider for the pair it cannot convert", async () => {
+      program({ ...twoAccounts, rates: [] });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledWith(
+        [{ from: "USD", to: "CAD" }],
+        "2017-08-18",
+      );
+    });
+
+    it("presents the account at the fetched rate once it lands", async () => {
+      const fixture: Fixture = { ...twoAccounts, rates: [] };
+      program(fixture);
+      exchangeRates.ensureRatesForDate.mockImplementation(async () => {
+        fixture.rates = [
+          {
+            from_currency: "USD",
+            to_currency: "CAD",
+            rate_date: "2017-08-17",
+            rate: "1.27",
+          },
+        ];
+        return 1;
+      });
+
+      const result = await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(result.displayRates).toEqual({ CAD: 1, USD: 1.27 });
+    });
+
+    // The fetched rows are read back out of the database rather than patched
+    // into the map in memory, so the report converts with exactly what a second
+    // request would find.
+    it("re-reads the stored rates rather than trusting the fetch", async () => {
+      program({ ...twoAccounts, rates: [] });
+      exchangeRates.ensureRatesForDate.mockResolvedValue(3);
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      const rateReads = query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes("FROM exchange_rates"),
+      );
+      expect(rateReads).toHaveLength(2);
+    });
+
+    it("does not re-read when the provider had nothing to add", async () => {
+      program({ ...twoAccounts, rates: [] });
+      exchangeRates.ensureRatesForDate.mockResolvedValue(0);
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      const rateReads = query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes("FROM exchange_rates"),
+      );
+      expect(rateReads).toHaveLength(1);
+    });
+
+    // Absent, exactly as before this existed -- a pair nobody has a rate for is
+    // still a pair nobody has a rate for, and the report says so rather than
+    // failing a read the database answered for everything else.
+    it("leaves the report standing when the fetch finds nothing", async () => {
+      program({ ...twoAccounts, rates: [] });
+      exchangeRates.ensureRatesForDate.mockResolvedValue(0);
+      const result = await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(result.displayRates).toEqual({ CAD: 1 });
+      expect(result.accounts).toHaveLength(2);
+    });
+
+    it("leaves the report standing when the fetch throws", async () => {
+      program({ ...twoAccounts, rates: [] });
+      exchangeRates.ensureRatesForDate.mockRejectedValue(
+        new Error("provider unreachable"),
+      );
+      const result = await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(result.displayRates).toEqual({ CAD: 1 });
+      expect(result.accounts).toHaveLength(2);
+    });
+
+    it("does not ask for a pair the date already has a rate for", async () => {
+      program({
+        ...twoAccounts,
+        rates: [
+          {
+            from_currency: "USD",
+            to_currency: "CAD",
+            rate_date: "2017-08-17",
+            rate: "1.27",
+          },
+        ],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(exchangeRates.ensureRatesForDate).not.toHaveBeenCalled();
+    });
+
+    // `convertWithRateLookup` answers a pair from its reciprocal, so a
+    // reverse-only row is not a missing rate and must not send anyone to the
+    // provider.
+    it("does not ask for a pair stored only in the reverse direction", async () => {
+      program({
+        ...twoAccounts,
+        rates: [
+          {
+            from_currency: "CAD",
+            to_currency: "USD",
+            rate_date: "2017-08-17",
+            rate: "0.8",
+          },
+        ],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(exchangeRates.ensureRatesForDate).not.toHaveBeenCalled();
+    });
+
+    // Two jobs need rates and they are not the same pairs: presenting each
+    // account in the user's currency, and pricing a foreign security into the
+    // currency of the account holding it. The report was blank for the second
+    // reason as well as the first.
+    it("asks for a held security's currency against its account's", async () => {
+      program({
+        accounts: [usdBrokerage],
+        balances: [{ id: "acc-ub", balance: "0" }],
+        investmentTransactions: [
+          {
+            account_id: "acc-ub",
+            security_id: "sec-1",
+            action: "BUY",
+            quantity: "10",
+          },
+        ],
+        prices: [
+          { security_id: "sec-1", price_date: "2017-08-17", close_price: "20" },
+        ],
+        securities: [{ id: "sec-1", currency_code: "EUR" }],
+        rates: [],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      const [pairs] = exchangeRates.ensureRatesForDate.mock.calls[0];
+      expect(pairs).toEqual(
+        expect.arrayContaining([
+          { from: "USD", to: "CAD" },
+          { from: "EUR", to: "USD" },
+        ]),
+      );
+      expect(pairs).toHaveLength(2);
+    });
+
+    it("values the holding once the security's rate lands", async () => {
+      const fixture: Fixture = {
+        accounts: [usdBrokerage],
+        balances: [{ id: "acc-ub", balance: "0" }],
+        investmentTransactions: [
+          {
+            account_id: "acc-ub",
+            security_id: "sec-1",
+            action: "BUY",
+            quantity: "10",
+          },
+        ],
+        prices: [
+          { security_id: "sec-1", price_date: "2017-08-17", close_price: "20" },
+        ],
+        securities: [{ id: "sec-1", currency_code: "EUR" }],
+        rates: [],
+      };
+      program(fixture);
+      exchangeRates.ensureRatesForDate.mockImplementation(async () => {
+        fixture.rates = [
+          {
+            from_currency: "EUR",
+            to_currency: "USD",
+            rate_date: "2017-08-17",
+            rate: "1.18",
+          },
+        ];
+        return 2;
+      });
+
+      const result = await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: 236,
+        missingRatePairs: [],
+        valuationComplete: true,
+      });
+    });
+
+    // A round trip spent on a currency nothing holds any more is a round trip
+    // spent on nothing, and the provider is rate limited.
+    it("does not ask for a security sold down to nothing", async () => {
+      program({
+        accounts: [usdBrokerage],
+        balances: [{ id: "acc-ub", balance: "0" }],
+        investmentTransactions: [
+          {
+            account_id: "acc-ub",
+            security_id: "sec-1",
+            action: "BUY",
+            quantity: "10",
+          },
+          {
+            account_id: "acc-ub",
+            security_id: "sec-1",
+            action: "SELL",
+            quantity: "10",
+          },
+        ],
+        securities: [{ id: "sec-1", currency_code: "EUR" }],
+        rates: [],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledWith(
+        [{ from: "USD", to: "CAD" }],
+        "2017-08-18",
+      );
+    });
+
+    // Prices and rates cannot run ahead of today, so the fetch is asked for the
+    // market date the rest of the report reads at -- not the ledger's date.
+    it("fetches at the market date, not a future report date", async () => {
+      program({ ...twoAccounts, rates: [] });
+      await service.getBalancesAsOf("user-1", "2027-05-04");
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledWith(
+        [{ from: "USD", to: "CAD" }],
+        "2026-08-18",
+      );
+    });
+
+    it("asks for nothing when every account is already in the display currency", async () => {
+      program({
+        accounts: [cheque],
+        balances: [{ id: "acc-1", balance: "100" }],
+        rates: [],
+      });
+      await service.getBalancesAsOf("user-1", "2017-08-18");
+      expect(exchangeRates.ensureRatesForDate).not.toHaveBeenCalled();
+    });
   });
 });
