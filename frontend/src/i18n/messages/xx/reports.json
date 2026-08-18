@@ -142,8 +142,6 @@
     "totalAssets": "[XX-Total Assets-XX]",
     "totalLiabilities": "[XX-Total Liabilities-XX]",
     "netWorth": "[XX-Net Worth-XX]",
-    "tableView": "[XX-Table view-XX]",
-    "chartView": "[XX-Chart view-XX]",
     "noData": "[XX-No data to display.-XX]",
     "noAccounts": "[XX-No accounts found.-XX]",
     "closed": "[XX-Closed-XX]",

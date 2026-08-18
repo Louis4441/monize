@@ -759,11 +759,11 @@ describe("AccountBalancesReport", () => {
     await waitFor(() => {
       expect(screen.getByText("Total Assets")).toBeInTheDocument();
     });
-    await act(async () => { fireEvent.click(screen.getByTitle("Chart view")); });
+    await act(async () => { fireEvent.click(chartViewButton()); });
     await waitFor(() => {
       expect(screen.getByTestId("pie-chart")).toBeInTheDocument();
     });
-    await act(async () => { fireEvent.click(screen.getByTitle("Table view")); });
+    await act(async () => { fireEvent.click(tableViewButton()); });
     await waitFor(() => {
       expect(screen.queryByTestId("pie-chart")).not.toBeInTheDocument();
     });
@@ -776,7 +776,7 @@ describe("AccountBalancesReport", () => {
     await waitFor(() => {
       expect(screen.getByText("Total Assets")).toBeInTheDocument();
     });
-    await act(async () => { fireEvent.click(screen.getByTitle("Chart view")); });
+    await act(async () => { fireEvent.click(chartViewButton()); });
     await waitFor(() => {
       expect(screen.getByText("No data to display.")).toBeInTheDocument();
     });
@@ -985,6 +985,21 @@ describe("AccountBalancesReport", () => {
     });
   });
 });
+
+/**
+ * The view toggle, found by the titles `ChartViewToggle` gives it.
+ *
+ * The report used to hand-roll this pair of buttons under its own "Chart
+ * view"/"Table view" copy, which is how they came to stand short of every
+ * field beside them; the shared component names them from `common`.
+ */
+function chartViewButton(): HTMLElement {
+  return screen.getByTitle("Pie Chart");
+}
+
+function tableViewButton(): HTMLElement {
+  return screen.getByTitle("Table");
+}
 
 /** The account rows the table is rendering, in order. */
 function rowButtons(): HTMLElement[] {
