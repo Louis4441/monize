@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Ongeldige transactiestatus: {{ status }}",
+    "reconciledLocked": "Deze transactie is afgestemd en vergrendeld. Zet 'Afgestemde transacties vergrendelen' uit in Instellingen om haar te wijzigen.",
     "pagePositiveInteger": "pagina moet een positief geheel getal zijn",
     "limitPositiveInteger": "limiet moet een positief geheel getal zijn",
     "limitMax200": "limiet mag niet meer dan 200 zijn",

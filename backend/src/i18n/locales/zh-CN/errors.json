@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "无效的交易状态：{{ status }}",
+    "reconciledLocked": "该交易已对账并被锁定。要修改它，请在设置中关闭“锁定已对账交易”。",
     "pagePositiveInteger": "page 必须是正整数",
     "limitPositiveInteger": "limit 必须是正整数",
     "limitMax200": "limit 不得超过 200",

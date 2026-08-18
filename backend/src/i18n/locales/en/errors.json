@@ -461,6 +461,7 @@
   },
   "transactions": {
     "invalidStatus": "Invalid transaction status: {{ status }}",
+    "reconciledLocked": "This transaction is reconciled and locked. Turn off 'Lock reconciled transactions' in Settings to change it.",
     "pagePositiveInteger": "page must be a positive integer",
     "limitPositiveInteger": "limit must be a positive integer",
     "limitMax200": "limit must not exceed 200",

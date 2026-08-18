@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "유효하지 않은 거래 상태입니다: {{ status }}",
+    "reconciledLocked": "이 거래는 조정되어 잠겨 있습니다. 변경하려면 설정에서 '조정된 거래 잠금'을 끄세요.",
     "pagePositiveInteger": "page는 양의 정수여야 합니다",
     "limitPositiveInteger": "limit은 양의 정수여야 합니다",
     "limitMax200": "limit은 200을 초과할 수 없습니다",

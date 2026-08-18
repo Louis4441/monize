@@ -454,6 +454,37 @@ page's rows, and a failed reload that keeps the rows has to keep the balance too
 `ui-conventions.test.ts` fails any `<TransactionList>` that sets
 `isSingleAccountView` without passing `startingBalance`.
 
+### An overdue-reconciliation window is the server's number, never the client's
+
+Whether an unreconciled row is *overdue* is decided by `classifyStaleRow`
+(`lib/stale-reconciliation.ts`), and it takes the boundary date as an argument
+because the server owns it: every response that asks for a classification
+carries `overdueBefore` (and `staleAfterDays` for the copy that names it), from
+`STALE_UNRECONCILED_DAYS` in `backend/src/transactions/stale-reconciliation.ts`.
+A component that hardcodes the number goes on saying 45 after the constant
+moves, and the row highlight then disagrees with the count in the header badge
+about which rows it is counting -- two surfaces describing the same ledger,
+neither obviously wrong.
+
+Three things the helper decides that a call site must not re-decide:
+
+- **An account nobody reconciles has no overdue rows**, whatever their age.
+  `lastReconciledDate` null is the whole of that test. Reconciliation is opt-in,
+  and a badge telling a user who has never reconciled that their entire history
+  is outstanding is one they will turn off and never look at again.
+- **`missed` wins over `overdue`.** A row can satisfy both comparisons; counted
+  under both, the two lines in the reminder add up to more than the badge.
+- **A RECONCILED or VOID row is never outstanding.** The status test lives
+  inside the helper rather than beside each caller, because both callers had
+  their own reason to believe they would never be handed one.
+
+**A failed lookup is not a clean ledger.** `useStaleReconciliation` returns
+`undefined` when the request fails, and every consumer reads undefined as "no
+information" and marks nothing -- the register keeps rendering, the badge does
+not appear. Returning an empty context instead would make an outage
+indistinguishable from a ledger that is up to date, which is the same class of
+mistake as `accounts = []` on a failed accounts request.
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 Two patterns, depending on where it lives:

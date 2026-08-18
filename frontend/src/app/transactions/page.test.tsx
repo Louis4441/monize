@@ -170,6 +170,14 @@ vi.mock('@/lib/transactions', () => ({
     // Used by the payee/category info widgets that mount on single-entity filters
     getGroupedTotals: vi.fn().mockResolvedValue([]),
     getRecurringCharges: vi.fn().mockResolvedValue([]),
+    // The register marks rows overdue for reconciliation from this summary.
+    // Default: no account has anything outstanding, so no row is marked.
+    getStaleUnreconciled: vi.fn().mockResolvedValue({
+      staleAfterDays: 45,
+      overdueBefore: '2026-07-04',
+      accounts: [],
+      totalCount: 0,
+    }),
   },
 }));
 
