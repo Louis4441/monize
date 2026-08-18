@@ -28,7 +28,8 @@
     "transactionCount": "{count, plural, one {# transakcja} few {# transakcje} many {# transakcji} other {# transakcji}}",
     "allPayees": "Wszyscy odbiorcy",
     "allCategories": "Wszystkie kategorie",
-    "toastDeleteFailed": "Nie udało się usunąć transakcji"
+    "toastDeleteFailed": "Nie udało się usunąć transakcji",
+    "toastLoadFailed": "Nie udało się wczytać transakcji"
   },
   "portfolioSummary": {
     "title": "Podsumowanie portfela",
@@ -131,6 +132,7 @@
     "portfolioLabel": "Portfel:"
   },
   "transactionList": {
+    "itemNamePlural": "transakcji",
     "title": "Ostatnie transakcje",
     "filtered": "(przefiltrowane)",
     "newBrokerageTransaction": "+ Nowa transakcja maklerska",

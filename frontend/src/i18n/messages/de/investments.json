@@ -28,7 +28,8 @@
     "transactionCount": "{count} Buchung{plural}",
     "allPayees": "Alle Zahlungsempfänger",
     "allCategories": "Alle Kategorien",
-    "toastDeleteFailed": "Buchung konnte nicht gelöscht werden"
+    "toastDeleteFailed": "Buchung konnte nicht gelöscht werden",
+    "toastLoadFailed": "Buchung konnte nicht geladen werden"
   },
   "portfolioSummary": {
     "title": "Portfolio-Übersicht",
@@ -131,6 +132,7 @@
     "portfolioLabel": "Portfolio:"
   },
   "transactionList": {
+    "itemNamePlural": "Buchungen",
     "title": "Letzte Buchungen",
     "filtered": "(gefiltert)",
     "newBrokerageTransaction": "+ Neue Brokeragebuchung",
