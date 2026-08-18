@@ -29,42 +29,59 @@ import { withScopedDb } from "@/common/db/scoped-db";
 import { createTestAccount } from "../helpers/test-factories";
 
 /**
- * INV-HOLDING-001 -- two-connection proof (audit P4-006).
+ * INV-HOLDING-001 -- two-connection proof (audit P4-006), through the real
+ * investment ledger.
  *
- * Mechanism under test: `lockHoldingScope` (`backend/src/common/db/locks.ts`),
- * an advisory lock keyed by account (`pg_advisory_xact_lock`) that every
- * holdings mutation path takes before reading the quantity it will write back.
- * `HoldingsService.createOrUpdate` computes `new = old + delta` in application
- * code -- a read-modify-write. The unique key on (account_id, security_id)
- * blocks a second *insert* and the row lock during an UPDATE serializes the
- * physical writes, but neither stops the second request from writing a quantity
- * it derived from the value it read *before* waiting. 10 shares, concurrent buys
- * of 1 and 2, and the holding ends at 12 instead of 13 -- one purchase and its
- * cost basis gone, with both trades committed.
+ * The invariant is that `holdings.quantity` and `average_cost` equal a
+ * deterministic replay of `investment_transactions`. So both the operations that
+ * race AND the expectation must come from that ledger, not from the test's own
+ * arithmetic:
  *
- * The invariant: two concurrent trades on one (account, security) holding must
- * not lose an update -- the stored quantity/average_cost equals a deterministic
- * replay of both trades over the starting position.
+ *   - the two racing trades are real `InvestmentTransactionsService.create`
+ *     BUYs, which persist an `investment_transactions` row and drive the holding
+ *     through the production path (processTransactionEffects -> updateHolding ->
+ *     createOrUpdate -> lockHoldingScope -> read-modify-write);
+ *   - after both commit, the expected quantity and average cost are computed by
+ *     replaying the *persisted* rows with the same blend `createOrUpdate` uses,
+ *     and compared against the stored `Holding`.
+ *
+ * That makes the test bite on more than a lost update. If the ledger->holding
+ * propagation were removed, or a BUY's quantity sign inverted, or its cost passed
+ * wrong, the persisted ledger would still replay to 30 shares at 200 while the
+ * holding would not -- and the assertion is holding-vs-replay, so it fails.
+ *
+ * Mechanism under test: `lockHoldingScope` (`backend/src/common/db/locks.ts`), an
+ * advisory lock keyed by account that createOrUpdate takes before reading the
+ * quantity it will write back. The unique key on (account_id, security_id) blocks
+ * a second insert and the row lock serializes the physical writes, but neither
+ * stops the second request writing a quantity it derived from the value it read
+ * *before* waiting.
  *
  * ---------------------------------------------------------------------------
- * The interleaving is forced, not hoped for. A plain `Promise.all` of two trades
- * loses an update only on the unlucky scheduling, so with the lock removed the
- * test would be flaky-green rather than reliably red. Instead a test-held row
- * lock on the holding pins the ordering so both arrangements are deterministic:
+ * The interleaving is forced, not hoped for. A plain `Promise.all` loses an
+ * update only on the unlucky scheduling, so with the lock removed the test would
+ * be flaky-green rather than reliably red. A test-held row lock on the holding
+ * pins the ordering so both arrangements are deterministic:
  *
  *   - A barrier transaction takes `SELECT ... FOR UPDATE` on the holding row and
- *     is held open. Every trade's `save` (an UPDATE of that row) then blocks on
- *     it, while `findByAccountAndSecurity` (a plain SELECT) is free to read.
- *   - WITHOUT the lock: both trades read the *same* starting quantity (their
- *     reads are not serialized against each other), compute their own totals,
- *     and park on the barrier at their writes. Releasing the barrier lets one
- *     commit and the other overwrite it with a total derived from the stale
- *     read -- a lost update.
- *   - WITH the lock: the first trade takes the advisory lock, reads, and parks
- *     on the barrier at its write; the second trade blocks at `lockHoldingScope`
- *     *before it can read*. Releasing the barrier lets the first commit and
- *     release the advisory lock; only then does the second read -- now the fresh
- *     post-first quantity -- and add its delta. Both trades survive.
+ *     is held open. Each trade's holding UPDATE (the first write `create` makes)
+ *     blocks on it, while `findByAccountAndSecurity` (a plain SELECT) reads free.
+ *   - WITHOUT the mechanism: both trades read the same starting quantity, compute
+ *     their totals, and park on the barrier at their writes. Releasing it lets one
+ *     commit and the other overwrite with a stale-derived total -- a lost update.
+ *   - WITH the mechanism: the first trade takes the advisory lock, reads, and
+ *     parks on the barrier; the second blocks at `lockHoldingScope` *before it can
+ *     read*. Releasing the barrier lets the first commit and release the advisory
+ *     lock; only then does the second read the fresh quantity and add its delta.
+ *
+ * The two BUYs fund from different cash accounts and settle on different dates, so
+ * the only row they contend on is the holding -- no funding-account balance row and
+ * no per-date security_prices row serializes them ahead of the holding write and
+ * masks the race.
+ *
+ * The prices are chosen so every intermediate blend is exact in either order
+ * (10@100 then +10@200 then +10@300 gives 30 shares at a 200.0000 average, and so
+ * does any permutation), so the replay expectation carries no rounding ambiguity.
  */
 describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () => {
   let module: TestingModule;
@@ -73,21 +90,17 @@ describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () =
   let dataSource: DataSource;
   let userId: string;
   let brokerageAccountId: string;
-  let fundingAccountId: string;
+  let fundingSeedId: string;
+  let fundingAId: string;
+  let fundingBId: string;
   let securityId: string;
   let holdingId: string;
 
-  // Starting position (seeded through a real BUY), then two concurrent BUYs at
-  // distinct prices driven through the holdings mutation path directly.
-  const SEED_QTY = 10;
-  const SEED_PRICE = 100;
-  const TRADE_1 = { qty: 1, price: 120 };
-  const TRADE_2 = { qty: 2, price: 150 };
-
-  // Filled from the real seeded holding so the expected values are a faithful
-  // replay of what the seed BUY actually stored, not an assumption about it.
-  let seededQty: number;
-  let seededAvgCost: number;
+  // Every trade is a plain BUY (commission 0), so cost basis is the weighted
+  // average of price by quantity, and the replay is unambiguous.
+  const SEED = { qty: 10, price: 100, date: "2026-01-15" };
+  const TRADE_1 = { qty: 10, price: 200, date: "2026-01-16" };
+  const TRADE_2 = { qty: 10, price: 300, date: "2026-01-17" };
 
   beforeAll(async () => {
     module = await createIntegrationModule([SecuritiesModule]);
@@ -99,6 +112,46 @@ describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () =
   afterAll(async () => {
     await module.close();
   });
+
+  async function makeBrokerage(name: string): Promise<string> {
+    const account = await createTestAccount(dataSource, userId, {
+      name,
+      openingBalance: 0,
+      currentBalance: 0,
+    });
+    await dataSource.manager.update(Account, account.id, {
+      accountType: AccountType.INVESTMENT,
+      accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+    });
+    return account.id;
+  }
+
+  async function makeFunding(name: string): Promise<string> {
+    const account = await createTestAccount(dataSource, userId, {
+      name,
+      openingBalance: 1000000,
+      currentBalance: 1000000,
+    });
+    return account.id;
+  }
+
+  async function buy(
+    fundingAccountId: string,
+    trade: { qty: number; price: number; date: string },
+  ): Promise<void> {
+    await withUserContext(userId, () =>
+      investments.create(userId, {
+        accountId: brokerageAccountId,
+        action: InvestmentAction.BUY,
+        transactionDate: trade.date,
+        securityId,
+        fundingAccountId,
+        quantity: trade.qty,
+        price: trade.price,
+        commission: 0,
+      } as any),
+    );
+  }
 
   beforeEach(async () => {
     await cleanTables(dataSource, [
@@ -125,25 +178,10 @@ describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () =
     const user = await createTestUserDirect(dataSource);
     userId = user.id;
 
-    // A brokerage account funded from an ordinary cash account, so a real BUY can
-    // establish the starting holding.
-    const brokerage = await createTestAccount(dataSource, userId, {
-      name: "Brokerage",
-      openingBalance: 0,
-      currentBalance: 0,
-    });
-    await dataSource.manager.update(Account, brokerage.id, {
-      accountType: AccountType.INVESTMENT,
-      accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
-    });
-    brokerageAccountId = brokerage.id;
-
-    const funding = await createTestAccount(dataSource, userId, {
-      name: "Funding",
-      openingBalance: 100000,
-      currentBalance: 100000,
-    });
-    fundingAccountId = funding.id;
+    brokerageAccountId = await makeBrokerage("Brokerage");
+    fundingSeedId = await makeFunding("Funding Seed");
+    fundingAId = await makeFunding("Funding A");
+    fundingBId = await makeFunding("Funding B");
 
     const securitiesService = module.get(SecuritiesService);
     const security = await withUserContext(userId, () =>
@@ -156,28 +194,15 @@ describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () =
     );
     securityId = security.id;
 
-    // Seed the starting position (10 shares) through a real BUY, so the holding
-    // row the barrier locks exists before the race.
-    await withUserContext(userId, () =>
-      investments.create(userId, {
-        accountId: brokerageAccountId,
-        action: InvestmentAction.BUY,
-        transactionDate: "2026-01-15",
-        securityId,
-        fundingAccountId,
-        quantity: SEED_QTY,
-        price: SEED_PRICE,
-        commission: 0,
-      }),
-    );
+    // Seed the starting position through a real BUY, so the holding row the
+    // barrier locks exists before the race and is itself a ledger row.
+    await buy(fundingSeedId, SEED);
 
     const seeded = await withUserContext(userId, () =>
       holdings.findByAccountAndSecurity(brokerageAccountId, securityId),
     );
     if (!seeded) throw new Error("seed BUY did not create a holding");
     holdingId = seeded.id;
-    seededQty = Number(seeded.quantity);
-    seededAvgCost = Number(seeded.averageCost);
   });
 
   /**
@@ -205,18 +230,50 @@ describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () =
     );
   }
 
-  it("does not lose an update: stored holding reflects BOTH concurrent trades", async () => {
-    // Deterministic replay of both buys over the actual seeded position. Both are
-    // buys, so the blended average cost -- total cost / total quantity -- is
-    // order-independent, which is why the assertion holds whichever trade the
-    // scheduler runs first.
-    const expectedQty = seededQty + TRADE_1.qty + TRADE_2.qty; // 13
-    const expectedAvgCost =
-      (seededQty * seededAvgCost +
-        TRADE_1.qty * TRADE_1.price +
-        TRADE_2.qty * TRADE_2.price) /
-      expectedQty;
+  /**
+   * Replay the persisted investment ledger for this holding with the same blend
+   * `HoldingsService.createOrUpdate` applies to a BUY. Independent of the stored
+   * holding and of the test's own constants: it reads back whatever `create`
+   * actually wrote to `investment_transactions`.
+   */
+  async function replayLedger(): Promise<{
+    quantity: number;
+    avgCost: number;
+  }> {
+    const rows: { quantity: string; price: string | null; action: string }[] =
+      await dataSource.query(
+        `SELECT quantity, price, action
+           FROM investment_transactions
+          WHERE account_id = $1 AND security_id = $2
+          ORDER BY transaction_date ASC, id ASC`,
+        [brokerageAccountId, securityId],
+      );
 
+    let quantity = 0;
+    let avgCost = 0;
+    for (const row of rows) {
+      // This fixture is BUYs only; a non-BUY would need the full reducer.
+      if (row.action !== InvestmentAction.BUY) {
+        throw new Error(
+          `replay fixture saw an unexpected action: ${row.action}`,
+        );
+      }
+      const qty = Number(row.quantity);
+      const price = Number(row.price);
+      const newQuantity = quantity + qty;
+      if (qty > 0) {
+        if (quantity <= 0 && newQuantity > 0) {
+          avgCost = price;
+        } else if (quantity > 0 && newQuantity > 0) {
+          avgCost = (quantity * avgCost + qty * price) / newQuantity;
+        }
+      }
+      quantity = newQuantity;
+    }
+    return { quantity, avgCost };
+  }
+
+  it("does not lose an update: stored holding equals a replay of the persisted ledger", async () => {
     let releaseBarrier!: () => void;
     const barrierCanRelease = new Promise<void>((resolve) => {
       releaseBarrier = resolve;
@@ -241,26 +298,11 @@ describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () =
 
     await barrierHeld;
 
-    // Two concurrent trades, each on its own connection/transaction, through the
-    // real holdings mutation path (createOrUpdate -> lockHoldingScope -> RMW).
-    const trade1 = withUserContext(userId, () =>
-      holdings.createOrUpdate(
-        userId,
-        brokerageAccountId,
-        securityId,
-        TRADE_1.qty,
-        TRADE_1.price,
-      ),
-    );
-    const trade2 = withUserContext(userId, () =>
-      holdings.createOrUpdate(
-        userId,
-        brokerageAccountId,
-        securityId,
-        TRADE_2.qty,
-        TRADE_2.price,
-      ),
-    );
+    // Two concurrent real BUYs, each on its own connection/transaction, through
+    // the production create path. Distinct funding accounts and dates so the only
+    // contended row is the holding.
+    const trade1 = buy(fundingAId, TRADE_1);
+    const trade2 = buy(fundingBId, TRADE_2);
 
     // Wait until both trades have parked (both on the barrier without the lock;
     // one on the barrier and one on the advisory lock with it), then release.
@@ -269,15 +311,19 @@ describe("concurrent trades on one holding (integration, INV-HOLDING-001)", () =
 
     await Promise.all([barrierDone, trade1, trade2]);
 
+    // The invariant: the stored holding equals a deterministic replay of the
+    // persisted ledger. Compute the expectation from the ledger, not the inputs.
+    const expected = await replayLedger();
     const holding = await dataSource.manager.findOneOrFail(Holding, {
       where: { id: holdingId },
     });
-    expect(Number(holding.quantity)).toBe(expectedQty);
-    expect(Number(holding.averageCost)).toBeCloseTo(expectedAvgCost, 6);
+    expect(Number(holding.quantity)).toBe(expected.quantity);
+    expect(Number(holding.averageCost)).toBeCloseTo(expected.avgCost, 6);
 
-    // Sanity: the seed really was the classic 10-share starting position, so the
-    // 13-vs-12 lost-update gap is exactly the one the invariant is about.
-    expect(seededQty).toBe(SEED_QTY);
-    expect(expectedQty).toBe(13);
+    // Sanity: the ledger really holds all three BUYs, so the lost-update gap the
+    // invariant is about (30 vs 20 shares) is the one under test. These numbers
+    // come from the fixture, independent of both the holding and the replay.
+    expect(expected.quantity).toBe(SEED.qty + TRADE_1.qty + TRADE_2.qty); // 30
+    expect(expected.avgCost).toBeCloseTo(200, 6);
   });
 });
