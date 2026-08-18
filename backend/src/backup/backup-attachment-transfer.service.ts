@@ -306,7 +306,13 @@ export class BackupAttachmentTransferService {
           // The blob row stays and is inserted with everything else.
           continue;
         }
-        await this.attachmentStorage.save(attachmentId, carried);
+        if (!(await this.tryStageAttachmentObject(attachmentId, carried))) {
+          // The write failed: drop the row rather than halt the whole restore,
+          // and leave the objects already staged this run untouched -- they are
+          // referenced by attachments that are still coming back.
+          unrestorable.add(attachmentId);
+          continue;
+        }
         stagedKeys.push(attachmentId);
         // ...and its blob row must not be inserted: `attachment_blobs` is the
         // database provider's storage, and a row there for an externally stored
@@ -376,7 +382,10 @@ export class BackupAttachmentTransferService {
         }
       }
 
-      await this.attachmentStorage.save(attachmentId, bytes);
+      if (!(await this.tryStageAttachmentObject(attachmentId, bytes))) {
+        unrestorable.add(attachmentId);
+        continue;
+      }
       stagedKeys.push(attachmentId);
       sourceKeys.push(oldKey);
     }
@@ -457,6 +466,56 @@ export class BackupAttachmentTransferService {
       });
     }
     return owned;
+  }
+
+  /**
+   * Write one staged object, turning a provider failure into a dropped
+   * attachment rather than an aborted restore.
+   *
+   * A bare `attachmentStorage.save` that throws mid-loop does two bad things at
+   * once. It halts a restore that could have completed without this one
+   * attachment -- the ledger is the point, and refusing the whole thing over a
+   * receipt image is the wrong trade, the same one `stageAttachmentObjects`
+   * already makes for a missing or corrupt object. And the throw escapes
+   * `stageAttachmentObjects` before it can return `stagedKeys`, so every object
+   * already staged this run is orphaned: the caller never receives the list its
+   * `.catch` would have discarded.
+   *
+   * So a failed save is handled where it happens. The object under `key` is the
+   * one the restored metadata would have named, so a partial write there is
+   * exactly the leak this method exists to avoid -- delete it, best-effort, and
+   * swallow a delete error the way the post-commit sweep does. The caller reads
+   * the `false` and drops the row (counting it in `skipped`); the objects staged
+   * before this one stay, still referenced by attachments that are restoring.
+   *
+   * Returns whether the bytes are now reachable under `key`.
+   */
+  private async tryStageAttachmentObject(
+    key: string,
+    bytes: Buffer,
+  ): Promise<boolean> {
+    try {
+      await this.attachmentStorage.save(key, bytes);
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `Could not stage attachment object ${key} during restore; dropping the ` +
+          `attachment: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      try {
+        await this.attachmentStorage.delete(key);
+      } catch (deleteError) {
+        this.logger.warn(
+          `Could not remove partially staged attachment object ${key} after a ` +
+            `failed write: ${
+              deleteError instanceof Error
+                ? deleteError.message
+                : String(deleteError)
+            }`,
+        );
+      }
+      return false;
+    }
   }
 
   /** Best-effort removal of objects staged for a restore that then failed. */

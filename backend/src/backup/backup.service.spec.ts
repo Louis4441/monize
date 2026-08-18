@@ -2485,6 +2485,168 @@ describe("BackupService", () => {
       });
 
       /**
+       * Objects staged before the destructive transaction leak on failure
+       * (issue #1094).
+       *
+       * `stageAttachmentObjects` writes bytes to the store *before* the restore
+       * transaction opens, so anything that throws between the first successful
+       * save and the transaction's own `.catch` leaves those objects orphaned:
+       * bytes in the volume or bucket that no `transaction_attachments` row will
+       * ever name again. Two throw sites had no cleanup -- a later save failing
+       * inside the stage loop, and the displaced-key lookup that runs after
+       * staging returns.
+       */
+      describe("objects staged for a restore that fails before it commits", () => {
+        const OLD_ID_2 = "33333333-3333-4333-8333-333333333333";
+        const TX_ID_2 = "44444444-4444-4444-8444-444444444444";
+
+        /** Two own external attachments, both copied from their old key. */
+        function backupWithTwoLocalAttachments() {
+          const base = backupWithLocalAttachment();
+          return {
+            ...base,
+            transaction_attachments: [
+              ...base.transaction_attachments,
+              {
+                id: OLD_ID_2,
+                user_id: userId,
+                transaction_id: TX_ID_2,
+                filename: "receipt-2.pdf",
+                content_type: "application/pdf",
+                byte_size: BYTES.length,
+                sha256: SHA256,
+                storage_provider: "local",
+                storage_key: OLD_ID_2,
+              },
+            ],
+          };
+        }
+
+        let warnSpy: jest.SpyInstance;
+
+        beforeEach(() => {
+          attachmentStorage.load.mockResolvedValue(BYTES);
+          // The server holds both rows, so both pass the ownership check and
+          // reach the copy.
+          ownedAttachments = [
+            {
+              id: OLD_ID,
+              storage_provider: "local",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+            },
+            {
+              id: OLD_ID_2,
+              storage_provider: "local",
+              byte_size: BYTES.length,
+              sha256: SHA256,
+            },
+          ];
+          warnSpy = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+        });
+
+        afterEach(() => warnSpy.mockRestore());
+
+        it("removes the failed object and finishes when a later save fails", async () => {
+          // First object stages; the second write fails. The restore must not
+          // abort over one attachment, and the failed write's own key -- which
+          // is exactly where the restored metadata would have pointed -- must be
+          // cleaned up so no orphan is left behind.
+          const savedKeys: string[] = [];
+          attachmentStorage.save.mockImplementation(async (key: string) => {
+            savedKeys.push(key);
+            if (savedKeys.length >= 2) throw new Error("EIO");
+          });
+
+          const result = await service.restoreData(
+            userId,
+            makeInput({
+              password: "test",
+              data: backupWithTwoLocalAttachments(),
+            }),
+          );
+
+          expect(savedKeys).toHaveLength(2);
+          // The object the failed save was writing is removed...
+          expect(attachmentStorage.delete).toHaveBeenCalledWith(savedKeys[1]);
+          // ...and only that one -- the first attachment is genuinely restored,
+          // so its object stays. No displaced keys exist in this fixture.
+          expect(attachmentStorage.delete).toHaveBeenCalledTimes(1);
+          // The restore completed, dropping the one attachment it could not stage.
+          expect(result.restored.transactionAttachments).toBe(1);
+          expect(result.skippedAttachments).toBe(1);
+        });
+
+        it("discards every staged object when the displaced-key lookup fails", async () => {
+          // One object stages, then the read of the user's current external keys
+          // throws -- a failure that escapes before the transaction's `.catch`
+          // could ever discard the staged object.
+          const savedKeys: string[] = [];
+          attachmentStorage.save.mockImplementation(async (key: string) => {
+            savedKeys.push(key);
+          });
+          mockQueryRunner.query.mockImplementation(
+            (sql: string, params?: unknown[]) => {
+              if (
+                String(sql).includes(
+                  "SELECT storage_key FROM transaction_attachments",
+                )
+              ) {
+                return Promise.reject(new Error("displaced-key read failed"));
+              }
+              return mockQueryHandler(sql, params);
+            },
+          );
+
+          await expect(
+            service.restoreData(
+              userId,
+              makeInput({
+                password: "test",
+                data: backupWithLocalAttachment(),
+              }),
+            ),
+          ).rejects.toThrow("displaced-key read failed");
+
+          expect(savedKeys).toHaveLength(1);
+          // The staged object is removed rather than left orphaned.
+          expect(attachmentStorage.delete).toHaveBeenCalledWith(savedKeys[0]);
+        });
+
+        it("lets the original error through when the cleanup delete also fails", async () => {
+          // A cleanup failure must not mask the error that actually aborted the
+          // restore: the user needs to see why it failed, not why the tidy-up
+          // did.
+          attachmentStorage.save.mockResolvedValue(undefined);
+          attachmentStorage.delete.mockRejectedValue(
+            new Error("delete failed"),
+          );
+          mockQueryRunner.query.mockImplementation(
+            (sql: string, params?: unknown[]) => {
+              if (
+                String(sql).includes(
+                  "SELECT storage_key FROM transaction_attachments",
+                )
+              ) {
+                return Promise.reject(new Error("displaced-key read failed"));
+              }
+              return mockQueryHandler(sql, params);
+            },
+          );
+
+          await expect(
+            service.restoreData(
+              userId,
+              makeInput({
+                password: "test",
+                data: backupWithLocalAttachment(),
+              }),
+            ),
+          ).rejects.toThrow("displaced-key read failed");
+        });
+      });
+
+      /**
        * The key in the uploaded file is attacker-controlled (F3RR-001).
        *
        * The destination used to come from `row.storage_key`, and a key the restore
