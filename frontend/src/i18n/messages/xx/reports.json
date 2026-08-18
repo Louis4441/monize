@@ -193,6 +193,7 @@
     "groupAll": "[XX-All accounts-XX]",
     "colGroup": "[XX-Group-XX]",
     "noAccountsForFilters": "[XX-No accounts match the current filters.-XX]",
+    "noAccountsOnDate": "[XX-None of your accounts existed on {date}.-XX]",
     "accountTypes": {
       "CHEQUING": "[XX-Chequing-XX]",
       "SAVINGS": "[XX-Savings-XX]",
