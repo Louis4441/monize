@@ -205,17 +205,18 @@ export function CashFilterBar({
           onChange={(categoryIds) => onChange({ ...value, categoryIds })}
           placeholder={t('page.allCategories')}
         />
+        {/* `onDateChange` alone: it emits an ISO date, while a raw `onChange`
+            beside it reports whatever is typed and so ignores the user's date
+            format (#1201). */}
         <DateInput
           label={t('page.cashFilterFrom')}
           value={value.startDate}
           onDateChange={(startDate) => onChange({ ...value, startDate })}
-          onChange={(e) => onChange({ ...value, startDate: e.target.value })}
         />
         <DateInput
           label={t('page.cashFilterTo')}
           value={value.endDate}
           onDateChange={(endDate) => onChange({ ...value, endDate })}
-          onChange={(e) => onChange({ ...value, endDate: e.target.value })}
         />
       </div>
       {activeCount > 0 && (
