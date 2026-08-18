@@ -380,6 +380,14 @@ export function InvestmentRegisterPanel({
         maxWidth="6xl"
         className="p-6"
       >
+        {/* The same heading the Investments page's copy of this modal carries,
+            from the same keys: one register drawn on two pages should not
+            announce itself differently on each. */}
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          {brokerageForm.editingItem
+            ? tInv('page.editTransaction')
+            : tInv('page.newInvestmentTransaction')}
+        </h2>
         <InvestmentTransactionForm
           accounts={accountsForForm}
           allAccounts={allAccounts}
@@ -405,6 +413,11 @@ export function InvestmentRegisterPanel({
             maxWidth="6xl"
             className="p-6"
           >
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              {cashForm.editingItem
+                ? tInv('page.editTransaction')
+                : tInv('page.newTransaction')}
+            </h2>
             <TransactionForm
               transaction={cashForm.editingItem}
               defaultAccountId={cashAccount.id}

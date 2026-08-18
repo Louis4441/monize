@@ -766,6 +766,42 @@ describe('InvestmentRegisterPanel', () => {
       expect(screen.getByText('+ New Cash Transaction')).toBeInTheDocument();
     });
 
+    it('titles each form the way the Investments page titles it', async () => {
+      // One register drawn on two pages should not announce itself differently
+      // on each: these modals opened with no heading at all.
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [cashTransaction],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+      });
+      await renderPanel(brokerage, cash);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('+ New Brokerage Transaction'));
+      });
+      expect(screen.getByText('New Investment Transaction')).toBeInTheDocument();
+
+      await switchToCash();
+      await act(async () => {
+        fireEvent.click(screen.getByText('+ New Cash Transaction'));
+      });
+      expect(screen.getByText('New Transaction')).toBeInTheDocument();
+    });
+
+    it('says Edit Transaction when a row is being edited', async () => {
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [cashTransaction],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+      });
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Cash deposit'));
+      });
+
+      expect(screen.getByText('Edit Transaction')).toBeInTheDocument();
+    });
+
     it('keeps the same gap between the heading and the strip below it', async () => {
       // The spacer is what that gap is; without it the cash register's rows sat
       // higher than the brokerage register's and the page jumped on the toggle.
