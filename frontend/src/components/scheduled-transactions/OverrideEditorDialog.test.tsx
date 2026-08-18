@@ -738,6 +738,10 @@ describe('OverrideEditorDialog', () => {
       );
     });
 
+    // Total-first (issue #1148): "use latest close" now keeps the scheduled total
+    // and re-derives the quantity, exactly as typing the same price does. It used
+    // to keep the quantity (10) and recompute the total to 1,234.5 -- the divergent
+    // behaviour the issue is closing.
     it('applies the latest close only when the user asks for it', async () => {
       mockGetSecurityPrices.mockResolvedValue([
         { closePrice: '123.45', priceDate: '2025-02-20' },
@@ -755,9 +759,37 @@ describe('OverrideEditorDialog', () => {
 
       const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
       expect(Number(priceInput.value)).toBeCloseTo(123.45, 6);
-      // The total follows the applied price, not the old one.
+      // The scheduled total stands; the quantity follows the applied price.
       const totalInput = screen.getByLabelText('Total Price') as HTMLInputElement;
-      expect(totalInput.value).toBe('1,234.5');
+      expect(totalInput.value.replace(/,/g, '')).toBe('1000');
+      const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
+      // 1000 / 123.45 = 8.10044552 shares.
+      expect(Number(qtyInput.value)).toBeCloseTo(8.100446, 5);
+    });
+
+    // Issue #1148: the button and the keystroke path must agree. Typing the same
+    // price the "use latest close" test clicks must book the same quantity and
+    // total -- both total-first now, so the divergence is gone.
+    it('books the same quantity and total whether the price is typed or applied', async () => {
+      mockGetSecurityPrices.mockResolvedValue([]);
+      render(
+        <OverrideEditorDialog
+          {...defaultProps}
+          scheduledTransaction={investmentTransaction}
+        />,
+      );
+      const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+      const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
+      const totalInput = screen.getByLabelText('Total Price') as HTMLInputElement;
+      // Starting state: qty=10, price=100, total=1000 (seeded from the schedule).
+      expect(totalInput.value.replace(/,/g, '')).toBe('1000');
+
+      fireEvent.change(priceInput, { target: { value: '123.45' } });
+
+      // Same figures the "use latest close" test asserts: total preserved,
+      // quantity re-derived.
+      expect(totalInput.value.replace(/,/g, '')).toBe('1000');
+      expect(Number(qtyInput.value)).toBeCloseTo(8.100446, 5);
     });
 
     it('fills Price from the latest close when the schedule stored none', async () => {

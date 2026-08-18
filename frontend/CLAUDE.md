@@ -314,14 +314,23 @@ price *or quantity* -- an override that set only the shares must not have them
 rescaled) or when the user has edited any field, keeping the base-schedule DCA
 refresh only for a price that is a creation-time snapshot.
 
-The two guards differ **because their fill precedence differs**, and the guard
-protects whichever field that precedence would clobber. The override editor's
-fill is quantity-first (it keeps the shares and recomputes the total), so it must
-not run once the user has typed a **total** -- but a quantity-only edit is safe
-and is left to auto-fill. The post dialog's refresh is total-first (it preserves
-the scheduled total and rescales the shares), so it must not run once the user
-has typed anything, because a typed **quantity** is what its precedence would
-overwrite. The fetch being asynchronous is what makes this matter: it can resolve
+Both fills are **total-first** (issue #1148): they preserve the amount invested
+and re-derive the share count, so the override editor's "use latest close" button,
+its keystroke path (`handleInvestmentPriceChange`), and the post dialog's refresh
+all book the same quantity and total for the same price -- the button used to be
+quantity-first and was the odd one out. The two guards **still differ**, not
+because the precedence differs but because the state each fill runs against does,
+and the guard protects the field the fill would clobber in that state. The
+override editor auto-fills only on an occurrence with no stored price, where the
+price field is empty and no total has been computed yet: with no total present the
+total-first fill degrades to deriving the total from the shares, which preserves a
+quantity-only edit -- so it blocks only once the user has typed a **total**
+(`userEditedTotal`), the one state where a total is present and the fill would
+rescale the quantity beside it. The post dialog's refresh carries the scheduled
+total, so a total is always present and the fill always rescales the shares --
+which is why it must block once the user has typed **anything**
+(`userEditedInvestment`), a typed quantity included. The fetch being asynchronous
+is what makes this matter: it can resolve
 *after* the dialog opens, and a value typed in the meantime (price still blank,
 so an "is the field empty" check alone lets the fill through) is the user's own
 instruction. The defect all of this prevents is a silent re-price: reopening an
