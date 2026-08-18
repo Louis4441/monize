@@ -156,21 +156,22 @@ export function AccountBalancesControls({
       </div>
 
       <div className="flex flex-wrap gap-4 items-end">
-        <div className="flex flex-wrap gap-2 self-end pb-1">
-          {SCOPES.map((scope) => (
-            <button
-              key={scope}
-              type="button"
-              onClick={() => onFiltersChange({ ...filters, scope })}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${
-                filters.scope === scope
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              {t(`accountBalances.filter${scope.charAt(0).toUpperCase()}${scope.slice(1)}` as Parameters<typeof t>[0])}
-            </button>
-          ))}
+        <div className="w-full sm:w-48">
+          <Select
+            label={t('accountBalances.scopeLabel')}
+            value={filters.scope}
+            onChange={(e) =>
+              onFiltersChange({ ...filters, scope: e.target.value as BalanceScope })
+            }
+            options={SCOPES.map((scope) => ({
+              value: scope,
+              label: t(
+                `accountBalances.scope${scope.charAt(0).toUpperCase()}${scope.slice(1)}` as Parameters<
+                  typeof t
+                >[0],
+              ),
+            }))}
+          />
         </div>
         <div className="w-full sm:w-56">
           <MultiSelect

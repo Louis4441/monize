@@ -178,25 +178,54 @@ export function AccountBalancesReport() {
     return map;
   }, [response]);
 
-  const institutionLabel = useCallback(
-    (key: string): string => {
-      if (key === INSTITUTION_NONE) return t('accountBalances.noInstitution');
-      if (key.startsWith('name:')) return key.slice('name:'.length);
-      return institutionNames.get(key) ?? t('accountBalances.noInstitution');
-    },
-    [institutionNames, t],
-  );
-
-  const institutionOptions = useMemo(() => {
-    const keys = new Map<string, string>();
+  /**
+   * What to call each institution the accounts belong to.
+   *
+   * The name is looked for in three places, in order, because a structured
+   * institution can be reachable without its record being in hand: the
+   * institutions request is allowed to fail without taking the report with it,
+   * and a jointly shared account's institution belongs to its owner. Falling
+   * straight from "no record" to "No institution" merged every such account
+   * into the unfiled bucket, so a user with three banks saw one option reading
+   * "No institution" -- and "this account has no institution" and "I could not
+   * name its institution" are different facts.
+   */
+  const institutionLabels = useMemo(() => {
+    const labels = new Map<string, string>();
     for (const account of accounts) {
       const key = institutionKeyFor(account);
-      if (!keys.has(key)) keys.set(key, institutionLabel(key));
+      if (labels.has(key)) continue;
+      if (key === INSTITUTION_NONE) {
+        labels.set(key, t('accountBalances.noInstitution'));
+        continue;
+      }
+      if (key.startsWith('name:')) {
+        labels.set(key, key.slice('name:'.length));
+        continue;
+      }
+      labels.set(
+        key,
+        institutionNames.get(key) ??
+          account.institution ??
+          t('accountBalances.unnamedInstitution'),
+      );
     }
-    return [...keys.entries()]
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [accounts, institutionLabel]);
+    return labels;
+  }, [accounts, institutionNames, t]);
+
+  const institutionLabel = useCallback(
+    (key: string): string =>
+      institutionLabels.get(key) ?? t('accountBalances.noInstitution'),
+    [institutionLabels, t],
+  );
+
+  const institutionOptions = useMemo(
+    () =>
+      [...institutionLabels.entries()]
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [institutionLabels],
+  );
 
   const accountTypeOptions = useMemo(() => {
     const present = new Set(accounts.map((a) => a.accountType));

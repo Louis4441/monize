@@ -311,11 +311,20 @@ describe("AccountBalancesReport", () => {
     );
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("assets")).toBeInTheDocument();
+      expect(screen.getByLabelText("Show")).toBeInTheDocument();
     });
-    await act(async () => { fireEvent.click(screen.getByText("assets")); });
+    expect(rowNames()).toEqual(["Chequing", "Visa Card"]);
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Show"), { target: { value: "assets" } });
+    });
     expect(rowNames()).toEqual(["Chequing"]);
-    await act(async () => { fireEvent.click(screen.getByText("liabilities")); });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Show"), {
+        target: { value: "liabilities" },
+      });
+    });
     expect(rowNames()).toEqual(["Visa Card"]);
   });
 
@@ -383,6 +392,47 @@ describe("AccountBalancesReport", () => {
     });
   });
 
+  // The institutions request is allowed to fail without taking the report with
+  // it, and a joint account's institution belongs to its owner -- so "no record
+  // in hand" must not collapse into "this account has no institution".
+  it("names an institution from the account's own text when no record resolves", async () => {
+    mockGetInstitutions.mockResolvedValue([]);
+    mockGetAll.mockResolvedValue([
+      acc({ institutionId: "inst-1", institution: "Legacy Bank" }),
+      acc({ id: "acc-2", name: "Wallet", accountType: "CASH" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 40)]),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Wallet")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("option-inst-1")).toHaveTextContent("Legacy Bank");
+    expect(screen.getByTestId("option-__none__")).toHaveTextContent("No institution");
+  });
+
+  it("says an institution is unnamed rather than calling the account unfiled", async () => {
+    mockGetInstitutions.mockResolvedValue([]);
+    mockGetAll.mockResolvedValue([
+      acc({ institutionId: "inst-1" }),
+      acc({ id: "acc-2", name: "Wallet", accountType: "CASH" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 40)]),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Wallet")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("option-inst-1")).toHaveTextContent(
+      "Institution not named",
+    );
+    // Still its own bucket: the account is filed somewhere, we just cannot
+    // say where.
+    expect(screen.getByTestId("option-__none__")).toHaveTextContent("No institution");
+  });
+
   it("filters by account type", async () => {
     mockGetAll.mockResolvedValue([
       acc(),
@@ -406,9 +456,13 @@ describe("AccountBalancesReport", () => {
     mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 5000)]));
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("liabilities")).toBeInTheDocument();
+      expect(screen.getByLabelText("Show")).toBeInTheDocument();
     });
-    await act(async () => { fireEvent.click(screen.getByText("liabilities")); });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Show"), {
+        target: { value: "liabilities" },
+      });
+    });
     await waitFor(() => {
       expect(
         screen.getByText("No accounts match the current filters."),
