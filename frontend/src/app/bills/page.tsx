@@ -715,11 +715,13 @@ function BillsContent() {
                   ))}
                 </div>
                 {/* Density belongs to the list, so it sits with the list's own
-                    controls and is absent from the calendar. `chip` because the
-                    neighbours here are filter chips, not plain toolbar buttons.
-                    It stays visible below `sm`, where the type chips do not:
-                    the rows are still there to tighten. */}
-                <DensityToggle view="bills" size="chip" />
+                    controls and is absent from the calendar. `sm` -- the plain
+                    borderless button every other table's toggle is, rather than
+                    a filled chip: it is not a fourth filter beside All/Bills/
+                    Deposits and must not read as one. It stays visible below
+                    `sm`, where the type chips do not: the rows are still there
+                    to tighten. */}
+                <DensityToggle view="bills" />
               </div>
             )}
             {viewMode === 'calendar' && (

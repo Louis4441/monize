@@ -475,6 +475,19 @@ describe('BillsPage', () => {
       expect(toggle.parentElement?.lastElementChild).toBe(toggle);
     });
 
+    it('is the plain toggle every other table draws, not a filled chip', async () => {
+      render(<BillsPage />);
+      await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
+
+      // It sits among the filter chips but is not one of them, so it carries no
+      // resting fill -- only the hover the borderless `sm` button has. Matched
+      // on whole class names, since `hover:bg-gray-100` contains the other.
+      const classes = screen.getByTitle('Toggle row density').className.split(/\s+/);
+      expect(classes).not.toContain('bg-gray-100');
+      expect(classes).not.toContain('dark:bg-gray-700');
+      expect(classes).toContain('hover:bg-gray-100');
+    });
+
     it('stays visible below sm, where the type chips do not', async () => {
       render(<BillsPage />);
       await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
