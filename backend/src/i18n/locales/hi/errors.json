@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "अमान्य लेनदेन स्थिति: {{ status }}",
+    "reconciledLocked": "यह लेनदेन समाधानित और लॉक है। इसे बदलने के लिए सेटिंग्स में \"समाधानित लेनदेन लॉक करें\" बंद करें।",
     "pagePositiveInteger": "page एक सकारात्मक पूर्णांक होना चाहिए",
     "limitPositiveInteger": "limit एक सकारात्मक पूर्णांक होना चाहिए",
     "limitMax200": "limit 200 से अधिक नहीं होनी चाहिए",

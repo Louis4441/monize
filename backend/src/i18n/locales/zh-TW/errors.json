@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "無效的交易狀態：{{ status }}",
+    "reconciledLocked": "此交易已對帳並遭鎖定。要修改請在設定中關閉「鎖定已對帳交易」。",
     "pagePositiveInteger": "page 必須是正整數",
     "limitPositiveInteger": "limit 必須是正整數",
     "limitMax200": "limit 不得超過 200",

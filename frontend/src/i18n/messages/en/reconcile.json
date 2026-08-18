@@ -87,11 +87,9 @@
   "reminder": {
     "title": "Reconciliation",
     "badgeLabel": "{count, plural, one {# transaction waiting to be reconciled} other {# transactions waiting to be reconciled}}",
-    "empty": "Every account you reconcile is up to date.",
     "accountLine": "{count, plural, one {# transaction} other {# transactions}}, oldest {date}",
     "missedLine": "{count, plural, one {# left out of a reconciled statement} other {# left out of reconciled statements}}",
     "overdueLine": "{count, plural, one {# older than {days} days} other {# older than {days} days}}",
-    "reconcileAction": "Reconcile",
-    "loadFailed": "Reconciliation reminders could not be loaded."
+    "reconcileAction": "Reconcile"
   }
 }

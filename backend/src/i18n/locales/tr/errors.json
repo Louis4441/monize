@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Geçersiz işlem durumu: {{ status }}",
+    "reconciledLocked": "Bu işlem mutabık kılınmış ve kilitli. Değiştirmek için Ayarlar'da 'Mutabık kılınan işlemleri kilitle' seçeneğini kapatın.",
     "pagePositiveInteger": "page pozitif bir tamsayı olmalıdır",
     "limitPositiveInteger": "limit pozitif bir tamsayı olmalıdır",
     "limitMax200": "limit 200'ü geçemez",

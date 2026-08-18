@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Ungültiger Buchungsstatus: {{ status }}",
+    "reconciledLocked": "Diese Buchung ist abgeglichen und gesperrt. Deaktivieren Sie „Abgeglichene Buchungen sperren“ in den Einstellungen, um sie zu ändern.",
     "pagePositiveInteger": "page muss eine positive ganze Zahl sein",
     "limitPositiveInteger": "limit muss eine positive ganze Zahl sein",
     "limitMax200": "limit darf 200 nicht überschreiten",

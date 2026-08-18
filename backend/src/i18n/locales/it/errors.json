@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Stato transazione non valido: {{ status }}",
+    "reconciledLocked": "Questa transazione è riconciliata e bloccata. Disattiva «Blocca le transazioni riconciliate» nelle Impostazioni per modificarla.",
     "pagePositiveInteger": "page deve essere un numero intero positivo",
     "limitPositiveInteger": "limit deve essere un numero intero positivo",
     "limitMax200": "limit non deve superare 200",

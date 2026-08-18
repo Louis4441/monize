@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Trạng thái giao tác không hợp lệ: {{ status }}",
+    "reconciledLocked": "Giao dịch này đã đối soát và bị khóa. Hãy tắt \"Khóa giao dịch đã đối soát\" trong Cài đặt để thay đổi.",
     "pagePositiveInteger": "page phải là số nguyên dương",
     "limitPositiveInteger": "limit phải là số nguyên dương",
     "limitMax200": "limit không được vượt quá 200",

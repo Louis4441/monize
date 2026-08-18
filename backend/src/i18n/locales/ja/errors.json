@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "無効な取引ステータス：{{ status }}",
+    "reconciledLocked": "この取引は照合済みでロックされています。変更するには設定で「照合済み取引をロックする」をオフにしてください。",
     "pagePositiveInteger": "page は正の整数でなければなりません",
     "limitPositiveInteger": "limit は正の整数でなければなりません",
     "limitMax200": "limit は200を超えてはなりません",

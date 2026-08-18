@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Status transaksi tidak valid: {{ status }}",
+    "reconciledLocked": "Transaksi ini sudah direkonsiliasi dan terkunci. Nonaktifkan \"Kunci transaksi yang direkonsiliasi\" di Pengaturan untuk mengubahnya.",
     "pagePositiveInteger": "page harus berupa bilangan bulat positif",
     "limitPositiveInteger": "limit harus berupa bilangan bulat positif",
     "limitMax200": "limit tidak boleh melebihi 200",

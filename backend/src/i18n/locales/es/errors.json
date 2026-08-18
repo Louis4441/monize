@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Estado de transacción no válido: {{ status }}",
+    "reconciledLocked": "Esta transacción está conciliada y bloqueada. Desactiva «Bloquear transacciones conciliadas» en Ajustes para cambiarla.",
     "pagePositiveInteger": "page debe ser un entero positivo",
     "limitPositiveInteger": "limit debe ser un entero positivo",
     "limitMax200": "limit no debe superar 200",

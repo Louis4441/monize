@@ -452,6 +452,7 @@
   },
   "transactions": {
     "invalidStatus": "Statut de transaction invalide : {{ status }}",
+    "reconciledLocked": "Cette transaction est rapprochée et verrouillée. Désactivez « Verrouiller les transactions rapprochées » dans les Paramètres pour la modifier.",
     "pagePositiveInteger": "page doit être un entier positif",
     "limitPositiveInteger": "limit doit être un entier positif",
     "limitMax200": "limit ne doit pas dépasser 200",
