@@ -147,8 +147,6 @@
     "filterLiabilities": "passiva",
     "tableView": "Tabelweergave",
     "chartView": "Grafiekweergave",
-    "byAccountType": "Per rekeningtype",
-    "byAccount": "Per rekening",
     "noData": "Geen gegevens om weer te geven.",
     "noAccounts": "Geen rekeningen gevonden.",
     "closed": "Gesloten",
@@ -156,7 +154,6 @@
     "total": "Totaal",
     "pdfTitle": "Rekeningsaldi",
     "colAccount": "Rekening",
-    "colType": "Type",
     "colBalance": "Saldo",
     "asOfDate": "Saldo per",
     "asOfSubtitle": "Saldi per {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Lening",
       "MORTGAGE": "Hypotheek",
       "ASSET": "Activa",
+      "OTHER": "Overig",
       "LIABILITY": "Passiva"
     }
   },

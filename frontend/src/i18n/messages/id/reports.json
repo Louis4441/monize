@@ -147,8 +147,6 @@
     "filterLiabilities": "liabilitas",
     "tableView": "Tampilan tabel",
     "chartView": "Tampilan grafik",
-    "byAccountType": "Per Tipe Akun",
-    "byAccount": "Per Akun",
     "noData": "Tidak ada data untuk ditampilkan.",
     "noAccounts": "Tidak ada akun ditemukan.",
     "closed": "Ditutup",
@@ -156,7 +154,6 @@
     "total": "Total",
     "pdfTitle": "Saldo Akun",
     "colAccount": "Akun",
-    "colType": "Tipe",
     "colBalance": "Saldo",
     "asOfDate": "Saldo per",
     "asOfSubtitle": "Saldo per {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Pinjaman",
       "MORTGAGE": "Hipotek",
       "ASSET": "Aset",
+      "OTHER": "Lainnya",
       "LIABILITY": "Liabilitas"
     }
   },

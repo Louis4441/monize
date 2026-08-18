@@ -147,8 +147,6 @@
     "filterLiabilities": "[XX-liabilities-XX]",
     "tableView": "[XX-Table view-XX]",
     "chartView": "[XX-Chart view-XX]",
-    "byAccountType": "[XX-By Account Type-XX]",
-    "byAccount": "[XX-By Account-XX]",
     "noData": "[XX-No data to display.-XX]",
     "noAccounts": "[XX-No accounts found.-XX]",
     "closed": "[XX-Closed-XX]",
@@ -156,7 +154,6 @@
     "total": "[XX-Total-XX]",
     "pdfTitle": "[XX-Account Balances-XX]",
     "colAccount": "[XX-Account-XX]",
-    "colType": "[XX-Type-XX]",
     "colBalance": "[XX-Balance-XX]",
     "asOfDate": "[XX-Balance as of-XX]",
     "asOfSubtitle": "[XX-Balances as of {date}-XX]",
@@ -204,6 +201,7 @@
       "LOAN": "[XX-Loan-XX]",
       "MORTGAGE": "[XX-Mortgage-XX]",
       "ASSET": "[XX-Asset-XX]",
+      "OTHER": "[XX-Other-XX]",
       "LIABILITY": "[XX-Liability-XX]"
     }
   },

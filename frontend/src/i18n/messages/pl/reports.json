@@ -147,8 +147,6 @@
     "filterLiabilities": "zobowiązania",
     "tableView": "Widok tabeli",
     "chartView": "Widok wykresu",
-    "byAccountType": "Wg typu konta",
-    "byAccount": "Wg konta",
     "noData": "Brak danych do wyświetlenia.",
     "noAccounts": "Nie znaleziono kont.",
     "closed": "Zamknięte",
@@ -156,7 +154,6 @@
     "total": "Suma",
     "pdfTitle": "Salda kont",
     "colAccount": "Konto",
-    "colType": "Typ",
     "colBalance": "Saldo",
     "asOfDate": "Saldo na dzień",
     "asOfSubtitle": "Salda na dzień {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Pożyczka",
       "MORTGAGE": "Kredyt hipoteczny",
       "ASSET": "Aktywo",
+      "OTHER": "Inne",
       "LIABILITY": "Zobowiązanie"
     }
   },

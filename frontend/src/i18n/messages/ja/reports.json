@@ -147,8 +147,6 @@
     "filterLiabilities": "負債",
     "tableView": "表形式",
     "chartView": "グラフ形式",
-    "byAccountType": "口座タイプ別",
-    "byAccount": "口座別",
     "noData": "表示するデータがありません。",
     "noAccounts": "口座が見つかりません。",
     "closed": "閉鎖済み",
@@ -156,7 +154,6 @@
     "total": "合計",
     "pdfTitle": "口座残高",
     "colAccount": "口座",
-    "colType": "タイプ",
     "colBalance": "残高",
     "asOfDate": "基準日",
     "asOfSubtitle": "{date} 時点の残高",
@@ -204,6 +201,7 @@
       "LOAN": "ローン",
       "MORTGAGE": "住宅ローン",
       "ASSET": "資産",
+      "OTHER": "その他",
       "LIABILITY": "負債"
     }
   },

@@ -147,8 +147,6 @@
     "filterLiabilities": "passifs",
     "tableView": "Vue tableau",
     "chartView": "Vue graphique",
-    "byAccountType": "Par type de compte",
-    "byAccount": "Par compte",
     "noData": "Aucune donnée à afficher.",
     "noAccounts": "Aucun compte trouvé.",
     "closed": "Clôturé",
@@ -156,7 +154,6 @@
     "total": "Total",
     "pdfTitle": "Soldes des comptes",
     "colAccount": "Compte",
-    "colType": "Type",
     "colBalance": "Solde",
     "asOfDate": "Solde au",
     "asOfSubtitle": "Soldes au {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Prêt",
       "MORTGAGE": "Prêt hypothécaire",
       "ASSET": "Actif",
+      "OTHER": "Autre",
       "LIABILITY": "Passif"
     }
   },

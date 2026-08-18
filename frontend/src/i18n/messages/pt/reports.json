@@ -147,8 +147,6 @@
     "filterLiabilities": "passivos",
     "tableView": "Vista de tabela",
     "chartView": "Vista de gráfico",
-    "byAccountType": "Por Tipo de Conta",
-    "byAccount": "Por Conta",
     "noData": "Sem dados para apresentar.",
     "noAccounts": "Nenhuma conta encontrada.",
     "closed": "Fechada",
@@ -156,7 +154,6 @@
     "total": "Total",
     "pdfTitle": "Saldos de Contas",
     "colAccount": "Conta",
-    "colType": "Tipo",
     "colBalance": "Saldo",
     "asOfDate": "Saldo em",
     "asOfSubtitle": "Saldos em {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Empréstimo",
       "MORTGAGE": "Crédito Habitação",
       "ASSET": "Ativo",
+      "OTHER": "Outro",
       "LIABILITY": "Passivo"
     }
   },

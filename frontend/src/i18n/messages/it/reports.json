@@ -147,8 +147,6 @@
     "filterLiabilities": "passività",
     "tableView": "Vista tabella",
     "chartView": "Vista grafico",
-    "byAccountType": "Per tipo di conto",
-    "byAccount": "Per conto",
     "noData": "Nessun dato da visualizzare.",
     "noAccounts": "Nessun conto trovato.",
     "closed": "Chiuso",
@@ -156,7 +154,6 @@
     "total": "Totale",
     "pdfTitle": "Saldi dei conti",
     "colAccount": "Conto",
-    "colType": "Tipo",
     "colBalance": "Saldo",
     "asOfDate": "Saldo al",
     "asOfSubtitle": "Saldi al {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Prestito",
       "MORTGAGE": "Mutuo",
       "ASSET": "Attività",
+      "OTHER": "Altro",
       "LIABILITY": "Passività"
     }
   },

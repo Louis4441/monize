@@ -147,8 +147,6 @@
     "filterLiabilities": "yükümlülükler",
     "tableView": "Tablo görünümü",
     "chartView": "Grafik görünümü",
-    "byAccountType": "Hesap Türüne Göre",
-    "byAccount": "Hesaba Göre",
     "noData": "Gösterilecek veri yok.",
     "noAccounts": "Hesap bulunamadı.",
     "closed": "Kapalı",
@@ -156,7 +154,6 @@
     "total": "Toplam",
     "pdfTitle": "Hesap Bakiyeleri",
     "colAccount": "Hesap",
-    "colType": "Tür",
     "colBalance": "Bakiye",
     "asOfDate": "Bakiye tarihi",
     "asOfSubtitle": "{date} tarihli bakiyeler",
@@ -204,6 +201,7 @@
       "LOAN": "Kredi",
       "MORTGAGE": "İpotek",
       "ASSET": "Varlık",
+      "OTHER": "Diğer",
       "LIABILITY": "Yükümlülük"
     }
   },

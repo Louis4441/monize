@@ -147,8 +147,6 @@
     "filterLiabilities": "nợ",
     "tableView": "Chế độ bảng",
     "chartView": "Chế độ biểu đồ",
-    "byAccountType": "Theo loại tài khoản",
-    "byAccount": "Theo tài khoản",
     "noData": "Không có dữ liệu để hiển thị.",
     "noAccounts": "Không tìm thấy tài khoản.",
     "closed": "Đã đóng",
@@ -156,7 +154,6 @@
     "total": "Tổng",
     "pdfTitle": "Số dư tài khoản",
     "colAccount": "Tài khoản",
-    "colType": "Loại",
     "colBalance": "Số dư",
     "asOfDate": "Số dư tính đến",
     "asOfSubtitle": "Số dư tính đến {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Vay",
       "MORTGAGE": "Thế chấp",
       "ASSET": "Tài sản",
+      "OTHER": "Khác",
       "LIABILITY": "Nợ"
     }
   },

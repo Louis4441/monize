@@ -147,8 +147,6 @@
     "filterLiabilities": "负债",
     "tableView": "表格视图",
     "chartView": "图表视图",
-    "byAccountType": "按账户类型",
-    "byAccount": "按账户",
     "noData": "无数据可显示。",
     "noAccounts": "未找到账户。",
     "closed": "已关闭",
@@ -156,7 +154,6 @@
     "total": "合计",
     "pdfTitle": "账户余额",
     "colAccount": "账户",
-    "colType": "类型",
     "colBalance": "余额",
     "asOfDate": "余额截至",
     "asOfSubtitle": "{date} 的余额",
@@ -204,6 +201,7 @@
       "LOAN": "贷款",
       "MORTGAGE": "抵押贷款",
       "ASSET": "资产",
+      "OTHER": "其他",
       "LIABILITY": "负债"
     }
   },

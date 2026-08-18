@@ -147,8 +147,6 @@
     "filterLiabilities": "liabilities",
     "tableView": "Table view",
     "chartView": "Chart view",
-    "byAccountType": "By Account Type",
-    "byAccount": "By Account",
     "noData": "No data to display.",
     "noAccounts": "No accounts found.",
     "closed": "Closed",
@@ -156,7 +154,6 @@
     "total": "Total",
     "pdfTitle": "Account Balances",
     "colAccount": "Account",
-    "colType": "Type",
     "colBalance": "Balance",
     "asOfDate": "Balance as of",
     "asOfSubtitle": "Balances as of {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Loan",
       "MORTGAGE": "Mortgage",
       "ASSET": "Asset",
+      "OTHER": "Other",
       "LIABILITY": "Liability"
     }
   },

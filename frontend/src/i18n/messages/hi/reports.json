@@ -147,8 +147,6 @@
     "filterLiabilities": "देनदारियाँ",
     "tableView": "तालिका दृश्य",
     "chartView": "चित्र दृश्य",
-    "byAccountType": "खाता प्रकार के अनुसार",
-    "byAccount": "खाते के अनुसार",
     "noData": "प्रदर्शित करने के लिए कोई डेटा नहीं।",
     "noAccounts": "कोई खाता नहीं मिला।",
     "closed": "बंद",
@@ -156,7 +154,6 @@
     "total": "कुल",
     "pdfTitle": "खाता शेष",
     "colAccount": "खाता",
-    "colType": "प्रकार",
     "colBalance": "शेष",
     "asOfDate": "शेष इस तिथि को",
     "asOfSubtitle": "{date} तक के शेष",
@@ -204,6 +201,7 @@
       "LOAN": "ऋण",
       "MORTGAGE": "बंधक",
       "ASSET": "संपत्ति",
+      "OTHER": "अन्य",
       "LIABILITY": "देनदारी"
     }
   },

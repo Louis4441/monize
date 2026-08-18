@@ -712,6 +712,29 @@ describe("AccountBalancesReport", () => {
     });
   });
 
+  // "Other" used to borrow the Asset label, so the type picker offered two
+  // options reading "Asset" and one group heading named the wrong kind.
+  it("names an OTHER account by its own label, not the Asset one", async () => {
+    mockGetAll.mockResolvedValue([acc({ name: "Odds and ends", accountType: "OTHER" })]);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 42)]));
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Other" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: "Asset" })).not.toBeInTheDocument();
+  });
+
+  it("falls back to the raw type for a type it has no label for", async () => {
+    mockGetAll.mockResolvedValue([
+      acc({ name: "Exotic Account", accountType: "EXOTIC_TYPE" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 1000)]));
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "EXOTIC_TYPE" })).toBeInTheDocument();
+    });
+  });
+
   it("shows an account description under its name", async () => {
     mockGetAll.mockResolvedValue([
       acc({ name: "My Savings", accountType: "SAVINGS", description: "Emergency fund" }),

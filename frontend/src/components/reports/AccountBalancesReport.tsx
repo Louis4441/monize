@@ -83,11 +83,7 @@ export function AccountBalancesReport() {
       Object.fromEntries(
         ACCOUNT_TYPE_KEYS.map((key) => [
           key,
-          t(
-            `accountBalances.accountTypes.${key === 'OTHER' ? 'ASSET' : key}` as Parameters<
-              typeof t
-            >[0],
-          ),
+          t(`accountBalances.accountTypes.${key}` as Parameters<typeof t>[0]),
         ]),
       ),
     [t],

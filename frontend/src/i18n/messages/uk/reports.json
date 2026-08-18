@@ -147,8 +147,6 @@
     "filterLiabilities": "пасиви",
     "tableView": "Таблиця",
     "chartView": "Діаграма",
-    "byAccountType": "За типом рахунку",
-    "byAccount": "За рахунком",
     "noData": "Немає даних для відображення.",
     "noAccounts": "Рахунків не знайдено.",
     "closed": "Закрито",
@@ -156,7 +154,6 @@
     "total": "Разом",
     "pdfTitle": "Баланси рахунків",
     "colAccount": "Рахунок",
-    "colType": "Тип",
     "colBalance": "Баланс",
     "asOfDate": "Баланс на",
     "asOfSubtitle": "Баланси на {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Позика",
       "MORTGAGE": "Іпотека",
       "ASSET": "Актив",
+      "OTHER": "Інше",
       "LIABILITY": "Пасив"
     }
   },

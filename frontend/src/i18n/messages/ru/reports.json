@@ -147,8 +147,6 @@
     "filterLiabilities": "обязательства",
     "tableView": "Таблица",
     "chartView": "График",
-    "byAccountType": "По типу счёта",
-    "byAccount": "По счёту",
     "noData": "Нет данных для отображения.",
     "noAccounts": "Счета не найдены.",
     "closed": "Закрыт",
@@ -156,7 +154,6 @@
     "total": "Итого",
     "pdfTitle": "Остатки по счетам",
     "colAccount": "Счёт",
-    "colType": "Тип",
     "colBalance": "Остаток",
     "asOfDate": "Баланс на",
     "asOfSubtitle": "Балансы на {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Займ",
       "MORTGAGE": "Ипотека",
       "ASSET": "Актив",
+      "OTHER": "Прочее",
       "LIABILITY": "Обязательство"
     }
   },

@@ -147,8 +147,6 @@
     "filterLiabilities": "Verbindlichkeiten",
     "tableView": "Tabellenansicht",
     "chartView": "Diagrammansicht",
-    "byAccountType": "Nach Kontotyp",
-    "byAccount": "Nach Konto",
     "noData": "Keine Daten vorhanden.",
     "noAccounts": "Keine Konten gefunden.",
     "closed": "Geschlossen",
@@ -156,7 +154,6 @@
     "total": "Gesamt",
     "pdfTitle": "Kontosalden",
     "colAccount": "Konto",
-    "colType": "Typ",
     "colBalance": "Saldo",
     "asOfDate": "Saldo per",
     "asOfSubtitle": "Salden per {date}",
@@ -204,6 +201,7 @@
       "LOAN": "Darlehen",
       "MORTGAGE": "Hypothek",
       "ASSET": "Aktiva",
+      "OTHER": "Sonstiges",
       "LIABILITY": "Verbindlichkeit"
     }
   },

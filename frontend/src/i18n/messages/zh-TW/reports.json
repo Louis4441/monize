@@ -147,8 +147,6 @@
     "filterLiabilities": "負債",
     "tableView": "表格檢視",
     "chartView": "圖表檢視",
-    "byAccountType": "依科目類型",
-    "byAccount": "依科目",
     "noData": "無資料可顯示。",
     "noAccounts": "找不到科目。",
     "closed": "已關閉",
@@ -156,7 +154,6 @@
     "total": "總計",
     "pdfTitle": "科目結餘",
     "colAccount": "科目",
-    "colType": "類型",
     "colBalance": "結餘",
     "asOfDate": "餘額截至",
     "asOfSubtitle": "{date} 的餘額",
@@ -204,6 +201,7 @@
       "LOAN": "貸款",
       "MORTGAGE": "抵押貸款",
       "ASSET": "資產",
+      "OTHER": "其他",
       "LIABILITY": "負債"
     }
   },
