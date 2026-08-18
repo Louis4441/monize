@@ -645,6 +645,15 @@ moves, and the row highlight then disagrees with the count in the header badge
 about which rows it is counting -- two surfaces describing the same ledger,
 neither obviously wrong.
 
+**Which of its two answers a surface *draws* is the surface's decision.** The
+register draws `missed` only (`registerStaleReason` in `TransactionList.tsx`):
+"overdue" says nobody has reconciled the account recently, which is true of
+every row in it at once, so on a page of history it marked transaction after
+transaction for a condition about none of them. `ReconcileTable` still draws
+both -- there it is about the statement being worked on -- and the header badge
+still counts both. That is a presentation choice about where the mark helps, and
+it is the *only* thing a call site may vary; everything below is the helper's.
+
 Three things the helper decides that a call site must not re-decide:
 
 - **An account nobody reconciles has no overdue rows**, whatever their age.
