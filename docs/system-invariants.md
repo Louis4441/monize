@@ -551,9 +551,15 @@ Enforcement         The handler awaits the revoke before reporting success, and
 Concurrency scope   per token family
 Retry semantics     Safe: setting is_revoked twice is a no-op.
 Failure response    a failed revoke surfaces as an error, not a cleared session.
-Required tests      Present: auth.controller.spec.ts forces revokeRefreshToken to
-                    reject and asserts logout rejects without clearing cookies or
-                    emitting the success body.
+Required tests      Failpoint (the load-bearing kind per docs/verification-contract.md):
+                    backend/test/integration/logout-revoke-failpoint.integration.spec.ts
+                    forces the family-revocation write to fail with a BEFORE UPDATE
+                    trigger and asserts the real revokeRefreshToken rejects and the
+                    family stays live, with a control case proving the same call
+                    revokes when nothing blocks it. Unit (supporting):
+                    auth.controller.spec.ts asserts the controller propagates that
+                    rejection without clearing cookies or emitting the success body.
+                    Still owed: the user-visible E2E assertion.
 Status              enforced
 ```
 
