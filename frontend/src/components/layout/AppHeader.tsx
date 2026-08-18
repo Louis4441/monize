@@ -11,7 +11,6 @@ import { markLogoutIncomplete, clearLogoutIncomplete } from '@/lib/logout-state'
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { BudgetAlertBadge } from '@/components/budgets/BudgetAlertBadge';
-import { ReconciliationReminderBadge } from '@/components/reconcile/ReconciliationReminderBadge';
 import { ActionHistoryPanel } from '@/components/layout/ActionHistoryPanel';
 import { MobileNavDrawer } from '@/components/layout/MobileNavDrawer';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
@@ -475,7 +474,10 @@ export function AppHeader() {
             </div>
             <ActionHistoryPanel />
             <BudgetAlertBadge />
-            <ReconciliationReminderBadge />
+            {/* The reconciliation reminder badge is deliberately not mounted
+                here for now: the reminder is kept off the header until
+                reconciliation is a more established habit. The component and
+                its tests stand, so putting it back is one line. */}
             <button
               {...tourAnchor(TOUR_ANCHORS.navSettings)}
               onClick={() => router.push('/settings')}
