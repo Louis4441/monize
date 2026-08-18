@@ -5,6 +5,12 @@ import { FxAggregate } from "../common/fx-aggregate";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
 import { roundMoney } from "../common/round.util";
 import { applyActionToQuantity } from "../securities/investment-replay.util";
+import {
+  BOUNDARY_LAG_DAYS,
+  closeAt,
+  withLeadDays,
+  type PricePoint,
+} from "../common/time-series/price-boundary.util";
 
 /**
  * One account's worth at the end of a single day.
@@ -60,12 +66,26 @@ export class AccountBalancesReportService {
    * `jointAccountIds` are accounts another owner shared with the caller; the
    * controller has already authorized them, and the predicate widens to those
    * exact ids and nothing else -- the same shape `getDailyBalances` uses.
+   *
+   * `restrictToAccountIds` narrows the answer to exactly those accounts, for a
+   * delegate whose grant names a subset of the owner's. It is a restriction on
+   * the *query*, not a filter over its result: reading the owner's other
+   * balances and dropping them afterwards answers correctly while still having
+   * read them.
    */
   async getBalancesAsOf(
     userId: string,
     asOfDate: string,
     jointAccountIds: string[] = [],
+    restrictToAccountIds?: string[],
   ): Promise<AccountBalancesAsOfResponse> {
+    // An empty restriction is "no accounts", not "no restriction": a delegate
+    // granted nothing must not fall through to the owner's whole list.
+    if (restrictToAccountIds && restrictToAccountIds.length === 0) {
+      return { asOfDate, accounts: [] };
+    }
+    const restriction = restrictToAccountIds ?? null;
+
     const accounts: Array<{
       id: string;
       currency_code: string;
@@ -74,8 +94,9 @@ export class AccountBalancesReportService {
     }> = await this.scopedQuery(
       `SELECT id, currency_code, account_type, account_sub_type
          FROM accounts
-        WHERE user_id = $1 OR id = ANY($2::UUID[])`,
-      [userId, jointAccountIds],
+        WHERE (user_id = $1 OR id = ANY($2::UUID[]))
+          AND ($3::UUID[] IS NULL OR id = ANY($3::UUID[]))`,
+      [userId, jointAccountIds, restriction],
     );
 
     if (accounts.length === 0) return { asOfDate, accounts: [] };
@@ -84,6 +105,7 @@ export class AccountBalancesReportService {
       userId,
       asOfDate,
       jointAccountIds,
+      restriction,
     );
 
     // Only these hold securities. The cash sleeve of a linked pair is an
@@ -142,6 +164,7 @@ export class AccountBalancesReportService {
     userId: string,
     asOfDate: string,
     jointAccountIds: string[],
+    restriction: string[] | null,
   ): Promise<Map<string, number>> {
     const rows: Array<{ id: string; balance: string }> = await this.scopedQuery(
       `SELECT a.id,
@@ -151,9 +174,10 @@ export class AccountBalancesReportService {
             AND (t.status IS NULL OR t.status != 'VOID')
             AND t.parent_transaction_id IS NULL
             AND t.transaction_date <= $2
-          WHERE a.user_id = $1 OR a.id = ANY($3::UUID[])
+          WHERE (a.user_id = $1 OR a.id = ANY($3::UUID[]))
+            AND ($4::UUID[] IS NULL OR a.id = ANY($4::UUID[]))
           GROUP BY a.id, a.opening_balance`,
-      [userId, asOfDate, jointAccountIds],
+      [userId, asOfDate, jointAccountIds, restriction],
     );
 
     return new Map(rows.map((r) => [r.id, roundMoney(Number(r.balance))]));
@@ -304,22 +328,54 @@ export class AccountBalancesReportService {
     return result;
   }
 
-  /** Each security's last close on or before `asOfDate`; absent when it has none. */
+  /**
+   * Each security's close standing for `asOfDate`, through the one door.
+   *
+   * `closeAt` is what applies the staleness bound (`docs/time-series-contract.md`
+   * section 2.1): a security last quoted months before the date has no price
+   * *for that date*, and answering with the old close would report an
+   * instrument as having gone nowhere since. Absent here means unpriced, which
+   * the caller turns into a null account total rather than a smaller one.
+   *
+   * The query is bounded on both sides for the same reason -- it loads exactly
+   * the window `closeAt` can accept, so the door and the read agree.
+   */
   private async closingPricesAsOf(
     securityIds: string[],
     asOfDate: string,
   ): Promise<Map<string, number>> {
     if (securityIds.length === 0) return new Map();
-    const rows: Array<{ security_id: string; close_price: string }> =
-      await this.scopedQuery(
-        `SELECT DISTINCT ON (security_id) security_id, close_price
+    const rows: Array<{
+      security_id: string;
+      price_date: string;
+      close_price: string;
+    }> = await this.scopedQuery(
+      `SELECT security_id, price_date::text AS price_date, close_price
            FROM security_prices
           WHERE security_id = ANY($1::UUID[])
+            AND price_date >= $3
             AND price_date <= $2
-          ORDER BY security_id, price_date DESC`,
-        [securityIds, asOfDate],
-      );
-    return new Map(rows.map((r) => [r.security_id, Number(r.close_price)]));
+          ORDER BY security_id, price_date ASC`,
+      [securityIds, asOfDate, withLeadDays(asOfDate, BOUNDARY_LAG_DAYS)],
+    );
+
+    const series = new Map<string, PricePoint[]>();
+    for (const row of rows) {
+      const points = series.get(row.security_id);
+      const point = { date: row.price_date, close: Number(row.close_price) };
+      if (points) {
+        points.push(point);
+      } else {
+        series.set(row.security_id, [point]);
+      }
+    }
+
+    const prices = new Map<string, number>();
+    for (const [securityId, points] of series) {
+      const close = closeAt(points, asOfDate);
+      if (close !== null) prices.set(securityId, close);
+    }
+    return prices;
   }
 
   private async securityCurrencies(
@@ -335,9 +391,14 @@ export class AccountBalancesReportService {
   }
 
   /**
-   * The last stored rate for every pair on or before `asOfDate`, keyed
-   * `"FROM->TO"`. `convertWithRateLookup` tries the reverse pair itself, so
-   * only one direction needs to exist.
+   * The rate standing for `asOfDate` for every pair, keyed `"FROM->TO"`.
+   * `convertWithRateLookup` tries the reverse pair itself, so only one
+   * direction needs to exist.
+   *
+   * A rate is an observation on a date exactly as a close is, so it goes
+   * through the same door and the same staleness bound: a pair last quoted
+   * long before the date has no rate *for* it, and the caller reports the pair
+   * as missing rather than converting at a number from another era.
    */
   private async storedRatesAsOf(
     asOfDate: string,
@@ -345,17 +406,34 @@ export class AccountBalancesReportService {
     const rows: Array<{
       from_currency: string;
       to_currency: string;
+      rate_date: string;
       rate: string;
     }> = await this.scopedQuery(
-      `SELECT DISTINCT ON (from_currency, to_currency)
-              from_currency, to_currency, rate
+      `SELECT from_currency, to_currency, rate_date::text AS rate_date, rate
          FROM exchange_rates
-        WHERE rate_date <= $1
-        ORDER BY from_currency, to_currency, rate_date DESC`,
-      [asOfDate],
+        WHERE rate_date >= $2
+          AND rate_date <= $1
+        ORDER BY from_currency, to_currency, rate_date ASC`,
+      [asOfDate, withLeadDays(asOfDate, BOUNDARY_LAG_DAYS)],
     );
-    return new Map(
-      rows.map((r) => [`${r.from_currency}->${r.to_currency}`, Number(r.rate)]),
-    );
+
+    const series = new Map<string, PricePoint[]>();
+    for (const row of rows) {
+      const key = `${row.from_currency}->${row.to_currency}`;
+      const points = series.get(key);
+      const point = { date: row.rate_date, close: Number(row.rate) };
+      if (points) {
+        points.push(point);
+      } else {
+        series.set(key, [point]);
+      }
+    }
+
+    const rates = new Map<string, number>();
+    for (const [pair, points] of series) {
+      const rate = closeAt(points, asOfDate);
+      if (rate !== null) rates.set(pair, rate);
+    }
+    return rates;
   }
 }

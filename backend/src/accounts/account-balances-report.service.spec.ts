@@ -18,9 +18,18 @@ interface Fixture {
   accounts?: any[];
   balances?: Array<{ id: string; balance: string }>;
   investmentTransactions?: any[];
-  prices?: Array<{ security_id: string; close_price: string }>;
+  prices?: Array<{
+    security_id: string;
+    price_date: string;
+    close_price: string;
+  }>;
   securities?: Array<{ id: string; currency_code: string }>;
-  rates?: Array<{ from_currency: string; to_currency: string; rate: string }>;
+  rates?: Array<{
+    from_currency: string;
+    to_currency: string;
+    rate_date: string;
+    rate: string;
+  }>;
 }
 
 describe("AccountBalancesReportService", () => {
@@ -111,7 +120,7 @@ describe("AccountBalancesReportService", () => {
     expect(ledgerCall[0]).toContain("t.status != 'VOID'");
     expect(ledgerCall[0]).toContain("t.parent_transaction_id IS NULL");
     expect(ledgerCall[0]).toContain("t.transaction_date <= $2");
-    expect(ledgerCall[1]).toEqual(["user-1", "2026-03-01", []]);
+    expect(ledgerCall[1]).toEqual(["user-1", "2026-03-01", [], null]);
   });
 
   it("reports the ledger balance in the account's own currency", async () => {
@@ -167,7 +176,9 @@ describe("AccountBalancesReportService", () => {
           quantity: "10",
         },
       ],
-      prices: [{ security_id: "sec-1", close_price: "22" }],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "22" },
+      ],
       securities: [{ id: "sec-1", currency_code: "CAD" }],
     });
     const result = await service.getBalancesAsOf("user-1", "2026-03-01");
@@ -182,6 +193,82 @@ describe("AccountBalancesReportService", () => {
     );
     expect(priceCall[0]).toContain("price_date <= $2");
     expect(priceCall[1][1]).toBe("2026-03-01");
+    // Bounded below as well, so the query loads exactly the window `closeAt`
+    // will accept -- the read and the door agree on one staleness rule.
+    expect(priceCall[0]).toContain("price_date >= $3");
+    expect(priceCall[1][2]).toBe("2026-02-15");
+  });
+
+  // `docs/time-series-contract.md` section 2.1: an instrument last quoted
+  // months ago has no price *for* this date, and answering with the old close
+  // would report it as having gone nowhere since.
+  it("treats a close older than the boundary window as no price for the date", async () => {
+    program({
+      accounts: [brokerage],
+      balances: [{ id: "acc-b", balance: "0" }],
+      investmentTransactions: [
+        {
+          account_id: "acc-b",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+        },
+      ],
+      prices: [
+        { security_id: "sec-1", price_date: "2025-01-02", close_price: "22" },
+      ],
+      securities: [{ id: "sec-1", currency_code: "CAD" }],
+    });
+    const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+    expect(result.accounts[0]).toMatchObject({
+      marketValue: null,
+      unpricedHoldingsCount: 1,
+      pricesComplete: false,
+    });
+  });
+
+  // A close a few days old is what prices a boundary the market was shut on.
+  it("carries a close forward across a weekend", async () => {
+    program({
+      accounts: [brokerage],
+      balances: [{ id: "acc-b", balance: "0" }],
+      investmentTransactions: [
+        {
+          account_id: "acc-b",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+        },
+      ],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "22" },
+      ],
+      securities: [{ id: "sec-1", currency_code: "CAD" }],
+    });
+    const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+    expect(result.accounts[0].marketValue).toBe(220);
+  });
+
+  it("takes the latest close in the window, not the first", async () => {
+    program({
+      accounts: [brokerage],
+      balances: [{ id: "acc-b", balance: "0" }],
+      investmentTransactions: [
+        {
+          account_id: "acc-b",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+        },
+      ],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-20", close_price: "18" },
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "22" },
+      ],
+      securities: [{ id: "sec-1", currency_code: "CAD" }],
+    });
+    const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+    expect(result.accounts[0].marketValue).toBe(220);
   });
 
   // A SPLIT's quantity is a ratio, and every replay in the codebase folds it
@@ -216,7 +303,9 @@ describe("AccountBalancesReportService", () => {
           quantity: "3",
         },
       ],
-      prices: [{ security_id: "sec-1", close_price: "10" }],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "10" },
+      ],
       securities: [{ id: "sec-1", currency_code: "CAD" }],
     });
     const result = await service.getBalancesAsOf("user-1", "2026-03-01");
@@ -259,7 +348,9 @@ describe("AccountBalancesReportService", () => {
           quantity: "4",
         },
       ],
-      prices: [{ security_id: "sec-1", close_price: "22" }],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "22" },
+      ],
       securities: [
         { id: "sec-1", currency_code: "CAD" },
         { id: "sec-2", currency_code: "CAD" },
@@ -288,7 +379,9 @@ describe("AccountBalancesReportService", () => {
           quantity: "10",
         },
       ],
-      prices: [{ security_id: "sec-1", close_price: "20" }],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "20" },
+      ],
       securities: [{ id: "sec-1", currency_code: "USD" }],
       rates: [],
     });
@@ -316,9 +409,18 @@ describe("AccountBalancesReportService", () => {
           quantity: "10",
         },
       ],
-      prices: [{ security_id: "sec-1", close_price: "20" }],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "20" },
+      ],
       securities: [{ id: "sec-1", currency_code: "USD" }],
-      rates: [{ from_currency: "USD", to_currency: "CAD", rate: "1.35" }],
+      rates: [
+        {
+          from_currency: "USD",
+          to_currency: "CAD",
+          rate_date: "2026-02-27",
+          rate: "1.35",
+        },
+      ],
     });
     const result = await service.getBalancesAsOf("user-1", "2026-03-01");
     expect(result.accounts[0].marketValue).toBe(270);
@@ -327,7 +429,44 @@ describe("AccountBalancesReportService", () => {
       sql.includes("FROM exchange_rates"),
     );
     expect(rateCall[0]).toContain("rate_date <= $1");
-    expect(rateCall[1]).toEqual(["2026-03-01"]);
+    expect(rateCall[0]).toContain("rate_date >= $2");
+    expect(rateCall[1]).toEqual(["2026-03-01", "2026-02-15"]);
+  });
+
+  // A rate is an observation on a date exactly as a close is: one long out of
+  // date is not the rate for this date, and converting at it would be an
+  // exchange rate from another era wearing today's.
+  it("treats a rate older than the boundary window as no rate for the date", async () => {
+    program({
+      accounts: [brokerage],
+      balances: [{ id: "acc-b", balance: "0" }],
+      investmentTransactions: [
+        {
+          account_id: "acc-b",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+        },
+      ],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "20" },
+      ],
+      securities: [{ id: "sec-1", currency_code: "USD" }],
+      rates: [
+        {
+          from_currency: "USD",
+          to_currency: "CAD",
+          rate_date: "2024-05-01",
+          rate: "1.35",
+        },
+      ],
+    });
+    const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+    expect(result.accounts[0]).toMatchObject({
+      marketValue: null,
+      missingRatePairs: ["USD->CAD"],
+      fxComplete: false,
+    });
   });
 
   // An empty portfolio is worth zero. Reporting that as unknown tells the user
@@ -420,7 +559,9 @@ describe("AccountBalancesReportService", () => {
           quantity: "2",
         },
       ],
-      prices: [{ security_id: "sec-1", close_price: "50" }],
+      prices: [
+        { security_id: "sec-1", price_date: "2026-02-27", close_price: "50" },
+      ],
       securities: [{ id: "sec-1", currency_code: "CAD" }],
     });
     const result = await service.getBalancesAsOf("user-1", "2026-03-01");
@@ -428,6 +569,35 @@ describe("AccountBalancesReportService", () => {
       balance: 100,
       marketValue: 100,
     });
+  });
+
+  // An empty restriction means "no accounts". Falling through to the owner's
+  // whole list would hand a delegate granted nothing every balance there is.
+  it("answers an empty restriction with nothing, without reading", async () => {
+    program({ accounts: [cheque], balances: [{ id: "acc-1", balance: "1" }] });
+    const result = await service.getBalancesAsOf(
+      "user-1",
+      "2026-03-01",
+      [],
+      [],
+    );
+    expect(result).toEqual({ asOfDate: "2026-03-01", accounts: [] });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("restricts both reads to the accounts a delegate may see", async () => {
+    program({ accounts: [cheque], balances: [{ id: "acc-1", balance: "1" }] });
+    await service.getBalancesAsOf("user-1", "2026-03-01", [], ["acc-1"]);
+
+    const accountsCall = query.mock.calls.find(
+      ([sql]: [string]) =>
+        sql.includes("FROM accounts\n") && sql.includes("account_sub_type"),
+    );
+    expect(accountsCall[1][2]).toEqual(["acc-1"]);
+    const ledgerCall = query.mock.calls.find(([sql]: [string]) =>
+      sql.includes("LEFT JOIN transactions"),
+    );
+    expect(ledgerCall[1][3]).toEqual(["acc-1"]);
   });
 
   it("widens the ownership predicate to the authorized joint accounts only", async () => {

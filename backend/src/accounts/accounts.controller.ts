@@ -411,21 +411,18 @@ export class AccountsController {
     const date = requested || todayYMD();
 
     if (req.user.isActing) {
-      // A delegate sees the accounts their grant names and nothing else, so the
-      // owner's scope is read with that set as the whole visible list.
+      // A delegate sees the accounts their grant names and nothing else. The
+      // set restricts the query rather than filtering its result, so the
+      // owner's other balances are never read in the first place.
       const readable = await this.delegationService.readableAccountIds(
         req.user.delegationId,
       );
-      if (readable.length === 0) return { asOfDate: date, accounts: [] };
-      const owned = await this.accountBalancesReport.getBalancesAsOf(
+      return this.accountBalancesReport.getBalancesAsOf(
         req.user.id,
         date,
+        [],
+        readable,
       );
-      const readableSet = new Set(readable);
-      return {
-        asOfDate: owned.asOfDate,
-        accounts: owned.accounts.filter((a) => readableSet.has(a.accountId)),
-      };
     }
 
     // Own context: a joint account participates exactly like an own account.

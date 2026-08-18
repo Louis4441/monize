@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "Gunakan endpoint pembaruan akun untuk mengubah favorit",
     "startDateFormat": "startDate harus dalam format YYYY-MM-DD",
     "endDateFormat": "endDate harus dalam format YYYY-MM-DD",
+    "asOfDateFormat": "asOfDate harus dalam format YYYY-MM-DD",
     "invalidExportFormat": "Format harus csv atau qif",
     "loanRequiredFields": "Akun pinjaman memerlukan paymentAmount, paymentFrequency, paymentStartDate, dan sourceAccountId",
     "loanRequiresInterestRate": "Akun pinjaman memerlukan tingkat bunga",

@@ -690,12 +690,13 @@ describe("AccountsController", () => {
       );
     });
 
-    // A delegate sees the accounts their grant names and nothing else -- an
-    // unfiltered owner-wide answer would hand them balances they may not read.
-    it("restricts an acting delegate to their readable accounts", async () => {
+    // A delegate sees the accounts their grant names and nothing else, and the
+    // grant restricts the query rather than filtering its result -- an
+    // owner-wide read narrowed afterwards has still read the other balances.
+    it("restricts an acting delegate's query to their readable accounts", async () => {
       mockDelegationService.readableAccountIds.mockResolvedValue(["acc-1"]);
       mockBalancesReport.getBalancesAsOf.mockResolvedValue(
-        payload("2020-01-01", [{ accountId: "acc-1" }, { accountId: "acc-2" }]),
+        payload("2020-01-01", [{ accountId: "acc-1" }]),
       );
 
       const result = await controller.getBalancesAsOf(
@@ -704,10 +705,20 @@ describe("AccountsController", () => {
       );
 
       expect(result.accounts).toEqual([{ accountId: "acc-1" }]);
+      expect(mockBalancesReport.getBalancesAsOf).toHaveBeenCalledWith(
+        "owner-1",
+        "2020-01-01",
+        [],
+        ["acc-1"],
+      );
     });
 
-    it("answers an acting delegate with no readable accounts without querying", async () => {
+    // An empty grant is "no accounts", never "no restriction".
+    it("passes an empty grant through as an empty restriction", async () => {
       mockDelegationService.readableAccountIds.mockResolvedValue([]);
+      mockBalancesReport.getBalancesAsOf.mockResolvedValue(
+        payload("2020-01-01", []),
+      );
 
       const result = await controller.getBalancesAsOf(
         { user: { id: "owner-1", isActing: true, delegationId: "del-1" } },
@@ -715,7 +726,12 @@ describe("AccountsController", () => {
       );
 
       expect(result).toEqual({ asOfDate: "2020-01-01", accounts: [] });
-      expect(mockBalancesReport.getBalancesAsOf).not.toHaveBeenCalled();
+      expect(mockBalancesReport.getBalancesAsOf).toHaveBeenCalledWith(
+        "owner-1",
+        "2020-01-01",
+        [],
+        [],
+      );
     });
   });
 

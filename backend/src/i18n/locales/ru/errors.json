@@ -20,6 +20,7 @@
     "useFavouriteUpdateEndpoint": "Используйте конечную точку обновления счёта для изменения избранного",
     "startDateFormat": "startDate должна быть в формате ГГГГ-ММ-ДД",
     "endDateFormat": "endDate должна быть в формате ГГГГ-ММ-ДД",
+    "asOfDateFormat": "asOfDate должна быть в формате ГГГГ-ММ-ДД",
     "invalidExportFormat": "Формат должен быть csv или qif",
     "loanRequiredFields": "Для кредитных счетов требуются: paymentAmount, paymentFrequency, paymentStartDate и sourceAccountId",
     "loanRequiresInterestRate": "Кредитные счета требуют процентную ставку",

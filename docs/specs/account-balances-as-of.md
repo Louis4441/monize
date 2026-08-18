@@ -49,12 +49,26 @@ opening_balance + SUM(amount)
 **Market value** (holdings accounts only -- `INVESTMENT_BROKERAGE`, or
 `INVESTMENT` with no sub-type): replay every non-VOID investment transaction
 dated `<= d` through `applyActionToQuantity`, then value each non-zero position
-at the security's last close **on or before `d`**, converted into the account's
-currency at the exchange rate **on or before `d`**.
+at the security's close **standing for `d`**, converted into the account's
+currency at the exchange rate standing for `d`.
 
-The last-close rule is what makes a future date meaningful: a position is
-carried at the most recent price known, which is the only honest answer a
-valuation can give about a day that has not happened. It is *not* a forecast.
+"Standing for `d`" is `closeAt` (`backend/src/common/time-series/price-boundary.util.ts`),
+the one door in `docs/time-series-contract.md` section 2.1: the most recent
+observation at or before `d`, and only when it was struck within
+`BOUNDARY_LAG_DAYS`. A rate is an observation on a date exactly as a close is,
+so both go through it. Each query is bounded on both sides to exactly the window
+the door accepts, so the read and the rule cannot disagree.
+
+The bound is what stops a position last quoted months ago being reported at that
+price under `d`'s heading -- an instrument that would then appear to have gone
+nowhere since, from a single observation. A security outside the window is
+**unpriced** for `d`, which makes the account's total null (section 4), not
+smaller.
+
+Carrying the last accepted close forward is also what makes a future date
+meaningful: the position is held at the most recent figure anybody knows, which
+is the only honest answer a valuation can give about a day that has not
+happened. It is *not* a forecast, and today's close is always inside the window.
 
 ## 4. Missing data
 
@@ -63,8 +77,8 @@ Per the contract, a total is `null` unless every component is known.
 | Condition | `marketValue` | `knownMarketValueSubtotal` | flags |
 |---|---|---|---|
 | every position priced and converted | the total | same number | `valuationComplete: true` |
-| a held position has no price at or before `d` | `null` | sum of the priced ones | `unpricedHoldingsCount > 0`, `pricesComplete: false` |
-| a position's currency has no rate to the account's currency | `null` | sum of the converted ones | `missingRatePairs` names the pair, `fxComplete: false` |
+| a held position has no accepted close for `d` -- none at all, or none newer than the boundary window | `null` | sum of the priced ones | `unpricedHoldingsCount > 0`, `pricesComplete: false` |
+| a position's currency has no accepted rate to the account's currency | `null` | sum of the converted ones | `missingRatePairs` names the pair, `fxComplete: false` |
 | account holds no positions at `d` | `0` | `0` | complete -- an empty portfolio is worth zero, not unknown |
 | account is not a holdings account | `null` | `0` | `valuationComplete: true`; the field does not apply |
 
@@ -119,6 +133,7 @@ payload without the date that produced it cannot be told from the previous one
 | BUY 10 @ 20 on 2026-01-05, close 22 on 2026-02-27, none later | 2026-03-01 | 0 | 220 |
 | same, plus SPLIT ratio 2 on 2026-02-01 | 2026-03-01 | 0 | 440 |
 | same, but no close on or before the date | 2026-01-04 | 0 | `null` |
+| same, last close 2025-09-30 (outside the window) | 2026-03-01 | 0 | `null` |
 | BUY 10 @ 20 USD in a CAD account, no USD->CAD rate | any | 0 | `null` |
 
 ## 7. Display currency
@@ -148,6 +163,8 @@ The backend spec must cover, at minimum:
    `unpricedHoldingsCount` counts it, `knownMarketValueSubtotal` holds the rest.
 7. A position whose currency has no rate -> `marketValue: null` and the pair is
    named.
+7a. A close, and separately a rate, older than `BOUNDARY_LAG_DAYS` is refused
+   the same way; one a few days old carries forward across a weekend.
 8. A holdings account with no positions -> `marketValue: 0`, complete.
 9. A rejected date (not YYYY-MM-DD) is a 400 and writes nothing.
 
