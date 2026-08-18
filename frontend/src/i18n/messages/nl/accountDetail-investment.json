@@ -8,6 +8,7 @@
     "empty": "Dit jaar geen beleggingsinkomsten"
   },
   "register": {
-    "deleteFailed": "Verwijderen van transactie mislukt"
+    "deleteFailed": "Verwijderen van transactie mislukt",
+    "loadFailed": "Laden van transactie mislukt"
   }
 }

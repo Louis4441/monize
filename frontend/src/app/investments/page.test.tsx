@@ -1225,6 +1225,12 @@ describe('InvestmentsPage', () => {
       expect(mockRouterPush).not.toHaveBeenCalledWith(
         expect.stringContaining('edit=itx-9'),
       );
+      // Both modals share one `useFormModal` mock here, so the discriminating
+      // claim is the argument: the cash row itself must never be handed to a
+      // form. Its amount, date and payee are consequences of the trade.
+      expect(mockOpenEdit).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'cash-tx-1' }),
+      );
     });
 
     it('does not ask for filter options while the brokerage register is on screen', async () => {

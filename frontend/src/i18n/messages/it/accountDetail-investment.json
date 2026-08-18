@@ -8,6 +8,7 @@
     "empty": "Nessun reddito da investimenti quest'anno"
   },
   "register": {
-    "deleteFailed": "Impossibile eliminare il movimento"
+    "deleteFailed": "Impossibile eliminare il movimento",
+    "loadFailed": "Caricamento transazione non riuscito"
   }
 }

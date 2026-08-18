@@ -8,6 +8,7 @@
     "empty": "今年の投資収益はありません"
   },
   "register": {
-    "deleteFailed": "取引を削除できませんでした"
+    "deleteFailed": "取引を削除できませんでした",
+    "loadFailed": "取引の読み込みに失敗しました"
   }
 }

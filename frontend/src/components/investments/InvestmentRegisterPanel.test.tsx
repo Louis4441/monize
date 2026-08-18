@@ -18,6 +18,7 @@ vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getTransactions: vi.fn(),
     getRegisterFilterOptions: vi.fn(),
+    getTransaction: vi.fn(),
     deleteTransaction: vi.fn(),
   },
 }));
@@ -25,6 +26,7 @@ vi.mock('@/lib/investments', () => ({
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getAll: vi.fn(),
+    getById: vi.fn(),
     getRegisterFilterOptions: vi.fn(),
     delete: vi.fn(),
     deleteTransfer: vi.fn(),
@@ -658,6 +660,67 @@ describe('InvestmentRegisterPanel', () => {
           expect.objectContaining({ payeeIds: ['payee-1'], page: 1 }),
         );
       });
+    });
+  });
+
+  describe('editing a cash row', () => {
+    /** Click the register's only row. */
+    const clickTheRow = async () => {
+      await act(async () => {
+        fireEvent.click(screen.getByText('Cash deposit'));
+      });
+    };
+
+    it("edits a trade's cash leg as the trade", async () => {
+      // Its amount, date and payee are consequences of the trade, so the cash
+      // form over it edits the wrong thing -- and offers to change figures the
+      // trade owns.
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [{ ...cashTransaction, linkedInvestmentTransactionId: 'itx-9' }],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+      });
+      (investmentsApi.getTransaction as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'itx-9',
+        action: 'BUY',
+      });
+
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+      await clickTheRow();
+
+      expect(investmentsApi.getTransaction).toHaveBeenCalledWith('itx-9');
+      expect(screen.getByTestId('investment-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('cash-form')).not.toBeInTheDocument();
+    });
+
+    it('fetches a transfer in full before editing it', async () => {
+      // The counterpart is not in the list payload, so the form would open
+      // without knowing where the money went.
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [{ ...cashTransaction, isTransfer: true }],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+      });
+      (transactionsApi.getById as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ...cashTransaction,
+        isTransfer: true,
+        linkedTransactionId: 'cash-tx-2',
+      });
+
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+      await clickTheRow();
+
+      expect(transactionsApi.getById).toHaveBeenCalledWith('cash-tx-1');
+      expect(screen.getByTestId('cash-form')).toBeInTheDocument();
+    });
+
+    it('edits an ordinary cash row as itself', async () => {
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+      await clickTheRow();
+
+      expect(screen.getByTestId('cash-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('investment-form')).not.toBeInTheDocument();
     });
   });
 

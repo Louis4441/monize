@@ -8,6 +8,7 @@
     "empty": "No hay ingresos por inversiones este año"
   },
   "register": {
-    "deleteFailed": "No se pudo eliminar la transacción"
+    "deleteFailed": "No se pudo eliminar la transacción",
+    "loadFailed": "Error al cargar la transacción"
   }
 }

@@ -8,6 +8,7 @@ import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
 import { transactionsApi } from '@/lib/transactions';
 import { invalidateBalanceCaches } from '@/lib/apiCache';
+import { editCashRow } from '@/lib/cash-row-edit';
 import { accountsApi } from '@/lib/accounts';
 import { categoriesApi } from '@/lib/categories';
 import { payeesApi } from '@/lib/payees';
@@ -464,36 +465,17 @@ export function useInvestmentData() {
   };
 
   // Cash transaction handlers
-  const handleEditCashTransaction = async (transaction: Transaction) => {
-    if (transaction.linkedInvestmentTransactionId) {
-      // The trade behind this cash row is edited in the investment form, which
-      // is already mounted on this page -- so open it here. Routing to
-      // `?edit=<id>` reached the same modal by navigating, which remounted the
-      // page, scrolled it back to the top and reloaded every section before the
-      // dialogue appeared. The URL parameter stays for arrivals from elsewhere.
-      try {
-        const investmentTx = await investmentsApi.getTransaction(
-          transaction.linkedInvestmentTransactionId,
-        );
-        openEdit(investmentTx);
-      } catch (error) {
-        logger.error('Failed to load linked investment transaction:', error);
-        toast.error(getErrorMessage(error, t('page.toastLoadFailed')));
-      }
-      return;
-    }
-    if (transaction.isTransfer) {
-      try {
-        const fullTransaction = await transactionsApi.getById(transaction.id);
-        openCashEdit(fullTransaction);
-      } catch (error) {
-        logger.error('Failed to load transaction details:', error);
-        openCashEdit(transaction);
-      }
-    } else {
-      openCashEdit(transaction);
-    }
-  };
+  const handleEditCashTransaction = (transaction: Transaction) =>
+    editCashRow(transaction, {
+      // The investment form is mounted on this page already, so a trade's cash
+      // leg opens it here. Routing to `?edit=<id>` reached the same modal by
+      // navigating, which remounted the page and scrolled it to the top first;
+      // the URL parameter stays for arrivals from elsewhere.
+      openInvestment: openEdit,
+      openCash: openCashEdit,
+      onLookupFailed: (error) =>
+        toast.error(getErrorMessage(error, t('page.toastLoadFailed'))),
+    });
 
   const handleCashTransactionUpdate = useCallback((updatedTx: Transaction) => {
     setCashTransactions(prev => prev.map(tx => tx.id === updatedTx.id ? updatedTx : tx));

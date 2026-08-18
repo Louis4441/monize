@@ -8,6 +8,7 @@
     "empty": "올해 투자 수익이 없습니다"
   },
   "register": {
-    "deleteFailed": "거래를 삭제하지 못했습니다"
+    "deleteFailed": "거래를 삭제하지 못했습니다",
+    "loadFailed": "거래를 불러오지 못했습니다"
   }
 }

@@ -8,6 +8,7 @@
     "empty": "No investment income this year"
   },
   "register": {
-    "deleteFailed": "Failed to delete transaction"
+    "deleteFailed": "Failed to delete transaction",
+    "loadFailed": "Failed to load transaction"
   }
 }

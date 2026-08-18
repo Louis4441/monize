@@ -8,6 +8,7 @@
     "empty": "[XX-No investment income this year-XX]"
   },
   "register": {
-    "deleteFailed": "[XX-Failed to delete transaction-XX]"
+    "deleteFailed": "[XX-Failed to delete transaction-XX]",
+    "loadFailed": "[XX-Failed to load transaction-XX]"
   }
 }

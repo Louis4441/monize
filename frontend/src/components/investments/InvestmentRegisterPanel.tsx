@@ -8,6 +8,7 @@ import { investmentsApi } from '@/lib/investments';
 import { transactionsApi } from '@/lib/transactions';
 import { invalidateBalanceCaches } from '@/lib/apiCache';
 import { getErrorMessage } from '@/lib/errors';
+import { editCashRow } from '@/lib/cash-row-edit';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useFormModal } from '@/hooks/useFormModal';
 import { useBrokerageFilterOptions } from '@/hooks/useBrokerageFilterOptions';
@@ -237,6 +238,21 @@ export function InvestmentRegisterPanel({
   const brokerageForm = useFormModal<InvestmentTransaction>();
   const cashForm = useFormModal<Transaction>();
 
+  // A row in this register can be a trade's cash leg, whose numbers the trade
+  // owns -- so it is edited as the trade, in the brokerage form mounted below,
+  // rather than as a cash row. Same decision as the Investments page's copy of
+  // this register (`editCashRow`).
+  const handleEditCashRow = useCallback(
+    (transaction: Transaction) =>
+      editCashRow(transaction, {
+        openInvestment: brokerageForm.openEdit,
+        openCash: cashForm.openEdit,
+        onLookupFailed: (error) =>
+          toast.error(getErrorMessage(error, t('register.loadFailed'))),
+      }),
+    [brokerageForm.openEdit, cashForm.openEdit, t],
+  );
+
   const handleDeleteBrokerage = useCallback(
     async (id: string) => {
       try {
@@ -344,7 +360,7 @@ export function InvestmentRegisterPanel({
           <TransactionList
             densityView="accountRegister"
             transactions={cashTx}
-            onEdit={cashForm.openEdit}
+            onEdit={handleEditCashRow}
             onRefresh={afterWrite}
             isSingleAccountView
             currentPage={cashPage}

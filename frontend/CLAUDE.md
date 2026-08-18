@@ -513,6 +513,17 @@ Tools. Comparing the pathname to the href unlit the tab the user had just come
 through, so the bar said nothing about where they were. The boundary is a slash,
 so `/accounts` never claims `/accounts-archive`.
 
+**A cash register holds rows that are not cash transactions, and one function
+decides which editor each gets** -- `editCashRow` (`lib/cash-row-edit.ts`). A
+trade's cash leg (`linkedInvestmentTransactionId`) is edited as the *trade*: its
+amount, date and payee are consequences of the trade, so a cash form over it
+offers to change figures it does not own. A transfer is fetched in full first,
+because the list payload does not carry its counterpart. Everything else opens
+on the row as listed. The account detail page's register had only the third
+case, which is how clicking a trade there opened a cash form -- and a failed
+lookup for a trade opens nothing rather than falling back to the cash form,
+since that fallback is the same defect arriving by another door.
+
 **A modal this page already mounts is opened, not navigated to.** Clicking an
 investment-linked row in the cash register pushed `/investments?edit=<id>`, which
 remounted the page, scrolled it to the top and refetched every section before the

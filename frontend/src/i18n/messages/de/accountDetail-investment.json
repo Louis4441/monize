@@ -8,6 +8,7 @@
     "empty": "Keine Anlageerträge in diesem Jahr"
   },
   "register": {
-    "deleteFailed": "Transaktion konnte nicht gelöscht werden"
+    "deleteFailed": "Transaktion konnte nicht gelöscht werden",
+    "loadFailed": "Buchung konnte nicht geladen werden"
   }
 }

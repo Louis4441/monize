@@ -8,6 +8,7 @@
     "empty": "Không có thu nhập đầu tư nào trong năm nay"
   },
   "register": {
-    "deleteFailed": "Không xóa được giao dịch"
+    "deleteFailed": "Không xóa được giao dịch",
+    "loadFailed": "Tải giao dịch thất bại"
   }
 }
