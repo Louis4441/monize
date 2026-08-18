@@ -811,7 +811,7 @@ export class ScheduledTransactionsService {
           m,
           userId,
           account.id,
-          true,
+          "fresh",
         );
       }
 
@@ -1003,6 +1003,33 @@ export class ScheduledTransactionsService {
     });
   }
 
+  /**
+   * The currency pair each existing investment split recorded, keyed by security
+   * id (issue #1167). All splits for one security share one pair, so the map is
+   * unambiguous; only splits that carry a complete pair are included. Used to
+   * carry a still-valid rate's provenance forward across an update's
+   * delete-and-recreate rather than re-stamping the current pair.
+   */
+  private splitProvenanceBySecurityId(
+    splits: ScheduledTransactionSplit[],
+  ): Map<string, { from: string; to: string }> {
+    const map = new Map<string, { from: string; to: string }>();
+    for (const s of splits) {
+      if (
+        s.kind === SplitKind.INVESTMENT &&
+        s.investmentSecurityId &&
+        s.investmentExchangeRateFromCurrency &&
+        s.investmentExchangeRateToCurrency
+      ) {
+        map.set(s.investmentSecurityId, {
+          from: s.investmentExchangeRateFromCurrency,
+          to: s.investmentExchangeRateToCurrency,
+        });
+      }
+    }
+    return map;
+  }
+
   private async createSplits(
     scheduledTransactionId: string,
     splits: CreateScheduledTransactionSplitDto[],
@@ -1013,13 +1040,20 @@ export class ScheduledTransactionsService {
     // account, so there is no separate funding account.
     userId: string,
     accountId: string,
-    // Whether to stamp the current settlement pair onto each split rate. True
-    // only when the rate is genuinely fresh (schedule create). On an update the
-    // form resends the stored scalar unchanged, so stamping the current pair
-    // would relabel a since-stale rate as belonging to the new pair (issue #1167
-    // review); those rows are written with a null pair instead, so posting
-    // re-resolves rather than trusting an unprovable scalar.
-    stampProvenance: boolean,
+    // How to record the currency-pair provenance of each per-split investment
+    // rate (issue #1167):
+    //   - "fresh" (schedule create): the rate is genuinely new, so stamp the
+    //     current settlement pair.
+    //   - a map of security id -> the pair the *existing* split recorded
+    //     (schedule update): the form resends stored rates unchanged, so stamping
+    //     the current pair would relabel a since-stale rate as belonging to the
+    //     new pair (the re-bless the earlier review caught). Carry the old pair
+    //     forward instead -- a rate whose pair is unchanged keeps working, and a
+    //     rate whose security or account currency has changed since is still
+    //     caught at posting because its old pair no longer matches. A split with
+    //     no old pair for its security (a newly added one, or a swapped security)
+    //     gets a null pair and re-resolves at posting.
+    provenanceSource: "fresh" | Map<string, { from: string; to: string }>,
   ): Promise<ScheduledTransactionSplit[]> {
     const savedSplits: ScheduledTransactionSplit[] = [];
 
@@ -1048,20 +1082,35 @@ export class ScheduledTransactionsService {
             ? SplitKind.TRANSFER
             : SplitKind.CATEGORY;
 
-      const investmentRateProvenance =
-        stampProvenance &&
-        inferredKind === SplitKind.INVESTMENT &&
-        split.investment
-          ? await this.resolveInvestmentRateProvenance(
-              userId,
-              split.investment.exchangeRate ?? null,
-              {
-                accountId,
-                fundingAccountId: null,
-                securityId: split.investment.securityId ?? null,
-              },
-            )
-          : { from: null, to: null };
+      const isInvestmentSplit =
+        inferredKind === SplitKind.INVESTMENT && !!split.investment;
+      const splitHasRate =
+        isInvestmentSplit && split.investment!.exchangeRate != null;
+      let investmentRateProvenance: {
+        from: string | null;
+        to: string | null;
+      } = { from: null, to: null };
+      if (splitHasRate) {
+        if (provenanceSource === "fresh") {
+          investmentRateProvenance = await this.resolveInvestmentRateProvenance(
+            userId,
+            split.investment!.exchangeRate ?? null,
+            {
+              accountId,
+              fundingAccountId: null,
+              securityId: split.investment!.securityId ?? null,
+            },
+          );
+        } else if (split.investment!.securityId) {
+          // Carry the existing split's recorded pair for this security forward.
+          investmentRateProvenance = provenanceSource.get(
+            split.investment!.securityId,
+          ) ?? {
+            from: null,
+            to: null,
+          };
+        }
+      }
 
       const entity = manager.create(ScheduledTransactionSplit, {
         scheduledTransactionId,
@@ -1125,7 +1174,7 @@ export class ScheduledTransactionsService {
    * supplied and may be stale for the current settlement pair, whereas the
    * forecast needs a rate that is safe to project with *now*. It goes through
    * the same settlement-pair + FX resolution path as posting
-   * (`resolveCashExchangeRateOrNull`, no supplied rate, latest snapshot):
+   * (`resolveCashExchangeRateOrNull`, no supplied rate):
    *   - same currency -> `1`;
    *   - a determinable current rate -> that rate;
    *   - a genuine cross-currency pair with no rate -> `null` (unknown), which the
@@ -1133,10 +1182,18 @@ export class ScheduledTransactionsService {
    *     rate. `null` is never returned for a same-currency pair, so the forecast
    *     cannot mistake "1:1" for "missing".
    * Returns `null` for a non-investment schedule (the forecast ignores it there).
+   *
+   * `asOf` is today: the forecast's occurrences are future-dated, and
+   * `getRateForDate` clamps a future date to today. Passing a date (rather than
+   * omitting it) is deliberate -- it takes the same provider-capable rate path
+   * posting uses, so the forecast does not say "unavailable" for a pair posting
+   * could resolve. Because that path can perform an external fetch (and persist
+   * the result), the caller runs this *outside* the `findAll` transaction.
    */
   private async resolveInvestmentForecastRate(
     userId: string,
     transaction: ScheduledTransaction,
+    asOf: Date,
   ): Promise<number | null> {
     if (!transaction.isInvestment || !transaction.investmentAction) {
       return null;
@@ -1150,7 +1207,7 @@ export class ScheduledTransactionsService {
         : null,
       transaction.investmentSecurityId,
       undefined,
-      undefined,
+      asOf,
     );
   }
 
@@ -1162,7 +1219,7 @@ export class ScheduledTransactionsService {
       investmentForecastExchangeRate?: number | null;
     })[]
   > {
-    return withScopedDb(this.dataSource, async (m) => {
+    const rows = await withScopedDb(this.dataSource, async (m) => {
       const transactions = await m
         .getRepository(ScheduledTransaction)
         .createQueryBuilder("st")
@@ -1250,28 +1307,35 @@ export class ScheduledTransactionsService {
         }
       }
 
-      // Resolve the forecast FX rate for each investment schedule (issue #1167).
-      // Only investment rows incur the lookup; same-currency ones short-circuit
-      // to 1 without a rate fetch.
-      const forecastRates = new Map<string, number | null>();
-      for (const t of transactions) {
-        if (t.isInvestment && t.investmentAction) {
-          forecastRates.set(
-            t.id,
-            await this.resolveInvestmentForecastRate(userId, t),
-          );
-        }
-      }
-
       return transactions.map((transaction) => ({
         ...transaction,
         overrideCount: countMap.get(transaction.id) || 0,
         nextOverride: nextOverrideMap.get(transaction.id) || null,
         futureOverrides: futureOverridesMap.get(transaction.id) || [],
-        investmentForecastExchangeRate:
-          forecastRates.get(transaction.id) ?? null,
       }));
     });
+
+    // Resolve the forecast FX rate for each investment schedule OUTSIDE the list
+    // transaction (issue #1167). The provider-capable rate path can perform an
+    // external fetch and persist the result, which must not run inside the long
+    // read transaction. Sequential so the first resolution of a pair persists it
+    // before the next schedule needs it (a natural dedup within one list read);
+    // same-currency rows short-circuit to 1 with no rate lookup at all.
+    const asOf = new Date();
+    const result: (ScheduledTransaction & {
+      overrideCount?: number;
+      nextOverride?: ScheduledTransactionOverride | null;
+      futureOverrides?: ScheduledTransactionOverride[];
+      investmentForecastExchangeRate?: number | null;
+    })[] = [];
+    for (const row of rows) {
+      const investmentForecastExchangeRate =
+        row.isInvestment && row.investmentAction
+          ? await this.resolveInvestmentForecastRate(userId, row, asOf)
+          : null;
+      result.push({ ...row, investmentForecastExchangeRate });
+    }
+    return result;
   }
 
   async findOne(userId: string, id: string): Promise<ScheduledTransaction> {
@@ -1887,6 +1951,16 @@ export class ScheduledTransactionsService {
 
       if (splits !== undefined) {
         if (Array.isArray(splits) && splits.length > 0) {
+          // Capture the existing splits' recorded pairs before deleting them, so
+          // a resent-unchanged rate keeps its provenance rather than being
+          // relabelled with the current pair (issue #1167 re-review). All splits
+          // for one security share one pair (security currency -> account
+          // currency), so a per-security map is unambiguous.
+          const oldSplits = await m.find(ScheduledTransactionSplit, {
+            where: { scheduledTransactionId: id },
+          });
+          const oldProvenanceBySecurityId =
+            this.splitProvenanceBySecurityId(oldSplits);
           await m.delete(ScheduledTransactionSplit, {
             scheduledTransactionId: id,
           });
@@ -1896,10 +1970,7 @@ export class ScheduledTransactionsService {
             m,
             userId,
             updateData.accountId ?? current.accountId,
-            // Update: the form resends stored split rates unchanged, so do not
-            // stamp the current pair onto them (issue #1167 review). They are
-            // written with a null pair and re-resolved at posting.
-            false,
+            oldProvenanceBySecurityId,
           );
           await m.update(ScheduledTransaction, id, {
             isSplit: true,
@@ -2701,8 +2772,8 @@ export class ScheduledTransactionsService {
     // account currency). If the referenced security or account changed currency
     // since the rate was stored, the pair no longer matches, so drop the scalar
     // and let the posting resolver re-resolve a fresh rate for the current pair.
-    // A rate with no recorded pair (a row written before this change) is trusted
-    // as before.
+    // A rate with no recorded pair (a row written before this change) is unknown,
+    // not current, so it is dropped and re-resolved too -- never trusted.
     if (
       exchangeRate !== undefined &&
       !(await this.storedInvestmentRateIsCurrent(
@@ -2906,14 +2977,46 @@ export class ScheduledTransactionsService {
     updateDto: UpdateScheduledTransactionOverrideDto,
   ): Promise<ScheduledTransactionOverride> {
     await this.findOne(userId, scheduledTransactionId);
-    // Deliberately no provenance derivation here (issue #1167 review): an
-    // override edit resends the stored split rate unchanged, so stamping the
-    // current pair onto it would relabel a since-stale rate. The override's
-    // split rates are written with no pair on update and re-resolved at posting.
+    // Do not stamp the *current* pair onto a resent override split rate -- that
+    // would relabel a since-stale rate (issue #1167 review). Instead carry the
+    // pair the existing override recorded for that security forward, so a rate
+    // whose pair is unchanged keeps working while a since-changed pair is still
+    // caught at posting; a split with no prior pair for its security re-resolves.
+    const existing = await this.overrideService.findOverride(
+      scheduledTransactionId,
+      overrideId,
+    );
+    const oldBySecurity = new Map<string, { from: string; to: string }>();
+    for (const s of existing.splits ?? []) {
+      const inv = s.investment;
+      if (
+        inv?.securityId &&
+        inv.exchangeRateFromCurrency &&
+        inv.exchangeRateToCurrency
+      ) {
+        oldBySecurity.set(inv.securityId, {
+          from: inv.exchangeRateFromCurrency,
+          to: inv.exchangeRateToCurrency,
+        });
+      }
+    }
+    const investmentProvenance = new Map<
+      number,
+      { from: string; to: string }
+    >();
+    (updateDto.splits ?? []).forEach((s, index) => {
+      const inv = s.investment;
+      if (inv?.exchangeRate === undefined || inv?.exchangeRate === null) return;
+      const carried = inv.securityId
+        ? oldBySecurity.get(inv.securityId)
+        : undefined;
+      if (carried) investmentProvenance.set(index, carried);
+    });
     return this.overrideService.updateOverride(
       scheduledTransactionId,
       overrideId,
       updateDto,
+      investmentProvenance,
     );
   }
 

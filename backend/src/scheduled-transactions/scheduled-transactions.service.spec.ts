@@ -223,6 +223,9 @@ describe("ScheduledTransactionsService", () => {
     );
     txManager.save.mockImplementation((data: unknown) => Promise.resolve(data));
     txManager.findBy.mockResolvedValue([]);
+    // The update split-rewrite reads the existing splits (to carry their FX pair
+    // provenance forward, issue #1167) before deleting them; default to none.
+    txManager.find.mockResolvedValue([]);
     txManager.createQueryBuilder.mockImplementation(() => ({
       delete: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
@@ -599,8 +602,9 @@ describe("ScheduledTransactionsService", () => {
       const result = await service.findAll(userId);
 
       expect(result[0].investmentForecastExchangeRate).toBe(1.35);
-      // Resolved with no supplied rate (the stale scalar is never trusted) and
-      // the schedule's settlement tuple.
+      // Resolved with no supplied rate (the stale scalar is never trusted), the
+      // schedule's settlement tuple, and today's date so it takes the same
+      // provider-capable rate path as posting (issue #1167 re-review).
       expect(
         investmentTransactionsService.resolveCashExchangeRateOrNull,
       ).toHaveBeenCalledWith(
@@ -609,7 +613,7 @@ describe("ScheduledTransactionsService", () => {
         null,
         "sec-usd",
         undefined,
-        undefined,
+        expect.any(Date),
       );
     });
 
@@ -4908,7 +4912,10 @@ describe("ScheduledTransactionsService", () => {
       expect(fields.investmentExchangeRateToCurrency).toBe("CAD");
     });
 
-    it("update() writes a null pair for rewritten split rates (re-resolves at posting)", async () => {
+    it("update() carries an existing split's recorded pair forward (a cosmetic edit keeps a valid rate)", async () => {
+      // A cosmetic edit resends the stored split rate unchanged. The pair is
+      // preserved -- not re-stamped -- so posting can still reuse the valid rate
+      // (or catch it as stale if the pair has since changed).
       stubFindOne(
         makeScheduled({
           isSplit: true,
@@ -4916,9 +4923,61 @@ describe("ScheduledTransactionsService", () => {
           amount: -675,
         } as any),
       );
-      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
-        { from: "USD", to: "CAD" },
+      // The existing (pre-edit) split recorded EUR->CAD for sec-eur.
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          kind: "investment",
+          investmentSecurityId: "sec-eur",
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            amount: -600,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-eur",
+              quantity: 4,
+              price: 100,
+              exchangeRate: 1.5,
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: -75 },
+        ],
+      } as any);
+
+      const createdSplit = mockQueryRunner.manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+      )?.[1];
+      expect(createdSplit).toBeDefined();
+      expect(createdSplit.investmentExchangeRate).toBe(1.5);
+      // The original pair is preserved, not re-stamped to the current one.
+      expect(createdSplit.investmentExchangeRateFromCurrency).toBe("EUR");
+      expect(createdSplit.investmentExchangeRateToCurrency).toBe("CAD");
+      // Preserving does not re-derive the current pair.
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("update() writes a null pair for a split whose security has no prior pair", async () => {
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -675,
+        } as any),
       );
+      // No existing split for sec-usd, so nothing to carry -> re-resolve later.
+      mockQueryRunner.manager.find.mockResolvedValue([]);
       mockQueryRunner.manager.delete = jest
         .fn()
         .mockResolvedValue({ affected: 1 });
@@ -4944,9 +5003,7 @@ describe("ScheduledTransactionsService", () => {
         (c: any[]) =>
           c[0] === ScheduledTransactionSplit && c[1].investmentAction,
       )?.[1];
-      expect(createdSplit).toBeDefined();
       expect(createdSplit.investmentExchangeRate).toBe(1.35);
-      // No pair is stamped onto a round-tripped split rate.
       expect(createdSplit.investmentExchangeRateFromCurrency).toBeNull();
       expect(createdSplit.investmentExchangeRateToCurrency).toBeNull();
       expect(
@@ -4954,7 +5011,7 @@ describe("ScheduledTransactionsService", () => {
       ).not.toHaveBeenCalled();
     });
 
-    it("updateOverride() writes no pair for a rewritten override split rate", async () => {
+    it("updateOverride() carries the existing override split's pair forward", async () => {
       stubFindOne(
         makeScheduled({ isSplit: true, accountId: "acc-cash" } as any),
       );
@@ -4972,8 +5029,8 @@ describe("ScheduledTransactionsService", () => {
             amount: -600,
             investment: {
               action: "BUY",
-              securityId: "sec-usd",
-              exchangeRate: 1.35,
+              securityId: "sec-eur",
+              exchangeRate: 1.5,
               exchangeRateFromCurrency: "EUR",
               exchangeRateToCurrency: "CAD",
             },
@@ -4998,10 +5055,10 @@ describe("ScheduledTransactionsService", () => {
             amount: -600,
             investment: {
               action: "BUY" as any,
-              securityId: "sec-usd",
-              quantity: 5,
+              securityId: "sec-eur",
+              quantity: 4,
               price: 100,
-              exchangeRate: 1.35,
+              exchangeRate: 1.5,
             },
           },
           { splitKind: "category" as any, categoryId: "cat-fees", amount: -75 },
@@ -5009,9 +5066,10 @@ describe("ScheduledTransactionsService", () => {
       } as any);
 
       const inv = (result.splits as any[])[0].investment;
-      expect(inv.exchangeRate).toBe(1.35);
-      expect(inv.exchangeRateFromCurrency).toBeUndefined();
-      expect(inv.exchangeRateToCurrency).toBeUndefined();
+      expect(inv.exchangeRate).toBe(1.5);
+      // The existing pair is carried forward, not re-stamped to the current one.
+      expect(inv.exchangeRateFromCurrency).toBe("EUR");
+      expect(inv.exchangeRateToCurrency).toBe("CAD");
       expect(
         investmentTransactionsService.resolveSettlementCurrencyPair,
       ).not.toHaveBeenCalled();

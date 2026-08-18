@@ -137,11 +137,15 @@ For each of the three surfaces:
    stale scalar was not forwarded.
 2. **Matching pair reuses.** Store a rate with provenance for pair A; post with the
    pair still A; assert the stored rate is forwarded (no re-resolution).
-3. **Legacy row (no provenance) is trusted.** A stored rate with null provenance is
-   forwarded unchanged.
-4. **Store-time provenance.** Creating/updating with a supplied rate records the
-   from/to pair; clearing the rate (settlement-basis change, mode switch) clears
-   the provenance.
+3. **Legacy row (no provenance) is re-resolved.** A stored rate with null
+   provenance is unknown, not current, so it is dropped and re-resolved at
+   posting (never forwarded unchanged).
+4. **Store-time provenance.** Creating with a supplied rate records the from/to
+   pair; clearing the rate (settlement-basis change, mode switch) clears the
+   provenance. A presentation-only edit that leaves the rate and its settlement
+   pair unchanged preserves the existing provenance (parent: value-difference;
+   split/override: the old pair is carried forward per security), so a still-valid
+   stored rate keeps working while a since-changed pair is still caught at posting.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

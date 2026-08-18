@@ -4188,6 +4188,30 @@ describe("InvestmentTransactionsService", () => {
       expect(rate).toBe(1.35);
     });
 
+    it("uses the date-aware (provider-capable) path when a date is supplied", async () => {
+      // The forecast passes today's date so it resolves through the same path as
+      // posting: getRateForDate can obtain a rate the stored snapshot lacks
+      // (issue #1167 re-review). getLatestRate alone would miss it.
+      crossCurrency();
+      exchangeRateService.getLatestRate.mockResolvedValue(null);
+      exchangeRateService.getRateForDate.mockResolvedValue(1.35);
+
+      const rate = await service.resolveCashExchangeRateOrNull(
+        userId,
+        accountId,
+        null,
+        securityId,
+        undefined,
+        new Date("2026-08-18T00:00:00.000Z"),
+      );
+      expect(rate).toBe(1.35);
+      expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
+        "EUR",
+        "CAD",
+        expect.any(Date),
+      );
+    });
+
     it("returns 1 for a same-currency pair (never null)", async () => {
       accountsService.findOne.mockResolvedValue({ ...mockInvestmentAccount });
       securitiesService.findOne.mockResolvedValue({ ...mockSecurity }); // USD
