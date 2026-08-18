@@ -980,6 +980,8 @@ export function toSplitRows(splits: {
   investmentPrice?: number | null;
   investmentCommission?: number | null;
   investmentExchangeRate?: number | null;
+  investmentExchangeRateFromCurrency?: string | null;
+  investmentExchangeRateToCurrency?: string | null;
   // Override JSON shape
   splitKind?: 'category' | 'transfer' | 'investment';
   investment?: {
@@ -989,6 +991,8 @@ export function toSplitRows(splits: {
     price?: number;
     commission?: number;
     exchangeRate?: number;
+    exchangeRateFromCurrency?: string;
+    exchangeRateToCurrency?: string;
   };
 }[]): SplitRow[] {
   return splits.map((split, index) => {
@@ -1020,6 +1024,13 @@ export function toSplitRows(splits: {
         price: Number(split.investmentPrice ?? 0),
         commission: Number(split.investmentCommission ?? 0),
         exchangeRate: Number(split.investmentExchangeRate ?? 1),
+        // Carry the server-recorded currency pair (issue #1167 F5-1) so a Post
+        // that resends this line unchanged lets the server tell a still-valid
+        // rate from a since-stale one, rather than trusting the scalar blindly.
+        exchangeRateFromCurrency:
+          split.investmentExchangeRateFromCurrency ?? undefined,
+        exchangeRateToCurrency:
+          split.investmentExchangeRateToCurrency ?? undefined,
       };
     } else if (split.investment) {
       investment = {
@@ -1029,6 +1040,8 @@ export function toSplitRows(splits: {
         price: split.investment.price,
         commission: split.investment.commission,
         exchangeRate: split.investment.exchangeRate,
+        exchangeRateFromCurrency: split.investment.exchangeRateFromCurrency,
+        exchangeRateToCurrency: split.investment.exchangeRateToCurrency,
       };
     }
     return {

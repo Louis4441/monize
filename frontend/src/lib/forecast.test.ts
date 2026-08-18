@@ -936,6 +936,98 @@ describe('buildForecast', () => {
       expect(jan20?.transactions[0].amount).toBe(-100);
       expect(jan20?.balance).toBe(9900);
     });
+
+    // Issue #1167 F5-2: a per-occurrence override with investment splits projects
+    // the server's effective total, not the override's stale stored amount.
+    it('projects an override investment split at its effective total, not the stale override amount', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'split-inv-ovr',
+        name: 'DCA buy',
+        accountId: 'cash-1',
+        amount: -1350,
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isSplit: true,
+        splits: [
+          { id: 's1', kind: 'investment', amount: -1350, investmentAction: 'BUY', investmentSecurityId: 'sec-usd' },
+        ],
+        investmentForecastAmount: -1350,
+        nextOverride: {
+          overrideDate: '2025-01-20',
+          amount: -1500, // stale snapshot at the old rate
+          isSplit: true,
+          splits: [
+            { splitKind: 'investment', amount: -1500, investment: { action: 'BUY', securityId: 'sec-usd' } },
+          ],
+          // Server re-summed the override's splits at the current rate.
+          investmentForecastAmount: -1350,
+        },
+      } as any)];
+      const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
+      const jan20 = result.find(dp => dp.date === '2025-01-20');
+      expect(jan20?.transactions[0].amount).toBe(-1350);
+      expect(jan20?.balance).toBe(8650);
+    });
+
+    it('projects an override that introduces an investment split over a plain base occurrence', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'plain-base-inv-ovr',
+        name: 'Utility bill',
+        accountId: 'cash-1',
+        amount: -100, // plain base occurrence
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isSplit: false,
+        // Base carries no investment splits.
+        investmentForecastAmount: null,
+        nextOverride: {
+          overrideDate: '2025-01-20',
+          amount: -1500,
+          isSplit: true,
+          splits: [
+            { splitKind: 'investment', amount: -1500, investment: { action: 'BUY', securityId: 'sec-usd' } },
+          ],
+          investmentForecastAmount: -1350,
+        },
+      } as any)];
+      const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
+      const jan20 = result.find(dp => dp.date === '2025-01-20');
+      // The override's effective total wins over both the base -100 and the
+      // stale override -1500.
+      expect(jan20?.transactions[0].amount).toBe(-1350);
+      expect(jan20?.balance).toBe(8650);
+    });
+
+    it('withholds the forecast when an override investment split rate is unknown', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'split-inv-ovr-unknown',
+        name: 'DCA buy',
+        accountId: 'cash-1',
+        amount: -1350,
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isSplit: true,
+        splits: [
+          { id: 's1', kind: 'investment', amount: -1350, investmentAction: 'BUY', investmentSecurityId: 'sec-usd' },
+        ],
+        investmentForecastAmount: -1350, // base is known...
+        nextOverride: {
+          overrideDate: '2025-01-20',
+          amount: -1500,
+          isSplit: true,
+          splits: [
+            { splitKind: 'investment', amount: -1500, investment: { action: 'BUY', securityId: 'sec-usd' } },
+          ],
+          investmentForecastAmount: null, // ...but this occurrence's rate is not
+        },
+      } as any)];
+      const result = buildForecast([cashAccount], transactions, 'month', 'cash-1');
+      expect(result.points).toEqual([]);
+      expect(result.missingCurrencies.length).toBeGreaterThan(0);
+    });
   });
 
   describe('multiple accounts and transactions', () => {

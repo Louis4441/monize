@@ -162,6 +162,24 @@ amount is refused there rather than written.
   of `(source, settlement)`; `resolveCashExchangeRate` consumes it, and a guard
   test (`investment-transactions.service.spec.ts`) keeps the resolver delegating
   to it.
+- **Every posting surface re-resolves, including inline (F5-1).** The manual Post
+  dialog resends the scheduled/override splits as inline `postDto.splits`, echoing
+  the persisted rate and its provenance. An inline investment split is routed
+  through the same effective-rate path as the stored surfaces -- reused only when
+  its echoed pair still matches, otherwise re-resolved; an inline split with no
+  provenance is re-resolved, never trusted. The frontend carries the provenance
+  through `toSplitRows`/`toOverrideSplits` so the round-trip is checkable.
+- **Provenance carry-forward is keyed by security AND rate (F5-3).** One schedule
+  can hold two investment splits for the same security at different rates; keyed by
+  security alone the second overwrites the first, so a resent-unchanged rate that
+  lost the collision is mis-stamped with the current pair. `provenanceKey(securityId,
+  rate)` keys both the store and the lookup, so each tuple keeps its own pair.
+- **Overrides forecast their own effective total (F5-2).** A per-occurrence override
+  carrying investment splits is FX-sensitive too; its stored `amount` is a stale
+  snapshot. The read model attaches `investmentForecastAmount` to each override, and
+  the forecast projects that (or withholds the occurrence when unknown) rather than
+  the override's scalar -- covering both an override that replaces an investment base
+  occurrence and one that introduces investment splits over a plain base.
 
 ## Test matrix (regression obligations)
 
@@ -190,6 +208,24 @@ For each of the three surfaces:
    The forecast half: assert the read model's `investmentForecastAmount` is the
    effective total (not the stale stored `amount`), and `null` for an unresolvable
    line, and that `forecast.ts` projects the effective total / withholds on `null`.
+
+6. **Inline post re-resolves (F5-1).** Post an inline split echoing a stale rate +
+   its provenance; assert it re-resolves and the parent is re-summed. Post an inline
+   split whose provenance still matches; assert the rate is honoured with no
+   re-resolution. Post an inline split with a bare scalar (no provenance); assert it
+   is re-resolved, never trusted. A frontend test asserts `toSplitRows` ->
+   `toOverrideSplits` carries the provenance so the round-trip is possible at all.
+
+7. **Multiple same-security splits keep distinct provenance (F5-3).** Two splits for
+   one security at different stored rates; change the security currency; cosmetic
+   edit resending both rates unchanged; assert neither is re-stamped with the current
+   pair (both keep their original pair, so posting still catches both as stale).
+
+8. **Override forecast parity (F5-2).** An investment override replacing an investment
+   base occurrence, and an override introducing an investment split over a plain base:
+   assert the forecast projects the override's `investmentForecastAmount` (not its
+   stale scalar, not the base), and withholds the series when the override's rate is
+   unknown.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

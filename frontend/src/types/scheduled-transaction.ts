@@ -207,6 +207,13 @@ export interface ScheduledTransactionOverride {
   investmentQuantity: number | null;
   investmentPrice: number | null;
   investmentTotalAmount: number | null;
+  // Read-only, server-resolved effective total this override would post today
+  // when it carries investment splits (issue #1167 F5-2) -- its base splits
+  // re-summed at current FX, so the forecast projects what posting would book
+  // rather than the stale stored `amount`. `null` when the override has no
+  // investment split (forecast uses `amount`) or when any line's current rate is
+  // unknown (forecast withholds this occurrence).
+  investmentForecastAmount?: number | null;
   createdAt: string;
   updatedAt: string;
 }

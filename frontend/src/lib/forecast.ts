@@ -104,6 +104,42 @@ function formatDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** One occurrence produced for the forecast. */
+interface Occurrence {
+  date: string;
+  amount: number;
+  /**
+   * The occurrence's FX-dependent cash amount could not be resolved (issue
+   * #1167): a base or override investment line whose current settlement rate is
+   * unknown. A cumulative forecast withholds the whole series when any occurrence
+   * is unknown, so the flag travels per-occurrence rather than per-schedule -- an
+   * override can be unknown while the base schedule is not, and vice versa.
+   */
+  unknown: boolean;
+}
+
+/**
+ * Does this override carry an embedded investment split? Such an override is
+ * FX-sensitive (issue #1167 F5-2) and projects its server-resolved
+ * `investmentForecastAmount`, not its stale stored `amount`.
+ */
+function overrideHasInvestmentSplits(
+  override: { splits?: { splitKind?: string; investment?: unknown }[] | null },
+): boolean {
+  return (
+    override.splits?.some(
+      s => s.investment != null || s.splitKind === 'investment',
+    ) ?? false
+  );
+}
+
+interface OverrideLookup {
+  overrideDate: string;
+  amount: number | null;
+  hasInvestmentSplits: boolean;
+  investmentForecastAmount?: number | null;
+}
+
 /**
  * Generate all occurrence dates for a scheduled transaction within a date range.
  * Uses override data (amount, date) from futureOverrides for each occurrence.
@@ -112,8 +148,8 @@ function generateOccurrences(
   transaction: ScheduledTransaction,
   startDate: Date,
   endDate: Date
-): Array<{ date: string; amount: number }> {
-  const occurrences: Array<{ date: string; amount: number }> = [];
+): Occurrence[] {
+  const occurrences: Occurrence[] = [];
 
   if (!transaction.isActive) return occurrences;
 
@@ -125,34 +161,69 @@ function generateOccurrences(
   let currentDate = parseLocalDate(transaction.nextDueDate);
   let remainingOccurrences = transaction.occurrencesRemaining;
   const baseAmount = Number(transaction.amount);
+  // Base-schedule FX unknown (parent-investment rate, or embedded-split effective
+  // total). Every base occurrence inherits it; so does an override that falls
+  // through to the base amount.
+  const baseUnknown = hasUnknownForecastRate(transaction);
 
   // Build override lookup map: originalDate -> override
-  const overrideMap = new Map<string, { overrideDate: string; amount: number | null }>();
+  const overrideMap = new Map<string, OverrideLookup>();
+  const toLookup = (o: {
+    overrideDate?: string;
+    amount: number | null;
+    splits?: { splitKind?: string; investment?: unknown }[] | null;
+    investmentForecastAmount?: number | null;
+  }): OverrideLookup => ({
+    // `overrideDate` may be absent on a fallback nextOverride fixture; downstream
+    // treats an absent date as "same date" (uses the occurrence's own date).
+    overrideDate: o.overrideDate ? o.overrideDate.split('T')[0] : '',
+    amount: o.amount,
+    hasInvestmentSplits: overrideHasInvestmentSplits(o),
+    investmentForecastAmount: o.investmentForecastAmount,
+  });
   if (transaction.futureOverrides) {
     for (const o of transaction.futureOverrides) {
       const origKey = o.originalDate.split('T')[0];
-      overrideMap.set(origKey, { overrideDate: o.overrideDate.split('T')[0], amount: o.amount });
+      overrideMap.set(origKey, toLookup(o));
     }
   }
   // Also include nextOverride as fallback (in case futureOverrides is not populated)
   if (transaction.nextOverride && !overrideMap.has(transaction.nextDueDate)) {
-    overrideMap.set(transaction.nextDueDate, {
-      overrideDate: transaction.nextOverride.overrideDate,
-      amount: transaction.nextOverride.amount,
-    });
+    overrideMap.set(transaction.nextDueDate, toLookup(transaction.nextOverride));
   }
+
+  // Resolve the effective amount and unknown flag for one occurrence, given the
+  // override that applies to it (if any). An override carrying investment splits
+  // projects its own server-resolved effective total (#1167 F5-2); one without
+  // uses its stored scalar; a base occurrence uses the base amount.
+  const resolveOccurrence = (
+    override: OverrideLookup | undefined,
+  ): { amount: number; unknown: boolean } => {
+    if (override?.hasInvestmentSplits) {
+      if (override.investmentForecastAmount == null) {
+        return { amount: 0, unknown: true };
+      }
+      return { amount: override.investmentForecastAmount, unknown: false };
+    }
+    if (override && override.amount != null) {
+      return { amount: Number(override.amount), unknown: false };
+    }
+    // No override, or an override that reuses the base amount.
+    return { amount: baseAmount, unknown: baseUnknown };
+  };
 
   // For ONCE frequency, just check if it's in range
   if (transaction.frequency === 'ONCE') {
     const override = overrideMap.get(formatDateKey(currentDate));
     const effectiveDate = override?.overrideDate ? parseLocalDate(override.overrideDate) : currentDate;
-    const effectiveAmount = override?.amount != null ? Number(override.amount) : baseAmount;
+    const { amount, unknown } = resolveOccurrence(override);
     const effectiveTime = effectiveDate.getTime();
     if (effectiveTime >= startTime && effectiveTime <= endTime) {
       if (!txEndTime || effectiveTime <= txEndTime) {
         occurrences.push({
           date: formatDateKey(effectiveDate),
-          amount: effectiveAmount,
+          amount,
+          unknown,
         });
       }
     }
@@ -185,13 +256,14 @@ function generateOccurrences(
     const effectiveDateKey = override?.overrideDate && override.overrideDate !== currentDateKey
       ? formatDateKey(effectiveDate)
       : currentDateKey;
-    const effectiveAmount = override?.amount != null ? Number(override.amount) : baseAmount;
+    const { amount, unknown } = resolveOccurrence(override);
 
     // Only include if effective date is within our forecast range
     if (effectiveTime >= startTime && effectiveTime <= endTime) {
       occurrences.push({
         date: effectiveDateKey,
-        amount: effectiveAmount,
+        amount,
+        unknown,
       });
 
       if (remainingOccurrences !== null) {
@@ -474,13 +546,14 @@ export function buildForecast(
   for (const { transaction: tx, isInbound } of relevantFlows) {
     const occurrences = generateOccurrences(tx, today, endDate);
     const txAccountId = isInbound ? (tx.transferAccountId ?? tx.accountId) : tx.accountId;
-    const unknownRate = hasUnknownForecastRate(tx);
     for (const occ of occurrences) {
       const existing = transactionsByDate.get(occ.date) || [];
       // An investment occurrence with an unresolved current FX rate makes the
       // running balance unknown from here on (issue #1167): record the missing
       // currency and contribute nothing, which withholds the whole series below.
-      if (unknownRate) {
+      // The flag is per-occurrence (F5-2): a base occurrence and an override on
+      // the same schedule can differ.
+      if (occ.unknown) {
         missingRateCurrencies.add(
           tx.investmentSecurity?.currencyCode ??
             accountCurrencyMap.get(txAccountId) ??
@@ -489,7 +562,7 @@ export function buildForecast(
       }
       existing.push({
         name: tx.name,
-        amount: unknownRate
+        amount: occ.unknown
           ? 0
           : conv(isInbound ? -occ.amount : occ.amount, txAccountId),
         scheduledTransactionId: tx.id,
@@ -633,18 +706,18 @@ export function buildMultiAccountForecast(
     }
 
     for (const { transaction, isInbound } of scheduledFlowsForAccount(normalized, account.id)) {
-      const unknownRate = hasUnknownForecastRate(transaction);
       for (const occ of generateOccurrences(transaction, today, endDate)) {
-        // Unresolved current FX for an investment schedule withholds the whole
-        // result (issue #1167), the same as a missing display-currency rate.
-        if (unknownRate) {
+        // Unresolved current FX for an investment occurrence withholds the whole
+        // result (issue #1167), the same as a missing display-currency rate. The
+        // flag is per-occurrence (F5-2).
+        if (occ.unknown) {
           missingRateCurrencies.add(
             transaction.investmentSecurity?.currencyCode ?? account.currencyCode,
           );
         }
         add(occ.date, {
           name: transaction.name,
-          amount: unknownRate
+          amount: occ.unknown
             ? 0
             : conv(isInbound ? -occ.amount : occ.amount, account.currencyCode),
           scheduledTransactionId: transaction.id,

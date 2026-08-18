@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toOverrideSplits } from './splitSerialization';
-import type { SplitRow } from '@/components/transactions/SplitEditor';
+import { toSplitRows, type SplitRow } from '@/components/transactions/SplitEditor';
 
 describe('toOverrideSplits', () => {
   it('preserves splitKind and the investment payload for investment-kind rows', () => {
@@ -81,6 +81,60 @@ describe('toOverrideSplits', () => {
       splitKind: 'category',
       categoryId: 'cat-1',
       transferAccountId: null,
+    });
+  });
+
+  // Issue #1167 F5-1: the Post dialog reads scheduled/override splits with
+  // `toSplitRows` and resends them with `toOverrideSplits`. The FX provenance
+  // (from/to) must survive that round-trip so the server can tell a still-valid
+  // rate from a stale one, instead of trusting the scalar blindly.
+  it('round-trips FX provenance from a scheduled split through the post payload', () => {
+    const rows = toSplitRows([
+      {
+        id: 's1',
+        kind: 'investment',
+        amount: -1500,
+        investmentAction: 'BUY',
+        investmentSecurityId: 'sec-usd',
+        investmentQuantity: 10,
+        investmentPrice: 100,
+        investmentCommission: 0,
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateFromCurrency: 'EUR',
+        investmentExchangeRateToCurrency: 'CAD',
+      },
+    ]);
+    const out = toOverrideSplits(rows);
+    expect(out[0].investment).toMatchObject({
+      action: 'BUY',
+      securityId: 'sec-usd',
+      exchangeRate: 1.5,
+      exchangeRateFromCurrency: 'EUR',
+      exchangeRateToCurrency: 'CAD',
+    });
+  });
+
+  it('round-trips FX provenance from an override split through the post payload', () => {
+    const rows = toSplitRows([
+      {
+        splitKind: 'investment',
+        amount: -1500,
+        investment: {
+          action: 'BUY',
+          securityId: 'sec-usd',
+          quantity: 10,
+          price: 100,
+          commission: 0,
+          exchangeRate: 1.5,
+          exchangeRateFromCurrency: 'EUR',
+          exchangeRateToCurrency: 'CAD',
+        },
+      },
+    ]);
+    const out = toOverrideSplits(rows);
+    expect(out[0].investment).toMatchObject({
+      exchangeRateFromCurrency: 'EUR',
+      exchangeRateToCurrency: 'CAD',
     });
   });
 

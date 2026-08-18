@@ -5181,5 +5181,220 @@ describe("ScheduledTransactionsService", () => {
         investmentTransactionsService.resolveSettlementCurrencyPair,
       ).not.toHaveBeenCalled();
     });
+
+    // ---- F5-1: inline post splits (the manual Post dialog bypass) ----
+
+    it("post() re-resolves a stale INLINE split rate the client resends (F5-1)", async () => {
+      // The manual Post dialog round-trips the scheduled split verbatim as an
+      // inline postDto split, echoing the persisted rate AND its provenance. The
+      // security's currency has since changed, so the stored EUR->CAD pair no
+      // longer matches the current USD->CAD pair: the scalar must be re-resolved,
+      // never trusted just because it arrived as an explicit rate.
+      stubFindOne(
+        makeScheduled({ isSplit: true, accountId: "acc-cash" } as any),
+      );
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+
+      await service.post(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            amount: -1500, // stale amount computed at the old rate
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              commission: 0,
+              exchangeRate: 1.5, // stale scalar
+              exchangeRateFromCurrency: "EUR",
+              exchangeRateToCurrency: "CAD",
+            },
+          },
+        ],
+      } as any);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      // cashImpact -(10*100) = -1000, re-resolved 1.35 -> -1350, never -1500.
+      expect(payload.splits[0].investment.exchangeRate).toBe(1.35);
+      expect(payload.splits[0].amount).toBe(-1350);
+      // Parent is re-summed from the recomputed inline split.
+      expect(payload.amount).toBe(-1350);
+    });
+
+    it("post() reuses a still-valid INLINE split rate whose pair matches (F5-1)", async () => {
+      // Same round-trip, but the pair is unchanged: the client's rate is honoured.
+      stubFindOne(
+        makeScheduled({ isSplit: true, accountId: "acc-cash" } as any),
+      );
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.post(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            amount: -1350,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              commission: 0,
+              exchangeRate: 1.35,
+              exchangeRateFromCurrency: "USD",
+              exchangeRateToCurrency: "CAD",
+            },
+          },
+        ],
+      } as any);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      expect(payload.splits[0].investment.exchangeRate).toBe(1.35);
+      expect(payload.splits[0].amount).toBe(-1350);
+      // No re-resolution: the pair matched, so the stored rate stands.
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("post() re-resolves an INLINE split with NO provenance rather than trusting it (F5-1)", async () => {
+      stubFindOne(
+        makeScheduled({ isSplit: true, accountId: "acc-cash" } as any),
+      );
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+
+      await service.post(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            amount: -1500,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              commission: 0,
+              exchangeRate: 1.5, // scalar with no from/to
+            },
+          },
+        ],
+      } as any);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      // Absent provenance is unknown -> re-resolved, never trusted.
+      expect(payload.splits[0].investment.exchangeRate).toBe(1.35);
+      expect(payload.splits[0].amount).toBe(-1350);
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).toHaveBeenCalled();
+    });
+
+    // ---- F5-3: two splits, same security, different stored rates ----
+
+    it("update() does not re-bless one same-security split when another's rate differs (F5-3)", async () => {
+      // Two persisted splits reference sec-1 with DIFFERENT stored rates. The
+      // security's currency later changed to USD. A cosmetic edit resends both
+      // rates unchanged; keyed by security alone, one entry would overwrite the
+      // other and the loser would be mis-stamped with the current pair. Keyed by
+      // security AND rate, each keeps its own recorded pair.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1525,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          kind: "investment",
+          investmentSecurityId: "sec-1",
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        },
+        {
+          kind: "investment",
+          investmentSecurityId: "sec-1",
+          investmentExchangeRate: 1.55,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            amount: -750,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-1",
+              quantity: 5,
+              price: 100,
+              exchangeRate: 1.5, // resent unchanged
+            },
+          },
+          {
+            splitKind: "investment" as any,
+            amount: -775,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-1",
+              quantity: 5,
+              price: 100,
+              exchangeRate: 1.55, // resent unchanged
+            },
+          },
+        ],
+      } as any);
+
+      const createdSplits = mockQueryRunner.manager.create.mock.calls
+        .filter(
+          (c: any[]) =>
+            c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+        )
+        .map((c: any[]) => c[1]);
+      expect(createdSplits).toHaveLength(2);
+      // BOTH resent-unchanged rates keep their original EUR->CAD pair; neither is
+      // re-stamped to the current USD->CAD, so posting still catches both as stale.
+      for (const s of createdSplits) {
+        expect(s.investmentExchangeRateFromCurrency).toBe("EUR");
+        expect(s.investmentExchangeRateToCurrency).toBe("CAD");
+      }
+      // Preserving both means the current pair is never derived.
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
   });
 });

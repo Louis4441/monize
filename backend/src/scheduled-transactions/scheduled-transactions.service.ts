@@ -1097,10 +1097,21 @@ export class ScheduledTransactionsService {
    * (carry the old pair forward) from a *genuinely re-entered* one (stamp the
    * current pair) -- provenance belongs to the rate+pair tuple, not the security.
    */
-  private splitProvenanceBySecurityId(
+  // Provenance carry-forward is keyed by security id AND the stored rate, never
+  // by security id alone (issue #1167 F5-3). One schedule can hold two investment
+  // splits for the *same* security with *different* stored rates; keyed by
+  // security alone the second overwrites the first, so the first's resent-unchanged
+  // rate no longer matches any entry and is wrongly treated as "changed" -- which
+  // stamps the current pair onto a stale rate. The rate is part of the identity of
+  // the tuple whose pair we are preserving, so it belongs in the key.
+  private provenanceKey(securityId: string, rate: number): string {
+    return `${securityId}::${rate}`;
+  }
+
+  private splitProvenanceBySecurityAndRate(
     splits: ScheduledTransactionSplit[],
-  ): Map<string, { rate: number; from: string; to: string }> {
-    const map = new Map<string, { rate: number; from: string; to: string }>();
+  ): Map<string, { from: string; to: string }> {
+    const map = new Map<string, { from: string; to: string }>();
     for (const s of splits) {
       if (
         s.kind === SplitKind.INVESTMENT &&
@@ -1110,11 +1121,16 @@ export class ScheduledTransactionsService {
         s.investmentExchangeRateFromCurrency &&
         s.investmentExchangeRateToCurrency
       ) {
-        map.set(s.investmentSecurityId, {
-          rate: Number(s.investmentExchangeRate),
-          from: s.investmentExchangeRateFromCurrency,
-          to: s.investmentExchangeRateToCurrency,
-        });
+        map.set(
+          this.provenanceKey(
+            s.investmentSecurityId,
+            Number(s.investmentExchangeRate),
+          ),
+          {
+            from: s.investmentExchangeRateFromCurrency,
+            to: s.investmentExchangeRateToCurrency,
+          },
+        );
       }
     }
     return map;
@@ -1134,17 +1150,15 @@ export class ScheduledTransactionsService {
     // rate (issue #1167):
     //   - "fresh" (schedule create): the rate is genuinely new, so stamp the
     //     current settlement pair.
-    //   - a map of security id -> the existing split's {rate, pair}
-    //     (schedule update): provenance belongs to the rate+pair tuple, so only a
-    //     *resent-unchanged* rate carries the old pair forward -- a rate whose
-    //     pair is unchanged keeps working, and one whose currency has since
-    //     changed is caught at posting because its old pair no longer matches. A
-    //     *changed* rate (the user re-entered it for the new pair) or a new
-    //     security is genuinely fresh, so it stamps the current pair -- never the
-    //     old one, which would reject a rate the user just entered.
-    provenanceSource:
-      | "fresh"
-      | Map<string, { rate: number; from: string; to: string }>,
+    //   - a map keyed by `provenanceKey(securityId, rate)` -> the existing
+    //     split's pair (schedule update): provenance belongs to the rate+pair
+    //     tuple, so only a *resent-unchanged* rate carries the old pair forward
+    //     -- a rate whose pair is unchanged keeps working, and one whose currency
+    //     has since changed is caught at posting because its old pair no longer
+    //     matches. A *changed* rate (the user re-entered it for the new pair) or
+    //     a new security is genuinely fresh, so it stamps the current pair --
+    //     never the old one, which would reject a rate the user just entered.
+    provenanceSource: "fresh" | Map<string, { from: string; to: string }>,
   ): Promise<ScheduledTransactionSplit[]> {
     const savedSplits: ScheduledTransactionSplit[] = [];
 
@@ -1185,11 +1199,14 @@ export class ScheduledTransactionsService {
         const incomingRate = Number(split.investment!.exchangeRate);
         const carried =
           provenanceSource !== "fresh" && split.investment!.securityId
-            ? provenanceSource.get(split.investment!.securityId)
+            ? provenanceSource.get(
+                this.provenanceKey(split.investment!.securityId, incomingRate),
+              )
             : undefined;
-        if (carried && carried.rate === incomingRate) {
-          // Resent-unchanged rate: carry its recorded pair forward so posting can
-          // reuse a still-valid rate or catch a since-stale one.
+        if (carried) {
+          // Resent-unchanged rate (same security AND same rate): carry its
+          // recorded pair forward so posting can reuse a still-valid rate or
+          // catch a since-stale one.
           investmentRateProvenance = { from: carried.from, to: carried.to };
         } else if (split.investment!.securityId) {
           // Fresh create, a genuinely changed rate, or a new security: the rate
@@ -1378,6 +1395,60 @@ export class ScheduledTransactionsService {
     return sumMoney(amounts);
   }
 
+  /**
+   * The effective total a *per-occurrence override* would post today for its own
+   * investment splits (issue #1167 F5-2). An override's stored `amount` is a
+   * snapshot at the rate current when it was created, so the forecast must not
+   * project it once a referenced security's currency has changed -- posting
+   * re-resolves the override's splits, and the forecast has to agree.
+   *
+   * Returns `null` when the override carries no investment split (so the forecast
+   * uses the override's own stored `amount` as before), and also `null` when any
+   * investment line's current rate is unknown (the forecast then withholds this
+   * occurrence). The override settles through the same account as the base
+   * schedule, so the pair derivation is identical.
+   */
+  private async resolveOverrideInvestmentForecastAmount(
+    userId: string,
+    scheduled: ScheduledTransaction,
+    override: ScheduledTransactionOverride,
+    asOf: Date,
+  ): Promise<number | null> {
+    if (!override.isSplit || !override.splits?.length) {
+      return null;
+    }
+    const hasInvestmentSplit = override.splits.some((s) => s.investment);
+    if (!hasInvestmentSplit) {
+      return null;
+    }
+    const amounts: number[] = [];
+    for (const split of override.splits) {
+      const inv = split.investment;
+      if (inv) {
+        const eff = await this.resolveEffectiveSplitCashOrNull(
+          userId,
+          scheduled.accountId,
+          inv.securityId,
+          inv.action as InvestmentAction,
+          Number(inv.quantity ?? 0),
+          Number(inv.price ?? 0),
+          Number(inv.commission ?? 0),
+          inv.exchangeRate,
+          inv.exchangeRateFromCurrency,
+          inv.exchangeRateToCurrency,
+          asOf,
+        );
+        if (eff === null) {
+          return null;
+        }
+        amounts.push(eff.amount);
+      } else {
+        amounts.push(Number(split.amount));
+      }
+    }
+    return sumMoney(amounts);
+  }
+
   async findAll(userId: string): Promise<
     (ScheduledTransaction & {
       overrideCount?: number;
@@ -1507,8 +1578,35 @@ export class ScheduledTransactionsService {
       // null for every other schedule leaves the forecast on `amount`.
       const investmentForecastAmount =
         await this.resolveInvestmentForecastSplitAmount(userId, row, asOf);
+      // Each override that carries investment splits gets its own effective
+      // total too (F5-2): a per-occurrence override with investment splits is
+      // FX-sensitive the same way the base schedule is, and its stored `amount`
+      // is a stale snapshot once a security's currency changes.
+      const augmentOverride = async (
+        override: ScheduledTransactionOverride | null | undefined,
+      ) => {
+        if (!override) return override ?? null;
+        const overrideForecastAmount =
+          await this.resolveOverrideInvestmentForecastAmount(
+            userId,
+            row,
+            override,
+            asOf,
+          );
+        return Object.assign(override, {
+          investmentForecastAmount: overrideForecastAmount,
+        });
+      };
+      const nextOverride = await augmentOverride(row.nextOverride);
+      const futureOverrides = row.futureOverrides
+        ? await Promise.all(row.futureOverrides.map(augmentOverride))
+        : row.futureOverrides;
       result.push({
         ...row,
+        nextOverride,
+        futureOverrides: futureOverrides as
+          | ScheduledTransactionOverride[]
+          | undefined,
         investmentForecastExchangeRate,
         investmentForecastAmount,
       });
@@ -2131,14 +2229,14 @@ export class ScheduledTransactionsService {
         if (Array.isArray(splits) && splits.length > 0) {
           // Capture the existing splits' recorded pairs before deleting them, so
           // a resent-unchanged rate keeps its provenance rather than being
-          // relabelled with the current pair (issue #1167 re-review). All splits
-          // for one security share one pair (security currency -> account
-          // currency), so a per-security map is unambiguous.
+          // relabelled with the current pair (issue #1167 re-review). Keyed by
+          // security AND rate, so two splits for one security with different
+          // stored rates do not collide (F5-3).
           const oldSplits = await m.find(ScheduledTransactionSplit, {
             where: { scheduledTransactionId: id },
           });
           const oldProvenanceBySecurityId =
-            this.splitProvenanceBySecurityId(oldSplits);
+            this.splitProvenanceBySecurityAndRate(oldSplits);
           await m.delete(ScheduledTransactionSplit, {
             scheduledTransactionId: id,
           });
@@ -2475,14 +2573,51 @@ export class ScheduledTransactionsService {
 
     if (useSplits) {
       if (hasInlineSplits && postDto?.splits) {
-        transactionPayload.splits = postDto.splits.map((split) => ({
-          splitKind: split.splitKind,
-          categoryId: split.categoryId || undefined,
-          transferAccountId: split.transferAccountId || undefined,
-          investment: split.investment,
-          amount: Number(split.amount),
-          memo: split.memo || undefined,
-        }));
+        // Inline splits come from the client (the manual Post dialog resends the
+        // scheduled/override splits verbatim). An investment line's stored FX
+        // scalar must NOT be trusted just because it arrived as an explicit rate
+        // -- that is the exact #1167 bypass (F5-1): the dialog round-trips the
+        // persisted rate, and without re-resolution a since-changed pair commits
+        // the stale figure. So each investment line is resolved through the same
+        // effective-rate path as the stored surfaces, using the provenance the
+        // client echoes back: a rate whose recorded pair still matches is reused,
+        // otherwise it is re-resolved for the current pair. A line with no
+        // provenance is re-resolved, never trusted.
+        transactionPayload.splits = await Promise.all(
+          postDto.splits.map(async (split) => {
+            if (split.investment) {
+              const eff = await this.resolveEffectiveSplitCash(
+                userId,
+                scheduled.accountId,
+                split.investment.securityId,
+                split.investment.action,
+                Number(split.investment.quantity ?? 0),
+                Number(split.investment.price ?? 0),
+                Number(split.investment.commission ?? 0),
+                split.investment.exchangeRate,
+                split.investment.exchangeRateFromCurrency,
+                split.investment.exchangeRateToCurrency,
+                postDate,
+              );
+              return {
+                splitKind: split.splitKind,
+                categoryId: split.categoryId || undefined,
+                transferAccountId: split.transferAccountId || undefined,
+                investment: { ...split.investment, exchangeRate: eff.rate },
+                amount: eff.amount,
+                memo: split.memo || undefined,
+              };
+            }
+            return {
+              splitKind: split.splitKind,
+              categoryId: split.categoryId || undefined,
+              transferAccountId: split.transferAccountId || undefined,
+              investment: split.investment,
+              amount: Number(split.amount),
+              memo: split.memo || undefined,
+            };
+          }),
+        );
       } else if (storedOverride?.splits && storedOverride.splits.length > 0) {
         transactionPayload.splits = await Promise.all(
           storedOverride.splits.map(async (split: any) => {
@@ -2595,14 +2730,15 @@ export class ScheduledTransactionsService {
       }
 
       // Investment split amounts above are recomputed from the effective FX rate
-      // (issue #1167): a re-resolved rate produces a new cash amount, so the
-      // parent must be re-summed to match or `validateSplitAmountSum` refuses the
-      // whole post. Inline splits come straight from the client, which sends a
-      // consistent parent amount alongside them, so those are left untouched.
+      // (issue #1167), on every surface -- inline, override and base scheduled
+      // splits. A re-resolved rate produces a new cash amount, so the parent must
+      // be re-summed to match or `validateSplitAmountSum` refuses the whole post.
+      // Inline splits are re-resolved too (F5-1), so their parent must be re-summed
+      // as well -- the client's parent amount was computed from the stale rate.
       const hasInvestmentSplits =
         Array.isArray(transactionPayload.splits) &&
         transactionPayload.splits.some((s: any) => s.investment);
-      if (hasInvestmentSplits && !(hasInlineSplits && postDto?.splits)) {
+      if (hasInvestmentSplits) {
         transactionPayload.amount = sumMoney(
           transactionPayload.splits.map((s: any) => Number(s.amount)),
         );
@@ -3216,9 +3352,11 @@ export class ScheduledTransactionsService {
       scheduledTransactionId,
       overrideId,
     );
-    const oldBySecurity = new Map<
+    // Keyed by security id AND stored rate, so two override splits for one
+    // security with different rates do not collide (issue #1167 F5-3).
+    const oldBySecurityAndRate = new Map<
       string,
-      { rate: number; from: string; to: string }
+      { from: string; to: string }
     >();
     for (const s of existing.splits ?? []) {
       const inv = s.investment;
@@ -3229,11 +3367,13 @@ export class ScheduledTransactionsService {
         inv.exchangeRateFromCurrency &&
         inv.exchangeRateToCurrency
       ) {
-        oldBySecurity.set(inv.securityId, {
-          rate: Number(inv.exchangeRate),
-          from: inv.exchangeRateFromCurrency,
-          to: inv.exchangeRateToCurrency,
-        });
+        oldBySecurityAndRate.set(
+          this.provenanceKey(inv.securityId, Number(inv.exchangeRate)),
+          {
+            from: inv.exchangeRateFromCurrency,
+            to: inv.exchangeRateToCurrency,
+          },
+        );
       }
     }
     const investmentProvenance = new Map<
@@ -3245,9 +3385,11 @@ export class ScheduledTransactionsService {
       if (inv?.exchangeRate === undefined || inv?.exchangeRate === null)
         continue;
       const carried = inv.securityId
-        ? oldBySecurity.get(inv.securityId)
+        ? oldBySecurityAndRate.get(
+            this.provenanceKey(inv.securityId, Number(inv.exchangeRate)),
+          )
         : undefined;
-      if (carried && carried.rate === Number(inv.exchangeRate)) {
+      if (carried) {
         investmentProvenance.set(index, { from: carried.from, to: carried.to });
       } else if (inv.securityId) {
         const pair =

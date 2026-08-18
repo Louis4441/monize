@@ -20,9 +20,11 @@ export interface InvestmentSplitDetails {
   price?: number;
   commission?: number;
   exchangeRate?: number;
-  // Currency pair a stored exchangeRate was resolved for, populated by the
-  // server on scheduled-transaction override responses (issue #1167). Read-only
-  // and derived server-side; the client never sends these.
+  // Currency pair a stored exchangeRate was resolved for (issue #1167),
+  // populated by the server on scheduled-transaction split/override responses.
+  // Server-derived; the client never *invents* these, but it does echo them back
+  // unchanged when posting a scheduled occurrence (F5-1) so the server can tell a
+  // rate that still belongs to the current settlement pair from a stale one.
   exchangeRateFromCurrency?: string;
   exchangeRateToCurrency?: string;
   description?: string;
