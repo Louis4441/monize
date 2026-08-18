@@ -6,11 +6,54 @@ vi.mock("@/lib/pdf-export", () => ({
   exportToPdf: vi.fn().mockResolvedValue(undefined),
 }));
 
+const mockExportToCsv = vi.fn();
+vi.mock("@/lib/csv-export", () => ({
+  exportToCsv: (...args: any[]) => mockExportToCsv(...args),
+}));
+
 vi.mock("@/components/ui/ExportDropdown", () => ({
   ExportDropdown: ({ onExportCsv, onExportPdf }: any) => (
     <div data-testid="export-dropdown">
       {onExportCsv && <button data-testid="export-csv" onClick={onExportCsv}>CSV</button>}
       <button data-testid="export-pdf" onClick={onExportPdf}>PDF</button>
+    </div>
+  ),
+}));
+
+// The real DateInput carries locale parsing and a calendar popover neither of
+// which this report owns; a plain field keeps the test about the report.
+vi.mock("@/components/ui/DateInput", () => ({
+  DateInput: ({ label, value, onDateChange, ...props }: any) => (
+    <label>
+      {label}
+      <input
+        value={value ?? ""}
+        onChange={(e) => onDateChange?.(e.target.value)}
+        {...props}
+      />
+    </label>
+  ),
+}));
+
+vi.mock("@/components/ui/MultiSelect", () => ({
+  MultiSelect: ({ label, options, value, onChange }: any) => (
+    <div data-testid={`multiselect-${label}`}>
+      <span>{label}</span>
+      {options.map((option: any) => (
+        <button
+          key={option.value}
+          data-testid={`option-${option.value}`}
+          onClick={() =>
+            onChange(
+              value.includes(option.value)
+                ? value.filter((v: string) => v !== option.value)
+                : [...value, option.value],
+            )
+          }
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   ),
 }));
@@ -28,9 +71,14 @@ vi.mock("@/hooks/useNumberFormat", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useDateFormat", () => ({
+  useDateFormat: () => ({ formatDate: (d: string) => `date(${d})` }),
+}));
+
 vi.mock("@/hooks/useExchangeRates", () => ({
   useExchangeRates: () => ({
-    convertToDefault: (amount: number, _currency: string) => amount,
+    convertToDefault: (amount: number, currency: string) =>
+      currency === "XXX" ? null : amount,
     defaultCurrency: "CAD",
   }),
 }));
@@ -43,14 +91,8 @@ vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: any) => (
     <div data-testid="responsive-container">{children}</div>
   ),
-  PieChart: ({ children }: any) => (
-    <div data-testid="pie-chart">{children}</div>
-  ),
-  Pie: ({ onClick, data }: any) => (
-    <div>
-      <button data-testid="pie-click" onClick={() => onClick && onClick(data?.[0] ?? {})}>click</button>
-    </div>
-  ),
+  PieChart: ({ children }: any) => <div data-testid="pie-chart">{children}</div>,
+  Pie: () => null,
   Cell: () => null,
   Tooltip: ({ content }: any) => {
     if (content && content.type) {
@@ -58,7 +100,7 @@ vi.mock("recharts", () => ({
       try {
         return (
           <div>
-            <C active={true} payload={[{ payload: { name: 'Cat', value: 100, percentage: 50, count: 2 } }]} />
+            <C active={true} payload={[{ payload: { name: "Cat", value: 100 } }]} />
             <C active={false} payload={[]} />
           </div>
         );
@@ -71,17 +113,19 @@ vi.mock("recharts", () => ({
 }));
 
 const mockGetAll = vi.fn();
-const mockGetPortfolioSummary = vi.fn();
+const mockGetBalancesAsOf = vi.fn();
+const mockGetInstitutions = vi.fn();
 
 vi.mock("@/lib/accounts", () => ({
   accountsApi: {
     getAll: (...args: any[]) => mockGetAll(...args),
+    getBalancesAsOf: (...args: any[]) => mockGetBalancesAsOf(...args),
   },
 }));
 
-vi.mock("@/lib/investments", () => ({
-  investmentsApi: {
-    getPortfolioSummary: (...args: any[]) => mockGetPortfolioSummary(...args),
+vi.mock("@/lib/institutions", () => ({
+  institutionsApi: {
+    getAll: (...args: any[]) => mockGetInstitutions(...args),
   },
 }));
 
@@ -94,122 +138,165 @@ vi.mock("@/lib/logger", () => ({
   }),
 }));
 
+const TODAY = new Date().toISOString().slice(0, 10);
+
+function acc(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "acc-1",
+    name: "Chequing",
+    accountType: "CHEQUING",
+    accountSubType: null,
+    currencyCode: "CAD",
+    isClosed: false,
+    isFavourite: false,
+    institution: null,
+    institutionId: null,
+    currentBalance: 0,
+    ...overrides,
+  };
+}
+
+function balance(accountId: string, value: number, overrides: Record<string, unknown> = {}) {
+  return {
+    accountId,
+    currencyCode: "CAD",
+    balance: value,
+    marketValue: null,
+    knownMarketValueSubtotal: 0,
+    unpricedHoldingsCount: 0,
+    missingRatePairs: [],
+    pricesComplete: true,
+    fxComplete: true,
+    valuationComplete: true,
+    ...overrides,
+  };
+}
+
+function balancesFor(rows: any[], asOfDate = TODAY) {
+  return { asOfDate, accounts: rows };
+}
+
 describe("AccountBalancesReport", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockClear();
+    mockExportToCsv.mockClear();
+    mockGetInstitutions.mockResolvedValue([]);
   });
 
   it("shows loading state initially", () => {
     mockGetAll.mockReturnValue(new Promise(() => {}));
-    mockGetPortfolioSummary.mockReturnValue(new Promise(() => {}));
+    mockGetBalancesAsOf.mockReturnValue(new Promise(() => {}));
     render(<AccountBalancesReport />);
     expect(document.querySelector(".animate-pulse")).toBeTruthy();
   });
 
   it("renders empty state when no accounts", async () => {
     mockGetAll.mockResolvedValue([]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([]));
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("No accounts found.")).toBeInTheDocument();
     });
   });
 
-  it("renders summary cards with data", async () => {
-    mockGetAll.mockResolvedValue([
-      {
-        id: "acc-1",
-        name: "Chequing",
-        accountType: "CHEQUING",
-        accountSubType: null,
-        currentBalance: 5000,
-        currencyCode: "CAD",
-        isClosed: false,
-      },
-      {
-        id: "acc-2",
-        name: "Visa",
-        accountType: "CREDIT_CARD",
-        accountSubType: null,
-        currentBalance: -1200,
-        currencyCode: "CAD",
-        isClosed: false,
-      },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+  // A balance is measured at an instant, and the instant a report with no date
+  // chosen is about is today (issue #1198).
+  it("asks the server for today's balances and says which date it is showing", async () => {
+    mockGetAll.mockResolvedValue([acc()]);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 5000)]));
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("Total Assets")).toBeInTheDocument();
     });
-    expect(screen.getByText("Total Liabilities")).toBeInTheDocument();
-    expect(screen.getByText("Net Worth")).toBeInTheDocument();
+    expect(mockGetBalancesAsOf).toHaveBeenCalledWith(TODAY);
+    expect(screen.getByTestId("as-of-caption")).toHaveTextContent(`date(${TODAY})`);
   });
 
-  it("renders filter buttons", async () => {
+  // The behaviour change in docs/specs/account-balances-as-of.md section 2:
+  // the report used to add every future-dated transaction to today's balance
+  // and call the result the balance. It now shows the measured figure.
+  it("shows the server's measured balance, not today's balance plus future rows", async () => {
     mockGetAll.mockResolvedValue([
-      {
-        id: "acc-1",
-        name: "Savings",
-        accountType: "SAVINGS",
-        accountSubType: null,
-        currentBalance: 10000,
-        currencyCode: "CAD",
-        isClosed: false,
-      },
+      acc({ currentBalance: 3000, futureTransactionsSum: 500 }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 3000)]));
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("all")).toBeInTheDocument();
+      expect(screen.getAllByText("$3000.00").length).toBeGreaterThanOrEqual(1);
     });
-    expect(screen.getByText("assets")).toBeInTheDocument();
-    expect(screen.getByText("liabilities")).toBeInTheDocument();
+    expect(screen.queryByText("$3500.00")).not.toBeInTheDocument();
   });
 
-  it("navigates to transactions page on account click", async () => {
+  it("refetches when the date changes and moves the caption with it", async () => {
+    mockGetAll.mockResolvedValue([acc()]);
+    mockGetBalancesAsOf.mockImplementation(async (date: string) =>
+      balancesFor([balance("acc-1", date === "2020-01-01" ? 100 : 5000)], date),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getAllByText("$5000.00").length).toBeGreaterThanOrEqual(1);
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("as-of-date"), {
+        target: { value: "2020-01-01" },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("$100.00").length).toBeGreaterThanOrEqual(1);
+    });
+    expect(mockGetBalancesAsOf).toHaveBeenLastCalledWith("2020-01-01");
+    expect(screen.getByTestId("as-of-caption")).toHaveTextContent("date(2020-01-01)");
+  });
+
+  it("renders summary cards with assets and liabilities", async () => {
     mockGetAll.mockResolvedValue([
-      {
-        id: "acc-1",
-        name: "Chequing",
-        accountType: "CHEQUING",
-        accountSubType: null,
-        currentBalance: 5000,
-        currencyCode: "CAD",
-        isClosed: false,
-      },
+      acc(),
+      acc({ id: "acc-2", name: "Visa", accountType: "CREDIT_CARD" }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", -1200)]),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Total Assets")).toBeInTheDocument();
+    });
+    expect(
+      within(screen.getByTestId("summary-assets")).getByText("$5000.00"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("summary-liabilities")).getByText("$1200.00"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("summary-networth")).getByText("$3800.00"),
+    ).toBeInTheDocument();
+  });
+
+  it("navigates to the register on an account click", async () => {
+    mockGetAll.mockResolvedValue([acc()]);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 5000)]));
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getAllByText("Chequing").length).toBeGreaterThanOrEqual(1);
     });
-    // Click the account row button (not the group header)
-    const buttons = screen
-      .getAllByText("Chequing")
-      .map((el) => el.closest("button"))
-      .filter(Boolean);
-    fireEvent.click(buttons[0]!);
+    fireEvent.click(rowButtons()[0]);
     expect(mockPush).toHaveBeenCalledWith("/transactions?accountId=acc-1");
   });
 
-  it("navigates to investments page for brokerage account click", async () => {
+  it("navigates to investments for a holdings account", async () => {
     mockGetAll.mockResolvedValue([
-      {
+      acc({
         id: "acc-b",
         name: "Brokerage",
         accountType: "INVESTMENT",
         accountSubType: "INVESTMENT_BROKERAGE",
-        currentBalance: 0,
-        currencyCode: "CAD",
-        isClosed: false,
-      },
+      }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue({
-      holdingsByAccount: [
-        { accountId: "acc-b", totalMarketValue: 10000, cashBalance: 500 },
-      ],
-    });
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-b", 0, { marketValue: 10000, knownMarketValueSubtotal: 10000 })]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("Brokerage")).toBeInTheDocument();
@@ -218,466 +305,435 @@ describe("AccountBalancesReport", () => {
     expect(mockPush).toHaveBeenCalledWith("/investments");
   });
 
-  it("filters by assets and liabilities", async () => {
+  it("filters to assets or liabilities", async () => {
     mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-      { id: "acc-2", name: "Visa", accountType: "CREDIT_CARD", accountSubType: null, currentBalance: -1200, currencyCode: "CAD", isClosed: false },
+      acc(),
+      acc({ id: "acc-2", name: "Visa Card", accountType: "CREDIT_CARD" }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", -1000)]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("assets")).toBeInTheDocument();
     });
     await act(async () => { fireEvent.click(screen.getByText("assets")); });
+    expect(rowNames()).toEqual(["Chequing"]);
     await act(async () => { fireEvent.click(screen.getByText("liabilities")); });
-    await act(async () => { fireEvent.click(screen.getByText("all")); });
+    expect(rowNames()).toEqual(["Visa Card"]);
   });
 
-  it("switches to chart view and changes grouping", async () => {
+  it("hides closed accounts by default and shows them on request", async () => {
     mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-      { id: "acc-2", name: "Visa", accountType: "CREDIT_CARD", accountSubType: null, currentBalance: -1200, currencyCode: "CAD", isClosed: false },
+      acc(),
+      acc({ id: "acc-2", name: "Old Savings", accountType: "SAVINGS", isClosed: true }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 800)]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("Total Assets")).toBeInTheDocument();
     });
-    // find chart toggle via title attribute
-    const chartBtn = screen.getByTitle("Chart view");
-    await act(async () => { fireEvent.click(chartBtn); });
+    expect(screen.queryByText("Old Savings")).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Status"), { target: { value: "all" } });
+    });
     await waitFor(() => {
-      expect(screen.getByTestId("pie-chart")).toBeInTheDocument();
+      expect(screen.getByText("Old Savings")).toBeInTheDocument();
     });
   });
 
-  it("exports pdf", async () => {
-    const { exportToPdf } = await import("@/lib/pdf-export");
-    (exportToPdf as any).mockClear();
+  it("filters to favourites", async () => {
     mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
+      acc({ isFavourite: true }),
+      acc({ id: "acc-2", name: "Rainy Day", accountType: "SAVINGS" }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 800)]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("Total Assets")).toBeInTheDocument();
+      expect(screen.getByText("Rainy Day")).toBeInTheDocument();
     });
-    await act(async () => { fireEvent.click(screen.getByTestId('export-pdf')); });
-    expect(exportToPdf).toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Favourites"), {
+        target: { value: "favourites" },
+      });
+    });
+    await waitFor(() => {
+      expect(rowNames()).toEqual(["Chequing"]);
+    });
   });
 
-  it("handles error in loadData", async () => {
-    mockGetAll.mockRejectedValue(new Error('boom'));
-    mockGetPortfolioSummary.mockResolvedValue(null);
+  it("filters by institution, naming the institution record", async () => {
+    mockGetInstitutions.mockResolvedValue([{ id: "inst-1", name: "Big Bank" }]);
+    mockGetAll.mockResolvedValue([
+      acc({ institutionId: "inst-1" }),
+      acc({ id: "acc-2", name: "Elsewhere", accountType: "SAVINGS" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 800)]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText(/Failed to load report data/)).toBeInTheDocument();
+      expect(screen.getByText("Elsewhere")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("option-inst-1")).toHaveTextContent("Big Bank");
+    await act(async () => { fireEvent.click(screen.getByTestId("option-inst-1")); });
+    await waitFor(() => {
+      expect(rowNames()).toEqual(["Chequing"]);
     });
   });
 
-  it("filters out closed accounts", async () => {
+  it("filters by account type", async () => {
     mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Open", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-      { id: "acc-2", name: "Closed", accountType: "SAVINGS", accountSubType: null, currentBalance: 10000, currencyCode: "CAD", isClosed: true },
+      acc(),
+      acc({ id: "acc-2", name: "Rainy Day", accountType: "SAVINGS" }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 800)]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("Total Assets")).toBeInTheDocument();
+      expect(screen.getByText("Rainy Day")).toBeInTheDocument();
     });
-    expect(screen.queryByText('Closed')).not.toBeInTheDocument();
-  });
-
-  it("does not double-count investment cash in brokerage and linked cash account", async () => {
-    mockGetAll.mockResolvedValue([
-      {
-        id: "acc-brokerage",
-        name: "Investments - Brokerage",
-        accountType: "INVESTMENT",
-        accountSubType: "INVESTMENT_BROKERAGE",
-        currentBalance: 0,
-        currencyCode: "CAD",
-        isClosed: false,
-        linkedAccountId: "acc-cash",
-      },
-      {
-        id: "acc-cash",
-        name: "Investments - Cash",
-        accountType: "INVESTMENT",
-        accountSubType: "INVESTMENT_CASH",
-        currentBalance: 5000,
-        currencyCode: "CAD",
-        isClosed: false,
-        linkedAccountId: "acc-brokerage",
-      },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue({
-      holdingsByAccount: [
-        { accountId: "acc-brokerage", totalMarketValue: 10000, cashBalance: 5000 },
-      ],
-    });
-    render(<AccountBalancesReport />);
+    await act(async () => { fireEvent.click(screen.getByTestId("option-SAVINGS")); });
     await waitFor(() => {
-      expect(screen.getByText("Investments")).toBeInTheDocument();
-    });
-    // One row for the pair, worth 10000 (holdings) + 5000 (cash) = 15000 --
-    // not 15000 counted again against the cash half's own 5000.
-    const assetElements = screen.getAllByText("$15000.00");
-    expect(assetElements.length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText("Investments - Brokerage")).not.toBeInTheDocument();
-    expect(screen.queryByText("Investments - Cash")).not.toBeInTheDocument();
-  });
-
-  // Showing the cash the report does know, in a total's place, would read as
-  // the account being worth that much.
-  it("shows no total for an account whose holdings cannot all be priced", async () => {
-    mockGetAll.mockResolvedValue([
-      {
-        id: "acc-brokerage",
-        name: "Investments - Brokerage",
-        accountType: "INVESTMENT",
-        accountSubType: "INVESTMENT_BROKERAGE",
-        currentBalance: 0,
-        currencyCode: "CAD",
-        isClosed: false,
-        linkedAccountId: "acc-cash",
-      },
-      {
-        id: "acc-cash",
-        name: "Investments - Cash",
-        accountType: "INVESTMENT",
-        accountSubType: "INVESTMENT_CASH",
-        currentBalance: 5000,
-        currencyCode: "CAD",
-        isClosed: false,
-        linkedAccountId: "acc-brokerage",
-      },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue({
-      holdingsByAccount: [
-        {
-          accountId: "acc-brokerage",
-          totalMarketValue: 10000,
-          unpricedHoldingsCount: 2,
-          cashBalance: 5000,
-        },
-      ],
-    });
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Investments")).toBeInTheDocument();
-    });
-
-    // The row itself reports no total. The summary cards above still sum the
-    // components they know -- a deliberate, documented gap: a nullable group
-    // total has to be threaded through those cards to mean anything.
-    const row = screen.getByText("Investments").closest("button")!;
-    expect(within(row).getByText("Total unavailable")).toBeInTheDocument();
-    expect(within(row).queryByText("$15000.00")).not.toBeInTheDocument();
-    expect(within(row).queryByText("$5000.00")).not.toBeInTheDocument();
-  });
-
-  it("shows negative net worth with orange styling", async () => {
-    // Liabilities > assets => negative net worth
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Visa", accountType: "CREDIT_CARD", accountSubType: null, currentBalance: -50000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Net Worth")).toBeInTheDocument();
-    });
-    // Net worth will be negative; its element should exist
-    const netWorthEl = screen.getByText("Net Worth").closest("div")?.nextElementSibling;
-    expect(netWorthEl).toBeTruthy();
-  });
-
-  it("switches to chart view and renders pie chart", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-      { id: "acc-2", name: "Savings", accountType: "SAVINGS", accountSubType: null, currentBalance: 10000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Total Assets")).toBeInTheDocument();
-    });
-    // Click the chart view button (SVG circle chart icon)
-    const chartBtn = screen.getByTitle("Chart view");
-    await act(async () => { fireEvent.click(chartBtn); });
-    await waitFor(() => {
-      expect(screen.getByTestId("pie-chart")).toBeInTheDocument();
-    });
-    expect(screen.getByText("By Account Type")).toBeInTheDocument();
-    expect(screen.getByText("By Account")).toBeInTheDocument();
-  });
-
-  it("switches chart grouping to 'by account'", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Total Assets")).toBeInTheDocument();
-    });
-    const chartViewBtn = screen.getByTitle("Chart view");
-    await act(async () => { fireEvent.click(chartViewBtn); });
-    await waitFor(() => {
-      expect(screen.getByText("By Account")).toBeInTheDocument();
-    });
-    await act(async () => { fireEvent.click(screen.getByText("By Account")); });
-    // Legend should show individual account name
-    await waitFor(() => {
-      // The legend item for the account should appear in the chart legend
-      expect(screen.getAllByText("Chequing").length).toBeGreaterThanOrEqual(1);
+      expect(rowNames()).toEqual(["Rainy Day"]);
     });
   });
 
-  it("shows empty chart message when all balances are zero", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Empty Account", accountType: "CHEQUING", accountSubType: null, currentBalance: 0, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Total Assets")).toBeInTheDocument();
-    });
-    const chartViewBtn = screen.getByTitle("Chart view");
-    await act(async () => { fireEvent.click(chartViewBtn); });
-    await waitFor(() => {
-      expect(screen.getByText("No data to display.")).toBeInTheDocument();
-    });
-  });
-
-  it("exports pdf via ExportDropdown", async () => {
-    const { exportToPdf } = await import("@/lib/pdf-export");
-    (exportToPdf as any).mockClear();
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByTestId("export-pdf")).toBeInTheDocument();
-    });
-    await act(async () => { fireEvent.click(screen.getByTestId("export-pdf")); });
-    expect(exportToPdf).toHaveBeenCalled();
-    const call = (exportToPdf as any).mock.calls[0][0];
-    expect(call.title).toBe("Account Balances");
-    expect(call.tableData.headers).toEqual(["Account", "Type", "Balance"]);
-  });
-
-  it("displays account with description", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "My Savings", accountType: "SAVINGS", accountSubType: null, currentBalance: 8000, currencyCode: "CAD", isClosed: false, description: "Emergency fund" },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Emergency fund")).toBeInTheDocument();
-    });
-  });
-
-  it("displays foreign currency conversion for non-default currency account", async () => {
-    // useExchangeRates mock returns defaultCurrency: 'CAD' and convertToDefault passes through
-    // We need the account's currencyCode !== 'CAD' to trigger the conversion display
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "USD Savings", accountType: "SAVINGS", accountSubType: null, currentBalance: 5000, currencyCode: "USD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("USD Savings")).toBeInTheDocument();
-    });
-    // The approximate conversion row should appear since USD !== CAD
-    expect(screen.getByText(/≈/)).toBeInTheDocument();
-  });
-
-  it("shows account with futureTransactionsSum in balance", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 3000, futureTransactionsSum: 500, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getAllByText("Chequing").length).toBeGreaterThanOrEqual(1);
-    });
-    // Balance should be 3000 + 500 = 3500
-    expect(screen.getAllByText("$3500.00").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders unknown account type label as raw type string", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Exotic Account", accountType: "EXOTIC_TYPE", accountSubType: null, currentBalance: 1000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("EXOTIC_TYPE")).toBeInTheDocument();
-    });
-  });
-
-  it("applies liability group red styling for credit card group header", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "My Visa", accountType: "CREDIT_CARD", accountSubType: null, currentBalance: -2000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Credit Card")).toBeInTheDocument();
-    });
-    expect(screen.getByText("My Visa")).toBeInTheDocument();
-    // Group total for liability should show absolute value (may appear in both group header and liabilities card)
-    expect(screen.getAllByText("$2000.00").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("filters to only assets when 'assets' filter selected", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-      { id: "acc-2", name: "Visa Card", accountType: "CREDIT_CARD", accountSubType: null, currentBalance: -1000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("assets")).toBeInTheDocument();
-    });
-    await act(async () => { fireEvent.click(screen.getByText("assets")); });
-    await waitFor(() => {
-      // Chequing appears in both group header and account row
-      expect(screen.getAllByText("Chequing").length).toBeGreaterThanOrEqual(1);
-    });
-    expect(screen.queryByText("Visa Card")).not.toBeInTheDocument();
-  });
-
-  it("filters to only liabilities when 'liabilities' filter selected", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
-      { id: "acc-2", name: "Visa Card", accountType: "CREDIT_CARD", accountSubType: null, currentBalance: -1000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+  it("says so when the filters leave nothing, rather than claiming no accounts", async () => {
+    mockGetAll.mockResolvedValue([acc()]);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 5000)]));
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("liabilities")).toBeInTheDocument();
     });
     await act(async () => { fireEvent.click(screen.getByText("liabilities")); });
     await waitFor(() => {
-      expect(screen.getByText("Visa Card")).toBeInTheDocument();
+      expect(
+        screen.getByText("No accounts match the current filters."),
+      ).toBeInTheDocument();
     });
-    expect(screen.queryByText("Chequing")).not.toBeInTheDocument();
+    expect(screen.queryByText("No accounts found.")).not.toBeInTheDocument();
+    expect(rowNames()).toEqual([]);
   });
 
-  it("switches back to table view after chart view", async () => {
+  it("groups by institution when asked", async () => {
+    mockGetInstitutions.mockResolvedValue([{ id: "inst-1", name: "Big Bank" }]);
     mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Savings", accountType: "SAVINGS", accountSubType: null, currentBalance: 10000, currencyCode: "CAD", isClosed: false },
+      acc({ institutionId: "inst-1" }),
+      acc({ id: "acc-2", name: "Wallet", accountType: "CASH" }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 40)]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("Total Assets")).toBeInTheDocument();
+      expect(screen.getByText("Wallet")).toBeInTheDocument();
     });
-    const chartViewBtn = screen.getByTitle("Chart view");
-    await act(async () => { fireEvent.click(chartViewBtn); });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Group by"), {
+        target: { value: "institution" },
+      });
+    });
     await waitFor(() => {
-      expect(screen.getByTestId("pie-chart")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Big Bank" })).toBeInTheDocument();
     });
-    // Switch back to table view
-    const tableViewBtn = screen.getByTitle("Table view");
-    await act(async () => { fireEvent.click(tableViewBtn); });
-    await waitFor(() => {
-      // Savings appears in both group header and account row
-      expect(screen.getAllByText("Savings").length).toBeGreaterThanOrEqual(1);
-    });
-    expect(screen.queryByTestId("pie-chart")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No institution" })).toBeInTheDocument();
   });
 
-  it("says what an investment account total is made of", async () => {
+  it("groups by assets and liabilities, assets first", async () => {
     mockGetAll.mockResolvedValue([
-      {
-        id: "acc-b",
-        name: "My Brokerage",
+      acc({ id: "acc-2", name: "Visa", accountType: "CREDIT_CARD" }),
+      acc(),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-2", -1000), balance("acc-1", 5000)]),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Visa")).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Group by"), {
+        target: { value: "assetLiability" },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Assets" })).toBeInTheDocument();
+    });
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    expect(headings).toEqual(["Assets", "Liabilities"]);
+  });
+
+  it("sorts by name within a group", async () => {
+    mockGetAll.mockResolvedValue([
+      acc({ id: "acc-1", name: "Zephyr" }),
+      acc({ id: "acc-2", name: "Aardvark" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 100), balance("acc-2", 900)]),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Zephyr")).toBeInTheDocument();
+    });
+    // Default sort is balance, highest first.
+    expect(rowNames()).toEqual(["Aardvark", "Zephyr"]);
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "name" } });
+    });
+    await waitFor(() => {
+      expect(rowNames()).toEqual(["Zephyr", "Aardvark"]);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTitle(/Sorted/));
+    });
+    await waitFor(() => {
+      expect(rowNames()).toEqual(["Aardvark", "Zephyr"]);
+    });
+  });
+
+  it("reports no total for an account whose holdings could not all be priced", async () => {
+    mockGetAll.mockResolvedValue([
+      acc({
+        id: "acc-brokerage",
+        name: "Investments - Brokerage",
         accountType: "INVESTMENT",
         accountSubType: "INVESTMENT_BROKERAGE",
-        currentBalance: 0,
-        currencyCode: "CAD",
-        isClosed: false,
-      },
+        linkedAccountId: "acc-cash",
+      }),
+      acc({
+        id: "acc-cash",
+        name: "Investments - Cash",
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_CASH",
+        linkedAccountId: "acc-brokerage",
+      }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue({
-      holdingsByAccount: [
-        { accountId: "acc-b", totalMarketValue: 25000, cashBalance: 0 },
-      ],
-    });
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([
+        balance("acc-brokerage", 0, {
+          marketValue: null,
+          knownMarketValueSubtotal: 10000,
+          unpricedHoldingsCount: 2,
+          pricesComplete: false,
+          valuationComplete: false,
+        }),
+        balance("acc-cash", 5000),
+      ]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
-      expect(screen.getByText("My Brokerage")).toBeInTheDocument();
+      expect(screen.getByText("Investments")).toBeInTheDocument();
     });
+    const row = screen.getByText("Investments").closest("button")!;
+    expect(within(row).getByText("Total unavailable")).toBeInTheDocument();
+    expect(within(row).queryByText("$15000.00")).not.toBeInTheDocument();
+    expect(within(row).queryByText("$5000.00")).not.toBeInTheDocument();
+  });
+
+  it("folds a linked investment pair into one row worth both halves", async () => {
+    mockGetAll.mockResolvedValue([
+      acc({
+        id: "acc-brokerage",
+        name: "Investments - Brokerage",
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_BROKERAGE",
+        linkedAccountId: "acc-cash",
+      }),
+      acc({
+        id: "acc-cash",
+        name: "Investments - Cash",
+        accountType: "INVESTMENT",
+        accountSubType: "INVESTMENT_CASH",
+        linkedAccountId: "acc-brokerage",
+      }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([
+        balance("acc-brokerage", 0, {
+          marketValue: 10000,
+          knownMarketValueSubtotal: 10000,
+        }),
+        balance("acc-cash", 5000),
+      ]),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Investments")).toBeInTheDocument();
+    });
+    expect(screen.getAllByText("$15000.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Investments - Brokerage")).not.toBeInTheDocument();
+    expect(screen.queryByText("Investments - Cash")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Investments $25000.00 · Cash $0.00"),
+      screen.getByText("Investments $10000.00 · Cash $5000.00"),
     ).toBeInTheDocument();
   });
 
-  it("handles portfolioSummary being null (empty brokerageMarketValues)", async () => {
+  // A brokerage the user closed years ago still held positions on a date before
+  // it was emptied, and the report can be asked about that date.
+  it("values a closed holdings account from the measured market value", async () => {
     mockGetAll.mockResolvedValue([
-      {
+      acc({
         id: "acc-b",
-        name: "Brokerage No Portfolio",
+        name: "Old Brokerage",
         accountType: "INVESTMENT",
         accountSubType: "INVESTMENT_BROKERAGE",
-        currentBalance: 0,
-        currencyCode: "CAD",
-        isClosed: false,
-      },
+        isClosed: true,
+      }),
     ]);
-    // portfolioSummary returns null -- brokerageMarketValues should be empty map
-    mockGetPortfolioSummary.mockResolvedValue(null);
-    render(<AccountBalancesReport />);
-    await waitFor(() => {
-      expect(screen.getByText("Brokerage No Portfolio")).toBeInTheDocument();
-    });
-    // Market value should show $0 since map is empty (may appear in multiple places)
-    expect(screen.getAllByText("$0.00").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("shows chart legend with percentage using 'by type' grouping", async () => {
-    mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 3000, currencyCode: "CAD", isClosed: false },
-      { id: "acc-2", name: "Savings", accountType: "SAVINGS", accountSubType: null, currentBalance: 7000, currencyCode: "CAD", isClosed: false },
-    ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor(
+        [balance("acc-b", 0, { marketValue: 7000, knownMarketValueSubtotal: 7000 })],
+        "2020-06-30",
+      ),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("Total Assets")).toBeInTheDocument();
     });
-    const chartViewBtn = screen.getByTitle("Chart view");
-    await act(async () => { fireEvent.click(chartViewBtn); });
-    await waitFor(() => {
-      expect(screen.getByText("By Account Type")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Status"), { target: { value: "closed" } });
     });
-    // Legend items should display percentages
-    const percentages = screen.getAllByText(/\d+\.\d+%/);
-    expect(percentages.length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      expect(screen.getByText("Old Brokerage")).toBeInTheDocument();
+    });
+    expect(screen.getAllByText("$7000.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders CustomTooltip with zero chartTotal (0.0% edge case)", async () => {
-    // The CustomTooltip in recharts mock renders with active=true and active=false
-    // The source pct branch: chartTotal > 0 ? ... : '0.0'
-    // To trigger chartTotal === 0 in tooltip, we can't easily do that via the mocked Tooltip
-    // but we can verify the Tooltip mock renders both branches
+  // A component with no rate to the display currency leaves the total, and the
+  // total says so rather than quietly shrinking.
+  it("marks the summary cards partial when an account cannot be converted", async () => {
     mockGetAll.mockResolvedValue([
-      { id: "acc-1", name: "Chequing", accountType: "CHEQUING", accountSubType: null, currentBalance: 5000, currencyCode: "CAD", isClosed: false },
+      acc(),
+      acc({ id: "acc-2", name: "Exotic", accountType: "SAVINGS", currencyCode: "XXX" }),
     ]);
-    mockGetPortfolioSummary.mockResolvedValue(null);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000), balance("acc-2", 900, { currencyCode: "XXX" })]),
+    );
     render(<AccountBalancesReport />);
     await waitFor(() => {
       expect(screen.getByText("Total Assets")).toBeInTheDocument();
     });
-    const chartViewBtn = screen.getByTitle("Chart view");
-    await act(async () => { fireEvent.click(chartViewBtn); });
+    const assets = screen.getByTestId("summary-assets");
+    expect(within(assets).getByText("$5000.00")).toBeInTheDocument();
+    expect(within(assets).getByTestId("partial-total-marker")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("summary-networth")).getByTestId("partial-total-marker"),
+    ).toBeInTheDocument();
+  });
+
+  it("switches to the chart view and back", async () => {
+    mockGetAll.mockResolvedValue([
+      acc(),
+      acc({ id: "acc-2", name: "Rainy Day", accountType: "SAVINGS" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 3000), balance("acc-2", 7000)]),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Total Assets")).toBeInTheDocument();
+    });
+    await act(async () => { fireEvent.click(screen.getByTitle("Chart view")); });
     await waitFor(() => {
       expect(screen.getByTestId("pie-chart")).toBeInTheDocument();
     });
-    // Tooltip should render (both active and inactive branches exercised by mock)
-    expect(screen.getByText("Total Assets")).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByTitle("Table view")); });
+    await waitFor(() => {
+      expect(screen.queryByTestId("pie-chart")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows the empty chart message when every balance is zero", async () => {
+    mockGetAll.mockResolvedValue([acc({ name: "Empty Account" })]);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 0)]));
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Total Assets")).toBeInTheDocument();
+    });
+    await act(async () => { fireEvent.click(screen.getByTitle("Chart view")); });
+    await waitFor(() => {
+      expect(screen.getByText("No data to display.")).toBeInTheDocument();
+    });
+  });
+
+  it("exports a PDF carrying the measured date", async () => {
+    const { exportToPdf } = await import("@/lib/pdf-export");
+    (exportToPdf as any).mockClear();
+    mockGetAll.mockResolvedValue([acc()]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000)], "2024-03-31"),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId("export-pdf")).toBeInTheDocument();
+    });
+    await act(async () => { fireEvent.click(screen.getByTestId("export-pdf")); });
+    const call = (exportToPdf as any).mock.calls[0][0];
+    expect(call.title).toBe("Account Balances");
+    expect(call.subtitle).toBe("Balances as of date(2024-03-31)");
+    expect(call.filename).toBe("account-balances-2024-03-31");
+    expect(call.tableData.headers).toEqual(["Account", "Group", "Balance"]);
+  });
+
+  it("exports a CSV through the shared writer", async () => {
+    mockGetAll.mockResolvedValue([acc()]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor([balance("acc-1", 5000)], "2024-03-31"),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId("export-csv")).toBeInTheDocument();
+    });
+    await act(async () => { fireEvent.click(screen.getByTestId("export-csv")); });
+    await waitFor(() => {
+      expect(mockExportToCsv).toHaveBeenCalled();
+    });
+    const [filename, headers, rows] = mockExportToCsv.mock.calls[0];
+    expect(filename).toBe("account-balances-2024-03-31");
+    expect(headers).toEqual(["Account", "Group", "Balance"]);
+    expect(rows).toEqual([["Chequing", "Chequing", "$5000.00"]]);
+  });
+
+  it("shows the report error state when a fetch fails", async () => {
+    mockGetAll.mockRejectedValue(new Error("boom"));
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([]));
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to load report data/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows an account description under its name", async () => {
+    mockGetAll.mockResolvedValue([
+      acc({ name: "My Savings", accountType: "SAVINGS", description: "Emergency fund" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(balancesFor([balance("acc-1", 8000)]));
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Emergency fund")).toBeInTheDocument();
+    });
   });
 });
+
+/** The account rows the table is rendering, in order. */
+function rowButtons(): HTMLElement[] {
+  return screen
+    .getAllByRole("button")
+    .filter((button) => button.className.includes("px-6 py-4"));
+}
+
+/** Account names in the order the table renders them. */
+function rowNames(): string[] {
+  return rowButtons().map(
+    (button) => button.querySelector("div.font-medium")?.textContent?.trim() ?? "",
+  );
+}
