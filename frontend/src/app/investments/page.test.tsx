@@ -300,7 +300,10 @@ vi.mock('@/components/investments/InvestmentTransactionList', () => ({
 }));
 
 vi.mock('@/components/transactions/TransactionList', () => ({
-  TransactionList: ({ transactions, onEdit, showToolbar, startingBalance, isSingleAccountView }: any) => (
+  // `onRefresh` is how the real list reports a row it has already deleted (and
+  // any other write it owns), so the mock's Delete button raises exactly that
+  // and nothing else -- see the delete-contract note in frontend/CLAUDE.md.
+  TransactionList: ({ transactions, onEdit, onRefresh, showToolbar, startingBalance, isSingleAccountView }: any) => (
     <div data-testid="cash-transaction-list">
       <span>{transactions.length} cash transactions</span>
       <span data-testid="cash-show-toolbar">{String(showToolbar)}</span>
@@ -309,6 +312,7 @@ vi.mock('@/components/transactions/TransactionList', () => ({
       {transactions.map((t: any) => (
         <div key={t.id} data-testid={`cash-tx-${t.id}`}>
           <button data-testid={`cash-edit-${t.id}`} onClick={() => onEdit(t)}>Edit</button>
+          <button data-testid={`cash-deleted-${t.id}`} onClick={() => onRefresh?.()}>Delete</button>
         </div>
       ))}
     </div>
@@ -328,9 +332,10 @@ vi.mock('@/components/investments/InvestmentTransactionForm', () => ({
 }));
 
 vi.mock('@/components/investments/InvestmentValueChart', () => ({
-  InvestmentValueChart: ({ accountIds }: any) => (
+  InvestmentValueChart: ({ accountIds, refreshKey }: any) => (
     <div data-testid="value-chart">
       {accountIds?.length > 0 ? `Filtered: ${accountIds.join(',')}` : 'All accounts'}
+      <span data-testid="value-chart-refresh-key">{String(refreshKey ?? '')}</span>
     </div>
   ),
   INVESTMENT_CHART_REFRESH_EVENT: 'monize:investment-chart-refresh',
@@ -699,6 +704,46 @@ describe('InvestmentsPage', () => {
       });
 
       vi.restoreAllMocks();
+    });
+
+    // A trade's cash leg goes with the trade, so a brokerage delete moves the
+    // cash register and the value chart as surely as the summary does.
+    it('refetches the cash register after deleting a brokerage transaction', async () => {
+      mockDeleteTransaction.mockResolvedValue(undefined);
+
+      await renderPage();
+      await waitFor(() => {
+        expect(screen.getByTestId('delete-itx-1')).toBeInTheDocument();
+      });
+
+      const cashCallsBefore = mockGetAllTransactions.mock.calls.length;
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('delete-itx-1'));
+      });
+
+      await waitFor(() => {
+        expect(mockGetAllTransactions.mock.calls.length).toBeGreaterThan(cashCallsBefore);
+      });
+    });
+
+    it('bumps the value chart refresh key after deleting a brokerage transaction', async () => {
+      mockDeleteTransaction.mockResolvedValue(undefined);
+
+      await renderPage();
+      await waitFor(() => {
+        expect(screen.getByTestId('delete-itx-1')).toBeInTheDocument();
+      });
+
+      const chartKeyBefore = screen.getByTestId('value-chart-refresh-key').textContent;
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('delete-itx-1'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('value-chart-refresh-key').textContent).not.toBe(chartKeyBefore);
+      });
     });
   });
 
@@ -1147,6 +1192,67 @@ describe('InvestmentsPage', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('transaction-list')).not.toBeInTheDocument();
         expect(screen.getByTestId('cash-transaction-list')).toBeInTheDocument();
+      });
+    });
+
+    // Issue #1190 facing the other way: the add path refreshed the figures
+    // above the register and the delete path reloaded the cash rows alone, so
+    // the deleted row vanished while the summary, the allocation, Holdings by
+    // Account and the chart kept their pre-delete values until Refresh.
+    describe('after a cash row is deleted', () => {
+      const deleteCashRow = async () => {
+        mockGetAllTransactions.mockResolvedValue({
+          data: [{ id: 'cash-tx-1', transactionDate: '2026-01-15', amount: 1000 }],
+          pagination: { page: 1, totalPages: 1, total: 1 },
+        });
+
+        await switchToCashView();
+        await waitFor(() => {
+          expect(screen.getByTestId('cash-deleted-cash-tx-1')).toBeInTheDocument();
+        });
+
+        const summaryCallsBefore = mockGetPortfolioSummary.mock.calls.length;
+        const brokerageCallsBefore = mockGetTransactions.mock.calls.length;
+        const cashCallsBefore = mockGetAllTransactions.mock.calls.length;
+        const chartKeyBefore = screen.getByTestId('value-chart-refresh-key').textContent;
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId('cash-deleted-cash-tx-1'));
+        });
+
+        return { summaryCallsBefore, brokerageCallsBefore, cashCallsBefore, chartKeyBefore };
+      };
+
+      it('refetches the portfolio summary the holdings and allocation are drawn from', async () => {
+        const { summaryCallsBefore } = await deleteCashRow();
+
+        await waitFor(() => {
+          expect(mockGetPortfolioSummary.mock.calls.length).toBeGreaterThan(summaryCallsBefore);
+        });
+      });
+
+      it('refetches the brokerage register, which a cash row with an investment split writes to', async () => {
+        const { brokerageCallsBefore } = await deleteCashRow();
+
+        await waitFor(() => {
+          expect(mockGetTransactions.mock.calls.length).toBeGreaterThan(brokerageCallsBefore);
+        });
+      });
+
+      it('refetches the cash register itself', async () => {
+        const { cashCallsBefore } = await deleteCashRow();
+
+        await waitFor(() => {
+          expect(mockGetAllTransactions.mock.calls.length).toBeGreaterThan(cashCallsBefore);
+        });
+      });
+
+      it('bumps the value chart refresh key, which fetches its own series', async () => {
+        const { chartKeyBefore } = await deleteCashRow();
+
+        await waitFor(() => {
+          expect(screen.getByTestId('value-chart-refresh-key').textContent).not.toBe(chartKeyBefore);
+        });
       });
     });
   });

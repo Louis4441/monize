@@ -54,14 +54,14 @@ function InvestmentsContent() {
   const tc = useTranslations('common');
   const mainAccountName = useMainAccountName();
   const data = useInvestmentData();
-  const { loadAllPortfolioData, selectedAccountIds, currentPage, transactionFilters } = data;
-  const handleUndoRedo = useCallback(() => {
-    loadAllPortfolioData(selectedAccountIds, currentPage, transactionFilters);
-  }, [loadAllPortfolioData, selectedAccountIds, currentPage, transactionFilters]);
-  useOnUndoRedo(handleUndoRedo);
+  // An undo or a redo is a write that happened elsewhere, so it refreshes the
+  // page the same way a write made here does -- both registers, the summary,
+  // the allocation and the chart.
+  const { refreshAfterWrite } = data;
+  useOnUndoRedo(refreshAfterWrite);
   // An AI write (e.g. an investment transaction from the chat bubble) mutates
   // the same data as an undo/redo, so refresh the same way.
-  useOnAiAction(handleUndoRedo);
+  useOnAiAction(refreshAfterWrite);
   const [transactionView, setTransactionView] = useLocalStorage<InvestmentTransactionView>('monize-investments-transaction-view', 'brokerage');
   // Tracks whether the investment transaction form currently shows a currency
   // conversion section so the modal can be widened to fit it without scrolling.
@@ -238,6 +238,7 @@ function InvestmentsContent() {
           <div className="mb-6">
             <InvestmentValueChart
               accountIds={data.selectedAccountIds}
+              refreshKey={data.writeRefreshKey}
               displayCurrency={
                 data.selectedAccountIds.length === 1
                   ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
@@ -380,7 +381,7 @@ function InvestmentsContent() {
                   densityView="investments"
                   transactions={data.cashTransactions}
                   onEdit={data.handleEditCashTransaction}
-                  onRefresh={data.refreshCashTransactions}
+                  onRefresh={data.refreshAfterWrite}
                   onTransactionUpdate={data.handleCashTransactionUpdate}
                   currentPage={data.cashCurrentPage}
                   totalPages={data.cashPagination?.totalPages ?? 1}

@@ -399,6 +399,20 @@ honest, and nothing mounted refetches on its own. `InvestmentRegisterPanel` rais
 `onDataChanged` after every write for exactly this, and `InvestmentDetailView`
 re-runs its load from it.
 
+**Every write path on a page shares one refresh, including the ones nobody
+reported.** The #1190 fix wired the account detail page's writes together and
+left the Investments page's own paths as they were, so adding a cash row there
+refreshed the summary, the allocation, Holdings by Account and the brokerage
+register, while deleting one reloaded the cash rows alone -- the row vanished
+and every figure above it kept its pre-delete value until the user pressed
+Refresh. A delete is a write, and so is an undo, a redo, an AI action and a
+status change; the fact that the reported symptom was a create says nothing
+about which paths are broken. `useInvestmentData.refreshAfterWrite` is that one
+function for the Investments page (`InvestmentRegisterPanel.afterWrite` is the
+detail page's), and each write path calls it rather than reloading the list the
+write happened on. When you fix a stale-figure defect, grep the surface for its
+other write paths and route them through the same function in the same commit.
+
 **A sibling that fetches for itself needs the signal as a prop, not as a
 re-render.** Re-running the parent's load refreshes what the parent fetched, and
 `InvestmentValueChart` fetches its own series -- so the write reaches it as
