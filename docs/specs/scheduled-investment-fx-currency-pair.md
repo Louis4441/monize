@@ -82,6 +82,40 @@ For each surface, before forwarding a stored rate into the posting resolver:
   in SQL would be a second, drift-prone copy of the derivation this contract keeps
   in one place.
 
+## The forecast consumes a resolved rate, never the stored scalar
+
+The cash-flow forecast must agree with what a later posting will do, so it must
+not project with the persisted `investmentExchangeRate` (which may be stale for
+the current pair) nor default a missing rate to `1`. The stored scalar and a
+rate safe to project with *now* are two different things.
+
+- The FX resolution used by posting is factored into
+  `InvestmentTransactionsService.resolveCashExchangeRateOrNull`, which returns
+  `number | null`: same pair derivation and rate path as posting, but a genuine
+  cross-currency pair with no determinable rate returns `null` instead of
+  throwing. `resolveCashExchangeRate` (the posting entry) wraps it and turns
+  `null` into the `exchangeRateUnavailable` `BadRequestException` -- so posting
+  still refuses loudly, and the forecast reads `null` directly.
+- The scheduled read model (`findAll`) attaches a read-only
+  `investmentForecastExchangeRate: number | null` per investment schedule,
+  resolved through that path with **no supplied rate** and the schedule's own
+  settlement tuple. `1` for same-currency, a resolved rate for a cross-currency
+  pair, `null` when the current rate is unknown. It never reads or overwrites the
+  persisted `investmentExchangeRate`.
+- `frontend/src/lib/forecast.ts` uses only `investmentForecastExchangeRate`. A
+  resolved number converts the projected cash impact; `null` (a genuine
+  cross-currency occurrence with no current rate) makes the projection unknown
+  and withholds the whole cumulative series through the existing
+  `missingCurrencies` mechanism -- the same treatment as a missing
+  display-currency rate. Same-currency is `1`, so it is never mistaken for
+  missing.
+
+The round trip the tests pin: stored `EUR->CAD = 1.50`, the security's currency
+changed to USD, the current `USD->CAD = 1.35`, a `10 x 100` occurrence -> the
+forecast projects `1,350` and posting commits `1,350`, never `1,500`; and when
+`USD->CAD` is unavailable, the forecast shows the projection as unavailable while
+posting refuses -- neither surface uses the stale `1.50` or a `1` fallback.
+
 ## Invariants
 
 - **A stored rate that carries provenance is reused only for its own pair.** A

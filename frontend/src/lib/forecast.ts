@@ -245,9 +245,21 @@ function normalizeInvestmentForForecast(
   if (!cashAccountId) {
     return transaction;
   }
-  const rate = transaction.investmentExchangeRate != null
-    ? Number(transaction.investmentExchangeRate)
-    : 1;
+  // Issue #1167: the forecast converts the security-currency amount into the
+  // cash account's currency with the server-resolved *forecast* rate, never the
+  // persisted `investmentExchangeRate` (which may be stale for the current
+  // settlement pair). The backend sends `1` for a same-currency pair, a resolved
+  // rate for a cross-currency one, and `null` when the current rate is unknown.
+  const rate = transaction.investmentForecastExchangeRate;
+  if (rate == null) {
+    // Unknown current FX: remap onto the cash account but do not convert. The
+    // forecast builders detect the null rate on an investment schedule and
+    // withhold the projection rather than inventing a rate.
+    if (transaction.accountId === cashAccountId) {
+      return transaction;
+    }
+    return { ...transaction, accountId: cashAccountId };
+  }
   if (!Number.isFinite(rate) || rate === 1) {
     if (transaction.accountId === cashAccountId) {
       return transaction;
@@ -267,6 +279,20 @@ function normalizeInvestmentForForecast(
       ? convertOverride(transaction.nextOverride)
       : transaction.nextOverride,
   };
+}
+
+/**
+ * An investment schedule whose current settlement FX rate could not be resolved
+ * server-side (issue #1167). Its projected cash impact is unknown, so -- like a
+ * missing display-currency rate -- it withholds the whole cumulative projection
+ * rather than contributing a stale or 1:1 figure. The security's currency (the
+ * `from` side of the unresolved pair) names it in `missingCurrencies`, falling
+ * back to the settlement account's currency.
+ */
+function hasUnknownForecastRate(transaction: ScheduledTransaction): boolean {
+  return (
+    transaction.isInvestment && transaction.investmentForecastExchangeRate == null
+  );
 }
 
 /**
@@ -413,11 +439,24 @@ export function buildForecast(
   for (const { transaction: tx, isInbound } of relevantFlows) {
     const occurrences = generateOccurrences(tx, today, endDate);
     const txAccountId = isInbound ? (tx.transferAccountId ?? tx.accountId) : tx.accountId;
+    const unknownRate = hasUnknownForecastRate(tx);
     for (const occ of occurrences) {
       const existing = transactionsByDate.get(occ.date) || [];
+      // An investment occurrence with an unresolved current FX rate makes the
+      // running balance unknown from here on (issue #1167): record the missing
+      // currency and contribute nothing, which withholds the whole series below.
+      if (unknownRate) {
+        missingRateCurrencies.add(
+          tx.investmentSecurity?.currencyCode ??
+            accountCurrencyMap.get(txAccountId) ??
+            tx.currencyCode,
+        );
+      }
       existing.push({
         name: tx.name,
-        amount: conv(isInbound ? -occ.amount : occ.amount, txAccountId),
+        amount: unknownRate
+          ? 0
+          : conv(isInbound ? -occ.amount : occ.amount, txAccountId),
         scheduledTransactionId: tx.id,
       });
       transactionsByDate.set(occ.date, existing);
@@ -559,10 +598,20 @@ export function buildMultiAccountForecast(
     }
 
     for (const { transaction, isInbound } of scheduledFlowsForAccount(normalized, account.id)) {
+      const unknownRate = hasUnknownForecastRate(transaction);
       for (const occ of generateOccurrences(transaction, today, endDate)) {
+        // Unresolved current FX for an investment schedule withholds the whole
+        // result (issue #1167), the same as a missing display-currency rate.
+        if (unknownRate) {
+          missingRateCurrencies.add(
+            transaction.investmentSecurity?.currencyCode ?? account.currencyCode,
+          );
+        }
         add(occ.date, {
           name: transaction.name,
-          amount: conv(isInbound ? -occ.amount : occ.amount, account.currencyCode),
+          amount: unknownRate
+            ? 0
+            : conv(isInbound ? -occ.amount : occ.amount, account.currencyCode),
           scheduledTransactionId: transaction.id,
           accountId: account.id,
         });

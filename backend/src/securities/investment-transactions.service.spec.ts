@@ -4142,6 +4142,81 @@ describe("InvestmentTransactionsService", () => {
     });
   });
 
+  describe("resolveCashExchangeRateOrNull (issue #1167)", () => {
+    const crossCurrency = () => {
+      accountsService.findOne.mockImplementation((_u: string, id: string) =>
+        id === accountId
+          ? Promise.resolve({ ...mockInvestmentAccount })
+          : id === cashAccountId
+            ? Promise.resolve({ ...mockCashAccount, currencyCode: "CAD" })
+            : Promise.resolve(null),
+      );
+      securitiesService.findOne.mockResolvedValue({
+        ...mockSecurity,
+        currencyCode: "EUR",
+      });
+    };
+
+    it("returns null (not throw) when a cross-currency rate is unavailable", async () => {
+      crossCurrency();
+      exchangeRateService.getLatestRate.mockResolvedValue(null);
+      exchangeRateService.getRateForDate.mockResolvedValue(null);
+
+      const rate = await service.resolveCashExchangeRateOrNull(
+        userId,
+        accountId,
+        null,
+        securityId,
+        undefined,
+        undefined,
+      );
+      expect(rate).toBeNull();
+    });
+
+    it("returns the resolved rate for a cross-currency pair", async () => {
+      crossCurrency();
+      exchangeRateService.getLatestRate.mockResolvedValue(1.35);
+
+      const rate = await service.resolveCashExchangeRateOrNull(
+        userId,
+        accountId,
+        null,
+        securityId,
+        undefined,
+        undefined,
+      );
+      expect(rate).toBe(1.35);
+    });
+
+    it("returns 1 for a same-currency pair (never null)", async () => {
+      accountsService.findOne.mockResolvedValue({ ...mockInvestmentAccount });
+      securitiesService.findOne.mockResolvedValue({ ...mockSecurity }); // USD
+
+      const rate = await service.resolveCashExchangeRateOrNull(
+        userId,
+        accountId,
+        null,
+        securityId,
+        undefined,
+        undefined,
+      );
+      expect(rate).toBe(1);
+    });
+
+    it("still throws for a non-positive supplied rate (a caller error, not a missing rate)", async () => {
+      await expect(
+        service.resolveCashExchangeRateOrNull(
+          userId,
+          accountId,
+          null,
+          securityId,
+          0,
+          undefined,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
   describe("resolveSettlementCurrencyPair (issue #1167)", () => {
     it("pairs the security currency with the linked cash account currency", async () => {
       accountsService.findOne.mockImplementation((_u: string, id: string) =>

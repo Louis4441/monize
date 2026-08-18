@@ -106,6 +106,13 @@ export interface ScheduledTransaction {
   // Currency pair the stored rate was resolved for (issue #1167), server-derived.
   investmentExchangeRateFromCurrency?: string | null;
   investmentExchangeRateToCurrency?: string | null;
+  // Read-only, server-resolved FX rate the cash-flow forecast must use for this
+  // investment schedule (issue #1167) -- resolved through the same settlement
+  // pair + FX path as posting, never the stale persisted `investmentExchangeRate`.
+  // `1` for same-currency, a number for a resolvable cross-currency pair, `null`
+  // when the current rate is unknown (forecast then shows the projection as
+  // unavailable rather than inventing a rate). Absent/`null` for non-investment.
+  investmentForecastExchangeRate?: number | null;
   tagIds?: string[];
   splits?: ScheduledTransactionSplit[];
   overrideCount?: number;

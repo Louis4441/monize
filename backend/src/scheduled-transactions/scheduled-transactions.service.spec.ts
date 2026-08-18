@@ -188,6 +188,9 @@ describe("ScheduledTransactionsService", () => {
       resolveSettlementCurrencyPair: jest
         .fn()
         .mockResolvedValue({ from: "USD", to: "USD" }),
+      // Issue #1167: the forecast rate the read model attaches. Defaults to 1
+      // (same currency); forecast tests override it per case.
+      resolveCashExchangeRateOrNull: jest.fn().mockResolvedValue(1),
     };
 
     mockActionHistoryService = {
@@ -567,6 +570,85 @@ describe("ScheduledTransactionsService", () => {
       expect(result[0].futureOverrides).toHaveLength(1);
       expect(result[0].futureOverrides![0].id).toBe("ovr-1");
       expect(result[0].overrideCount).toBe(1);
+    });
+
+    it("attaches the server-resolved investmentForecastExchangeRate for an investment schedule (issue #1167)", async () => {
+      const st = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-usd",
+        investmentFundingAccountId: null,
+        investmentQuantity: 1,
+        investmentPrice: 100,
+        // Persisted rate is stale EUR->CAD 1.50; it must NOT be what the forecast
+        // uses.
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateFromCurrency: "EUR",
+        investmentExchangeRateToCurrency: "CAD",
+      });
+      const qb = mockQueryBuilder([st]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      // The current pair resolves to 1.35 (security now USD, USD->CAD = 1.35).
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+
+      const result = await service.findAll(userId);
+
+      expect(result[0].investmentForecastExchangeRate).toBe(1.35);
+      // Resolved with no supplied rate (the stale scalar is never trusted) and
+      // the schedule's settlement tuple.
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).toHaveBeenCalledWith(
+        userId,
+        st.accountId,
+        null,
+        "sec-usd",
+        undefined,
+        undefined,
+      );
+    });
+
+    it("attaches a null investmentForecastExchangeRate when the current rate is unavailable (issue #1167)", async () => {
+      const st = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-usd",
+        investmentQuantity: 1,
+        investmentPrice: 100,
+      });
+      const qb = mockQueryBuilder([st]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      const result = await service.findAll(userId);
+
+      expect(result[0].investmentForecastExchangeRate).toBeNull();
+    });
+
+    it("leaves investmentForecastExchangeRate null for a non-investment schedule", async () => {
+      const st = makeScheduled();
+      const qb = mockQueryBuilder([st]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+
+      const result = await service.findAll(userId);
+
+      expect(result[0].investmentForecastExchangeRate).toBeNull();
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).not.toHaveBeenCalled();
     });
   });
 

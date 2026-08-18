@@ -1117,11 +1117,49 @@ export class ScheduledTransactionsService {
     return savedSplits;
   }
 
+  /**
+   * The effective FX rate a cash-flow *forecast* should apply to a scheduled
+   * investment's projected cash impact (issue #1167). This is a read-only,
+   * server-resolved value, deliberately distinct from the persisted
+   * `investmentExchangeRate`: the stored scalar records the rate a past caller
+   * supplied and may be stale for the current settlement pair, whereas the
+   * forecast needs a rate that is safe to project with *now*. It goes through
+   * the same settlement-pair + FX resolution path as posting
+   * (`resolveCashExchangeRateOrNull`, no supplied rate, latest snapshot):
+   *   - same currency -> `1`;
+   *   - a determinable current rate -> that rate;
+   *   - a genuine cross-currency pair with no rate -> `null` (unknown), which the
+   *     forecast renders as an unavailable projection rather than inventing a
+   *     rate. `null` is never returned for a same-currency pair, so the forecast
+   *     cannot mistake "1:1" for "missing".
+   * Returns `null` for a non-investment schedule (the forecast ignores it there).
+   */
+  private async resolveInvestmentForecastRate(
+    userId: string,
+    transaction: ScheduledTransaction,
+  ): Promise<number | null> {
+    if (!transaction.isInvestment || !transaction.investmentAction) {
+      return null;
+    }
+    const action = transaction.investmentAction as InvestmentAction;
+    return this.investmentTransactionsService.resolveCashExchangeRateOrNull(
+      userId,
+      transaction.accountId,
+      FUNDING_ACCOUNT_ACTIONS.has(action)
+        ? transaction.investmentFundingAccountId
+        : null,
+      transaction.investmentSecurityId,
+      undefined,
+      undefined,
+    );
+  }
+
   async findAll(userId: string): Promise<
     (ScheduledTransaction & {
       overrideCount?: number;
       nextOverride?: ScheduledTransactionOverride | null;
       futureOverrides?: ScheduledTransactionOverride[];
+      investmentForecastExchangeRate?: number | null;
     })[]
   > {
     return withScopedDb(this.dataSource, async (m) => {
@@ -1212,11 +1250,26 @@ export class ScheduledTransactionsService {
         }
       }
 
+      // Resolve the forecast FX rate for each investment schedule (issue #1167).
+      // Only investment rows incur the lookup; same-currency ones short-circuit
+      // to 1 without a rate fetch.
+      const forecastRates = new Map<string, number | null>();
+      for (const t of transactions) {
+        if (t.isInvestment && t.investmentAction) {
+          forecastRates.set(
+            t.id,
+            await this.resolveInvestmentForecastRate(userId, t),
+          );
+        }
+      }
+
       return transactions.map((transaction) => ({
         ...transaction,
         overrideCount: countMap.get(transaction.id) || 0,
         nextOverride: nextOverrideMap.get(transaction.id) || null,
         futureOverrides: futureOverridesMap.get(transaction.id) || [],
+        investmentForecastExchangeRate:
+          forecastRates.get(transaction.id) ?? null,
       }));
     });
   }

@@ -700,7 +700,7 @@ describe('buildForecast', () => {
         nextDueDate: '2025-01-20',
         isInvestment: true,
         investmentFundingAccountId: 'cash-1',
-        investmentExchangeRate: 1,
+        investmentForecastExchangeRate: 1,
       } as any)];
       const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
       const jan20 = result.find(dp => dp.date === '2025-01-20');
@@ -720,14 +720,14 @@ describe('buildForecast', () => {
         nextDueDate: '2025-01-20',
         isInvestment: true,
         investmentFundingAccountId: 'cash-1',
-        investmentExchangeRate: 1,
+        investmentForecastExchangeRate: 1,
       } as any)];
       const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
       const jan20 = result.find(dp => dp.date === '2025-01-20');
       expect(jan20?.balance).toBe(11500);
     });
 
-    it('converts the cash impact via investmentExchangeRate', () => {
+    it('converts the cash impact via the server-resolved forecast rate', () => {
       const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
       const transactions = [makeScheduled({
         id: 'inv-1',
@@ -738,7 +738,7 @@ describe('buildForecast', () => {
         nextDueDate: '2025-01-20',
         isInvestment: true,
         investmentFundingAccountId: 'cash-1',
-        investmentExchangeRate: 1.35,
+        investmentForecastExchangeRate: 1.35,
       } as any)];
       const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
       const jan20 = result.find(dp => dp.date === '2025-01-20');
@@ -756,7 +756,7 @@ describe('buildForecast', () => {
         nextDueDate: '2025-01-20',
         isInvestment: true,
         investmentFundingAccountId: 'cash-1',
-        investmentExchangeRate: 1,
+        investmentForecastExchangeRate: 1,
       } as any)];
       const result = forecastPoints([otherCash], transactions, 'month', 'cash-other');
       const allBalances = result.map(dp => dp.balance);
@@ -780,7 +780,7 @@ describe('buildForecast', () => {
         nextDueDate: '2025-01-20',
         isInvestment: true,
         investmentFundingAccountId: null,
-        investmentExchangeRate: 1,
+        investmentForecastExchangeRate: 1,
       } as any)];
       const result = forecastPoints([cashAccount, brokerage], transactions, 'month', 'cash-1');
       const jan20 = result.find(dp => dp.date === '2025-01-20');
@@ -797,7 +797,7 @@ describe('buildForecast', () => {
         nextDueDate: '2025-01-20',
         isInvestment: true,
         investmentFundingAccountId: 'cash-1',
-        investmentExchangeRate: 1,
+        investmentForecastExchangeRate: 1,
       } as any)];
       const result = forecastPoints([cashAccount], transactions, '90days', 'cash-1');
       const jan20 = result.find(dp => dp.date === '2025-01-20');
@@ -806,6 +806,52 @@ describe('buildForecast', () => {
       expect(jan20?.balance).toBe(9500);
       expect(feb20?.balance).toBe(9000);
       expect(mar20?.balance).toBe(8500);
+    });
+
+    // Issue #1167: the forecast uses the server-resolved forecast rate, never the
+    // persisted (possibly stale) investmentExchangeRate.
+    it('uses the current forecast rate, not a stale persisted rate', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'inv-1',
+        name: 'Buy USD security',
+        accountId: 'brokerage-1',
+        amount: -1000, // 10 shares * 100, security currency
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isInvestment: true,
+        investmentFundingAccountId: 'cash-1',
+        // Stale persisted rate (EUR->CAD 1.50) the security has since outgrown.
+        investmentExchangeRate: 1.5,
+        // The server resolved the CURRENT pair (USD->CAD) to 1.35.
+        investmentForecastExchangeRate: 1.35,
+      } as any)];
+      const result = forecastPoints([cashAccount], transactions, 'month', 'cash-1');
+      const jan20 = result.find(dp => dp.date === '2025-01-20');
+      // 1000 * 1.35 = 1350 posted (10000 - 1350), never 1500 from the stale rate.
+      expect(jan20?.transactions[0].amount).toBe(-1350);
+      expect(jan20?.balance).toBe(8650);
+    });
+
+    it('withholds the forecast when the current forecast rate is unknown', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'inv-1',
+        name: 'Buy unpriceable security',
+        accountId: 'brokerage-1',
+        amount: -1000,
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isInvestment: true,
+        investmentFundingAccountId: 'cash-1',
+        investmentExchangeRate: 1.5, // stale scalar must not be used as a fallback
+        investmentForecastExchangeRate: null, // current rate unavailable
+        investmentSecurity: { currencyCode: 'USD' },
+      } as any)];
+      const result = buildForecast([cashAccount], transactions, 'month', 'cash-1');
+      // Unknown -> the whole projection is withheld (no stale 1.50, no 1:1).
+      expect(result.points).toEqual([]);
+      expect(result.missingCurrencies).toContain('USD');
     });
   });
 
@@ -1363,7 +1409,7 @@ describe('getProjectedBalanceAtDate', () => {
       nextDueDate: '2025-01-20',
       isInvestment: true,
       investmentFundingAccountId: 'cash-1',
-      investmentExchangeRate: 1,
+      investmentForecastExchangeRate: 1,
     } as any)];
     const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
     expect(result).toBe(8500);
@@ -1615,6 +1661,7 @@ describe('buildMultiAccountForecast', () => {
     const transactions = [makeScheduled({
       id: 'st-1', accountId: 'acc-3', amount: -400,
       isInvestment: true, investmentFundingAccountId: 'acc-1',
+      investmentForecastExchangeRate: 1,
       frequency: 'ONCE', nextDueDate: '2025-01-20',
     } as Partial<ScheduledTransaction>)];
     const result = buildMultiAccountForecast(
