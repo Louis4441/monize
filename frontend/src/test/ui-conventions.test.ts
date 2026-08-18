@@ -776,6 +776,58 @@ describe("a category typed into a picker is created by one helper", () => {
   });
 });
 
+describe("a register that draws a Balance column is given the balance", () => {
+  /** The list that renders the column and computes the running balances. */
+  const LIST = "/src/components/transactions/TransactionList.tsx";
+
+  /** The attribute text of every `<TransactionList ...>` opening tag in a file. */
+  function transactionListTags(content: string): string[] {
+    const tags: string[] = [];
+    const open = /<TransactionList[\s>]/g;
+    let match: RegExpExecArray | null;
+    while ((match = open.exec(content)) !== null) {
+      let depth = 0;
+      for (let i = match.index; i < content.length; i++) {
+        if (content[i] === "{") depth++;
+        else if (content[i] === "}") depth--;
+        else if (content[i] === ">" && depth === 0) {
+          tags.push(content.slice(match.index, i));
+          break;
+        }
+      }
+    }
+    return tags;
+  }
+
+  it("supplies startingBalance wherever isSingleAccountView is set", () => {
+    const offenders = productionSources()
+      .flatMap(([path, content]) =>
+        transactionListTags(content).map((tag) => [path, tag] as const),
+      )
+      .filter(([, tag]) => /\bisSingleAccountView\b/.test(tag))
+      .filter(([, tag]) => !/\bstartingBalance\b/.test(tag))
+      .map(([path]) => path);
+
+    // `isSingleAccountView` alone draws the Balance column, and the number in
+    // it comes from the backend's `startingBalance` run down the page. The
+    // investment register panel read the rows off the response and dropped that
+    // field, so the column it had just asked for rendered "-" on every row
+    // (issue #1188). The two are one decision: ask for the column, supply the
+    // balance, and take both from the same response.
+    expect(offenders).toEqual([]);
+  });
+
+  it("still needs the balance to draw the column, so the rule cannot pass by accident", () => {
+    // Were the list to start deriving the running balance itself, this check
+    // would be demanding a prop nothing reads. This fails first and says so.
+    const list = sources[LIST];
+    expect(list, `${LIST} not found -- update LIST in this test`).toBeTruthy();
+    expect(/isSingleAccountView \|\| startingBalance !== undefined/.test(list)).toBe(
+      true,
+    );
+  });
+});
+
 describe("TransactionList performs its own delete", () => {
   /** The list that owns the confirmation, the API call and the toast. */
   const LIST = "/src/components/transactions/TransactionList.tsx";

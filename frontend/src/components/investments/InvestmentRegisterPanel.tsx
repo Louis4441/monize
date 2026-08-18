@@ -73,6 +73,13 @@ export function InvestmentRegisterPanel({
   const [cashTx, setCashTx] = useState<Transaction[]>([]);
   const [cashPage, setCashPage] = useState(1);
   const [cashTotal, setCashTotal] = useState(0);
+  // The balance the page's first row runs from. It is part of the same
+  // payload as the rows and is only meaningful beside them, so it is adopted
+  // in the same block -- a starting balance from one page against another
+  // page's rows is a running balance for transactions nobody is looking at.
+  const [cashStartingBalance, setCashStartingBalance] = useState<
+    number | undefined
+  >(undefined);
   const [reloadKey, setReloadKey] = useState(0);
   // Every account the user can fund a trade from, for the brokerage form's
   // "Funds From" / "Deposit To" pickers. Undefined until it loads and after a
@@ -128,6 +135,7 @@ export function InvestmentRegisterPanel({
       if (cash) {
         setCashTx(cash.data);
         setCashTotal(cash.pagination?.total ?? cash.data.length);
+        setCashStartingBalance(cash.startingBalance);
       }
       setLoadedKey(requestKey);
     })();
@@ -251,6 +259,7 @@ export function InvestmentRegisterPanel({
             totalItems={cashTotal}
             pageSize={PAGE_SIZE}
             onPageChange={setCashPage}
+            startingBalance={cashStartingBalance}
           />
         </div>
       )}

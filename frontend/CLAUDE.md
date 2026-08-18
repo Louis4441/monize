@@ -382,6 +382,21 @@ lookup there stays `undefined`, never `[]`: the form reads undefined as "not
 supplied" and falls back, while an empty array is a claim that the user has no
 other accounts.
 
+### Asking for the Balance column and supplying the balance are one decision
+
+`<TransactionList isSingleAccountView>` draws the Balance column, and the number
+in it is the backend's `startingBalance` run down the page -- the list derives
+nothing on its own, so the column arrives empty without it. `InvestmentRegisterPanel`
+read the rows off `transactionsApi.getAll` and dropped the `startingBalance` that
+came with them, so the account detail page's cash register showed "-" on every row
+while the Investments page's copy of the same register was right (issue #1188).
+
+Take both from the same response and adopt them in the same block: a starting
+balance is computed for one page of one account and means nothing beside another
+page's rows, and a failed reload that keeps the rows has to keep the balance too.
+`ui-conventions.test.ts` fails any `<TransactionList>` that sets
+`isSingleAccountView` without passing `startingBalance`.
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 Two patterns, depending on where it lives:
