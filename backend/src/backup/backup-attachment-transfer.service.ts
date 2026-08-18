@@ -382,12 +382,22 @@ export class BackupAttachmentTransferService {
         }
       }
 
+      // `oldKey` was loaded and its bytes verified above, so it is a source this
+      // restore read from -- record it *before* attempting the destination
+      // write, not after. On a same-account restore `oldKey` is also the user's
+      // current, displaced object and the file's only copy of these bytes; if
+      // the copy then fails and this row is dropped (below), the post-commit
+      // sweep must still spare `oldKey` rather than delete the bytes and leave
+      // the backup unrestorable. `sourceKeys` is defined as exactly "keys this
+      // restore read from, never removed by the post-commit sweep", and reading
+      // is what already happened here.
+      sourceKeys.push(oldKey);
+
       if (!(await this.tryStageAttachmentObject(attachmentId, bytes))) {
         unrestorable.add(attachmentId);
         continue;
       }
       stagedKeys.push(attachmentId);
-      sourceKeys.push(oldKey);
     }
 
     if (unrestorable.size > 0) {
