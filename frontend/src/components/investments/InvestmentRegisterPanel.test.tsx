@@ -168,11 +168,15 @@ async function renderPanel(
   });
 }
 
-/** Switch to the cash ledger and delete its only row, confirmation included. */
-async function deleteTheCashRow() {
+/** Put the cash ledger on screen. */
+async function switchToCash() {
   await act(async () => {
     fireEvent.click(screen.getByText('Cash'));
   });
+}
+
+/** Delete the cash register's only row, confirmation included. */
+async function deleteFirstCashRow() {
   const rowDelete = screen
     .getAllByRole('button')
     .filter((b) => b.textContent === 'Delete')[0];
@@ -186,6 +190,12 @@ async function deleteTheCashRow() {
   await act(async () => {
     fireEvent.click(confirm);
   });
+}
+
+/** Switch to the cash ledger and delete its only row. */
+async function deleteTheCashRow() {
+  await switchToCash();
+  await deleteFirstCashRow();
 }
 
 describe('InvestmentRegisterPanel', () => {
@@ -272,6 +282,84 @@ describe('InvestmentRegisterPanel', () => {
       await renderPanel(brokerage, null);
 
       expect(screen.queryByText('Cash')).not.toBeInTheDocument();
+    });
+  });
+
+  // Issue #1188. The register draws a Balance column for a single-account view,
+  // and the number in it is the backend's starting balance run down the page.
+  // The panel read the rows off the response and dropped the starting balance
+  // beside them, so every row's balance cell rendered the empty marker.
+  describe('the running balance', () => {
+    it('shows the balance the rows run from', async () => {
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [cashTransaction],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+        startingBalance: 3500,
+      });
+
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+
+      expect(screen.getByText('Balance')).toBeInTheDocument();
+      expect(screen.getByText('$3,500.00')).toBeInTheDocument();
+    });
+
+    // The starting balance is computed for one page of one account and means
+    // nothing beside another page's rows, so it is adopted from the same
+    // response as the rows rather than lagging a request behind them.
+    it('moves the balance with the rows it was computed for', async () => {
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [cashTransaction],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+        startingBalance: 3500,
+      });
+
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+
+      // The write's reload answers with the register as it now stands.
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [
+          {
+            ...cashTransaction,
+            id: 'cash-tx-2',
+            payeeName: 'Withdrawal',
+            amount: -750,
+          },
+        ],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+        startingBalance: 2750,
+      });
+      await deleteFirstCashRow();
+
+      await waitFor(() => {
+        expect(screen.getByText('Withdrawal')).toBeInTheDocument();
+        expect(screen.getByText('$2,750.00')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('$3,500.00')).not.toBeInTheDocument();
+    });
+
+    // A failed reload is not a register with no starting balance: the rows on
+    // screen stay, so the balances beside them have to stay too rather than
+    // collapsing to the empty marker under unchanged rows.
+    it('keeps the balance when a reload fails', async () => {
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: [cashTransaction],
+        pagination: { total: 1, page: 1, limit: 25, totalPages: 1 },
+        startingBalance: 3500,
+      });
+
+      await renderPanel(brokerage, cash);
+      await switchToCash();
+
+      (transactionsApi.getAll as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('network'),
+      );
+      await deleteFirstCashRow();
+      await act(async () => {});
+
+      expect(screen.getByText('Contribution')).toBeInTheDocument();
+      expect(screen.getByText('$3,500.00')).toBeInTheDocument();
     });
   });
 
