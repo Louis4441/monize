@@ -49,15 +49,23 @@ vi.mock('./InvestmentTransactionForm', () => ({
   InvestmentTransactionForm: ({
     defaultAccountId,
     allAccounts,
+    onConversionStateChange,
   }: {
     defaultAccountId?: string;
     allAccounts?: { id: string }[];
+    onConversionStateChange?: (needsConversion: boolean) => void;
   }) => (
     <div data-testid="investment-form">
       {defaultAccountId}
       <span data-testid="form-all-accounts">
         {allAccounts === undefined ? 'undefined' : allAccounts.map((a) => a.id).join(',')}
       </span>
+      <button
+        data-testid="form-needs-conversion"
+        onClick={() => onConversionStateChange?.(true)}
+      >
+        show conversion
+      </button>
     </div>
   ),
 }));
@@ -785,6 +793,43 @@ describe('InvestmentRegisterPanel', () => {
         fireEvent.click(screen.getByText('+ New Cash Transaction'));
       });
       expect(screen.getByText('New Transaction')).toBeInTheDocument();
+    });
+
+    it('opens the brokerage form at the width the Investments page opens it', async () => {
+      // Same form, same modal, two pages: it was `6xl` here and `xl` there, so
+      // the same dialogue arrived half the screen wider depending on the route
+      // taken to it.
+      await renderPanel(brokerage, cash);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('+ New Brokerage Transaction'));
+      });
+
+      expect(document.querySelector('.max-w-xl')).toBeInTheDocument();
+      expect(document.querySelector('.max-w-6xl')).not.toBeInTheDocument();
+    });
+
+    it('widens for the currency conversion section, and narrows again after', async () => {
+      await renderPanel(brokerage, cash);
+      await act(async () => {
+        fireEvent.click(screen.getByText('+ New Brokerage Transaction'));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('form-needs-conversion'));
+      });
+      expect(document.querySelector('.max-w-3xl')).toBeInTheDocument();
+
+      // Reopening starts narrow rather than at the last form's size. Escape is
+      // one of the routes out that has to reset it, alongside cancel, the
+      // backdrop and the back button -- they all land on the same close.
+      await act(async () => {
+        fireEvent.keyDown(document, { key: 'Escape' });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('+ New Brokerage Transaction'));
+      });
+      expect(document.querySelector('.max-w-xl')).toBeInTheDocument();
     });
 
     it('says Edit Transaction when a row is being edited', async () => {

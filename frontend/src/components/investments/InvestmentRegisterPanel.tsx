@@ -102,6 +102,11 @@ export function InvestmentRegisterPanel({
   const [brokerageFilters, setBrokerageFilters] = useState<TransactionFilters>({});
   const [cashFilters, setCashFilters] = useState<CashFilterValues>(EMPTY_CASH_FILTERS);
   const [showCashFilters, setShowCashFilters] = useState(false);
+  // Whether the brokerage form is currently showing its currency-conversion
+  // section, which the modal widens to fit. The Investments page's copy of this
+  // modal does the same, so the same form opens at the same size on both.
+  const [brokerageFormNeedsConversion, setBrokerageFormNeedsConversion] =
+    useState(false);
   // Every account the user can fund a trade from, for the brokerage form's
   // "Funds From" / "Deposit To" pickers. Undefined until it loads and after a
   // failure, because the form reads undefined as "not supplied" and falls back
@@ -237,6 +242,13 @@ export function InvestmentRegisterPanel({
 
   const brokerageForm = useFormModal<InvestmentTransaction>();
   const cashForm = useFormModal<Transaction>();
+
+  // Every way out of the brokerage modal resets the conversion width, so
+  // reopening it starts narrow rather than at the last form's size.
+  const closeBrokerageForm = useCallback(() => {
+    setBrokerageFormNeedsConversion(false);
+    brokerageForm.close();
+  }, [brokerageForm]);
 
   // A row in this register can be a trade's cash leg, whose numbers the trade
   // owns -- so it is edited as the trade, in the brokerage form mounted below,
@@ -375,9 +387,9 @@ export function InvestmentRegisterPanel({
 
       <Modal
         isOpen={brokerageForm.showForm}
-        onClose={brokerageForm.close}
+        onClose={closeBrokerageForm}
         {...brokerageForm.modalProps}
-        maxWidth="6xl"
+        maxWidth={brokerageFormNeedsConversion ? '3xl' : 'xl'}
         className="p-6"
       >
         {/* The same heading the Investments page's copy of this modal carries,
@@ -394,11 +406,12 @@ export function InvestmentRegisterPanel({
           transaction={brokerageForm.editingItem}
           defaultAccountId={holdingsAccount.id}
           onSuccess={() => {
-            brokerageForm.close();
+            closeBrokerageForm();
             afterWrite();
           }}
-          onCancel={brokerageForm.close}
+          onCancel={closeBrokerageForm}
           onDirtyChange={brokerageForm.setFormDirty}
+          onConversionStateChange={setBrokerageFormNeedsConversion}
           submitRef={brokerageForm.formSubmitRef}
         />
       </Modal>
