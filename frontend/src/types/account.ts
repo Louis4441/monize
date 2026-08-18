@@ -332,5 +332,15 @@ export interface AccountBalanceAsOf {
 export interface AccountBalancesAsOfResponse {
   /** The date the figures were measured at -- the payload's own request key. */
   asOfDate: string;
+  /** The currency every total is presented in (the user's reporting currency). */
+  displayCurrency: string;
+  /**
+   * Multiplier from each account currency present to `displayCurrency`, as the
+   * rate stood on `asOfDate`. A currency **absent** from this map had no rate
+   * for that date: its accounts are unconvertible, and a consumer must say so
+   * rather than reaching for a live rate or for 1. See
+   * `components/reports/account-balances/as-of-rates.ts`.
+   */
+  displayRates: Record<string, number>;
   accounts: AccountBalanceAsOf[];
 }

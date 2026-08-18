@@ -2,10 +2,18 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { AccountBalancesReportService } from "./account-balances-report.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { UserPreference } from "../users/entities/user-preference.entity";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
+
+// The market date is clamped against today, so today has to be a fixture --
+// otherwise "is this date in the future" is a question about the day the suite
+// happens to run on.
+jest.mock("../common/date-utils", () => ({
+  todayYMD: jest.fn(() => "2026-08-18"),
+}));
 
 /**
  * Point-in-time balances, per `docs/specs/account-balances-as-of.md` section 8.
@@ -35,6 +43,7 @@ interface Fixture {
 describe("AccountBalancesReportService", () => {
   let service: AccountBalancesReportService;
   let query: jest.Mock;
+  let preferencesRepo: { findOne: jest.Mock };
 
   const program = (fixture: Fixture) => {
     query.mockImplementation(async (sql: string) => {
@@ -64,7 +73,10 @@ describe("AccountBalancesReportService", () => {
   };
 
   beforeEach(async () => {
-    const mocks = createScopedDbMocks([]);
+    preferencesRepo = {
+      findOne: jest.fn().mockResolvedValue({ defaultCurrency: "CAD" }),
+    };
+    const mocks = createScopedDbMocks([[UserPreference, preferencesRepo]]);
     query = mocks.manager.query;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -90,10 +102,184 @@ describe("AccountBalancesReportService", () => {
     account_sub_type: "INVESTMENT_BROKERAGE",
   };
 
+  // An empty answer still has a reporting currency; leaving it out would make
+  // the client guess which currency its zeroes are in.
   it("returns nothing at all when the caller has no accounts", async () => {
     program({ accounts: [] });
     const result = await service.getBalancesAsOf("user-1", "2026-03-01");
-    expect(result).toEqual({ asOfDate: "2026-03-01", accounts: [] });
+    expect(result).toEqual({
+      asOfDate: "2026-03-01",
+      displayCurrency: "CAD",
+      displayRates: { CAD: 1 },
+      accounts: [],
+    });
+  });
+
+  describe("presenting every account in one currency", () => {
+    const usdSavings = {
+      id: "acc-usd",
+      currency_code: "USD",
+      account_type: "SAVINGS",
+      account_sub_type: null,
+    };
+
+    // A point-in-time report converts at that point in time: asked what an
+    // account held in 2019, "what it was worth then" is the question, and
+    // today's rate answers a different one.
+    it("resolves each account currency at the rate stored for the date", async () => {
+      program({
+        accounts: [cheque, usdSavings],
+        balances: [
+          { id: "acc-1", balance: "100" },
+          { id: "acc-usd", balance: "50" },
+        ],
+        rates: [
+          {
+            from_currency: "USD",
+            to_currency: "CAD",
+            rate_date: "2026-02-27",
+            rate: "1.35",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayCurrency).toBe("CAD");
+      expect(result.displayRates).toEqual({ CAD: 1, USD: 1.35 });
+    });
+
+    // Same currency is 1:1 by definition, and it has to stay distinguishable
+    // from the missing case -- which is why the map carries it explicitly.
+    it("carries the display currency at 1", async () => {
+      program({
+        accounts: [cheque],
+        balances: [{ id: "acc-1", balance: "1" }],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayRates).toEqual({ CAD: 1 });
+    });
+
+    // Omitted, never 1. A currency given a fallback rate is an account
+    // presented at a number nobody quoted.
+    it("omits a currency with no accepted rate rather than defaulting it", async () => {
+      program({
+        accounts: [cheque, usdSavings],
+        balances: [
+          { id: "acc-1", balance: "100" },
+          { id: "acc-usd", balance: "50" },
+        ],
+        rates: [],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayRates).toEqual({ CAD: 1 });
+      expect(result.displayRates.USD).toBeUndefined();
+    });
+
+    it("resolves a pair stored only in the reverse direction", async () => {
+      program({
+        accounts: [cheque, usdSavings],
+        balances: [
+          { id: "acc-1", balance: "100" },
+          { id: "acc-usd", balance: "50" },
+        ],
+        rates: [
+          {
+            from_currency: "CAD",
+            to_currency: "USD",
+            rate_date: "2026-02-27",
+            rate: "0.8",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayRates.USD).toBeCloseTo(1.25, 10);
+    });
+
+    it("falls back to USD when the user has stated no reporting currency", async () => {
+      preferencesRepo.findOne.mockResolvedValue(null);
+      program({
+        accounts: [cheque],
+        balances: [{ id: "acc-1", balance: "1" }],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayCurrency).toBe("USD");
+    });
+  });
+
+  // The ledger runs ahead of the market: a transaction can be dated next year,
+  // a close cannot. Without the clamp `closeAt` refuses its own inputs -- a
+  // report dated a year out finds today's close 365 days stale and calls every
+  // position unpriced.
+  describe("a date in the future", () => {
+    it("sums the ledger to the requested date but reads the market at today", async () => {
+      program({
+        accounts: [brokerage],
+        balances: [{ id: "acc-b", balance: "0" }],
+        investmentTransactions: [
+          {
+            account_id: "acc-b",
+            security_id: "sec-1",
+            action: "BUY",
+            quantity: "10",
+          },
+        ],
+        prices: [
+          { security_id: "sec-1", price_date: "2026-08-17", close_price: "22" },
+        ],
+        securities: [{ id: "sec-1", currency_code: "CAD" }],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2027-06-30");
+
+      // The ledger is asked about the future date...
+      const ledgerCall = query.mock.calls.find(([sql]: [string]) =>
+        sql.includes("LEFT JOIN transactions"),
+      );
+      expect(ledgerCall[1][1]).toBe("2027-06-30");
+      const replayCall = query.mock.calls.find(([sql]: [string]) =>
+        sql.includes("FROM investment_transactions"),
+      );
+      expect(replayCall[1][1]).toBe("2027-06-30");
+
+      // ...and the market about today.
+      const priceCall = query.mock.calls.find(([sql]: [string]) =>
+        sql.includes("FROM security_prices"),
+      );
+      expect(priceCall[1][1]).toBe("2026-08-18");
+      expect(priceCall[1][2]).toBe("2026-08-04");
+      const rateCall = query.mock.calls.find(([sql]: [string]) =>
+        sql.includes("FROM exchange_rates"),
+      );
+      expect(rateCall[1]).toEqual(["2026-08-18", "2026-08-04"]);
+
+      // The position is held at the latest close, not called unpriced.
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: 220,
+        valuationComplete: true,
+      });
+    });
+
+    it("still converts for presentation on a far-future date", async () => {
+      program({
+        accounts: [
+          {
+            id: "acc-usd",
+            currency_code: "USD",
+            account_type: "SAVINGS",
+            account_sub_type: null,
+          },
+        ],
+        balances: [{ id: "acc-usd", balance: "50" }],
+        rates: [
+          {
+            from_currency: "USD",
+            to_currency: "CAD",
+            rate_date: "2026-08-17",
+            rate: "1.35",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2030-01-01");
+      expect(result.displayRates).toEqual({ CAD: 1, USD: 1.35 });
+    });
   });
 
   it("echoes the date it measured, so the payload carries its own request key", async () => {
@@ -573,7 +759,7 @@ describe("AccountBalancesReportService", () => {
 
   // An empty restriction means "no accounts". Falling through to the owner's
   // whole list would hand a delegate granted nothing every balance there is.
-  it("answers an empty restriction with nothing, without reading", async () => {
+  it("answers an empty restriction with nothing, reading no account", async () => {
     program({ accounts: [cheque], balances: [{ id: "acc-1", balance: "1" }] });
     const result = await service.getBalancesAsOf(
       "user-1",
@@ -581,7 +767,14 @@ describe("AccountBalancesReportService", () => {
       [],
       [],
     );
-    expect(result).toEqual({ asOfDate: "2026-03-01", accounts: [] });
+    expect(result).toEqual({
+      asOfDate: "2026-03-01",
+      displayCurrency: "CAD",
+      displayRates: { CAD: 1 },
+      accounts: [],
+    });
+    // The caller's own preference is not an account: no balance, holding or
+    // price query may run for a grant that names nothing.
     expect(query).not.toHaveBeenCalled();
   });
 

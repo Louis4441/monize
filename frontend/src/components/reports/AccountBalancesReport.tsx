@@ -14,7 +14,6 @@ import { buildLogicalAccounts, type LogicalAccount } from '@/lib/logical-account
 import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
-import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { sumConverted, combineTotals } from '@/lib/currency-total';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useReportData } from '@/hooks/useReportData';
@@ -24,6 +23,7 @@ import {
   AccountBalancesControls,
   type ViewMode,
 } from '@/components/reports/account-balances/AccountBalancesControls';
+import { asOfConverter } from '@/components/reports/account-balances/as-of-rates';
 import {
   DEFAULT_FILTERS,
   INSTITUTION_NONE,
@@ -61,9 +61,8 @@ export function AccountBalancesReport() {
   const tAccounts = useTranslations('accounts');
   const tCommon = useTranslations('common');
   const router = useRouter();
-  const { formatCurrency } = useNumberFormat();
+  const { formatCurrency, defaultCurrency: preferredCurrency } = useNumberFormat();
   const { formatDate } = useDateFormat();
-  const { convertToDefault, defaultCurrency } = useExchangeRates();
   const mainAccountName = useMainAccountName();
 
   // A balance is measured at an instant, so the date is a first-class input --
@@ -121,6 +120,21 @@ export function AccountBalancesReport() {
   // date is in flight the previous day's numbers are still held, so the heading
   // and the export follow `dataKey` rather than the input.
   const measuredDate = dataKey ?? asOfDate;
+
+  /**
+   * Conversion into the reporting currency, at the rates that stood on the
+   * measured date -- not today's.
+   *
+   * A point-in-time report converts at that point in time: what an account was
+   * worth *then* is the question it asks, and a live rate answers a different
+   * one. Taking the rates from the same payload as the figures is also what
+   * keeps the two from drifting apart while a new date is in flight.
+   */
+  const displayCurrency = response?.balances.displayCurrency ?? preferredCurrency;
+  const convertToDisplay = useMemo(
+    () => asOfConverter(displayCurrency, response?.balances.displayRates ?? {}),
+    [displayCurrency, response],
+  );
 
   /** Ledger balance per account id at the measured date. */
   const ledgerBalances = useMemo(() => {
@@ -196,13 +210,13 @@ export function AccountBalancesReport() {
   const displayValue = useCallback(
     (entry: LogicalAccount): number | null => {
       if (entry.combinedValue === null) return null;
-      const converted = convertToDefault(entry.combinedValue, entry.primary.currencyCode);
+      const converted = convertToDisplay(entry.combinedValue, entry.primary.currencyCode);
       if (converted === null) return null;
       return isLiabilityAccountType(entry.primary.accountType)
         ? Math.abs(converted)
         : converted;
     },
-    [convertToDefault],
+    [convertToDisplay],
   );
 
   const groups = useMemo(
@@ -253,7 +267,7 @@ export function AccountBalancesReport() {
         // -- `sumConverted` treats a non-finite component exactly that way.
         (entry) => entry.combinedValue ?? Number.NaN,
         (entry) => entry.primary.currencyCode,
-        convertToDefault,
+        convertToDisplay,
       );
     const assets = split(false);
     const rawLiabilities = split(true);
@@ -264,7 +278,7 @@ export function AccountBalancesReport() {
       ([assetValue, liabilityValue]) => assetValue - liabilityValue,
     );
     return { assets, liabilities, netWorth };
-  }, [visibleAccounts, convertToDefault]);
+  }, [visibleAccounts, convertToDisplay]);
 
   const groupTotal = useCallback(
     (entries: LogicalAccount[]) =>
@@ -272,9 +286,9 @@ export function AccountBalancesReport() {
         entries,
         (entry) => entry.combinedValue ?? Number.NaN,
         (entry) => entry.primary.currencyCode,
-        convertToDefault,
+        convertToDisplay,
       ),
-    [convertToDefault],
+    [convertToDisplay],
   );
 
   const chartData = useMemo(() => {
@@ -327,7 +341,7 @@ export function AccountBalancesReport() {
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
           <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
           <p className="text-gray-600 dark:text-gray-400">
-            {formatCurrency(data.value)} ({pct}%)
+            {formatCurrency(data.value, displayCurrency)} ({pct}%)
           </p>
         </div>
       );
@@ -378,12 +392,12 @@ export function AccountBalancesReport() {
       summaryCards: [
         {
           label: t('accountBalances.totalAssets'),
-          value: `${formatCurrency(totals.assets.value)}${partial(totals.assets)}`,
+          value: `${formatCurrency(totals.assets.value, displayCurrency)}${partial(totals.assets)}`,
           color: '#16a34a',
         },
         {
           label: t('accountBalances.totalLiabilities'),
-          value: `${formatCurrency(totals.liabilities.value)}${partial(totals.liabilities)}`,
+          value: `${formatCurrency(totals.liabilities.value, displayCurrency)}${partial(totals.liabilities)}`,
           color: '#dc2626',
         },
         // Neutral grey when the net worth is a subtotal: its sign is uncertain,
@@ -391,7 +405,7 @@ export function AccountBalancesReport() {
         // declined to show for the same excluded account.
         {
           label: t('accountBalances.netWorth'),
-          value: `${formatCurrency(totals.netWorth.value)}${partial(totals.netWorth)}`,
+          value: `${formatCurrency(totals.netWorth.value, displayCurrency)}${partial(totals.netWorth)}`,
           color:
             totals.netWorth.excludedCount > 0
               ? '#111827'
@@ -404,7 +418,17 @@ export function AccountBalancesReport() {
       tableData: { headers: exportHeaders, rows: exportRows() },
       filename: `account-balances-${measuredDate}`,
     });
-  }, [t, tCommon, subtitle, totals, formatCurrency, exportHeaders, exportRows, measuredDate]);
+  }, [
+    t,
+    tCommon,
+    subtitle,
+    totals,
+    formatCurrency,
+    displayCurrency,
+    exportHeaders,
+    exportRows,
+    measuredDate,
+  ]);
 
   if (error) {
     return <ReportError onRetry={reload} />;
@@ -434,16 +458,16 @@ export function AccountBalancesReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6" data-testid="summary-assets">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.totalAssets')}</div>
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            <PartialTotal total={totals.assets} displayCurrency={defaultCurrency}>
-              {formatCurrency(totals.assets.value)}
+            <PartialTotal total={totals.assets} displayCurrency={displayCurrency}>
+              {formatCurrency(totals.assets.value, displayCurrency)}
             </PartialTotal>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6" data-testid="summary-liabilities">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.totalLiabilities')}</div>
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-            <PartialTotal total={totals.liabilities} displayCurrency={defaultCurrency}>
-              {formatCurrency(totals.liabilities.value)}
+            <PartialTotal total={totals.liabilities} displayCurrency={displayCurrency}>
+              {formatCurrency(totals.liabilities.value, displayCurrency)}
             </PartialTotal>
           </div>
         </div>
@@ -456,8 +480,8 @@ export function AccountBalancesReport() {
               ? 'text-gray-900 dark:text-gray-100'
               : totals.netWorth.value >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'
           }`}>
-            <PartialTotal total={totals.netWorth} displayCurrency={defaultCurrency}>
-              {formatCurrency(totals.netWorth.value)}
+            <PartialTotal total={totals.netWorth} displayCurrency={displayCurrency}>
+              {formatCurrency(totals.netWorth.value, displayCurrency)}
             </PartialTotal>
           </div>
         </div>
@@ -534,7 +558,7 @@ export function AccountBalancesReport() {
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
                 <div className="text-sm text-gray-500 dark:text-gray-400">{t('accountBalances.total')}</div>
                 <div className="font-semibold text-gray-900 dark:text-gray-100">
-                  {formatCurrency(chartTotal)}
+                  {formatCurrency(chartTotal, displayCurrency)}
                 </div>
               </div>
             </>
@@ -567,8 +591,11 @@ export function AccountBalancesReport() {
                         ? 'text-gray-900 dark:text-gray-100'
                         : 'text-green-600 dark:text-green-400'
                   }`}>
-                    <PartialTotal total={total} displayCurrency={defaultCurrency}>
-                      {formatCurrency(isLiabilityGroup ? Math.abs(total.value) : total.value)}
+                    <PartialTotal total={total} displayCurrency={displayCurrency}>
+                      {formatCurrency(
+                        isLiabilityGroup ? Math.abs(total.value) : total.value,
+                        displayCurrency,
+                      )}
                     </PartialTotal>
                   </span>
                 </div>
@@ -635,18 +662,18 @@ export function AccountBalancesReport() {
                               }`}>
                                 {formatCurrency(isLiability ? Math.abs(combined) : combined, acc.currencyCode)}
                               </div>
-                              {acc.currencyCode !== defaultCurrency &&
+                              {acc.currencyCode !== displayCurrency &&
                                 (() => {
                                   // Nothing rather than the unconverted amount under
                                   // the display currency's symbol.
-                                  const approx = convertToDefault(
+                                  const approx = convertToDisplay(
                                     Math.abs(combined),
                                     acc.currencyCode,
                                   );
                                   if (approx === null) return null;
                                   return (
                                     <div className="text-xs text-gray-400 dark:text-gray-500">
-                                      {'\u2248 '}{formatCurrency(approx, defaultCurrency)}
+                                      {'\u2248 '}{formatCurrency(approx, displayCurrency)}
                                     </div>
                                   );
                                 })()}

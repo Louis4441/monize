@@ -11,6 +11,8 @@ import {
   withLeadDays,
   type PricePoint,
 } from "../common/time-series/price-boundary.util";
+import { todayYMD } from "../common/date-utils";
+import { UserPreference } from "../users/entities/user-preference.entity";
 
 /**
  * One account's worth at the end of a single day.
@@ -36,11 +38,43 @@ export interface AccountBalanceAsOf {
 export interface AccountBalancesAsOfResponse {
   /** Echoes the date the figures were measured at, so the payload carries its own request key. */
   asOfDate: string;
+  /** The user's reporting currency, which every total is presented in. */
+  displayCurrency: string;
+  /**
+   * Multiplier from each account currency present to `displayCurrency`, as the
+   * rate stood on `asOfDate`.
+   *
+   * A currency **absent** from this map has no accepted rate for that date, and
+   * a consumer must treat its accounts as unconvertible rather than reaching
+   * for a live rate or for 1 -- which is the whole point of shipping the rates
+   * beside the figures they belong to. `displayCurrency` itself is present at
+   * 1, because same-currency is 1:1 by definition and has to stay
+   * distinguishable from the missing case.
+   */
+  displayRates: Record<string, number>;
   accounts: AccountBalanceAsOf[];
 }
 
 /** A share position is treated as closed below this, matching HoldingsService. */
 const QUANTITY_EPSILON = 0.00000001;
+
+/**
+ * The date the *market* is read at, for a report asked about `asOfDate`.
+ *
+ * The ledger runs ahead -- a transaction can be dated next year -- but prices
+ * and rates cannot, so a future `asOfDate` is clamped to today, which is the
+ * same thing `ExchangeRateService.getRateForDate` does and for the same reason:
+ * today's figure is the best available estimate of a day that has not happened.
+ *
+ * Without the clamp the staleness bound refuses its own inputs. `closeAt` asks
+ * how old an observation is *relative to the date being priced*, so a report
+ * dated a year out would find today's close 365 days stale and call every
+ * position unpriced -- and the bounded query would not even return it.
+ */
+function marketDateFor(asOfDate: string): string {
+  const today = todayYMD();
+  return asOfDate > today ? today : asOfDate;
+}
 
 /**
  * Point-in-time balances for the Account Balances report (issue #1198).
@@ -79,11 +113,20 @@ export class AccountBalancesReportService {
     jointAccountIds: string[] = [],
     restrictToAccountIds?: string[],
   ): Promise<AccountBalancesAsOfResponse> {
+    // An answer with no accounts in it still has a reporting currency: the
+    // client draws its (zero) totals and its empty state in one, and a response
+    // that omitted it would leave that currency to be guessed.
+    const displayCurrency = await this.resolveDisplayCurrency(userId);
+    const empty = {
+      asOfDate,
+      displayCurrency,
+      displayRates: { [displayCurrency]: 1 },
+      accounts: [],
+    };
+
     // An empty restriction is "no accounts", not "no restriction": a delegate
     // granted nothing must not fall through to the owner's whole list.
-    if (restrictToAccountIds && restrictToAccountIds.length === 0) {
-      return { asOfDate, accounts: [] };
-    }
+    if (restrictToAccountIds && restrictToAccountIds.length === 0) return empty;
     const restriction = restrictToAccountIds ?? null;
 
     const accounts: Array<{
@@ -99,7 +142,7 @@ export class AccountBalancesReportService {
       [userId, jointAccountIds, restriction],
     );
 
-    if (accounts.length === 0) return { asOfDate, accounts: [] };
+    if (accounts.length === 0) return empty;
 
     const ledgerBalances = await this.ledgerBalances(
       userId,
@@ -107,6 +150,12 @@ export class AccountBalancesReportService {
       jointAccountIds,
       restriction,
     );
+
+    // One rate read serves both jobs: pricing a foreign holding into its own
+    // account's currency, and presenting every account in the user's. Reading
+    // them twice would be two chances for the two halves of one report to be
+    // converted at different vintages.
+    const rates = await this.storedRatesAsOf(marketDateFor(asOfDate));
 
     // Only these hold securities. The cash sleeve of a linked pair is an
     // ordinary ledger account and is excluded here, exactly as it is everywhere
@@ -122,10 +171,18 @@ export class AccountBalancesReportService {
         currencyCode: a.currency_code,
       })),
       asOfDate,
+      rates,
     );
 
     return {
       asOfDate,
+      displayCurrency,
+      displayRates: this.displayRates(
+        accounts.map((a) => a.currency_code),
+        displayCurrency,
+        rates,
+        asOfDate,
+      ),
       accounts: accounts.map((a) => {
         const valuation = marketValues.get(a.id);
         // A row that holds no securities has no market value to report -- that
@@ -195,6 +252,7 @@ export class AccountBalancesReportService {
   private async marketValuesAsOf(
     holdingsAccounts: Array<{ id: string; currencyCode: string }>,
     asOfDate: string,
+    rates: Map<string, number>,
   ): Promise<
     Map<
       string,
@@ -270,10 +328,9 @@ export class AccountBalancesReportService {
     ];
 
     const [prices, securityCurrencies] = await Promise.all([
-      this.closingPricesAsOf(heldSecurityIds, asOfDate),
+      this.closingPricesAsOf(heldSecurityIds, marketDateFor(asOfDate)),
       this.securityCurrencies(heldSecurityIds),
     ]);
-    const rates = await this.storedRatesAsOf(asOfDate);
 
     for (const account of holdingsAccounts) {
       const bySecurity = positions.get(account.id);
@@ -326,6 +383,56 @@ export class AccountBalancesReportService {
     }
 
     return result;
+  }
+
+  /** The currency the user reads their totals in. */
+  private async resolveDisplayCurrency(userId: string): Promise<string> {
+    const preference = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
+    return preference?.defaultCurrency || "USD";
+  }
+
+  /**
+   * The multiplier from each account currency to `displayCurrency`, as the rate
+   * stood on the report's date.
+   *
+   * A point-in-time report converts at that point in time: asked what an
+   * account held in 2019, "what it was worth then" is the question, and today's
+   * rate answers a different one. The rates travel in the payload beside the
+   * figures for the same reason the date does -- a consumer converting with a
+   * live rate map would be presenting one date's balances at another date's
+   * rates, and nothing on screen would say so.
+   *
+   * A currency with no accepted rate is **omitted**, never given 1. The display
+   * currency itself is present at 1 because that is a definition, not a
+   * fallback, and it has to stay distinguishable from the absent case.
+   */
+  private displayRates(
+    accountCurrencies: string[],
+    displayCurrency: string,
+    rates: Map<string, number>,
+    asOfDate: string,
+  ): Record<string, number> {
+    const resolved: Record<string, number> = { [displayCurrency]: 1 };
+    const missing = new Set<string>();
+    for (const currency of new Set(accountCurrencies)) {
+      if (currency === displayCurrency) continue;
+      const rate = convertWithRateLookup(1, currency, displayCurrency, (f, t) =>
+        rates.get(`${f}->${t}`),
+      );
+      if (rate === null) {
+        missing.add(`${currency}->${displayCurrency}`);
+        continue;
+      }
+      resolved[currency] = rate;
+    }
+    if (missing.size > 0) {
+      this.logger.warn(
+        `No exchange rate at ${asOfDate} for ${[...missing].sort().join(", ")}; accounts in those currencies cannot be presented in ${displayCurrency}`,
+      );
+    }
+    return resolved;
   }
 
   /**

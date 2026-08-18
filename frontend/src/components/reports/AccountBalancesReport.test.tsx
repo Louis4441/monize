@@ -75,14 +75,6 @@ vi.mock("@/hooks/useDateFormat", () => ({
   useDateFormat: () => ({ formatDate: (d: string) => `date(${d})` }),
 }));
 
-vi.mock("@/hooks/useExchangeRates", () => ({
-  useExchangeRates: () => ({
-    convertToDefault: (amount: number, currency: string) =>
-      currency === "XXX" ? null : amount,
-    defaultCurrency: "CAD",
-  }),
-}));
-
 vi.mock("@/lib/chart-colours", () => ({
   CHART_COLOURS: ["#3b82f6", "#ef4444", "#22c55e"],
 }));
@@ -172,8 +164,12 @@ function balance(accountId: string, value: number, overrides: Record<string, unk
   };
 }
 
-function balancesFor(rows: any[], asOfDate = TODAY) {
-  return { asOfDate, accounts: rows };
+function balancesFor(
+  rows: any[],
+  asOfDate = TODAY,
+  displayRates: Record<string, number> = { CAD: 1 },
+) {
+  return { asOfDate, displayCurrency: "CAD", displayRates, accounts: rows };
 }
 
 describe("AccountBalancesReport", () => {
@@ -608,15 +604,20 @@ describe("AccountBalancesReport", () => {
     expect(screen.getAllByText("$7000.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  // A component with no rate to the display currency leaves the total, and the
-  // total says so rather than quietly shrinking.
+  // A currency the payload has no rate for leaves the total, and the total says
+  // so rather than quietly shrinking.
   it("marks the summary cards partial when an account cannot be converted", async () => {
     mockGetAll.mockResolvedValue([
       acc(),
       acc({ id: "acc-2", name: "Exotic", accountType: "SAVINGS", currencyCode: "XXX" }),
     ]);
     mockGetBalancesAsOf.mockResolvedValue(
-      balancesFor([balance("acc-1", 5000), balance("acc-2", 900, { currencyCode: "XXX" })]),
+      balancesFor(
+        [balance("acc-1", 5000), balance("acc-2", 900, { currencyCode: "XXX" })],
+        TODAY,
+        // XXX omitted: the server found no rate for it on this date.
+        { CAD: 1 },
+      ),
     );
     render(<AccountBalancesReport />);
     await waitFor(() => {
@@ -628,6 +629,67 @@ describe("AccountBalancesReport", () => {
     expect(
       within(screen.getByTestId("summary-networth")).getByTestId("partial-total-marker"),
     ).toBeInTheDocument();
+    // Never the unconverted amount under the display currency's symbol.
+    const row = screen.getByText("Exotic").closest("button")!;
+    expect(within(row).queryByText(/≈/)).not.toBeInTheDocument();
+  });
+
+  // The rates travel with the figures because they belong to the same instant:
+  // a 2019 balance converted at today's rate answers a different question, and
+  // nothing on screen would say which of the two the number is.
+  it("converts a foreign account at the rate the payload carries for that date", async () => {
+    mockGetAll.mockResolvedValue([
+      acc({ name: "US Savings", accountType: "SAVINGS", currencyCode: "USD" }),
+    ]);
+    mockGetBalancesAsOf.mockResolvedValue(
+      balancesFor(
+        [balance("acc-1", 1000, { currencyCode: "USD" })],
+        "2019-06-28",
+        { CAD: 1, USD: 1.3 },
+      ),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(screen.getByText("US Savings")).toBeInTheDocument();
+    });
+    // The row keeps its own currency; the approximation and the totals are
+    // converted at the payload's rate.
+    const row = screen.getByText("US Savings").closest("button")!;
+    expect(within(row).getByText("$1000.00")).toBeInTheDocument();
+    expect(within(row).getByText(/≈/)).toHaveTextContent("$1300.00");
+    expect(
+      within(screen.getByTestId("summary-assets")).getByText("$1300.00"),
+    ).toBeInTheDocument();
+  });
+
+  it("re-converts at the new date's rates when the date changes", async () => {
+    mockGetAll.mockResolvedValue([
+      acc({ name: "US Savings", accountType: "SAVINGS", currencyCode: "USD" }),
+    ]);
+    mockGetBalancesAsOf.mockImplementation(async (date: string) =>
+      balancesFor([balance("acc-1", 1000, { currencyCode: "USD" })], date, {
+        CAD: 1,
+        USD: date === "2019-06-28" ? 1.3 : 1.4,
+      }),
+    );
+    render(<AccountBalancesReport />);
+    await waitFor(() => {
+      expect(
+        within(screen.getByTestId("summary-assets")).getByText("$1400.00"),
+      ).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("as-of-date"), {
+        target: { value: "2019-06-28" },
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByTestId("summary-assets")).getByText("$1300.00"),
+      ).toBeInTheDocument();
+    });
   });
 
   it("switches to the chart view and back", async () => {

@@ -65,10 +65,20 @@ nowhere since, from a single observation. A security outside the window is
 **unpriced** for `d`, which makes the account's total null (section 4), not
 smaller.
 
-Carrying the last accepted close forward is also what makes a future date
-meaningful: the position is held at the most recent figure anybody knows, which
-is the only honest answer a valuation can give about a day that has not
-happened. It is *not* a forecast, and today's close is always inside the window.
+**The market date is `min(d, today)`.** The ledger runs ahead -- a transaction
+can be dated next year -- and prices and rates cannot, so a future `d` reads the
+market at today, the same clamp `ExchangeRateService.getRateForDate` applies and
+for the same reason: today's figure is the best available estimate of a day that
+has not happened.
+
+Without the clamp the staleness bound refuses its own inputs. `closeAt` asks how
+old an observation is *relative to the date being priced*, so a report dated a
+year out would find today's close 365 days stale and call every position
+unpriced -- and the bounded query would not return it in the first place.
+
+So a future-dated report is the ledger projected forward, holding each position
+at the most recent figure anybody knows. It is *not* a forecast: no price or
+rate is extrapolated.
 
 ## 4. Missing data
 
@@ -138,15 +148,37 @@ payload without the date that produced it cannot be told from the previous one
 
 ## 7. Display currency
 
-Conversion of each account's figure into the user's display currency stays on
-the client, at **current** rates, exactly as it does today -- the report's
-summary cards, group subtotals and chart already go through `convertToDefault`
-and `PartialTotal`. Only the security-to-account-currency leg inside a holdings
-account uses the as-of rate, because that leg is part of the account's own
-figure rather than of its presentation.
+Every figure is presented in the user's reporting currency **at the rate that
+stood on `d`** -- the summary cards, the group subtotals, the chart and the
+per-row approximation alike. A point-in-time report converts at that point in
+time: asked what an account held in 2019, "what it was worth then" is the
+question, and today's rate answers a different one.
 
-This is a deliberate split, not an oversight: "what my 2019 balance is worth to
-me now" is the question the display currency answers.
+The rates therefore travel in the payload beside the figures they belong to:
+
+```typescript
+displayCurrency: string;              // the user's reporting currency
+displayRates: Record<string, number>; // account currency -> multiplier, on d
+```
+
+A currency the server could not resolve a rate for on `d` is **omitted** from
+the map, never given 1. `asOfConverter`
+(`frontend/src/components/reports/account-balances/as-of-rates.ts`) is the one
+place that map is read; it returns `null` for an omitted currency, and for a
+rate that is present but not a usable positive number, so those accounts leave
+the totals through `sumConverted` and are marked by `PartialTotal` rather than
+being folded in unconverted. `displayCurrency` itself is present at 1, because
+same-currency is 1:1 by definition and has to stay distinguishable from missing.
+
+Shipping the rates with the figures is also what keeps the two from drifting:
+while a new date is in flight the client still holds the previous response, and
+converting it with a live rate map would present one date's balances at another
+date's rates with nothing on screen saying so. `useExchangeRates` stays the
+right tool for a surface reporting *now*; it is the wrong one here.
+
+An account row still prints its own balance in its own currency -- that figure
+is not a conversion -- and so do the CSV and PDF table rows. Only what is summed
+across accounts is converted.
 
 ## 8. Test matrix
 
@@ -167,6 +199,12 @@ The backend spec must cover, at minimum:
    the same way; one a few days old carries forward across a weekend.
 8. A holdings account with no positions -> `marketValue: 0`, complete.
 9. A rejected date (not YYYY-MM-DD) is a 400 and writes nothing.
+10. `displayRates` carries the reporting currency at 1, resolves a foreign
+   currency at the date's rate (including a pair stored only in reverse), and
+   omits a currency it has no accepted rate for.
+11. A future date sums the ledger to that date while reading prices and rates at
+   today, and its positions are valued rather than reported unpriced.
 
-The client tests must cover the filters, the grouping keys, the sort orders, and
-the default-date change in section 2.
+The client tests must cover the filters, the grouping keys, the sort orders, the
+default-date change in section 2, conversion at the payload's rates, and an
+omitted currency leaving the totals marked partial.
