@@ -684,7 +684,7 @@ describe('PayeeList', () => {
     ];
 
     render(<PayeeList payees={payees} onEdit={onEdit} onRefresh={onRefresh} />);
-    const categoryBadge = screen.getByText('Groceries');
+    const categoryBadge = screen.getByText('Groceries').parentElement as HTMLElement;
     expect(categoryBadge).toBeInTheDocument();
     // Should have color-mix styles applied
     expect(categoryBadge.getAttribute('style')).toContain('#ef4444');
@@ -854,7 +854,7 @@ describe('PayeeList', () => {
     const badge = screen.getByText('Groceries');
     // dense mode applies px-1.5 py-0.5
     expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain('px-1.5');
+    expect((badge.parentElement as HTMLElement).className).toContain('px-1.5');
   });
 
   it('shows regular category badge in normal mode', () => {
@@ -872,7 +872,7 @@ describe('PayeeList', () => {
 
     useDensityStore.setState({ densities: { payees: 'normal' } });
     render(<PayeeList payees={payees} onEdit={onEdit} onRefresh={onRefresh} />);
-    const badge = screen.getByText('Groceries');
+    const badge = screen.getByText('Groceries').parentElement as HTMLElement;
     expect(badge.className).toContain('px-2');
   });
 
@@ -1033,7 +1033,7 @@ describe('PayeeList', () => {
         categoryColorMap={categoryColorMap}
       />,
     );
-    const badge = screen.getByText('Groceries');
+    const badge = screen.getByText('Groceries').parentElement as HTMLElement;
     // Should use the map color (#ff0000), not the category color (#000000)
     expect(badge.getAttribute('style')).toContain('#ff0000');
   });
@@ -1060,7 +1060,7 @@ describe('PayeeList', () => {
         categoryColorMap={categoryColorMap}
       />,
     );
-    const badge = screen.getByText('Groceries');
+    const badge = screen.getByText('Groceries').parentElement as HTMLElement;
     expect(badge.getAttribute('style')).toContain('#123456');
   });
 
@@ -1090,6 +1090,70 @@ describe('PayeeList', () => {
     const badge = screen.getByText('Groceries');
     // When map returns null, defaultCategoryColor = null, so uses var(--category-bg-base)
     expect(badge).toBeInTheDocument();
+  });
+
+  // categoryIconMap lookup -- the Default Category pill draws the category's glyph
+  const withCategory = (over: Record<string, unknown>) => makePayee({
+    id: 'p1',
+    name: 'Walmart',
+    defaultCategory: {
+      id: 'cat-1', userId: 'u', parentId: null, parent: null, children: [],
+      name: 'Groceries', description: null, icon: null, color: '#22c55e',
+      effectiveColor: '#22c55e', effectiveIcon: null,
+      isIncome: false, isSystem: false, createdAt: '',
+      ...over,
+    },
+  });
+
+  it("renders the default category's own icon in the pill", () => {
+    render(
+      <PayeeList
+        payees={[withCategory({ icon: 'shopping-cart', effectiveIcon: 'shopping-cart' })]}
+        onEdit={onEdit}
+        onRefresh={onRefresh}
+      />,
+    );
+    const pill = screen.getByText('Groceries').parentElement as HTMLElement;
+    expect(pill.querySelector('svg')).toBeTruthy();
+  });
+
+  it('prefers the inherited icon from categoryIconMap over the joined row', () => {
+    // A joined defaultCategory carries only its own `icon`, so a child filed
+    // under an icon-bearing parent has none -- the map supplies the effective one.
+    render(
+      <PayeeList
+        payees={[withCategory({})]}
+        onEdit={onEdit}
+        onRefresh={onRefresh}
+        categoryIconMap={new Map([['cat-1', 'shopping-cart']])}
+      />,
+    );
+    const pill = screen.getByText('Groceries').parentElement as HTMLElement;
+    expect(pill.querySelector('svg')).toBeTruthy();
+  });
+
+  it('renders no glyph when the category has no icon anywhere', () => {
+    render(
+      <PayeeList
+        payees={[withCategory({})]}
+        onEdit={onEdit}
+        onRefresh={onRefresh}
+        categoryIconMap={new Map<string, string | null>([['cat-1', null]])}
+      />,
+    );
+    const pill = screen.getByText('Groceries').parentElement as HTMLElement;
+    expect(pill.querySelector('svg')).toBeNull();
+  });
+
+  it('never renders the icon name as text', () => {
+    render(
+      <PayeeList
+        payees={[withCategory({ icon: 'shopping-cart', effectiveIcon: 'shopping-cart' })]}
+        onEdit={onEdit}
+        onRefresh={onRefresh}
+      />,
+    );
+    expect(screen.queryByText(/shopping-cart/)).toBeNull();
   });
 
   // Odd/even row striping in non-normal density

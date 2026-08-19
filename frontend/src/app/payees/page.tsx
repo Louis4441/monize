@@ -18,7 +18,7 @@ import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { payeesApi } from '@/lib/payees';
 import { categoriesApi } from '@/lib/categories';
-import { buildCategoryColorMap, buildCategoryLabelMap } from '@/lib/categoryUtils';
+import { buildCategoryColorMap, buildCategoryIconMap, buildCategoryLabelMap } from '@/lib/categoryUtils';
 import { MergePayeeDialog } from '@/components/payees/MergePayeeDialog';
 import { Payee, PayeeStatusFilter, PayeeCategoryFilter } from '@/types/payee';
 import { Category } from '@/types/category';
@@ -148,6 +148,7 @@ function PayeesContent() {
   };
 
   const categoryColorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
+  const categoryIconMap = useMemo(() => buildCategoryIconMap(categories), [categories]);
   const categoryLabelMap = useMemo(() => buildCategoryLabelMap(categories), [categories]);
 
   // Payees that have a default category set but still have uncategorized
@@ -443,6 +444,7 @@ function PayeesContent() {
               sortDirection={sortDirection}
               onSort={handleSort}
               categoryColorMap={categoryColorMap}
+              categoryIconMap={categoryIconMap}
               categoryLabelMap={categoryLabelMap}
               highlightId={highlightId}
             />
