@@ -1333,3 +1333,49 @@ describe("a panel card is the shared Card surface", () => {
     expect(card.split("\n").some(CARD_FINGERPRINT)).toBe(true);
   });
 });
+
+describe("an auth page renders inside AuthShell", () => {
+  /**
+   * The centered logo-plus-form shell used to be duplicated across every auth
+   * branch -- six near-identical copies, each drifting on its own -- and the
+   * form sat bare on the page background, the one surface in the app without
+   * a card. `AuthShell` (components/auth/AuthShell.tsx) is the single shell:
+   * transparent brand mark (the boxed logo bakes in a white rect and rendered
+   * as a white square in dark mode), title, notices, and the shared Card
+   * around the body.
+   */
+  const SHELL = "/src/components/auth/AuthShell.tsx";
+  const AUTH_ROUTES = [
+    "/src/app/login/page.tsx",
+    "/src/app/register/page.tsx",
+    "/src/app/forgot-password/page.tsx",
+    "/src/app/reset-password/page.tsx",
+    "/src/app/change-password/page.tsx",
+    "/src/app/verify-email/page.tsx",
+    "/src/app/setup-2fa/page.tsx",
+  ];
+  const HAND_ROLLED_SHELL = "min-h-screen flex items-center justify-center";
+
+  it("imports AuthShell on every auth route", () => {
+    const missing = AUTH_ROUTES.filter(
+      (path) => !sources[path]?.includes("components/auth/AuthShell"),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("has no hand-rolled centered shell on an auth route", () => {
+    const offenders = AUTH_ROUTES.filter((path) =>
+      sources[path]?.includes(HAND_ROLLED_SHELL),
+    );
+    // A new branch that rebuilds the wrapper is the drift this rule exists to
+    // stop -- render the branch through AuthShell (plain, if it has no card).
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the shell, so the rule cannot pass by accident", () => {
+    const shell = sources[SHELL];
+    expect(shell, `${SHELL} not found -- update SHELL in this test`).toBeTruthy();
+    expect(shell.includes(HAND_ROLLED_SHELL)).toBe(true);
+    expect(shell.includes("monize-logo-transparent")).toBe(true);
+  });
+});
