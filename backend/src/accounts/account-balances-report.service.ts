@@ -11,6 +11,10 @@ import {
   withLeadDays,
   type PricePoint,
 } from "../common/time-series/price-boundary.util";
+import {
+  nearestClosesFor,
+  nearestRatesFor,
+} from "../common/time-series/nearest-observation";
 import { todayYMD } from "../common/date-utils";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -35,6 +39,23 @@ export interface AccountBalanceAsOf {
   pricesComplete: boolean;
   fxComplete: boolean;
   valuationComplete: boolean;
+  /**
+   * Held positions valued at the closest close the database holds, because
+   * nothing was observed inside the accepted window for `asOfDate` and the
+   * provider could not fill it (spec section 4.2).
+   *
+   * The figure is a real observation, so it is *known* -- which is why it
+   * counts towards a complete valuation rather than nulling it -- but it was
+   * struck on another day, and a consumer must say so. Zero means every price
+   * behind this row stood for the date itself.
+   */
+  approximatedPriceCount: number;
+  /**
+   * `"USD->CAD"` for each pair this row converted at the closest rate outside
+   * the window, on the same terms as `approximatedPriceCount` (spec section
+   * 7.2).
+   */
+  approximatedRatePairs: string[];
   /**
    * Whether the account existed at `asOfDate`.
    *
@@ -72,7 +93,35 @@ export interface AccountBalancesAsOfResponse {
    * distinguishable from the missing case.
    */
   displayRates: Record<string, number>;
+  /**
+   * Currency -> the date the rate presenting it was actually struck on, for
+   * every entry in `displayRates` that came from the closest observation
+   * outside the accepted window rather than from `asOfDate` itself.
+   *
+   * A currency absent from here converted at a rate that stood on the date. A
+   * currency absent from `displayRates` has no rate at all -- the two absences
+   * mean opposite things, which is why the approximation is named rather than
+   * folded into the rate map it qualifies.
+   */
+  approximatedDisplayRates: Record<string, string>;
   accounts: AccountBalanceAsOf[];
+}
+
+/**
+ * The rates the report converts with, and which of them are approximations.
+ *
+ * `approximated` is keyed exactly as `rates` is (`"USD->CAD"`, in the direction
+ * the rate is stored) and holds the date each such observation was struck on.
+ */
+interface ResolvedRates {
+  rates: Map<string, number>;
+  approximated: Map<string, string>;
+}
+
+/** The closes the report values with, and which of them are approximations. */
+interface ResolvedPrices {
+  prices: Map<string, number>;
+  approximated: Map<string, string>;
 }
 
 /** A share position is treated as closed below this, matching HoldingsService. */
@@ -162,6 +211,33 @@ function marketDateFor(asOfDate: string): string {
 }
 
 /**
+ * The date the rate used for `from -> to` was struck on, when that rate is an
+ * approximation -- `null` when the conversion is same-currency, unresolvable,
+ * or made at a rate that stood on the report's own date.
+ *
+ * It mirrors `convertWithRateLookup`'s direct-then-inverse preference rather
+ * than testing both keys, because the pair the conversion *used* is the only
+ * one whose vintage the figure inherits: a stored `USD->CAD` inside the window
+ * is not made approximate by an old `CAD->USD` sitting beside it.
+ */
+function approximateRateDate(
+  rates: ResolvedRates,
+  from: string,
+  to: string,
+): string | null {
+  if (!from || from === to) return null;
+  const direct = rates.rates.get(`${from}->${to}`);
+  if (direct != null && direct > 0) {
+    return rates.approximated.get(`${from}->${to}`) ?? null;
+  }
+  const inverse = rates.rates.get(`${to}->${from}`);
+  if (inverse != null && inverse > 0) {
+    return rates.approximated.get(`${to}->${from}`) ?? null;
+  }
+  return null;
+}
+
+/**
  * Point-in-time balances for the Account Balances report (issue #1198).
  *
  * Kept apart from `AccountsService` because it answers a different question:
@@ -212,6 +288,7 @@ export class AccountBalancesReportService {
       asOfDate,
       displayCurrency,
       displayRates: { [displayCurrency]: 1 },
+      approximatedDisplayRates: {},
       accounts: [],
     };
 
@@ -303,15 +380,18 @@ export class AccountBalancesReportService {
       asOfDate,
     );
 
+    const display = this.displayRates(
+      accounts.map((a) => a.currency_code),
+      displayCurrency,
+      rates,
+      asOfDate,
+    );
+
     return {
       asOfDate,
       displayCurrency,
-      displayRates: this.displayRates(
-        accounts.map((a) => a.currency_code),
-        displayCurrency,
-        rates,
-        asOfDate,
-      ),
+      displayRates: display.rates,
+      approximatedDisplayRates: display.approximated,
       accounts: accounts.map((a) => {
         const existsAsOf = this.existedOn(
           a,
@@ -337,6 +417,8 @@ export class AccountBalancesReportService {
             pricesComplete: true,
             fxComplete: true,
             valuationComplete: true,
+            approximatedPriceCount: 0,
+            approximatedRatePairs: [],
             existsAsOf,
           };
         }
@@ -520,39 +602,53 @@ export class AccountBalancesReportService {
   private valuePositions(
     holdingsAccounts: Array<{ id: string; currencyCode: string }>,
     positions: AccountPositions,
-    prices: Map<string, number>,
+    prices: ResolvedPrices,
     securityCurrencies: Map<string, string>,
-    rates: Map<string, number>,
+    rates: ResolvedRates,
     asOfDate: string,
   ): Map<string, AccountValuation> {
     const result = new Map<string, AccountValuation>();
+    const lookup = (from: string, to: string) =>
+      rates.rates.get(`${from}->${to}`);
 
     for (const account of holdingsAccounts) {
       const bySecurity = positions.get(account.id);
       const aggregate = new FxAggregate();
       const unpriced = new Set<string>();
+      const approximatedPrices = new Set<string>();
+      const approximatedPairs = new Set<string>();
 
       for (const [securityId, quantity] of bySecurity ?? []) {
         if (Math.abs(quantity) <= QUANTITY_EPSILON) continue;
-        const price = prices.get(securityId);
+        const price = prices.prices.get(securityId);
         // An unpriced position is unknown, not free. Folding it in at zero is
         // what makes a partial valuation look like a settled one.
         if (price == null) {
           unpriced.add(securityId);
           continue;
         }
+        if (prices.approximated.has(securityId))
+          approximatedPrices.add(securityId);
         const securityCurrency =
           securityCurrencies.get(securityId) ?? account.currencyCode;
-        aggregate.add(
-          convertWithRateLookup(
-            quantity * price,
-            securityCurrency,
-            account.currencyCode,
-            (from, to) => rates.get(`${from}->${to}`),
-          ),
+        const converted = convertWithRateLookup(
+          quantity * price,
           securityCurrency,
           account.currencyCode,
+          lookup,
         );
+        // Only a conversion that actually happened can have been approximated;
+        // a pair with no rate at all is a gap the aggregate already names, and
+        // reporting it as both missing and approximated would say two
+        // contradictory things about one component.
+        if (
+          converted !== null &&
+          approximateRateDate(rates, securityCurrency, account.currencyCode) !==
+            null
+        ) {
+          approximatedPairs.add(`${securityCurrency}->${account.currencyCode}`);
+        }
+        aggregate.add(converted, securityCurrency, account.currencyCode);
       }
 
       const missingRatePairs = aggregate.missingPairs;
@@ -563,6 +659,15 @@ export class AccountBalancesReportService {
       }
       const complete = aggregate.isComplete && unpriced.size === 0;
       const knownSubtotal = roundMoney(aggregate.knownSubtotal);
+      if (approximatedPrices.size > 0 || approximatedPairs.size > 0) {
+        this.logger.log(
+          `Account ${account.id} valuation at ${asOfDate} uses the closest available data: ` +
+            `${approximatedPrices.size} approximated price(s)` +
+            (approximatedPairs.size > 0
+              ? `, rates for ${[...approximatedPairs].sort().join(", ")}`
+              : ""),
+        );
+      }
 
       result.set(account.id, {
         // An account holding nothing is worth zero, not unknown -- the
@@ -574,6 +679,8 @@ export class AccountBalancesReportService {
         pricesComplete: unpriced.size === 0,
         fxComplete: aggregate.isComplete,
         valuationComplete: complete,
+        approximatedPriceCount: approximatedPrices.size,
+        approximatedRatePairs: [...approximatedPairs].sort(),
       });
     }
 
@@ -582,35 +689,41 @@ export class AccountBalancesReportService {
 
   /**
    * The rate map the report converts with, after giving the provider a chance
-   * to supply what nobody has stored yet.
+   * to supply what nobody has stored yet, and then the database a chance to
+   * supply the closest thing it holds.
    *
-   * A stored rate is preferred without qualification -- this only ever runs for
-   * pairs the database cannot answer at all for `marketDate`. When the fetch
-   * comes back with something, the map is re-read from the database rather than
-   * patched in memory, so what the report converts with is exactly what a
-   * second request would find: one source of truth, not two that agree today.
+   * A stored rate inside the window is preferred without qualification -- the
+   * fetch only ever runs for pairs the database cannot answer at all for
+   * `marketDate`. When the fetch comes back with something, the map is re-read
+   * from the database rather than patched in memory, so what the report
+   * converts with is exactly what a second request would find: one source of
+   * truth, not two that agree today.
    *
-   * The fetch is best-effort. A provider that is down, rate-limited, or simply
-   * has no history for a pair leaves the report exactly where it was before
-   * this existed -- the pair named in `missingRatePairs` and the total null --
-   * rather than failing a read the database could answer for everything else.
+   * The fetch is best-effort. What it cannot supply falls back to the closest
+   * observation either side of the date (spec section 7.2) -- a real rate,
+   * struck on another day, returned with that day so the report can say so. A
+   * pair with no stored rate at *any* date has nothing to approximate from and
+   * stays missing, which is what leaves the total null.
    */
   private async ratesForReport(
     required: Array<{ from: string; to: string }>,
     marketDate: string,
-  ): Promise<Map<string, number>> {
+  ): Promise<ResolvedRates> {
     const rates = await this.storedRatesAsOf(marketDate);
 
     // `convertWithRateLookup` is the one place that decides a pair is
     // answerable -- direct rate, else the reciprocal of the reverse. Asking it
     // means the set fetched is exactly the set the valuation would fail on.
-    const missing = required.filter(
-      (pair) =>
-        convertWithRateLookup(1, pair.from, pair.to, (f, t) =>
-          rates.get(`${f}->${t}`),
-        ) === null,
-    );
-    if (missing.length === 0) return rates;
+    const unanswerable = (map: Map<string, number>) =>
+      required.filter(
+        (pair) =>
+          convertWithRateLookup(1, pair.from, pair.to, (f, t) =>
+            map.get(`${f}->${t}`),
+          ) === null,
+      );
+
+    const missing = unanswerable(rates);
+    if (missing.length === 0) return { rates, approximated: new Map() };
 
     this.logger.log(
       `No stored rate at ${marketDate} for ${missing
@@ -628,35 +741,84 @@ export class AccountBalancesReportService {
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return rates;
     }
-    if (loaded === 0) return rates;
+    const settled = loaded > 0 ? await this.storedRatesAsOf(marketDate) : rates;
 
-    return this.storedRatesAsOf(marketDate);
+    return this.withNearestRates(settled, unanswerable(settled), marketDate);
+  }
+
+  /**
+   * The rate map widened with the closest observation either side of the date,
+   * for the pairs nothing else could answer.
+   *
+   * The approximations are added to the same map the bounded rates live in --
+   * one map, so `convertWithRateLookup` keeps making the one direct-then-
+   * inverse decision -- with a parallel map naming which keys they are and when
+   * they were struck. Nothing here overwrites a rate that stood on the date:
+   * only pairs already established as unanswerable are asked for.
+   */
+  private async withNearestRates(
+    rates: Map<string, number>,
+    stillMissing: Array<{ from: string; to: string }>,
+    marketDate: string,
+  ): Promise<ResolvedRates> {
+    const approximated = new Map<string, string>();
+    if (stillMissing.length === 0) return { rates, approximated };
+
+    const nearest = await nearestRatesFor(
+      (sql, params) => this.scopedQuery(sql, params),
+      stillMissing,
+      marketDate,
+    );
+    if (nearest.size === 0) {
+      this.logger.warn(
+        `No stored rate at any date for ${stillMissing
+          .map((p) => `${p.from}->${p.to}`)
+          .sort()
+          .join(", ")}; those figures stay unknown`,
+      );
+      return { rates, approximated };
+    }
+
+    const widened = new Map(rates);
+    for (const [pair, observation] of nearest) {
+      widened.set(pair, observation.value);
+      approximated.set(pair, observation.date);
+    }
+    this.logger.log(
+      `Using the closest stored rate to ${marketDate} for ${[...approximated]
+        .map(([pair, date]) => `${pair} (${date})`)
+        .sort()
+        .join(", ")}`,
+    );
+    return { rates: widened, approximated };
   }
 
   /**
    * The closes the report values with, after giving the provider a chance to
-   * supply the history nobody has stored yet.
+   * supply the history nobody has stored yet, and then the database a chance to
+   * supply the closest thing it holds.
    *
    * The exact counterpart of `ratesForReport`, and deliberately shaped the
    * same: only securities `closeAt` cannot answer for `marketDate` are asked
-   * for, the fetch is best-effort, and what it returns is re-read from the
-   * database rather than patched into the map -- so the valuation uses what a
-   * second request would find.
+   * for, the fetch is best-effort, what it returns is re-read from the database
+   * rather than patched into the map, and whatever is still missing falls back
+   * to the nearest stored close either side of the date (spec section 4.2).
    *
    * A security refused by the *staleness bound* is asked for as well as one
    * with no rows at all, and it has to be: "the last close is from 2016" and
    * "there are no closes" are the same absence from a 2017 report's point of
-   * view, and the fill is what tells them apart.
+   * view, and the fill is what tells them apart. A security with no close at
+   * *any* date has nothing to approximate from and stays unpriced.
    */
   private async pricesForReport(
     heldSecurityIds: string[],
     stored: Map<string, number>,
     marketDate: string,
-  ): Promise<Map<string, number>> {
+  ): Promise<ResolvedPrices> {
     const missing = heldSecurityIds.filter((id) => !stored.has(id));
-    if (missing.length === 0) return stored;
+    if (missing.length === 0)
+      return { prices: stored, approximated: new Map() };
 
     this.logger.log(
       `No accepted close at ${marketDate} for ${missing.length} held securities; fetching historical prices`,
@@ -674,11 +836,56 @@ export class AccountBalancesReportService {
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return stored;
     }
-    if (loaded === 0) return stored;
+    const settled =
+      loaded > 0
+        ? await this.closingPricesAsOf(heldSecurityIds, marketDate)
+        : stored;
 
-    return this.closingPricesAsOf(heldSecurityIds, marketDate);
+    return this.withNearestPrices(
+      settled,
+      heldSecurityIds.filter((id) => !settled.has(id)),
+      marketDate,
+    );
+  }
+
+  /**
+   * The price map widened with the closest close either side of the date, for
+   * the securities nothing else could price.
+   *
+   * Same contract as `withNearestRates`: only securities already established as
+   * unpriced are looked up, so no close that stood on the date is displaced,
+   * and each approximation is returned with the day it was struck on.
+   */
+  private async withNearestPrices(
+    prices: Map<string, number>,
+    stillMissing: string[],
+    marketDate: string,
+  ): Promise<ResolvedPrices> {
+    const approximated = new Map<string, string>();
+    if (stillMissing.length === 0) return { prices, approximated };
+
+    const nearest = await nearestClosesFor(
+      (sql, params) => this.scopedQuery(sql, params),
+      stillMissing,
+      marketDate,
+    );
+    if (nearest.size === 0) {
+      this.logger.warn(
+        `No stored close at any date for ${stillMissing.length} held securities; those positions stay unpriced`,
+      );
+      return { prices, approximated };
+    }
+
+    const widened = new Map(prices);
+    for (const [securityId, observation] of nearest) {
+      widened.set(securityId, observation.value);
+      approximated.set(securityId, observation.date);
+    }
+    this.logger.log(
+      `Using the closest stored close to ${marketDate} for ${approximated.size} held securities`,
+    );
+    return { prices: widened, approximated };
   }
 
   /** The currency the user reads their totals in. */
@@ -691,7 +898,8 @@ export class AccountBalancesReportService {
 
   /**
    * The multiplier from each account currency to `displayCurrency`, as the rate
-   * stood on the report's date.
+   * stood on the report's date -- and which of those multipliers is an
+   * approximation.
    *
    * A point-in-time report converts at that point in time: asked what an
    * account held in 2019, "what it was worth then" is the question, and today's
@@ -700,35 +908,45 @@ export class AccountBalancesReportService {
    * live rate map would be presenting one date's balances at another date's
    * rates, and nothing on screen would say so.
    *
-   * A currency with no accepted rate is **omitted**, never given 1. The display
+   * A currency with no rate at any date is **omitted**, never given 1. One
+   * converted at the closest observation outside the window is present, and
+   * named in `approximated` with the day that observation was struck: the
+   * figure is real and the user is told which day it came from. The display
    * currency itself is present at 1 because that is a definition, not a
    * fallback, and it has to stay distinguishable from the absent case.
    */
   private displayRates(
     accountCurrencies: string[],
     displayCurrency: string,
-    rates: Map<string, number>,
+    rates: ResolvedRates,
     asOfDate: string,
-  ): Record<string, number> {
+  ): { rates: Record<string, number>; approximated: Record<string, string> } {
     const resolved: Record<string, number> = { [displayCurrency]: 1 };
+    const approximated: Record<string, string> = {};
     const missing = new Set<string>();
     for (const currency of new Set(accountCurrencies)) {
       if (currency === displayCurrency) continue;
       const rate = convertWithRateLookup(1, currency, displayCurrency, (f, t) =>
-        rates.get(`${f}->${t}`),
+        rates.rates.get(`${f}->${t}`),
       );
       if (rate === null) {
         missing.add(`${currency}->${displayCurrency}`);
         continue;
       }
       resolved[currency] = rate;
+      const approximatedOn = approximateRateDate(
+        rates,
+        currency,
+        displayCurrency,
+      );
+      if (approximatedOn) approximated[currency] = approximatedOn;
     }
     if (missing.size > 0) {
       this.logger.warn(
         `No exchange rate at ${asOfDate} for ${[...missing].sort().join(", ")}; accounts in those currencies cannot be presented in ${displayCurrency}`,
       );
     }
-    return resolved;
+    return { rates: resolved, approximated };
   }
 
   /**
