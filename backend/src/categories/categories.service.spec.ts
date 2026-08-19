@@ -605,7 +605,6 @@ describe("CategoriesService", () => {
     });
   });
 
-
   describe("getTree", () => {
     it("builds hierarchical tree from flat categories", async () => {
       const parent = { ...mockCategory, id: "p1", parentId: null };

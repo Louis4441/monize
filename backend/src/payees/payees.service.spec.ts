@@ -2657,4 +2657,56 @@ describe("PayeesService", () => {
       });
     });
   });
+  describe("preview website (AI/MCP confirmation cards)", () => {
+    it("normalises a bare domain so the card shows what will be stored", async () => {
+      // A preview computes what the commit will do: the card must not show
+      // "acme.com" for a save that writes "https://acme.com".
+      payeesRepository.findOne.mockResolvedValue(null);
+
+      const preview = await service.previewCreate(userId, {
+        name: "Acme",
+        website: "acme.com",
+      });
+
+      expect(preview.website).toBe("https://acme.com");
+    });
+
+    it("leaves the website undefined when the request said nothing about it", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+
+      const preview = await service.previewCreate(userId, { name: "Acme" });
+
+      expect(preview.website).toBeUndefined();
+    });
+
+    it("previews an edit that clears the website as null", async () => {
+      payeesRepository.findOne.mockResolvedValue({
+        ...mockPayee,
+        website: "https://acme.com",
+      });
+
+      const preview = await service.previewUpdatePayee(userId, {
+        name: "Starbucks",
+        website: "",
+      });
+
+      // "" is the clear instruction; null is what the commit will store.
+      expect(preview.website).toBeNull();
+    });
+
+    it("leaves an edit's website undefined when it was not mentioned", async () => {
+      payeesRepository.findOne.mockResolvedValue({
+        ...mockPayee,
+        website: "https://acme.com",
+      });
+
+      // The rename path is exercised elsewhere; here the point is only that
+      // an edit which never names the website leaves it untouched.
+      const preview = await service.previewUpdatePayee(userId, {
+        name: "Starbucks",
+      });
+
+      expect(preview.website).toBeUndefined();
+    });
+  });
 });

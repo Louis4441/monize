@@ -45,6 +45,13 @@ export interface CreatePayeePreview {
   name: string;
   defaultCategoryId: string | null;
   defaultCategoryName: string | null;
+  /**
+   * The website as it would be stored -- already normalised, so the card the
+   * user approves shows the address the commit will write rather than the
+   * bare domain they typed. `undefined` means the request said nothing about
+   * it; `null` means clear it.
+   */
+  website?: string | null;
 }
 
 /**
@@ -57,6 +64,8 @@ export interface UpdatePayeePreview {
   name: string;
   defaultCategoryId: string | null;
   defaultCategoryName: string | null;
+  /** See {@link CreatePayeePreview.website}. */
+  website?: string | null;
 }
 
 /** Resolved preview of a proposed payee deletion. */
@@ -167,9 +176,17 @@ export class PayeesService {
    */
   async previewCreate(
     userId: string,
-    input: { name: string; defaultCategoryId?: string | null },
+    input: {
+      name: string;
+      defaultCategoryId?: string | null;
+      website?: string | null;
+    },
   ): Promise<CreatePayeePreview> {
     const name = stripHtml(input.name)?.trim() || "";
+    // Normalise here, not at commit time: a preview has to compute what the
+    // commit will do, so the card shows "https://acme.com" for a typed
+    // "acme.com" rather than a value the save would then change.
+    const website = normalizeWebsite(input.website);
 
     return withScopedDb(this.dataSource, async (m) => {
       const existing = await m.getRepository(Payee).findOne({
@@ -203,7 +220,7 @@ export class PayeesService {
         defaultCategoryName = names.get(cat.id) ?? cat.name;
       }
 
-      return { name, defaultCategoryId, defaultCategoryName };
+      return { name, defaultCategoryId, defaultCategoryName, website };
     });
   }
 
@@ -265,7 +282,11 @@ export class PayeesService {
    */
   async previewCreatePayee(
     userId: string,
-    input: { name: string; categoryName?: string | null },
+    input: {
+      name: string;
+      categoryName?: string | null;
+      website?: string | null;
+    },
   ): Promise<CreatePayeePreview> {
     let defaultCategoryId: string | null = null;
     if (input.categoryName) {
@@ -273,7 +294,11 @@ export class PayeesService {
         await this.resolveCategoryByName(userId, input.categoryName)
       ).id;
     }
-    return this.previewCreate(userId, { name: input.name, defaultCategoryId });
+    return this.previewCreate(userId, {
+      name: input.name,
+      defaultCategoryId,
+      website: input.website,
+    });
   }
 
   /**
@@ -283,7 +308,12 @@ export class PayeesService {
    */
   async previewUpdatePayee(
     userId: string,
-    input: { name: string; newName?: string; categoryName?: string | null },
+    input: {
+      name: string;
+      newName?: string;
+      categoryName?: string | null;
+      website?: string | null;
+    },
   ): Promise<UpdatePayeePreview> {
     const payee = await this.resolvePayeeForManage(userId, input.name);
 
@@ -331,7 +361,20 @@ export class PayeesService {
       }
     }
 
-    return { payeeId: payee.id, name, defaultCategoryId, defaultCategoryName };
+    // Absent means "leave the stored address alone"; "" or null clears it.
+    // Normalised here so the card shows the value the commit will store.
+    const website =
+      input.website === undefined
+        ? undefined
+        : (normalizeWebsite(input.website) ?? null);
+
+    return {
+      payeeId: payee.id,
+      name,
+      defaultCategoryId,
+      defaultCategoryName,
+      website,
+    };
   }
 
   /** Validate + resolve a proposed payee deletion (by name) WITHOUT persisting. */
