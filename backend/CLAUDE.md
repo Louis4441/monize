@@ -127,6 +127,31 @@ transactionDate: string;
 
 **Raw selects bypass both transformers.** `getRawOne`/`getRawMany` return driver values, not entity-hydrated ones, so a DATE column comes back as a JS `Date` and a numeric as a string -- regardless of the transformer on the entity. Select a DATE as text in SQL (`TO_CHAR(col, 'YYYY-MM-DD')`) and pass a numeric through `Number()` before it reaches a DTO that declares `string`/`number`. `main.ts` installs a global DATE string parser, which hides the DATE half of this in the running server but not in tests, jobs, or any other process -- so do not rely on it. `payee-detail.service.ts` is the worked example; its `test/payee-detail.e2e-spec.ts` is what caught it, because a unit spec with mocked query builders cannot.
 
+**A hand-written column name is checked by nobody -- so a scan checks it.** A
+mocked `manager.query` records the string and resolves, which makes every raw
+statement's column names untested by construction. `AutoBackupService`'s claim
+ended `RETURNING id`, `auto_backup_settings` has no `id` (its primary key is
+`user_id`), and the spec beside it asserted
+`expect(sql).toContain("RETURNING id")` -- so the mistake was not merely
+uncaught, it was pinned. In production every hourly sweep raised
+`column "id" does not exist` (42703) and no user's automatic backup ran.
+`src/common/db/raw-sql-columns.spec.ts` now checks every `RETURNING` list,
+`INSERT` column list and `UPDATE ... SET` target in `src/` against
+`database/schema.sql`, with the grammar in `raw-sql-columns.ts` unit-tested
+separately. Assert the *column*, not the substring: a mock cannot tell a real
+column from a plausible one.
+
+**A per-user loop in a cron isolates each user, including the steps before the
+work starts.** The auto-backup sweep's `try` began *below* the claim, so an
+error while deciding whether to run -- the maintenance pre-check, the claim's
+own `UPDATE` -- left the whole handler and every remaining user was skipped,
+with nothing recorded as failed. Wrap the entire per-user body, record the
+failure on the row so the surface that shows a last-run status tells the truth,
+and record it through a path that cannot itself throw (the outcome write is a
+database call, and whatever broke the work can break the recording of it).
+`enrollManagedUsers` in the same file already had the rule; the loop below it
+did not.
+
 ## DTO Conventions
 
 ### An optional field with a format validator needs `@ValidateIf`, not just `@IsOptional`
