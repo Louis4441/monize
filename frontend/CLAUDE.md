@@ -121,6 +121,26 @@ deleting its baseline line, and new code takes the primitive from the start.
 Everything in it stays on the gray ramp so the colour themes re-skin it --
 never add a literal hex or an off-ramp hue to a card.
 
+### A category's colour and icon are inherited, and drawn by `CategoryGlyph`
+
+A category shows its own colour and icon, or the nearest ancestor's when it
+sets none. Both are resolved server-side in one walk up the ancestry
+(`effectiveColor` / `effectiveIcon`), so read `category.effectiveIcon ??
+category.icon` rather than `category.icon` -- the raw column is only what this
+row set, which is null for most leaves.
+
+`components/categories/CategoryGlyph.tsx` draws the result: the icon when
+there is one, the colour dot otherwise, dimmed when the value came from an
+ancestor. Never interpolate `category.icon` into text -- it is a name like
+`shopping-cart`, so `{category.icon} {name}` renders the name of the icon
+instead of the icon, which reads as a typo rather than a missing feature. That
+is what the detail header and the subcategory table both did.
+
+A surface holding a *joined* category row (a transaction, a payee's default
+category) has no inherited value at all, so it reads
+`buildCategoryIconMap` / `buildCategoryColorMap` (`lib/categoryUtils.ts`) built
+from the full category list, exactly as the register does.
+
 ### A brand favicon is `BrandLogo`, addressed by its entity's wrapper
 
 `components/ui/BrandLogo.tsx` renders a cached favicon with the neutral badge

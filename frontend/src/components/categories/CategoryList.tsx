@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Category } from '@/types/category';
-import { getIconComponent } from '@/components/ui/IconPicker';
+import { CategoryGlyph } from '@/components/categories/CategoryGlyph';
 import { DeleteCategoryDialog } from './DeleteCategoryDialog';
 import { categoriesApi } from '@/lib/categories';
 import toast from 'react-hot-toast';
@@ -93,6 +93,11 @@ const CategoryRow = memo(function CategoryRow({
     [category, tc, onEdit, onDeleteClick],
   );
 
+  // Dense rows drop to the bare colour dot: an icon at that row height is
+  // noise rather than a cue.
+  const glyphIcon =
+    density === 'dense' ? null : (category.effectiveIcon ?? category.icon);
+
   return (
     <tr
       ref={rowRef}
@@ -104,25 +109,18 @@ const CategoryRow = memo(function CategoryRow({
           className="flex items-center"
           style={{ paddingLeft: `${(category._level || 0) * (density === 'dense' ? 0.75 : 1.5)}rem` }}
         >
-          {category.icon && density !== 'dense' ? (
-            <span
-              aria-hidden
-              className="mr-2 flex-shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"
-              style={category.effectiveColor ? { color: category.effectiveColor } : undefined}
-            >
-              {getIconComponent(category.icon)}
-            </span>
-          ) : (
-            category.effectiveColor && (
-              <span
-                className={`rounded-full mr-2 flex-shrink-0 ${density === 'dense' ? 'w-2 h-2' : 'w-3 h-3'} ${
-                  !category.color && category.effectiveColor ? 'opacity-50' : ''
-                }`}
-                style={{ backgroundColor: category.effectiveColor }}
-                title={!category.color && category.effectiveColor ? t('list.inheritedColorTitle') : undefined}
-              />
-            )
-          )}
+          <CategoryGlyph
+            icon={glyphIcon}
+            color={category.effectiveColor}
+            inherited={!category.color && !category.icon}
+            size={glyphIcon ? 16 : density === 'dense' ? 8 : 12}
+            title={
+              !category.color && category.effectiveColor
+                ? t('list.inheritedColorTitle')
+                : undefined
+            }
+            className="mr-2"
+          />
           <button
             onClick={(e) => { e.stopPropagation(); onViewTransactions(category); }}
             className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline text-left"

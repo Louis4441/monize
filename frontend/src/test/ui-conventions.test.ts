@@ -1461,3 +1461,48 @@ describe("an empty state is the shared EmptyState", () => {
     expect(component.includes(FINGERPRINT)).toBe(true);
   });
 });
+
+describe("a brand logo keeps the display mode its badge centres with", () => {
+  /**
+   * `BrandLogo`'s fallback badge centres its letter with `inline-flex` +
+   * `items-center justify-center`. The caller's `className` is appended last,
+   * so a display utility in it wins: `hidden sm:block` on the payee list left
+   * every letter jammed against the top-left of its circle, which reads as a
+   * rendering fault rather than a class conflict. Responsive hiding is spelled
+   * `hidden sm:inline-flex`.
+   */
+  const LOGO_TAGS = /<(?:BrandLogo|PayeeLogo|InstitutionLogo)\b[\s\S]{0,400}?\/>/g;
+  /** A display utility, at any breakpoint, inside that element's className. */
+  const DISPLAY_UTILITY =
+    /className="[^"]*\b(?:[a-z]+:)?(?:block|grid|inline-block|flow-root)\b[^"]*"/;
+
+  it("has no call site whose className overrides the badge's display", () => {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      for (const match of content.matchAll(LOGO_TAGS)) {
+        if (DISPLAY_UTILITY.test(match[0])) {
+          offenders.push(path);
+        }
+      }
+    }
+    expect([...new Set(offenders)]).toEqual([]);
+  });
+
+  it("still finds the badge's centring, so the rule cannot pass by accident", () => {
+    const brandLogo = sources["/src/components/ui/BrandLogo.tsx"];
+    expect(brandLogo, "BrandLogo.tsx not found -- update this test").toBeTruthy();
+    expect(brandLogo).toContain("inline-flex items-center justify-center");
+  });
+
+  it("recognises the shape it is looking for", () => {
+    // Were the tag regex to stop matching, the scan above would police an
+    // empty set.
+    const sample = '<PayeeLogo payee={p} size={20} className="hidden sm:block" />';
+    const [found] = [...sample.matchAll(LOGO_TAGS)];
+    expect(found).toBeTruthy();
+    expect(DISPLAY_UTILITY.test(found[0])).toBe(true);
+    expect(
+      DISPLAY_UTILITY.test('<PayeeLogo className="hidden sm:inline-flex" />'),
+    ).toBe(false);
+  });
+});

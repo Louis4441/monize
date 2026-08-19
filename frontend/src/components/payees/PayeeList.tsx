@@ -165,7 +165,7 @@ const PayeeRow = memo(function PayeeRow({
       <td className={`${cellPadding} whitespace-nowrap`}>
         <div className="flex flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
           {density !== 'dense' && (
-            <PayeeLogo payee={payee} size={20} className="hidden sm:block" />
+            <PayeeLogo payee={payee} size={20} className="hidden sm:inline-flex" />
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onViewTransactions(payee); }}

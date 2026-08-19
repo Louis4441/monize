@@ -1351,6 +1351,7 @@ function TransactionsContent() {
               pageSize={PAGE_SIZE}
               onPageChange={filters.goToPage}
               categoryColorMap={filters.categoryColorMap}
+              categoryIconMap={filters.categoryIconMap}
               categoryLabelMap={filters.categoryLabelMap}
               budgetStatusMap={budgetStatusMap}
               highlightTransactionId={filters.highlightTransactionId}

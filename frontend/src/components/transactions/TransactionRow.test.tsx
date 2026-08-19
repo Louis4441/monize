@@ -685,6 +685,21 @@ describe('TransactionRow', () => {
     expect(screen.getByText('Food')).toBeInTheDocument();
   });
 
+  it('draws the icon a category inherited from its parent', () => {
+    // The joined category row carries only its own icon, so without the map a
+    // child of an icon-bearing parent shows a bare pill while the categories
+    // list beside it shows a glyph.
+    const { container } = renderRow({
+      categoryIconMap: new Map([['c1', 'shopping-cart']]),
+    });
+    expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it('draws no glyph when neither the row nor the map has an icon', () => {
+    const { container } = renderRow({ categoryIconMap: new Map() });
+    expect(container.querySelector('svg')).toBeNull();
+  });
+
   it('renders category badge using categoryColorMap color override', () => {
     renderRow({
       categoryColorMap: new Map([['c1', '#abcdef']]),

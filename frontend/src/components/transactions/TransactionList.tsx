@@ -66,6 +66,8 @@ interface TransactionListProps {
   onToggleAllOnPage?: () => void;
   isAllOnPageSelected?: boolean;
   categoryColorMap?: Map<string, string | null>;
+  /** Inherited-aware icon per category id; see buildCategoryIconMap. */
+  categoryIconMap?: Map<string, string | null>;
   categoryLabelMap?: Map<string, string>;
   budgetStatusMap?: Record<string, CategoryBudgetStatus>;
   /**
@@ -174,6 +176,7 @@ export function TransactionList({
   onToggleAllOnPage,
   isAllOnPageSelected,
   categoryColorMap,
+  categoryIconMap,
   categoryLabelMap,
   budgetStatusMap,
   densityView = 'transactions',
@@ -604,6 +607,7 @@ export function TransactionList({
                     isSelected={selectionMode ? (selectAllMatching ? !excludedIds?.has(transaction.id) : (selectedIds?.has(transaction.id) || false)) : undefined}
                     onToggleSelection={selectionMode ? () => onToggleSelection?.(transaction.id) : undefined}
                     categoryColorMap={categoryColorMap}
+                    categoryIconMap={categoryIconMap}
                     budgetStatusMap={budgetStatusMap}
                     isFuture={isFuture}
                     isHighlighted={!!highlightTransactionId && transaction.id === highlightTransactionId}

@@ -172,6 +172,8 @@ export interface TransactionRowProps {
   selectionMode?: boolean;
   onToggleSelection?: () => void;
   categoryColorMap?: Map<string, string | null>;
+  /** Inherited-aware icon per category id; see buildCategoryIconMap. */
+  categoryIconMap?: Map<string, string | null>;
   budgetStatusMap?: Record<string, CategoryBudgetStatus>;
   isFuture?: boolean;
   /** Flash and scroll to this row (e.g. when arriving from a deep link). */
@@ -220,6 +222,7 @@ export const TransactionRow = memo(function TransactionRow({
   selectionMode,
   onToggleSelection,
   categoryColorMap,
+  categoryIconMap,
   budgetStatusMap,
   isFuture,
   isHighlighted,
@@ -252,6 +255,11 @@ export const TransactionRow = memo(function TransactionRow({
   const fxFeePaid = showFxColumns ? foreignTransactionFee(transaction) : 0;
   const categoryColor = transaction.category
     ? (categoryColorMap?.get(transaction.category.id) ?? transaction.category.color)
+    : null;
+  // Same inheritance as the colour: the joined row carries only its own icon,
+  // so a child of an icon-bearing parent needs the map to show one.
+  const categoryIcon = transaction.category
+    ? (categoryIconMap?.get(transaction.category.id) ?? transaction.category.icon)
     : null;
 
   return (
@@ -342,7 +350,7 @@ export const TransactionRow = memo(function TransactionRow({
               <CategoryPill
                 name={transaction.category.name}
                 color={categoryColor}
-                icon={transaction.category.icon}
+                icon={categoryIcon}
                 density={density}
                 maxWidthClass="max-w-[140px]"
                 title={
@@ -445,7 +453,7 @@ export const TransactionRow = memo(function TransactionRow({
                 <CategoryPill
                   name={transaction.category!.name}
                   color={categoryColor}
-                  icon={transaction.category!.icon}
+                  icon={categoryIcon}
                   density={density}
                   title={
                     onCategoryClick
