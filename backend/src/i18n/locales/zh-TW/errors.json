@@ -343,6 +343,7 @@
     "nameConflict": "已有名為「{{ name }}」的收款人",
     "nameRequired": "收款人名稱為必填項目",
     "notFound": "找不到 ID 為 {{ id }} 的收款人",
+    "logoNotFound": "此收款人沒有可用的標誌",
     "categoryIdsNotOwned": "找不到類別 ID 或類別不屬於使用者：{{ ids }}",
     "aliasEmpty": "別名不能為空",
     "aliasDuplicate": "別名「{{ alias }}」已指派給收款人「{{ payeeName }}」",

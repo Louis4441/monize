@@ -20,6 +20,7 @@ import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 import { DensityToggleBar } from '@/components/ui/DensityToggle';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PayeeLogo } from '@/components/payees/PayeeLogo';
 
 const logger = createLogger('PayeeList');
 
@@ -163,6 +164,9 @@ const PayeeRow = memo(function PayeeRow({
     >
       <td className={`${cellPadding} whitespace-nowrap`}>
         <div className="flex flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+          {density !== 'dense' && (
+            <PayeeLogo payee={payee} size={20} className="hidden sm:block" />
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onViewTransactions(payee); }}
             className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline text-left"

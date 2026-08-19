@@ -385,6 +385,37 @@ synthetic prefix can tell them apart (`buildPlainRootedPathPattern`). Do not
 escape `-`: outside a character class it is literal, and `\-` is a SyntaxError
 under the `u` flag -- so never interpolate the result *inside* a class.
 
+## A cached brand favicon is four columns, one fetcher, and one export rule
+
+Institutions and payees both resolve a website's favicon server-side and cache
+the bytes so the browser never contacts a third party. Everything shared lives
+in `src/common/favicon/`: `FaviconService` (the gstatic fetch, with its
+timeout, size cap and image-only content-type check) and `brandLogoColumns`,
+which turns a fetch result into the four columns
+(`logo_data`, `logo_content_type`, `has_logo`, `logo_fetched_at`). A third
+entity imports `FaviconModule`; it does not copy the fetcher.
+
+Four rules the two implementations share, each of which has a test:
+
+- **The fetch stays outside the transaction.** It is best-effort -- a favicon
+  that could not be resolved never fails the create or update around it -- and
+  a slow remote host must not hold a database connection open.
+- **Re-resolve only when the address actually changed.** The form resends the
+  current website on every save, and a re-fetch that failed would clear a
+  perfectly good icon. Clearing the address clears the icon with it.
+- **The flag and the bytes move together.** `has_logo` is what every list read
+  answers "is there an icon?" with, because the bytes are `select: false` and
+  never serialized; they leave only through that entity's `GET /:id/logo`,
+  which 404s so the client can draw its own badge. `logo_fetched_at` stamps the
+  *attempt*, so null means never looked for.
+- **A bytea column breaks `SELECT *`.** The driver returns a Buffer, which JSON
+  cannot carry and the restore's `decode(..., 'base64')` cannot read, so the
+  table's export query must list its columns and wrap the bytes in
+  `encode(logo_data, 'base64')` -- `export-driver-values.spec.ts` is what
+  catches the omission. The support backup drops the bytes and forces
+  `has_logo` to false, because a brand icon re-identifies a payee whose name
+  was masked.
+
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock when concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.

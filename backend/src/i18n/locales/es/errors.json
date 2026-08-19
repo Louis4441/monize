@@ -343,6 +343,7 @@
     "nameConflict": "Ya existe un beneficiario con el nombre \"{{ name }}\"",
     "nameRequired": "El nombre del beneficiario es obligatorio",
     "notFound": "Beneficiario con ID {{ id }} no encontrado",
+    "logoNotFound": "No hay logotipo disponible para este beneficiario",
     "categoryIdsNotOwned": "IDs de categoría no encontrados o no pertenecen al usuario: {{ ids }}",
     "aliasEmpty": "El alias no puede estar vacío",
     "aliasDuplicate": "El alias \"{{ alias }}\" ya está asignado al beneficiario \"{{ payeeName }}\"",

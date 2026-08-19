@@ -343,6 +343,7 @@
     "nameConflict": "Zahlungsempfänger mit dem Namen \"{{ name }}\" existiert bereits",
     "nameRequired": "Name des Zahlungsempfängers ist erforderlich",
     "notFound": "Zahlungsempfänger mit ID {{ id }} nicht gefunden",
+    "logoNotFound": "Für diesen Zahlungsempfänger ist kein Logo verfügbar",
     "categoryIdsNotOwned": "Kategorie-IDs nicht gefunden oder nicht im Besitz des Benutzers: {{ ids }}",
     "aliasEmpty": "Alias darf nicht leer sein",
     "aliasDuplicate": "Alias \"{{ alias }}\" ist bereits dem Zahlungsempfänger \"{{ payeeName }}\" zugewiesen",

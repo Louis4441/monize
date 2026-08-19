@@ -33,6 +33,8 @@ import {
 import { stripHtml } from "../common/sanitization.util";
 import { withScopedDb } from "../common/db/scoped-db";
 import { normalizeWebsite } from "../common/normalize-website";
+import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
+import { brandLogoColumns } from "../common/favicon/brand-logo.columns";
 
 /**
  * Resolved, sanitized preview of a proposed new payee. Shared by the AI
@@ -91,9 +93,21 @@ export class PayeesService {
   constructor(
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
+    private faviconService: FaviconService,
   ) {}
 
   async create(userId: string, createPayeeDto: CreatePayeeDto): Promise<Payee> {
+    // The DTO accepts "starbucks.com"; a stored link needs its scheme or the
+    // anchor resolves it relative to the current page -- and the favicon
+    // resolver needs an absolute address too.
+    const website = normalizeWebsite(createPayeeDto.website) ?? null;
+    // Best-effort: never fail creation because the favicon could not be
+    // fetched. The HTTP fetch stays outside any transaction so a slow remote
+    // host cannot hold a database connection open.
+    const logo = website
+      ? await this.faviconService.fetchFavicon(website)
+      : null;
+
     const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Payee);
       // Check if payee with same name already exists for this user
@@ -116,9 +130,11 @@ export class PayeesService {
 
       const payee = repo.create({
         ...createPayeeDto,
-        // The DTO accepts "starbucks.com"; a stored link needs its scheme or
-        // the anchor resolves it relative to the current page.
-        website: normalizeWebsite(createPayeeDto.website) ?? null,
+        website,
+        // No website is "never looked for", which logo_fetched_at records as
+        // null -- so the columns are only written when there was an address
+        // to resolve.
+        ...(website ? brandLogoColumns(logo) : {}),
         userId,
       });
 
@@ -439,6 +455,59 @@ export class PayeesService {
     return payee;
   }
 
+  /**
+   * Load the cached favicon bytes for streaming. Throws NotFound when the
+   * payee is missing or has no cached logo -- the client renders its own
+   * fallback badge from that 404.
+   */
+  async getLogo(userId: string, id: string): Promise<FetchedLogo> {
+    const payee = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Payee)
+        .createQueryBuilder("payee")
+        // The bytes are `select: false`, so they have to be asked for.
+        .addSelect(["payee.logoData", "payee.logoContentType"])
+        .where("payee.id = :id", { id })
+        .andWhere("payee.user_id = :userId", { userId })
+        .getOne(),
+    );
+
+    if (!payee) {
+      throw new NotFoundException(
+        tr("errors.payees.notFound", `Payee with ID ${id} not found`, { id }),
+      );
+    }
+
+    if (!payee.hasLogo || !payee.logoData) {
+      throw new NotFoundException(
+        tr("errors.payees.logoNotFound", "No logo available for this payee"),
+      );
+    }
+
+    return {
+      data: payee.logoData,
+      contentType: payee.logoContentType || "image/png",
+    };
+  }
+
+  /**
+   * Re-fetch the favicon for the payee's current website. A payee with no
+   * website has nothing to resolve, so its cached icon is cleared rather than
+   * left behind an address that no longer exists.
+   */
+  async refreshLogo(userId: string, id: string): Promise<Payee> {
+    const payee = await this.findOne(userId, id);
+    const logo = payee.website
+      ? await this.faviconService.fetchFavicon(payee.website)
+      : null;
+
+    await withScopedDb(this.dataSource, (m) =>
+      m.update(Payee, { id, userId }, brandLogoColumns(logo)),
+    );
+
+    return this.findOne(userId, id);
+  }
+
   async search(
     userId: string,
     query: string,
@@ -645,10 +714,22 @@ export class PayeesService {
       updateFields.defaultCategoryId = updatePayeeDto.defaultCategoryId;
     if (updatePayeeDto.notes !== undefined)
       updateFields.notes = updatePayeeDto.notes;
-    if (updatePayeeDto.website !== undefined)
+    if (updatePayeeDto.website !== undefined) {
       // "" is what the form sends for an address the user emptied, and
       // `normalizeWebsite` reads it as "clear it".
-      updateFields.website = normalizeWebsite(updatePayeeDto.website) ?? null;
+      const website = normalizeWebsite(updatePayeeDto.website) ?? null;
+      updateFields.website = website;
+      // Re-resolve the icon only when the address actually moved. The form
+      // resends the current website on every save, and a re-fetch that failed
+      // would clear a perfectly good cached icon; clearing the address clears
+      // the icon with it. The fetch stays outside the transaction below.
+      if (website !== payee.website) {
+        const logo = website
+          ? await this.faviconService.fetchFavicon(website)
+          : null;
+        Object.assign(updateFields, brandLogoColumns(logo));
+      }
+    }
     if (updatePayeeDto.isActive !== undefined)
       updateFields.isActive = updatePayeeDto.isActive;
 

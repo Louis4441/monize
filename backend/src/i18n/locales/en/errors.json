@@ -352,6 +352,7 @@
     "nameConflict": "Payee with name \"{{ name }}\" already exists",
     "nameRequired": "Payee name is required",
     "notFound": "Payee with ID {{ id }} not found",
+    "logoNotFound": "No logo available for this payee",
     "categoryIdsNotOwned": "Category IDs not found or not owned by user: {{ ids }}",
     "aliasEmpty": "Alias cannot be empty",
     "aliasDuplicate": "Alias \"{{ alias }}\" is already assigned to payee \"{{ payeeName }}\"",

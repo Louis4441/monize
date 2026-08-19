@@ -26,6 +26,9 @@ vi.mock('@/lib/payees', () => ({
   payeesApi: {
     delete: (...args: any[]) => mockPayeesApi.delete(...args),
   },
+  // The row's brand badge builds its src from this; the real helper is a pure
+  // string builder, so the mock mirrors it rather than stubbing it away.
+  payeeLogoUrl: (id: string) => `/api/v1/payees/${id}/logo`,
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -43,6 +46,8 @@ function makePayee(overrides: Partial<Payee> & { id: string; name: string }): Pa
     defaultCategory: null,
     notes: null,
     website: null,
+    hasLogo: false,
+    logoFetchedAt: null,
     isActive: true,
     createdAt: '2026-01-01T00:00:00Z',
     transactionCount: 0,
@@ -497,7 +502,7 @@ describe('PayeeList', () => {
     fireEvent.click(screen.getByText('Default Category'));
 
     const names = Array.from(container.querySelectorAll('tbody tr')).map(
-      (row) => row.querySelector('td')?.textContent?.trim(),
+      (row) => row.querySelector('td button')?.textContent?.trim(),
     );
     // Ascending by full label: "Animals: Zebra" (Netflix) < "Zoo: Apples" (Walmart)
     expect(names[0]).toBe('Netflix');
@@ -526,7 +531,7 @@ describe('PayeeList', () => {
 
     const { container } = render(<PayeeList payees={payees} onEdit={onEdit} onRefresh={onRefresh} />);
     const rows = container.querySelectorAll('tbody tr');
-    const names = Array.from(rows).map(row => row.querySelector('td')?.textContent?.trim());
+    const names = Array.from(rows).map(row => row.querySelector('td button')?.textContent?.trim());
 
     // Default sort is name asc; case-insensitive means Apple < banana < cherry
     expect(names[0]).toBe('Apple');
@@ -883,8 +888,8 @@ describe('PayeeList', () => {
     fireEvent.click(screen.getByText('Aliases'));
     // With desc sort on aliases: Amazon (5) first, Walmart (2) second
     const rows = container.querySelectorAll('tbody tr');
-    expect(rows[0].querySelector('td')?.textContent?.trim()).toBe('Amazon');
-    expect(rows[1].querySelector('td')?.textContent?.trim()).toBe('Walmart');
+    expect(rows[0].querySelector('td button')?.textContent?.trim()).toBe('Amazon');
+    expect(rows[1].querySelector('td button')?.textContent?.trim()).toBe('Walmart');
   });
 
   it('sorts by lastUsed when Last Used header is clicked', () => {
@@ -920,12 +925,12 @@ describe('PayeeList', () => {
     const { container } = render(<PayeeList payees={payees} onEdit={onEdit} onRefresh={onRefresh} />);
     // Initial order: Apple, banana (asc)
     let rows = container.querySelectorAll('tbody tr');
-    expect(rows[0].querySelector('td')?.textContent?.trim()).toBe('Apple');
+    expect(rows[0].querySelector('td button')?.textContent?.trim()).toBe('Apple');
 
     // Click Name again — toggles to desc
     fireEvent.click(screen.getByText('Name'));
     rows = container.querySelectorAll('tbody tr');
-    expect(rows[0].querySelector('td')?.textContent?.trim()).toBe('banana');
+    expect(rows[0].querySelector('td button')?.textContent?.trim()).toBe('banana');
   });
 
   it('resets direction to desc when switching to a count field', () => {
@@ -939,8 +944,8 @@ describe('PayeeList', () => {
     fireEvent.click(screen.getByText('Count'));
     // With desc sort on count: Walmart (10) first, Amazon (5) second
     const rows = container.querySelectorAll('tbody tr');
-    expect(rows[0].querySelector('td')?.textContent?.trim()).toBe('Walmart');
-    expect(rows[1].querySelector('td')?.textContent?.trim()).toBe('Amazon');
+    expect(rows[0].querySelector('td button')?.textContent?.trim()).toBe('Walmart');
+    expect(rows[1].querySelector('td button')?.textContent?.trim()).toBe('Amazon');
   });
 
   it('resets direction to asc when switching to category field', () => {
@@ -961,8 +966,8 @@ describe('PayeeList', () => {
     fireEvent.click(screen.getByText('Default Category'));
     // With asc sort on category: '' (Amazon/None) < 'Zoning' (Walmart)
     const rows = container.querySelectorAll('tbody tr');
-    expect(rows[0].querySelector('td')?.textContent?.trim()).toBe('Amazon');
-    expect(rows[1].querySelector('td')?.textContent?.trim()).toBe('Walmart');
+    expect(rows[0].querySelector('td button')?.textContent?.trim()).toBe('Amazon');
+    expect(rows[1].querySelector('td button')?.textContent?.trim()).toBe('Walmart');
   });
 
   // lastUsedDate and createdAt display
@@ -1200,7 +1205,35 @@ describe('PayeeList', () => {
 
     const rows = container.querySelectorAll('tbody tr');
     // Should maintain the order given — no local re-sorting
-    expect(rows[0].querySelector('td')?.textContent?.trim()).toBe('Zulu');
-    expect(rows[1].querySelector('td')?.textContent?.trim()).toBe('Alpha');
+    expect(rows[0].querySelector('td button')?.textContent?.trim()).toBe('Zulu');
+    expect(rows[1].querySelector('td button')?.textContent?.trim()).toBe('Alpha');
+  });
+  describe('brand favicon', () => {
+    it('renders the payee icon beside the name when one is cached', () => {
+      const { container } = render(
+        <PayeeList
+          payees={[makePayee({ id: 'p-logo', name: 'Starbucks', hasLogo: true })]}
+          onEdit={onEdit}
+          onRefresh={onRefresh}
+        />,
+      );
+
+      const img = container.querySelector('tbody tr td img') as HTMLImageElement;
+      expect(img).toBeTruthy();
+      expect(img.getAttribute('src')).toBe('/api/v1/payees/p-logo/logo');
+    });
+
+    it('requests no image for a payee with no cached icon', () => {
+      // hasLogo is what spares every row in a long list a guaranteed 404.
+      const { container } = render(
+        <PayeeList
+          payees={[makePayee({ id: 'p-none', name: 'Cash' })]}
+          onEdit={onEdit}
+          onRefresh={onRefresh}
+        />,
+      );
+
+      expect(container.querySelector('tbody tr td img')).toBeNull();
+    });
   });
 });

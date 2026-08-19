@@ -343,6 +343,7 @@
     "nameConflict": "「{{ name }}」という名前の支払先はすでに存在します",
     "nameRequired": "支払先名は必須です",
     "notFound": "ID {{ id }} の支払先が見つかりません",
+    "logoNotFound": "この支払先のロゴはありません",
     "categoryIdsNotOwned": "カテゴリIDが見つからないか、ユーザーが所有していません：{{ ids }}",
     "aliasEmpty": "エイリアスは空にできません",
     "aliasDuplicate": "エイリアス「{{ alias }}」はすでに支払先「{{ payeeName }}」に割り当てられています",

@@ -121,6 +121,18 @@ deleting its baseline line, and new code takes the primitive from the start.
 Everything in it stays on the gray ramp so the colour themes re-skin it --
 never add a literal hex or an off-ramp hue to a card.
 
+### A brand favicon is `BrandLogo`, addressed by its entity's wrapper
+
+`components/ui/BrandLogo.tsx` renders a cached favicon with the neutral badge
+fallback, and owns the one rule that matters: the bytes always come from our
+own backend, never a third party, so drawing a logo cannot leak which
+institutions or payees a user has. `InstitutionLogo` and `PayeeLogo` are thin
+wrappers that only say which `/:id/logo` route to read, gated on the entity's
+`hasLogo` so a list of icon-less rows issues no requests at all. A 404 (no icon
+cached, or the fetch failed) lands on `onError` and shows the same badge, so the
+two "no image" states look identical to the reader. Adding the treatment to a
+third entity means a wrapper, not a second component.
+
 ### An empty list renders `EmptyState`
 
 `components/ui/EmptyState.tsx` (glyph, title, optional description and
