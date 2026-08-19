@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { CARD_CLASS } from '@/components/ui/Card';
 
 interface SummaryCardProps {
   /** Label text (e.g., "Total Accounts") */
@@ -46,7 +47,7 @@ export function SummaryCard({ label, value, icon, valueColor = 'default', onClic
     </div>
   );
 
-  const baseClasses = 'bg-white dark:bg-gray-800 overflow-hidden shadow dark:shadow-gray-700/50 rounded-lg';
+  const baseClasses = `${CARD_CLASS} overflow-hidden`;
 
   if (onClick) {
     return (

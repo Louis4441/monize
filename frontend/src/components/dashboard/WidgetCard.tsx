@@ -4,6 +4,7 @@ import { ReactNode, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import {
   WidgetIdentityConfig,
@@ -71,8 +72,9 @@ export function WidgetCard({
   const hasGear = !!configControls || identityEnabled;
 
   return (
-    <div
-      className={`bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 sm:p-6 ${minHeightClass} flex flex-col h-full ${className}`}
+    <Card
+      padding="md"
+      className={`${minHeightClass} flex flex-col h-full ${className}`}
     >
       <div className="flex items-start justify-between gap-2 mb-4">
         <div className="min-w-0">
@@ -133,7 +135,7 @@ export function WidgetCard({
           </div>
         </Modal>
       )}
-    </div>
+    </Card>
   );
 }
 
