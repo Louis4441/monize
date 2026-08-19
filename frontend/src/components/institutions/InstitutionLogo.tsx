@@ -16,6 +16,11 @@ interface InstitutionLogoProps {
   className?: string;
   /** Glyph shown when there is no institution (e.g. cashflow-only accounts). */
   fallbackGlyph?: string;
+  /**
+   * Icon shown instead of the glyph when there is no institution at all --
+   * e.g. the account-type icon, which says more than a generic "$".
+   */
+  fallbackIcon?: React.ReactNode;
 }
 
 /**
@@ -28,6 +33,7 @@ export function InstitutionLogo({
   size = 20,
   className = '',
   fallbackGlyph = '$',
+  fallbackIcon,
 }: InstitutionLogoProps) {
   const [errored, setErrored] = useState(false);
 
@@ -40,8 +46,8 @@ export function InstitutionLogo({
   }
 
   const dimension = { width: size, height: size };
-  const letter =
-    institution?.name?.trim()?.charAt(0)?.toUpperCase() || fallbackGlyph;
+  const letter = institution?.name?.trim()?.charAt(0)?.toUpperCase();
+  const fallback = letter ?? fallbackIcon ?? fallbackGlyph;
 
   if (institution?.hasLogo && !errored) {
     return (
@@ -67,7 +73,7 @@ export function InstitutionLogo({
       aria-hidden="true"
       className={`shrink-0 inline-flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-semibold ${className}`}
     >
-      {letter}
+      {fallback}
     </span>
   );
 }

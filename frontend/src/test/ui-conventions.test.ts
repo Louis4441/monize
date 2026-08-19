@@ -1406,3 +1406,32 @@ describe("nav links and their icons come from lib/nav-links", () => {
     expect(mod.includes("NAV_ICONS")).toBe(true);
   });
 });
+
+describe("account-type colours and icons come from lib/account-type-meta", () => {
+  /**
+   * The type-to-pill-colour switch lived inside `AccountList` and the type had
+   * no icon anywhere; any other surface wanting the treatment had to copy the
+   * switch. `lib/account-type-meta.tsx` is the one mapping now (pill class +
+   * icon per type). A second mapping drifts the moment either changes.
+   *
+   * Fingerprint: an AccountType literal within reach of a `bg-*-100
+   * text-*-800` pill class, in either order.
+   */
+  const MODULE = "/src/lib/account-type-meta.tsx";
+  const SECOND_MAPPING =
+    /\bCHEQUING\b[\s\S]{0,600}bg-\w+-100 text-\w+-800|bg-\w+-100 text-\w+-800[\s\S]{0,600}\bCHEQUING\b/;
+
+  it("has no second account-type colour mapping", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== MODULE)
+      .filter(([, content]) => SECOND_MAPPING.test(content))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the mapping, so the rule cannot pass by accident", () => {
+    const mod = sources[MODULE];
+    expect(mod, `${MODULE} not found -- update MODULE in this test`).toBeTruthy();
+    expect(SECOND_MAPPING.test(mod)).toBe(true);
+  });
+});

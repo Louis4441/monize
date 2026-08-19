@@ -69,31 +69,6 @@ function getStoredValue<T>(key: string, defaultValue: T): T {
   }
 }
 
-const getAccountTypeColor = (type: AccountType) => {
-  switch (type) {
-    case 'CHEQUING':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-    case 'SAVINGS':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-    case 'CREDIT_CARD':
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-    case 'INVESTMENT':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-    case 'LOAN':
-      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-    case 'MORTGAGE':
-      return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-    case 'CASH':
-      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200';
-    case 'LINE_OF_CREDIT':
-      return 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200';
-    case 'ASSET':
-      return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200';
-    default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-  }
-};
-
 interface AccountListProps {
   accounts: Account[];
   institutions?: Institution[];
@@ -928,7 +903,6 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
                   formatCurrencyBase={formatCurrencyBase}
                   convertToDefault={convertToDefault}
                   formatAccountType={(type) => formatAccountType(type, tc)}
-                  getAccountTypeColor={getAccountTypeColor}
                   actionLabels={accountActionLabels}
                   onDetails={handleDetails}
                   onEdit={onEdit}
