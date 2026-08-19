@@ -3055,7 +3055,11 @@ describe('TransactionList', () => {
       });
     });
 
-    it('marks a row older than the overdue boundary', async () => {
+    // "Overdue" says nobody has reconciled the *account* recently, which is
+    // true of every row in it at once -- so the register marked page after page
+    // of ordinary transactions for a condition about none of them. The
+    // reconcile screen still shows it, and the header badge still counts it.
+    it('leaves a row older than the overdue boundary unmarked', async () => {
       const overdue = createTransaction({
         transactionDate: '2026-07-02',
         status: TransactionStatus.UNRECONCILED,
@@ -3064,11 +3068,9 @@ describe('TransactionList', () => {
       render(<TransactionList transactions={[overdue]} staleContext={staleContext} />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('stale-reconciliation-chip')).toHaveAttribute(
-          'data-stale',
-          'overdue',
-        );
+        expect(screen.getByText('Grocery Store')).toBeInTheDocument();
       });
+      expect(screen.queryByTestId('stale-reconciliation-chip')).not.toBeInTheDocument();
     });
 
     it('marks nothing without the context, which is how a failed lookup reads', async () => {

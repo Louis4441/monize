@@ -432,10 +432,29 @@ rows is `ListTopToolbar` (`components/ui/ListTopToolbar.tsx`) -- where you are i
 the list on the left, the density toggle and the list's own buttons on the right
 -- and both `TransactionList` and `InvestmentTransactionList` compose it rather
 than rebuilding the markup; `ui-conventions.test.ts` fails on a second call site
-handing `Pagination` an `infoRight`. A pager below the table is one the reader
-meets only after scrolling past everything it could have helped them skip, which
-is what the brokerage register had while the cash register beside it paged from
-above.
+handing `Pagination` an `infoRight`. A pager *only* below the table is one the
+reader meets after scrolling past everything it could have helped them skip,
+which is what the brokerage register had while the cash register beside it paged
+from above.
+
+**A register pages from both ends, and the second one is `ListBottomPager`**
+(`components/ui/ListBottomPager.tsx`). The top strip is met before the rows; the
+bottom pager is where a reader who scrolled the whole page actually finishes, and
+the Transactions page has ended that way for as long as it has had a pager. On a
+single page it draws the count instead of an inert pager -- the opposite of the
+top strip, which keeps its pager because "Showing 1-7 of 7" is the answer to "did
+that filter work?", asked once, up where the filter controls are.
+
+Which end lives where is a layout fact, not a preference: the top strip is the
+card's own header row, so it belongs inside the list component, while
+`Pagination` carries its own background and shadow and so must sit *outside* the
+card -- inside it, it reads as a white box on a white panel. That is why the
+surface draws the bottom one and passes it the same paging state it gave the
+list. `ui-conventions.test.ts` fails on a raw `<Pagination>` anywhere but the two
+wrappers and the four standalone list pages, and separately requires each
+register surface to reference `ListBottomPager`. Nothing repeats the density
+toggle down there: repeating a position is the point, repeating a control is
+not.
 
 Filtering follows the same rule with different questions: a trade is narrowed by
 symbol and action (the brokerage list's own filter row), a cash row by payee and
@@ -450,9 +469,9 @@ new-row button marked the same way on both, and the same gap between the header
 and the strip. A heading that renames itself and a spacer present on one side
 only made the toggle read as a navigation rather than a change of ledger. The
 Investments page and the account detail page draw the same two registers, so
-they take the same treatment: both page from the strip, neither draws a second
-pager below the table, and neither page puts a density toggle in its own heading
-beside the register's.
+they take the same treatment: both page from the strip and from a
+`ListBottomPager` below the rows, and neither page puts a density toggle in its
+own heading beside the register's.
 
 **A filter picker offers what the rows use, and it loads because the register is
 on screen.** `useCashFilterOptions` asks
@@ -625,6 +644,15 @@ A component that hardcodes the number goes on saying 45 after the constant
 moves, and the row highlight then disagrees with the count in the header badge
 about which rows it is counting -- two surfaces describing the same ledger,
 neither obviously wrong.
+
+**Which of its two answers a surface *draws* is the surface's decision.** The
+register draws `missed` only (`registerStaleReason` in `TransactionList.tsx`):
+"overdue" says nobody has reconciled the account recently, which is true of
+every row in it at once, so on a page of history it marked transaction after
+transaction for a condition about none of them. `ReconcileTable` still draws
+both -- there it is about the statement being worked on -- and the header badge
+still counts both. That is a presentation choice about where the mark helps, and
+it is the *only* thing a call site may vary; everything below is the helper's.
 
 Three things the helper decides that a call site must not re-decide:
 

@@ -4,7 +4,7 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Transaction, TransactionStatus } from '@/types/transaction';
-import { classifyStaleRow } from '@/lib/stale-reconciliation';
+import { classifyStaleRow, type StaleUnreconciledReason } from '@/lib/stale-reconciliation';
 import { nextCycleStatus } from '@/lib/transaction-status-cycle';
 import { CategoryBudgetStatus } from '@/types/budget';
 import { transactionsApi } from '@/lib/transactions';
@@ -88,17 +88,52 @@ interface TransactionListProps {
     { canCreate: boolean; canEdit: boolean; canDelete: boolean }
   >;
   /**
-   * What the register needs to say which rows are overdue for reconciliation:
+   * What the register needs to say which rows a reconciled statement left out:
    * the last reconciled date of each account the user reconciles, and the date
    * the server chose as the overdue boundary. Undefined means the caller has no
    * information -- a page that has not asked, or whose request failed -- and no
    * row is marked, which is the right answer for both. An account absent from
-   * the map has never been reconciled and so has no overdue rows at all.
+   * the map has never been reconciled and so has nothing outstanding at all.
+   *
+   * The register draws only the `missed` half of the classification; see
+   * `registerStaleReason` below for why.
    */
   staleContext?: {
     lastReconciledByAccount: Map<string, string>;
     overdueBefore: string;
   };
+}
+
+/**
+ * The reconciliation mark the *register* draws, which is not every mark
+ * `classifyStaleRow` can produce.
+ *
+ * A `missed` row is a fact about the ledger: the statement covering it was
+ * reconciled without it, so the account's reconciled balance and its real one
+ * disagree until somebody looks. That is worth an amber chip anywhere the row
+ * appears.
+ *
+ * `overdue` is not that. It only says nobody has reconciled recently, which is
+ * true of every row in the account at once -- so on a register showing months
+ * of history it marked page after page of ordinary transactions with nothing
+ * wrong with them, for a condition about the *account* rather than about any
+ * row. The reconcile screen still shows it (`ReconcileTable`), where it is
+ * about the statement being worked on, and the header badge still counts it.
+ */
+function registerStaleReason(
+  staleContext:
+    | { lastReconciledByAccount: Map<string, string>; overdueBefore: string }
+    | undefined,
+  transaction: Transaction,
+): StaleUnreconciledReason | undefined {
+  if (!staleContext) return undefined;
+  const reason = classifyStaleRow(
+    transaction.status,
+    transaction.transactionDate,
+    staleContext.lastReconciledByAccount.get(transaction.accountId) ?? null,
+    staleContext.overdueBefore,
+  );
+  return reason === 'missed' ? reason : undefined;
 }
 
 export function TransactionList({
@@ -547,16 +582,7 @@ export function TransactionList({
                     isFuture={isFuture}
                     isHighlighted={!!highlightTransactionId && transaction.id === highlightTransactionId}
                     showFxColumns={showFxColumns}
-                    staleReason={
-                      staleContext
-                        ? classifyStaleRow(
-                            transaction.status,
-                            transaction.transactionDate,
-                            staleContext.lastReconciledByAccount.get(transaction.accountId) ?? null,
-                            staleContext.overdueBefore,
-                          ) ?? undefined
-                        : undefined
-                    }
+                    staleReason={registerStaleReason(staleContext, transaction)}
                   />
                 </React.Fragment>
               );
