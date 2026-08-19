@@ -1506,3 +1506,71 @@ describe("a brand logo keeps the display mode its badge centres with", () => {
     ).toBe(false);
   });
 });
+
+describe("an icon name is never rendered as text", () => {
+  /**
+   * `category.icon` (and `tag.icon`) hold an icon *name* -- "shopping-cart" --
+   * that `getIconComponent` turns into an SVG. A surface that puts one in a
+   * text position renders the literal string beside the category name, which
+   * reads as a typo rather than as a missing feature. It happened three times
+   * before this scan existed: the detail header, the subcategory table, and
+   * the transactions page's category sidebar.
+   *
+   * Two shapes are policed, and only one of them can be caught generally:
+   *
+   *  - **Inside a template literal.** Always wrong whatever the property
+   *    holds: a name renders as text, and a ReactNode icon stringifies to
+   *    "[object Object]". Zero false positives, so it is scanned everywhere.
+   *  - **As a bare JSX child** (`{category.icon}`). Only wrong for the
+   *    entities whose `icon` is a name string -- `report.icon`, `card.icon`
+   *    and `step.icon` are genuine ReactNodes and are correct that way -- so
+   *    this half is limited to the identifiers that carry names.
+   *
+   * Draw them with `CategoryGlyph`, or with `getIconComponent` where a bespoke
+   * wrapper is genuinely needed.
+   */
+  const ICON_IN_TEMPLATE_LITERAL = /\$\{[^}]*\.icon\b[^}]*\}/;
+  /** Identifiers whose `.icon` is an icon *name*, not a ReactNode. */
+  const NAME_CARRYING = [
+    "category",
+    "parentCategory",
+    "subcategory",
+    "child",
+    "cat",
+    "tag",
+  ];
+  const NAME_ICON_AS_JSX_CHILD = new RegExp(
+    `(?<![=\\w])\\{\\s*(?:${NAME_CARRYING.join("|")})\\.icon\\s*\\}`,
+  );
+
+  it("never interpolates an icon into a template literal", () => {
+    const offenders = productionSources()
+      .filter(([, content]) => ICON_IN_TEMPLATE_LITERAL.test(content))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("never renders a name-carrying icon as a bare JSX child", () => {
+    const offenders = productionSources()
+      .filter(([, content]) => NAME_ICON_AS_JSX_CHILD.test(content))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("still catches both shapes, so the rules cannot pass by accident", () => {
+    // The exact line this scan was written for, plus the JSX-child form.
+    expect(
+      ICON_IN_TEMPLATE_LITERAL.test("{category.icon ? `${category.icon} ` : ''}"),
+    ).toBe(true);
+    expect(NAME_ICON_AS_JSX_CHILD.test("<h3>{category.icon}</h3>")).toBe(true);
+    // ...and leaves the legitimate shapes alone.
+    expect(NAME_ICON_AS_JSX_CHILD.test("<Glyph icon={category.icon} />")).toBe(
+      false,
+    );
+    expect(NAME_ICON_AS_JSX_CHILD.test("<span>{report.icon}</span>")).toBe(
+      false,
+    );
+  });
+});
