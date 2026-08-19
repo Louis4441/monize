@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Category } from '@/types/category';
+import { getIconComponent } from '@/components/ui/IconPicker';
 import { DeleteCategoryDialog } from './DeleteCategoryDialog';
 import { categoriesApi } from '@/lib/categories';
 import toast from 'react-hot-toast';
@@ -102,14 +103,24 @@ const CategoryRow = memo(function CategoryRow({
           className="flex items-center"
           style={{ paddingLeft: `${(category._level || 0) * (density === 'dense' ? 0.75 : 1.5)}rem` }}
         >
-          {category.effectiveColor && (
+          {category.icon && density !== 'dense' ? (
             <span
-              className={`rounded-full mr-2 flex-shrink-0 ${density === 'dense' ? 'w-2 h-2' : 'w-3 h-3'} ${
-                !category.color && category.effectiveColor ? 'opacity-50' : ''
-              }`}
-              style={{ backgroundColor: category.effectiveColor }}
-              title={!category.color && category.effectiveColor ? t('list.inheritedColorTitle') : undefined}
-            />
+              aria-hidden
+              className="mr-2 flex-shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"
+              style={category.effectiveColor ? { color: category.effectiveColor } : undefined}
+            >
+              {getIconComponent(category.icon)}
+            </span>
+          ) : (
+            category.effectiveColor && (
+              <span
+                className={`rounded-full mr-2 flex-shrink-0 ${density === 'dense' ? 'w-2 h-2' : 'w-3 h-3'} ${
+                  !category.color && category.effectiveColor ? 'opacity-50' : ''
+                }`}
+                style={{ backgroundColor: category.effectiveColor }}
+                title={!category.color && category.effectiveColor ? t('list.inheritedColorTitle') : undefined}
+              />
+            )
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onViewTransactions(category); }}

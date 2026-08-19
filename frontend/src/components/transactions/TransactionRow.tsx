@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { createPortal } from 'react-dom';
 import { getIconComponent } from '@/components/ui/IconPicker';
+import { CategoryPill } from '@/components/transactions/CategoryPill';
 import { Transaction, TransactionSplit, TransactionStatus } from '@/types/transaction';
 import { StatusCellButton } from '@/components/transactions/StatusCellButton';
 import { CategoryBudgetStatus } from '@/types/budget';
@@ -337,39 +338,25 @@ export const TransactionRow = memo(function TransactionRow({
           // the category chip alongside the arrow so the assigned category is
           // visible, not hidden behind the transfer chip.
           <span className="inline-flex items-center gap-1 flex-wrap">
-            {transaction.category &&
-              (onCategoryClick ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onCategoryClick(transaction.category!.id); }}
-                  className={`inline-flex text-xs leading-5 font-semibold rounded-full truncate max-w-[140px] hover:opacity-80 transition-opacity ${density === 'dense' ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
-                  style={{
-                    backgroundColor: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 15%, var(--category-bg-base, #e5e7eb))`
-                      : 'var(--category-bg-base, #e5e7eb)',
-                    color: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 85%, var(--category-text-mix, #000))`
-                      : 'var(--category-text-base, #6b7280)',
-                  }}
-                  title={t('list.row.filterByCategory', { name: transaction.category.name })}
-                >
-                  {transaction.category.name}
-                </button>
-              ) : (
-                <span
-                  className={`inline-flex text-xs leading-5 font-semibold rounded-full truncate max-w-[140px] ${density === 'dense' ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
-                  style={{
-                    backgroundColor: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 15%, var(--category-bg-base, #e5e7eb))`
-                      : 'var(--category-bg-base, #e5e7eb)',
-                    color: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 85%, var(--category-text-mix, #000))`
-                      : 'var(--category-text-base, #6b7280)',
-                  }}
-                  title={transaction.category.name}
-                >
-                  {transaction.category.name}
-                </span>
-              ))}
+            {transaction.category && (
+              <CategoryPill
+                name={transaction.category.name}
+                color={categoryColor}
+                icon={transaction.category.icon}
+                density={density}
+                maxWidthClass="max-w-[140px]"
+                title={
+                  onCategoryClick
+                    ? t('list.row.filterByCategory', { name: transaction.category.name })
+                    : undefined
+                }
+                onClick={
+                  onCategoryClick
+                    ? (e) => { e.stopPropagation(); onCategoryClick(transaction.category!.id); }
+                    : undefined
+                }
+              />
+            )}
             {onTransferClick && transaction.linkedTransaction?.account?.id && transaction.linkedTransactionId ? (
               <button
                 onClick={(e) => {
@@ -453,41 +440,24 @@ export const TransactionRow = memo(function TransactionRow({
               />
             ) : null;
 
-            return onCategoryClick ? (
+            return (
               <span className="inline-flex items-center">
-                <button
-                  onClick={(e) => { e.stopPropagation(); onCategoryClick(transaction.category!.id); }}
-                  className={`inline-flex text-xs leading-5 font-semibold rounded-full truncate max-w-[160px] hover:opacity-80 transition-opacity ${density === 'dense' ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
-                  style={{
-                    backgroundColor: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 15%, var(--category-bg-base, #e5e7eb))`
-                      : 'var(--category-bg-base, #e5e7eb)',
-                    color: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 85%, var(--category-text-mix, #000))`
-                      : 'var(--category-text-base, #6b7280)',
-                  }}
-                  title={t('list.row.filterByCategory', { name: transaction.category!.name })}
-                >
-                  {transaction.category!.name}
-                </button>
-                {budgetIndicator}
-              </span>
-            ) : (
-              <span className="inline-flex items-center">
-                <span
-                  className={`inline-flex text-xs leading-5 font-semibold rounded-full truncate max-w-[160px] ${density === 'dense' ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
-                  style={{
-                    backgroundColor: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 15%, var(--category-bg-base, #e5e7eb))`
-                      : 'var(--category-bg-base, #e5e7eb)',
-                    color: categoryColor
-                      ? `color-mix(in srgb, ${categoryColor} 85%, var(--category-text-mix, #000))`
-                      : 'var(--category-text-base, #6b7280)',
-                  }}
-                  title={transaction.category!.name}
-                >
-                  {transaction.category!.name}
-                </span>
+                <CategoryPill
+                  name={transaction.category!.name}
+                  color={categoryColor}
+                  icon={transaction.category!.icon}
+                  density={density}
+                  title={
+                    onCategoryClick
+                      ? t('list.row.filterByCategory', { name: transaction.category!.name })
+                      : undefined
+                  }
+                  onClick={
+                    onCategoryClick
+                      ? (e) => { e.stopPropagation(); onCategoryClick(transaction.category!.id); }
+                      : undefined
+                  }
+                />
                 {budgetIndicator}
               </span>
             );
