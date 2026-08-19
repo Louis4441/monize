@@ -1435,3 +1435,29 @@ describe("account-type colours and icons come from lib/account-type-meta", () =>
     expect(SECOND_MAPPING.test(mod)).toBe(true);
   });
 });
+
+describe("an empty state is the shared EmptyState", () => {
+  /**
+   * The centered grey-glyph empty block was hand-rolled in fourteen files,
+   * each drifting on its own (some with a heading, some a bare paragraph,
+   * three different text tones). `components/ui/EmptyState.tsx` is the one
+   * layout now; the fingerprint of a hand-rolled copy is its container
+   * class.
+   */
+  const EMPTY_STATE = "/src/components/ui/EmptyState.tsx";
+  const FINGERPRINT = "text-center py-12";
+
+  it("has no hand-rolled empty-state container", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== EMPTY_STATE)
+      .filter(([, content]) => content.includes(FINGERPRINT))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the shared component, so the rule cannot pass by accident", () => {
+    const component = sources[EMPTY_STATE];
+    expect(component, `${EMPTY_STATE} not found -- update this test`).toBeTruthy();
+    expect(component.includes(FINGERPRINT)).toBe(true);
+  });
+});

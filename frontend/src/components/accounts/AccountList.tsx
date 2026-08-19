@@ -26,6 +26,7 @@ import { formatAccountType } from '@/lib/account-utils';
 import { buildLogicalAccounts, type LogicalAccount } from '@/lib/logical-accounts';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { DensityToggleBar } from '@/components/ui/DensityToggle';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type SortField = 'name' | 'type' | 'balance' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -660,9 +661,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
 
   if (accounts.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 dark:text-gray-400">{t('list.empty')}</p>
-      </div>
+      <EmptyState title={t('list.empty')} />
     );
   }
 
@@ -779,15 +778,17 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
       </div>
 
       {filteredAndSortedAccounts.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">{t('list.noMatch')}</p>
-          <button
-            onClick={clearFilters}
-            className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-          >
-            {t('list.clearFilters')}
-          </button>
-        </div>
+        <EmptyState
+          title={t('list.noMatch')}
+          action={
+            <button
+              onClick={clearFilters}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+            >
+              {t('list.clearFilters')}
+            </button>
+          }
+        />
       ) : (
       <div>
         {/* Density toggle */}
