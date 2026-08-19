@@ -11,6 +11,12 @@ export interface PayeeLogoData {
 
 interface PayeeLogoProps {
   payee?: PayeeLogoData | null;
+  /**
+   * Name for the letter badge when there is no payee record to read one from
+   * -- a free-text payee on a transaction has a name but no row, and so no
+   * logo route, yet still needs a badge to keep a column aligned.
+   */
+  name?: string | null;
   /** Rendered square size in pixels. */
   size?: number;
   className?: string;
@@ -27,6 +33,7 @@ interface PayeeLogoProps {
  */
 export function PayeeLogo({
   payee,
+  name,
   size = 20,
   className = '',
   fallbackGlyph = '$',
@@ -35,7 +42,7 @@ export function PayeeLogo({
   return (
     <BrandLogo
       src={payee?.hasLogo ? payeeLogoUrl(payee.id) : null}
-      name={payee?.name}
+      name={payee?.name ?? name}
       size={size}
       className={className}
       fallbackGlyph={fallbackGlyph}

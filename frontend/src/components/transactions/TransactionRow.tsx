@@ -6,6 +6,7 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 import { createPortal } from 'react-dom';
 import { getIconComponent } from '@/components/ui/IconPicker';
 import { CategoryPill } from '@/components/transactions/CategoryPill';
+import { PayeeLogo } from '@/components/payees/PayeeLogo';
 import { Transaction, TransactionSplit, TransactionStatus } from '@/types/transaction';
 import { StatusCellButton } from '@/components/transactions/StatusCellButton';
 import { CategoryBudgetStatus } from '@/types/budget';
@@ -309,22 +310,36 @@ export const TransactionRow = memo(function TransactionRow({
         {transaction.account?.name || '-'}
       </td>
       <td className={`${cellPadding} max-w-[100px] sm:max-w-none overflow-hidden`}>
-        {transaction.payeeId && onPayeeClick ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); onPayeeClick(transaction.payeeId!); }}
-            className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate sm:max-w-[280px] text-left ${isVoid ? 'line-through' : ''}`}
-            title={t('list.row.viewPayeeTitle', { name: payeeLabel ?? '' })}
-          >
-            {payeeLabel || '-'}
-          </button>
-        ) : (
-          <div
-            className={`text-sm font-medium text-gray-900 dark:text-gray-100 truncate sm:max-w-[280px] ${isVoid ? 'line-through' : ''}`}
-            title={payeeLabel || undefined}
-          >
-            {payeeLabel || '-'}
-          </div>
-        )}
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Brand badge beside the name, never inside the button: the button's
+              text is the payee name, and a decorative glyph in it changes what
+              every textContent assertion reads. Hidden at dense, where the row
+              is one line of data and a 20px chip per row is noise. */}
+          {density !== 'dense' && payeeLabel && (
+            <PayeeLogo
+              payee={transaction.payee}
+              name={payeeLabel}
+              size={20}
+              className="hidden sm:inline-flex"
+            />
+          )}
+          {transaction.payeeId && onPayeeClick ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPayeeClick(transaction.payeeId!); }}
+              className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate sm:max-w-[280px] text-left ${isVoid ? 'line-through' : ''}`}
+              title={t('list.row.viewPayeeTitle', { name: payeeLabel ?? '' })}
+            >
+              {payeeLabel || '-'}
+            </button>
+          ) : (
+            <div
+              className={`text-sm font-medium text-gray-900 dark:text-gray-100 truncate sm:max-w-[280px] ${isVoid ? 'line-through' : ''}`}
+              title={payeeLabel || undefined}
+            >
+              {payeeLabel || '-'}
+            </div>
+          )}
+        </div>
         {density === 'normal' && transaction.referenceNumber && (
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {t('list.row.ref', { number: transaction.referenceNumber })}

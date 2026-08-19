@@ -922,3 +922,71 @@ describe('TransactionRow', () => {
     expect(screen.getByText(/Dividend:/)).toBeInTheDocument();
   });
 });
+
+describe('TransactionRow payee brand icon', () => {
+  const withLogo = {
+    id: 'p1',
+    name: 'Coffee Co',
+    hasLogo: true,
+  } as Transaction['payee'];
+
+  it('renders the cached favicon at normal density', () => {
+    const { container } = renderRow({}, { payee: withLogo });
+    const img = container.querySelector('td img') as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.getAttribute('src')).toBe('/api/v1/payees/p1/logo');
+  });
+
+  it('renders the cached favicon at compact density', () => {
+    const { container } = renderRow({ density: 'compact' }, { payee: withLogo });
+    expect(container.querySelector('td img')).toBeTruthy();
+  });
+
+  it('draws no badge at dense density', () => {
+    // A dense row is one line of data; a chip on every row is noise there.
+    const { container } = renderRow({ density: 'dense' }, { payee: withLogo });
+    expect(container.querySelector('td img')).toBeNull();
+    expect(screen.queryByText('C')).toBeNull();
+  });
+
+  it('falls back to the initial badge when the payee has no cached icon', () => {
+    const { container } = renderRow(
+      {},
+      { payee: { ...withLogo, hasLogo: false } as Transaction['payee'] },
+    );
+    // hasLogo false must not issue a request that is a guaranteed 404.
+    expect(container.querySelector('td img')).toBeNull();
+    expect(screen.getByText('C')).toBeInTheDocument();
+  });
+
+  it('badges a free-text payee from its name', () => {
+    // payeeId/payee are null for a name typed straight onto the transaction;
+    // there is no logo route to read, but the column still has to line up.
+    const { container } = renderRow(
+      {},
+      { payeeId: null, payee: null, payeeName: 'Corner Shop' },
+    );
+    expect(container.querySelector('td img')).toBeNull();
+    expect(screen.getByText('C')).toBeInTheDocument();
+  });
+
+  it('draws no badge when the row has no payee at all', () => {
+    const { container } = renderRow(
+      {},
+      { payeeId: null, payee: null, payeeName: null },
+    );
+    expect(container.querySelector('td img')).toBeNull();
+    expect(container.querySelector('td span[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('keeps the payee button\'s text to the name alone', () => {
+    // The badge is a sibling of the button, never inside it: a glyph in there
+    // changes what every textContent assertion over the cell reads.
+    renderRow({ onPayeeClick: vi.fn() }, { payee: withLogo });
+    // getByText matches an element's own text, so a badge moved inside the
+    // button would make this fail rather than quietly pass.
+    const button = screen.getByText('Coffee Co');
+    expect(button.tagName).toBe('BUTTON');
+    expect(button.textContent).toBe('Coffee Co');
+  });
+});
