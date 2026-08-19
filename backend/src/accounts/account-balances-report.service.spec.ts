@@ -54,6 +54,38 @@ interface Fixture {
 const isReplayQuery = (sql: string): boolean =>
   sql.includes("security_id, action");
 
+/**
+ * The two reads of one table, told apart.
+ *
+ * The bounded read loads the window `closeAt` accepts; the nearest read is the
+ * approximation door of section 4.2 / 7.2, which has no lower bound and returns
+ * at most one row either side of the date. Both name the same table, so a test
+ * counting one of them has to say which -- an assertion that "the prices were
+ * re-read" is worthless if the nearest lookup satisfies it.
+ */
+const isNearestRead = (sql: string): boolean =>
+  sql.includes("CROSS JOIN LATERAL");
+const isBoundedPriceRead = (sql: string): boolean =>
+  sql.includes("FROM security_prices") && !isNearestRead(sql);
+const isBoundedRateRead = (sql: string): boolean =>
+  sql.includes("FROM exchange_rates") && !isNearestRead(sql);
+
+/**
+ * The rows the database would return for a nearest-observation read: for each
+ * subject, the last observation at or before the date and the first after it.
+ *
+ * Simulating the query rather than handing the fixture straight back is what
+ * keeps the fixture honest -- one set of stored rows, read two different ways,
+ * so a test cannot accidentally give the fallback a series the bounded read
+ * never saw.
+ */
+function nearestRows<T extends { date: string }>(rows: T[], date: string): T[] {
+  const ordered = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const before = [...ordered].reverse().find((r) => r.date <= date);
+  const after = ordered.find((r) => r.date > date);
+  return [before, after].filter((r): r is T => r != null);
+}
+
 describe("AccountBalancesReportService", () => {
   let service: AccountBalancesReportService;
   let query: jest.Mock;
@@ -62,7 +94,7 @@ describe("AccountBalancesReportService", () => {
   let securityPrices: { ensurePricesForDate: jest.Mock };
 
   const program = (fixture: Fixture) => {
-    query.mockImplementation(async (sql: string) => {
+    query.mockImplementation(async (sql: string, params: any[] = []) => {
       if (sql.includes("FROM accounts\n") && sql.includes("account_sub_type")) {
         return fixture.accounts ?? [];
       }
@@ -79,6 +111,38 @@ describe("AccountBalancesReportService", () => {
       }
       if (isReplayQuery(sql)) {
         return fixture.investmentTransactions ?? [];
+      }
+      if (isNearestRead(sql) && sql.includes("FROM security_prices")) {
+        const [securityIds, date] = params as [string[], string];
+        return securityIds.flatMap((securityId) =>
+          nearestRows(
+            (fixture.prices ?? [])
+              .filter((row) => row.security_id === securityId)
+              .map((row) => ({ ...row, date: row.price_date })),
+            date,
+          ).map(({ date: _date, ...row }) => row),
+        );
+      }
+      if (isNearestRead(sql) && sql.includes("FROM exchange_rates")) {
+        const [froms, tos, date] = params as [string[], string[], string];
+        return froms.flatMap((from, index) => {
+          const to = tos[index];
+          return nearestRows(
+            (fixture.rates ?? [])
+              .filter(
+                (row) =>
+                  (row.from_currency === from && row.to_currency === to) ||
+                  (row.from_currency === to && row.to_currency === from),
+              )
+              .map((row) => ({ ...row, date: row.rate_date })),
+            date,
+          ).map((row) => ({
+            stored_from: row.from_currency,
+            stored_to: row.to_currency,
+            rate_date: row.rate_date,
+            rate: row.rate,
+          }));
+        });
       }
       if (sql.includes("FROM security_prices")) {
         return fixture.prices ?? [];
@@ -140,6 +204,7 @@ describe("AccountBalancesReportService", () => {
       asOfDate: "2026-03-01",
       displayCurrency: "CAD",
       displayRates: { CAD: 1 },
+      approximatedDisplayRates: {},
       accounts: [],
     });
   });
@@ -613,9 +678,13 @@ describe("AccountBalancesReportService", () => {
   });
 
   // `docs/time-series-contract.md` section 2.1: an instrument last quoted
-  // months ago has no price *for* this date, and answering with the old close
-  // would report it as having gone nowhere since.
-  it("treats a close older than the boundary window as no price for the date", async () => {
+  // months ago has no price *for* this date. The bounded door still refuses it
+  // -- what changed in section 4.2 is what happens next: rather than reporting
+  // the account as unvaluable, the report falls back to that close and says so,
+  // which `approximatedPriceCount` is. The two halves are asserted together
+  // because the marker is the only thing separating this from the defect the
+  // bound exists to prevent.
+  it("values a close older than the boundary window as a marked approximation", async () => {
     program({
       accounts: [brokerage],
       balances: [{ id: "acc-b", balance: "0" }],
@@ -634,9 +703,10 @@ describe("AccountBalancesReportService", () => {
     });
     const result = await service.getBalancesAsOf("user-1", "2026-03-01");
     expect(result.accounts[0]).toMatchObject({
-      marketValue: null,
-      unpricedHoldingsCount: 1,
-      pricesComplete: false,
+      marketValue: 220,
+      unpricedHoldingsCount: 0,
+      pricesComplete: true,
+      approximatedPriceCount: 1,
     });
   });
 
@@ -847,9 +917,11 @@ describe("AccountBalancesReportService", () => {
   });
 
   // A rate is an observation on a date exactly as a close is: one long out of
-  // date is not the rate for this date, and converting at it would be an
-  // exchange rate from another era wearing today's.
-  it("treats a rate older than the boundary window as no rate for the date", async () => {
+  // date is not the rate *for* this date. As with a stale close, the report
+  // converts at it rather than refusing the figure, and names the approximation
+  // -- an exchange rate from another era is only a defect while it wears this
+  // date's clothes.
+  it("converts at a rate older than the boundary window as a marked approximation", async () => {
     program({
       accounts: [brokerage],
       balances: [{ id: "acc-b", balance: "0" }],
@@ -876,10 +948,12 @@ describe("AccountBalancesReportService", () => {
     });
     const result = await service.getBalancesAsOf("user-1", "2026-03-01");
     expect(result.accounts[0]).toMatchObject({
-      marketValue: null,
-      missingRatePairs: ["USD->CAD"],
-      fxComplete: false,
+      marketValue: 270,
+      missingRatePairs: [],
+      fxComplete: true,
+      approximatedRatePairs: ["USD->CAD"],
     });
+    expect(result.approximatedDisplayRates).toEqual({});
   });
 
   // An empty portfolio is worth zero. Reporting that as unknown tells the user
@@ -996,6 +1070,7 @@ describe("AccountBalancesReportService", () => {
       asOfDate: "2026-03-01",
       displayCurrency: "CAD",
       displayRates: { CAD: 1 },
+      approximatedDisplayRates: {},
       accounts: [],
     });
     // The caller's own preference is not an account: no balance, holding or
@@ -1099,7 +1174,7 @@ describe("AccountBalancesReportService", () => {
       exchangeRates.ensureRatesForDate.mockResolvedValue(3);
       await service.getBalancesAsOf("user-1", "2017-08-18");
       const rateReads = query.mock.calls.filter(([sql]: [string]) =>
-        sql.includes("FROM exchange_rates"),
+        isBoundedRateRead(sql),
       );
       expect(rateReads).toHaveLength(2);
     });
@@ -1109,7 +1184,7 @@ describe("AccountBalancesReportService", () => {
       exchangeRates.ensureRatesForDate.mockResolvedValue(0);
       await service.getBalancesAsOf("user-1", "2017-08-18");
       const rateReads = query.mock.calls.filter(([sql]: [string]) =>
-        sql.includes("FROM exchange_rates"),
+        isBoundedRateRead(sql),
       );
       expect(rateReads).toHaveLength(1);
     });
@@ -1411,7 +1486,7 @@ describe("AccountBalancesReportService", () => {
       securityPrices.ensurePricesForDate.mockResolvedValue(22);
       await service.getBalancesAsOf("user-1", "2017-08-18");
       const priceReads = query.mock.calls.filter(([sql]: [string]) =>
-        sql.includes("FROM security_prices"),
+        isBoundedPriceRead(sql),
       );
       expect(priceReads).toHaveLength(2);
     });
@@ -1421,7 +1496,7 @@ describe("AccountBalancesReportService", () => {
       securityPrices.ensurePricesForDate.mockResolvedValue(0);
       await service.getBalancesAsOf("user-1", "2017-08-18");
       const priceReads = query.mock.calls.filter(([sql]: [string]) =>
-        sql.includes("FROM security_prices"),
+        isBoundedPriceRead(sql),
       );
       expect(priceReads).toHaveLength(1);
     });
@@ -1467,6 +1542,388 @@ describe("AccountBalancesReportService", () => {
       });
       await service.getBalancesAsOf("user-1", "2017-08-18");
       expect(securityPrices.ensurePricesForDate).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Spec sections 4.2 and 7.2: when neither the window nor the provider can
+   * answer for the date, the report values at the closest observation the
+   * database holds either side of it, and says which figures those are.
+   *
+   * The point of every case here is the pair: a figure *and* its marker. A
+   * number without the marker is the defect the staleness bound exists to
+   * prevent, and a marker without the number is the "Total unavailable" this
+   * replaced.
+   */
+  describe("falling back to the closest observation", () => {
+    const heldOne = {
+      accounts: [brokerage],
+      balances: [{ id: "acc-b", balance: "0" }],
+      investmentTransactions: [
+        {
+          account_id: "acc-b",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+        },
+      ],
+      securities: [{ id: "sec-1", currency_code: "CAD" }],
+    };
+
+    const usdSavings = {
+      id: "acc-usd",
+      currency_code: "USD",
+      account_type: "SAVINGS",
+      account_sub_type: null,
+    };
+
+    // A close struck after the date is still the closest thing anybody
+    // observed, and the user asked for the closest -- before or after.
+    it("prices from the closer of the two neighbours when it comes after the date", async () => {
+      program({
+        ...heldOne,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2025-11-14",
+            close_price: "10",
+          },
+          {
+            security_id: "sec-1",
+            price_date: "2026-03-20",
+            close_price: "22",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: 220,
+        approximatedPriceCount: 1,
+        unpricedHoldingsCount: 0,
+        valuationComplete: true,
+      });
+    });
+
+    it("prices from the earlier neighbour when that is the closer one", async () => {
+      program({
+        ...heldOne,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2026-01-30",
+            close_price: "10",
+          },
+          {
+            security_id: "sec-1",
+            price_date: "2026-08-14",
+            close_price: "22",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: 100,
+        approximatedPriceCount: 1,
+      });
+    });
+
+    // A tie goes to the close that had already been struck when the date
+    // arrived; the later one is a price the date could not have known.
+    it("prefers the earlier observation when both are equally close", async () => {
+      program({
+        ...heldOne,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2026-02-01",
+            close_price: "10",
+          },
+          {
+            security_id: "sec-1",
+            price_date: "2026-03-29",
+            close_price: "22",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0].marketValue).toBe(100);
+    });
+
+    // The fallback fills a gap in coverage. It does not invent an observation
+    // nobody made, so a security nobody ever priced is still unpriced and the
+    // total is still null.
+    it("leaves a security with no stored close at any date unpriced", async () => {
+      program({ ...heldOne, prices: [] });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: null,
+        unpricedHoldingsCount: 1,
+        pricesComplete: false,
+        approximatedPriceCount: 0,
+      });
+    });
+
+    // A close of zero is a row that says nothing, and substituting it would
+    // report a held position as worthless.
+    it("ignores a non-positive close when looking for the closest one", async () => {
+      program({
+        ...heldOne,
+        prices: [
+          { security_id: "sec-1", price_date: "2026-02-01", close_price: "0" },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: null,
+        unpricedHoldingsCount: 1,
+      });
+    });
+
+    it("presents an account currency at the closest rate and names the day it was struck", async () => {
+      program({
+        accounts: [cheque, usdSavings],
+        balances: [
+          { id: "acc-1", balance: "100" },
+          { id: "acc-usd", balance: "50" },
+        ],
+        rates: [
+          {
+            from_currency: "USD",
+            to_currency: "CAD",
+            rate_date: "2024-05-01",
+            rate: "1.35",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayRates).toEqual({ CAD: 1, USD: 1.35 });
+      expect(result.approximatedDisplayRates).toEqual({ USD: "2024-05-01" });
+    });
+
+    // The same observation seen from the other side. `convertWithRateLookup`
+    // turns it back around for an approximation exactly as it does for a rate
+    // inside the window.
+    it("uses a closest rate stored only in the reverse direction", async () => {
+      program({
+        accounts: [cheque, usdSavings],
+        balances: [
+          { id: "acc-1", balance: "100" },
+          { id: "acc-usd", balance: "50" },
+        ],
+        rates: [
+          {
+            from_currency: "CAD",
+            to_currency: "USD",
+            rate_date: "2024-05-01",
+            rate: "0.8",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayRates.USD).toBeCloseTo(1.25, 10);
+      expect(result.approximatedDisplayRates).toEqual({ USD: "2024-05-01" });
+    });
+
+    // A pair nobody ever stored has nothing to approximate from: the currency
+    // stays out of the map, which is what tells a consumer its accounts are
+    // unconvertible rather than converted at 1.
+    it("omits a currency with no stored rate at any date", async () => {
+      program({
+        accounts: [cheque, usdSavings],
+        balances: [
+          { id: "acc-1", balance: "100" },
+          { id: "acc-usd", balance: "50" },
+        ],
+        rates: [],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.displayRates).toEqual({ CAD: 1 });
+      expect(result.approximatedDisplayRates).toEqual({});
+    });
+
+    // Nothing that stood on the date is displaced by the fallback -- the reads
+    // only ever run for what is still missing.
+    it("does not look for a closest observation when the date answers everything", async () => {
+      program({
+        ...heldOne,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2026-02-27",
+            close_price: "22",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: 220,
+        approximatedPriceCount: 0,
+        approximatedRatePairs: [],
+      });
+      expect(
+        query.mock.calls.filter(([sql]: [string]) => isNearestRead(sql)),
+      ).toHaveLength(0);
+    });
+
+    it("asks only for the securities still missing a price", async () => {
+      program({
+        accounts: [brokerage],
+        balances: [{ id: "acc-b", balance: "0" }],
+        investmentTransactions: [
+          {
+            account_id: "acc-b",
+            security_id: "sec-1",
+            action: "BUY",
+            quantity: "10",
+          },
+          {
+            account_id: "acc-b",
+            security_id: "sec-2",
+            action: "BUY",
+            quantity: "5",
+          },
+        ],
+        securities: [
+          { id: "sec-1", currency_code: "CAD" },
+          { id: "sec-2", currency_code: "CAD" },
+        ],
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2026-02-27",
+            close_price: "22",
+          },
+          {
+            security_id: "sec-2",
+            price_date: "2024-01-05",
+            close_price: "4",
+          },
+        ],
+      });
+      await service.getBalancesAsOf("user-1", "2026-03-01");
+      const nearest = query.mock.calls.find(
+        ([sql]: [string]) =>
+          isNearestRead(sql) && sql.includes("FROM security_prices"),
+      );
+      expect(nearest[1][0]).toEqual(["sec-2"]);
+    });
+
+    // Prices and rates cannot be observed for a day that has not happened, so
+    // the fallback searches around the market date like everything else.
+    it("searches around the market date rather than a future report date", async () => {
+      program({
+        ...heldOne,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2024-01-05",
+            close_price: "4",
+          },
+        ],
+      });
+      await service.getBalancesAsOf("user-1", "2027-05-04");
+      const nearest = query.mock.calls.find(
+        ([sql]: [string]) =>
+          isNearestRead(sql) && sql.includes("FROM security_prices"),
+      );
+      expect(nearest[1][1]).toBe("2026-08-18");
+    });
+
+    // A holding priced in another currency needs a rate to reach its account's
+    // currency, and that rate is approximated on the same terms -- named on the
+    // row it valued, not only in the display map.
+    it("names an approximated rate used to price a foreign holding", async () => {
+      program({
+        ...heldOne,
+        securities: [{ id: "sec-1", currency_code: "USD" }],
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2026-02-27",
+            close_price: "20",
+          },
+        ],
+        rates: [
+          {
+            from_currency: "USD",
+            to_currency: "CAD",
+            rate_date: "2024-05-01",
+            rate: "1.35",
+          },
+        ],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: 270,
+        approximatedRatePairs: ["USD->CAD"],
+        approximatedPriceCount: 0,
+        fxComplete: true,
+      });
+    });
+
+    // A pair with nothing at all is a gap, not an approximation: saying both
+    // about one component would be two contradictory claims.
+    it("names a pair it could not resolve as missing, never as approximated", async () => {
+      program({
+        ...heldOne,
+        securities: [{ id: "sec-1", currency_code: "USD" }],
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2026-02-27",
+            close_price: "20",
+          },
+        ],
+        rates: [],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        marketValue: null,
+        missingRatePairs: ["USD->CAD"],
+        approximatedRatePairs: [],
+        fxComplete: false,
+      });
+    });
+
+    // The provider is still asked first: an approximation is the last resort,
+    // not a reason to stop fetching the real thing.
+    it("falls back only after the provider fetch has had its turn", async () => {
+      program({
+        ...heldOne,
+        prices: [
+          {
+            security_id: "sec-1",
+            price_date: "2024-01-05",
+            close_price: "4",
+          },
+        ],
+      });
+      await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(securityPrices.ensurePricesForDate).toHaveBeenCalledWith(
+        ["sec-1"],
+        "2026-03-01",
+      );
+      expect(
+        query.mock.calls.filter(
+          ([sql]: [string]) =>
+            isNearestRead(sql) && sql.includes("FROM security_prices"),
+        ),
+      ).toHaveLength(1);
+    });
+
+    // A non-holdings row has no market value to approximate, and the fields
+    // still have to be there: a consumer reading them per row cannot have one
+    // shape for brokerages and another for chequing.
+    it("reports no approximation on an account that holds nothing", async () => {
+      program({
+        accounts: [cheque],
+        balances: [{ id: "acc-1", balance: "5" }],
+      });
+      const result = await service.getBalancesAsOf("user-1", "2026-03-01");
+      expect(result.accounts[0]).toMatchObject({
+        approximatedPriceCount: 0,
+        approximatedRatePairs: [],
+      });
     });
   });
 });
