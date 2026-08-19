@@ -1111,3 +1111,236 @@ describe("the bar above a table is the shared ListTopToolbar", () => {
     expect(SLOT.test(pagination)).toBe(true);
   });
 });
+
+describe("a panel card is the shared Card surface", () => {
+  /**
+   * `CARD_CLASS` in `components/ui/Card.tsx` is the one card surface --
+   * background, radius, shadow and (new with it) the border that keeps a card
+   * legible on the colour themes where the weakest shadow disappears. Before
+   * it existed the same trio was inlined hundreds of times, in at least three
+   * different orderings, and no two surfaces could be restyled together.
+   *
+   * The scan keys on the fingerprint every ordering shares: one className line
+   * carrying `bg-white dark:bg-gray-800`, `rounded-lg` and a `shadow`. A menu
+   * or tooltip on `rounded-md` is deliberately out of scope.
+   *
+   * The baseline is **shrink-only**: each entry predates the primitive.
+   * Converting a file to `Card` / `CARD_CLASS` means deleting its line here.
+   * New code takes the primitive from the start.
+   */
+  const CARD = "/src/components/ui/Card.tsx";
+  const CARD_FINGERPRINT = (line: string) =>
+    line.includes("bg-white dark:bg-gray-800") &&
+    line.includes("rounded-lg") &&
+    line.includes("shadow");
+
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/app/accounts/[id]/page.tsx",
+    "/src/app/accounts/page.tsx",
+    "/src/app/bills/page.tsx",
+    "/src/app/budgets/[id]/edit/page.tsx",
+    "/src/app/budgets/[id]/page.tsx",
+    "/src/app/budgets/create/page.tsx",
+    "/src/app/budgets/page.tsx",
+    "/src/app/categories/page.tsx",
+    "/src/app/currencies/page.tsx",
+    "/src/app/dashboard/loading.tsx",
+    "/src/app/institutions/page.tsx",
+    "/src/app/investments/page.tsx",
+    "/src/app/payees/page.tsx",
+    "/src/app/reconcile/page.tsx",
+    "/src/app/reports/[reportId]/page.tsx",
+    "/src/app/reports/loading.tsx",
+    "/src/app/reports/page.tsx",
+    "/src/app/securities/page.tsx",
+    "/src/app/settings/emergency-access/page.tsx",
+    "/src/app/settings/loading.tsx",
+    "/src/app/settings/page.tsx",
+    "/src/app/tags/page.tsx",
+    "/src/app/transactions/page.tsx",
+    "/src/components/accounts/asset-detail/AssetDetailView.tsx",
+    "/src/components/accounts/asset-detail/EquityPanel.tsx",
+    "/src/components/accounts/banking-detail/BankingDetailView.tsx",
+    "/src/components/accounts/banking-detail/CashFlowMiniReport.tsx",
+    "/src/components/accounts/credit-card-detail/CreditCardDetailView.tsx",
+    "/src/components/accounts/credit-card-detail/InterestAndFeesPanel.tsx",
+    "/src/components/accounts/credit-card-detail/PayoffCalculator.tsx",
+    "/src/components/accounts/credit-card-detail/SpendingBreakdown.tsx",
+    "/src/components/accounts/credit-card-detail/StatementPanel.tsx",
+    "/src/components/accounts/investment-detail/InvestmentIncomePanel.tsx",
+    "/src/components/accounts/loan-detail/AmortizationScheduleTable.tsx",
+    "/src/components/accounts/loan-detail/ComparisonSummaryCards.tsx",
+    "/src/components/accounts/loan-detail/LineOfCreditView.tsx",
+    "/src/components/accounts/loan-detail/OverpaymentSimulator.tsx",
+    "/src/components/accounts/loan-detail/PayoffComparisonChart.tsx",
+    "/src/components/accounts/loan-detail/RateHistorySidebar.tsx",
+    "/src/components/accounts/loan-detail/ScenarioComparisonChart.tsx",
+    "/src/components/accounts/shared/ForeignCurrencyFeeChart.tsx",
+    "/src/components/accounts/shared/ForeignCurrencyFeesSection.tsx",
+    "/src/components/accounts/shared/RecurringChargesPanel.tsx",
+    "/src/components/accounts/shared/SummaryCardGrid.tsx",
+    "/src/components/accounts/shared/TopGroupsPanel.tsx",
+    "/src/components/ai/ResultChart.tsx",
+    "/src/components/bills/CashFlowForecastChart.tsx",
+    "/src/components/budgets/Budget503020Summary.tsx",
+    "/src/components/budgets/BudgetAlertList.tsx",
+    "/src/components/budgets/BudgetCategoryList.tsx",
+    "/src/components/budgets/BudgetCategoryTrend.tsx",
+    "/src/components/budgets/BudgetFlexGroupCard.tsx",
+    "/src/components/budgets/BudgetHealthGauge.tsx",
+    "/src/components/budgets/BudgetHeatmap.tsx",
+    "/src/components/budgets/BudgetPeriodDetail.tsx",
+    "/src/components/budgets/BudgetScenarioPlanner.tsx",
+    "/src/components/budgets/BudgetTrendChart.tsx",
+    "/src/components/budgets/BudgetUpcomingBills.tsx",
+    "/src/components/budgets/BudgetVelocityWidget.tsx",
+    "/src/components/budgets/BudgetWizardCategories.tsx",
+    "/src/components/budgets/BudgetWizardReview.tsx",
+    "/src/components/budgets/BudgetWizardStrategy.tsx",
+    "/src/components/budgets/BudgetZeroBasedBar.tsx",
+    "/src/components/dashboard/AssetsVsLiabilities.tsx",
+    "/src/components/dashboard/BudgetStatusWidget.tsx",
+    "/src/components/dashboard/ExpensesPieChart.tsx",
+    "/src/components/dashboard/FavouriteAccounts.tsx",
+    "/src/components/dashboard/FavouriteReportsWidget.tsx",
+    "/src/components/dashboard/FavouriteSecurities.tsx",
+    "/src/components/dashboard/GettingStarted.tsx",
+    "/src/components/dashboard/IncomeExpensesBarChart.tsx",
+    "/src/components/dashboard/InsightsWidget.tsx",
+    "/src/components/dashboard/NetWorthChart.tsx",
+    "/src/components/dashboard/TopMovers.tsx",
+    "/src/components/dashboard/UpcomingBills.tsx",
+    "/src/components/dashboard/WidgetCard.tsx",
+    "/src/components/dashboard/widget-registry.tsx",
+    "/src/components/import/CompleteStep.tsx",
+    "/src/components/import/CsvColumnMappingStep.tsx",
+    "/src/components/import/MapAccountsStep.tsx",
+    "/src/components/import/MapCategoriesStep.tsx",
+    "/src/components/import/MapSecuritiesStep.tsx",
+    "/src/components/import/ReviewStep.tsx",
+    "/src/components/import/SelectAccountStep.tsx",
+    "/src/components/import/UploadStep.tsx",
+    "/src/components/investments/AssetAllocationChart.tsx",
+    "/src/components/investments/GroupedHoldingsList.tsx",
+    "/src/components/investments/HoldingsList.tsx",
+    "/src/components/investments/InvestmentRegisterPanel.tsx",
+    "/src/components/investments/InvestmentTransactionList.tsx",
+    "/src/components/investments/InvestmentValueChart.tsx",
+    "/src/components/investments/PortfolioSummaryCard.tsx",
+    "/src/components/layout/ActionHistoryPanel.tsx",
+    "/src/components/payees/detail/PayeeRecurringPanel.tsx",
+    "/src/components/reconcile/ReconciliationReminderBadge.tsx",
+    "/src/components/reports/AccountBalancesReport.tsx",
+    "/src/components/reports/BillPaymentHistoryReport.tsx",
+    "/src/components/reports/BudgetHealthScoreReport.tsx",
+    "/src/components/reports/BudgetSeasonalPatternsReport.tsx",
+    "/src/components/reports/BudgetTrendReport.tsx",
+    "/src/components/reports/BudgetVsActualReport.tsx",
+    "/src/components/reports/CashFlowReport.tsx",
+    "/src/components/reports/CategoryPerformanceReport.tsx",
+    "/src/components/reports/ChartTooltip.tsx",
+    "/src/components/reports/CreditUtilizationReport.tsx",
+    "/src/components/reports/CurrencyExposureReport.tsx",
+    "/src/components/reports/CustomReportForm.tsx",
+    "/src/components/reports/CustomReportViewer.tsx",
+    "/src/components/reports/DebtPayoffTimelineReport.tsx",
+    "/src/components/reports/DividendIncomeReport.tsx",
+    "/src/components/reports/DividendYieldGrowthReport.tsx",
+    "/src/components/reports/DuplicateTransactionReport.tsx",
+    "/src/components/reports/FlexGroupAnalysisReport.tsx",
+    "/src/components/reports/ForeignCurrencyFeesReport.tsx",
+    "/src/components/reports/GeographicAllocationReport.tsx",
+    "/src/components/reports/HealthScoreHistoryReport.tsx",
+    "/src/components/reports/IncomeBySourceReport.tsx",
+    "/src/components/reports/IncomeVsExpensesReport.tsx",
+    "/src/components/reports/InvestmentPerformanceReport.tsx",
+    "/src/components/reports/InvestmentReportForm.tsx",
+    "/src/components/reports/InvestmentReportViewer.tsx",
+    "/src/components/reports/InvestmentTransactionHistoryReport.tsx",
+    "/src/components/reports/LoanAmortizationReport.tsx",
+    "/src/components/reports/LoanOverpaymentSimulatorReport.tsx",
+    "/src/components/reports/MonteCarloChartParts.tsx",
+    "/src/components/reports/MonteCarloReport.tsx",
+    "/src/components/reports/MonteCarloResultsTable.tsx",
+    "/src/components/reports/MonthlyCategoryBreakdownReport.tsx",
+    "/src/components/reports/MonthlyComparisonReport.tsx",
+    "/src/components/reports/MonthlySpendingTrendReport.tsx",
+    "/src/components/reports/NetWorthReport.tsx",
+    "/src/components/reports/PortfolioValueReport.tsx",
+    "/src/components/reports/RealizedGainsReport.tsx",
+    "/src/components/reports/RecurringExpensesReport.tsx",
+    "/src/components/reports/ReportChart.tsx",
+    "/src/components/reports/ReportError.tsx",
+    "/src/components/reports/SavingsRateReport.tsx",
+    "/src/components/reports/SeasonalSpendingMapReport.tsx",
+    "/src/components/reports/SectorWeightingsReport.tsx",
+    "/src/components/reports/SecurityComparisonChart.tsx",
+    "/src/components/reports/SecurityPerformanceReport.tsx",
+    "/src/components/reports/SecurityTypeAllocationReport.tsx",
+    "/src/components/reports/SpendingAnomaliesReport.tsx",
+    "/src/components/reports/SpendingByCategoryReport.tsx",
+    "/src/components/reports/SpendingByPayeeReport.tsx",
+    "/src/components/reports/TaxSummaryReport.tsx",
+    "/src/components/reports/UncategorizedTransactionsReport.tsx",
+    "/src/components/reports/UpcomingBillsReport.tsx",
+    "/src/components/reports/WeekendVsWeekdayReport.tsx",
+    "/src/components/reports/YearOverYearReport.tsx",
+    "/src/components/reports/account-balances/AccountBalancesControls.tsx",
+    "/src/components/reports/monte-carlo/CompareMetricTable.tsx",
+    "/src/components/reports/monte-carlo/CompareScenariosView.tsx",
+    "/src/components/scheduled-transactions/BillsFilterPanel.tsx",
+    "/src/components/settings/AboutSection.tsx",
+    "/src/components/settings/ApiAccessSection.tsx",
+    "/src/components/settings/AutoBackupSection.tsx",
+    "/src/components/settings/BackupRestoreSection.tsx",
+    "/src/components/settings/DangerZoneSection.tsx",
+    "/src/components/settings/HelpSection.tsx",
+    "/src/components/settings/NotificationsSection.tsx",
+    "/src/components/settings/PreferencesSection.tsx",
+    "/src/components/settings/ProfileSection.tsx",
+    "/src/components/settings/SecuritySection.tsx",
+    "/src/components/settings/SettingsNav.tsx",
+    "/src/components/settings/SharedAccessSection.tsx",
+    "/src/components/settings/TourCatalog.tsx",
+    "/src/components/settings/ai/AiBubbleToggle.tsx",
+    "/src/components/settings/ai/ProviderList.tsx",
+    "/src/components/settings/ai/UsageDashboard.tsx",
+    "/src/components/transactions/AccountBalancesBarChart.tsx",
+    "/src/components/transactions/AccountInfoWidget.tsx",
+    "/src/components/transactions/BalanceHistoryChart.tsx",
+    "/src/components/transactions/CategoryInfoWidget.tsx",
+    "/src/components/transactions/CategoryPayeeBarChart.tsx",
+    "/src/components/transactions/PayeeInfoWidget.tsx",
+    "/src/components/transactions/TagKeyBreakdownChart.tsx",
+    "/src/components/transactions/TransactionFilterPanel.tsx",
+    "/src/components/ui/CalendarPopover.tsx",
+    "/src/components/ui/LoadingSkeleton.tsx",
+    "/src/components/ui/Modal.tsx",
+    "/src/components/ui/Pagination.tsx",
+    "/src/components/ui/SummaryCard.tsx",
+  ];
+
+  function filesWithInlineCard(): string[] {
+    return productionSources()
+      .filter(([path]) => path !== CARD)
+      .filter(([, content]) => content.split("\n").some(CARD_FINGERPRINT))
+      .map(([path]) => path);
+  }
+
+  it("has no inline card surface outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    const offenders = filesWithInlineCard().filter((path) => !allowed.has(path));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithInlineCard());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("still finds the shared surface, so the rule cannot pass by accident", () => {
+    const card = sources[CARD];
+    expect(card, `${CARD} not found -- update CARD in this test`).toBeTruthy();
+    expect(card.split("\n").some(CARD_FINGERPRINT)).toBe(true);
+  });
+});
