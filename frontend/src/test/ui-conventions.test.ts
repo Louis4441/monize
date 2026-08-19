@@ -1379,3 +1379,30 @@ describe("an auth page renders inside AuthShell", () => {
     expect(shell.includes("monize-logo-transparent")).toBe(true);
   });
 });
+
+describe("nav links and their icons come from lib/nav-links", () => {
+  /**
+   * The link arrays and the per-route icon map live together in
+   * `lib/nav-links.ts`, so `nav-links.test.ts` can hold "every nav route has
+   * an icon". A nav surface that declares its own links (or reaches for
+   * Heroicons directly per row) re-opens the drift this closed: a route added
+   * in one place, bare in the other.
+   */
+  const NAV_SOURCES = [
+    "/src/components/layout/AppHeader.tsx",
+    "/src/components/layout/MobileNavDrawer.tsx",
+  ];
+
+  it("keeps both nav surfaces on the shared module", () => {
+    const missing = NAV_SOURCES.filter(
+      (path) => !sources[path]?.includes("@/lib/nav-links"),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("still finds the module, so the rule cannot pass by accident", () => {
+    const mod = sources["/src/lib/nav-links.ts"];
+    expect(mod, "lib/nav-links.ts not found -- update this test").toBeTruthy();
+    expect(mod.includes("NAV_ICONS")).toBe(true);
+  });
+});
