@@ -76,7 +76,7 @@ export function MobileNavDrawer({
         {Icon && (
           <Icon
             aria-hidden
-            className={`mr-3 h-5 w-5 flex-shrink-0 ${
+            className={`mr-4 h-5 w-5 flex-shrink-0 ${
               active
                 ? 'text-blue-600 dark:text-blue-300'
                 : 'text-gray-400 dark:text-gray-500'
