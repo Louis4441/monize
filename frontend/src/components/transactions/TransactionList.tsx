@@ -5,7 +5,10 @@ import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 import { classifyStaleRow, type StaleUnreconciledReason } from '@/lib/stale-reconciliation';
-import { nextCycleStatus } from '@/lib/transaction-status-cycle';
+import {
+  nextCycleStatus,
+  RECONCILED_UNDO_WINDOW_SECONDS,
+} from '@/lib/transaction-status-cycle';
 import { CategoryBudgetStatus } from '@/types/budget';
 import { transactionsApi } from '@/lib/transactions';
 import { getErrorMessage } from '@/lib/errors';
@@ -18,6 +21,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getLocalDateString } from '@/lib/utils';
 import { useTableDensity } from '@/hooks/useTableDensity';
 import { useDensityPreference, type DensityView } from '@/store/densityStore';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -299,6 +303,12 @@ export function TransactionList({
     setDeleteConfirm({ isOpen: false, transaction: null });
   }, []);
 
+  // Whether the strict lock is on, which is what makes a reconcile from this
+  // register a one-way door after the undo window closes.
+  const reconciledLocked = usePreferencesStore(
+    (s) => s.preferences?.lockReconciledTransactions ?? false,
+  );
+
   const handleCycleStatus = useCallback(async (transaction: Transaction) => {
     const nextStatus = nextCycleStatus(transaction.status);
     if (nextStatus === null) {
@@ -314,7 +324,19 @@ export function TransactionList({
         [TransactionStatus.RECONCILED]: t('list.status.reconciled'),
         [TransactionStatus.VOID]: t('list.status.void'),
       };
-      toast.success(t('list.status.changed', { status: statusLabels[nextStatus] }));
+      // With the strict lock on, reconciling here is the last freely reversible
+      // click on this row: the server allows the undo for a few seconds and
+      // refuses it afterwards. Saying so is the difference between a window and
+      // a trap -- the plain "status changed" toast gives the user no reason to
+      // look at the row again until the next click has already been refused.
+      toast.success(
+        reconciledLocked && nextStatus === TransactionStatus.RECONCILED
+          ? t('list.status.changedLockedUndo', {
+              status: statusLabels[nextStatus],
+              seconds: RECONCILED_UNDO_WINDOW_SECONDS,
+            })
+          : t('list.status.changed', { status: statusLabels[nextStatus] }),
+      );
 
       if (onTransactionUpdate) {
         // The status endpoint returns the plain transaction; list-only
@@ -332,7 +354,7 @@ export function TransactionList({
     } catch (error) {
       toast.error(getErrorMessage(error, t('list.status.updateError')));
     }
-  }, [onRefresh, onTransactionUpdate, t]);
+  }, [onRefresh, onTransactionUpdate, reconciledLocked, t]);
 
   // Find the index where future transactions end and today/past begin.
   // Transactions are sorted DESC by date, so future ones come first.
