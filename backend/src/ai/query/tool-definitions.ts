@@ -597,7 +597,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "manage_payees",
     description:
-      "Create, edit, or delete the user's payees. This does NOT change anything immediately: it shows the user a confirmation card (or cards) they must approve. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). create: { name, categoryName? }. update: { name, newName?, categoryName? } (name identifies the existing payee; provide newName to rename and/or categoryName to set the default category; an empty categoryName clears it; at least one change is required). delete: { name }. approvalMode = 'bulk' (default; one card for the whole batch) or 'individual' (one card per item); ignored for a single item. Accepts NAMES (payee + category) and resolves them internally. After calling, briefly tell the user to review and approve the card(s); never claim the change was made.",
+      "Create, edit, or delete the user's payees. This does NOT change anything immediately: it shows the user a confirmation card (or cards) they must approve. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). create: { name, categoryName?, website? }. update: { name, newName?, categoryName?, website? } (name identifies the existing payee; provide newName to rename, categoryName to set the default category, and/or website to set the payee's web address; an empty categoryName or website clears that field; at least one change is required). delete: { name }. website accepts a bare domain ('acme.com') and is stored as an absolute https URL; setting one also resolves that site's icon for the payee. To find payees that need one, call list_payees and look for a null or missing website. approvalMode = 'bulk' (default; one card for the whole batch) or 'individual' (one card per item); ignored for a single item. Accepts NAMES (payee + category) and resolves them internally. After calling, briefly tell the user to review and approve the card(s); never claim the change was made.",
     inputSchema: {
       type: "object",
       properties: {
@@ -625,6 +625,11 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
                 type: "string",
                 description:
                   'create/update: default category name ("Parent: Child" for a subcategory). update: empty string clears it.',
+              },
+              website: {
+                type: "string",
+                description:
+                  "create/update: the payee's web address. A bare domain ('acme.com') is stored as 'https://acme.com'. update: empty string clears it.",
               },
             },
             required: ["name"],
@@ -886,7 +891,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "list_payees",
     description:
-      "List the user's payees (the people and businesses they pay or receive money from), optionally filtered by a search query. Use this for questions like 'list my payees', 'do I have a payee for Netflix', or to confirm the exact spelling of a payee name before filtering list_transactions or proposing a manage_transactions edit. Returns each payee's name and default category. To see how much was spent at a payee, use list_transactions with payeeNames or generate_report (spending_by_payee) instead.",
+      "List the user's payees (the people and businesses they pay or receive money from), optionally filtered by a search query. Use this for questions like 'list my payees', 'do I have a payee for Netflix', or to confirm the exact spelling of a payee name before filtering list_transactions or proposing a manage_transactions edit. Returns each payee's name, default category and website (null when unset -- use this to find payees whose website is missing, then fill them in with manage_payees). To see how much was spent at a payee, use list_transactions with payeeNames or generate_report (spending_by_payee) instead.",
     inputSchema: {
       type: "object",
       properties: {

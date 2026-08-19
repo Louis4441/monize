@@ -244,6 +244,10 @@ export const managePayeesSchema = z.object({
         name: z.string().min(1).max(100),
         newName: z.string().min(1).max(100).optional(),
         categoryName: z.string().max(100).optional(),
+        // No .min(1): an empty string is how an update clears the address,
+        // mirroring categoryName. Zod strips unknown keys, so a field absent
+        // here is silently dropped rather than rejected.
+        website: z.string().max(2048).optional(),
       }),
     )
     .min(1)

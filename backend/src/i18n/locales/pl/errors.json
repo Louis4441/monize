@@ -343,6 +343,7 @@
     "nameConflict": "Odbiorca o nazwie \"{{ name }}\" już istnieje",
     "nameRequired": "Nazwa odbiorcy jest wymagana",
     "notFound": "Nie znaleziono odbiorcy o ID {{ id }}",
+    "logoNotFound": "Brak logo dla tego odbiorcy",
     "categoryIdsNotOwned": "Identyfikatory kategorii nie zostały znalezione lub nie należą do użytkownika: {{ ids }}",
     "aliasEmpty": "Alias nie może być pusty",
     "aliasDuplicate": "Alias \"{{ alias }}\" jest już przypisany do odbiorcy \"{{ payeeName }}\"",

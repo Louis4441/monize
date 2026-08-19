@@ -343,6 +343,7 @@
     "nameConflict": "Penerima bernama \"{{ name }}\" sudah ada",
     "nameRequired": "Nama penerima wajib diisi",
     "notFound": "Penerima dengan ID {{ id }} tidak ditemukan",
+    "logoNotFound": "Tidak ada logo yang tersedia untuk penerima pembayaran ini",
     "categoryIdsNotOwned": "ID kategori tidak ditemukan atau bukan milik pengguna: {{ ids }}",
     "aliasEmpty": "Alias tidak boleh kosong",
     "aliasDuplicate": "Alias \"{{ alias }}\" sudah ditetapkan ke penerima \"{{ payeeName }}\"",

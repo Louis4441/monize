@@ -1051,6 +1051,7 @@ export class ToolExecutorService {
     return {
       name: item.name as string,
       categoryName: item.categoryName as string | undefined,
+      website: item.website as string | undefined,
     };
   }
 
@@ -1061,6 +1062,7 @@ export class ToolExecutorService {
       name: item.name as string,
       newName: item.newName as string | undefined,
       categoryName: item.categoryName as string | undefined,
+      website: item.website as string | undefined,
     };
   }
 
@@ -1084,7 +1086,7 @@ export class ToolExecutorService {
         );
         return {
           data: PENDING_ACTION_TOOL_RESULT,
-          summary: `Prepared to create payee "${preview.name}"${preview.defaultCategoryName ? ` with default category ${preview.defaultCategoryName}` : ""}. Awaiting user confirmation.`,
+          summary: `Prepared to create payee "${preview.name}"${preview.defaultCategoryName ? ` with default category ${preview.defaultCategoryName}` : ""}${preview.website ? ` and website ${preview.website}` : ""}. Awaiting user confirmation.`,
           sources: [],
           pendingAction: this.actionBuilder.buildCreatePayee(userId, preview),
         };
@@ -1139,7 +1141,7 @@ export class ToolExecutorService {
         );
         return {
           data: PENDING_ACTION_TOOL_RESULT,
-          summary: `Prepared an edit to payee "${preview.name}" (default category ${preview.defaultCategoryName ?? "none"}). Awaiting user confirmation.`,
+          summary: `Prepared an edit to payee "${preview.name}" (default category ${preview.defaultCategoryName ?? "none"}${preview.website !== undefined ? `, website ${preview.website ?? "cleared"}` : ""}). Awaiting user confirmation.`,
           sources: [],
           pendingAction: this.actionBuilder.buildUpdatePayee(userId, preview),
         };
