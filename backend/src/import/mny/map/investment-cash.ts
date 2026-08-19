@@ -1,5 +1,6 @@
 import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
 import { roundFxRate } from "../../../common/fx-entry.util";
+import { disposalCashAmount } from "../../../securities/accrued-interest.util";
 import {
   MappedInvestmentTransaction,
   MappedInvestments,
@@ -58,6 +59,7 @@ export function tradesByHandle(
       accountKey: transaction.accountKey,
       action: transaction.action,
       cashAmount: transaction.cashAmount,
+      accruedInterest: transaction.accruedInterest,
       status: transaction.status,
     });
   }
@@ -76,6 +78,10 @@ export function tradesByHandle(
  * FX spread. `cashAmount !== 0` is what puts a trade in this map at all, and
  * `cashAmountOf` returns 0 whenever `totalAmount` is 0, so the divisor is
  * always positive here.
+ *
+ * The divisor is what the trade moved, accrued interest included -- the funding
+ * row's amount carries it, so dividing by proceeds alone would inflate the rate
+ * by the interest.
  */
 export function applyInvestmentCashSources(
   investments: MappedInvestments,
@@ -119,7 +125,13 @@ export function applyInvestmentCashSources(
           source.currencyCode === transaction.currencyCode ||
           transaction.totalAmount <= 0
             ? 1
-            : roundFxRate(Math.abs(source.amount) / transaction.totalAmount),
+            : roundFxRate(
+                Math.abs(source.amount) /
+                  disposalCashAmount(
+                    transaction.totalAmount,
+                    transaction.accruedInterest,
+                  ),
+              ),
       };
     }),
   };

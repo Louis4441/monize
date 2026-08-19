@@ -60,6 +60,7 @@ guessing -- see INV-AUTH-004.
 | INV-HOLDING-001 | A holding equals a deterministic replay of the investment ledger | unenforced |
 | INV-HOLDING-002 | Every view replays the ledger the same way | unenforced |
 | INV-TRANSFER-001 | A transfer's two legs share one status and one balance decision | unenforced |
+| INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | partial |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | unenforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | unenforced |
@@ -298,6 +299,31 @@ Required tests      Per status-changing endpoint, assert both legs moved and bot
                     balances are consistent. Include the split-transfer variant,
                     which links through the split parent, not a mirror leg.
 Status              unenforced
+```
+
+### INV-REDEEM-001 -- a redemption's accrued interest moves cash once
+
+```text
+Statement           A REDEEM carrying accrued interest produces exactly one cash
+                    transaction, for proceeds plus interest, and the interest is
+                    counted exactly once as interest income.
+Source of truth     the REDEEM row and its linked INTEREST companion
+Enforcement         disposalCashAmount (securities/accrued-interest.util.ts) is
+                    the only place the two are added; the companion is written
+                    with transaction_id null, so it can produce no second cash
+                    row. accrued-interest.guard.spec.ts fails a hand-rolled
+                    addition elsewhere. The companion is created, statused and
+                    deleted with the redemption inside one withScopedDb.
+Concurrency scope   per redemption pair
+Retry semantics     None needed: create, edit and delete each run in one
+                    transaction, and the companion has no independent write path.
+Crash semantics     Before commit, neither row exists. After commit, both rows
+                    and the single cash row exist. There is no mid-state where a
+                    companion exists without its redemption.
+Failure response    400 before any write for a non-REDEEM action, a negative
+                    value, or a row embedded in a split.
+Required tests      docs/specs/redemption-accrued-interest.md section 6.
+Status              enforced
 ```
 
 ### INV-RECONCILE-001 -- while the strict lock is on, a reconciled transaction is not altered

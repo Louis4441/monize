@@ -512,6 +512,8 @@ export interface BatchUpdateInvestmentTransactionRow {
   quantity: number | null;
   price: number | null;
   commission: number;
+  /** REDEEM only; applied through the linked INTEREST companion. */
+  accruedInterest: number;
   exchangeRate: number;
   description: string | null;
 }

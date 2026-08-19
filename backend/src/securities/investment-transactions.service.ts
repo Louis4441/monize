@@ -29,6 +29,11 @@ import {
   applyActionToQuantity,
   baseInvestmentAction,
 } from "./investment-replay.util";
+import {
+  disposalCashAmount,
+  isAccruedInterestCompanion,
+  supportsAccruedInterest,
+} from "./accrued-interest.util";
 import { CreateInvestmentTransactionDto } from "./dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
 import { TransferSecurityDto } from "./dto/transfer-security.dto";
@@ -228,6 +233,8 @@ export interface CreateInvestmentTransactionPreview {
   quantity: number | null;
   price: number | null;
   commission: number;
+  /** Accrued interest riding on the same cash movement (REDEEM only). */
+  accruedInterest: number;
   /** Magnitude of the transaction in the security's currency (stored totalAmount). */
   totalAmount: number;
   /** Rate converting the security's currency into the cash account's currency. */
@@ -267,6 +274,8 @@ export interface InvestmentCreateRowInput {
   quantity?: number;
   price?: number;
   commission?: number;
+  /** REDEEM only; recorded as the linked INTEREST companion. */
+  accruedInterest?: number;
   fundingAccountName?: string;
   /** Optional FX rate (security currency -> cash currency) to pin the cash posting. */
   exchangeRate?: number;
@@ -282,6 +291,8 @@ export interface InvestmentUpdateRowInput {
   quantity?: number;
   price?: number;
   commission?: number;
+  /** REDEEM only; recorded as the linked INTEREST companion. */
+  accruedInterest?: number;
   /** Optional FX rate (security currency -> cash currency) to pin the cash posting. */
   exchangeRate?: number;
   description?: string;
@@ -692,6 +703,180 @@ export class InvestmentTransactionsService {
     );
   }
 
+  /**
+   * Refuse accrued interest where it cannot be honoured, before anything is
+   * written. REDEEM alone carries it (`ACCRUED_INTEREST_ACTIONS`), and an
+   * embedded row cannot: the parent split's leg is already the cash side there,
+   * so a companion would move money the parent has not accounted for.
+   */
+  private assertAccruedInterestAllowed(
+    action: InvestmentAction,
+    accruedInterest: number | null | undefined,
+    isEmbedded: boolean,
+  ): void {
+    const amount = Number(accruedInterest ?? 0);
+    if (!(amount > 0)) return;
+    if (!supportsAccruedInterest(action)) {
+      throw new BadRequestException(
+        tr(
+          "errors.securities.accruedInterestActionNotAllowed",
+          `Accrued interest can only be recorded on a REDEEM transaction, not on ${action}.`,
+          { action },
+        ),
+      );
+    }
+    if (isEmbedded) {
+      throw new BadRequestException(
+        tr(
+          "errors.securities.accruedInterestNotAllowedInSplit",
+          "Accrued interest cannot be recorded on an investment transaction inside a split. Record the interest as its own split line instead.",
+        ),
+      );
+    }
+  }
+
+  /**
+   * The INTEREST companion of a redemption, or null.
+   *
+   * `linked_transaction_id` also links transfer legs, so the pair is identified
+   * by action rather than by the link alone (`isAccruedInterestCompanion`).
+   */
+  private async findAccruedInterestCompanion(
+    manager: EntityManager,
+    userId: string,
+    redemption: Pick<
+      InvestmentTransaction,
+      "id" | "action" | "linkedTransactionId"
+    >,
+  ): Promise<InvestmentTransaction | null> {
+    if (!redemption.linkedTransactionId) return null;
+    if (!supportsAccruedInterest(redemption.action)) return null;
+
+    // includes VOID rows: records read -- a VOID redemption's companion is VOID
+    // too, and both are still loaded so an edit or delete reaches the pair.
+    const companion = await manager
+      .getRepository(InvestmentTransaction)
+      .findOne({ where: { id: redemption.linkedTransactionId, userId } });
+
+    return companion && isAccruedInterestCompanion(companion, redemption)
+      ? companion
+      : null;
+  }
+
+  /**
+   * Make the companion match the redemption's accrued interest: create it,
+   * re-amount it, or delete it when the interest goes to zero.
+   *
+   * The companion writes no cash row of its own (`transactionId` stays null) --
+   * the redemption's single cash row already carries the interest, and a second
+   * one would move the money twice. Its status is the redemption's, because the
+   * two rows describe one event.
+   */
+  private async syncAccruedInterestCompanion(
+    manager: EntityManager,
+    userId: string,
+    redemption: InvestmentTransaction,
+    accruedInterest: number,
+    /**
+     * The companion as it was before this edit, resolved while the row still
+     * had its stored action. Passed in rather than looked up here because an
+     * edit that turns a REDEEM into something else must still be able to find
+     * the companion it has to delete.
+     */
+    existing: InvestmentTransaction | null,
+  ): Promise<void> {
+    // includes VOID rows: records written -- the companion carries the
+    // redemption's status, VOID included, so it is created and re-amounted
+    // whatever that status is.
+    const repo = manager.getRepository(InvestmentTransaction);
+    const amount = roundMoney(Number(accruedInterest) || 0);
+
+    if (!(amount > 0)) {
+      if (existing) {
+        // Break the link first so neither row's FK points at a row that is
+        // about to disappear.
+        await repo.update(redemption.id, { linkedTransactionId: null });
+        redemption.linkedTransactionId = null;
+        await repo.update(existing.id, { linkedTransactionId: null });
+        await repo.delete({ id: existing.id, userId });
+      }
+      redemption.accruedInterest = 0;
+      return;
+    }
+
+    if (existing) {
+      // Quantity stays null and price carries the amount, so any recompute of
+      // `totalAmount` for an INTEREST row lands on the same figure.
+      existing.accountId = redemption.accountId;
+      existing.securityId = redemption.securityId;
+      existing.transactionDate = redemption.transactionDate;
+      existing.status = redemption.status;
+      existing.exchangeRate = redemption.exchangeRate;
+      existing.price = amount;
+      existing.totalAmount = amount;
+      await repo.save(existing);
+      redemption.accruedInterest = amount;
+      return;
+    }
+
+    const companion = repo.create({
+      userId,
+      accountId: redemption.accountId,
+      securityId: redemption.securityId,
+      fundingAccountId: null,
+      action: InvestmentAction.INTEREST,
+      transactionDate: redemption.transactionDate,
+      quantity: null,
+      price: amount,
+      commission: 0,
+      totalAmount: amount,
+      exchangeRate: redemption.exchangeRate,
+      description: redemption.description,
+      status: redemption.status,
+      transactionId: null,
+      linkedTransactionId: redemption.id,
+    });
+    const savedCompanion = await repo.save(companion);
+
+    await repo.update(redemption.id, {
+      linkedTransactionId: savedCompanion.id,
+    });
+    redemption.linkedTransactionId = savedCompanion.id;
+    redemption.accruedInterest = amount;
+  }
+
+  /** Attach each redemption's accrued interest to the rows being returned. */
+  private async attachAccruedInterest(
+    manager: EntityManager,
+    userId: string,
+    rows: InvestmentTransaction[],
+  ): Promise<void> {
+    const redemptions = rows.filter(
+      (row) => supportsAccruedInterest(row.action) && row.linkedTransactionId,
+    );
+    for (const row of rows) {
+      if (supportsAccruedInterest(row.action)) row.accruedInterest = 0;
+    }
+    if (redemptions.length === 0) return;
+
+    // includes VOID rows: records read -- a VOID redemption still shows what
+    // its accrued interest was.
+    const companions = await manager.getRepository(InvestmentTransaction).find({
+      where: redemptions.map((row) => ({
+        id: row.linkedTransactionId as string,
+        userId,
+      })),
+    });
+    const byId = new Map(companions.map((row) => [row.id, row]));
+
+    for (const row of redemptions) {
+      const companion = byId.get(row.linkedTransactionId as string);
+      if (companion && isAccruedInterestCompanion(companion, row)) {
+        row.accruedInterest = Number(companion.totalAmount);
+      }
+    }
+  }
+
   async create(
     userId: string,
     createDto: CreateInvestmentTransactionDto,
@@ -749,6 +934,8 @@ export class InvestmentTransactionsService {
     }
 
     const totalAmount = this.calculateTotalAmount(createDto);
+    const accruedInterest = roundMoney(Number(createDto.accruedInterest ?? 0));
+    this.assertAccruedInterestAllowed(createDto.action, accruedInterest, false);
 
     // Resolve the rate that will convert totalAmount (security currency)
     // into the cash account's currency when we post the linked cash transaction.
@@ -785,7 +972,24 @@ export class InvestmentTransactionsService {
 
       const saved = await manager.save(investmentTransaction);
 
-      await this.processTransactionEffectsInTransaction(manager, userId, saved);
+      // Before the effects: the cash row the effects create carries the
+      // interest as well as the proceeds, and there is only one of them.
+      await this.syncAccruedInterestCompanion(
+        manager,
+        userId,
+        saved,
+        accruedInterest,
+        null,
+      );
+
+      await this.processTransactionEffectsInTransaction(
+        manager,
+        userId,
+        saved,
+        false,
+        true,
+        accruedInterest,
+      );
 
       return saved.id;
     });
@@ -908,6 +1112,7 @@ export class InvestmentTransactionsService {
       quantity?: number;
       price?: number;
       commission?: number;
+      accruedInterest?: number;
       fundingAccountId?: string;
       exchangeRate?: number;
       description?: string;
@@ -1006,6 +1211,11 @@ export class InvestmentTransactionsService {
         ? roundToDecimals(Number(input.price), 6)
         : null;
     const commission = roundToDecimals(Number(input.commission ?? 0), 4);
+    const accruedInterest = roundToDecimals(
+      Number(input.accruedInterest ?? 0),
+      4,
+    );
+    this.assertAccruedInterestAllowed(input.action, accruedInterest, false);
 
     const totalAmount = this.calculateTotalAmount({
       action: input.action,
@@ -1031,6 +1241,7 @@ export class InvestmentTransactionsService {
       Number(quantity ?? 0),
       Number(price ?? 0),
       commission,
+      accruedInterest,
     );
 
     let cashAccountName: string | null = null;
@@ -1063,6 +1274,7 @@ export class InvestmentTransactionsService {
       quantity,
       price,
       commission,
+      accruedInterest,
       totalAmount,
       exchangeRate,
       fundingAccountId: fundingAccount?.id ?? null,
@@ -1091,6 +1303,7 @@ export class InvestmentTransactionsService {
       quantity?: number;
       price?: number;
       commission?: number;
+      accruedInterest?: number;
       exchangeRate?: number;
       description?: string;
     },
@@ -1104,6 +1317,7 @@ export class InvestmentTransactionsService {
       input.quantity !== undefined ||
       input.price !== undefined ||
       input.commission !== undefined ||
+      input.accruedInterest !== undefined ||
       input.exchangeRate !== undefined ||
       input.description !== undefined;
     if (!hasChange) {
@@ -1131,6 +1345,10 @@ export class InvestmentTransactionsService {
           ? Number(existing.price)
           : undefined),
       commission: input.commission ?? Number(existing.commission ?? 0),
+      // `findOne` reads it off the companion, so an edit that does not mention
+      // the interest keeps it -- the same rule `update()` applies.
+      accruedInterest:
+        input.accruedInterest ?? Number(existing.accruedInterest ?? 0),
       fundingAccountId: existing.fundingAccountId ?? undefined,
       // Only an explicit override pins the rate; otherwise the preview
       // re-resolves it fresh (for the new currency pair if the security or
@@ -1273,6 +1491,7 @@ export class InvestmentTransactionsService {
       quantity: row.quantity,
       price: row.price,
       commission: row.commission,
+      accruedInterest: row.accruedInterest,
       fundingAccountId,
       exchangeRate: row.exchangeRate,
       description: row.description,
@@ -1349,6 +1568,7 @@ export class InvestmentTransactionsService {
           quantity: row.quantity,
           price: row.price,
           commission: row.commission,
+          accruedInterest: row.accruedInterest,
           fundingAccountId,
           exchangeRate: row.exchangeRate,
           description: row.description,
@@ -1393,6 +1613,7 @@ export class InvestmentTransactionsService {
             quantity: row.quantity,
             price: row.price,
             commission: row.commission,
+            accruedInterest: row.accruedInterest,
             exchangeRate: row.exchangeRate,
             description: row.description,
           },
@@ -1407,6 +1628,7 @@ export class InvestmentTransactionsService {
           quantity: preview.quantity,
           price: preview.price,
           commission: preview.commission,
+          accruedInterest: preview.accruedInterest,
           exchangeRate: preview.exchangeRate,
           description: preview.description,
         });
@@ -1723,6 +1945,13 @@ export class InvestmentTransactionsService {
     transaction: InvestmentTransaction,
     allowNegative: boolean = false,
     createCashSide: boolean = true,
+    /**
+     * Accrued interest riding on this row's single cash movement. Only a
+     * redemption has any; it is added to the proceeds for the cash row alone,
+     * never to `totalAmount`, which every realized-gain fold measures against
+     * cost basis.
+     */
+    accruedInterest: number = 0,
   ): Promise<void> {
     // Future-dated investments: still create the linked cash transaction so
     // it shows in the cash account ledger as a projected entry (matching how
@@ -1813,7 +2042,7 @@ export class InvestmentTransactionsService {
             userId,
             cashAccount,
             transaction,
-            Number(totalAmount),
+            disposalCashAmount(totalAmount, accruedInterest),
           );
         }
         break;
@@ -1951,6 +2180,7 @@ export class InvestmentTransactionsService {
       quantity?: number | null;
       price?: number | null;
       commission?: number | null;
+      accruedInterest?: number | null;
       exchangeRate?: number | null;
       description?: string | null;
     },
@@ -1977,6 +2207,8 @@ export class InvestmentTransactionsService {
         ),
       );
     }
+
+    this.assertAccruedInterestAllowed(dto.action, dto.accruedInterest, true);
 
     const brokerageAccount = await this.accountsService.findOne(
       userId,
@@ -2412,6 +2644,22 @@ export class InvestmentTransactionsService {
         .leftJoinAndSelect("it.fundingAccount", "fundingAccount")
         .where("it.userId = :userId", { userId });
 
+      // A redemption's accrued-interest companion is not its own event in the
+      // register: it is shown as part of the redemption, whose single cash row
+      // already carries it. Excluded from the count as well as the page, so
+      // pagination cannot split a pair across two pages.
+      query.andWhere(
+        `NOT (it.action = :companionAction AND EXISTS (
+           SELECT 1 FROM investment_transactions parent
+           WHERE parent.id = it.linked_transaction_id
+             AND parent.user_id = it.user_id
+             AND parent.action = :redeemAction))`,
+        {
+          companionAction: InvestmentAction.INTEREST,
+          redeemAction: InvestmentAction.REDEEM,
+        },
+      );
+
       const allIds = await this.resolveRegisterAccountIds(userId, accountIds);
       if (allIds) {
         query.andWhere("it.accountId IN (:...allIds)", { allIds });
@@ -2441,6 +2689,8 @@ export class InvestmentTransactionsService {
         .skip(skip)
         .take(pageSize)
         .getMany();
+
+      await this.attachAccruedInterest(m, userId, data);
 
       return {
         data,
@@ -2869,8 +3119,8 @@ export class InvestmentTransactionsService {
 
   async findOne(userId: string, id: string): Promise<InvestmentTransaction> {
     // includes VOID rows: records read -- a VOID row is still viewable.
-    const transaction = await withScopedDb(this.dataSource, (m) =>
-      m
+    const transaction = await withScopedDb(this.dataSource, async (m) => {
+      const row = await m
         .getRepository(InvestmentTransaction)
         .createQueryBuilder("it")
         .leftJoinAndSelect("it.account", "account")
@@ -2878,8 +3128,10 @@ export class InvestmentTransactionsService {
         .leftJoinAndSelect("it.fundingAccount", "fundingAccount")
         .where("it.id = :id", { id })
         .andWhere("it.userId = :userId", { userId })
-        .getOne(),
-    );
+        .getOne();
+      if (row) await this.attachAccruedInterest(m, userId, [row]);
+      return row;
+    });
 
     if (!transaction) {
       throw new NotFoundException(
@@ -3328,6 +3580,30 @@ export class InvestmentTransactionsService {
       );
     }
 
+    // The companion is materialized from its redemption's accrued interest, so
+    // editing it directly would be overwritten by the next edit of the pair --
+    // and its amount is the one the single cash row was built from.
+    if (
+      transaction.action === InvestmentAction.INTEREST &&
+      transaction.linkedTransactionId
+    ) {
+      const partner = await withScopedDb(this.dataSource, (m) =>
+        // includes VOID rows: records read -- the partner is loaded whatever
+        // its status, to decide whether this row is a companion at all.
+        m.getRepository(InvestmentTransaction).findOne({
+          where: { id: transaction.linkedTransactionId!, userId },
+        }),
+      );
+      if (partner && isAccruedInterestCompanion(transaction, partner)) {
+        throw new BadRequestException(
+          tr(
+            "errors.securities.accruedInterestCompanionLocked",
+            "This interest row records the accrued interest of a redemption. Edit the redemption's accrued interest instead, so both sides change together.",
+          ),
+        );
+      }
+    }
+
     const beforeData = { ...transaction };
     const accountId = transaction.accountId;
     const oldSecurityId = transaction.securityId;
@@ -3410,6 +3686,28 @@ export class InvestmentTransactionsService {
     const priorPrice = transaction.price;
 
     const savedId = await withScopedDb(this.dataSource, async (manager) => {
+      // Resolved before the reversal, while the row still carries its stored
+      // action: an edit may take the action away from REDEEM, and the companion
+      // still has to be found so it can be refused or removed.
+      const existingCompanion = await this.findAccruedInterestCompanion(
+        manager,
+        userId,
+        transaction,
+      );
+      // Keyed on the value, not on the field being present: the form resends
+      // the whole row on every save, so an omitted field means "unchanged"
+      // rather than "cleared".
+      const accruedInterest = roundMoney(
+        updateDto.accruedInterest !== undefined
+          ? Number(updateDto.accruedInterest)
+          : Number(existingCompanion?.totalAmount ?? 0),
+      );
+      this.assertAccruedInterestAllowed(
+        updateDto.action ?? transaction.action,
+        accruedInterest,
+        isEmbedded,
+      );
+
       // Reverse the original transaction effects
       await this.reverseTransactionEffectsInTransaction(
         manager,
@@ -3571,6 +3869,14 @@ export class InvestmentTransactionsService {
 
       const saved = await manager.save(transaction);
 
+      await this.syncAccruedInterestCompanion(
+        manager,
+        userId,
+        saved,
+        accruedInterest,
+        existingCompanion,
+      );
+
       // Apply the new transaction effects. Allow intermediate negative
       // holdings so editing a past transaction is not blocked by the
       // current (possibly zero) balance. Correctness is enforced by the
@@ -3586,6 +3892,7 @@ export class InvestmentTransactionsService {
         saved,
         true,
         !isEmbedded,
+        accruedInterest,
       );
 
       if (isEmbedded) {
