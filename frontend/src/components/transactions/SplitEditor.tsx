@@ -24,6 +24,12 @@ export type SplitType = 'category' | 'transfer' | 'investment';
 export interface SplitRow extends CreateSplitData {
   id: string; // Temporary ID for React keys
   splitType: SplitType;
+  // Real user intent (issue #1167 R9-F2): true once the user edits this line's FX
+  // rate input, so a re-entered rate on a *continuing* investment line is honoured
+  // for the current pair even when its value equals the stale stored one. Reset
+  // when the security (and thus the pair) changes. UI-only -- the serializer turns
+  // it into `rateExplicit`; it never reaches an ordinary transaction DTO.
+  exchangeRateEdited?: boolean;
 }
 
 interface SplitEditorProps {
@@ -219,15 +225,25 @@ export function SplitEditor({
 
     if (field === 'investment') {
       // Caller updated the investment payload; set both `investment` and the
-      // computed cash impact passed as `_amount` via the value object.
-      const { investment, amount } = value as {
+      // computed cash impact passed as `_amount` via the value object. `meta`
+      // carries the real rate-edit intent (issue #1167 R9-F2): a user edit of the
+      // FX rate latches `exchangeRateEdited`; a security change resets it, because
+      // the rate then belongs to a new pair the user has not yet chosen a value
+      // for.
+      const { investment, amount, meta } = value as {
         investment: InvestmentSplitDetails;
         amount: number;
+        meta?: { rateEdited?: boolean; securityChanged?: boolean };
       };
+      const prevEdited = newSplits[index].exchangeRateEdited ?? false;
+      const exchangeRateEdited = meta?.securityChanged
+        ? false
+        : prevEdited || meta?.rateEdited === true;
       newSplits[index] = {
         ...newSplits[index],
         investment,
         amount,
+        exchangeRateEdited,
       };
       setLocalSplits(newSplits);
       onChange(newSplits);
@@ -571,8 +587,8 @@ export function SplitEditor({
                 {split.splitType === 'investment' ? (
                   <InvestmentSplitFields
                     value={split.investment}
-                    onChange={(investment, amount) =>
-                      handleSplitChange(index, 'investment', { investment, amount })
+                    onChange={(investment, amount, meta) =>
+                      handleSplitChange(index, 'investment', { investment, amount, meta })
                     }
                     disabled={disabled}
                     currencyCode={currencyCode}
@@ -745,8 +761,8 @@ export function SplitEditor({
                   {split.splitType === 'investment' ? (
                     <InvestmentSplitFields
                       value={split.investment}
-                      onChange={(investment, amount) =>
-                        handleSplitChange(index, 'investment', { investment, amount })
+                      onChange={(investment, amount, meta) =>
+                        handleSplitChange(index, 'investment', { investment, amount, meta })
                       }
                       disabled={disabled}
                       currencyCode={currencyCode}
@@ -1102,14 +1118,17 @@ export function toCreateSplitData(
     sourceSplitId: options.includeSourceIdentity
       ? split.sourceSplitId
       : undefined,
-    // A new investment line (no source identity) carries a rate the user set for
-    // the current settlement pair, so tell the server to stamp that pair rather
-    // than treat the line as an unidentified legacy row (issue #1167 R8-F2).
-    // Scheduled surfaces only, alongside the source-identity opt-in.
+    // The line's FX rate is a deliberate value for the current settlement pair,
+    // so the server stamps that pair rather than treating the line as an
+    // unidentified legacy row (issue #1167 R8-F2/R9-F2). True for a genuinely new
+    // investment line (no source identity), or a continuing one whose rate the
+    // user actually edited (`exchangeRateEdited`) -- the latter closes the
+    // same-value re-entry edge where the re-typed value equals the stale stored
+    // one. Scheduled surfaces only, alongside the source-identity opt-in.
     rateExplicit:
       options.includeSourceIdentity &&
       split.splitType === 'investment' &&
-      !split.sourceSplitId
+      (!split.sourceSplitId || split.exchangeRateEdited === true)
         ? true
         : undefined,
   }));

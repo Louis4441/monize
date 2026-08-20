@@ -161,6 +161,30 @@ describe('toOverrideSplits', () => {
     expect(out[0].rateExplicit).toBeUndefined();
   });
 
+  // Issue #1167 R9-F2: a continuing line whose rate the user actually edited is
+  // marked rateExplicit, so the server stamps the current pair even if the
+  // re-entered value equals the stale stored one (the same-value re-entry edge).
+  it('marks rateExplicit for a continuing line whose rate the user edited', () => {
+    const rows: SplitRow[] = [
+      {
+        id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        sourceSplitId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        splitType: 'investment',
+        exchangeRateEdited: true,
+        amount: -750,
+        memo: '',
+        investment: {
+          action: 'BUY',
+          securityId: 'sec-1',
+          exchangeRate: 1.5,
+        } as never,
+      },
+    ];
+    const out = toOverrideSplits(rows);
+    expect(out[0].sourceSplitId).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    expect(out[0].rateExplicit).toBe(true);
+  });
+
   it('leaves sourceSplitId undefined for a newly added row', () => {
     const rows: SplitRow[] = [
       {

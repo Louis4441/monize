@@ -15,13 +15,17 @@ import {
 } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
 import { SplitKind } from "../transactions/entities/split-kind.enum";
-import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
+import {
+  ScheduledTransactionOverride,
+  OverrideSplit,
+} from "./entities/scheduled-transaction-override.entity";
 import { CreateScheduledTransactionDto } from "./dto/create-scheduled-transaction.dto";
 import { UpdateScheduledTransactionDto } from "./dto/update-scheduled-transaction.dto";
 import { CreateScheduledTransactionSplitDto } from "./dto/create-scheduled-transaction-split.dto";
 import {
   CreateScheduledTransactionOverrideDto,
   UpdateScheduledTransactionOverrideDto,
+  OverrideSplitDto,
 } from "./dto/scheduled-transaction-override.dto";
 import { PostScheduledTransactionDto } from "./dto/post-scheduled-transaction.dto";
 import { Tag } from "../tags/entities/tag.entity";
@@ -1131,34 +1135,141 @@ export class ScheduledTransactionsService {
    * "carried" by value).
    */
   private buildSplitProvenanceSource(splits: ScheduledTransactionSplit[]): {
-    byId: Map<string, { rate: number; from: string | null; to: string | null }>;
+    byId: Map<
+      string,
+      { rate: number | null; from: string | null; to: string | null }
+    >;
     byKey: Map<string, { from: string; to: string }>;
   } {
     const byId = new Map<
       string,
-      { rate: number; from: string | null; to: string | null }
+      { rate: number | null; from: string | null; to: string | null }
     >();
     const byKey = new Map<string, { from: string; to: string }>();
     for (const s of splits) {
-      if (
+      const isInvestmentRate =
         s.kind === SplitKind.INVESTMENT &&
         s.investmentSecurityId &&
         s.investmentExchangeRate !== null &&
-        s.investmentExchangeRate !== undefined
-      ) {
+        s.investmentExchangeRate !== undefined;
+      if (isInvestmentRate) {
         const rate = Number(s.investmentExchangeRate);
         const from = s.investmentExchangeRateFromCurrency ?? null;
         const to = s.investmentExchangeRateToCurrency ?? null;
-        if (from && to) {
+        if (from && to && s.investmentSecurityId) {
           byKey.set(this.provenanceKey(s.investmentSecurityId, rate), {
             from,
             to,
           });
         }
         if (s.id) byId.set(s.id, { rate, from, to });
+      } else if (s.id) {
+        // Every source split has an identity, even one that carried no investment
+        // rate (a category/transfer split, or an investment line with no stored
+        // rate). Recording it with rate=null lets the decision tell "a valid line
+        // converted into an investment, whose new rate is fresh" (R9-F2) from "a
+        // claimed id that does not exist" (unverifiable, R7-F2).
+        byId.set(s.id, { rate: null, from: null, to: null });
       }
     }
     return { byId, byKey };
+  }
+
+  /**
+   * Build the same provenance source shape from an occurrence override's stored
+   * jsonb splits (issue #1167 R9), so `createOverride`/`updateOverride` decide by
+   * the same rule as scheduled splits. Every split with an id is recorded; a line
+   * with no investment rate carries rate=null.
+   */
+  private buildOverrideProvenanceSource(
+    splits: OverrideSplit[] | null | undefined,
+  ): {
+    byId: Map<
+      string,
+      { rate: number | null; from: string | null; to: string | null }
+    >;
+    byKey: Map<string, { from: string; to: string }>;
+  } {
+    const byId = new Map<
+      string,
+      { rate: number | null; from: string | null; to: string | null }
+    >();
+    const byKey = new Map<string, { from: string; to: string }>();
+    for (const s of splits ?? []) {
+      const inv = s.investment;
+      const isInvestmentRate =
+        inv?.securityId &&
+        inv.exchangeRate !== null &&
+        inv.exchangeRate !== undefined;
+      if (isInvestmentRate) {
+        const rate = Number(inv!.exchangeRate);
+        const from = inv!.exchangeRateFromCurrency ?? null;
+        const to = inv!.exchangeRateToCurrency ?? null;
+        if (from && to && inv!.securityId) {
+          byKey.set(this.provenanceKey(inv!.securityId, rate), { from, to });
+        }
+        if (s.id) byId.set(s.id, { rate, from, to });
+      } else if (s.id) {
+        byId.set(s.id, { rate: null, from: null, to: null });
+      }
+    }
+    return { byId, byKey };
+  }
+
+  /**
+   * The single provenance decision (issue #1167 R9), shared by create and update
+   * of both scheduled splits and occurrence overrides -- there is exactly one
+   * rule, so it cannot drift between the four write paths.
+   *
+   * Given an incoming investment line (its claimed source id, its `rateExplicit`
+   * new-line/edit marker, its security and rate) and the source rows it may
+   * continue, return the currency pair to persist beside its rate:
+   *   - a matched source whose stored investment rate is unchanged, and the user
+   *     did not re-enter it (`!rateExplicit`), preserves the source pair exactly
+   *     (including a legacy null/null -- never re-derive a stale scalar's pair);
+   *   - a matched source that was NOT an investment-with-rate (a converted
+   *     category/transfer line, `src.rate === null`), a changed rate, or an
+   *     explicit re-entry, stamps the current pair;
+   *   - a claimed id that matches nothing is unverifiable -> unprovenanced;
+   *   - no id but `rateExplicit` (a genuinely new line) stamps the current pair;
+   *   - no id, unmarked: carry a still-complete pair by exact security+rate, else
+   *     leave unprovenanced so posting re-resolves (never stamp, R8-F2).
+   */
+  private async decideSplitProvenance(
+    incoming: {
+      sourceSplitId?: string | null;
+      rateExplicit?: boolean;
+      securityId: string;
+      rate: number;
+    },
+    source: {
+      byId: Map<
+        string,
+        { rate: number | null; from: string | null; to: string | null }
+      >;
+      byKey: Map<string, { from: string; to: string }>;
+    },
+    stampCurrent: () => Promise<{ from: string | null; to: string | null }>,
+  ): Promise<{ from: string | null; to: string | null }> {
+    if (incoming.sourceSplitId) {
+      const src = source.byId.get(incoming.sourceSplitId);
+      if (!src) return { from: null, to: null };
+      if (
+        src.rate !== null &&
+        src.rate === incoming.rate &&
+        !incoming.rateExplicit
+      ) {
+        return { from: src.from, to: src.to };
+      }
+      return stampCurrent();
+    }
+    if (incoming.rateExplicit) return stampCurrent();
+    const carried = source.byKey.get(
+      this.provenanceKey(incoming.securityId, incoming.rate),
+    );
+    return carried
+      ? { from: carried.from, to: carried.to }
+      : { from: null, to: null };
   }
 
   private async createSplits(
@@ -1188,7 +1299,7 @@ export class ScheduledTransactionsService {
       | {
           byId: Map<
             string,
-            { rate: number; from: string | null; to: string | null }
+            { rate: number | null; from: string | null; to: string | null }
           >;
           byKey: Map<string, { from: string; to: string }>;
         },
@@ -1231,60 +1342,27 @@ export class ScheduledTransactionsService {
       if (splitHasRate) {
         const incomingRate = Number(split.investment!.exchangeRate);
         const securityId = split.investment!.securityId;
-        let resolved = false;
-        if (provenanceSource !== "fresh" && securityId) {
-          if (split.sourceSplitId) {
-            const src = provenanceSource.byId.get(split.sourceSplitId);
-            if (src) {
-              if (src.rate === incomingRate && !split.rateExplicit) {
-                // Unchanged (F4): preserve the source pair EXACTLY, including a
-                // legacy null/null (R7-F2). Never re-derive it -- re-deriving a
-                // stale scalar's pair as the current one is the #1167 corruption.
-                // `rateExplicit` overrides this: a rate the user re-entered for
-                // the current pair is stamped even when it equals the old value
-                // (the same-value re-entry edge, R8-F2).
-                investmentRateProvenance = { from: src.from, to: src.to };
-                resolved = true;
-              }
-              // else: a changed (or explicitly re-entered) rate -> stamp below.
-            } else {
-              // A supplied-but-unmatched id is an unverifiable claim (R7-F2): do
-              // not fall back to the value key and do not stamp current -- leave
-              // the rate unprovenanced so posting re-resolves it.
-              investmentRateProvenance = { from: null, to: null };
-              resolved = true;
-            }
-          } else if (!split.rateExplicit) {
-            // No sourceSplitId and NOT marked as a new line: this is an
-            // unidentified line -- an older client that predates `sourceSplitId`,
-            // or a legacy row resent without one. Its scalar cannot be proven to
-            // belong to the current pair, so never stamp it (R8-F2): carry a
-            // still-complete pair by value if we recognise the exact
-            // security+rate tuple, otherwise leave it unprovenanced so posting
-            // re-resolves. Stamping here is the #1167 re-bless via an old client.
-            const carried = provenanceSource.byKey.get(
-              this.provenanceKey(securityId, incomingRate),
-            );
-            investmentRateProvenance = carried
-              ? { from: carried.from, to: carried.to }
-              : { from: null, to: null };
-            resolved = true;
-          }
-          // else: no sourceSplitId but rateExplicit -> a genuinely new line whose
-          // rate is for the current pair; fall through to stamp it (R8-F2).
-        }
-        if (!resolved && securityId) {
-          // Fresh create, a genuinely changed rate, or a genuinely new split: the
-          // rate is for the current pair, so stamp it.
-          investmentRateProvenance = await this.resolveInvestmentRateProvenance(
-            userId,
-            incomingRate,
-            {
+        if (securityId) {
+          const stampCurrent = () =>
+            this.resolveInvestmentRateProvenance(userId, incomingRate, {
               accountId,
               fundingAccountId: null,
-              securityId: split.investment!.securityId,
-            },
-          );
+              securityId,
+            });
+          investmentRateProvenance =
+            provenanceSource === "fresh"
+              ? // A brand-new schedule: every line's rate is for the current pair.
+                await stampCurrent()
+              : await this.decideSplitProvenance(
+                  {
+                    sourceSplitId: split.sourceSplitId,
+                    rateExplicit: split.rateExplicit,
+                    securityId,
+                    rate: incomingRate,
+                  },
+                  provenanceSource,
+                  stampCurrent,
+                );
         }
       }
 
@@ -3478,38 +3556,56 @@ export class ScheduledTransactionsService {
   // Delegated override methods
 
   /**
-   * The currency-pair provenance for each override investment split that
-   * carries a rate (issue #1167), keyed by split index. An override split
-   * settles through the parent's INVESTMENT_CASH account with no separate
-   * funding account, exactly like an embedded scheduled split. Only indices
-   * whose investment supplies a rate get an entry; the rest re-resolve at
-   * posting as before.
+   * The currency-pair provenance for each override investment split that carries
+   * a rate (issue #1167), keyed by split index, decided through the one shared
+   * rule (`decideSplitProvenance`). An override split settles through the
+   * parent's INVESTMENT_CASH account with no separate funding account, exactly
+   * like an embedded scheduled split. Only indices whose investment supplies a
+   * rate get an entry; the rest re-resolve at posting.
+   *
+   * `source` is the rows the incoming splits may continue: the base scheduled
+   * splits when creating an override (so an inherited stale scalar is not
+   * re-blessed with the current pair, R9-F1), or the existing override's splits
+   * when updating one.
    */
-  private async resolveOverrideSplitProvenance(
+  private async buildOverrideInvestmentProvenance(
     userId: string,
     accountId: string,
-    splits:
-      | Array<{
-          investment?: {
-            securityId?: string | null;
-            exchangeRate?: number | null;
-          } | null;
-        }>
-      | null
-      | undefined,
-  ): Promise<Map<number, { from: string; to: string }>> {
-    const provenance = new Map<number, { from: string; to: string }>();
-    if (!splits) return provenance;
-    for (const [index, split] of splits.entries()) {
-      const rate = split.investment?.exchangeRate;
-      if (rate === undefined || rate === null) continue;
-      const pair =
-        await this.investmentTransactionsService.resolveSettlementCurrencyPair(
-          userId,
-          accountId,
-          null,
-          split.investment?.securityId ?? null,
-        );
+    source: {
+      byId: Map<
+        string,
+        { rate: number | null; from: string | null; to: string | null }
+      >;
+      byKey: Map<string, { from: string; to: string }>;
+    },
+    splits: OverrideSplitDto[] | null | undefined,
+  ): Promise<Map<number, { from: string | null; to: string | null }>> {
+    const provenance = new Map<
+      number,
+      { from: string | null; to: string | null }
+    >();
+    for (const [index, s] of (splits ?? []).entries()) {
+      const inv = s.investment;
+      if (inv?.exchangeRate === undefined || inv?.exchangeRate === null)
+        continue;
+      if (!inv.securityId) continue;
+      const securityId = inv.securityId;
+      const pair = await this.decideSplitProvenance(
+        {
+          sourceSplitId: s.sourceSplitId,
+          rateExplicit: s.rateExplicit,
+          securityId,
+          rate: Number(inv.exchangeRate),
+        },
+        source,
+        () =>
+          this.investmentTransactionsService.resolveSettlementCurrencyPair(
+            userId,
+            accountId,
+            null,
+            securityId,
+          ),
+      );
       provenance.set(index, pair);
     }
     return provenance;
@@ -3521,9 +3617,15 @@ export class ScheduledTransactionsService {
     createDto: CreateScheduledTransactionOverrideDto,
   ): Promise<ScheduledTransactionOverride> {
     const scheduled = await this.findOne(userId, scheduledTransactionId);
-    const investmentProvenance = await this.resolveOverrideSplitProvenance(
+    // A new override inherits the base scheduled splits (their id, rate and
+    // recorded pair), so decide provenance against them as the source: an
+    // inherited unchanged rate keeps its base pair (incl. a stale one, caught at
+    // posting) rather than being re-stamped with the current pair (issue #1167
+    // R9-F1). A genuinely new or re-entered line still stamps the current pair.
+    const investmentProvenance = await this.buildOverrideInvestmentProvenance(
       userId,
       scheduled.accountId,
+      this.buildSplitProvenanceSource(scheduled.splits ?? []),
       createDto.splits,
     );
     return this.overrideService.createOverride(
@@ -3582,80 +3684,14 @@ export class ScheduledTransactionsService {
       scheduledTransactionId,
       overrideId,
     );
-    // Correlated by the override split's stable id (issue #1167 F4), with a
-    // value-key fallback for a client that echoes none. `oldById` includes a
-    // legacy null-pair rate (R7-F2), so an unchanged legacy scalar is recognised
-    // and kept unprovenanced rather than re-stamped with the current pair.
-    const oldById = new Map<
-      string,
-      { rate: number; from: string | null; to: string | null }
-    >();
-    const oldByKey = new Map<string, { from: string; to: string }>();
-    for (const s of existing.splits ?? []) {
-      const inv = s.investment;
-      if (
-        inv?.securityId &&
-        inv.exchangeRate !== undefined &&
-        inv.exchangeRate !== null
-      ) {
-        const rate = Number(inv.exchangeRate);
-        const from = inv.exchangeRateFromCurrency ?? null;
-        const to = inv.exchangeRateToCurrency ?? null;
-        if (from && to) {
-          oldByKey.set(this.provenanceKey(inv.securityId, rate), { from, to });
-        }
-        if (s.id) oldById.set(s.id, { rate, from, to });
-      }
-    }
-    const investmentProvenance = new Map<
-      number,
-      { from: string | null; to: string | null }
-    >();
-    for (const [index, s] of (updateDto.splits ?? []).entries()) {
-      const inv = s.investment;
-      if (inv?.exchangeRate === undefined || inv?.exchangeRate === null)
-        continue;
-      if (!inv.securityId) continue;
-      const incomingRate = Number(inv.exchangeRate);
-      const stampCurrent = async () =>
-        this.investmentTransactionsService.resolveSettlementCurrencyPair(
-          userId,
-          scheduled.accountId,
-          null,
-          inv.securityId!,
-        );
-      if (s.sourceSplitId) {
-        const src = oldById.get(s.sourceSplitId);
-        if (src) {
-          if (src.rate === incomingRate && !s.rateExplicit) {
-            // Unchanged: preserve the source pair exactly (null for legacy).
-            // `rateExplicit` overrides, so a rate re-entered for the current pair
-            // is stamped even when it equals the old value (R8-F2).
-            investmentProvenance.set(index, { from: src.from, to: src.to });
-          } else {
-            // Changed, or explicitly re-entered: stamp the current pair.
-            investmentProvenance.set(index, await stampCurrent());
-          }
-        } else {
-          // Unverifiable claimed id (R7-F2): leave unprovenanced -> re-resolved.
-          investmentProvenance.set(index, { from: null, to: null });
-        }
-      } else if (s.rateExplicit) {
-        // A genuinely new line the client added: its rate is for the current
-        // pair, so stamp it and honour it at posting (R8-F2).
-        investmentProvenance.set(index, await stampCurrent());
-      } else {
-        // No sourceSplitId and not a marked new line: an older client, or a
-        // legacy override JSON row without an id. Never stamp an unverified
-        // scalar with the current pair (R7-F2/R8-F2) -- carry a still-complete
-        // pair by value if the exact security+rate tuple is recognised,
-        // otherwise leave it unprovenanced so posting re-resolves it.
-        const carried = oldByKey.get(
-          this.provenanceKey(inv.securityId, incomingRate),
-        );
-        investmentProvenance.set(index, carried ?? { from: null, to: null });
-      }
-    }
+    // Decide each split's FX provenance against the *existing* override's splits
+    // as the source, through the one shared rule (issue #1167 R9).
+    const investmentProvenance = await this.buildOverrideInvestmentProvenance(
+      userId,
+      scheduled.accountId,
+      this.buildOverrideProvenanceSource(existing.splits),
+      updateDto.splits,
+    );
     return this.overrideService.updateOverride(
       scheduledTransactionId,
       overrideId,

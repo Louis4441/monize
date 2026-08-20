@@ -22,7 +22,15 @@ import { baseInvestmentAction } from '@/lib/investment-actions';
 
 interface InvestmentSplitFieldsProps {
   value: InvestmentSplitDetails | undefined;
-  onChange: (next: InvestmentSplitDetails, computedAmount: number) => void;
+  onChange: (
+    next: InvestmentSplitDetails,
+    computedAmount: number,
+    // Real intent for the FX rate on this emit (issue #1167 R9): `rateEdited` when
+    // the user changed the rate input, `securityChanged` when the selected
+    // security (and thus the settlement pair) changed. The parent turns these
+    // into the row's `exchangeRateEdited` latch.
+    meta: { rateEdited: boolean; securityChanged: boolean },
+  ) => void;
   disabled?: boolean;
   currencyCode?: string;
 }
@@ -118,6 +126,8 @@ export function InvestmentSplitFields({
     field: K,
     fieldValue: InvestmentSplitDetails[K],
   ) => {
+    const securityChanged =
+      field === 'securityId' && fieldValue !== value?.securityId;
     const next: InvestmentSplitDetails = {
       action,
       securityId: value?.securityId,
@@ -140,6 +150,26 @@ export function InvestmentSplitFields({
       [field]: fieldValue,
     };
 
+    // A security change moves the settlement pair, so the rate in force (which may
+    // be the same-currency 1, or a rate resolved for the *old* pair) must not
+    // carry over onto the new pair (issue #1167 R9-F3): a stale 1 blessed as the
+    // new pair's rate books the trade unconverted. Recompute from the NEW
+    // security -- its current market rate for the new pair, or 1 when the new pair
+    // is same-currency -- and leave it unresolved (undefined) rather than 1 when a
+    // cross-currency rate is unavailable. Clear the recorded pair too, so no stale
+    // scalar is blessed for a pair it was not resolved for.
+    if (securityChanged) {
+      const nextSecurity = securities.find((s) => s.id === next.securityId);
+      const nextSecurityCurrency = nextSecurity?.currencyCode ?? currencyCode;
+      const nextCross = nextSecurityCurrency !== currencyCode;
+      const nextMarket = nextCross
+        ? getRate(nextSecurityCurrency, currencyCode)
+        : 1;
+      next.exchangeRate = nextCross ? (nextMarket ?? undefined) : 1;
+      next.exchangeRateFromCurrency = undefined;
+      next.exchangeRateToCurrency = undefined;
+    }
+
     const cashImpact = computeInvestmentCashImpact(
       next.action,
       Number(next.quantity ?? 0),
@@ -158,7 +188,10 @@ export function InvestmentSplitFields({
     // investment form, which already converts at 4dp.
     const rate = Number(next.exchangeRate);
     const amount = rate > 0 ? roundToDecimals(cashImpact * rate, 4) : 0;
-    onChange(next, amount);
+    onChange(next, amount, {
+      rateEdited: field === 'exchangeRate',
+      securityChanged,
+    });
   };
 
   // Base-normalized so the Money-vocabulary refinements behave as their base.

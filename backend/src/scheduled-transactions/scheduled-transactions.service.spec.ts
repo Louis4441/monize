@@ -4932,6 +4932,9 @@ describe("ScheduledTransactionsService", () => {
         splits: [
           {
             splitKind: "investment" as any,
+            // A genuinely new investment line the client marks rateExplicit, so
+            // its rate is stamped with the current pair (issue #1167 R8/R9).
+            rateExplicit: true,
             categoryId: null,
             amount: -600,
             investment: {
@@ -6102,6 +6105,198 @@ describe("ScheduledTransactionsService", () => {
           c[0] === ScheduledTransactionSplit && c[1].investmentAction,
       )?.[1];
       // The stale EUR->CAD is NOT preserved -- the current USD->CAD is stamped.
+      expect(createdSplit.investmentExchangeRateFromCurrency).toBe("USD");
+      expect(createdSplit.investmentExchangeRateToCurrency).toBe("CAD");
+    });
+
+    // ---- R9-F1: createOverride decides against the BASE scheduled splits, so an
+    // inherited stale scalar is not re-blessed with the current pair. ----
+
+    it("createOverride() preserves a base split's stale pair on a date-only override, never re-stamping current (R9-F1)", async () => {
+      // Base scheduled split stored EUR->CAD at 1.50. The security's currency has
+      // since changed, so the current settlement pair is USD->CAD. The user makes
+      // a date-only override; the editor resends the base split unchanged, naming
+      // its id. The override must inherit EUR->CAD (caught as stale at posting),
+      // NOT be re-stamped USD->CAD (which posting would then trust -> -1500).
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          splits: [
+            {
+              id: "base-inv",
+              scheduledTransactionId: stId,
+              kind: "investment",
+              categoryId: null,
+              amount: -1500,
+              investmentAction: "BUY",
+              investmentSecurityId: "sec-usd",
+              investmentQuantity: 10,
+              investmentPrice: 100,
+              investmentExchangeRate: 1.5,
+              investmentExchangeRateFromCurrency: "EUR",
+              investmentExchangeRateToCurrency: "CAD",
+            } as any,
+          ],
+        } as any),
+      );
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.create.mockImplementation((data: any) => data);
+      overridesRepo.save.mockImplementation((data: any) =>
+        Promise.resolve(data),
+      );
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      const result = await service.createOverride(userId, stId, {
+        originalDate: "2025-03-01",
+        overrideDate: "2025-03-02", // date-only change
+        isSplit: true,
+        amount: -1500,
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "base-inv", // continues the base split
+            categoryId: null,
+            amount: -1500,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.5, // resent unchanged
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const inv = (result.splits as any[])[0].investment;
+      // The base EUR->CAD pair is inherited, NOT re-stamped USD->CAD.
+      expect(inv.exchangeRateFromCurrency).toBe("EUR");
+      expect(inv.exchangeRateToCurrency).toBe("CAD");
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("createOverride() stamps the current pair when a base category split is converted to an investment line (R9-F2)", async () => {
+      // The base split was a CATEGORY line (no FX rate). The override converts it
+      // to an investment BUY and enters a rate. Correlated by id, the source has
+      // no pair to preserve, so its new rate is fresh -> stamp the current pair.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          splits: [
+            {
+              id: "base-cat",
+              scheduledTransactionId: stId,
+              kind: "category",
+              categoryId: "cat-1",
+              amount: -1370,
+            } as any,
+          ],
+        } as any),
+      );
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.create.mockImplementation((data: any) => data);
+      overridesRepo.save.mockImplementation((data: any) =>
+        Promise.resolve(data),
+      );
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      const result = await service.createOverride(userId, stId, {
+        originalDate: "2025-03-01",
+        overrideDate: "2025-03-01",
+        isSplit: true,
+        amount: -1370,
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "base-cat", // the id of the former category line
+            categoryId: null,
+            amount: -1370,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.37,
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const inv = (result.splits as any[])[0].investment;
+      // The former category line has no pair to preserve, so the entered rate is
+      // stamped for the current pair (honoured at posting), not left unprovenanced.
+      expect(inv.exchangeRateFromCurrency).toBe("USD");
+      expect(inv.exchangeRateToCurrency).toBe("CAD");
+      expect(inv.exchangeRate).toBe(1.37);
+    });
+
+    it("update() stamps the current pair when a base category split is converted to an investment line (R9-F2)", async () => {
+      // Same conversion, on the schedule itself: a category split's id is resent
+      // as sourceSplitId with a new investment rate. byId now records every split
+      // id (not only investment-rate rows), so the source is found and, having no
+      // pair to preserve, the new rate is stamped current -- not left unprovenanced.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1370,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          id: "cat-split",
+          kind: "category",
+          categoryId: "cat-1",
+          investmentSecurityId: null,
+          investmentExchangeRate: null,
+          investmentExchangeRateFromCurrency: null,
+          investmentExchangeRateToCurrency: null,
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "cat-split",
+            amount: -1370,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.37,
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const createdSplit = mockQueryRunner.manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+      )?.[1];
+      expect(createdSplit.investmentExchangeRate).toBe(1.37);
       expect(createdSplit.investmentExchangeRateFromCurrency).toBe("USD");
       expect(createdSplit.investmentExchangeRateToCurrency).toBe("CAD");
     });

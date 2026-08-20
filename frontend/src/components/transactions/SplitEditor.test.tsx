@@ -1984,6 +1984,22 @@ describe('toCreateSplitData — rateExplicit marks a new investment line (R8-F2)
     expect(data[0].rateExplicit).toBeUndefined();
   });
 
+  it('sets rateExplicit for a continuing line whose rate the user edited (R9-F2)', () => {
+    const rows: SplitRow[] = [
+      {
+        id: '11111111-2222-4333-8444-555555555555',
+        sourceSplitId: '11111111-2222-4333-8444-555555555555',
+        splitType: 'investment',
+        exchangeRateEdited: true,
+        amount: -100,
+        memo: '',
+        investment: { action: 'BUY', securityId: 's', exchangeRate: 1.5 } as any,
+      },
+    ];
+    const data = toCreateSplitData(rows, { includeSourceIdentity: true });
+    expect(data[0].rateExplicit).toBe(true);
+  });
+
   it('omits rateExplicit entirely for ordinary transactions (no opt-in)', () => {
     const rows: SplitRow[] = [
       {

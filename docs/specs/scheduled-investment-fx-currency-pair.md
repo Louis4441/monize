@@ -241,6 +241,39 @@ amount is refused there rather than written.
   equal the old value is stamped current rather than preserved stale. The field is
   scheduled-only and opt-in in `toCreateSplitData`, so it never leaks into ordinary
   transactions (same rule as `sourceSplitId`, R7-F1).
+- **One provenance decision, four write paths (R9-F1).** `createSplits`,
+  `updateOverride` and `createOverride` all decide provenance through a single
+  `decideSplitProvenance`, so the rule cannot drift between them. In particular
+  `createOverride` decides against the *base scheduled splits* as the source: a new
+  occurrence override that inherits a base split unchanged (a date-only override)
+  keeps the base pair -- including a stale one, caught at posting -- rather than
+  re-stamping the current pair onto an inherited scalar. Moving an existing override
+  is delete-then-create on the client, so this is the path that a "change only the
+  date" edit actually takes; re-blessing there is the #1167 corruption by another
+  door.
+- **Source identity spans every split, and records the prior kind (R9-F2).** The
+  `byId` map holds *every* source split's id, recording `rate: null` for one that
+  carried no investment rate (a category/transfer line, or an investment line with
+  no stored rate). So a category split converted to an investment line -- whose id
+  the client still echoes -- is recognised as a real source with no pair to
+  preserve, and its entered rate is stamped current rather than dropped as an
+  unverifiable id. That is distinct from a claimed id that matches nothing, which is
+  still left unprovenanced.
+- **Rate intent is real per-row state, not "is this row new" (R9-F2).** `rateExplicit`
+  is set from `SplitRow.exchangeRateEdited` -- latched true when the user actually
+  edits the FX-rate input and reset when the security changes -- in addition to the
+  new-line case. So a rate re-entered on a *continuing* line for a changed pair is
+  honoured even when the re-typed value equals the stale stored one (the same-value
+  re-entry edge), which the derived-from-`!sourceSplitId` signal could not express.
+- **A security change re-resolves the rate for the new pair; the same-currency 1
+  never survives it (R9-F3).** Selecting a foreign security recomputes the rate for
+  the *new* security's pair (its current market rate, or `1` only when the new pair
+  is genuinely same-currency) and clears the recorded pair, instead of carrying the
+  rate in force. The row started same-currency at `1`, and copying that `1` into a
+  cross-currency line booked the trade unconverted (a ~26% error) which R8 then
+  blessed as an explicit pair rate. When the new pair has no available rate the line
+  is left unresolved (`undefined`), never `1`, so posting refuses rather than
+  converting at par.
 
 ## Test matrix (regression obligations)
 
@@ -338,6 +371,28 @@ For each of the three surfaces:
     stamped current, not preserved stale (the same-value re-entry edge). The serializer
     sets `rateExplicit` only for a new investment line and only under the scheduled
     opt-in, so it never reaches an ordinary transaction.
+
+17. **createOverride inherits, never re-blesses (R9-F1).** Base scheduled split stored
+    `EUR/CAD 1.50`; the security's currency becomes USD; create a date-only override
+    that resends the base split unchanged (naming its id). Assert the persisted
+    override split keeps `EUR/CAD` (not `USD/CAD`) and the pair resolver was not
+    called, so posting produces `-1,350`, never `-1,500`. Break-on-purpose confirms
+    the guard fails when the shared preserve branch is made to stamp.
+
+18. **Converted category->investment keeps its entered rate (R9-F2).** A base
+    category split's id is resent as `sourceSplitId` with a new investment rate
+    (`1.37`); assert the current pair is stamped (not dropped as unverifiable), on
+    both `createOverride` and `update`. Break-on-purpose confirms the guard fails when
+    `byId` stops recording non-investment ids.
+
+19. **Security change never carries the stale 1 (R9-F3).** Component-level: a new
+    investment split on a CAD account, no security yet (rate 1); select a USD security
+    with a mocked `USD/CAD = 1.35`, quantity `10`, price `100`; assert the emitted
+    rate is `1.35` and amount `-1,350`, never `1` / `-1,000`, the recorded pair is
+    cleared, and `meta.securityChanged` is set. Unavailable-rate variant: the line is
+    left `undefined` (not `1`) and the amount `0`. Companion: `meta.rateEdited` is true
+    only for a rate-input edit, and a continuing line with `exchangeRateEdited`
+    serializes `rateExplicit: true`.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only
