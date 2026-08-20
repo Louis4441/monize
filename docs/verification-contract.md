@@ -74,6 +74,7 @@ adds value but proves nothing on its own. `--` means not applicable.
 | INV-HOLDING-001 holding replay | supporting | -- | required | **required** | optional | required | -- | optional |
 | INV-HOLDING-002 one reducer | required | **required** | supporting | -- | -- | -- | -- | required |
 | INV-TRANSFER-001 both legs | required | -- | required | optional | -- | -- | -- | required |
+| INV-REDEEM-001 accrued interest | required | **required** | required | -- | -- | -- | -- | optional |
 | INV-RECONCILE-001 reconciled lock | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |
@@ -103,7 +104,10 @@ previous fix corrected one and left the others. `INV-RECONCILE-001` is the same
 shape: the strict lock is only as strong as its least-guarded entry point -- a
 single-row refusal was once walked around by `bulkUpdate` -- so
 `reconciled-lock.guard.spec.ts` scanning every write path is the load-bearing
-kind, not any one service test.
+kind, not any one service test. `INV-REDEEM-001` too: proceeds and accrued
+interest are added in exactly one place, and `accrued-interest.guard.spec.ts`
+failing a hand-rolled addition anywhere else is what keeps the cash from being
+moved twice.
 
 `INV-IMPORT-002`'s load-bearing kind is a **failpoint**, and it is worth
 understanding why the other columns cannot substitute. The MNY import has real
