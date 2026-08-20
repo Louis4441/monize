@@ -218,6 +218,29 @@ amount is refused there rather than written.
   no id at all, are unverifiable claims: both are left unprovenanced (re-resolved at
   posting), never value-key-matched into a pair and never stamped with the current one. A
   genuinely *changed* legacy rate is a fresh rate for the current pair and does stamp it.
+- **Only a server UUID is source identity; a synthetic React key never is (R8-F1).** An
+  override JSON split written before F4 has no `id`, so the editor gives it a synthetic
+  React key (`override-N`). That key is UI-only: it must never become `sourceSplitId`,
+  or the DTO's `@IsUUID` rejects the edit with a 400 (making every pre-existing split
+  override uneditable after deploy) and a UI-only value would masquerade as a persistent
+  id. `toSplitRows` copies `id` into `sourceSplitId` only when it is a real UUID;
+  everything else stays undefined ("new/unidentified line"). Migration 162 backfills a
+  stable UUID into every existing override JSON split lacking one -- identity only, no FX
+  provenance inferred -- so real continuing lines carry a real id the frontend can echo.
+- **`sourceSplitId` absence is not overloaded between "new" and "legacy" (R8-F2).** A line
+  with no `sourceSplitId` is ambiguous: a genuinely new line the user just added, or a
+  legacy row an older client resent without one. Stamping the current pair on it re-blesses
+  a possibly-stale scalar (the #1167 corruption via an old client); leaving it unprovenanced
+  loses a genuinely new line's explicit rate. The client disambiguates with `rateExplicit`:
+  the serializer sets it for a new investment line (no source identity), so the server
+  stamps the current pair and posting honours the rate; an unmarked line with no
+  `sourceSplitId` (older client, or legacy row) is never stamped -- a still-complete pair is
+  carried by value if the exact security+rate tuple is recognised, otherwise it is left
+  unprovenanced and re-resolved at posting. `rateExplicit` also resolves the same-value
+  re-entry edge on a *matched* line: a rate re-entered for a changed pair that happens to
+  equal the old value is stamped current rather than preserved stale. The field is
+  scheduled-only and opt-in in `toCreateSplitData`, so it never leaks into ordinary
+  transactions (same rule as `sourceSplitId`, R7-F1).
 
 ## Test matrix (regression obligations)
 
@@ -297,6 +320,24 @@ For each of the three surfaces:
     called; then post at the current pair (`USD->CAD = 1.35`, `10 x 100`) and assert
     `-1,350`, never the stale `-1,500`. Companion: a genuinely changed legacy rate
     stamps the current pair.
+
+15. **Source identity is UUID-only (R8-F1).** `toSplitRows` copies a real UUID `id`
+    into `sourceSplitId` but drops a synthetic `override-N`/`temp-` key (assert both).
+    The override DTO, run through the real production pipe, accepts an absent or UUID
+    `sourceSplitId` and rejects a non-UUID one. Migration 162 backfills a UUID into an
+    id-less override JSON split (verified against Postgres: order preserved, existing
+    ids kept, re-run is a no-op), assigning identity without inferring FX provenance.
+
+16. **`sourceSplitId` absence is not overloaded (R8-F2).** An unmarked line with no
+    `sourceSplitId` (older client / legacy row) is never stamped -- a legacy null-pair
+    scalar resent this way keeps its null pair and the pair resolver is not called
+    (assert both), so posting re-resolves. A new line marked `rateExplicit` (no
+    `sourceSplitId`) is stamped with the current pair, so posting honours its rate
+    (`1.37`, not the `1.35` market) -- covering the reviewer's `-1,370` vs `-1,350`
+    override repro. A *matched* line re-entered unchanged but marked `rateExplicit` is
+    stamped current, not preserved stale (the same-value re-entry edge). The serializer
+    sets `rateExplicit` only for a new investment line and only under the scheduled
+    opt-in, so it never reaches an ordinary transaction.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

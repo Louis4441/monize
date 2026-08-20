@@ -5111,6 +5111,7 @@ describe("ScheduledTransactionsService", () => {
       );
       mockQueryRunner.manager.find.mockResolvedValue([
         {
+          id: "split-x",
           kind: "investment",
           investmentSecurityId: "sec-x",
           investmentExchangeRate: 1.5,
@@ -5129,6 +5130,8 @@ describe("ScheduledTransactionsService", () => {
         splits: [
           {
             splitKind: "investment" as any,
+            // The line continues split-x; its rate is genuinely changed 1.5 -> 1.37.
+            sourceSplitId: "split-x",
             amount: -610,
             investment: {
               action: "BUY" as any,
@@ -5156,7 +5159,7 @@ describe("ScheduledTransactionsService", () => {
       ).toHaveBeenCalledWith(userId, "acc-cash", null, "sec-x");
     });
 
-    it("update() stamps the current pair for a split whose security has no prior pair", async () => {
+    it("update() stamps the current pair for a genuinely new split (rateExplicit, no prior pair)", async () => {
       stubFindOne(
         makeScheduled({
           isSplit: true,
@@ -5164,7 +5167,9 @@ describe("ScheduledTransactionsService", () => {
           amount: -675,
         } as any),
       );
-      // No existing split for sec-usd -> a fresh rate for the current pair.
+      // No existing split for sec-usd -> a fresh rate for the current pair. The
+      // client marks the line new (rateExplicit), so the current pair is stamped
+      // -- an unmarked line with no id would instead be left unprovenanced (R8-F2).
       mockQueryRunner.manager.find.mockResolvedValue([]);
       mockQueryRunner.manager.delete = jest
         .fn()
@@ -5177,6 +5182,7 @@ describe("ScheduledTransactionsService", () => {
         splits: [
           {
             splitKind: "investment" as any,
+            rateExplicit: true,
             amount: -600,
             investment: {
               action: "BUY" as any,
@@ -5878,6 +5884,226 @@ describe("ScheduledTransactionsService", () => {
       expect(
         investmentTransactionsService.resolveSettlementCurrencyPair,
       ).not.toHaveBeenCalled();
+    });
+
+    // ---- R8-F2: `sourceSplitId` absence must not be overloaded. An
+    // unidentified line (older client, or a legacy row resent without an id) is
+    // never stamped with the current pair -- that is the #1167 re-bless arriving
+    // through an old client. A genuinely new line the client marks `rateExplicit`
+    // IS stamped, so its explicit rate is honoured at posting. ----
+
+    it("update() does NOT stamp the current pair for a legacy split resent with no id and no rateExplicit (old client, R8-F2)", async () => {
+      // An older client that predates sourceSplitId resends a legacy null-pair
+      // split (rate 1.50) with neither an id nor the new-line marker. It cannot be
+      // proven current, so it must be left unprovenanced (re-resolved at posting),
+      // never stamped USD->CAD -- which would re-book -1500 instead of -1350.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1500,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          id: "split-legacy",
+          kind: "investment",
+          investmentSecurityId: "sec-usd",
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: null,
+          investmentExchangeRateToCurrency: null,
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            // Old client: no sourceSplitId, no rateExplicit.
+            splitKind: "investment" as any,
+            amount: -1500,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.5,
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const createdSplit = mockQueryRunner.manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+      )?.[1];
+      expect(createdSplit).toBeDefined();
+      // Left unprovenanced -- NOT stamped USD->CAD -- so posting re-resolves.
+      expect(createdSplit.investmentExchangeRateFromCurrency).toBeNull();
+      expect(createdSplit.investmentExchangeRateToCurrency).toBeNull();
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("update() stamps the current pair for a new split marked rateExplicit, honouring its rate (R8-F2)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1370,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            rateExplicit: true,
+            amount: -1370,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.37,
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const createdSplit = mockQueryRunner.manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+      )?.[1];
+      expect(createdSplit.investmentExchangeRate).toBe(1.37);
+      expect(createdSplit.investmentExchangeRateFromCurrency).toBe("USD");
+      expect(createdSplit.investmentExchangeRateToCurrency).toBe("CAD");
+    });
+
+    it("updateOverride() stamps the current pair for a new investment line marked rateExplicit (R8-F2 honour)", async () => {
+      // The reviewer's repro: a user adds a NEW USD->CAD BUY (10 x 100) to an
+      // existing override and explicitly enters 1.37 while the market is 1.35.
+      // The new line carries rateExplicit and no sourceSplitId, so the current
+      // pair is stamped and posting later honours 1.37, not the 1.35 market.
+      stubFindOne(
+        makeScheduled({ isSplit: true, accountId: "acc-cash" } as any),
+      );
+      const existing = {
+        id: "ovr-1",
+        scheduledTransactionId: stId,
+        originalDate: "2025-03-01",
+        overrideDate: "2025-03-01",
+        isSplit: true,
+        amount: -1370,
+        splits: [] as any[],
+      };
+      overridesRepo.findOne.mockResolvedValue(existing);
+      overridesRepo.save.mockImplementation((data: any) =>
+        Promise.resolve(data),
+      );
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      const result = await service.updateOverride(userId, stId, "ovr-1", {
+        isSplit: true,
+        amount: -1370,
+        splits: [
+          {
+            splitKind: "investment" as any,
+            rateExplicit: true,
+            categoryId: null,
+            amount: -1370,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.37,
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const inv = (result.splits as any[])[0].investment;
+      expect(inv.exchangeRate).toBe(1.37);
+      // Stamped for the current pair, so posting reuses 1.37 (a matching pair)
+      // rather than re-resolving to the 1.35 market rate.
+      expect(inv.exchangeRateFromCurrency).toBe("USD");
+      expect(inv.exchangeRateToCurrency).toBe("CAD");
+    });
+
+    it("update() re-stamps the current pair when a matched line's rate is re-entered unchanged but marked rateExplicit (R8-F2 same-value edit)", async () => {
+      // The same-value re-entry edge: the security's currency changed so the pair
+      // is now USD->CAD, but the user re-typed the same numeric rate (1.50) that
+      // the stored EUR->CAD row already held. A pure value compare would preserve
+      // the stale EUR->CAD; rateExplicit forces the current pair.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1500,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          id: "split-e",
+          kind: "investment",
+          investmentSecurityId: "sec-1",
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "split-e",
+            rateExplicit: true, // user re-entered the rate for the new pair
+            amount: -1500,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-1",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.5, // numerically unchanged
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const createdSplit = mockQueryRunner.manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+      )?.[1];
+      // The stale EUR->CAD is NOT preserved -- the current USD->CAD is stamped.
+      expect(createdSplit.investmentExchangeRateFromCurrency).toBe("USD");
+      expect(createdSplit.investmentExchangeRateToCurrency).toBe("CAD");
     });
   });
 });

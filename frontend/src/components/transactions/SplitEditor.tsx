@@ -957,6 +957,17 @@ export function createEmptySplits(transactionAmount: number): SplitRow[] {
 // Convert API splits to SplitRow format. Accepts both transaction splits (with
 // `investmentTransaction` relation) and scheduled-transaction splits (with the
 // investment payload denormalized as `investment*` columns on the row itself).
+// A real server-issued split id is a UUID. A synthetic React key (a
+// pre-migration override's `override-N`, or a `temp-...` row the user just
+// added) is not, and must never be treated as source identity (issue #1167
+// R8-F1) -- it would be rejected by the DTO's `@IsUUID` and could masquerade as
+// a persistent id.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(value: string | null | undefined): value is string {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
 export function toSplitRows(splits: {
   id?: string;
   kind?: 'category' | 'transfer' | 'investment';
@@ -1048,8 +1059,13 @@ export function toSplitRows(splits: {
       id: split.id || `temp-${Date.now()}-${index}`,
       // The source split's real id (undefined for a row the user just added), so
       // an edit/post can name it as `sourceSplitId` and the server decides FX
-      // provenance by identity (issue #1167 F4).
-      sourceSplitId: split.id || undefined,
+      // provenance by identity (issue #1167 F4). Only a real server id (a UUID)
+      // may become source identity: a synthetic React key (a pre-migration
+      // override's `override-N`, or a `temp-` row) is UI-only and would be
+      // rejected by the DTO's `@IsUUID` and, worse, could masquerade as a
+      // persistent id (issue #1167 R8-F1). Anything else stays undefined, which
+      // the server reads as "new/unidentified line".
+      sourceSplitId: isUuid(split.id) ? split.id : undefined,
       splitType: kind,
       categoryId: split.categoryId || undefined,
       transferAccountId: split.transferAccountId || undefined,
@@ -1086,5 +1102,15 @@ export function toCreateSplitData(
     sourceSplitId: options.includeSourceIdentity
       ? split.sourceSplitId
       : undefined,
+    // A new investment line (no source identity) carries a rate the user set for
+    // the current settlement pair, so tell the server to stamp that pair rather
+    // than treat the line as an unidentified legacy row (issue #1167 R8-F2).
+    // Scheduled surfaces only, alongside the source-identity opt-in.
+    rateExplicit:
+      options.includeSourceIdentity &&
+      split.splitType === 'investment' &&
+      !split.sourceSplitId
+        ? true
+        : undefined,
   }));
 }

@@ -19,5 +19,10 @@ export function toOverrideSplits(splits: SplitRow[]): OverrideSplit[] {
     // Name the source split so the server decides FX provenance by identity and
     // preserves this split's stable id across the edit (issue #1167 F4).
     sourceSplitId: s.sourceSplitId,
+    // A new investment line (no source identity) carries a rate for the current
+    // settlement pair, so the server stamps that pair instead of re-resolving it
+    // as an unidentified legacy row (issue #1167 R8-F2).
+    rateExplicit:
+      s.splitType === 'investment' && !s.sourceSplitId ? true : undefined,
   }));
 }

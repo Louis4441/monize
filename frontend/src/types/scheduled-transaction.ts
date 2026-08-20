@@ -197,6 +197,10 @@ export interface OverrideSplit {
   memo?: string | null;
   // Set by the client on write to name the source split this row continues.
   sourceSplitId?: string;
+  // Set for a newly added investment line (no `sourceSplitId`) so the server
+  // stamps the current settlement pair for its rate instead of re-resolving it
+  // as an unidentified legacy row (issue #1167 R8-F2).
+  rateExplicit?: boolean;
 }
 
 export interface ScheduledTransactionOverride {

@@ -29,6 +29,19 @@ export class OverrideSplitDto {
   @IsUUID()
   sourceSplitId?: string;
 
+  // The client asserts this new override investment line's FX rate is for the
+  // CURRENT settlement pair (issue #1167 R8-F2). Set for a line the user just
+  // added (no `sourceSplitId`); the server stamps the current pair so the
+  // explicit rate is honoured at posting. Absent, a line with no `sourceSplitId`
+  // is unknown (older client or legacy JSON) and re-resolved -- never stamped.
+  @ApiPropertyOptional({
+    description:
+      "The FX rate on this new line is for the current settlement pair",
+  })
+  @IsOptional()
+  @IsBoolean()
+  rateExplicit?: boolean;
+
   @ApiPropertyOptional({ enum: SplitKind })
   @IsOptional()
   @IsEnum(SplitKind)

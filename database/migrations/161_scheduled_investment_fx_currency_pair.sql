@@ -1,4 +1,4 @@
--- 160: Record the currency pair a scheduled investment's FX rate was resolved for
+-- 161: Record the currency pair a scheduled investment's FX rate was resolved for
 --
 -- A scheduled investment (and an embedded investment split) can persist an FX
 -- rate that converts the security's currency into the settlement account's

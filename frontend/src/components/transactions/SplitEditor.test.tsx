@@ -1918,6 +1918,87 @@ describe('toCreateSplitData — sourceSplitId is opt-in (R7-F1)', () => {
   });
 });
 
+// Issue #1167 R8-F1: only a real server id (a UUID) may become source identity.
+// A pre-migration override split has no id, so OverrideEditorDialog gives it a
+// synthetic React key (`override-N`); that key must never leave as sourceSplitId,
+// or the DTO's @IsUUID rejects the edit with a 400.
+describe('toSplitRows — source identity is UUID-only (R8-F1)', () => {
+  const UUID = '11111111-2222-4333-8444-555555555555';
+
+  it('copies a real UUID id into sourceSplitId', () => {
+    const rows = toSplitRows([
+      { id: UUID, kind: 'category', categoryId: 'c', amount: -10 },
+    ]);
+    expect(rows[0].sourceSplitId).toBe(UUID);
+  });
+
+  it('does NOT copy a synthetic override-N key into sourceSplitId', () => {
+    const rows = toSplitRows([
+      { id: 'override-0', kind: 'category', categoryId: 'c', amount: -10 },
+    ]);
+    // React key is preserved for rendering, but source identity is withheld.
+    expect(rows[0].id).toBe('override-0');
+    expect(rows[0].sourceSplitId).toBeUndefined();
+  });
+
+  it('leaves sourceSplitId undefined for a row with no id (a temp key is generated)', () => {
+    const rows = toSplitRows([
+      { kind: 'category', categoryId: 'c', amount: -10 },
+    ]);
+    expect(rows[0].id).toMatch(/^temp-/);
+    expect(rows[0].sourceSplitId).toBeUndefined();
+  });
+});
+
+// Issue #1167 R8-F2: a new investment line (no source identity) is marked
+// rateExplicit so the server stamps the current settlement pair for its rate,
+// instead of treating it as an unidentified legacy row and re-resolving.
+describe('toCreateSplitData — rateExplicit marks a new investment line (R8-F2)', () => {
+  it('sets rateExplicit for a new investment line under the scheduled opt-in', () => {
+    const rows: SplitRow[] = [
+      {
+        id: 'temp-1',
+        splitType: 'investment',
+        amount: -100,
+        memo: '',
+        investment: { action: 'BUY', securityId: 's', exchangeRate: 1.3 } as any,
+      },
+    ];
+    const data = toCreateSplitData(rows, { includeSourceIdentity: true });
+    expect(data[0].rateExplicit).toBe(true);
+    expect(data[0].sourceSplitId).toBeUndefined();
+  });
+
+  it('omits rateExplicit for a continuing investment line (has sourceSplitId)', () => {
+    const rows: SplitRow[] = [
+      {
+        id: '11111111-2222-4333-8444-555555555555',
+        sourceSplitId: '11111111-2222-4333-8444-555555555555',
+        splitType: 'investment',
+        amount: -100,
+        memo: '',
+        investment: { action: 'BUY', securityId: 's', exchangeRate: 1.3 } as any,
+      },
+    ];
+    const data = toCreateSplitData(rows, { includeSourceIdentity: true });
+    expect(data[0].rateExplicit).toBeUndefined();
+  });
+
+  it('omits rateExplicit entirely for ordinary transactions (no opt-in)', () => {
+    const rows: SplitRow[] = [
+      {
+        id: 'temp-1',
+        splitType: 'investment',
+        amount: -100,
+        memo: '',
+        investment: { action: 'BUY', securityId: 's', exchangeRate: 1.3 } as any,
+      },
+    ];
+    const data = toCreateSplitData(rows);
+    expect(data[0].rateExplicit).toBeUndefined();
+  });
+});
+
 describe('toCreateSplitData', () => {
   it('removes temp fields (id, splitType)', () => {
     const rows: SplitRow[] = [

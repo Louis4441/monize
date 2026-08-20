@@ -140,10 +140,12 @@ describe('toOverrideSplits', () => {
 
   // Issue #1167 F4: the source split's id round-trips as sourceSplitId so the
   // server correlates FX provenance by identity, not by matching rate values.
+  // The id is a real server UUID (R8-F1): a non-UUID synthetic key is withheld.
   it('round-trips the source split id as sourceSplitId', () => {
+    const sourceId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
     const rows = toSplitRows([
       {
-        id: 'ovr-split-1',
+        id: sourceId,
         kind: 'investment',
         amount: -750,
         investmentAction: 'BUY',
@@ -154,7 +156,9 @@ describe('toOverrideSplits', () => {
       },
     ]);
     const out = toOverrideSplits(rows);
-    expect(out[0].sourceSplitId).toBe('ovr-split-1');
+    expect(out[0].sourceSplitId).toBe(sourceId);
+    // A continuing line (has source identity) is not marked as a new line.
+    expect(out[0].rateExplicit).toBeUndefined();
   });
 
   it('leaves sourceSplitId undefined for a newly added row', () => {

@@ -1236,14 +1236,17 @@ export class ScheduledTransactionsService {
           if (split.sourceSplitId) {
             const src = provenanceSource.byId.get(split.sourceSplitId);
             if (src) {
-              if (src.rate === incomingRate) {
+              if (src.rate === incomingRate && !split.rateExplicit) {
                 // Unchanged (F4): preserve the source pair EXACTLY, including a
                 // legacy null/null (R7-F2). Never re-derive it -- re-deriving a
                 // stale scalar's pair as the current one is the #1167 corruption.
+                // `rateExplicit` overrides this: a rate the user re-entered for
+                // the current pair is stamped even when it equals the old value
+                // (the same-value re-entry edge, R8-F2).
                 investmentRateProvenance = { from: src.from, to: src.to };
                 resolved = true;
               }
-              // else: a genuinely changed rate -> stamp current below.
+              // else: a changed (or explicitly re-entered) rate -> stamp below.
             } else {
               // A supplied-but-unmatched id is an unverifiable claim (R7-F2): do
               // not fall back to the value key and do not stamp current -- leave
@@ -1251,17 +1254,24 @@ export class ScheduledTransactionsService {
               investmentRateProvenance = { from: null, to: null };
               resolved = true;
             }
-          } else {
-            // No sourceSplitId (older client / general form): value-key fallback
-            // for an unchanged complete-pair rate.
+          } else if (!split.rateExplicit) {
+            // No sourceSplitId and NOT marked as a new line: this is an
+            // unidentified line -- an older client that predates `sourceSplitId`,
+            // or a legacy row resent without one. Its scalar cannot be proven to
+            // belong to the current pair, so never stamp it (R8-F2): carry a
+            // still-complete pair by value if we recognise the exact
+            // security+rate tuple, otherwise leave it unprovenanced so posting
+            // re-resolves. Stamping here is the #1167 re-bless via an old client.
             const carried = provenanceSource.byKey.get(
               this.provenanceKey(securityId, incomingRate),
             );
-            if (carried) {
-              investmentRateProvenance = { from: carried.from, to: carried.to };
-              resolved = true;
-            }
+            investmentRateProvenance = carried
+              ? { from: carried.from, to: carried.to }
+              : { from: null, to: null };
+            resolved = true;
           }
+          // else: no sourceSplitId but rateExplicit -> a genuinely new line whose
+          // rate is for the current pair; fall through to stamp it (R8-F2).
         }
         if (!resolved && securityId) {
           // Fresh create, a genuinely changed rate, or a genuinely new split: the
@@ -2785,10 +2795,13 @@ export class ScheduledTransactionsService {
                 ? postSourceRate.get(split.sourceSplitId)
                 : undefined;
               const userEdited =
-                srcRate !== undefined &&
                 incomingRate !== null &&
                 incomingRate > 0 &&
-                incomingRate !== srcRate;
+                // A rate the user changed from its source is fresh for the current
+                // pair; so is a rate on a line the client marked new (rateExplicit,
+                // no sourceSplitId) -- both are honoured, not re-resolved (R8-F2).
+                ((srcRate !== undefined && incomingRate !== srcRate) ||
+                  (!split.sourceSplitId && split.rateExplicit === true));
               if (userEdited && split.investment.securityId) {
                 // A rate the user changed from the source is a fresh rate for the
                 // current settlement pair, so stamp that pair -- reused (honoured),
@@ -3604,41 +3617,43 @@ export class ScheduledTransactionsService {
         continue;
       if (!inv.securityId) continue;
       const incomingRate = Number(inv.exchangeRate);
+      const stampCurrent = async () =>
+        this.investmentTransactionsService.resolveSettlementCurrencyPair(
+          userId,
+          scheduled.accountId,
+          null,
+          inv.securityId!,
+        );
       if (s.sourceSplitId) {
         const src = oldById.get(s.sourceSplitId);
         if (src) {
-          if (src.rate === incomingRate) {
+          if (src.rate === incomingRate && !s.rateExplicit) {
             // Unchanged: preserve the source pair exactly (null for legacy).
+            // `rateExplicit` overrides, so a rate re-entered for the current pair
+            // is stamped even when it equals the old value (R8-F2).
             investmentProvenance.set(index, { from: src.from, to: src.to });
           } else {
-            // Changed: stamp the current pair.
-            investmentProvenance.set(
-              index,
-              await this.investmentTransactionsService.resolveSettlementCurrencyPair(
-                userId,
-                scheduled.accountId,
-                null,
-                inv.securityId,
-              ),
-            );
+            // Changed, or explicitly re-entered: stamp the current pair.
+            investmentProvenance.set(index, await stampCurrent());
           }
         } else {
           // Unverifiable claimed id (R7-F2): leave unprovenanced -> re-resolved.
           investmentProvenance.set(index, { from: null, to: null });
         }
+      } else if (s.rateExplicit) {
+        // A genuinely new line the client added: its rate is for the current
+        // pair, so stamp it and honour it at posting (R8-F2).
+        investmentProvenance.set(index, await stampCurrent());
       } else {
+        // No sourceSplitId and not a marked new line: an older client, or a
+        // legacy override JSON row without an id. Never stamp an unverified
+        // scalar with the current pair (R7-F2/R8-F2) -- carry a still-complete
+        // pair by value if the exact security+rate tuple is recognised,
+        // otherwise leave it unprovenanced so posting re-resolves it.
         const carried = oldByKey.get(
           this.provenanceKey(inv.securityId, incomingRate),
         );
-        if (carried) {
-          // Value-key fallback for an unchanged complete-pair rate (old client).
-          investmentProvenance.set(index, carried);
-        } else {
-          // Legacy JSON without an id, or a genuinely new line: never stamp the
-          // current pair onto an unverified scalar (R7-F2) -- leave it
-          // unprovenanced so posting re-resolves it.
-          investmentProvenance.set(index, { from: null, to: null });
-        }
+        investmentProvenance.set(index, carried ?? { from: null, to: null });
       }
     }
     return this.overrideService.updateOverride(
