@@ -224,7 +224,7 @@ amount is refused there rather than written.
   or the DTO's `@IsUUID` rejects the edit with a 400 (making every pre-existing split
   override uneditable after deploy) and a UI-only value would masquerade as a persistent
   id. `toSplitRows` copies `id` into `sourceSplitId` only when it is a real UUID;
-  everything else stays undefined ("new/unidentified line"). Migration 162 backfills a
+  everything else stays undefined ("new/unidentified line"). Migration 163 backfills a
   stable UUID into every existing override JSON split lacking one -- identity only, no FX
   provenance inferred -- so real continuing lines carry a real id the frontend can echo.
 - **`sourceSplitId` absence is not overloaded between "new" and "legacy" (R8-F2).** A line
@@ -415,7 +415,7 @@ For each of the three surfaces:
 15. **Source identity is UUID-only (R8-F1).** `toSplitRows` copies a real UUID `id`
     into `sourceSplitId` but drops a synthetic `override-N`/`temp-` key (assert both).
     The override DTO, run through the real production pipe, accepts an absent or UUID
-    `sourceSplitId` and rejects a non-UUID one. Migration 162 backfills a UUID into an
+    `sourceSplitId` and rejects a non-UUID one. Migration 163 backfills a UUID into an
     id-less override JSON split (verified against Postgres: order preserved, existing
     ids kept, re-run is a no-op), assigning identity without inferring FX provenance.
 
