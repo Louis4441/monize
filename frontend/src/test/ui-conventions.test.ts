@@ -1718,3 +1718,207 @@ describe("text-md is not a Tailwind size", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("row hover comes from the shared pair, not a hand-picked grey", () => {
+  /**
+   * The same light hover value appeared with eight different darks -- plain
+   * `gray-700`, `gray-600`, `gray-800`, and `gray-700` at /20, /30, /40, /50
+   * and /60 -- across twelve variants. Two lists side by side highlighted
+   * differently, and nobody could say which was intended.
+   *
+   * `HOVER_ROW_ON_CARD` / `HOVER_ROW_ON_PAGE` in `Card.tsx` are the two that
+   * mean something, and both carry the transition that most call sites
+   * omitted: 180 files had a `hover:bg-*` that snapped, which reads as a
+   * redraw rather than a response.
+   *
+   * The baseline is **shrink-only**. Converting a file to one of the
+   * constants removes the literal, so its line here must go in the same
+   * commit.
+   */
+  const HOVER_OWNER = "/src/components/ui/Card.tsx";
+  const HOVER_FINGERPRINT = /hover:bg-gray-(50|100)[^"'`]*dark:hover:bg-gray-/;
+
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/app/bills/page.tsx",
+    "/src/app/budgets/[id]/edit/page.tsx",
+    "/src/app/categories/page.tsx",
+    "/src/app/currencies/page.tsx",
+    "/src/app/error.tsx",
+    "/src/app/institutions/page.tsx",
+    "/src/app/not-found.tsx",
+    "/src/app/payees/page.tsx",
+    "/src/app/reports/page.tsx",
+    "/src/app/securities/page.tsx",
+    "/src/app/settings/page.tsx",
+    "/src/components/accounts/AccountForm.tsx",
+    "/src/components/accounts/AccountList.tsx",
+    "/src/components/accounts/AccountRow.tsx",
+    "/src/components/accounts/credit-card-detail/SpendingBreakdown.tsx",
+    "/src/components/accounts/loan-detail/SavedScenariosPanel.tsx",
+    "/src/components/accounts/loan-detail/ScheduleTableRow.tsx",
+    "/src/components/accounts/shared/RecurringChargesPanel.tsx",
+    "/src/components/accounts/shared/SummaryCardGrid.tsx",
+    "/src/components/accounts/shared/TopGroupsPanel.tsx",
+    "/src/components/admin/UserManagementTable.tsx",
+    "/src/components/ai/AiChatBubble.tsx",
+    "/src/components/ai/AssistantTable.tsx",
+    "/src/components/ai/ResultChart.tsx",
+    "/src/components/budgets/BudgetAlertBadge.tsx",
+    "/src/components/budgets/BudgetAlertList.tsx",
+    "/src/components/budgets/BudgetCategoryList.tsx",
+    "/src/components/budgets/BudgetCategoryRow.tsx",
+    "/src/components/budgets/BudgetWizardCategories.tsx",
+    "/src/components/budgets/BudgetWizardStrategy.tsx",
+    "/src/components/categories/CategoryList.tsx",
+    "/src/components/categories/detail/CategorySubcategoriesTab.tsx",
+    "/src/components/currencies/CurrencyList.tsx",
+    "/src/components/dashboard/CustomizeDashboardModal.tsx",
+    "/src/components/dashboard/FavouriteAccounts.tsx",
+    "/src/components/dashboard/FavouriteReportsWidget.tsx",
+    "/src/components/dashboard/FavouriteSecurities.tsx",
+    "/src/components/dashboard/GettingStarted.tsx",
+    "/src/components/dashboard/PortfolioValueWidget.tsx",
+    "/src/components/dashboard/TopMovers.tsx",
+    "/src/components/dashboard/UpcomingBills.tsx",
+    "/src/components/dashboard/WidgetCard.tsx",
+    "/src/components/institutions/InstitutionAccountsManager.tsx",
+    "/src/components/institutions/InstitutionList.tsx",
+    "/src/components/investments/CashRegisterFilters.tsx",
+    "/src/components/investments/GroupedHoldingsList.tsx",
+    "/src/components/investments/HoldingsList.tsx",
+    "/src/components/investments/InvestmentTransactionList.tsx",
+    "/src/components/investments/NewTransactionButton.tsx",
+    "/src/components/layout/ActionHistoryPanel.tsx",
+    "/src/components/layout/AppHeader.tsx",
+    "/src/components/layout/MobileNavDrawer.tsx",
+    "/src/components/payees/CategoryAutoAssignDialog.tsx",
+    "/src/components/payees/DeactivateUnusedPayeesDialog.tsx",
+    "/src/components/payees/PayeeList.tsx",
+    "/src/components/payees/detail/PayeeDetailHeader.tsx",
+    "/src/components/payees/detail/PayeeRecurringPanel.tsx",
+    "/src/components/reconcile/ReconcileTable.tsx",
+    "/src/components/reconcile/ReconciliationReminderBadge.tsx",
+    "/src/components/reports/AccountBalancesReport.tsx",
+    "/src/components/reports/BillPaymentHistoryReport.tsx",
+    "/src/components/reports/BudgetSeasonalPatternsReport.tsx",
+    "/src/components/reports/CashFlowReport.tsx",
+    "/src/components/reports/CreditUtilizationReport.tsx",
+    "/src/components/reports/CurrencyExposureReport.tsx",
+    "/src/components/reports/CustomReportViewer.tsx",
+    "/src/components/reports/DividendIncomeReport.tsx",
+    "/src/components/reports/DividendYieldGrowthReport.tsx",
+    "/src/components/reports/GeographicAllocationReport.tsx",
+    "/src/components/reports/IncomeBySourceReport.tsx",
+    "/src/components/reports/IncomeVsExpensesReport.tsx",
+    "/src/components/reports/InvestmentPerformanceReport.tsx",
+    "/src/components/reports/InvestmentReportViewer.tsx",
+    "/src/components/reports/InvestmentTransactionHistoryReport.tsx",
+    "/src/components/reports/LoanAmortizationReport.tsx",
+    "/src/components/reports/MonteCarloReport.tsx",
+    "/src/components/reports/MonthlyCategoryBreakdownReport.tsx",
+    "/src/components/reports/MonthlyComparisonReport.tsx",
+    "/src/components/reports/MonthlySpendingTrendReport.tsx",
+    "/src/components/reports/NetWorthReport.tsx",
+    "/src/components/reports/NewReportButton.tsx",
+    "/src/components/reports/PortfolioValueReport.tsx",
+    "/src/components/reports/RealizedGainsReport.tsx",
+    "/src/components/reports/RecurringExpensesReport.tsx",
+    "/src/components/reports/ReportChart.tsx",
+    "/src/components/reports/SectorWeightingsReport.tsx",
+    "/src/components/reports/SecurityPerformanceReport.tsx",
+    "/src/components/reports/SecurityTypeAllocationReport.tsx",
+    "/src/components/reports/SpendingByCategoryReport.tsx",
+    "/src/components/reports/SpendingByPayeeReport.tsx",
+    "/src/components/reports/UncategorizedTransactionsReport.tsx",
+    "/src/components/reports/UpcomingBillsReport.tsx",
+    "/src/components/reports/YearOverYearReport.tsx",
+    "/src/components/reports/account-balances/AccountBalancesControls.tsx",
+    "/src/components/scheduled-transactions/OccurrenceDatePicker.tsx",
+    "/src/components/scheduled-transactions/PostTransactionDialog.tsx",
+    "/src/components/scheduled-transactions/ScheduledTransactionForm.tsx",
+    "/src/components/scheduled-transactions/ScheduledTransactionList.tsx",
+    "/src/components/securities/SecurityForm.tsx",
+    "/src/components/securities/SecurityList.tsx",
+    "/src/components/securities/SecurityLookupPicker.tsx",
+    "/src/components/securities/SecurityPriceHistory.tsx",
+    "/src/components/securities/SecurityTransactionHistory.tsx",
+    "/src/components/securities/detail/SecurityAccountsTable.tsx",
+    "/src/components/securities/detail/SecurityChartSection.tsx",
+    "/src/components/securities/detail/SecurityDocumentsTab.tsx",
+    "/src/components/securities/detail/SecuritySummaryCards.tsx",
+    "/src/components/settings/AboutSection.tsx",
+    "/src/components/settings/ApiAccessSection.tsx",
+    "/src/components/settings/HelpSection.tsx",
+    "/src/components/settings/SettingsNav.tsx",
+    "/src/components/settings/ai/UsageDashboard.tsx",
+    "/src/components/strategies/GemInstrumentSelect.tsx",
+    "/src/components/strategies/GemSignalHistoryTable.tsx",
+    "/src/components/tags/TagList.tsx",
+    "/src/components/transactions/AccountInfoWidget.tsx",
+    "/src/components/transactions/CategoryInfoWidget.tsx",
+    "/src/components/transactions/CurrencyPickerButton.tsx",
+    "/src/components/transactions/NormalTransactionFields.tsx",
+    "/src/components/transactions/PayeeInfoWidget.tsx",
+    "/src/components/transactions/RecentTransactionsPopover.tsx",
+    "/src/components/transactions/SplitEditor.tsx",
+    "/src/components/transactions/SplitTransactionFields.tsx",
+    "/src/components/transactions/StatusCellButton.tsx",
+    "/src/components/transactions/TransactionActionSheet.tsx",
+    "/src/components/transactions/TransactionFilterPanel.tsx",
+    "/src/components/transactions/TransactionForm.tsx",
+    "/src/components/transactions/TransactionList.tsx",
+    "/src/components/transactions/TransactionRow.tsx",
+    "/src/components/ui/ActionMenu.tsx",
+    "/src/components/ui/Button.tsx",
+    "/src/components/ui/CalendarPopover.tsx",
+    "/src/components/ui/ChartDownloadButton.tsx",
+    "/src/components/ui/ColorPicker.tsx",
+    "/src/components/ui/CurrencyInput.tsx",
+    "/src/components/ui/DensityToggle.tsx",
+    "/src/components/ui/DragHandle.tsx",
+    "/src/components/ui/EntitySwitcher.tsx",
+    "/src/components/ui/ExportDropdown.tsx",
+    "/src/components/ui/ExportIconButton.tsx",
+    "/src/components/ui/IconPicker.tsx",
+    "/src/components/ui/MultiSelect.tsx",
+    "/src/components/ui/Pagination.tsx",
+    "/src/components/ui/SortableHeader.tsx",
+    "/src/components/ui/SplitSubmitButton.tsx",
+    "/src/components/ui/SummaryCard.tsx",
+    "/src/components/ui/ThemeToggle.tsx",
+    "/src/components/ui/row-actions/RowActionSheet.tsx",
+    "/src/components/ui/row-actions/RowActions.tsx",
+    "/src/components/ui/row-actions/RowActionsOverflow.tsx",
+  ];
+
+  function filesWithInlineHover(): string[] {
+    return productionSources()
+      .filter(([path]) => path !== HOVER_OWNER)
+      .filter(([, content]) => HOVER_FINGERPRINT.test(content))
+      .map(([path]) => path);
+  }
+
+  it("has no hand-rolled row hover outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    const offenders = filesWithInlineHover().filter((path) => !allowed.has(path));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithInlineHover());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("still finds both constants, so the rule cannot pass by accident", () => {
+    const owner = sources[HOVER_OWNER];
+    expect(owner, `${HOVER_OWNER} not found -- update HOVER_OWNER here`).toBeTruthy();
+    expect(owner).toContain("HOVER_ROW_ON_CARD");
+    expect(owner).toContain("HOVER_ROW_ON_PAGE");
+    // Both must animate: the missing transition is half the defect.
+    for (const line of owner.split("\n")) {
+      if (line.includes("hover:bg-gray-")) {
+        expect(line).toContain("transition-colors");
+      }
+    }
+  });
+});

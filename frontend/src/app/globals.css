@@ -10,6 +10,19 @@
   --color-income: #10b981;
   --color-expense: #ef4444;
 
+  /* The surface shadow. In Tailwind v4 both the bare `shadow` utility and
+     `shadow-sm` resolve to this one token, and between them they carry
+     roughly every panel and every form field in the app -- so it has to suit
+     both. The stock value is tight and fairly dark (two layers at 0.1), which
+     is why cards read flat and stamped-on rather than lifted.
+
+     This spends *less* total ink over a slightly wider blur: a faint contact
+     shadow plus a soft ambient one. Cards gain some depth, and fields stay
+     crisp rather than puffy -- a large ambient shadow under a text input
+     reads as a floating pill. Themes whose page and card sit close together
+     lean on CARD_CLASS's border for separation rather than on this. */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 6px -1px rgb(0 0 0 / 0.07);
+
   /* Table stripe color -- subtle alternating row in dark mode (between gray-900 and gray-800) */
   --color-table-stripe-dark: #161d2b;
 
