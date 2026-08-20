@@ -180,7 +180,18 @@ export interface CreateScheduledTransactionData {
   tagIds?: string[];
 }
 
-export interface UpdateScheduledTransactionData extends Partial<CreateScheduledTransactionData> {}
+export interface UpdateScheduledTransactionData
+  extends Partial<CreateScheduledTransactionData> {
+  // Update-only marker (issue #1167 R11-F1): set true when the user actually
+  // re-enters the parent investment FX rate, so the server stamps the current
+  // settlement pair even when the value equals the stored one. The form resends
+  // the whole object, so numeric equality alone cannot distinguish an explicit
+  // re-entry from a passive round-trip. No shipping form emits the parent
+  // `investmentExchangeRate` yet, so nothing sends this today; it exists so a
+  // future caller can express the intent rather than silently re-blessing a
+  // stale rate.
+  investmentExchangeRateExplicit?: boolean;
+}
 
 // ==================== Override Types ====================
 

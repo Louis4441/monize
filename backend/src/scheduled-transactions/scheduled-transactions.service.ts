@@ -2432,12 +2432,16 @@ export class ScheduledTransactionsService {
         if (writtenRate === null) {
           fieldsToUpdate.investmentExchangeRateFromCurrency = null;
           fieldsToUpdate.investmentExchangeRateToCurrency = null;
-        } else if (rateUnchanged) {
+        } else if (rateUnchanged && !updateDto.investmentExchangeRateExplicit) {
           fieldsToUpdate.investmentExchangeRateFromCurrency =
             scheduled.investmentExchangeRateFromCurrency ?? null;
           fieldsToUpdate.investmentExchangeRateToCurrency =
             scheduled.investmentExchangeRateToCurrency ?? null;
         } else {
+          // A genuinely changed rate, or one the user explicitly re-entered for
+          // the current pair (`investmentExchangeRateExplicit`, R11-F1) even when
+          // its value equals the stored one, was just resolved for the current
+          // pair -- so record the current pair.
           const provenance = await this.resolveInvestmentRateProvenance(
             userId,
             writtenRate,

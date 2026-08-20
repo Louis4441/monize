@@ -5043,6 +5043,140 @@ describe("ScheduledTransactionsService", () => {
       expect(fields.investmentExchangeRateToCurrency).toBe("CAD");
     });
 
+    // ---- R11-F1: the form resends the whole object, so numeric equality alone
+    // cannot tell an explicit re-entry from a passive round-trip. An update-only
+    // `investmentExchangeRateExplicit` marker lets the client say "the user
+    // actually entered this rate for the current pair", and the server then
+    // stamps the current pair even when the value equals the stored one --
+    // honouring a rate deliberately re-entered for a since-changed pair. ----
+
+    it("update() stamps the current pair for a same-value rate re-entered with explicit intent (R11-F1)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+      // The security's currency has since changed, so the current pair differs
+      // from the recorded one even though the user re-entered the same number.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateExplicit: true,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) =>
+          c[1] === stId &&
+          c[2].investmentExchangeRateFromCurrency !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      // The explicitly re-entered rate belongs to the current pair, so it is
+      // stamped USD->CAD -- the value is unchanged but the intent is not passive.
+      expect(fields.investmentExchangeRate).toBe(1.5);
+      expect(fields.investmentExchangeRateFromCurrency).toBe("USD");
+      expect(fields.investmentExchangeRateToCurrency).toBe("CAD");
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).toHaveBeenCalled();
+    });
+
+    it("update() preserves the recorded pair for a same-value rate resent WITHOUT explicit intent (R11-F1)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      // The form echoes the stored scalar with the flag explicitly false -- a
+      // passive round-trip, not a re-entry. The stored pair must survive so the
+      // stale rate is still caught at posting rather than re-blessed here.
+      await service.update(userId, stId, {
+        name: "Renamed",
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateExplicit: false,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) =>
+          c[1] === stId &&
+          c[2].investmentExchangeRateFromCurrency !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentExchangeRateFromCurrency).toBe("EUR");
+      expect(fields.investmentExchangeRateToCurrency).toBe("CAD");
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("update() stamps the current pair for a genuinely changed rate regardless of the explicit flag (R11-F1)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      accountsService.findOne.mockResolvedValue({
+        id: "acc-1",
+        userId,
+        accountSubType: "INVESTMENT_BROKERAGE",
+      });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        investmentExchangeRate: 1.37,
+        investmentExchangeRateExplicit: true,
+      } as any);
+
+      const fields = mockQueryRunner.manager.update.mock.calls.find(
+        (c: any[]) =>
+          c[1] === stId &&
+          c[2].investmentExchangeRateFromCurrency !== undefined,
+      )?.[2];
+      expect(fields).toBeDefined();
+      expect(fields.investmentExchangeRate).toBe(1.37);
+      expect(fields.investmentExchangeRateFromCurrency).toBe("USD");
+      expect(fields.investmentExchangeRateToCurrency).toBe("CAD");
+    });
+
     it("update() carries an existing split's recorded pair forward (a cosmetic edit keeps a valid rate)", async () => {
       // A cosmetic edit resends the stored split rate unchanged. The pair is
       // preserved -- not re-stamped -- so posting can still reuse the valid rate

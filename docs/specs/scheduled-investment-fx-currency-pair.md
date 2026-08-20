@@ -245,12 +245,12 @@ amount is refused there rather than written.
   `updateOverride` and `createOverride` all decide provenance through a single
   `decideSplitProvenance`, so the rule cannot drift between them. In particular
   `createOverride` decides against the *base scheduled splits* as the source: a new
-  occurrence override that inherits a base split unchanged (a date-only override)
-  keeps the base pair -- including a stale one, caught at posting -- rather than
-  re-stamping the current pair onto an inherited scalar. Moving an existing override
-  is delete-then-create on the client, so this is the path that a "change only the
-  date" edit actually takes; re-blessing there is the #1167 corruption by another
-  door.
+  occurrence override that inherits a base split unchanged keeps the base pair --
+  including a stale one, caught at posting -- rather than re-stamping the current
+  pair onto an inherited scalar. (Moving an *existing* override's date is an
+  in-place `updateOverride`, not delete+create, so that edit no longer runs through
+  `createOverride` at all -- see R10-F3 below; `createOverride` here is the genuinely
+  new-occurrence path.)
 - **Source identity spans every split, and records the prior kind (R9-F2).** The
   `byId` map holds *every* source split's id, recording `rate: null` for one that
   carried no investment rate (a category/transfer line, or an investment line with
@@ -300,6 +300,21 @@ amount is refused there rather than written.
   its provenance and was re-resolved. `originalDate` (the row's identity) is
   unchanged; only `overrideDate` moves, and provenance is decided against the
   existing override, so an unchanged pinned rate is preserved.
+- **A parent investment rate re-entered with explicit intent stamps the current
+  pair, even when its value equals the stored one (R11-F1).** The scheduled form
+  resends the whole object, so on the *parent* investment rate numeric equality
+  cannot tell an explicit re-entry from a passive round-trip -- and the
+  no-re-bless rule (preserve the stored pair when the value is unchanged) would
+  otherwise suppress a rate deliberately re-entered for a since-changed pair.
+  `UpdateScheduledTransactionDto.investmentExchangeRateExplicit` is an update-only
+  marker the client sets when the user actually edits the rate; the service stamps
+  the current settlement pair when it is set, even for an unchanged value, and
+  keeps the conservative preserve-the-stored-pair behaviour when it is absent or
+  false (so a stale rate is still caught at posting rather than re-blessed). A
+  genuinely changed value stamps the current pair regardless of the marker. This
+  is the parent-scalar analogue of the split-line `rateExplicit` intent (R9-F2 /
+  R10-F2); it is an API-contract addition -- no shipping form currently emits the
+  parent `investmentExchangeRate`, so nothing is wired to send it yet.
 
 ## Test matrix (regression obligations)
 
@@ -439,6 +454,16 @@ For each of the three surfaces:
     date and preserves `1.37` USD/CAD (resolver not called, so a since-changed pair
     is not substituted). Component-level: a date-only edit calls `updateOverride`
     with the new `overrideDate` and never `deleteOverride`/`createOverride`.
+
+23. **Parent investment rate: explicit re-entry stamps, passive resend preserves
+    (R11-F1).** Stored `1.50` EUR/CAD, the current settlement pair since changed to
+    USD/CAD. (a) `update` with `investmentExchangeRate: 1.50` and
+    `investmentExchangeRateExplicit: true` stamps the current pair (USD/CAD) even
+    though the value is unchanged, and calls the pair resolver. (b) `update`
+    resending `1.50` with the marker absent/false preserves the stored EUR/CAD and
+    does not call the resolver (so posting still catches the stale rate). (c)
+    `update` with a genuinely changed `1.37` stamps USD/CAD regardless of the
+    marker.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only
