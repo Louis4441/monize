@@ -1922,3 +1922,142 @@ describe("row hover comes from the shared pair, not a hand-picked grey", () => {
     }
   });
 });
+
+describe("a dialog is titled through Modal, not by a hand-rolled heading", () => {
+  /**
+   * `Modal` had no `title`, so all 74 call sites drew their own header. That
+   * produced eight different treatments of one slot -- `text-lg font-semibold`
+   * (32), `text-2xl font-bold` (22), `text-lg font-medium` (17) and more --
+   * and, more seriously, a dialog with no `aria-labelledby`: screen readers
+   * announced an unnamed region and the visible heading was decoration.
+   *
+   * Passing `title` draws the standard header and wires the label. The
+   * baseline is **shrink-only**: converting a call site removes its line.
+   *
+   * A modal whose header is genuinely bespoke -- ConfirmDialog puts an icon
+   * beside the heading -- stays on the baseline deliberately rather than
+   * being flattened into the standard one.
+   */
+  const MODAL = "/src/components/ui/Modal.tsx";
+
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/app/bills/page.tsx",
+    "/src/app/budgets/[id]/edit/page.tsx",
+    "/src/app/categories/[id]/page.tsx",
+    "/src/app/categories/page.tsx",
+    "/src/app/currencies/page.tsx",
+    "/src/app/institutions/page.tsx",
+    "/src/app/investments/page.tsx",
+    "/src/app/payees/[id]/page.tsx",
+    "/src/app/payees/page.tsx",
+    "/src/app/reconcile/page.tsx",
+    "/src/app/reports/custom/[id]/edit/page.tsx",
+    "/src/app/reports/investment/[id]/edit/page.tsx",
+    "/src/app/securities/[id]/page.tsx",
+    "/src/app/securities/page.tsx",
+    "/src/app/settings/emergency-access/page.tsx",
+    "/src/app/tags/page.tsx",
+    "/src/app/transactions/page.tsx",
+    "/src/components/accounts/AccountExportModal.tsx",
+    "/src/components/accounts/AccountForm.tsx",
+    "/src/components/accounts/AccountFormModal.tsx",
+    "/src/components/accounts/LoanPaymentSetupDialog.tsx",
+    "/src/components/accounts/asset-detail/UpdateValueDialog.tsx",
+    "/src/components/accounts/credit-card-detail/PaymentSetupDialog.tsx",
+    "/src/components/accounts/loan-detail/LoanRateControls.tsx",
+    "/src/components/accounts/loan-detail/SavedScenariosPanel.tsx",
+    "/src/components/accounts/shared/ForeignCurrencyFeesSection.tsx",
+    "/src/components/accounts/shared/RecurringChargesPanel.tsx",
+    "/src/components/admin/CreateUserModal.tsx",
+    "/src/components/admin/ResetPasswordModal.tsx",
+    "/src/components/auth/StepUpAuthModal.tsx",
+    "/src/components/categories/DeleteCategoryDialog.tsx",
+    "/src/components/categories/ImportDefaultCategoriesDialog.tsx",
+    "/src/components/categories/detail/CategoryTransactionsTab.tsx",
+    "/src/components/dashboard/CustomizeDashboardModal.tsx",
+    "/src/components/dashboard/WidgetCard.tsx",
+    "/src/components/import/MnyPasswordDialog.tsx",
+    "/src/components/import/MnyWipeConfirmDialog.tsx",
+    "/src/components/institutions/InstitutionAccountsManager.tsx",
+    "/src/components/investments/InvestmentRegisterPanel.tsx",
+    "/src/components/investments/InvestmentTransactionForm.tsx",
+    "/src/components/layout/MobileNavDrawer.tsx",
+    "/src/components/payees/AutoMergePayeesDialog.tsx",
+    "/src/components/payees/CategoryAutoAssignDialog.tsx",
+    "/src/components/payees/DeactivateUnusedPayeesDialog.tsx",
+    "/src/components/payees/MergePayeeDialog.tsx",
+    "/src/components/payees/ReactivatePayeeDialog.tsx",
+    "/src/components/payees/detail/PayeeTransactionsTab.tsx",
+    "/src/components/reports/ForeignCurrencyFeesReport.tsx",
+    "/src/components/reports/MonteCarloSaveAsDialog.tsx",
+    "/src/components/scheduled-transactions/OccurrenceDatePicker.tsx",
+    "/src/components/scheduled-transactions/OverrideEditorDialog.tsx",
+    "/src/components/scheduled-transactions/PostTransactionDialog.tsx",
+    "/src/components/scheduled-transactions/ScheduledTransactionForm.tsx",
+    "/src/components/securities/SecurityForm.tsx",
+    "/src/components/securities/SecurityLookupPicker.tsx",
+    "/src/components/securities/SecurityTransactionHistory.tsx",
+    "/src/components/securities/detail/SecurityDocumentsTab.tsx",
+    "/src/components/settings/ApiAccessSection.tsx",
+    "/src/components/settings/BackupRestoreSection.tsx",
+    "/src/components/settings/SecuritySection.tsx",
+    "/src/components/settings/SharedAccessSection.tsx",
+    "/src/components/settings/SupportBackupModal.tsx",
+    "/src/components/settings/ai/ProviderConfigForm.tsx",
+    "/src/components/strategies/GemScenarioSwitcher.tsx",
+    "/src/components/strategies/GemSettingsForm.tsx",
+    "/src/components/transactions/BulkUpdateModal.tsx",
+    "/src/components/transactions/CurrencyPickerButton.tsx",
+    "/src/components/transactions/TransactionActionSheet.tsx",
+    "/src/components/transactions/TransactionForm.tsx",
+    "/src/components/ui/ConfirmDialog.tsx",
+    "/src/components/ui/UnsavedChangesDialog.tsx",
+    "/src/components/ui/row-actions/RowActionSheet.tsx",
+    "/src/components/whats-new/WhatsNewModal.tsx",
+    "/src/hooks/useFormModal.ts",
+  ];
+
+  /** Opening `<Modal ...>` tags, tolerating `>` inside `{...}` expressions. */
+  function modalTagsIn(content: string): string[] {
+    const tags: string[] = [];
+    for (const match of content.matchAll(/<Modal\b/g)) {
+      let i = match.index + match[0].length;
+      let depth = 0;
+      while (i < content.length) {
+        const ch = content[i];
+        if (ch === "{") depth += 1;
+        else if (ch === "}") depth -= 1;
+        else if (ch === ">" && depth === 0) break;
+        i += 1;
+      }
+      tags.push(content.slice(match.index, i));
+    }
+    return tags;
+  }
+
+  function filesWithUntitledModal(): string[] {
+    return productionSources()
+      .filter(([path]) => path !== MODAL)
+      .filter(([, content]) => modalTagsIn(content).some((tag) => !tag.includes("title=")))
+      .map(([path]) => path);
+  }
+
+  it("has no untitled Modal outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    const offenders = filesWithUntitledModal().filter((path) => !allowed.has(path));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithUntitledModal());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("Modal still wires the label, so the rule cannot pass by accident", () => {
+    const modal = sources[MODAL];
+    expect(modal, `${MODAL} not found -- update MODAL in this test`).toBeTruthy();
+    expect(modal).toContain("aria-labelledby");
+    // Absent title must mean no attribute, never a reference to nothing.
+    expect(modal).toContain("aria-labelledby={title ? titleId : undefined}");
+  });
+});
