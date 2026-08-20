@@ -654,6 +654,48 @@ describe("ScheduledTransactionsService", () => {
       ).not.toHaveBeenCalled();
     });
 
+    it("never reuses a stored non-1 scalar when the current pair is same-currency -- forecast resolves to 1 (R12-F1)", async () => {
+      const st = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-usd",
+        investmentFundingAccountId: null,
+        investmentQuantity: 10,
+        investmentPrice: 100,
+        // A 1.50 scalar stamped against a CAD->CAD pair (e.g. the security's
+        // currency changed to the cash currency and 1.50 was explicitly
+        // re-entered). Its from/to still equal the current pair, so the old
+        // "pair matches" reuse would have taken it.
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateFromCurrency: "CAD",
+        investmentExchangeRateToCurrency: "CAD",
+      });
+      const qb = mockQueryBuilder([st]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      // The current settlement pair is same-currency CAD->CAD.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "CAD", to: "CAD" },
+      );
+      // The real resolver returns 1 for a same-currency pair; mock that here.
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1,
+      );
+
+      const result = await service.findAll(userId);
+
+      // Same-currency dominates: the forecast uses 1, never the stored 1.50, so
+      // it matches the posting it predicts (cash impact at par).
+      expect(result[0].investmentForecastExchangeRate).toBe(1);
+      // Reuse was refused for the same-currency pair, so the resolver was called
+      // rather than the stored scalar trusted.
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).toHaveBeenCalled();
+    });
+
     it("attaches a null investmentForecastExchangeRate when the current rate is unavailable (issue #1167)", async () => {
       const st = makeScheduled({
         isInvestment: true,
@@ -4712,6 +4754,36 @@ describe("ScheduledTransactionsService", () => {
       expect(dto.exchangeRate).toBeUndefined();
     });
 
+    it("post() does not forward a stored non-1 scalar for a same-currency pair -- resolver settles it to 1 (R12-F1)", async () => {
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentFundingAccountId: null,
+          investmentQuantity: 10,
+          investmentPrice: 100,
+          // 1.50 stamped against a CAD->CAD pair; its from/to match the current
+          // pair, so the old reuse would have forwarded it as the posting rate.
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "CAD",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      setupOverrideQuery();
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "CAD", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      // The stale non-1 scalar is not forwarded; InvestmentTransactionsService's
+      // resolver derives the same-currency pair and settles it to 1 (proven by
+      // the resolver's own R12-F1 test), so cash posts at par -- never 10x100x1.50.
+      expect(dto.exchangeRate).toBeUndefined();
+    });
+
     it("update() clears the recorded pair when it clears the rate", async () => {
       stubFindOne(
         makeScheduled({
@@ -4851,6 +4923,30 @@ describe("ScheduledTransactionsService", () => {
 
       const payload = transactionsService.create.mock.calls[0][1];
       expect(payload.splits[0].investment.exchangeRate).toBe(1.35);
+    });
+
+    it("post() settles an embedded split's non-1 scalar to 1 for a same-currency pair, recomputing the amount at par (R12-F1)", async () => {
+      // 1.50 stamped against CAD->CAD; its from/to match the current pair.
+      stubFindOne(investmentSplitSchedule(1.5, "CAD", "CAD"));
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "CAD", to: "CAD" },
+      );
+      // The real resolver returns 1 for a same-currency pair; mock that here.
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1,
+      );
+
+      await service.post(userId, stId);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      // Same-currency dominates: rate 1, and the cash amount is recomputed at par
+      // (cashImpact = -(5 * 100) = -500 x 1 = -500), never the stored -750.
+      expect(payload.splits[0].investment.exchangeRate).toBe(1);
+      expect(payload.splits[0].amount).toBe(-500);
     });
 
     // ---- Surface 3: an occurrence-override embedded split ----

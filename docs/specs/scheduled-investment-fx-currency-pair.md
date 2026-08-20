@@ -315,6 +315,23 @@ amount is refused there rather than written.
   is the parent-scalar analogue of the split-line `rateExplicit` intent (R9-F2 /
   R10-F2); it is an API-contract addition -- no shipping form currently emits the
   parent `investmentExchangeRate`, so nothing is wired to send it yet.
+- **Same-currency settlement resolves to 1 and dominates any explicit or stored
+  scalar (R12-F1).** Provenance is a currency pair, so once a rate is stamped
+  against an `X -> X` pair (a security whose currency changed to the settlement
+  currency, then an explicit re-entry, or a legacy row), `from === to` matches
+  the current pair and the "pair still current" reuse would otherwise forward a
+  non-1 scalar -- posting `10 x 100 x 1.50 = 1,500 CAD` where the correct cash is
+  `1,000 CAD`. The invariant is enforced at the two read chokepoints so it holds
+  for every row regardless of what was persisted: `resolveCashExchangeRateOrNull`
+  derives the pair *before* honouring a supplied rate and returns `1` for
+  same-currency (covering ordinary investment create and posting), and
+  `storedInvestmentRateIsCurrent` returns `false` whenever the current pair is
+  same-currency, so every scheduled effective-rate path (parent forecast, embedded
+  split, override, inline, post) re-resolves through that resolver to `1` rather
+  than reusing the stored scalar. A stored rate that genuinely is `1` gets the
+  identical result. Write paths are deliberately left to persist whatever the
+  stamp produced: the guarantee is at consumption, so no write path -- present,
+  legacy, or future -- can violate it.
 
 ## Test matrix (regression obligations)
 
@@ -464,6 +481,18 @@ For each of the three surfaces:
     does not call the resolver (so posting still catches the stale rate). (c)
     `update` with a genuinely changed `1.37` stamps USD/CAD regardless of the
     marker.
+
+24. **Same-currency dominates a stored/explicit non-1 scalar (R12-F1).** A `1.50`
+    scalar recorded against a `CAD -> CAD` pair (its `from`/`to` equal the current
+    pair). (a) Resolver: `resolveCashExchangeRateOrNull` with an explicit `1.50`
+    and a same-currency pair returns `1`, not `1.50`. (b) Parent forecast: `findAll`
+    yields `investmentForecastExchangeRate === 1` and calls the resolver (reuse
+    refused). (c) Parent post: the stored `1.50` is not forwarded
+    (`dto.exchangeRate` undefined), so the resolver settles it to `1`. (d) Embedded
+    split post: rate `1` and the cash amount recomputed at par (`-(5 x 100) = -500`,
+    never the stored `-750`). Break-on-purpose covers both chokepoints: reverting
+    the resolver ordering fails (a); dropping the same-currency arm of
+    `storedInvestmentRateIsCurrent` fails (b), (c) and (d).
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

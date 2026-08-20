@@ -4239,6 +4239,25 @@ describe("InvestmentTransactionsService", () => {
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it("normalizes an explicit non-1 rate to 1 for a same-currency pair -- same-currency dominates (R12-F1)", async () => {
+      // The security and cash account are both USD, so the settlement pair is
+      // USD->USD. A supplied 1.50 (e.g. a rate that was legitimate before the
+      // security's currency changed to the cash currency, then explicitly
+      // re-entered) must resolve to 1, never convert the amount away from par.
+      accountsService.findOne.mockResolvedValue({ ...mockInvestmentAccount });
+      securitiesService.findOne.mockResolvedValue({ ...mockSecurity }); // USD
+
+      const rate = await service.resolveCashExchangeRateOrNull(
+        userId,
+        accountId,
+        null,
+        securityId,
+        1.5,
+        undefined,
+      );
+      expect(rate).toBe(1);
+    });
   });
 
   describe("resolveSettlementCurrencyPair (issue #1167)", () => {

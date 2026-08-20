@@ -566,6 +566,7 @@ export class InvestmentTransactionsService {
     dtoRate: number | undefined,
     transactionDate?: string | Date,
   ): Promise<number | null> {
+    let supplied: number | undefined;
     if (dtoRate !== undefined && dtoRate !== null) {
       // A supplied rate is trusted but still has to be a rate. Zero used to be
       // accepted here (the DTO allowed @Min(0)): the preview then multiplied the
@@ -574,7 +575,7 @@ export class InvestmentTransactionsService {
       // user could approve a zero-cash preview and receive a 1,000 debit
       // (audit P5-005). Negative is equally not a rate. This is a caller error,
       // not a missing rate, so it throws in both variants.
-      const supplied = Number(dtoRate);
+      supplied = Number(dtoRate);
       if (!Number.isFinite(supplied) || supplied <= 0) {
         throw new BadRequestException(
           tr(
@@ -583,7 +584,6 @@ export class InvestmentTransactionsService {
           ),
         );
       }
-      return supplied;
     }
 
     // One derivation of the pair, shared with the provenance check (issue #1167).
@@ -595,8 +595,19 @@ export class InvestmentTransactionsService {
         securityId,
       );
 
+    // Same-currency settlement is 1 by definition and DOMINATES an explicit rate
+    // (issue #1167): a non-1 scalar supplied for -- or stored against -- an X->X
+    // pair (e.g. a rate that was legitimate before a security's currency changed
+    // to the cash currency, then explicitly re-entered) must never convert an
+    // amount away from par. This is checked *before* honouring `supplied`, and
+    // after deriving the pair rather than the previous early return on `dtoRate`,
+    // so an explicit 1.50 CAD/CAD resolves to 1, not 1.50.
     if (sourceCurrency === cashCurrency) {
       return 1;
+    }
+
+    if (supplied !== undefined) {
+      return supplied;
     }
 
     // Prefer the rate as of the transaction date (fetching from Yahoo for that
@@ -4307,10 +4318,7 @@ export class InvestmentTransactionsService {
           }),
         )
       : null;
-    if (
-      linkedLeg &&
-      isAccruedInterestCompanion(transaction, linkedLeg)
-    ) {
+    if (linkedLeg && isAccruedInterestCompanion(transaction, linkedLeg)) {
       throw new BadRequestException(
         tr(
           "errors.securities.accruedInterestCompanionLocked",

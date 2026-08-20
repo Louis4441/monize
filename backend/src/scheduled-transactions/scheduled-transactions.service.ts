@@ -629,6 +629,18 @@ export class ScheduledTransactionsService {
         settlement.fundingAccountId,
         settlement.securityId,
       );
+    // Same-currency settlement resolves to 1 by definition (issue #1167), so a
+    // stored non-1 scalar recorded against an X->X pair is never "the current
+    // rate" even when its from/to still equal the pair -- e.g. a 1.50 EUR/CAD
+    // rate stamped CAD/CAD after the security's currency changed to CAD, or an
+    // explicit re-entry on a since-same-currency pair. Refusing reuse here routes
+    // every effective-rate path (parent forecast, split/override, post) through
+    // `resolveCashExchangeRateOrNull`, which returns 1 for same-currency, rather
+    // than reusing the scalar directly. A stored rate that genuinely is 1 gets
+    // the identical result from the resolver, so nothing is lost.
+    if (pair.from === pair.to) {
+      return false;
+    }
     return pair.from === storedFrom && pair.to === storedTo;
   }
 
