@@ -1062,7 +1062,17 @@ export function toSplitRows(splits: {
 }
 
 // Convert SplitRow to API format (removes temporary id and splitType)
-export function toCreateSplitData(splits: SplitRow[]): CreateSplitData[] {
+// Convert SplitRow to API format (removes temporary id and splitType).
+//
+// `includeSourceIdentity` is opt-in and OFF by default: `sourceSplitId` is a
+// scheduled-transaction correlation field (issue #1167 F4) that the ordinary
+// transaction DTO does not accept, so emitting it there fails validation under
+// `forbidNonWhitelisted` (R7-F1). Only the scheduled create/update surface passes
+// it true.
+export function toCreateSplitData(
+  splits: SplitRow[],
+  options: { includeSourceIdentity?: boolean } = {},
+): CreateSplitData[] {
   return splits.map((split) => ({
     splitKind: split.splitType,
     categoryId: split.splitType === 'category' ? split.categoryId : undefined,
@@ -1071,8 +1081,10 @@ export function toCreateSplitData(splits: SplitRow[]): CreateSplitData[] {
     amount: split.amount,
     memo: split.memo || undefined,
     tagIds: split.tagIds && split.tagIds.length > 0 ? split.tagIds : undefined,
-    // Carry the source split id so the server decides FX provenance by identity
-    // (issue #1167 F4); undefined for a row the user added.
-    sourceSplitId: split.sourceSplitId,
+    // Carry the source split id only for scheduled surfaces that decide FX
+    // provenance by identity; undefined for a row the user added.
+    sourceSplitId: options.includeSourceIdentity
+      ? split.sourceSplitId
+      : undefined,
   }));
 }

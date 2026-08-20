@@ -194,6 +194,30 @@ amount is refused there rather than written.
   the forecast projects that (or withholds the occurrence when unknown) rather than
   the override's scalar -- covering both an override that replaces an investment base
   occurrence and one that introduces investment splits over a plain base.
+- **The split identity metadata is opt-in, never in the ordinary serializer (R7-F1).**
+  `sourceSplitId` is scheduled-transaction correlation metadata and exists only to let
+  the server decide provenance by identity (F4). The ordinary-transaction
+  `CreateTransactionSplitDto` does **not** declare it, and the global ValidationPipe
+  runs `forbidNonWhitelisted`, so a shared serializer that emitted it unconditionally
+  would make the API reject every ordinary split edit and duplicate with a 400. The
+  shared serializer (`toCreateSplitData`) therefore emits it only under an explicit
+  `{ includeSourceIdentity: true }`, which **only** `ScheduledTransactionForm` passes;
+  the ordinary `TransactionForm` calls it without the option and its payload carries no
+  `sourceSplitId`. A DTO-level contract test runs the ordinary payload through the real
+  production pipe in both directions.
+- **A legacy no-provenance rate stays unknown across an edit -- no re-bless (R7-F2).** A
+  rate stored before this change carries a null pair and is *unknown*, not *current* --
+  and that is true across a presentation-only edit, not only at posting. A cosmetic edit
+  that resends such a rate unchanged (correlated by `sourceSplitId`) preserves the null
+  pair exactly; it is never re-derived to the current pair, which would re-bless a stale
+  scalar as belonging to a pair it may not describe -- the original #1167 corruption,
+  arriving through the edit path instead of the currency-change path. Identity therefore
+  exists independently of provenance: `byId`/`oldById` include null-pair rows, so an
+  unchanged legacy scalar is recognised as unchanged rather than treated as fresh and
+  stamped. A supplied-but-unmatched `sourceSplitId`, and a legacy override JSON line with
+  no id at all, are unverifiable claims: both are left unprovenanced (re-resolved at
+  posting), never value-key-matched into a pair and never stamped with the current one. A
+  genuinely *changed* legacy rate is a fresh rate for the current pair and does stamp it.
 
 ## Test matrix (regression obligations)
 
@@ -257,6 +281,22 @@ For each of the three surfaces:
 
 12. **Top-level investment override forecast (F3).** An override changing
     quantity/price/total projects the override's effective cash amount, not the base.
+
+13. **Ordinary split serializer omits sourceSplitId (R7-F1).** Run the ordinary
+    split-edit payload (the serializer's output with no `includeSourceIdentity`)
+    through the real production ValidationPipe and assert it is accepted; run the same
+    payload with a `sourceSplitId` added on an ordinary split and assert the pipe
+    rejects it (`forbidNonWhitelisted`). A frontend test asserts `toCreateSplitData`
+    omits `sourceSplitId` by default and includes it only under
+    `{ includeSourceIdentity: true }`.
+
+14. **Legacy null-pair rate kept unprovenanced on a cosmetic edit (R7-F2).** For a
+    scheduled split and for an override JSON line, start from a pre-migration rate
+    (`1.50`, null pair); perform a name/date-only edit that resends the rate unchanged;
+    assert the rewritten split still has a null pair and the pair resolver was not
+    called; then post at the current pair (`USD->CAD = 1.35`, `10 x 100`) and assert
+    `-1,350`, never the stale `-1,500`. Companion: a genuinely changed legacy rate
+    stamps the current pair.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

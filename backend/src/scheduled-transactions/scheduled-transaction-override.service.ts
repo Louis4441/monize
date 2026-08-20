@@ -23,7 +23,7 @@ import {
  */
 export type OverrideInvestmentProvenance = Map<
   number,
-  { from: string; to: string }
+  { from: string | null; to: string | null }
 >;
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -50,12 +50,16 @@ export class ScheduledTransactionOverrideService {
     return (
       splits?.map((s, index) => {
         const pair = investmentProvenance?.get(index);
+        // When the service decided a pair for this split, apply it -- including a
+        // deliberate null (a legacy or unverifiable rate the server refuses to
+        // bless, #1167 R7-F2), which overwrites any stale pair the client echoed
+        // with "unprovenanced" (undefined) so posting re-resolves it.
         const investment =
           s.investment && pair
             ? {
                 ...s.investment,
-                exchangeRateFromCurrency: pair.from,
-                exchangeRateToCurrency: pair.to,
+                exchangeRateFromCurrency: pair.from ?? undefined,
+                exchangeRateToCurrency: pair.to ?? undefined,
               }
             : s.investment;
         return {

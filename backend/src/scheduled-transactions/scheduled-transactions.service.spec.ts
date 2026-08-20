@@ -5625,5 +5625,259 @@ describe("ScheduledTransactionsService", () => {
         investmentTransactionsService.resolveCashExchangeRateOrNull,
       ).not.toHaveBeenCalled();
     });
+
+    // ---- R7-F2: a presentation-only edit must not re-bless a legacy
+    // no-provenance rate as belonging to the current pair. A rate stored before
+    // #1167 backfilled no pair (from/to null) is unknown, so a cosmetic edit
+    // that resends it unchanged has to keep it null -- never stamp the current
+    // pair, which would recreate the original #1167 corruption path. ----
+
+    it("update() keeps a legacy null-pair split unprovenanced on a rate-unchanged edit, never stamping the current pair (R7-F2)", async () => {
+      // A split stored before #1167 carries a rate (1.50) with NO recorded pair.
+      // The user renames the schedule (a name-only edit) and the form resends
+      // the split unchanged, echoing its stable id. Correlated by id, the
+      // unchanged legacy scalar must be preserved as null/null, so posting later
+      // re-resolves it rather than trusting 1.50 for whatever the pair is now.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1500,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          id: "split-legacy",
+          kind: "investment",
+          investmentSecurityId: "sec-usd",
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: null,
+          investmentExchangeRateToCurrency: null,
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      // If the edit were (wrongly) treated as fresh, this is the pair it would be
+      // re-blessed with -- the assertion below proves it is NOT.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        name: "Renamed",
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "split-legacy",
+            amount: -1500,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.5, // resent unchanged
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const createdSplit = mockQueryRunner.manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+      )?.[1];
+      expect(createdSplit).toBeDefined();
+      expect(createdSplit.investmentExchangeRate).toBe(1.5);
+      // The legacy null pair survives -- it is NOT stamped USD->CAD.
+      expect(createdSplit.investmentExchangeRateFromCurrency).toBeNull();
+      expect(createdSplit.investmentExchangeRateToCurrency).toBeNull();
+      // Preserving null never re-derives the current pair.
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("update() stamps the current pair when a legacy null-pair split rate is genuinely changed (R7-F2 companion)", async () => {
+      // The same legacy split, but this time the user re-enters a new rate. A
+      // changed rate IS for the current pair, so it stamps USD->CAD -- the null
+      // preservation applies only to an unchanged scalar.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          amount: -1600,
+        } as any),
+      );
+      mockQueryRunner.manager.find.mockResolvedValue([
+        {
+          id: "split-legacy",
+          kind: "investment",
+          investmentSecurityId: "sec-usd",
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: null,
+          investmentExchangeRateToCurrency: null,
+        },
+      ]);
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.update(userId, stId, {
+        splits: [
+          {
+            splitKind: "investment" as any,
+            sourceSplitId: "split-legacy",
+            amount: -1600,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.6, // genuinely changed from 1.50
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const createdSplit = mockQueryRunner.manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[0] === ScheduledTransactionSplit && c[1].investmentAction,
+      )?.[1];
+      expect(createdSplit.investmentExchangeRate).toBe(1.6);
+      expect(createdSplit.investmentExchangeRateFromCurrency).toBe("USD");
+      expect(createdSplit.investmentExchangeRateToCurrency).toBe("CAD");
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).toHaveBeenCalledWith(userId, "acc-cash", null, "sec-usd");
+    });
+
+    it("post() re-resolves a legacy null-pair embedded split to the current rate: -1350, never the stale -1500 (R7-F2)", async () => {
+      // End-to-end numeric repro (issue #1167 R7): a persisted split rate 1.50
+      // with no recorded pair is unknown. Posting must re-resolve it at the
+      // current USD->CAD=1.35 and re-sum the parent from the recomputed amount,
+      // so the user is charged -1350, not the stale -1500 pinned at 1.50.
+      stubFindOne(
+        makeScheduled({
+          isSplit: true,
+          accountId: "acc-cash",
+          splits: [
+            {
+              id: "s-legacy",
+              scheduledTransactionId: stId,
+              kind: "investment",
+              categoryId: null,
+              transferAccountId: null,
+              amount: -1500,
+              memo: null,
+              investmentAction: "BUY",
+              investmentSecurityId: "sec-usd",
+              investmentQuantity: 10,
+              investmentPrice: 100,
+              investmentCommission: 0,
+              investmentExchangeRate: 1.5,
+              investmentExchangeRateFromCurrency: null,
+              investmentExchangeRateToCurrency: null,
+            } as any,
+          ],
+        } as any),
+      );
+      setupOverrideQuery();
+      mockQueryRunner.manager.delete = jest
+        .fn()
+        .mockResolvedValue({ affected: 1 });
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+
+      await service.post(userId, stId);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      // cashImpact -(10*100) = -1000, re-resolved 1.35 -> -1350, never -1500.
+      expect(payload.splits[0].investment.exchangeRate).toBe(1.35);
+      expect(payload.splits[0].amount).toBe(-1350);
+      expect(payload.amount).toBe(-1350);
+    });
+
+    it("updateOverride() keeps a legacy override split (no id, no pair) unprovenanced on a cosmetic edit, never stamping the current pair (R7-F2)", async () => {
+      // A pre-#1167 override JSON split: it carries a rate but no recorded pair
+      // and no stable id (minted only after #1167). A client that echoes no
+      // sourceSplitId resends it unchanged. The value-key fallback cannot carry a
+      // null pair, and an unverified scalar must never be stamped with the
+      // current pair -- so it stays unprovenanced and posting re-resolves it.
+      stubFindOne(
+        makeScheduled({ isSplit: true, accountId: "acc-cash" } as any),
+      );
+      const existing = {
+        id: "ovr-1",
+        scheduledTransactionId: stId,
+        originalDate: "2025-03-01",
+        overrideDate: "2025-03-01",
+        isSplit: true,
+        amount: -1500,
+        splits: [
+          {
+            // No `id` -- a legacy override JSON split predates the minted id.
+            splitKind: "investment",
+            categoryId: null,
+            amount: -1500,
+            investment: {
+              action: "BUY",
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.5,
+              // No pair recorded (pre-#1167).
+            },
+          },
+        ],
+      };
+      overridesRepo.findOne.mockResolvedValue(existing);
+      overridesRepo.save.mockImplementation((data: any) =>
+        Promise.resolve(data),
+      );
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      const result = await service.updateOverride(userId, stId, "ovr-1", {
+        // Cosmetic edit: change only the override date, resend the split as-is
+        // with no sourceSplitId (legacy client) and the unchanged rate.
+        overrideDate: "2025-03-02",
+        isSplit: true,
+        amount: -1500,
+        splits: [
+          {
+            splitKind: "investment" as any,
+            categoryId: null,
+            amount: -1500,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-usd",
+              quantity: 10,
+              price: 100,
+              exchangeRate: 1.5, // resent unchanged
+            },
+          },
+          { splitKind: "category" as any, categoryId: "cat-fees", amount: 0 },
+        ],
+      } as any);
+
+      const inv = (result.splits as any[])[0].investment;
+      expect(inv.exchangeRate).toBe(1.5);
+      // The unverified legacy scalar stays unprovenanced -- NOT stamped USD->CAD.
+      expect(inv.exchangeRateFromCurrency).toBeUndefined();
+      expect(inv.exchangeRateToCurrency).toBeUndefined();
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).not.toHaveBeenCalled();
+    });
   });
 });

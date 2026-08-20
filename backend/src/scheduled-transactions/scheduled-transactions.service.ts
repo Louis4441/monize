@@ -1121,29 +1121,40 @@ export class ScheduledTransactionsService {
    *   - `byKey`: `provenanceKey(securityId, rate)` -> pair. The fallback for a
    *     client that sends no `sourceSplitId` (older UI, or the general form),
    *     which still carries an unchanged rate's pair the way F5-3 did.
+   *
+   * `byId` includes a legacy row whose pair is NULL (a rate stored before #1167
+   * backfilled no provenance), carrying `from: null, to: null` (R7-F2). Identity
+   * must exist independently of whether provenance does: otherwise an unchanged
+   * legacy scalar is absent from `byId`, treated as fresh on a cosmetic edit, and
+   * stamped with the current pair -- re-blessing exactly the stale rate #1167
+   * forbids. `byKey` still carries only complete pairs (a null pair cannot be
+   * "carried" by value).
    */
   private buildSplitProvenanceSource(splits: ScheduledTransactionSplit[]): {
-    byId: Map<string, { rate: number; from: string; to: string }>;
+    byId: Map<string, { rate: number; from: string | null; to: string | null }>;
     byKey: Map<string, { from: string; to: string }>;
   } {
-    const byId = new Map<string, { rate: number; from: string; to: string }>();
+    const byId = new Map<
+      string,
+      { rate: number; from: string | null; to: string | null }
+    >();
     const byKey = new Map<string, { from: string; to: string }>();
     for (const s of splits) {
       if (
         s.kind === SplitKind.INVESTMENT &&
         s.investmentSecurityId &&
         s.investmentExchangeRate !== null &&
-        s.investmentExchangeRate !== undefined &&
-        s.investmentExchangeRateFromCurrency &&
-        s.investmentExchangeRateToCurrency
+        s.investmentExchangeRate !== undefined
       ) {
         const rate = Number(s.investmentExchangeRate);
-        const from = s.investmentExchangeRateFromCurrency;
-        const to = s.investmentExchangeRateToCurrency;
-        byKey.set(this.provenanceKey(s.investmentSecurityId, rate), {
-          from,
-          to,
-        });
+        const from = s.investmentExchangeRateFromCurrency ?? null;
+        const to = s.investmentExchangeRateToCurrency ?? null;
+        if (from && to) {
+          byKey.set(this.provenanceKey(s.investmentSecurityId, rate), {
+            from,
+            to,
+          });
+        }
         if (s.id) byId.set(s.id, { rate, from, to });
       }
     }
@@ -1175,7 +1186,10 @@ export class ScheduledTransactionsService {
     provenanceSource:
       | "fresh"
       | {
-          byId: Map<string, { rate: number; from: string; to: string }>;
+          byId: Map<
+            string,
+            { rate: number; from: string | null; to: string | null }
+          >;
           byKey: Map<string, { from: string; to: string }>;
         },
   ): Promise<ScheduledTransactionSplit[]> {
@@ -1217,35 +1231,41 @@ export class ScheduledTransactionsService {
       if (splitHasRate) {
         const incomingRate = Number(split.investment!.exchangeRate);
         const securityId = split.investment!.securityId;
-        let carried: { from: string; to: string } | undefined;
+        let resolved = false;
         if (provenanceSource !== "fresh" && securityId) {
-          const src = split.sourceSplitId
-            ? provenanceSource.byId.get(split.sourceSplitId)
-            : undefined;
-          if (src) {
-            // Stable identity (F4): carry the old pair only when THIS source
-            // split's rate is unchanged; a changed rate is fresh for the current
-            // pair (stamped below), so it is never mislabelled by colliding with
-            // another split's old rate.
-            if (src.rate === incomingRate) {
-              carried = { from: src.from, to: src.to };
+          if (split.sourceSplitId) {
+            const src = provenanceSource.byId.get(split.sourceSplitId);
+            if (src) {
+              if (src.rate === incomingRate) {
+                // Unchanged (F4): preserve the source pair EXACTLY, including a
+                // legacy null/null (R7-F2). Never re-derive it -- re-deriving a
+                // stale scalar's pair as the current one is the #1167 corruption.
+                investmentRateProvenance = { from: src.from, to: src.to };
+                resolved = true;
+              }
+              // else: a genuinely changed rate -> stamp current below.
+            } else {
+              // A supplied-but-unmatched id is an unverifiable claim (R7-F2): do
+              // not fall back to the value key and do not stamp current -- leave
+              // the rate unprovenanced so posting re-resolves it.
+              investmentRateProvenance = { from: null, to: null };
+              resolved = true;
             }
           } else {
-            // No stable-identity match (client sent no sourceSplitId, or a new
-            // split): fall back to the value key so an unchanged rate still
-            // carries its pair.
-            carried = provenanceSource.byKey.get(
+            // No sourceSplitId (older client / general form): value-key fallback
+            // for an unchanged complete-pair rate.
+            const carried = provenanceSource.byKey.get(
               this.provenanceKey(securityId, incomingRate),
             );
+            if (carried) {
+              investmentRateProvenance = { from: carried.from, to: carried.to };
+              resolved = true;
+            }
           }
         }
-        if (carried) {
-          // Resent-unchanged rate: carry its recorded pair forward so posting can
-          // reuse a still-valid rate or catch a since-stale one.
-          investmentRateProvenance = { from: carried.from, to: carried.to };
-        } else if (securityId) {
-          // Fresh create, a genuinely changed rate, or a new security: the rate
-          // is for the current pair, so stamp it.
+        if (!resolved && securityId) {
+          // Fresh create, a genuinely changed rate, or a genuinely new split: the
+          // rate is for the current pair, so stamp it.
           investmentRateProvenance = await this.resolveInvestmentRateProvenance(
             userId,
             incomingRate,
@@ -3550,11 +3570,12 @@ export class ScheduledTransactionsService {
       overrideId,
     );
     // Correlated by the override split's stable id (issue #1167 F4), with a
-    // value-key fallback for a client that echoes none: two override splits for
-    // one security cannot swap provenance when one's rate changes to the other's.
+    // value-key fallback for a client that echoes none. `oldById` includes a
+    // legacy null-pair rate (R7-F2), so an unchanged legacy scalar is recognised
+    // and kept unprovenanced rather than re-stamped with the current pair.
     const oldById = new Map<
       string,
-      { rate: number; from: string; to: string }
+      { rate: number; from: string | null; to: string | null }
     >();
     const oldByKey = new Map<string, { from: string; to: string }>();
     for (const s of existing.splits ?? []) {
@@ -3562,22 +3583,20 @@ export class ScheduledTransactionsService {
       if (
         inv?.securityId &&
         inv.exchangeRate !== undefined &&
-        inv.exchangeRate !== null &&
-        inv.exchangeRateFromCurrency &&
-        inv.exchangeRateToCurrency
+        inv.exchangeRate !== null
       ) {
         const rate = Number(inv.exchangeRate);
-        const entry = {
-          from: inv.exchangeRateFromCurrency,
-          to: inv.exchangeRateToCurrency,
-        };
-        oldByKey.set(this.provenanceKey(inv.securityId, rate), entry);
-        if (s.id) oldById.set(s.id, { rate, ...entry });
+        const from = inv.exchangeRateFromCurrency ?? null;
+        const to = inv.exchangeRateToCurrency ?? null;
+        if (from && to) {
+          oldByKey.set(this.provenanceKey(inv.securityId, rate), { from, to });
+        }
+        if (s.id) oldById.set(s.id, { rate, from, to });
       }
     }
     const investmentProvenance = new Map<
       number,
-      { from: string; to: string }
+      { from: string | null; to: string | null }
     >();
     for (const [index, s] of (updateDto.splits ?? []).entries()) {
       const inv = s.investment;
@@ -3585,28 +3604,41 @@ export class ScheduledTransactionsService {
         continue;
       if (!inv.securityId) continue;
       const incomingRate = Number(inv.exchangeRate);
-      let carried: { from: string; to: string } | undefined;
-      const src = s.sourceSplitId ? oldById.get(s.sourceSplitId) : undefined;
-      if (src) {
-        // Stable identity: carry only when THIS source split's rate is unchanged.
-        if (src.rate === incomingRate) carried = { from: src.from, to: src.to };
+      if (s.sourceSplitId) {
+        const src = oldById.get(s.sourceSplitId);
+        if (src) {
+          if (src.rate === incomingRate) {
+            // Unchanged: preserve the source pair exactly (null for legacy).
+            investmentProvenance.set(index, { from: src.from, to: src.to });
+          } else {
+            // Changed: stamp the current pair.
+            investmentProvenance.set(
+              index,
+              await this.investmentTransactionsService.resolveSettlementCurrencyPair(
+                userId,
+                scheduled.accountId,
+                null,
+                inv.securityId,
+              ),
+            );
+          }
+        } else {
+          // Unverifiable claimed id (R7-F2): leave unprovenanced -> re-resolved.
+          investmentProvenance.set(index, { from: null, to: null });
+        }
       } else {
-        // Fallback: value key (unchanged rate carries its pair).
-        carried = oldByKey.get(
+        const carried = oldByKey.get(
           this.provenanceKey(inv.securityId, incomingRate),
         );
-      }
-      if (carried) {
-        investmentProvenance.set(index, carried);
-      } else {
-        const pair =
-          await this.investmentTransactionsService.resolveSettlementCurrencyPair(
-            userId,
-            scheduled.accountId,
-            null,
-            inv.securityId,
-          );
-        investmentProvenance.set(index, pair);
+        if (carried) {
+          // Value-key fallback for an unchanged complete-pair rate (old client).
+          investmentProvenance.set(index, carried);
+        } else {
+          // Legacy JSON without an id, or a genuinely new line: never stamp the
+          // current pair onto an unverified scalar (R7-F2) -- leave it
+          // unprovenanced so posting re-resolves it.
+          investmentProvenance.set(index, { from: null, to: null });
+        }
       }
     }
     return this.overrideService.updateOverride(

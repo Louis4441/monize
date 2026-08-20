@@ -1891,6 +1891,33 @@ describe('toCreateSplitData — tagIds branch', () => {
   });
 });
 
+// Issue #1167 R7-F1: sourceSplitId is a scheduled-only correlation field the
+// ordinary transaction DTO rejects (forbidNonWhitelisted). It must be OFF by
+// default so editing/duplicating an ordinary split transaction does not 400.
+describe('toCreateSplitData — sourceSplitId is opt-in (R7-F1)', () => {
+  const rows: SplitRow[] = [
+    {
+      id: 'db-split-1',
+      sourceSplitId: 'db-split-1',
+      splitType: 'category',
+      categoryId: 'cat-1',
+      amount: -30,
+      memo: '',
+    },
+  ];
+
+  it('omits sourceSplitId by default (ordinary transactions)', () => {
+    const data = toCreateSplitData(rows);
+    expect(data[0].sourceSplitId).toBeUndefined();
+    expect(data[0]).not.toHaveProperty('sourceSplitId', 'db-split-1');
+  });
+
+  it('includes sourceSplitId only when explicitly opted in (scheduled surfaces)', () => {
+    const data = toCreateSplitData(rows, { includeSourceIdentity: true });
+    expect(data[0].sourceSplitId).toBe('db-split-1');
+  });
+});
+
 describe('toCreateSplitData', () => {
   it('removes temp fields (id, splitType)', () => {
     const rows: SplitRow[] = [
