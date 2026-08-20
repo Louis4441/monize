@@ -5177,6 +5177,75 @@ describe("ScheduledTransactionsService", () => {
       expect(fields.investmentExchangeRateToCurrency).toBe("CAD");
     });
 
+    // ---- R11-F1 downstream: the pair an explicit re-entry stamps must actually
+    // change what posting forwards to InvestmentTransactionsService.create, or
+    // the stamp is inert. The update tests above prove which pair each edit
+    // persists; these two prove the consequence at the post -> create boundary.
+    // (The `update` mocks do not persist into `findOne`, so the stored record
+    // here carries the exact provenance state the matching update produces.) ----
+
+    it("post() forwards a same-value rate stamped current by an explicit re-entry -- 1.50 reused, not re-resolved (R11-F1 downstream)", async () => {
+      // The state an explicit re-entry produces: the pair was stamped to the
+      // current USD->CAD even though the value equals the old EUR->CAD scalar.
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentFundingAccountId: null,
+          investmentQuantity: 10,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "USD",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      setupOverrideQuery();
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      // The stamped pair matches the current pair, so 1.50 is reused rather than
+      // re-resolved to the 1.35 market -- the user's explicit instruction stands.
+      expect(dto.exchangeRate).toBe(1.5);
+    });
+
+    it("post() re-resolves a same-value rate a passive resend left on its old pair (R11-F1 downstream)", async () => {
+      // The state a passive resend leaves: 1.50 is still recorded against the
+      // stale EUR->CAD pair, because no explicit intent was signalled.
+      stubFindOne(
+        makeScheduled({
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentFundingAccountId: null,
+          investmentQuantity: 10,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        } as any),
+      );
+      setupOverrideQuery();
+      // The current settlement pair is USD->CAD, so the stored EUR->CAD scalar is
+      // unprovable and must be re-resolved.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+
+      await service.post(userId, stId);
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      // The stale scalar is not forwarded; the posting resolver re-resolves.
+      expect(dto.exchangeRate).toBeUndefined();
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).toHaveBeenCalledWith(userId, "acc-1", null, "sec-usd");
+    });
+
     it("update() carries an existing split's recorded pair forward (a cosmetic edit keeps a valid rate)", async () => {
       // A cosmetic edit resends the stored split rate unchanged. The pair is
       // preserved -- not re-stamped -- so posting can still reuse the valid rate
