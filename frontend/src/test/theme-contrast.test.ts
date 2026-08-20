@@ -385,6 +385,20 @@ describe('theme CSS structure', () => {
     expect(missing).toEqual([]);
   });
 
+  it('every theme tints its light-mode paper, apart from the deliberate exceptions', () => {
+    // Cards dominate the screen, so a theme whose card is pure #ffffff is
+    // distinguishable in light mode only by its accent -- which is exactly
+    // the sameness this branch removed. `default` keeps the stock identity,
+    // `midnight` is documented as neutral in light mode, and the two
+    // accessibility themes spend no contrast/CVD budget on decoration.
+    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'highcontrast', 'colorblind']);
+    const missing = COLOR_THEMES.filter(
+      (theme) =>
+        !UNTINTED_BY_DESIGN.has(theme) && !themeBlocks.light.get(theme)?.['--color-white'],
+    );
+    expect(missing).toEqual([]);
+  });
+
   it('every themes.css value is a literal 6-digit hex, for resolvePdfColor', () => {
     // resolvePdfColor (src/components/reports/resolve-pdf-color.ts) accepts
     // only #rrggbb and silently falls back to grey for anything else, so an

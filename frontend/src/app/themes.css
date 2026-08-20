@@ -12,7 +12,13 @@
  *   - sky-500/600 (legacy accent aliases -- focus rings and checkboxes now
  *     use the blue ramp directly, but a few components still render sky
  *     utilities, so themes keep overriding both ramps)
- *   - --color-white where the theme wants tinted "paper" cards
+ *   - --color-white where the theme wants tinted "paper" cards. Every theme
+ *     tints its paper at least subtly, so light mode is distinguishable by
+ *     its dominant surface and not only by the accent -- with four
+ *     deliberate exceptions: `default` (the stock identity), `midnight`
+ *     (neutral light mode by design), and `highcontrast`/`colorblind`
+ *     (accessibility themes, where a tint spends contrast/CVD budget for
+ *     no benefit).
  *   - the --chart-* tokens that don't already follow gray/blue automatically
  *
  * Light/dark behaviour stays with the existing mode setting: light mode uses
@@ -177,6 +183,8 @@ html.dark[data-theme='msmoney'] {
 
 /* ===== Nord -- arctic blue-grey (nordtheme.com), frost accent, aurora charts ===== */
 html[data-theme='nord'] {
+  --color-white: #f9fafc;
+
   --color-gray-50: #eceff4;
   --color-gray-100: #e5e9f0;
   --color-gray-200: #d8dee9;
@@ -247,6 +255,8 @@ html.dark[data-theme='nord'] {
 
 /* ===== Forest -- warm stone neutrals, forest-green accent ===== */
 html[data-theme='forest'] {
+  --color-white: #fbfaf7;
+
   --color-gray-50: #fafaf9;
   --color-gray-100: #f5f5f4;
   --color-gray-200: #e7e5e4;
@@ -283,7 +293,7 @@ html[data-theme='forest'] {
   --chart-3: #c9892e;
   --chart-4: #b5543d;
   --chart-5: #7a5c8f;
-  --chart-6: #8f9a3d;
+  --chart-6: #8b953b;
   --chart-7: #57a578;
   --chart-8: #8c6d4f;
   --chart-9: #356b5e;
@@ -525,12 +535,14 @@ html.dark[data-theme='newspaper'] {
 
 /* ===== Burgundy -- warm gray neutrals, deep wine accent ===== */
 html[data-theme='burgundy'] {
+  --color-white: #fbf8f7;
+
   --color-gray-50: #faf9f8;
   --color-gray-100: #f4f2f0;
   --color-gray-200: #e6e2df;
   --color-gray-300: #d3cdc9;
   --color-gray-400: #a39c97;
-  --color-gray-500: #7a736e;
+  --color-gray-500: #76706b;
   --color-gray-600: #5c5651;
   --color-gray-700: #46413d;
   --color-gray-800: #2e2a28;
@@ -662,12 +674,14 @@ html.dark[data-theme='gruvbox'] {
 
 /* ===== Dracula -- (draculatheme.com) purple accent, neon chart accents ===== */
 html[data-theme='dracula'] {
+  --color-white: #fbfaff;
+
   --color-gray-50: #f7f7fb;
   --color-gray-100: #ededf5;
   --color-gray-200: #dcdcea;
   --color-gray-300: #c0c2d8;
   --color-gray-400: #9a9cb8;
-  --color-gray-500: #6f7396;
+  --color-gray-500: #6d7193;
   --color-gray-600: #565a7c;
   --color-gray-700: #44475a;
   --color-gray-800: #343746;
@@ -731,6 +745,8 @@ html.dark[data-theme='dracula'] {
 
 /* ===== Tokyo Night -- indigo darks (github.com/tokyo-night), blue accent ===== */
 html[data-theme='tokyonight'] {
+  --color-white: #f9fafd;
+
   --color-gray-50: #eceef4;
   --color-gray-100: #e1e2e7;
   --color-gray-200: #d0d2de;
