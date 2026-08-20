@@ -173,6 +173,18 @@ markup would be fought everywhere. `SortableHeader` deliberately stays off
 header inside a `text-sm` table, and folding it in would restyle every report
 under cover of a refactor.
 
+### The card shadow is `--shadow-card`; the bare `shadow` reads no token
+
+A Tailwind v4 trap worth knowing before you try to restyle elevation: the
+bare `shadow` utility is a legacy alias with the stock value compiled into
+it, so redefining `--shadow-sm` in `@theme` does not touch it. It changes
+`shadow-sm`, which in this codebase is worn almost entirely by form fields --
+so that override puffs up every input and leaves every card exactly as flat.
+The mistake is invisible in the source and only shows in the built
+stylesheet, which is why `ui-conventions.test.ts` fails on a `--shadow-sm`
+redefinition. Card elevation goes through `--shadow-card`, worn by
+`CARD_CLASS`.
+
 ### A focus ring is `focus-visible:`, and a hover animates
 
 `focus:ring-*` paints on a mouse click as well as a Tab, which is the most
