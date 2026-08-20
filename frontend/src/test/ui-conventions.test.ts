@@ -1574,3 +1574,147 @@ describe("an icon name is never rendered as text", () => {
     );
   });
 });
+
+describe("a keyboard focus ring is focus-visible, never focus", () => {
+  /**
+   * `focus:ring-2` paints the ring on a mouse click as well as on a Tab, so
+   * every button in the app flashed a 2px offset halo when clicked. That is
+   * the single most visible "unfinished" tell in a UI, and the fix is one
+   * pseudo-class: `focus-visible` fires only when the browser judges the
+   * focus worth showing -- keyboard, not pointer.
+   *
+   * Text inputs are deliberately exempt, both here and in `inputBaseClasses`
+   * and the element selectors in `globals.css`: a field that shows its
+   * focused border after a click is telling the user where their typing will
+   * go, which is the opposite of noise.
+   *
+   * The baseline is **shrink-only**. Converting a file means deleting its
+   * line here; new code uses `focus-visible:` from the start.
+   */
+  const FOCUS_RING = /focus:ring-/;
+
+  /** The shared input styling, where a click-visible focus ring is correct. */
+  const INPUT_EXEMPT = new Set([
+    "/src/lib/utils.ts",
+    "/src/components/ui/Input.tsx",
+  ]);
+
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/app/categories/page.tsx",
+    "/src/app/currencies/page.tsx",
+    "/src/app/error.tsx",
+    "/src/app/institutions/page.tsx",
+    "/src/app/login/page.tsx",
+    "/src/app/not-found.tsx",
+    "/src/app/payees/page.tsx",
+    "/src/app/reports/page.tsx",
+    "/src/app/securities/page.tsx",
+    "/src/app/tags/page.tsx",
+    "/src/components/accounts/AccountForm.tsx",
+    "/src/components/accounts/LoanPaymentSetupDialog.tsx",
+    "/src/components/accounts/MortgageFields.tsx",
+    "/src/components/accounts/credit-card-detail/PaymentSetupDialog.tsx",
+    "/src/components/accounts/loan-detail/OverpaymentSimulator.tsx",
+    "/src/components/admin/UserManagementTable.tsx",
+    "/src/components/ai/ChatInterface.tsx",
+    "/src/components/auth/BackupCodesDisplay.tsx",
+    "/src/components/auth/TwoFactorVerify.tsx",
+    "/src/components/budgets/BudgetForm.tsx",
+    "/src/components/budgets/BudgetWizardCategories.tsx",
+    "/src/components/budgets/BudgetWizardStrategy.tsx",
+    "/src/components/categories/CategoryForm.tsx",
+    "/src/components/categories/DeleteCategoryDialog.tsx",
+    "/src/components/dashboard/TourBanner.tsx",
+    "/src/components/dashboard/UpcomingBills.tsx",
+    "/src/components/dashboard/WidgetCard.tsx",
+    "/src/components/import/CategoryMappingRow.tsx",
+    "/src/components/investments/InvestmentTransactionList.tsx",
+    "/src/components/layout/AppHeader.tsx",
+    "/src/components/layout/DelegationBanner.tsx",
+    "/src/components/payees/AutoMergePayeesDialog.tsx",
+    "/src/components/payees/CategoryAutoAssignDialog.tsx",
+    "/src/components/payees/MergePayeeDialog.tsx",
+    "/src/components/reconcile/ReconcileTable.tsx",
+    "/src/components/reports/CustomReportForm.tsx",
+    "/src/components/reports/FilterBuilder.tsx",
+    "/src/components/reports/MonteCarloReport.tsx",
+    "/src/components/reports/MonteCarloSaveAsDialog.tsx",
+    "/src/components/reports/ReportError.tsx",
+    "/src/components/scheduled-transactions/PostTransactionDialog.tsx",
+    "/src/components/scheduled-transactions/ScheduledTransactionForm.tsx",
+    "/src/components/securities/SecurityForm.tsx",
+    "/src/components/settings/ApiAccessSection.tsx",
+    "/src/components/settings/AutoBackupSection.tsx",
+    "/src/components/settings/DangerZoneSection.tsx",
+    "/src/components/settings/NotificationsSection.tsx",
+    "/src/components/strategies/GemInstrumentSelect.tsx",
+    "/src/components/tags/TagForm.tsx",
+    "/src/components/transactions/AccountInfoWidget.tsx",
+    "/src/components/transactions/BulkUpdateModal.tsx",
+    "/src/components/transactions/CategoryInfoWidget.tsx",
+    "/src/components/transactions/CurrencyPickerButton.tsx",
+    "/src/components/transactions/NormalTransactionFields.tsx",
+    "/src/components/transactions/PayeeInfoWidget.tsx",
+    "/src/components/transactions/SplitTransactionFields.tsx",
+    "/src/components/transactions/TransactionForm.tsx",
+    "/src/components/transactions/TransactionList.tsx",
+    "/src/components/transactions/TransactionRow.tsx",
+    "/src/components/ui/ColorPicker.tsx",
+    "/src/components/ui/ConfirmDialog.tsx",
+    "/src/components/ui/DragHandle.tsx",
+    "/src/components/ui/IconPicker.tsx",
+    "/src/components/ui/MultiSelect.tsx",
+    "/src/components/ui/Pagination.tsx",
+    "/src/components/ui/Select.tsx",
+    "/src/components/ui/ThemeToggle.tsx",
+    "/src/components/ui/UnsavedChangesDialog.tsx",
+  ];
+
+  function filesWithFocusRing(): string[] {
+    return productionSources()
+      .filter(([path]) => !INPUT_EXEMPT.has(path))
+      .filter(([, content]) => FOCUS_RING.test(content))
+      .map(([path]) => path);
+  }
+
+  it("has no focus:ring outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    const offenders = filesWithFocusRing().filter((path) => !allowed.has(path));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithFocusRing());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("the shared primitives are converted, so the rule has real subjects", () => {
+    // Button and Tabs are the two every screen renders; if either regressed to
+    // `focus:`, the baseline above would be hiding it rather than the rule
+    // catching it.
+    for (const path of ["/src/components/ui/Button.tsx", "/src/components/ui/Tabs.tsx"]) {
+      const content = sources[path];
+      expect(content, `${path} not found -- update this test`).toBeTruthy();
+      expect(FOCUS_RING.test(content), `${path} still uses focus:ring-`).toBe(false);
+      expect(content).toContain("focus-visible:ring-");
+    }
+  });
+});
+
+describe("text-md is not a Tailwind size", () => {
+  /**
+   * There is no `text-md` in Tailwind -- the scale runs `text-sm`,
+   * `text-base`, `text-lg`. A heading carrying it silently renders at the
+   * inherited size, so it looks like a heading that forgot to be one. Three
+   * of them sat in the Security settings section.
+   *
+   * No baseline: the class never does anything, so there is nothing to
+   * grandfather.
+   */
+  it("appears nowhere in the source", () => {
+    const offenders = productionSources()
+      .filter(([, content]) => /\btext-md\b/.test(content))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+});
