@@ -2141,6 +2141,48 @@ describe('SplitEditor — investment kind gating by parent account', () => {
 });
 
 describe('toSplitRows — investment shapes', () => {
+  // Issue #1167 R10-F1: a persisted rate of null is unknown FX, not 1. Coercing
+  // it to 1 let the server bless a synthetic 1 as the current cross-currency pair.
+  it('preserves a null scheduled investment rate as undefined, never 1 (R10-F1)', () => {
+    const rows = toSplitRows([
+      {
+        id: 's1',
+        amount: -1000,
+        kind: 'investment',
+        categoryId: null,
+        transferAccountId: null,
+        investmentAction: 'BUY',
+        investmentSecurityId: 'sec-1',
+        investmentQuantity: 10,
+        investmentPrice: 100,
+        investmentCommission: 0,
+        investmentExchangeRate: null,
+      },
+    ]);
+    expect(rows[0].investment?.exchangeRate).toBeUndefined();
+  });
+
+  it('preserves a null investmentTransaction rate as undefined, never 1 (R10-F1)', () => {
+    const rows = toSplitRows([
+      {
+        id: 's1',
+        amount: -1000,
+        kind: 'investment',
+        categoryId: null,
+        transferAccountId: null,
+        investmentTransaction: {
+          action: 'BUY',
+          securityId: 'sec-1',
+          quantity: 10,
+          price: 100,
+          commission: 0,
+          exchangeRate: null as never,
+        },
+      },
+    ]);
+    expect(rows[0].investment?.exchangeRate).toBeUndefined();
+  });
+
   it('hydrates investment fields from a transaction-split investmentTransaction relation', () => {
     const rows = toSplitRows([
       {

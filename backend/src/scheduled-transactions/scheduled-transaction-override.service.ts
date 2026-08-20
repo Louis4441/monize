@@ -237,6 +237,10 @@ export class ScheduledTransactionOverrideService {
       this.validateOverrideSplits(updateDto.splits, amount);
     }
 
+    // Moving the occurrence's date is an in-place update, so the row (and its
+    // split identities / FX provenance) survives (issue #1167 R10-F3).
+    if (updateDto.overrideDate !== undefined)
+      override.overrideDate = updateDto.overrideDate;
     if (updateDto.amount !== undefined) override.amount = updateDto.amount;
     if (updateDto.categoryId !== undefined)
       override.categoryId = updateDto.categoryId ?? null;

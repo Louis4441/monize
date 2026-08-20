@@ -157,6 +157,19 @@ export class CreateScheduledTransactionOverrideDto {
 }
 
 export class UpdateScheduledTransactionOverrideDto {
+  // Moving an occurrence's date is an update of the existing override, not a
+  // delete-then-recreate (issue #1167 R10-F3): recreating loses the override's
+  // split identities, so a validly pinned FX rate could no longer be correlated
+  // and was silently re-resolved. `originalDate` (which scheduled occurrence this
+  // overrides) is the row's identity and does not change; only `overrideDate`
+  // (the actual date) moves.
+  @ApiPropertyOptional({
+    description: "New actual date for this occurrence (YYYY-MM-DD)",
+  })
+  @IsOptional()
+  @IsDateString()
+  overrideDate?: string;
+
   @ApiPropertyOptional({ description: "Overridden amount" })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 4 })

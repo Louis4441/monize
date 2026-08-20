@@ -274,6 +274,32 @@ amount is refused there rather than written.
   blessed as an explicit pair rate. When the new pair has no available rate the line
   is left unresolved (`undefined`), never `1`, so posting refuses rather than
   converting at par.
+- **A null persisted rate is unknown FX; a null-rate source is stamped only with
+  proven intent (R10-F1).** `toSplitRows` no longer coerces a null persisted
+  investment rate to `1` (`?? 1`) -- it preserves `undefined`, so a legacy split
+  with unknown FX carries no rate rather than a synthetic `1`. And the shared
+  decision separates the two states that both surface as `src.rate === null`: a
+  matched source that carried no investment rate (a category/transfer line, or a
+  legacy investment split with unknown FX) acquires the current pair **only** when
+  the incoming rate is proven fresh (`rateExplicit`); otherwise it stays
+  unprovenanced and posting re-resolves. Stamping it unconditionally blessed the
+  synthetic `1` as the current cross-currency rate.
+- **Manual Post honours `rateExplicit` regardless of `sourceSplitId` (R10-F2).**
+  The inline-post rate decision keyed its explicit-intent clause off
+  `!sourceSplitId`, so a continuing row's honest edit was ignored: a same-value
+  re-entry (`1.50` re-typed for a changed pair) and a category->investment
+  conversion in the Post dialog were both re-resolved to market. `rateExplicit`
+  now means fresh current-pair intent whether or not the row names a source; a
+  rate merely changed from its source stays fresh too.
+- **Moving an occurrence's date is an in-place update, not delete+create
+  (R10-F3).** `UpdateScheduledTransactionOverrideDto` carries `overrideDate`, the
+  override service applies it, and the editor moves a date through `updateOverride`
+  (keeping the row's id and its split identities) rather than deleting the override
+  and recreating it. Recreation correlated the new payload against the *base*
+  schedule splits -- never the deleted override's -- so a validly pinned rate lost
+  its provenance and was re-resolved. `originalDate` (the row's identity) is
+  unchanged; only `overrideDate` moves, and provenance is decided against the
+  existing override, so an unchanged pinned rate is preserved.
 
 ## Test matrix (regression obligations)
 
@@ -393,6 +419,26 @@ For each of the three surfaces:
     left `undefined` (not `1`) and the amount `0`. Companion: `meta.rateEdited` is true
     only for a rate-input edit, and a continuing line with `exchangeRateEdited`
     serializes `rateExplicit: true`.
+
+20. **Null persisted rate stays unknown (R10-F1).** `toSplitRows` maps a null
+    scheduled/investment-transaction rate to `undefined`, never `1` (both branches).
+    And `update()` with a matched null-rate source that resends a rate without
+    `rateExplicit` leaves the split unprovenanced (pair null, resolver not called),
+    not stamped current. Break-on-purpose confirms the guard fails when the
+    null-rate branch is removed.
+
+21. **Manual Post honours explicit intent on a continuing row (R10-F2).** Post an
+    inline split with `sourceSplitId` present, `rateExplicit: true`, and a value
+    equal to the stored one (same-value re-entry) against a stale-pair source;
+    assert the entered rate is honoured (`1.50`, `-1,500`), not re-resolved to the
+    `1.35` market.
+
+22. **Override date-move preserves the pinned pair (R10-F3).** `updateOverride`
+    with a changed `overrideDate` and a resent-unchanged pinned split (`1.37`
+    USD/CAD, `sourceSplitId` naming the existing override split) applies the new
+    date and preserves `1.37` USD/CAD (resolver not called, so a since-changed pair
+    is not substituted). Component-level: a date-only edit calls `updateOverride`
+    with the new `overrideDate` and never `deleteOverride`/`createOverride`.
 
 Adversarial inputs drawn from `docs/testing-contract.md`: same-currency pair (rate
 1, provenance recorded as `{X, X}` and always matches), a security-less amount-only

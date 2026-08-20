@@ -242,6 +242,9 @@ export interface CreateScheduledTransactionOverrideData {
 }
 
 export interface UpdateScheduledTransactionOverrideData {
+  // Moving the occurrence's date updates the existing override in place, so its
+  // split identities and FX provenance survive (issue #1167 R10-F3).
+  overrideDate?: string;
   amount?: number | null;
   categoryId?: string | null;
   description?: string | null;

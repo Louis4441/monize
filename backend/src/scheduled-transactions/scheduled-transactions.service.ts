@@ -1261,6 +1261,16 @@ export class ScheduledTransactionsService {
       ) {
         return { from: src.from, to: src.to };
       }
+      // A matched source that carried NO investment rate (src.rate === null: a
+      // category/transfer line, or a legacy investment split with unknown FX)
+      // acquires the current pair only when the rate is proven fresh -- the user
+      // marked it `rateExplicit`. Otherwise it stays unprovenanced and posting
+      // re-resolves it: stamping here would bless a synthetic scalar (e.g. a null
+      // rate the client serialized as 1) as the current cross-currency rate
+      // (issue #1167 R10-F1).
+      if (src.rate === null && !incoming.rateExplicit) {
+        return { from: null, to: null };
+      }
       return stampCurrent();
     }
     if (incoming.rateExplicit) return stampCurrent();
@@ -2875,11 +2885,16 @@ export class ScheduledTransactionsService {
               const userEdited =
                 incomingRate !== null &&
                 incomingRate > 0 &&
-                // A rate the user changed from its source is fresh for the current
-                // pair; so is a rate on a line the client marked new (rateExplicit,
-                // no sourceSplitId) -- both are honoured, not re-resolved (R8-F2).
-                ((srcRate !== undefined && incomingRate !== srcRate) ||
-                  (!split.sourceSplitId && split.rateExplicit === true));
+                // `rateExplicit` means the client asserts this rate is a deliberate
+                // value for the current pair -- a new line, OR a continuing line
+                // whose rate the user actually edited (incl. a same-value re-entry,
+                // and a category->investment conversion). It is honoured regardless
+                // of whether the row carries a sourceSplitId (issue #1167 R10-F2);
+                // gating it on `!sourceSplitId` ignored the intent on exactly the
+                // continuing rows that need it. A changed-from-source rate is also
+                // fresh even when the client sent no explicit flag.
+                (split.rateExplicit === true ||
+                  (srcRate !== undefined && incomingRate !== srcRate));
               if (userEdited && split.investment.securityId) {
                 // A rate the user changed from the source is a fresh rate for the
                 // current settlement pair, so stamp that pair -- reused (honoured),

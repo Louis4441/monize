@@ -1041,7 +1041,13 @@ export function toSplitRows(splits: {
         quantity: Number(split.investmentTransaction.quantity ?? 0),
         price: Number(split.investmentTransaction.price ?? 0),
         commission: Number(split.investmentTransaction.commission ?? 0),
-        exchangeRate: Number(split.investmentTransaction.exchangeRate ?? 1),
+        // A persisted rate of null is unknown FX, not 1 (issue #1167 R10-F1):
+        // coercing it to 1 lets the server bless a synthetic 1 as the current
+        // pair. Preserve undefined so the split carries no rate.
+        exchangeRate:
+          split.investmentTransaction.exchangeRate != null
+            ? Number(split.investmentTransaction.exchangeRate)
+            : undefined,
       };
     } else if (split.investmentAction) {
       investment = {
@@ -1050,7 +1056,15 @@ export function toSplitRows(splits: {
         quantity: Number(split.investmentQuantity ?? 0),
         price: Number(split.investmentPrice ?? 0),
         commission: Number(split.investmentCommission ?? 0),
-        exchangeRate: Number(split.investmentExchangeRate ?? 1),
+        // A persisted scheduled rate of null is unknown FX, not 1 (issue #1167
+        // R10-F1): coercing it to 1 lets a cosmetic edit bless a synthetic 1 as
+        // the current cross-currency pair. Preserve undefined -- the cross-currency
+        // field then resolves the real rate, and a matched null-rate source is not
+        // stamped unless the user actually enters one.
+        exchangeRate:
+          split.investmentExchangeRate != null
+            ? Number(split.investmentExchangeRate)
+            : undefined,
         // Carry the server-recorded currency pair (issue #1167 F5-1) so a Post
         // that resends this line unchanged lets the server tell a still-valid
         // rate from a since-stale one, rather than trusting the scalar blindly.
