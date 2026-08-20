@@ -1398,13 +1398,35 @@ Values must be literal 6-digit hex: `resolvePdfColor` accepts nothing else and
 silently falls back to grey. `frontend/scripts/derive-dark-palette.mjs` generates a
 starting point for a new palette; the test, not the script, is the authority.
 
-**Light mode is distinguishable by its paper, not only by its accent.** Nine
-themes left `--color-white` at pure white, so their cards -- the dominant
-surface on every screen -- were identical and only the buttons and charts
-differed. Every theme now tints its paper, except `default` (the stock
-identity), `midnight` (documented neutral light mode) and
-`highcontrast`/`colorblind`, where a tint spends contrast and CVD budget for
-nothing. That policy is asserted, so the four exceptions read as decisions.
+**The gray ramp is the theme, and it is generated.** Cards, pages, borders
+and most text all read from the gray ramp, so it covers nearly every pixel,
+while the accent shows up only on buttons, links and chart series. Themes
+whose ramps were near-neutral therefore looked interchangeable no matter how
+distinct their accents were -- and a first attempt at fixing it by tinting
+`--color-white` a percent or two did not move anything, because at that
+lightness sRGB has almost no chroma to give.
+
+So the ramps come from `frontend/scripts/derive-theme-ramp.mjs`: one lightness
+curve and one chroma profile shared by every theme, with only the HUE
+varying. Two consequences worth knowing before editing a palette by hand.
+Contrast is a property of the curve rather than of each value, so it is
+checked once. And chroma is spent as a *share of what the hue can hold*
+rather than as a flat number, because the gamut is wildly asymmetric near
+white -- at L 0.95 a green carries about four times the chroma of a blue, so
+a flat target tints the warm themes hard and leaves the cool ones looking
+untouched. Themes that shift hue between their light and dark ends (parchment
+over navy) concentrate the shift in the midtones and damp chroma across it,
+so the ramp does not detour through a colour the theme never chose.
+
+Four themes are deliberately ungenerated and near-neutral: `default` (the
+stock identity), `midnight` (a black AMOLED palette by design) and
+`highcontrast`/`colorblind`, where chroma spends contrast and CVD budget for
+nothing. That policy is asserted, so the exceptions read as decisions.
+
+Changing the curve is a change to every theme at once, which is the point --
+but it moves every value sitting on those surfaces too, so expect the guard
+to name chart colours and accents that need re-seating, and re-seat them
+rather than widening the debt register.
 
 **A theme preview is a copy of the stylesheet, and copies rot.** A browser
 only computes the *active* theme's custom properties, so the picker's swatches

@@ -180,14 +180,6 @@ const KNOWN_CONTRAST_DEBT = new Set<string>([
   'colorblind light chart-3-on-card',
   'colorblind light chart-6-on-card',
   'colorblind light chart-7-on-card',
-  // -- light muted text a shade too light on its own paper --
-  'latte light muted-on-card',
-  'msmoney light muted-on-card',
-  'newspaper light muted-on-card',
-  'nord light muted-on-card',
-  'solarized light muted-on-card',
-  'gruvbox light muted-on-card',
-  'rosepine light muted-on-card',
   // -- accents picked as text-on-white, carrying white button text --
   'nord light button-text',
   'default dark button-text',
@@ -197,9 +189,6 @@ const KNOWN_CONTRAST_DEBT = new Set<string>([
   'gruvbox dark button-text',
   'dracula dark button-text',
   'midnight dark button-text',
-  // -- canonical upstream surfaces this compressed by design; the card
-  //    border and shadow carry the separation there --
-  'rosepine dark card-vs-page',
 ]);
 
 describe('theme contrast invariants', () => {
@@ -238,7 +227,9 @@ describe('theme CSS structure', () => {
   });
 
   it('the parser still finds a known token, so the checks cannot pass over an empty set', () => {
-    expect(themeBlocks.light.get('latte')?.['--color-white']).toBe('#fbf7ef');
+    // Assert the shape, not the value: pinning a literal here makes every
+    // palette edit fail a test about the parser rather than about the colour.
+    expect(themeBlocks.light.get('latte')?.['--color-white']).toMatch(/^#[0-9a-f]{6}$/);
     expect(globals.root['--chart-1']).toBeTruthy();
     expect(globals.dark['--chart-1']).toBeTruthy();
   });
