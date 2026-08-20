@@ -359,6 +359,23 @@ cannot recover from the sign of a column they are looking at in a spreadsheet.
 Its twin is `transferCsvLabel` in `frontend/src/lib/transfer-label.ts`; the QIF
 export keeps Quicken's `L[Account]` form and is deliberately untouched.
 
+## A blank transfer payee is stored blank and resolved at read time
+
+A transfer created without a payee persists `payee_name` as NULL (issue #1214);
+the display label ("Transfer to Savings") is resolved per read from the linked
+leg's account -- its CURRENT name, in the reader's language -- so renames and
+language switches reach every historical row. The English form for
+machine-facing surfaces (CSV/QIF export, AI/MCP rows, custom reports) lives
+only in `src/transactions/transfer-payee-label.util.ts`, and
+`transfer-payee-stamp.guard.spec.ts` fails on a `Transfer to/from ${...}`
+template anywhere else in `src/`. Migration 161 blanked the rows the old
+writers stamped (exact match against the counterpart's current name only);
+`updateTransfer` heals a surviving legacy stamp to NULL when it recognises
+one, and never regenerates it. A read surface that joins
+`linkedTransaction.account` for this must mask or restrict cross-owner
+counterparts the reader cannot read -- the account export masks, the custom
+report query restricts the join to same-owner legs.
+
 The guard also asks what a value *is* rather than what it starts with, matching
 its twin in `frontend/src/lib/csv-export.ts`: a value a spreadsheet reads as a
 number is data, and prefixing one stops the column adding up (issue #1134).

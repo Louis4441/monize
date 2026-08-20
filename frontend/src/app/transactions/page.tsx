@@ -27,7 +27,7 @@ const ChartLoadingPlaceholder = () => (
 const BalanceHistoryChart = dynamic(() => import('@/components/transactions/BalanceHistoryChart').then(m => m.BalanceHistoryChart), { ssr: false, loading: ChartLoadingPlaceholder });
 const CategoryPayeeBarChart = dynamic(() => import('@/components/transactions/CategoryPayeeBarChart').then(m => m.CategoryPayeeBarChart), { ssr: false, loading: ChartLoadingPlaceholder });
 const AccountBalancesBarChart = dynamic(() => import('@/components/transactions/AccountBalancesBarChart').then(m => m.AccountBalancesBarChart), { ssr: false, loading: ChartLoadingPlaceholder });
-import { transferCsvLabel } from '@/lib/transfer-label';
+import { transferCsvLabel, transferPayeeCsvLabel } from '@/lib/transfer-label';
 import { transactionsApi } from '@/lib/transactions';
 import { accountsApi } from '@/lib/accounts';
 import { institutionsApi } from '@/lib/institutions';
@@ -914,7 +914,9 @@ function TransactionsContent() {
         return [
           tx.transactionDate,
           tx.account?.name ?? '',
-          tx.payee?.name ?? tx.payeeName ?? '',
+          // Blank-payee transfer legs export the same "Transfer to <account>"
+          // text the register resolves at render time (issue #1214).
+          tx.payee?.name ?? tx.payeeName ?? transferPayeeCsvLabel(tx) ?? '',
           categoryCell,
           tx.description ?? '',
           tx.tags?.map(t => t.name).join('; ') ?? '',

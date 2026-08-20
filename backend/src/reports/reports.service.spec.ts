@@ -2276,6 +2276,40 @@ describe("ReportsService", () => {
         expect(result.data).toEqual([]);
       });
 
+      it("resolves a blank transfer payee from the linked account (issue #1214, NONE metric mode)", async () => {
+        // A transfer persisted with no payee labels itself from the linked
+        // leg's current account name, ahead of the description -- the same
+        // text the register shows for the row.
+        const transactions = [
+          createMockTransaction({
+            id: "tx-1",
+            payeeId: null,
+            payee: null,
+            payeeName: null,
+            isTransfer: true,
+            amount: -250,
+            description: "monthly move",
+            linkedTransactionId: "tx-2",
+            linkedTransaction: {
+              id: "tx-2",
+              account: { id: "acc-2", name: "Savings" },
+            },
+          } as unknown as Partial<Transaction>),
+        ];
+        setupExecuteMocks(
+          {
+            groupBy: GroupByType.NONE,
+            config: { ...defaultConfig, metric: MetricType.NONE },
+          },
+          transactions,
+        );
+
+        const result = await service.execute("user-1", "report-1");
+
+        expect(result.data[0].label).toBe("Transfer to Savings");
+        expect(result.data[0].payee).toBe("Transfer to Savings");
+      });
+
       it("uses description as label when payeeName is null (NONE metric mode)", async () => {
         const transactions = [
           createMockTransaction({
