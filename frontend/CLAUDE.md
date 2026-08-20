@@ -121,6 +121,23 @@ deleting its baseline line, and new code takes the primitive from the start.
 Everything in it stays on the gray ramp so the colour themes re-skin it --
 never add a literal hex or an off-ramp hue to a card.
 
+**A theme with a strong border is a test the rest of the app has to pass.**
+Ten dashboard widgets drew the borderless trio by hand while thirteen went
+through `WidgetCard` -> `Card`, so half the dashboard had an edge and half did
+not. Nobody could see it while the border was `gray-200`; raising
+`highcontrast`'s to `#b0b0b0` turned it into alternating outlined and
+un-outlined panels. All twenty-three now resolve to `CARD_CLASS`.
+
+The tempting fix is the other one -- drop the border so everything matches the
+widgets that had none -- and the numbers say no. Card-versus-page luminance is
+1.045 in `default` light, 1.044 in `midnight` and exactly **1.000** in
+`highcontrast`, whose page and card are both pure white. In those three the
+border is the only thing that defines a card at all, so removing it does not
+make the dashboard consistent, it makes the panels disappear. Every other
+theme clears the guard's 1.15 separation floor and would have survived it,
+which is exactly why this is worth writing down: the change looks safe from
+any theme except the three it breaks.
+
 ### A category's colour and icon are inherited, and drawn by `CategoryGlyph`
 
 A category shows its own colour and icon, or the nearest ancestor's when it
