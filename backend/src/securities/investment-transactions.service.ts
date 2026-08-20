@@ -17,6 +17,7 @@ import {
   LockedInvestmentTransactionRow,
 } from "../common/db/locks";
 import { applyVoidTransitionToMirrorLeg } from "../transactions/void-status-transition.util";
+import { assertReconciledRowsMutable } from "../transactions/reconciled-lock.util";
 import { investmentRowHasEffect } from "./investment-row-effects.util";
 import { formatInvestmentCashPayeeName } from "./investment-cash-payee.util";
 import {
@@ -2474,14 +2475,10 @@ export class InvestmentTransactionsService {
       );
     }
 
-    await manager.update(TransactionSplit, splitId, {
-      amount: newSplitAmount,
-    });
-
-    // Locked: the delta below reverses `oldParentAmount`, so it has to be the
-    // version this write replaces. Two concurrent edits to the same parent's
-    // splits would otherwise each apply a delta derived from the same stale
-    // amount (audit P4-003).
+    // Locked first, before any write: the delta below reverses `oldParentAmount`,
+    // so it has to be the version this write replaces. Two concurrent edits to
+    // the same parent's splits would otherwise each apply a delta derived from
+    // the same stale amount (audit P4-003).
     const parentTransaction = await lockTransactionRow(
       manager,
       split.transactionId,
@@ -2496,6 +2493,18 @@ export class InvestmentTransactionsService {
         ),
       );
     }
+
+    // INV-RECONCILE-001: editing an embedded investment row rewrites this split's
+    // amount and the parent transaction's total, so a reconciled locked parent
+    // refuses the change -- "not its fields, not its splits". Runs after the row
+    // lock and before the first write, so the refusal reverses nothing. Editing
+    // the split amount used to happen before the parent was even loaded, which is
+    // why this had to move above that write rather than beside it.
+    await assertReconciledRowsMutable(manager, userId, [parentTransaction]);
+
+    await manager.update(TransactionSplit, splitId, {
+      amount: newSplitAmount,
+    });
 
     const siblingSplits = await manager.find(TransactionSplit, {
       where: { transactionId: split.transactionId },
