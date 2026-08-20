@@ -48,6 +48,19 @@ const securities: MappedSecurities = mapSecurities({
   activeHandles: new Set([1]),
 });
 
+// A file mixing a lot-tracked fund with a lot-less instrument (a CD, savings
+// bond or money-market fund): Money records the CD's trades but keeps no `LOT`
+// row for it.
+const securitiesWithCd: MappedSecurities = mapSecurities({
+  securities: [
+    mnySecurity({ handle: 1, symbol: "VOO", name: "Vanguard" }),
+    mnySecurity({ handle: 2, symbol: "CD-5PCT", name: "5% Certificate" }),
+  ],
+  currencyByHandle: new Map(),
+  baseCurrency: "USD",
+  activeHandles: new Set([1, 2]),
+});
+
 function tx(
   action: InvestmentAction,
   quantity: number | null,
@@ -254,5 +267,60 @@ describe("crossCheckHoldings", () => {
     });
 
     expect(result.checks[0].matches).toBe(true);
+  });
+
+  // Money keeps no `LOT` row for a CD, savings bond or money-market fund, so its
+  // open-lot reading is a spurious zero. The report must reconcile it against
+  // the transaction replay -- Money's own data -- rather than flag a difference
+  // the correct import never introduced.
+  it("reconciles a lot-less security against its replay, not a zero", () => {
+    const result = crossCheckHoldings({
+      accounts: accountsFixture(),
+      securities: securitiesWithCd,
+      transactions: [
+        tx(InvestmentAction.BUY, 10),
+        tx(InvestmentAction.BUY, 5, { securityHandle: 2 }),
+      ],
+      // A LOT row for the fund only; the CD has none.
+      lots: [mnyLot({ account: 10, security: 1, quantity: 10 })],
+    });
+
+    const cd = result.checks.find((check) => check.symbol === "CD-5PCT");
+    expect(cd).toMatchObject({
+      lotQuantity: 5,
+      replayQuantity: 5,
+      delta: 0,
+      matches: true,
+    });
+    expect(result.warnings).toEqual([]);
+  });
+
+  // A security that genuinely has an open lot but disagrees with the replay is
+  // still a real mismatch: the lot-less fallback must not swallow it.
+  it("still flags a security whose open lot disagrees with the replay", () => {
+    const result = crossCheckHoldings({
+      accounts: accountsFixture(),
+      securities: securitiesWithCd,
+      transactions: [
+        tx(InvestmentAction.BUY, 10),
+        tx(InvestmentAction.BUY, 5, { securityHandle: 2 }),
+      ],
+      lots: [
+        mnyLot({ account: 10, security: 1, quantity: 10 }),
+        mnyLot({ account: 10, security: 2, quantity: 4 }),
+      ],
+    });
+
+    const cd = result.checks.find((check) => check.symbol === "CD-5PCT");
+    expect(cd).toMatchObject({
+      lotQuantity: 4,
+      replayQuantity: 5,
+      matches: false,
+    });
+    expect(result.warnings).toContainEqual({
+      code: "holdingsMismatch",
+      subject: "Brokerage - Investments: CD-5PCT",
+      detail: "replay 5 vs lots 4",
+    });
   });
 });
