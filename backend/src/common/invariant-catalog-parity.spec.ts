@@ -16,28 +16,55 @@ import { join } from "path";
  * Both documents write their IDs as the first cell of a table row (`| INV-... |`
  * in the Index, `| INV-... <description> |` in the matrix), so the same
  * line-anchored match reads both.
+ *
+ * The IDs are collected as a **list**, not a set, so a duplicated row is visible.
+ * Set equality alone would pass a document that carried the same ID twice -- and
+ * a duplicate matrix row is worse than a missing one, because the two copies can
+ * disagree about the required-test classification and nothing says which the
+ * reader should believe. So each document is first checked for duplicate rows,
+ * then the de-duplicated sets are compared for one-to-one coverage.
  */
 const DOCS = join(__dirname, "..", "..", "..", "docs");
 
-function tableRowInvariantIds(file: string): Set<string> {
+function tableRowInvariantIdList(file: string): string[] {
   const text = readFileSync(join(DOCS, file), "utf8");
-  const ids = new Set<string>();
+  const ids: string[] = [];
   for (const line of text.split("\n")) {
     const match = /^\|\s*(INV-[A-Z]+-\d+)\b/.exec(line);
-    if (match) ids.add(match[1]);
+    if (match) ids.push(match[1]);
   }
   return ids;
 }
 
+function duplicates(ids: string[]): string[] {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) repeated.add(id);
+    else seen.add(id);
+  }
+  return [...repeated].sort();
+}
+
 describe("the invariant catalog and the verification matrix cover the same IDs", () => {
-  const catalog = tableRowInvariantIds("system-invariants.md");
-  const matrix = tableRowInvariantIds("verification-contract.md");
+  const catalogList = tableRowInvariantIdList("system-invariants.md");
+  const matrixList = tableRowInvariantIdList("verification-contract.md");
+  const catalog = new Set(catalogList);
+  const matrix = new Set(matrixList);
 
   it("reads a plausible number of invariants from each document", () => {
-    // A parsing regression (a reformatted table) would empty one set and make
+    // A parsing regression (a reformatted table) would empty one list and make
     // the parity checks below pass vacuously; anchor them against reality.
     expect(catalog.size).toBeGreaterThan(20);
     expect(matrix.size).toBeGreaterThan(20);
+  });
+
+  it("has no invariant catalogued twice", () => {
+    expect(duplicates(catalogList)).toEqual([]);
+  });
+
+  it("has no invariant in the verification matrix twice", () => {
+    expect(duplicates(matrixList)).toEqual([]);
   });
 
   it("gives every catalogued invariant a verification-matrix row", () => {
