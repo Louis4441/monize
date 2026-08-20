@@ -1407,16 +1407,33 @@ distinct their accents were -- and a first attempt at fixing it by tinting
 lightness sRGB has almost no chroma to give.
 
 So the ramps come from `frontend/scripts/derive-theme-ramp.mjs`: one lightness
-curve and one chroma profile shared by every theme, with only the HUE
-varying. Two consequences worth knowing before editing a palette by hand.
+curve shared by every theme, with each theme setting its own hue and
+intensity. Three consequences worth knowing before editing a palette by hand.
 Contrast is a property of the curve rather than of each value, so it is
-checked once. And chroma is spent as a *share of what the hue can hold*
-rather than as a flat number, because the gamut is wildly asymmetric near
-white -- at L 0.95 a green carries about four times the chroma of a blue, so
-a flat target tints the warm themes hard and leaves the cool ones looking
-untouched. Themes that shift hue between their light and dark ends (parchment
-over navy) concentrate the shift in the midtones and damp chroma across it,
-so the ramp does not detour through a colour the theme never chose.
+checked once. Chroma is spent as a *share of what the hue can hold* rather
+than as a flat number, because the gamut is wildly asymmetric near white --
+at L 0.95 a green carries about four times the chroma of a blue, so a flat
+target tints the warm themes hard and leaves the cool ones looking untouched.
+And themes that shift hue between their light and dark ends (parchment over
+navy) concentrate the shift in the midtones and damp chroma across it, so the
+ramp does not detour through a colour the theme never chose.
+
+**Intensity is not a tuning knob, it is half the identity.** A version that
+varied only the hue flattened every palette into the same theme at a
+different angle, and a human reported both costs: palettes whose hues sat
+close became indistinguishable (gruvbox and solarized read as one cream,
+newspaper and burgundy as one pink), and MS Money -- whose character is *pale*
+parchment with navy text and a green accent -- became a yellow theme wearing
+MS Money's accent. Cream and parchment is a crowded, legitimate family that
+hue alone cannot separate; its members are told apart by how strongly the
+paper is tinted and by where the ramp's dark end goes.
+
+That is why `theme-swatches.test.ts` measures **perceptual distance** between
+every pair of tinted papers rather than comparing hex strings. Byte-equality
+is far too weak a test for "these look the same": the reported collisions
+differed in every byte, and the closest measured 0.0032 in OKLab. Eleven
+tinted themes on one hue wheel do have a bounded best case, so the floors are
+set below the achievable minimum rather than at some ideal.
 
 Four themes are deliberately ungenerated and near-neutral: `default` (the
 stock identity), `midnight` (a black AMOLED palette by design) and

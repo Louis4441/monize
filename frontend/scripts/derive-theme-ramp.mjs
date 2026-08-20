@@ -88,26 +88,52 @@ const CHROMA_CAP = {
 const GAMUT_SHARE = 0.9;
 
 /**
- * Per-theme hue, in OKLCH degrees.
+ * Per-theme identity: hue at each end of the ramp, and how hard to tint.
  *
- * Several palettes deliberately shift hue between their light and dark ends
- * -- MS Money is parchment over navy, newspaper is salmon paper over slate --
- * so each theme names a light hue and a dark hue and the ramp interpolates
- * between them across the midtones. Where a theme is one hue throughout,
- * both are the same.
+ * `intensity` scales the chroma profile, and it matters as much as hue.
+ * A first pass varied only the hue, which flattened every palette into "the
+ * same theme at a different angle" and had two visible costs. Themes whose
+ * hues sit close became indistinguishable -- latte, gruvbox, solarized and
+ * MS Money were crammed into twelve degrees of cream. And a theme whose
+ * character WAS its intensity lost it: MS Money is pale parchment with navy
+ * text and a deep green accent, so rendering it as saturated butter made it
+ * a yellow theme wearing MS Money's accent.
+ *
+ * Cream and parchment is a crowded, legitimate family, and hue alone cannot
+ * separate its members -- they genuinely occupy the same arc. What separates
+ * them is how strongly the paper is tinted, where the ramp's dark end goes,
+ * and the accent. So the four warm themes sit at four intensities (pale
+ * ivory, warm cream, soft wheat, rich butter) and run to four different
+ * darks (navy, taupe, teal, brown).
+ *
+ * Hues are spread so no two themes sit within ~20 degrees at a comparable
+ * intensity; where they are closer than that, the intensities differ enough
+ * that the papers do not read alike.
  */
 const THEMES = {
-  latte: { light: 84, dark: 66, note: 'warm cream paper over taupe darks' },
-  msmoney: { light: 96, dark: 248, note: 'parchment paper over Money navy' },
-  newspaper: { light: 52, dark: 268, note: 'salmon FT paper over navy slate' },
-  burgundy: { light: 32, dark: 12, note: 'warm neutrals deepening into wine' },
-  nord: { light: 248, dark: 254, note: 'arctic blue-grey throughout' },
-  forest: { light: 132, dark: 146, note: 'green-tinted paper over forest darks' },
-  solarized: { light: 92, dark: 205, note: 'base3 yellow over base03 cyan' },
-  gruvbox: { light: 88, dark: 72, note: 'retro warm throughout' },
-  dracula: { light: 300, dark: 292, note: 'violet throughout' },
-  tokyonight: { light: 272, dark: 278, note: 'indigo throughout' },
-  rosepine: { light: 18, dark: 296, note: 'dawn rose over main iris' },
+  // -- the cream/parchment family, separated by intensity and by dark end --
+  msmoney: {
+    light: 84,
+    dark: 250,
+    intensity: 0.32,
+    note: 'pale parchment over Money navy -- the palest of the warm papers',
+  },
+  latte: { light: 70, dark: 58, intensity: 0.82, note: 'warm caramel cream over taupe' },
+  solarized: { light: 118, dark: 200, intensity: 0.68, note: 'soft wheat base3 over base03 teal' },
+  gruvbox: { light: 94, dark: 74, intensity: 1.15, note: 'rich retro butter, the most saturated paper' },
+
+  // -- warm reds, spread apart so salmon and wine do not meet --
+  // Reds run out of gamut near white sooner than yellows do, so these carry
+  // a higher intensity to land at a comparable tint.
+  newspaper: { light: 42, dark: 268, intensity: 0.95, note: 'FT salmon paper over navy slate' },
+  burgundy: { light: 12, dark: 4, intensity: 1.0, note: 'rose paper deepening into wine' },
+  rosepine: { light: 337, dark: 295, intensity: 0.75, note: 'dawn rose over main iris' },
+
+  // -- greens and cools --
+  forest: { light: 148, dark: 152, intensity: 0.85, note: 'green paper over forest darks' },
+  nord: { light: 245, dark: 258, intensity: 1.0, note: 'arctic blue-grey throughout' },
+  tokyonight: { light: 275, dark: 283, intensity: 0.95, note: 'indigo throughout' },
+  dracula: { light: 303, dark: 296, intensity: 0.9, note: 'violet throughout' },
 };
 
 const STEPS = ['white', 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
@@ -175,9 +201,12 @@ function maxChroma(L, H) {
   return c;
 }
 
-/** The lesser of the step's cap and a fixed share of the available gamut. */
-function chromaFor(step, L, H) {
-  return Math.min(CHROMA_CAP[step], GAMUT_SHARE * maxChroma(L, H));
+/**
+ * The lesser of the step's cap and a fixed share of the available gamut,
+ * scaled by the theme's own intensity.
+ */
+function chromaFor(step, L, H, intensity) {
+  return Math.min(CHROMA_CAP[step], GAMUT_SHARE * maxChroma(L, H)) * intensity;
 }
 
 /** Back off chroma until the colour is representable in sRGB. */
@@ -209,7 +238,7 @@ for (const [name, cfg] of Object.entries(THEMES)) {
     const t = HUE_POSITION[step];
     const hue = mixHue(cfg.light, cfg.dark, t);
     const delta = ((cfg.dark - cfg.light + 540) % 360) - 180;
-    const base = chromaFor(step, LIGHTNESS[step], hue);
+    const base = chromaFor(step, LIGHTNESS[step], hue, cfg.intensity);
     const hex = toHex(LIGHTNESS[step], base * chromaDamp(delta, t), hue);
     const token = step === 'white' ? '--color-white' : `--color-gray-${step}`;
     lines.push(`  ${token}: ${hex};`);
@@ -217,7 +246,7 @@ for (const [name, cfg] of Object.entries(THEMES)) {
   // The dark-mode table stripe sits between the card (800) and page (900).
   const stripeL = (LIGHTNESS[800] + LIGHTNESS[900]) / 2;
   lines.push(
-    `  --color-table-stripe-dark: ${toHex(stripeL, chromaFor(900, stripeL, cfg.dark), cfg.dark)};`,
+    `  --color-table-stripe-dark: ${toHex(stripeL, chromaFor(900, stripeL, cfg.dark, cfg.intensity), cfg.dark)};`,
   );
   lines.push('');
 }

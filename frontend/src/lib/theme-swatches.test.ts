@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { COLOR_THEMES } from '@/lib/color-themes';
 import { THEME_SWATCHES, type ThemeSwatch } from '@/lib/theme-swatches';
-import { resolveHex, themeTokens, type Mode } from '@/test/theme-css';
+import { oklabDistance, resolveHex, themeTokens, type Mode } from '@/test/theme-css';
 
 /**
  * `THEME_SWATCHES` claims to show what each palette looks like. A browser can
@@ -79,5 +79,44 @@ describe('THEME_SWATCHES matches the stylesheets', () => {
       }
       expect(duplicates).toEqual([]);
     }
+  });
+
+  it('no two tinted themes share a paper a reader cannot tell apart', () => {
+    // Byte-equality is far too weak a test for "these look the same", and
+    // this is the check that was missing: gruvbox and solarized differed in
+    // every byte while rendering as one cream, and so did newspaper and
+    // burgundy as one pink. Both passed the duplicate check above and both
+    // were reported by a human looking at the running app.
+    //
+    // So compare the papers by perceptual distance in OKLab instead. The
+    // floors are set below the current minimum with margin, and comfortably
+    // above the collisions that were reported -- the worst of those measured
+    // 0.0032 between two cards.
+    const MIN_CARD_DISTANCE = 0.008;
+    const MIN_PAGE_DISTANCE = 0.015;
+
+    // The four themes that deliberately keep a neutral, untinted paper. They
+    // all share a literally white card, so a paper-distance rule cannot apply
+    // to them; the duplicate check above still holds them apart by accent and
+    // chart colours, which is what actually distinguishes them.
+    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'highcontrast', 'colorblind']);
+    const tinted = COLOR_THEMES.filter((theme) => !UNTINTED_BY_DESIGN.has(theme));
+
+    const tooClose: string[] = [];
+    for (let i = 0; i < tinted.length; i += 1) {
+      for (let j = i + 1; j < tinted.length; j += 1) {
+        const a = THEME_SWATCHES[tinted[i]].light;
+        const b = THEME_SWATCHES[tinted[j]].light;
+        const card = oklabDistance(a.card, b.card);
+        const page = oklabDistance(a.page, b.page);
+        if (card < MIN_CARD_DISTANCE || page < MIN_PAGE_DISTANCE) {
+          tooClose.push(
+            `${tinted[i]} / ${tinted[j]}: card ${card.toFixed(4)} (min ${MIN_CARD_DISTANCE}), ` +
+              `page ${page.toFixed(4)} (min ${MIN_PAGE_DISTANCE})`,
+          );
+        }
+      }
+    }
+    expect(tooClose).toEqual([]);
   });
 });
