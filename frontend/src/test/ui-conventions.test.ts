@@ -1304,7 +1304,6 @@ describe("a panel card is the shared Card surface", () => {
     "/src/components/transactions/TagKeyBreakdownChart.tsx",
     "/src/components/transactions/TransactionFilterPanel.tsx",
     "/src/components/ui/CalendarPopover.tsx",
-    "/src/components/ui/LoadingSkeleton.tsx",
     "/src/components/ui/Modal.tsx",
     "/src/components/ui/Pagination.tsx",
   ];
@@ -2151,5 +2150,128 @@ describe("a status pill is Badge, not a hand-rolled rounded-full", () => {
       badge.indexOf("const BADGE_SIZES"),
     );
     expect(variants).not.toMatch(/#[0-9a-f]{3,6}/i);
+  });
+});
+
+describe("table chrome comes from Table.tsx, not a repeated divide string", () => {
+  /**
+   * `divide-y divide-gray-200 dark:divide-gray-700` was written out 147 times
+   * across 81 files, and the header cell existed in at least six paddings.
+   * None of it could be restyled together.
+   *
+   * `Table.tsx` is constants plus two thin cells rather than a `<Table>`
+   * wrapper, because these tables are hand-laid -- colspans, sticky cells,
+   * per-density padding -- and a component owning the markup would be fought
+   * at every call site. What drifted was the chrome, so that is what is
+   * shared.
+   *
+   * The baseline is **shrink-only**: converting a file removes its line.
+   */
+  const TABLE = "/src/components/ui/Table.tsx";
+  const DIVIDE_FINGERPRINT = "divide-y divide-gray-200 dark:divide-gray-700";
+
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/app/reports/page.tsx",
+    "/src/components/accounts/AccountList.tsx",
+    "/src/components/accounts/loan-detail/AmortizationScheduleTable.tsx",
+    "/src/components/accounts/loan-detail/SavedScenariosPanel.tsx",
+    "/src/components/admin/UserManagementTable.tsx",
+    "/src/components/budgets/BudgetPeriodDetail.tsx",
+    "/src/components/categories/CategoryList.tsx",
+    "/src/components/categories/detail/CategorySubcategoriesTab.tsx",
+    "/src/components/currencies/CurrencyList.tsx",
+    "/src/components/institutions/InstitutionAccountsManager.tsx",
+    "/src/components/institutions/InstitutionList.tsx",
+    "/src/components/investments/GroupedHoldingsList.tsx",
+    "/src/components/investments/HoldingsList.tsx",
+    "/src/components/investments/InvestmentTransactionList.tsx",
+    "/src/components/payees/CategoryAutoAssignDialog.tsx",
+    "/src/components/payees/DeactivateUnusedPayeesDialog.tsx",
+    "/src/components/payees/PayeeList.tsx",
+    "/src/components/reconcile/ReconcileTable.tsx",
+    "/src/components/reconcile/ReconciliationReminderBadge.tsx",
+    "/src/components/reports/AccountBalancesReport.tsx",
+    "/src/components/reports/BillPaymentHistoryReport.tsx",
+    "/src/components/reports/CashFlowReport.tsx",
+    "/src/components/reports/CreditUtilizationReport.tsx",
+    "/src/components/reports/CurrencyExposureReport.tsx",
+    "/src/components/reports/DividendIncomeReport.tsx",
+    "/src/components/reports/DividendYieldGrowthReport.tsx",
+    "/src/components/reports/DuplicateTransactionReport.tsx",
+    "/src/components/reports/GeographicAllocationReport.tsx",
+    "/src/components/reports/IncomeBySourceReport.tsx",
+    "/src/components/reports/IncomeVsExpensesReport.tsx",
+    "/src/components/reports/InvestmentPerformanceReport.tsx",
+    "/src/components/reports/InvestmentReportColumnChooser.tsx",
+    "/src/components/reports/InvestmentReportViewer.tsx",
+    "/src/components/reports/InvestmentTransactionHistoryReport.tsx",
+    "/src/components/reports/LoanAmortizationReport.tsx",
+    "/src/components/reports/MonteCarloHoldingStatsTable.tsx",
+    "/src/components/reports/MonteCarloPerformanceSummary.tsx",
+    "/src/components/reports/MonteCarloResultsTable.tsx",
+    "/src/components/reports/MonthlyComparisonReport.tsx",
+    "/src/components/reports/MonthlySpendingTrendReport.tsx",
+    "/src/components/reports/NetWorthReport.tsx",
+    "/src/components/reports/PortfolioValueReport.tsx",
+    "/src/components/reports/RealizedGainsReport.tsx",
+    "/src/components/reports/RecurringExpensesReport.tsx",
+    "/src/components/reports/ReportChart.tsx",
+    "/src/components/reports/SectorWeightingsReport.tsx",
+    "/src/components/reports/SecurityPerformanceReport.tsx",
+    "/src/components/reports/SecurityTypeAllocationReport.tsx",
+    "/src/components/reports/SpendingByCategoryReport.tsx",
+    "/src/components/reports/SpendingByPayeeReport.tsx",
+    "/src/components/reports/TaxSummaryReport.tsx",
+    "/src/components/reports/UncategorizedTransactionsReport.tsx",
+    "/src/components/reports/UpcomingBillsReport.tsx",
+    "/src/components/reports/YearOverYearReport.tsx",
+    "/src/components/reports/monte-carlo/CompareMetricTable.tsx",
+    "/src/components/scheduled-transactions/ScheduledTransactionList.tsx",
+    "/src/components/securities/SecurityList.tsx",
+    "/src/components/securities/SecurityLookupPicker.tsx",
+    "/src/components/securities/SecurityPriceHistory.tsx",
+    "/src/components/securities/SecurityTransactionHistory.tsx",
+    "/src/components/securities/detail/SecurityAccountsTable.tsx",
+    "/src/components/securities/detail/SecurityDocumentsTab.tsx",
+    "/src/components/securities/detail/SecurityNewsTab.tsx",
+    "/src/components/settings/TourCatalog.tsx",
+    "/src/components/tags/TagList.tsx",
+    "/src/components/transactions/SplitEditor.tsx",
+    "/src/components/transactions/TransactionList.tsx",
+    "/src/components/ui/LoadingSkeleton.tsx",
+    "/src/components/whats-new/WhatsNewModal.tsx",
+  ];
+
+  function filesWithInlineDivide(): string[] {
+    return productionSources()
+      .filter(([path]) => path !== TABLE)
+      .filter(([, content]) => content.includes(DIVIDE_FINGERPRINT))
+      .map(([path]) => path);
+  }
+
+  it("has no inline divide string outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    const offenders = filesWithInlineDivide().filter((path) => !allowed.has(path));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithInlineDivide());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("still finds the shared chrome, so the rule cannot pass by accident", () => {
+    const table = sources[TABLE];
+    expect(table, `${TABLE} not found -- update TABLE in this test`).toBeTruthy();
+    expect(table).toContain(DIVIDE_FINGERPRINT);
+  });
+
+  it("the skeletons use the real card, so nothing shifts when data arrives", () => {
+    // Every LoadingSkeleton export hand-rolled the card trio, so a skeleton
+    // was missing the 1px border a real card draws and the layout moved on
+    // load.
+    const skeleton = sources["/src/components/ui/LoadingSkeleton.tsx"];
+    expect(skeleton).toContain("CARD_CLASS");
+    expect(skeleton).not.toContain("bg-white dark:bg-gray-800");
   });
 });
