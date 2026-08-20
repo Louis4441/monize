@@ -2061,3 +2061,95 @@ describe("a dialog is titled through Modal, not by a hand-rolled heading", () =>
     expect(modal).toContain("aria-labelledby={title ? titleId : undefined}");
   });
 });
+
+describe("a status pill is Badge, not a hand-rolled rounded-full", () => {
+  /**
+   * The same pill shape -- `rounded-full` + `text-xs` + `font-medium` -- was
+   * written out about fifty times, in six padding combinations, with each
+   * colour pair spelled out at the call site. Two lists side by side
+   * disagreed on how big a pill was and how strong its tint.
+   *
+   * The exemptions are pills whose colour carries meaning of its own, each
+   * already a single source of truth: `CategoryPill` mixes the category's own
+   * colour, `ACCOUNT_TYPE_META` maps a type to its classes, and
+   * `SCHEDULED_KIND_CHIP_CLASSES` maps the four scheduled kinds. Flattening
+   * any of them into a generic variant would throw that mapping away.
+   *
+   * The baseline is **shrink-only**: converting a file removes its line.
+   */
+  const BADGE = "/src/components/ui/Badge.tsx";
+  const MEANINGFUL_PILLS = new Set([
+    "/src/components/transactions/CategoryPill.tsx",
+    "/src/lib/account-type-meta.tsx",
+    "/src/lib/scheduled-kind.ts",
+  ]);
+  const PILL_FINGERPRINT =
+    /rounded-full[^"'`]*(?:text-xs|text-\[10px\])[^"'`]*font-medium|(?:text-xs|text-\[10px\])[^"'`]*font-medium[^"'`]*rounded-full|rounded-full[^"'`]*font-medium[^"'`]*(?:text-xs|text-\[10px\])/;
+
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/app/budgets/page.tsx",
+    "/src/components/budgets/BudgetCategoryTrend.tsx",
+    "/src/components/budgets/BudgetPeriodDetail.tsx",
+    "/src/components/budgets/BudgetWizard.tsx",
+    "/src/components/categories/detail/CategoryDetailHeader.tsx",
+    "/src/components/insights/InsightsList.tsx",
+    "/src/components/payees/AutoMergePayeesDialog.tsx",
+    "/src/components/payees/CategoryAutoAssignDialog.tsx",
+    "/src/components/payees/detail/PayeeDetailHeader.tsx",
+    "/src/components/reconcile/ReconcileTable.tsx",
+    "/src/components/reports/DuplicateTransactionReport.tsx",
+    "/src/components/reports/FilterBuilder.tsx",
+    "/src/components/reports/RecurringExpensesReport.tsx",
+    "/src/components/reports/SpendingAnomaliesReport.tsx",
+    "/src/components/scheduled-transactions/BillsFilterPanel.tsx",
+    "/src/components/scheduled-transactions/ScheduledTransactionList.tsx",
+    "/src/components/securities/SecurityList.tsx",
+    "/src/components/securities/detail/SecurityDetailHeader.tsx",
+    "/src/components/securities/detail/SecurityPositionInfoCard.tsx",
+    "/src/components/securities/detail/SecurityPositionState.tsx",
+    "/src/components/settings/BackupRestoreSection.tsx",
+    "/src/components/settings/SecuritySection.tsx",
+    "/src/components/transactions/AccountInfoWidget.tsx",
+    "/src/components/transactions/CategoryInfoWidget.tsx",
+    "/src/components/transactions/PayeeInfoWidget.tsx",
+    "/src/components/transactions/TransactionFilterPanel.tsx",
+    "/src/components/transactions/TransactionForm.tsx",
+    "/src/components/transactions/TransactionRow.tsx",
+  ];
+
+  function filesWithInlinePill(): string[] {
+    return productionSources()
+      .filter(([path]) => path !== BADGE && !MEANINGFUL_PILLS.has(path))
+      .filter(([, content]) => PILL_FINGERPRINT.test(content))
+      .map(([path]) => path);
+  }
+
+  it("has no hand-rolled pill outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    const offenders = filesWithInlinePill().filter((path) => !allowed.has(path));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithInlinePill());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("still finds the primitive, so the rule cannot pass by accident", () => {
+    const badge = sources[BADGE];
+    expect(badge, `${BADGE} not found -- update BADGE in this test`).toBeTruthy();
+    expect(badge).toContain("rounded-full");
+    expect(badge).toContain("font-medium");
+  });
+
+  it("every Badge variant stays on the theme ramps", () => {
+    // A literal hex here would look right on the default palette and stay
+    // that colour on the other fourteen.
+    const badge = sources[BADGE];
+    const variants = badge.slice(
+      badge.indexOf("const BADGE_VARIANTS"),
+      badge.indexOf("const BADGE_SIZES"),
+    );
+    expect(variants).not.toMatch(/#[0-9a-f]{3,6}/i);
+  });
+});
