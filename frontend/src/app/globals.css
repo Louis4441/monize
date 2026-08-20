@@ -142,11 +142,33 @@ body {
   --chart-10: #6366f1;
 }
 
+/* Dark-mode chart defaults. The light `--chart-1..10` above are picked to sit
+   on white paper; on a dark card they read as low-contrast mud, so dark mode
+   lifts the whole series to the Tailwind 400 step and follows the accent at
+   blue-400 rather than blue-500. These defaults reach only the `default` and
+   `midnight` palettes: every other theme sets chart tokens in its
+   `html[data-theme]` block, whose specificity beats `.dark`, so each of those
+   themes carries its own `html.dark[data-theme]` block in themes.css
+   (src/test/theme-contrast.test.ts enforces that pairing). */
 .dark {
+  --chart-primary: var(--color-blue-400);
   --chart-grid: var(--color-gray-700);
   --chart-axis: var(--color-gray-400);
   --chart-surface: var(--color-gray-800);
   --chart-neutral: var(--color-gray-500);
+  --chart-income: #34d399;
+  --chart-expense: #f87171;
+  --chart-warning: #fbbf24;
+  --chart-1: #60a5fa;
+  --chart-2: #34d399;
+  --chart-3: #fbbf24;
+  --chart-4: #f87171;
+  --chart-5: #a78bfa;
+  --chart-6: #f472b6;
+  --chart-7: #22d3ee;
+  --chart-8: #a3e635;
+  --chart-9: #fb923c;
+  --chart-10: #818cf8;
 }
 
 /* Form element styling (replaces @tailwindcss/forms) */
