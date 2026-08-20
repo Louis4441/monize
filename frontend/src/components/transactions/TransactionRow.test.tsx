@@ -115,6 +115,67 @@ describe('TransactionRow', () => {
     expect(onPayeeClick).toHaveBeenCalledWith('p1');
   });
 
+  it('resolves a blank transfer payee from the linked account (issue #1214)', () => {
+    // A transfer persisted with no payee (the stored state since #1214)
+    // shows "Transfer to <account>" resolved at render time from the linked
+    // leg's CURRENT account name, localized -- not a dash, and not a stamped
+    // string from creation time.
+    renderRow({}, {
+      payeeId: null,
+      payeeName: null,
+      payee: null,
+      isTransfer: true,
+      amount: -250,
+      categoryId: null,
+      category: null,
+      linkedTransactionId: 't2',
+      linkedTransaction: {
+        id: 't2',
+        accountId: 'a2',
+        account: { id: 'a2', name: 'Savings' },
+      } as any,
+    });
+    expect(screen.getByText('Transfer to Savings')).toBeInTheDocument();
+  });
+
+  it('resolves the receiving leg as Transfer from (issue #1214)', () => {
+    renderRow({}, {
+      payeeId: null,
+      payeeName: null,
+      payee: null,
+      isTransfer: true,
+      amount: 250,
+      categoryId: null,
+      category: null,
+      linkedTransactionId: 't2',
+      linkedTransaction: {
+        id: 't2',
+        accountId: 'a2',
+        account: { id: 'a2', name: 'Chequing' },
+      } as any,
+    });
+    expect(screen.getByText('Transfer from Chequing')).toBeInTheDocument();
+  });
+
+  it('keeps a stored payee over the resolved transfer label', () => {
+    // A custom label (or a legacy stamp the migration could not match) wins.
+    renderRow({}, {
+      payeeId: null,
+      payeeName: 'Transfer to Old Name',
+      payee: null,
+      isTransfer: true,
+      amount: -250,
+      linkedTransactionId: 't2',
+      linkedTransaction: {
+        id: 't2',
+        accountId: 'a2',
+        account: { id: 'a2', name: 'Savings' },
+      } as any,
+    });
+    expect(screen.getByText('Transfer to Old Name')).toBeInTheDocument();
+    expect(screen.queryByText('Transfer to Savings')).not.toBeInTheDocument();
+  });
+
   it('renders payee as text when no payeeId', () => {
     renderRow({}, { payeeId: null, payeeName: null });
     // Multiple "-" in row

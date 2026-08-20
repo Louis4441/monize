@@ -15,6 +15,7 @@ import { HIGHLIGHT_FLASH, HIGHLIGHT_FLASH_CELL } from '@/hooks/useHighlightTarge
 import { formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
 import { foreignTransactionFee } from '@/lib/fx-fees';
 import { transferDirection } from '@/lib/transfer-label';
+import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { StaleUnreconciledReason } from '@/lib/stale-reconciliation';
 
@@ -246,10 +247,12 @@ export const TransactionRow = memo(function TransactionRow({
       rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [isHighlighted]);
-  // Prefer the denormalized payeeName, but fall back to the linked payee's name
-  // so a transaction that has only payeeId set (e.g. created via the REST API
-  // without payeeName) still shows the payee instead of a dash.
-  const payeeLabel = transaction.payeeName || transaction.payee?.name || null;
+  // Prefer the denormalized payeeName, then the linked payee's name (a
+  // transaction with only payeeId set still shows its payee), then -- for a
+  // transfer leg with no payee at all -- the label resolved from the linked
+  // account's current name, localized (issue #1214).
+  const payeeDisplay = usePayeeDisplay();
+  const payeeLabel = payeeDisplay(transaction);
 
   // Fee paid, as a positive cost in the account currency. 0 means no fee
   // applied (e.g. recorded before the account's fee percentage was configured).

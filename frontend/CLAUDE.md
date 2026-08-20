@@ -866,6 +866,20 @@ new `? 'to' : 'from'` outside the helper.
 Coerce before comparing: `'-67.9900' < 0` is false, and a decimal string is what
 the API sends, so a hand-rolled comparison labels every debit backwards.
 
+### A transaction's payee display is `usePayeeDisplay`, never a bare `payeeName` read
+
+A transfer created with a blank payee is PERSISTED blank (issue #1214) --
+nothing stamps "Transfer to Savings" into the row any more, and migration 161
+blanked the rows the old writers stamped. The label is resolved at render
+time: `usePayeeDisplay()` (`hooks/usePayeeDisplay.ts`) returns the stored
+payee when there is one and otherwise, for a transfer leg, the localized
+`common.transferPayee` string built from `linkedTransaction.account.name` --
+the counterpart's CURRENT name, so an account rename or a language switch
+updates every historical row at once. A surface that reads
+`tx.payeeName || tx.payee?.name` directly shows those transfers as unnamed.
+English CSV exports use `transferPayeeCsvLabel` (`lib/transfer-label.ts`), the
+byte-identical twin of the backend's `transferPayeeLabel`.
+
 ### A CSV file is written by `exportToCsv`, and a number in it is a number
 
 `lib/csv-export.ts` is the only CSV writer: it owns the BOM, the CRLF line
