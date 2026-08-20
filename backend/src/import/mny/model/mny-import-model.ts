@@ -359,8 +359,9 @@ export interface MappedInvestmentTransaction {
   readonly commission: number;
   /**
    * Accrued interest Money recorded on the row (`TRN_INV.amtInt`), taken out of
-   * `totalAmount` and written as the linked INTEREST companion. Mapping-time
-   * metadata: the companion row is what persists, and there is no column here.
+    * `totalAmount`. Mapping-time metadata: it becomes the linked INTEREST
+    * companion when the cash split collapses, or is cleared when a preserved
+    * sibling split leg already records the interest. There is no column here.
    */
   readonly accruedInterest: number;
   /** Positive magnitude of the transaction, in the account's currency. */

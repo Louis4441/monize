@@ -7403,6 +7403,25 @@ describe("InvestmentTransactionsService", () => {
     });
 
     describe("delete", () => {
+      it("refuses direct deletion of the companion before changing either row", async () => {
+        investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+          createMockQueryBuilder(storedCompanion()),
+        );
+        investmentTransactionsRepository.findOne.mockResolvedValue(
+          storedRedemption(),
+        );
+
+        await expect(service.remove(userId, companionId)).rejects.toThrow(
+          BadRequestException,
+        );
+
+        expect(investmentTransactionsRepository.remove).not.toHaveBeenCalled();
+        expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+        expect(accountsService.updateBalance).not.toHaveBeenCalled();
+        expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+        expect(mockActionHistoryService.record).not.toHaveBeenCalled();
+      });
+
       it("removes the companion with the redemption and reverses the cash once", async () => {
         investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
           createMockQueryBuilder(storedRedemption()),

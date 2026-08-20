@@ -63,9 +63,10 @@ refused (section 2, invariant 6).
 4. **Two rows, one event, one status.** The companion is created with the
    redemption's status, follows it across the VOID boundary, and is deleted with
    it. A VOID redemption's companion is VOID and moves no cash.
-5. **The companion is not independently editable.** It is materialized from the
-   redemption's `accruedInterest`; editing it directly is refused with a pointer
-   at the redemption, the same shape as the split-embedded status refusal.
+5. **The companion is not independently mutable.** It is materialized from the
+   redemption's `accruedInterest`; editing or deleting it directly is refused
+   with a pointer at the redemption, the same shape as the split-embedded status
+   refusal. Deleting the redemption still deletes the pair.
 6. **Accrued interest is refused where it cannot be honoured.** A non-`REDEEM`
    action, a negative value, or an embedded split row (`transaction_split_id`
    set, where the parent split leg is already the cash side) is a
@@ -132,7 +133,11 @@ today `indexDetails` in `backend/src/import/mny/map/map-investments.ts` drops it
    cash row **only** when the parent has exactly two legs, one of them the
    investment leg, and the sibling leg's amount equals `amtInt`. Any other
    shape keeps today's split fidelity untouched -- a split that means something
-   else must not be rewritten because one leg happened to be a redemption.
+   else must not be rewritten because one leg happened to be a redemption. In
+   that non-collapse shape, the preserved sibling remains the interest record;
+   the generated companion and its redemption back-link are discarded after
+   cash-source mapping so income is not counted twice and an embedded row does
+   not carry a state the write API refuses.
 3. `act` 30 maps to `REDEEM` in `ACTION_BY_CODE` already. That mapping is
    asserted at the code-map level only, so this change adds a writer-level
    regression test that a mapped `act` 30 row persists with `action = REDEEM`.
@@ -151,7 +156,7 @@ Per `docs/verification-contract.md` and the adversarial list in
 | Guard (source scan) | no hand-rolled `proceeds + interest` addition outside `accrued-interest.util.ts` |
 | Service | create with and without interest; the cash row amount and the account balance |
 | Service | edit raising, lowering, removing and adding accrued interest, asserting the balance delta each time |
-| Service | delete removes companion and cash row and reverses exactly the combined amount once |
+| Service | deleting the redemption removes companion and cash row and reverses exactly the combined amount once; deleting the companion directly is refused before mutation |
 | Service | VOID redemption creates a VOID companion and moves no balance; un-voiding moves the combined amount |
 | Service | future-dated redemption defers the balance but writes the cash row |
 | Service | cross-currency redemption converts the combined figure at one rate |
@@ -160,7 +165,7 @@ Per `docs/verification-contract.md` and the adversarial list in
 | Financial | the interest appears exactly once in dividend/interest income |
 | Import | `act` 30 persists as `REDEEM` (writer level) |
 | Import | `amtInt` becomes the companion and `TRN.amt - amtInt` the proceeds |
-| Import | a two-leg split matching `amtInt` collapses; a three-leg split, or a two-leg split whose sibling does not match, does not |
+| Import | a two-leg split matching `amtInt` collapses; a three-leg split, or a two-leg split whose sibling does not match, stays intact and has no generated companion or back-link |
 | Frontend | the ledger renders one row for the pair, with the combined total |
 | Frontend | the accrued-interest input appears for REDEEM and for no other action |
 | Frontend | `redemptionTotalWithInterest` treats an absent field as no interest, so a page served by an older backend still renders |

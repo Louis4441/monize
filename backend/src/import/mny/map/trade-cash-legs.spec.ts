@@ -25,6 +25,7 @@ import { mapInvestments } from "./map-investments";
 import {
   applyInvestmentCashSources,
   investmentWritesOwnCashRow,
+  reconcileEmbeddedAccruedInterest,
   tradesByHandle,
 } from "./investment-cash";
 
@@ -123,9 +124,11 @@ function mapAll(
     cashKeyByAccountKey: cashKeyByAccountKey(mappedAccounts),
     tradesByHandle: tradesByHandle(mappedInvestments),
   });
-  const investments = applyInvestmentCashSources(
-    mappedInvestments,
-    banking.investmentCashSources,
+  const investments = reconcileEmbeddedAccruedInterest(
+    applyInvestmentCashSources(
+      mappedInvestments,
+      banking.investmentCashSources,
+    ),
   );
 
   /** Every row a given account's register will hold, from both writers. */
@@ -661,12 +664,21 @@ describe("a redemption whose interest Money put in a sibling split leg", () => {
     expect(
       investments.transactions.find(
         (row) => row.action === InvestmentAction.REDEEM,
-      )?.transactionSplitId,
-    ).toBe(parent?.splits[0].id);
+      ),
+    ).toMatchObject({
+      transactionSplitId: parent?.splits[0].id,
+      linkedInvestmentId: null,
+      accruedInterest: 0,
+    });
+    expect(
+      investments.transactions.filter(
+        (row) => row.action === InvestmentAction.INTEREST,
+      ),
+    ).toHaveLength(0);
   });
 
   it("keeps a three-leg split", () => {
-    const { banking } = mapAll(
+    const { banking, investments } = mapAll(
       redemptionRows([
         { handle: 21, amount: PRINCIPAL },
         { handle: 22, amount: INTEREST },
@@ -678,5 +690,19 @@ describe("a redemption whose interest Money put in a sibling split leg", () => {
     const parent = banking.transactions.find((row) => row.handle === 20);
     expect(parent?.splits).toHaveLength(3);
     expect(parent?.collapsedTradeHandle).toBeNull();
+    expect(
+      investments.transactions.find(
+        (row) => row.action === InvestmentAction.REDEEM,
+      ),
+    ).toMatchObject({
+      transactionSplitId: parent?.splits[0].id,
+      linkedInvestmentId: null,
+      accruedInterest: 0,
+    });
+    expect(
+      investments.transactions.filter(
+        (row) => row.action === InvestmentAction.INTEREST,
+      ),
+    ).toHaveLength(0);
   });
 });

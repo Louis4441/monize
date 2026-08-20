@@ -1,6 +1,9 @@
 import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
 import { roundFxRate } from "../../../common/fx-entry.util";
-import { disposalCashAmount } from "../../../securities/accrued-interest.util";
+import {
+  disposalCashAmount,
+  supportsAccruedInterest,
+} from "../../../securities/accrued-interest.util";
 import {
   MappedInvestmentTransaction,
   MappedInvestments,
@@ -134,5 +137,48 @@ export function applyInvestmentCashSources(
               ),
       };
     }),
+  };
+}
+
+/**
+ * Drops generated interest companions when Money's original split was kept.
+ * The preserved sibling leg already records that income, and an embedded
+ * investment row cannot carry a companion through the normal write API.
+ */
+export function reconcileEmbeddedAccruedInterest(
+  investments: MappedInvestments,
+): MappedInvestments {
+  const embeddedRedemptions = investments.transactions.filter(
+    (transaction) =>
+      supportsAccruedInterest(transaction.action) &&
+      transaction.transactionSplitId !== null &&
+      transaction.linkedInvestmentId !== null,
+  );
+  if (embeddedRedemptions.length === 0) {
+    return investments;
+  }
+
+  const redemptionIds = new Set(
+    embeddedRedemptions.map((transaction) => transaction.id),
+  );
+  const companionIds = new Set(
+    embeddedRedemptions.map(
+      (transaction) => transaction.linkedInvestmentId as string,
+    ),
+  );
+
+  return {
+    ...investments,
+    transactions: investments.transactions
+      .filter((transaction) => !companionIds.has(transaction.id))
+      .map((transaction) =>
+        redemptionIds.has(transaction.id)
+          ? {
+              ...transaction,
+              accruedInterest: 0,
+              linkedInvestmentId: null,
+            }
+          : transaction,
+      ),
   };
 }

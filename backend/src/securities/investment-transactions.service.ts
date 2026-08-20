@@ -4222,6 +4222,17 @@ export class InvestmentTransactionsService {
           }),
         )
       : null;
+    if (
+      linkedLeg &&
+      isAccruedInterestCompanion(transaction, linkedLeg)
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.securities.accruedInterestCompanionLocked",
+          "This interest row records the accrued interest of a redemption. Edit the redemption's accrued interest instead, so both sides change together.",
+        ),
+      );
+    }
     if (linkedLeg) {
       beforeData.linkedTransferLeg = { ...linkedLeg };
     }
