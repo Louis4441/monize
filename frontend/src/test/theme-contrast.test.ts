@@ -1,131 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { COLOR_THEMES } from '@/lib/color-themes';
-
-/**
- * Contrast invariants for the colour themes in `src/app/themes.css` and the
- * defaults in `src/app/globals.css`.
- *
- * The defect this guards against: a palette value that looks plausible in the
- * file and is unreadable in the app -- a light-tuned chart colour on a dark
- * card, a muted text grey that faded into its surface, a page and card two
- * near-identical darks apart. Each of those shipped before this test existed.
- * The values are hand- or script-derived (scripts/derive-dark-palette.mjs),
- * but the invariant lives here, measured against the CSS that ships.
- *
- * The token maps are built the way the cascade actually layers them:
- * stock Tailwind values, then globals.css `:root`, then (dark) globals
- * `.dark`, then the theme's `html[data-theme]` block -- whose specificity
- * (0,1,1) beats `.dark` (0,1,0), which is why every theme that overrides
- * chart tokens needs its own `html.dark[data-theme]` block -- then (dark)
- * that dark block. A theme missing its dark block fails the coverage test
- * below before any ratio is measured.
- *
- * Known shortfalls that predate this test are recorded in
- * KNOWN_CONTRAST_DEBT, which is shrink-only: an entry that starts passing
- * must be deleted, and no new failure may be added.
- */
-
-// Read the stylesheets off disk rather than via import.meta.glob with
-// `?raw`: Vitest's CSS handling intercepts .css modules first and hands back
-// an empty string, which would let every check pass over an empty token set
-// (the "still finds a known token" test below would catch it, but there is
-// no reason to depend on that).
-const themesCss = readFileSync(resolve(process.cwd(), 'src/app/themes.css'), 'utf8');
-const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
-
-// Stock Tailwind v4 values as sRGB hex, for the tokens the checks read. The
-// default palette is the only consumer (every other theme overrides these).
-// Risk: a Tailwind upgrade that retunes its oklch ramp would drift from this
-// fixture; these change rarely and the default theme's checks would only be
-// off by that drift, not silently skipped.
-const STOCK: Record<string, string> = {
-  '--color-white': '#ffffff',
-  '--color-gray-50': '#f9fafb',
-  '--color-gray-100': '#f3f4f6',
-  '--color-gray-200': '#e5e7eb',
-  '--color-gray-300': '#d1d5db',
-  '--color-gray-400': '#99a1af',
-  '--color-gray-500': '#6a7282',
-  '--color-gray-600': '#4a5565',
-  '--color-gray-700': '#364153',
-  '--color-gray-800': '#1e2939',
-  '--color-gray-900': '#101828',
-  '--color-gray-950': '#030712',
-  '--color-blue-400': '#51a2ff',
-  '--color-blue-500': '#2b7fff',
-  '--color-blue-600': '#155dfc',
-};
-
-type Decls = Record<string, string>;
-
-function parseDecls(body: string): Decls {
-  const decls: Decls = {};
-  for (const match of body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
-    decls[match[1]] = match[2].trim();
-  }
-  return decls;
-}
-
-/** `html[data-theme='x']` and `html.dark[data-theme='x']` blocks. */
-function parseThemeBlocks(css: string): {
-  light: Map<string, Decls>;
-  dark: Map<string, Decls>;
-} {
-  const light = new Map<string, Decls>();
-  const dark = new Map<string, Decls>();
-  for (const match of css.matchAll(
-    /html(\.dark)?\[data-theme='([a-z]+)'\]\s*\{([^}]*)\}/g,
-  )) {
-    const target = match[1] ? dark : light;
-    target.set(match[2], parseDecls(match[3]));
-  }
-  return { light, dark };
-}
-
-/** Merged `:root { ... }` and `.dark { ... }` declarations from globals.css.
- *  Selector must be exactly `:root`/`.dark` (descendant selectors like
- *  `.dark body` are surface styling, not token definitions). */
-function parseGlobals(css: string): { root: Decls; dark: Decls } {
-  const root: Decls = {};
-  const dark: Decls = {};
-  for (const match of css.matchAll(/(?:^|\n)(:root|\.dark)\s*\{([^}]*)\}/g)) {
-    Object.assign(match[1] === ':root' ? root : dark, parseDecls(match[2]));
-  }
-  return { root, dark };
-}
-
-const themeBlocks = parseThemeBlocks(themesCss);
-const globals = parseGlobals(globalsCss);
-
-type Mode = 'light' | 'dark';
-
-function tokens(theme: string, mode: Mode): Decls {
-  return {
-    ...STOCK,
-    ...globals.root,
-    ...(mode === 'dark' ? globals.dark : {}),
-    ...(themeBlocks.light.get(theme) ?? {}),
-    ...(mode === 'dark' ? (themeBlocks.dark.get(theme) ?? {}) : {}),
-  };
-}
-
-function resolveHex(decls: Decls, name: string): string {
-  let value = decls[name];
-  for (let i = 0; i < 10 && value; i += 1) {
-    const ref = value.match(/^var\((--[\w-]+)\)$/);
-    if (!ref) break;
-    value = decls[ref[1]];
-  }
-  if (!value || !/^#[0-9a-f]{6}$/i.test(value)) {
-    throw new Error(
-      `Cannot resolve ${name} to a 6-digit hex (got ${JSON.stringify(value)}). ` +
-        'Extend the STOCK fixture or fix the token.',
-    );
-  }
-  return value.toLowerCase();
-}
+import { globals, resolveHex, themeBlocks, themeTokens } from './theme-css';
 
 const srgbToLinear = (c: number): number =>
   c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -170,7 +45,7 @@ interface Check {
 function checksFor(theme: string): Check[] {
   const checks: Check[] = [];
   for (const mode of ['light', 'dark'] as const) {
-    const t = tokens(theme, mode);
+    const t = themeTokens(theme, mode);
     const resolve = (name: string) => resolveHex(t, name);
     const card = mode === 'light' ? resolve('--color-white') : resolve('--color-gray-800');
     const page = mode === 'light' ? resolve('--color-gray-50') : resolve('--color-gray-900');
