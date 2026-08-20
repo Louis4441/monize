@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
  * inline string shrink-only.
  */
 export const CARD_CLASS =
-  'bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 ' +
+  'bg-white dark:bg-gray-800 rounded-lg shadow-card dark:shadow-gray-700/50 ' +
   'border border-gray-200 dark:border-gray-700';
 
 /**

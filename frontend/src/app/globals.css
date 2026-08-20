@@ -10,18 +10,21 @@
   --color-income: #10b981;
   --color-expense: #ef4444;
 
-  /* The surface shadow. In Tailwind v4 both the bare `shadow` utility and
-     `shadow-sm` resolve to this one token, and between them they carry
-     roughly every panel and every form field in the app -- so it has to suit
-     both. The stock value is tight and fairly dark (two layers at 0.1), which
-     is why cards read flat and stamped-on rather than lifted.
+  /* The card shadow.
+     
+     Tailwind v4 trap, verified against the compiled output rather than
+     assumed: the bare `shadow` utility is a legacy alias with the stock value
+     hardcoded into it, so redefining `--shadow-sm` does NOT change it -- it
+     changes `shadow-sm`, which in this codebase is worn almost entirely by
+     form fields. Softening that token therefore puffs up every input and
+     leaves every card exactly as flat as it was, which is the opposite of the
+     intent. A named token is the only way to reach the cards.
 
-     This spends *less* total ink over a slightly wider blur: a faint contact
-     shadow plus a soft ambient one. Cards gain some depth, and fields stay
-     crisp rather than puffy -- a large ambient shadow under a text input
-     reads as a floating pill. Themes whose page and card sit close together
-     lean on CARD_CLASS's border for separation rather than on this. */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 6px -1px rgb(0 0 0 / 0.07);
+     The value spends less total ink than the stock shadow over a slightly
+     wider blur, so a card lifts off the page instead of looking stamped onto
+     it. `CARD_CLASS` is the consumer; surfaces still carrying a bare `shadow`
+     from the inline-card baseline keep the old one until they are converted. */
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 6px -1px rgb(0 0 0 / 0.07);
 
   /* Table stripe color -- subtle alternating row in dark mode (between gray-900 and gray-800) */
   --color-table-stripe-dark: #161d2b;

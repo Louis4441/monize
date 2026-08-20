@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 
 /**
@@ -2273,5 +2275,33 @@ describe("table chrome comes from Table.tsx, not a repeated divide string", () =
     const skeleton = sources["/src/components/ui/LoadingSkeleton.tsx"];
     expect(skeleton).toContain("CARD_CLASS");
     expect(skeleton).not.toContain("bg-white dark:bg-gray-800");
+  });
+});
+
+describe("the card shadow is a named token, not a redefined shadow-sm", () => {
+  /**
+   * A Tailwind v4 trap that cost this branch a wrong commit, verified against
+   * the compiled CSS rather than assumed: the bare `shadow` utility is a
+   * legacy alias with the stock value hardcoded into it. Redefining
+   * `--shadow-sm` in `@theme` does not touch it -- it changes `shadow-sm`,
+   * which here is worn almost entirely by form fields. So that override
+   * puffed up every input and left every card exactly as flat, which is the
+   * opposite of what it was written to do.
+   *
+   * `--shadow-card` is the token that actually reaches the cards, through
+   * `CARD_CLASS`. This test fails if someone reaches for `--shadow-sm` again.
+   */
+  it("defines --shadow-card and leaves --shadow-sm alone", () => {
+    const globals = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
+    expect(globals).toContain("--shadow-card:");
+    expect(
+      globals.includes("--shadow-sm:"),
+      "redefining --shadow-sm restyles form fields, not cards -- use --shadow-card",
+    ).toBe(false);
+  });
+
+  it("CARD_CLASS wears it, so the one card surface is the one that changed", () => {
+    const card = sources["/src/components/ui/Card.tsx"];
+    expect(card).toContain("shadow-card");
   });
 });
