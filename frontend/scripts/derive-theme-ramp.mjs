@@ -23,9 +23,8 @@
  * checked once, rather than of each hand-picked value.
  *
  * Themes deliberately absent: `default` (stock Tailwind identity),
- * `midnight` (a neutral black AMOLED palette by design) and
- * `highcontrast`/`colorblind` (accessibility themes, where chroma spends
- * contrast and CVD budget for no benefit).
+ * `midnight` (a neutral black AMOLED palette by design) and `colorblind`
+ * (an accessibility theme, where chroma spends CVD budget for no benefit).
  *
  * Usage: node scripts/derive-theme-ramp.mjs
  * Output is literal 6-digit hex, which resolvePdfColor requires.

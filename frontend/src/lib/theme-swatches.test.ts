@@ -99,7 +99,7 @@ describe('THEME_SWATCHES matches the stylesheets', () => {
     // all share a literally white card, so a paper-distance rule cannot apply
     // to them; the duplicate check above still holds them apart by accent and
     // chart colours, which is what actually distinguishes them.
-    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'highcontrast', 'colorblind']);
+    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'colorblind']);
     const tinted = COLOR_THEMES.filter((theme) => !UNTINTED_BY_DESIGN.has(theme));
 
     const tooClose: string[] = [];

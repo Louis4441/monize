@@ -79,10 +79,6 @@ export const THEME_SWATCHES: Record<ColorTheme, { light: ThemeSwatch; dark: Them
     light: { page: '#fafafa', card: '#ffffff', accent: '#155dfc', chart2: '#10b981', chart4: '#ef4444' },
     dark: { page: '#000000', card: '#0c0c0c', accent: '#51a2ff', chart2: '#34d399', chart4: '#f87171' },
   },
-  highcontrast: {
-    light: { page: '#ffffff', card: '#ffffff', accent: '#1a3faf', chart2: '#15803d', chart4: '#b91c1c' },
-    dark: { page: '#000000', card: '#0a0a0a', accent: '#93c5fd', chart2: '#4ade80', chart4: '#f87171' },
-  },
   colorblind: {
     light: { page: '#f9fafb', card: '#ffffff', accent: '#005e94', chart2: '#009e73', chart4: '#d55e00' },
     dark: { page: '#101828', card: '#1e2939', accent: '#4299d3', chart2: '#009e73', chart4: '#d55e00' },

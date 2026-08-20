@@ -179,7 +179,6 @@
       "tokyonight": "Tokyo Night",
       "rosepine": "Rosé Pine",
       "midnight": "Midnight",
-      "highcontrast": "Contraste élevé",
       "colorblind": "Adapté aux daltoniens"
     },
     "timezoneBrowserOption": "Utiliser le fuseau horaire du navigateur (détecté automatiquement : {tz})"

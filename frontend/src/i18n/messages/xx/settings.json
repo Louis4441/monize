@@ -179,7 +179,6 @@
       "tokyonight": "[XX-Tokyo Night-XX]",
       "rosepine": "[XX-Rosé Pine-XX]",
       "midnight": "[XX-Midnight-XX]",
-      "highcontrast": "[XX-High contrast-XX]",
       "colorblind": "[XX-Colour-blind safe-XX]"
     },
     "timezoneBrowserOption": "[XX-Use browser timezone (auto-detected as {tz})-XX]"

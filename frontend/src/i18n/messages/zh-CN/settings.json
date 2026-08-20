@@ -179,7 +179,6 @@
       "tokyonight": "Tokyo Night",
       "rosepine": "Rosé Pine",
       "midnight": "午夜",
-      "highcontrast": "高对比度",
       "colorblind": "色盲友好"
     },
     "timezoneBrowserOption": "使用浏览器时区（自动检测为 {tz}）"

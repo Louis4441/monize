@@ -179,7 +179,6 @@
       "tokyonight": "Tokyo Night",
       "rosepine": "Rosé Pine",
       "midnight": "Midnight",
-      "highcontrast": "Висококонтрастна",
       "colorblind": "Для людей із порушенням кольорового сприйняття"
     },
     "timezoneBrowserOption": "Використовувати часовий пояс браузера (автовизначено: {tz})"

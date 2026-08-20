@@ -20,7 +20,6 @@ export const COLOR_THEMES = [
   'tokyonight',
   'rosepine',
   'midnight',
-  'highcontrast',
   'colorblind',
 ] as const;
 

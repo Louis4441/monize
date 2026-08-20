@@ -1392,8 +1392,8 @@ The same test holds the contrast floors -- body text, muted text, links and
 every chart token against the surface they sit on, per theme and mode, plus a
 minimum page/card/border separation in dark mode. Shortfalls that predate it
 are listed in a shrink-only `KNOWN_CONTRAST_DEBT`; genuine design exceptions
-(midnight and highcontrast are black-on-black by intent, separated by their
-border) are listed separately in `DELIBERATE`, so the two never blur together.
+(midnight is black-on-black by intent, separated by its border) are listed
+separately in `DELIBERATE`, so the two never blur together.
 Values must be literal 6-digit hex: `resolvePdfColor` accepts nothing else and
 silently falls back to grey. `frontend/scripts/derive-dark-palette.mjs` generates a
 starting point for a new palette; the test, not the script, is the authority.
@@ -1435,10 +1435,19 @@ differed in every byte, and the closest measured 0.0032 in OKLab. Eleven
 tinted themes on one hue wheel do have a bounded best case, so the floors are
 set below the achievable minimum rather than at some ideal.
 
-Four themes are deliberately ungenerated and near-neutral: `default` (the
+Three themes are deliberately ungenerated and near-neutral: `default` (the
 stock identity), `midnight` (a black AMOLED palette by design) and
-`highcontrast`/`colorblind`, where chroma spends contrast and CVD budget for
-nothing. That policy is asserted, so the exceptions read as decisions.
+`colorblind`, where chroma spends CVD budget for nothing. That policy is
+asserted, so the exceptions read as decisions.
+
+**Removing a theme is more than deleting its block.** The list in
+`color-themes.ts`, the CSS blocks, the swatch entry, the `colorThemeOptions`
+string in *every* locale, the backend DTO's `IsIn` list, and any exemption
+naming it in the guards all have to go together -- and the value users already
+have stored needs a migration, or the column keeps a name that resolves to
+nothing while the picker shows `default`. `highcontrast` was removed this way
+(migration 162); both client paths validate through `isColorTheme`, so the
+fallback itself was already safe.
 
 Changing the curve is a change to every theme at once, which is the point --
 but it moves every value sitting on those surfaces too, so expect the guard
