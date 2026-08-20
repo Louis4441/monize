@@ -220,6 +220,16 @@ describe("MnyParserService", () => {
       ]);
     });
 
+    it("excludes the watch account from net worth, from the file's own fWatch", () => {
+      const parsed = parse();
+
+      expect(
+        parsed.accounts.accounts.every(
+          (account) => account.excludeFromNetWorth,
+        ),
+      ).toBe(true);
+    });
+
     it("defers all three of its investment transactions", () => {
       const parsed = parse();
 
