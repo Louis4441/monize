@@ -443,6 +443,7 @@ export class AiActionsService {
           quantity: r.quantity ?? undefined,
           price: r.price ?? undefined,
           commission: r.commission,
+          accruedInterest: r.accruedInterest,
           exchangeRate: r.exchangeRate,
           description: r.description ?? undefined,
         });

@@ -832,6 +832,14 @@ loosening the global Helmet `form-action` -- only this page needs it.
 
 `node-oidc-provider` prints its own `oidc-provider NOTICE:`/`WARNING:` lines with bare `console.info`/`console.warn`, outside the Nest `Logger`. The library exposes no logger hook, so `oauth/oidc-provider-log-bridge.ts` -- installed at the top of `main.ts`, before anything can instantiate the provider -- re-routes exactly those lines to a `[OidcProvider]` logger and passes any other console output through untouched. That fixes the formatting only: every such notice still means a config option was left at its default, so fix the config rather than treating the bridge as the answer. In particular, `ttl` needs an explicit number for every artifact the provider can issue (`AccessToken`, `AuthorizationCode`, `IdToken`, `RefreshToken`, `Grant`, `Interaction`, `Session`); the guard test in `src/oauth/oauth-provider.service.spec.ts` fails when one is missing.
 
+## Money investment mapping is finalized after both mappers run
+
+`mapInvestments` cannot know whether `mapTransactions` will preserve or
+collapse a cash split. Reconcile generated investment companions only after
+cash-source mapping: when a redemption remains embedded, its preserved sibling
+is the interest record, so the generated companion and mutual link must not be
+written as a second representation of that income.
+
 ## Automatic backups are an operator setting, not a user preference
 
 The auto-backup endpoints live on `AutoBackupController`, whose class-level
