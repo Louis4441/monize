@@ -179,6 +179,7 @@
       "tokyonight": "Tokyo Night",
       "rosepine": "Rosé Pine",
       "midnight": "Midnight",
+      "highcontrast": "Yüksek kontrast",
       "colorblind": "Renk körü uyumlu"
     },
     "timezoneBrowserOption": "Tarayıcı saat dilimini kullan (otomatik algılandı: {tz})"

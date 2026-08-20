@@ -179,6 +179,7 @@
       "tokyonight": "Tokyo Night",
       "rosepine": "Rosé Pine",
       "midnight": "Midnight",
+      "highcontrast": "उच्च कंट्रास्ट",
       "colorblind": "वर्णान्ध-सुरक्षित"
     },
     "timezoneBrowserOption": "ब्राउज़र समयक्षेत्र उपयोग करें (स्वत: पहचाना {tz})"

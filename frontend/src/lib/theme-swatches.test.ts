@@ -95,11 +95,11 @@ describe('THEME_SWATCHES matches the stylesheets', () => {
     const MIN_CARD_DISTANCE = 0.008;
     const MIN_PAGE_DISTANCE = 0.015;
 
-    // The four themes that deliberately keep a neutral, untinted paper. They
+    // The three themes that deliberately keep a neutral, untinted paper. They
     // all share a literally white card, so a paper-distance rule cannot apply
     // to them; the duplicate check above still holds them apart by accent and
     // chart colours, which is what actually distinguishes them.
-    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'colorblind']);
+    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'highcontrast']);
     const tinted = COLOR_THEMES.filter((theme) => !UNTINTED_BY_DESIGN.has(theme));
 
     const tooClose: string[] = [];

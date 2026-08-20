@@ -23,8 +23,10 @@
  * checked once, rather than of each hand-picked value.
  *
  * Themes deliberately absent: `default` (stock Tailwind identity),
- * `midnight` (a neutral black AMOLED palette by design) and `colorblind`
- * (an accessibility theme, where chroma spends CVD budget for no benefit).
+ * `midnight` (a neutral black AMOLED palette by design) and `highcontrast`,
+ * whose whole point is maximum luminance contrast -- chroma on those surfaces
+ * spends exactly the budget the theme exists to protect. `colorblind` IS
+ * generated: its guarantee is about the chart palette, not the chrome.
  *
  * Usage: node scripts/derive-theme-ramp.mjs
  * Output is literal 6-digit hex, which resolvePdfColor requires.
@@ -133,6 +135,15 @@ const THEMES = {
   nord: { light: 245, dark: 258, intensity: 1.0, note: 'arctic blue-grey throughout' },
   tokyonight: { light: 275, dark: 283, intensity: 0.95, note: 'indigo throughout' },
   dracula: { light: 303, dark: 296, intensity: 0.9, note: 'violet throughout' },
+
+  // The CVD-safe theme keeps its Okabe-Ito CHART palette untouched -- that is
+  // the accessibility guarantee -- but its surfaces are not data, so tinting
+  // them costs no CVD budget and nothing in the guarantee. Leaving them stock
+  // made it byte-identical to `default` everywhere except a chart: every grey
+  // token matched, and the dark link accent differed by 0.069. Low intensity
+  // and a hue in the wide gap between forest and nord, so it reads as cool
+  // grey rather than as a second blue theme beside nord.
+  colorblind: { light: 205, dark: 212, intensity: 0.5, note: 'cool neutral grey, Okabe-Ito charts' },
 };
 
 const STEPS = ['white', 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];

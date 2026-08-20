@@ -67,6 +67,7 @@ export class UpdatePreferencesDto {
       "tokyonight",
       "rosepine",
       "midnight",
+      "highcontrast",
       "colorblind",
     ],
   })
@@ -86,6 +87,7 @@ export class UpdatePreferencesDto {
     "tokyonight",
     "rosepine",
     "midnight",
+    "highcontrast",
     "colorblind",
   ])
   colorTheme?: string;

@@ -81,6 +81,22 @@ function checksFor(theme: string): Check[] {
 const DELIBERATE = new Set<string>([
   'midnight dark card-vs-page',
   'midnight dark border-vs-card',
+  // `highcontrast` used to be listed here for the same reason and no longer
+  // is: separating its card from its page was the fix for it reading as a
+  // second midnight, and that separation clears the floor on its own.
+
+  // The Okabe-Ito palette optimises for how well the SERIES separate from
+  // each other under colour-vision deficiency, and spends background
+  // contrast to do it -- several members sit near 3:1 even on pure white, so
+  // any tinted card puts them under. These are deliberate, not debt: the
+  // values are canonical and must stay exact. Darkening chart-2/5/9 to clear
+  // the floor was tried and measured, and it dropped the closest pair's
+  // separation under deuteranopia from 0.0327 to 0.0251 in OKLab -- a 23%
+  // loss of the one thing this theme promises, to gain contrast the palette
+  // never claimed. Change the surface before you change these.
+  'colorblind light chart-2-on-card',
+  'colorblind light chart-5-on-card',
+  'colorblind light chart-9-on-card',
 ]);
 
 /**
@@ -252,9 +268,10 @@ describe('theme CSS structure', () => {
     // Cards dominate the screen, so a theme whose card is pure #ffffff is
     // distinguishable in light mode only by its accent -- which is exactly
     // the sameness this branch removed. `default` keeps the stock identity,
-    // `midnight` is documented as neutral in light mode, and `colorblind`
-    // spends no CVD budget on decoration.
-    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'colorblind']);
+    // `midnight` is documented as neutral in light mode, and `highcontrast`
+    // must not spend luminance budget on decoration. `colorblind` is tinted:
+    // its guarantee covers the chart palette, not the chrome.
+    const UNTINTED_BY_DESIGN = new Set(['default', 'midnight', 'highcontrast']);
     const missing = COLOR_THEMES.filter(
       (theme) =>
         !UNTINTED_BY_DESIGN.has(theme) && !themeBlocks.light.get(theme)?.['--color-white'],

@@ -1437,17 +1437,29 @@ set below the achievable minimum rather than at some ideal.
 
 Three themes are deliberately ungenerated and near-neutral: `default` (the
 stock identity), `midnight` (a black AMOLED palette by design) and
-`colorblind`, where chroma spends CVD budget for nothing. That policy is
-asserted, so the exceptions read as decisions.
+`highcontrast`, whose whole point is maximum luminance contrast. That policy
+is asserted, so the exceptions read as decisions.
 
-**Removing a theme is more than deleting its block.** The list in
-`color-themes.ts`, the CSS blocks, the swatch entry, the `colorThemeOptions`
-string in *every* locale, the backend DTO's `IsIn` list, and any exemption
-naming it in the guards all have to go together -- and the value users already
-have stored needs a migration, or the column keeps a name that resolves to
-nothing while the picker shows `default`. `highcontrast` was removed this way
-(migration 162); both client paths validate through `isColorTheme`, so the
-fallback itself was already safe.
+**An accessibility theme is exempt from what it actually guarantees, and no
+more.** `colorblind` was on that list too, on the reasoning that chroma
+"spends CVD budget". That is true of the CHART palette, which is the promise,
+and false of the chrome: surfaces are not data. Leaving its greys stock made
+it byte-identical to `default` on every screen without a chart -- every grey
+token matched to the byte, and the dark link accent differed by 0.069 -- so a
+user picking it saw no change at all until they opened a report. Its ramp is
+generated now and only its Okabe-Ito charts are hand-picked. `highcontrast`
+stays exempt because *its* promise is about luminance, which chroma really
+would spend.
+
+**Two themes that share a strategy need different jobs, not different hexes.**
+`highcontrast` and `midnight` were both a black page under a near-black card
+(#0a0a0a and #0c0c0c) and read as one theme in dark mode. The fix was not to
+nudge a value but to separate what they optimise for: midnight is for an OLED
+panel, where every black pixel is unlit and borders stay quiet, and
+highcontrast is for visible STRUCTURE, where a panel edge you cannot locate is
+the accessibility failure. Its card now sits well clear of its page with a
+much brighter border -- which is also why it no longer needs the
+`card-vs-page` exemption midnight still carries.
 
 Changing the curve is a change to every theme at once, which is the point --
 but it moves every value sitting on those surfaces too, so expect the guard
