@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
 import { investmentsApi } from './investments';
 import { invalidateCache } from './apiCache';
+import { API_MAX_PAGE_LIMIT } from './api-page-limits';
 
 vi.mock('./api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
@@ -101,6 +102,62 @@ describe('investmentsApi', () => {
     await investmentsApi.getTransactions({ page: 1, limit: 20 });
     expect(apiClient.get).toHaveBeenCalledWith('/investment-transactions', {
       params: { page: 1, limit: 20 },
+    });
+  });
+
+  describe('getAllTransactionPages', () => {
+    /** A page of `count` rows, reporting whether another follows it. */
+    function page(count: number, hasMore: boolean, idPrefix = 'it') {
+      return {
+        data: Array.from({ length: count }, (_, i) => ({ id: `${idPrefix}-${i}` })),
+        pagination: { page: 1, limit: API_MAX_PAGE_LIMIT, total: 0, totalPages: 0, hasMore },
+      };
+    }
+
+    it('never asks for more rows than the endpoint accepts', async () => {
+      // The whole point of the helper. `GET /investment-transactions` answers
+      // 400 above this, and the caller's .catch() turns that into a zero.
+      vi.mocked(apiClient.get).mockResolvedValue({ data: page(1, false) });
+      await investmentsApi.getAllTransactionPages({ accountIds: 'a-1' });
+
+      const limits = vi
+        .mocked(apiClient.get)
+        .mock.calls.map(([, config]) => (config as { params: { limit: number } }).params.limit);
+      expect(limits.every((limit) => limit <= API_MAX_PAGE_LIMIT)).toBe(true);
+    });
+
+    it('walks past the first page and returns every row', async () => {
+      vi.mocked(apiClient.get)
+        .mockResolvedValueOnce({ data: page(2, true, 'p1') })
+        .mockResolvedValueOnce({ data: page(1, false, 'p2') });
+
+      const rows = await investmentsApi.getAllTransactionPages({ action: 'DIVIDEND' });
+
+      expect(rows.map((r) => r.id)).toEqual(['p1-0', 'p1-1', 'p2-0']);
+      expect(apiClient.get).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(apiClient.get).mock.calls[1][1]).toMatchObject({
+        params: { page: 2, action: 'DIVIDEND' },
+      });
+    });
+
+    it('stops on an empty page even when the server still claims more', async () => {
+      // Without this the walk spins to MAX_PAGES against a backend whose
+      // hasMore is wrong, which is a hang rather than a wrong number.
+      vi.mocked(apiClient.get)
+        .mockResolvedValueOnce({ data: page(1, true, 'p1') })
+        .mockResolvedValue({ data: page(0, true) });
+
+      const rows = await investmentsApi.getAllTransactionPages();
+
+      expect(rows.map((r) => r.id)).toEqual(['p1-0']);
+      expect(apiClient.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('passes the filter through and does not swallow a failure', async () => {
+      // A rejection has to reach the caller: a caller that cannot tell a failed
+      // lookup from an empty result reports an outage as a confident zero.
+      vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
+      await expect(investmentsApi.getAllTransactionPages()).rejects.toThrow('boom');
     });
   });
 

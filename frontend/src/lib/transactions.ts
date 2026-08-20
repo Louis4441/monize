@@ -24,6 +24,7 @@ import {
   RegisterFilterOptions,
 } from '@/types/transaction';
 import { invalidateBalanceCaches } from './apiCache';
+import { API_MAX_PAGE_LIMIT } from './api-page-limits';
 
 /** Convert array filter params to comma-separated strings for the API. */
 function buildFilterParams(params?: {
@@ -145,7 +146,7 @@ export const transactionsApi = {
     params?: TransactionsGetAllParams & { pageSize?: number },
   ): Promise<Transaction[]> => {
     const MAX_PAGES = 5000;
-    const { pageSize = 200, ...rest } = params ?? {};
+    const { pageSize = API_MAX_PAGE_LIMIT, ...rest } = params ?? {};
     const all: Transaction[] = [];
     let page = 1;
     let hasMore = true;

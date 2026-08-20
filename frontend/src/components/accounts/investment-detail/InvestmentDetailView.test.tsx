@@ -54,12 +54,12 @@ vi.mock('@/lib/accounts', () => ({
 }));
 
 const mockGetPortfolioSummary = vi.fn();
-const mockGetTransactions = vi.fn();
+const mockGetAllTransactionPages = vi.fn();
 const mockGetRealizedGains = vi.fn();
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getPortfolioSummary: (...a: unknown[]) => mockGetPortfolioSummary(...a),
-    getTransactions: (...a: unknown[]) => mockGetTransactions(...a),
+    getAllTransactionPages: (...a: unknown[]) => mockGetAllTransactionPages(...a),
     getRealizedGains: (...a: unknown[]) => mockGetRealizedGains(...a),
   },
 }));
@@ -99,18 +99,15 @@ beforeEach(() => {
     holdingsByAccount: [],
     allocation: [],
   });
-  mockGetTransactions.mockImplementation((params: { startDate?: string }) =>
+  // Income is fetched one action at a time, server-side, so each call answers
+  // with only the rows for the action it asked for.
+  mockGetAllTransactionPages.mockImplementation((params: { action?: string }) =>
     Promise.resolve(
-      params?.startDate
-        ? {
-            data: [
-              { id: 'd1', action: 'DIVIDEND', totalAmount: 50 },
-              { id: 'i1', action: 'INTEREST', totalAmount: 10 },
-              { id: 'b1', action: 'BUY', totalAmount: 1000 },
-            ],
-            pagination: {},
-          }
-        : { data: [{ id: 't1', action: 'BUY', totalAmount: 1000 }], pagination: {} },
+      params?.action === 'DIVIDEND'
+        ? [{ id: 'd1', action: 'DIVIDEND', totalAmount: 50 }]
+        : params?.action === 'INTEREST'
+          ? [{ id: 'i1', action: 'INTEREST', totalAmount: 10 }]
+          : [],
     ),
   );
   mockGetRealizedGains.mockResolvedValue([{ realizedGain: 120 }, { realizedGain: -20 }]);
@@ -136,6 +133,50 @@ describe('InvestmentDetailView', () => {
     await renderView();
     await waitFor(() => expect(screen.getByText('$60.00')).toBeInTheDocument());
     expect(screen.getByText('$100.00')).toBeInTheDocument();
+  });
+
+  // The YTD income figure asked for 500 rows in one page. The endpoint caps a
+  // page at 200 and answers 400 rather than clamping, the .catch() below turned
+  // that into an empty list, and the figure read $0.00 for every account, every
+  // year -- with nothing on screen to say the request had failed at all.
+  it('asks for income a page at a time, never as one over-cap request', async () => {
+    await renderView();
+    await waitFor(() => expect(mockGetAllTransactionPages).toHaveBeenCalled());
+
+    const params = mockGetAllTransactionPages.mock.calls.map(([p]) => p);
+    expect(params.map((p) => p.action).sort()).toEqual(['DIVIDEND', 'INTEREST']);
+    // No caller-supplied page size: the helper's default is the cap itself.
+    expect(params.every((p) => p.limit === undefined && p.pageSize === undefined)).toBe(true);
+    expect(params.every((p) => p.accountIds === 'br-1,cash-1')).toBe(true);
+  });
+
+  // Lowering the old literal to the cap would have swapped a visible zero for a
+  // silent undercount, which is the worse failure of the two: a year with more
+  // than one page of income has to total all of it.
+  it('counts income past the first page', async () => {
+    mockGetAllTransactionPages.mockImplementation((params: { action?: string }) =>
+      Promise.resolve(
+        params?.action === 'DIVIDEND'
+          ? Array.from({ length: 250 }, (_, i) => ({
+              id: `d${i}`,
+              action: 'DIVIDEND',
+              totalAmount: 2,
+            }))
+          : [],
+      ),
+    );
+
+    await renderView();
+    await waitFor(() => expect(screen.getByText('$500.00')).toBeInTheDocument());
+  });
+
+  // A failed lookup is not a year without income, but it is all the component
+  // can say -- so the rest of the page must still render rather than blanking.
+  it('survives an income lookup that fails', async () => {
+    mockGetAllTransactionPages.mockRejectedValue(new Error('boom'));
+    await renderView();
+    await waitFor(() => expect(mockGetPortfolioSummary).toHaveBeenCalled());
+    expect(screen.getByTestId('portfolio-summary')).toBeInTheDocument();
   });
 
   // The header owns both actions now (InvestmentDetailActions), so the body

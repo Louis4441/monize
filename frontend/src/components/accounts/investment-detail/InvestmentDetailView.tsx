@@ -28,6 +28,14 @@ function round2(value: number): number {
 }
 
 /**
+ * The actions that count towards the YTD income figure. Filtered server-side,
+ * one request each, because `GET /investment-transactions` matches a single
+ * action per call -- the reinvestment actions are deliberately absent, matching
+ * what this figure has always counted.
+ */
+const INCOME_ACTIONS = ['DIVIDEND', 'INTEREST'] as const;
+
+/**
  * The investment detail body for a brokerage/cash pair. Resolves the pair (via
  * investment-pair, falling back to a standalone brokerage), then composes the
  * existing portfolio components scoped to the pair's accounts: summary,
@@ -71,11 +79,24 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
       const today = format(now, 'yyyy-MM-dd');
       const yearStart = `${now.getFullYear()}-01-01`;
 
+      // Income is asked for one action at a time and walked a page at a time.
+      // A single unfiltered request capped the year at one page, and asking for
+      // a bigger page is what the server refuses outright -- the 400 landed in
+      // the catch below and reported the year's dividends as 0.00.
       const [summaryData, incomeTx, realized] = await Promise.all([
         investmentsApi.getPortfolioSummary(ids).catch(() => null),
-        investmentsApi
-          .getTransactions({ accountIds: idsStr, startDate: yearStart, endDate: today, limit: 500 })
-          .catch(() => ({ data: [] as InvestmentTransaction[] })),
+        Promise.all(
+          INCOME_ACTIONS.map((action) =>
+            investmentsApi.getAllTransactionPages({
+              accountIds: idsStr,
+              startDate: yearStart,
+              endDate: today,
+              action,
+            }),
+          ),
+        )
+          .then((perAction) => perAction.flat())
+          .catch(() => [] as InvestmentTransaction[]),
         investmentsApi
           .getRealizedGains({ accountIds: idsStr, startDate: yearStart, endDate: today })
           .catch(() => [] as RealizedGainEntry[]),
@@ -85,9 +106,7 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
       setBrokerage(resolvedBrokerage);
       setCash(resolvedCash);
       setSummary(summaryData);
-      const income = incomeTx.data
-        .filter((tx) => tx.action === 'DIVIDEND' || tx.action === 'INTEREST')
-        .reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+      const income = incomeTx.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
       setDividendInterestYtd(round2(income));
       setRealizedGainsYtd(round2(realized.reduce((sum, r) => sum + (Number(r.realizedGain) || 0), 0)));
       setLoadedForId(account.id);
