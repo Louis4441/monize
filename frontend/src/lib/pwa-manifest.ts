@@ -1,14 +1,27 @@
 import type { MetadataRoute } from 'next';
+import type { ColorTheme } from './color-themes';
+import { bootPageColor, type ResolvedTheme } from './pwa-theme';
 
-export default function manifest(): MetadataRoute.Manifest {
+// The OS builds the PWA splash screen from the manifest's background_color,
+// icon and name, captured when the manifest was last fetched -- there is no
+// media query in the manifest format. Serving the manifest dynamically from
+// the resolved-theme and colour-palette cookies is the only lever: browsers
+// re-check the manifest on launch, so the splash follows the user's theme
+// from the next launch on. With no cookies (fresh browser, cookie expired)
+// the default light palette is served, matching the pre-cookie behaviour.
+export function buildManifest(
+  theme: ResolvedTheme | null,
+  colorTheme: ColorTheme | null = null,
+): MetadataRoute.Manifest {
+  const page = bootPageColor(colorTheme, theme);
   return {
     name: 'Monize - Personal Finance Manager',
     short_name: 'Monize',
     description: 'Track your finances, manage budgets, and monitor investments',
     start_url: '/',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#10b981',
+    background_color: page,
+    theme_color: page,
     orientation: 'portrait-primary',
     icons: [
       {
