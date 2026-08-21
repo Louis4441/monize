@@ -99,6 +99,13 @@ export const accountsApi = {
   update: async (id: string, data: UpdateAccountData): Promise<Account> => {
     const response = await apiClient.patch<Account>(`/accounts/${id}`, data);
     invalidateCache('accounts:');
+    // Issue #1167: a funding / linked-cash / brokerage account's currency is one
+    // side of a scheduled investment's settlement pair, and the cached
+    // scheduled-transaction read model (`scheduled:all`) holds server-derived FX
+    // fields resolved against that pair. An account-currency edit makes that
+    // payload stale, so force findAll() to resolve those fields again -- the
+    // same reasoning as investmentsApi.updateSecurity's scheduled invalidation.
+    invalidateCache('scheduled:');
     return response.data;
   },
 
