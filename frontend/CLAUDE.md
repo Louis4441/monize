@@ -1462,8 +1462,11 @@ Colour themes are pure CSS variable overrides in `src/app/themes.css` (`html[dat
 inside it ships as an empty body and nothing the provider renders can decide
 what the first paint looks like. The surfaces that paint before hydration --
 the server-stamped `dark` class and `data-theme` attribute in `layout.tsx`,
-the boot splash (`components/layout/BootSplash.tsx`, removed by
-`BootSplashRemover` once the app mounts), the `theme-color` viewport meta,
+the boot splash (`components/layout/BootSplash.tsx`, hidden by
+`BootSplashHider` once the app mounts -- *hidden*, never removed: the splash
+is a React-rendered node, and detaching a React-owned node outside React
+crashes the reconciler on the next client-side navigation, sending every
+page to the error boundary), the `theme-color` viewport meta,
 and the PWA manifest's splash palette (`app/manifest.webmanifest/route.ts`)
 -- read the `monize-resolved-theme` and `monize-color-theme` cookies that
 `ThemeContext` mirrors on every change (`src/lib/pwa-theme.ts` owns the names

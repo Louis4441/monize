@@ -29,8 +29,9 @@ interface BootSplashProps {
 // indistinguishable from being stuck on the OS splash. This overlay paints
 // immediately with zero JS, and after SLOW_REVEAL_SECONDS a pure-CSS delayed
 // animation reveals a reload link so a hung boot always leaves the user an
-// exit that is not force-closing the app. BootSplashRemover deletes it once
-// the app tree has actually mounted.
+// exit that is not force-closing the app. BootSplashHider hides it (never
+// detaches it -- this node is React-owned) once the app tree has actually
+// mounted.
 //
 // Everything here is self-contained (inline styles, no app CSS, no JS) so it
 // still works when static assets are unreachable. The colours read the

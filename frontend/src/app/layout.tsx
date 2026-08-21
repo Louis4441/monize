@@ -6,7 +6,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { BootSplash } from '@/components/layout/BootSplash';
-import { BootSplashRemover } from '@/components/providers/BootSplashRemover';
+import { BootSplashHider } from '@/components/providers/BootSplashHider';
 import { OfflineFallbackSync } from '@/components/providers/OfflineFallbackSync';
 import { PreferencesLoader } from '@/components/providers/PreferencesLoader';
 import { ServiceWorkerRegistrar } from '@/components/providers/ServiceWorkerRegistrar';
@@ -136,7 +136,7 @@ export default async function RootLayout({
         <PwaLifecycleHandler />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider>
-            <BootSplashRemover />
+            <BootSplashHider />
             <OfflineFallbackSync />
             <PreferencesLoader>
               <SwipeShell httpsHeadersActive={httpsHeadersActive}>
