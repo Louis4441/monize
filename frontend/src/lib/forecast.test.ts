@@ -914,6 +914,37 @@ describe('buildForecast', () => {
       expect(result.missingCurrencies.length).toBeGreaterThan(0);
     });
 
+    it('withholds a split-investment schedule when the effective total is ABSENT (old backend, issue #1167 review MEDIUM-1)', () => {
+      // Rolling deploy: a backend predating investmentForecastAmount omits it for
+      // a split-investment schedule. The client cannot re-derive a split's
+      // current-FX total from data it holds, so an absent value is unknown -- it
+      // must NOT fall through to the stale stored parent `amount` (-1500, computed
+      // at the old 1.50 rate). Withhold rather than project a stale figure.
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const transactions = [makeScheduled({
+        id: 'split-inv-1',
+        name: 'Buy USD security (split)',
+        accountId: 'cash-1',
+        amount: -1500, // stale scalar must not be used as a fallback
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isSplit: true,
+        splits: [
+          {
+            id: 's1',
+            kind: 'investment',
+            amount: -1500,
+            investmentAction: 'BUY',
+            investmentSecurityId: 'sec-usd',
+          },
+        ],
+        // investmentForecastAmount intentionally omitted (old backend).
+      } as any)];
+      const result = buildForecast([cashAccount], transactions, 'month', 'cash-1');
+      expect(result.points).toEqual([]);
+      expect(result.missingCurrencies.length).toBeGreaterThan(0);
+    });
+
     it('leaves an ordinary (non-investment) split schedule on its stored amount', () => {
       const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
       const transactions = [makeScheduled({
@@ -1663,12 +1694,19 @@ describe('getProjectedBalanceAtDate', () => {
     expect(result).toBeNull();
   });
 
-  it('does not withhold when the forecast-rate field is ABSENT, falling back to the persisted rate (rolling deploy)', () => {
+  it('does not withhold when the forecast-rate field is ABSENT and the derived pair is same-currency (rolling deploy)', () => {
     // A backend predating the forecast-rate field (#1167) sends no
     // investmentForecastExchangeRate. Treating absent as unknown would blank the
-    // projection during a rolling deploy; instead it falls back to the persisted
-    // rate that backend would itself post at.
-    const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+    // projection during a rolling deploy; instead the client derives the current
+    // settlement pair from the accounts it holds -- here a CAD security settling
+    // into a CAD cash account -- and a same-currency pair is always rate 1, so
+    // the projection is NOT withheld and needs no persisted scalar.
+    const brokerage = makeAccount({ id: 'brokerage-1', currencyCode: 'CAD' });
+    const cashAccount = makeAccount({
+      id: 'cash-1',
+      currencyCode: 'CAD',
+      currentBalance: 10000,
+    });
     const scheduled = [makeScheduled({
       id: 'inv-1',
       accountId: 'brokerage-1',
@@ -1676,22 +1714,38 @@ describe('getProjectedBalanceAtDate', () => {
       frequency: 'ONCE',
       nextDueDate: '2025-01-20',
       isInvestment: true,
+      investmentSecurity: { currencyCode: 'CAD' },
       investmentFundingAccountId: 'cash-1',
+      // A persisted scalar is present but must be ignored: same-currency is 1.
       investmentExchangeRate: 1,
       // investmentForecastExchangeRate intentionally omitted (old backend).
     } as any)];
-    const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
+    const result = getProjectedBalanceAtDate(
+      cashAccount,
+      '2025-01-25',
+      scheduled,
+      [],
+      undefined,
+      [brokerage, cashAccount],
+    );
     expect(result).toBe(8500);
   });
 
-  it('withholds (does not invent 1:1) when the forecast field is ABSENT and the persisted rate is null (R14 review MEDIUM-1)', () => {
-    // Rolling deploy: an old backend omits investmentForecastExchangeRate AND
-    // persists investmentExchangeRate: null (the parent-investment form does not
-    // submit a rate). An absent field is NOT evidence of a 1:1 pair, so a
-    // cross-currency USD->CAD BUY of 10 x 100 must NOT be projected at rate 1
-    // (-1,000 CAD, understating the real -1,350). With no usable persisted
-    // fallback the occurrence is unknown, so the projected balance is withheld.
-    const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+  it('withholds (does not trust an UNPROVENANCED persisted scalar) when the forecast field is ABSENT on a cross-currency pair (issue #1167 review MEDIUM-1)', () => {
+    // Rolling deploy: an old backend omits investmentForecastExchangeRate. The
+    // security is USD and the cash account CAD, so the derived pair is
+    // cross-currency. A persisted investmentExchangeRate of 1.30 is present and
+    // positive, but it carries NO recorded currency-pair provenance -- it may be
+    // a rate for a pair the security or account has since moved off of. An
+    // unprovenanced scalar is unknown, not current, so projecting the USD->CAD
+    // BUY of -1,000 at 1.30 (a plausible -1,300) would fabricate a figure. The
+    // occurrence is withheld instead.
+    const brokerage = makeAccount({ id: 'brokerage-1', currencyCode: 'USD' });
+    const cashAccount = makeAccount({
+      id: 'cash-1',
+      currencyCode: 'CAD',
+      currentBalance: 10000,
+    });
     const scheduled = [makeScheduled({
       id: 'inv-1',
       accountId: 'brokerage-1',
@@ -1699,11 +1753,93 @@ describe('getProjectedBalanceAtDate', () => {
       frequency: 'ONCE',
       nextDueDate: '2025-01-20',
       isInvestment: true,
+      investmentSecurity: { currencyCode: 'USD' },
+      investmentFundingAccountId: 'cash-1',
+      investmentExchangeRate: 1.3,
+      // No investmentExchangeRate{From,To}Currency provenance recorded.
+      // investmentForecastExchangeRate intentionally omitted (old backend).
+    } as any)];
+    const result = getProjectedBalanceAtDate(
+      cashAccount,
+      '2025-01-25',
+      scheduled,
+      [],
+      undefined,
+      [brokerage, cashAccount],
+    );
+    expect(result).toBeNull();
+  });
+
+  it('reuses a PROVENANCE-MATCHED persisted scalar when the forecast field is ABSENT (issue #1167 review MEDIUM-1)', () => {
+    // Same rolling-deploy cross-currency pair (USD security -> CAD cash), but now
+    // the persisted investmentExchangeRate of 1.35 carries provenance proving it
+    // was resolved for exactly this USD->CAD pair. That is the one case an absent
+    // forecast field may fall back to the scalar: it is the rate the old backend
+    // would itself post at, so forecast/post parity holds. The -1,000 USD BUY
+    // projects at 1.35 -> -1,350 CAD, leaving 10,000 - 1,350 = 8,650.
+    const brokerage = makeAccount({ id: 'brokerage-1', currencyCode: 'USD' });
+    const cashAccount = makeAccount({
+      id: 'cash-1',
+      currencyCode: 'CAD',
+      currentBalance: 10000,
+    });
+    const scheduled = [makeScheduled({
+      id: 'inv-1',
+      accountId: 'brokerage-1',
+      amount: -1000,
+      frequency: 'ONCE',
+      nextDueDate: '2025-01-20',
+      isInvestment: true,
+      investmentSecurity: { currencyCode: 'USD' },
+      investmentFundingAccountId: 'cash-1',
+      investmentExchangeRate: 1.35,
+      investmentExchangeRateFromCurrency: 'USD',
+      investmentExchangeRateToCurrency: 'CAD',
+      // investmentForecastExchangeRate intentionally omitted (old backend).
+    } as any)];
+    const result = getProjectedBalanceAtDate(
+      cashAccount,
+      '2025-01-25',
+      scheduled,
+      [],
+      undefined,
+      [brokerage, cashAccount],
+    );
+    expect(result).toBe(8650);
+  });
+
+  it('withholds when the forecast field is ABSENT and the persisted scalar is null (issue #1167 review MEDIUM-1)', () => {
+    // A cross-currency pair (USD security -> CAD cash) whose old backend persisted
+    // investmentExchangeRate: null (the parent-investment form does not submit a
+    // rate). There is no scalar to fall back to and same-currency does not apply,
+    // so the occurrence is unknown and the projected balance is withheld -- never
+    // invented at 1:1.
+    const brokerage = makeAccount({ id: 'brokerage-1', currencyCode: 'USD' });
+    const cashAccount = makeAccount({
+      id: 'cash-1',
+      currencyCode: 'CAD',
+      currentBalance: 10000,
+    });
+    const scheduled = [makeScheduled({
+      id: 'inv-1',
+      accountId: 'brokerage-1',
+      amount: -1000,
+      frequency: 'ONCE',
+      nextDueDate: '2025-01-20',
+      isInvestment: true,
+      investmentSecurity: { currencyCode: 'USD' },
       investmentFundingAccountId: 'cash-1',
       investmentExchangeRate: null,
       // investmentForecastExchangeRate intentionally omitted (old backend).
     } as any)];
-    const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
+    const result = getProjectedBalanceAtDate(
+      cashAccount,
+      '2025-01-25',
+      scheduled,
+      [],
+      undefined,
+      [brokerage, cashAccount],
+    );
     expect(result).toBeNull();
   });
 });
