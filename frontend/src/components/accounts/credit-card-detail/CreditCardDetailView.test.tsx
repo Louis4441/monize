@@ -28,11 +28,13 @@ vi.mock('@/lib/accounts', () => ({
 
 const mockGetGroupedTotals = vi.fn();
 const mockGetAll = vi.fn();
+const mockGetAllPages = vi.fn();
 const mockGetRecurringCharges = vi.fn();
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getGroupedTotals: (...a: unknown[]) => mockGetGroupedTotals(...a),
     getAll: (...a: unknown[]) => mockGetAll(...a),
+    getAllPages: (...a: unknown[]) => mockGetAllPages(...a),
     getRecurringCharges: (...a: unknown[]) => mockGetRecurringCharges(...a),
   },
 }));
@@ -81,6 +83,7 @@ beforeEach(() => {
     data: [{ id: 'tx1', payeeId: 'p1', payeeName: 'Netflix' }],
     pagination: { hasMore: false },
   });
+  mockGetAllPages.mockResolvedValue([{ id: 'tx1', payeeId: 'p1', payeeName: 'Netflix' }]);
   mockGetRecurringCharges.mockResolvedValue([
     {
       payeeName: 'Netflix',
@@ -149,12 +152,13 @@ describe('CreditCardDetailView', () => {
   it('shows recurring charges detected on the card', async () => {
     await renderView();
     await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());
-    expect(mockGetAll).toHaveBeenCalledWith(
+    // Detection is asked for by account. It used to be asked for by a payee
+    // list the panel built by reading the card's transactions, which is the
+    // request that outgrew the URL on a card with many payees.
+    expect(mockGetRecurringCharges).toHaveBeenCalledWith(
       expect.objectContaining({ accountId: 'cc-1' }),
     );
-    expect(mockGetRecurringCharges).toHaveBeenCalledWith(
-      expect.objectContaining({ payeeIds: ['p1'] }),
-    );
+    expect(mockGetRecurringCharges.mock.calls[0][0]).not.toHaveProperty('payeeIds');
   });
 
   it('does not offer a make-a-payment action', async () => {

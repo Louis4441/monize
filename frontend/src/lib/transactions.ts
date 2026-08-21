@@ -24,6 +24,7 @@ import {
   RegisterFilterOptions,
 } from '@/types/transaction';
 import { invalidateBalanceCaches } from './apiCache';
+import { API_MAX_PAGE_LIMIT } from './api-page-limits';
 
 /** Convert array filter params to comma-separated strings for the API. */
 function buildFilterParams(params?: {
@@ -145,7 +146,7 @@ export const transactionsApi = {
     params?: TransactionsGetAllParams & { pageSize?: number },
   ): Promise<Transaction[]> => {
     const MAX_PAGES = 5000;
-    const { pageSize = 200, ...rest } = params ?? {};
+    const { pageSize = API_MAX_PAGE_LIMIT, ...rest } = params ?? {};
     const all: Transaction[] = [];
     let page = 1;
     let hasMore = true;
@@ -335,15 +336,28 @@ export const transactionsApi = {
     return response.data;
   },
 
-  // Detect recurring charges (cadence + typical amount) for the given payees
+  /**
+   * Detect recurring charges (cadence + typical amount), either on one account
+   * or for named payees. The server requires one of the two.
+   *
+   * Prefer `accountId` for a per-account view. `payeeIds` is serialized into
+   * the query string, so its request grows with the number of ids: a caller
+   * that would have to enumerate an account's payees to build that list is
+   * asking an account-shaped question and should send the account instead.
+   * Enumerating ~250 payees puts roughly 9 KB of UUIDs in the URL, past the
+   * request-line limit of a typical proxy. `payeeIds` stays for the payee
+   * surfaces, which pass exactly one id.
+   */
   getRecurringCharges: async (params: {
-    payeeIds: string[];
+    payeeIds?: string[];
+    accountId?: string;
     startDate: string;
     endDate: string;
   }): Promise<RecurringChargeInfo[]> => {
     const response = await apiClient.get<RecurringChargeInfo[]>('/transactions/recurring-charges', {
       params: {
-        payeeIds: params.payeeIds.join(','),
+        payeeIds: params.payeeIds?.length ? params.payeeIds.join(',') : undefined,
+        accountId: params.accountId,
         startDate: params.startDate,
         endDate: params.endDate,
       },
