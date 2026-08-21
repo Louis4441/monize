@@ -45,6 +45,37 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 
 Feature API modules (one per feature, typed axios wrappers) live alongside `api.ts`. Use the filesystem to discover them.
 
+### A paged endpoint is never asked for more rows than it accepts
+
+`API_MAX_PAGE_LIMIT` (`lib/api-page-limits.ts`) is the ceiling both paged list
+endpoints enforce, and neither of them clamps: `GET /transactions` (via the
+backend's `PAGINATION_MAX_LIMIT`) and `GET /investment-transactions` (a
+hand-written check in its controller) answer **400** to a larger `limit`. Every
+one of these calls sits behind a `.catch()` that degrades to an empty list, so
+the rejection never reaches the user as an error -- it reaches them as a figure
+that is quietly, permanently zero. `limit: 500` on the recurring-charges panel is
+issue #1229 (no subscriptions ever detected); the same literal on the investment
+detail page reported every year's dividends and interest as $0.00.
+
+Lowering the literal to the cap is **not** the fix. That trades a visible zero
+for a plausible undercount, which is the worse of the two: nothing on screen
+distinguishes a truncated year from a quiet one. Either walk the pages --
+`transactionsApi.getAllPages` and `investmentsApi.getAllTransactionPages`, both
+defaulting their page size to the constant -- or narrow the query server-side
+until one page is genuinely enough. The YTD income figure does the second,
+asking for `DIVIDEND` and `INTEREST` separately because that endpoint matches one
+action per request, and still walks pages within each.
+
+Prefer narrowing to walking. A page walk that pulls a whole year of rows down in
+order to distil a handful of ids is a side panel paying for a report, and the
+request count grows with the user's history.
+
+`src/test/api-page-limits.test.ts` scans the tree for a call site above the cap
+and checks the constant against **both** backend sources, so the layers cannot
+drift apart quietly. Its known-violation register is the honest half: an entry
+there is a defect being tracked with the change that fixes it, and the test fails
+once the violation is gone, so a stale entry cannot outlive its fix.
+
 ### A filter the server can apply is not a list the client enumerates
 
 `transactionsApi.getRecurringCharges` takes an `accountId`. It used to take only
@@ -72,6 +103,7 @@ runs as its owner. And the *meaning* usually sharpens rather than staying
 identical: detection scoped to an account measures cadence from that account's
 own rows, so a charge recurring on another card stops being reported on this
 one. Say which of the two you intended, and test it.
+
 
 ### A write that moves money calls `invalidateBalanceCaches()`
 

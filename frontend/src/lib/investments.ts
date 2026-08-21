@@ -36,6 +36,7 @@ import {
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
 import { getCached, setCache, invalidateBalanceCaches, invalidateCache } from './apiCache';
+import { API_MAX_PAGE_LIMIT } from './api-page-limits';
 
 export const investmentsApi = {
   // Get portfolio summary
@@ -252,6 +253,50 @@ export const investmentsApi = {
       { params },
     );
     return response.data;
+  },
+
+  /**
+   * Every investment transaction matching the filter, walked a page at a time.
+   *
+   * The counterpart to `transactionsApi.getAllPages`, and it exists for the
+   * same reason: `GET /investment-transactions` rejects a `limit` above
+   * {@link API_MAX_PAGE_LIMIT} with a 400 rather than clamping it, so a caller
+   * that wants more than one page walks the pages. Reaching for a bigger
+   * `limit` produces a request the server refuses, which every caller here
+   * degrades into an empty list -- a figure that reads as a confident zero.
+   *
+   * Prefer narrowing the query (`action`, `symbol`, a date range) over walking
+   * a whole register client-side; use this when the filtered set can still run
+   * past one page.
+   */
+  getAllTransactionPages: async (
+    params?: {
+      accountIds?: string;
+      startDate?: string;
+      endDate?: string;
+      symbol?: string;
+      action?: string;
+    } & { pageSize?: number },
+  ): Promise<InvestmentTransaction[]> => {
+    const MAX_PAGES = 5000;
+    const { pageSize = API_MAX_PAGE_LIMIT, ...rest } = params ?? {};
+    const all: InvestmentTransaction[] = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore && page <= MAX_PAGES) {
+      const result = await investmentsApi.getTransactions({
+        ...rest,
+        page,
+        limit: pageSize,
+      });
+      // Defend against a backend that reports hasMore=true on an empty page;
+      // without new rows there is nothing left to fetch.
+      if (result.data.length === 0) break;
+      all.push(...result.data);
+      hasMore = result.pagination.hasMore;
+      page++;
+    }
+    return all;
   },
 
   /**
