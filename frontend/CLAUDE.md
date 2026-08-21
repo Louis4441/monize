@@ -1479,7 +1479,15 @@ built-in fallbacks equal to the catalog and `pwa-theme` constants. The
 manifest link is hand-written in `layout.tsx` with
 `crossorigin="use-credentials"` because a manifest fetch carries no cookies
 without it -- Next's static manifest file convention cannot express that,
-which is why the route handler exists instead.
+which is why the route handler exists instead. The link's href also encodes
+the theme as query parameters: an installed app's manifest update check
+re-fetches the URL it was installed with, possibly without credentials, so
+the query keeps a cookieless check resolving the installed theme (cookies,
+when present, win). The manifest pins `id: '/'` so every URL variant is the
+same app. The OS bakes the splash colours in at install time and refreshes
+them lazily (days, or a reinstall), so a theme change reaching the OS splash
+is expected to lag; the boot splash is the surface that follows it
+immediately.
 
 **A palette needs a dark block, or dark mode renders its light colours.** A
 theme's `html[data-theme]` block has specificity (0,1,1) and the `.dark`

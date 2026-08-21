@@ -15,6 +15,9 @@ export function buildManifest(
 ): MetadataRoute.Manifest {
   const page = bootPageColor(colorTheme, theme);
   return {
+    // The manifest URL varies with the theme query string, so the app's
+    // identity is pinned explicitly -- every variant is the same app.
+    id: '/',
     name: 'Monize - Personal Finance Manager',
     short_name: 'Monize',
     description: 'Track your finances, manage budgets, and monitor investments',

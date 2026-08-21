@@ -89,6 +89,18 @@ export default async function RootLayout({
       : undefined;
   const tLayout = await getTranslations('layout');
 
+  // The theme rides the manifest URL as well as the cookies: an installed
+  // app's update check re-fetches the URL it was installed with, possibly
+  // without credentials, so the query string is what keeps a cookieless
+  // update check resolving the palette the app was installed under.
+  const manifestParams = new URLSearchParams();
+  if (bootTheme) manifestParams.set('theme', bootTheme);
+  if (bootColorTheme) manifestParams.set('palette', bootColorTheme);
+  const manifestHref =
+    manifestParams.size > 0
+      ? `/manifest.webmanifest?${manifestParams.toString()}`
+      : '/manifest.webmanifest';
+
   return (
     <html
       lang={locale}
@@ -105,7 +117,7 @@ export default async function RootLayout({
             (see app/manifest.webmanifest/route.ts). */}
         <link
           rel="manifest"
-          href="/manifest.webmanifest"
+          href={manifestHref}
           crossOrigin="use-credentials"
         />
         {/* Also hoisted, and deliberately not in the viewport export: the

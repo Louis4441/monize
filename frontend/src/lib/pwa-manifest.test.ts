@@ -33,6 +33,7 @@ describe('buildManifest', () => {
     const light = buildManifest('light');
     const dark = buildManifest('dark', 'midnight');
 
+    expect(light.id).toBe('/');
     expect(light.name).toBe('Monize - Personal Finance Manager');
     expect(light.short_name).toBe('Monize');
     expect(light.start_url).toBe('/');
