@@ -672,6 +672,7 @@ export class ScheduledTransactionsService {
     storedFrom: string | null | undefined,
     storedTo: string | null | undefined,
     asOf: string | Date,
+    cache?: Map<string, Promise<number | null>>,
   ): Promise<{ rate: number; amount: number } | null> {
     let effectiveRate: number | null = null;
     if (storedRate !== null && storedRate !== undefined) {
@@ -684,15 +685,14 @@ export class ScheduledTransactionsService {
       if (isCurrent) effectiveRate = Number(storedRate);
     }
     if (effectiveRate === null) {
-      effectiveRate =
-        await this.investmentTransactionsService.resolveCashExchangeRateOrNull(
-          userId,
-          accountId,
-          null,
-          securityId ?? null,
-          undefined,
-          asOf,
-        );
+      effectiveRate = await this.resolveForecastPairRate(
+        userId,
+        accountId,
+        null,
+        securityId ?? null,
+        asOf,
+        cache,
+      );
     }
     if (effectiveRate === null) {
       return null;
@@ -721,6 +721,7 @@ export class ScheduledTransactionsService {
     storedFrom: string | null | undefined,
     storedTo: string | null | undefined,
     asOf: string | Date,
+    cache?: Map<string, Promise<number | null>>,
   ): Promise<{ rate: number; amount: number }> {
     const eff = await this.resolveEffectiveSplitCashOrNull(
       userId,
@@ -734,6 +735,7 @@ export class ScheduledTransactionsService {
       storedFrom,
       storedTo,
       asOf,
+      cache,
     );
     if (eff === null) {
       const pair =
@@ -1498,6 +1500,9 @@ export class ScheduledTransactionsService {
       to: string | null | undefined;
     },
     asOf: Date,
+    // Per-list-read negative cache for the pair-rate fetch (issue #1167 review
+    // R14-F1); omitted outside a list read, where the fetch runs directly.
+    cache?: Map<string, Promise<number | null>>,
   ): Promise<number | null> {
     if (
       stored.rate !== null &&
@@ -1510,20 +1515,60 @@ export class ScheduledTransactionsService {
     ) {
       return stored.rate;
     }
-    return this.investmentTransactionsService.resolveCashExchangeRateOrNull(
+    return this.resolveForecastPairRate(
       userId,
       settlement.accountId,
       settlement.fundingAccountId,
       settlement.securityId,
-      undefined,
       asOf,
+      cache,
     );
+  }
+
+  /**
+   * The settlement-pair FX rate a forecast resolver needs, deduped within one
+   * list read (issue #1167 review R14-F1). Every forecast path -- parent rate,
+   * split-amount and override-amount -- resolves an unchanged pair through the
+   * same `resolveCashExchangeRateOrNull(..., undefined, asOf)`, and a pair that
+   * does not resolve persists nothing, so without a shared negative cache each
+   * of N schedules on the same unfetchable pair re-hits the external FX provider
+   * on every list read. The cache is passed in (never an instance field) so it
+   * is scoped to one `findAll`; callers outside a list read omit it and fetch
+   * directly, unchanged.
+   */
+  private resolveForecastPairRate(
+    userId: string,
+    accountId: string,
+    fundingAccountId: string | null | undefined,
+    securityId: string | null | undefined,
+    asOf: string | Date,
+    cache?: Map<string, Promise<number | null>>,
+  ): Promise<number | null> {
+    const fetch = () =>
+      this.investmentTransactionsService.resolveCashExchangeRateOrNull(
+        userId,
+        accountId,
+        fundingAccountId,
+        securityId,
+        undefined,
+        asOf,
+      );
+    if (!cache) return fetch();
+    // `asOf` is constant across one findAll, so the pair tuple is the whole key.
+    const key = [accountId, fundingAccountId ?? "", securityId ?? ""].join("|");
+    let pending = cache.get(key);
+    if (!pending) {
+      pending = fetch();
+      cache.set(key, pending);
+    }
+    return pending;
   }
 
   private async resolveInvestmentForecastRate(
     userId: string,
     transaction: ScheduledTransaction,
     asOf: Date,
+    cache?: Map<string, Promise<number | null>>,
   ): Promise<number | null> {
     if (!transaction.isInvestment || !transaction.investmentAction) {
       return null;
@@ -1548,6 +1593,7 @@ export class ScheduledTransactionsService {
         to: transaction.investmentExchangeRateToCurrency,
       },
       asOf,
+      cache,
     );
   }
 
@@ -1572,6 +1618,7 @@ export class ScheduledTransactionsService {
     userId: string,
     transaction: ScheduledTransaction,
     asOf: Date,
+    cache?: Map<string, Promise<number | null>>,
   ): Promise<number | null> {
     if (!transaction.isSplit || !transaction.splits?.length) {
       return null;
@@ -1611,6 +1658,7 @@ export class ScheduledTransactionsService {
           split.investmentExchangeRateFromCurrency,
           split.investmentExchangeRateToCurrency,
           asOf,
+          cache,
         );
         if (eff === null) {
           // Current rate unknown -> the whole projection is unknown.
@@ -1648,6 +1696,7 @@ export class ScheduledTransactionsService {
     scheduled: ScheduledTransaction,
     override: ScheduledTransactionOverride,
     asOf: Date,
+    cache?: Map<string, Promise<number | null>>,
   ): Promise<number | null | undefined> {
     // Top-level investment override: same precedence as postInvestment
     // (override value -> base fallback) at the effective (stored-or-resolved) rate.
@@ -1672,6 +1721,7 @@ export class ScheduledTransactionsService {
           to: scheduled.investmentExchangeRateToCurrency,
         },
         asOf,
+        cache,
       );
       if (rate === null) {
         return null;
@@ -1717,6 +1767,7 @@ export class ScheduledTransactionsService {
           inv.exchangeRateFromCurrency,
           inv.exchangeRateToCurrency,
           asOf,
+          cache,
         );
         if (eff === null) {
           return null;
@@ -1841,14 +1892,21 @@ export class ScheduledTransactionsService {
     // before the next schedule needs it (a natural dedup within one list read);
     // same-currency rows short-circuit to 1 with no rate lookup at all.
     const asOf = new Date();
-    // Negative-cache the forecast-rate resolution within this one list read
-    // (issue #1167 review). `resolveInvestmentForecastRate` can perform an
-    // external FX fetch, and a pair that does not resolve persists nothing, so
-    // the "first resolution persists it" dedup does not cover it -- every
-    // schedule sharing an unfetchable pair would re-fetch on every list read.
-    // Key on the full determinant of the result (settlement tuple + stored
-    // rate/pair + action), so two rows that would resolve identically fetch once,
-    // and a null (unfetchable) result is remembered for the rest of the read.
+    // Dedup the settlement-pair FX fetch across EVERY forecast resolver within
+    // this one list read (issue #1167 review R14-F1). The parent rate, the
+    // split-investment amount and each override amount all resolve an unchanged
+    // pair through the same external `resolveCashExchangeRateOrNull`, and a pair
+    // that does not resolve persists nothing -- so without this shared negative
+    // cache each of N schedules on the same unfetchable pair re-hits the FX
+    // provider on every list read. Passed into all three resolvers; keyed on the
+    // settlement pair (`asOf` is constant across the read). A same-currency row
+    // still short-circuits to 1 with no lookup at all.
+    const pairRateCache = new Map<string, Promise<number | null>>();
+    // A second, higher-level memo for the parent rate: dedups the stored-current
+    // decision as well as the fetch, so two rows with the same settlement tuple,
+    // stored rate/pair and action resolve once. It shares `pairRateCache` for the
+    // fetch, so the parent path and the amount paths never fetch the same pair
+    // twice.
     const forecastRateCache = new Map<string, Promise<number | null>>();
     const forecastRateFor = (
       row: ScheduledTransaction,
@@ -1867,7 +1925,12 @@ export class ScheduledTransactionsService {
       ].join("|");
       let pending = forecastRateCache.get(key);
       if (!pending) {
-        pending = this.resolveInvestmentForecastRate(userId, row, asOf);
+        pending = this.resolveInvestmentForecastRate(
+          userId,
+          row,
+          asOf,
+          pairRateCache,
+        );
         forecastRateCache.set(key, pending);
       }
       return pending;
@@ -1885,7 +1948,12 @@ export class ScheduledTransactionsService {
       // with current FX) rather than the stored parent amount (issue #1167);
       // null for every other schedule leaves the forecast on `amount`.
       const investmentForecastAmount =
-        await this.resolveInvestmentForecastSplitAmount(userId, row, asOf);
+        await this.resolveInvestmentForecastSplitAmount(
+          userId,
+          row,
+          asOf,
+          pairRateCache,
+        );
       // Each override that carries investment splits gets its own effective
       // total too (F5-2): a per-occurrence override with investment splits is
       // FX-sensitive the same way the base schedule is, and its stored `amount`
@@ -1900,6 +1968,7 @@ export class ScheduledTransactionsService {
             row,
             override,
             asOf,
+            pairRateCache,
           );
         // Return a new object rather than mutating the loaded entity in place
         // (immutability rule): the override entities are shared read models, and

@@ -696,6 +696,82 @@ describe("ScheduledTransactionsService", () => {
       ).toHaveBeenCalled();
     });
 
+    it("fetches an unfetchable settlement pair once per list read across parent and split forecast resolvers (R14-F1)", async () => {
+      // Two schedules on the SAME unfetchable pair (acc-1 / sec-usd), reached
+      // through DIFFERENT forecast resolvers: a top-level investment schedule
+      // (resolveInvestmentForecastRate) and a split-investment schedule
+      // (resolveInvestmentForecastSplitAmount). Their high-level memo keys
+      // differ, so only the shared pair-rate negative cache can stop the second
+      // from re-hitting the FX provider. Both carry a stale recorded pair so the
+      // stored scalar is not reused and the resolver is actually consulted.
+      const parent = makeScheduled({
+        id: "st-parent",
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-usd",
+        investmentFundingAccountId: null,
+        investmentQuantity: 1,
+        investmentPrice: 100,
+        investmentExchangeRate: 1.5,
+        investmentExchangeRateFromCurrency: "EUR",
+        investmentExchangeRateToCurrency: "CAD",
+      });
+      const splitParent = makeScheduled({
+        id: "st-split",
+        isSplit: true,
+        splits: [
+          {
+            id: "s1",
+            scheduledTransactionId: "st-split",
+            kind: "investment",
+            categoryId: null,
+            transferAccountId: null,
+            amount: -600,
+            memo: null,
+            investmentAction: "BUY",
+            investmentSecurityId: "sec-usd",
+            investmentQuantity: 5,
+            investmentPrice: 100,
+            investmentCommission: 0,
+            investmentExchangeRate: 1.6,
+            investmentExchangeRateFromCurrency: "EUR",
+            investmentExchangeRateToCurrency: "CAD",
+          } as any,
+          {
+            id: "s2",
+            scheduledTransactionId: "st-split",
+            kind: "category",
+            categoryId: "cat-fees",
+            transferAccountId: null,
+            amount: -75,
+            memo: null,
+          } as any,
+        ],
+      } as any);
+      const qb = mockQueryBuilder([parent, splitParent]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      // Current pair (USD->CAD) differs from the stored EUR->CAD, so both rows
+      // re-resolve; the provider has no rate for it.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      await service.findAll(userId);
+
+      // One external fetch for the shared pair, not one per schedule.
+      const pairCalls =
+        investmentTransactionsService.resolveCashExchangeRateOrNull.mock.calls.filter(
+          (c: any[]) => c[1] === "acc-1" && c[3] === "sec-usd",
+        );
+      expect(pairCalls).toHaveLength(1);
+    });
+
     it("attaches a null investmentForecastExchangeRate when the current rate is unavailable (issue #1167)", async () => {
       const st = makeScheduled({
         isInvestment: true,
