@@ -1536,7 +1536,7 @@ export class ScheduledTransactionsService {
    * is scoped to one `findAll`; callers outside a list read omit it and fetch
    * directly, unchanged.
    */
-  private resolveForecastPairRate(
+  private async resolveForecastPairRate(
     userId: string,
     accountId: string,
     fundingAccountId: string | null | undefined,
@@ -1554,8 +1554,23 @@ export class ScheduledTransactionsService {
         asOf,
       );
     if (!cache) return fetch();
-    // `asOf` is constant across one findAll, so the pair tuple is the whole key.
-    const key = [accountId, fundingAccountId ?? "", securityId ?? ""].join("|");
+    // Key the negative cache by the DIRECTIONAL CURRENCY PAIR, not the entity
+    // tuple (issue #1167 review, R14 follow-up): twenty different securities that
+    // all settle USD->CAD ask the provider one and the same question, and a
+    // failed lookup persists nothing -- so an (account, security) key would still
+    // hit the provider once per security. Derive the pair (a cheap account/
+    // security currency read, not a provider call) and key by `from->to`; the
+    // rate for a cross-currency pair is a property of the pair, and same-currency
+    // resolves to 1 inside `fetch()` regardless of which security asked. `asOf`
+    // is constant across one findAll, so the pair is the whole key.
+    const pair =
+      await this.investmentTransactionsService.resolveSettlementCurrencyPair(
+        userId,
+        accountId,
+        fundingAccountId,
+        securityId,
+      );
+    const key = `${pair.from}->${pair.to}`;
     let pending = cache.get(key);
     if (!pending) {
       pending = fetch();

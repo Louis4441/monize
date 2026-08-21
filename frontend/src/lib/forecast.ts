@@ -320,6 +320,36 @@ function hasEmbeddedInvestmentSplits(transaction: ScheduledTransaction): boolean
   );
 }
 
+/**
+ * The FX rate the forecast should convert a top-level investment schedule at,
+ * as `number | null` where `null` means "unknown -- withhold" (issue #1167).
+ *
+ * A PRESENT `investmentForecastExchangeRate` is authoritative: `1` for a proven
+ * same-currency pair, a number for a resolved cross-currency pair, `null` when
+ * the current backend could not resolve it.
+ *
+ * An ABSENT field means a backend that predates the field (a rolling deploy).
+ * It is NOT evidence of a 1:1 pair -- the client cannot derive the current
+ * settlement pair, so it cannot claim same-currency, and inventing `1` for an
+ * unresolved cross-currency schedule understates the debit by the whole FX move
+ * (issue #1167 review). Fall back only to a usable PERSISTED scalar (the rate
+ * that old backend would itself post at, so forecast/post parity holds for it);
+ * a null/absent persisted rate is unknown, never `1`, so the projection is
+ * withheld rather than fabricated.
+ */
+function effectiveForecastRate(
+  transaction: ScheduledTransaction,
+): number | null {
+  const forecastRate = transaction.investmentForecastExchangeRate;
+  if (forecastRate !== undefined) return forecastRate;
+  const persisted = transaction.investmentExchangeRate;
+  return persisted != null &&
+    Number.isFinite(Number(persisted)) &&
+    Number(persisted) > 0
+    ? Number(persisted)
+    : null;
+}
+
 function normalizeInvestmentForForecast(
   transaction: ScheduledTransaction,
   accountsById: Map<string, Account>,
@@ -354,15 +384,7 @@ function normalizeInvestmentForForecast(
   // persisted `investmentExchangeRate` (which may be stale for the current
   // settlement pair). The backend sends `1` for a same-currency pair, a resolved
   // rate for a cross-currency one, and `null` when the current rate is unknown.
-  const forecastRate = transaction.investmentForecastExchangeRate;
-  // Absent (undefined) = a backend predating the forecast-rate field (#1167);
-  // fall back to the rate that backend would itself post at, so a rolling deploy
-  // projects with the persisted rate rather than blanking the schedule. An
-  // explicit null = the current backend says the pair is unknown.
-  const rate =
-    forecastRate === undefined
-      ? (transaction.investmentExchangeRate ?? 1)
-      : forecastRate;
+  const rate = effectiveForecastRate(transaction);
   if (rate === null) {
     // Unknown current FX: remap onto the cash account but do not convert. The
     // forecast builders detect the null rate on an investment schedule and
@@ -410,7 +432,11 @@ function hasUnknownForecastRate(transaction: ScheduledTransaction): boolean {
   // persisted rate in `convertInvestmentScheduleToCashFlow`, so it is not
   // withheld here (defensive-read rule).
   if (transaction.isInvestment) {
-    return transaction.investmentForecastExchangeRate === null;
+    // Unknown whenever the EFFECTIVE rate is null -- an explicit null, or an
+    // absent field with no usable persisted fallback. An absent field with a
+    // usable persisted rate is known (that old backend would post at it), so it
+    // is not withheld (issue #1167 review).
+    return effectiveForecastRate(transaction) === null;
   }
   // A split-investment schedule whose effective total could not be resolved (any
   // investment line's current rate unknown) is withheld the same way (#1167).

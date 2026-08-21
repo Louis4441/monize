@@ -772,6 +772,49 @@ describe("ScheduledTransactionsService", () => {
       expect(pairCalls).toHaveLength(1);
     });
 
+    it("fetches an unfetchable pair once even across DIFFERENT securities that settle to it (R14 review MEDIUM-2)", async () => {
+      // Two DISTINCT securities (sec-usd-a, sec-usd-b) that both settle USD->CAD.
+      // Their entity tuples differ, so an (account, security) cache key would
+      // still hit the provider once per security; keying by the directional
+      // currency pair asks the provider the one USD->CAD question a single time.
+      const mk = (id: string, securityId: string) =>
+        makeScheduled({
+          id,
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: securityId,
+          investmentFundingAccountId: null,
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          // Stale recorded pair so the stored scalar is not reused; both re-resolve.
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        });
+      const qb = mockQueryBuilder([
+        mk("st-a", "sec-usd-a"),
+        mk("st-b", "sec-usd-b"),
+      ]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      // Both securities settle to the same current pair; the provider has no rate.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      await service.findAll(userId);
+
+      // One provider-capable fetch for the USD->CAD pair, not one per security.
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).toHaveBeenCalledTimes(1);
+    });
+
     it("attaches a null investmentForecastExchangeRate when the current rate is unavailable (issue #1167)", async () => {
       const st = makeScheduled({
         isInvestment: true,

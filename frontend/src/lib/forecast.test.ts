@@ -1683,6 +1683,29 @@ describe('getProjectedBalanceAtDate', () => {
     const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
     expect(result).toBe(8500);
   });
+
+  it('withholds (does not invent 1:1) when the forecast field is ABSENT and the persisted rate is null (R14 review MEDIUM-1)', () => {
+    // Rolling deploy: an old backend omits investmentForecastExchangeRate AND
+    // persists investmentExchangeRate: null (the parent-investment form does not
+    // submit a rate). An absent field is NOT evidence of a 1:1 pair, so a
+    // cross-currency USD->CAD BUY of 10 x 100 must NOT be projected at rate 1
+    // (-1,000 CAD, understating the real -1,350). With no usable persisted
+    // fallback the occurrence is unknown, so the projected balance is withheld.
+    const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+    const scheduled = [makeScheduled({
+      id: 'inv-1',
+      accountId: 'brokerage-1',
+      amount: -1000,
+      frequency: 'ONCE',
+      nextDueDate: '2025-01-20',
+      isInvestment: true,
+      investmentFundingAccountId: 'cash-1',
+      investmentExchangeRate: null,
+      // investmentForecastExchangeRate intentionally omitted (old backend).
+    } as any)];
+    const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
+    expect(result).toBeNull();
+  });
 });
 
 describe('buildForecast — a missing rate withholds the series', () => {
