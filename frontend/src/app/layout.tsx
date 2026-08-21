@@ -26,35 +26,19 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// theme-color follows the active palette and resolved mode from the cookies
-// ThemeContext maintains (ThemeContext also re-pins the rendered meta tags at
-// runtime). With no resolved-mode cookie the choice falls back to the system
-// preference via a media-split pair.
-export async function generateViewport(): Promise<Viewport> {
-  const cookieStore = await cookies();
-  const rawTheme = cookieStore.get(RESOLVED_THEME_COOKIE)?.value;
-  const rawColorTheme = cookieStore.get(COLOR_THEME_COOKIE)?.value;
-  const theme = isResolvedTheme(rawTheme) ? rawTheme : null;
-  const colorTheme = isColorTheme(rawColorTheme) ? rawColorTheme : null;
-
-  return {
-    themeColor: theme
-      ? bootPageColor(colorTheme, theme)
-      : [
-          {
-            media: '(prefers-color-scheme: light)',
-            color: bootPageColor(colorTheme, 'light'),
-          },
-          {
-            media: '(prefers-color-scheme: dark)',
-            color: bootPageColor(colorTheme, 'dark'),
-          },
-        ],
-    width: 'device-width',
-    initialScale: 1,
-    viewportFit: 'cover',
-  };
-}
+// theme-color is deliberately NOT part of this export. The viewport is
+// re-applied on every soft navigation, and Next removes and re-inserts its
+// meta tags to do it -- for the frames in between, the installed PWA's
+// header falls back to the manifest's stored theme_color, which flashed the
+// old manifest green on every swipe between sections. The theme-color metas
+// are instead rendered as plain JSX in the layout body below: React hoists
+// them into <head> once, the root layout persists across navigations, and
+// nothing churns them.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'Monize - Personal Finance Manager',
@@ -124,6 +108,30 @@ export default async function RootLayout({
           href="/manifest.webmanifest"
           crossOrigin="use-credentials"
         />
+        {/* Also hoisted, and deliberately not in the viewport export: the
+            viewport's metas are removed and re-inserted on every soft
+            navigation, which flashed the manifest's stored theme_color in
+            the PWA header on each swipe. These persist with the layout;
+            ThemeContext re-pins their content on runtime theme changes. */}
+        {bootTheme ? (
+          <meta
+            name="theme-color"
+            content={bootPageColor(bootColorTheme ?? null, bootTheme)}
+          />
+        ) : (
+          <>
+            <meta
+              name="theme-color"
+              media="(prefers-color-scheme: light)"
+              content={bootPageColor(bootColorTheme ?? null, 'light')}
+            />
+            <meta
+              name="theme-color"
+              media="(prefers-color-scheme: dark)"
+              content={bootPageColor(bootColorTheme ?? null, 'dark')}
+            />
+          </>
+        )}
         <BootSplash
           bootTheme={bootTheme}
           strings={{
