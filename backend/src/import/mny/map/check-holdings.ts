@@ -140,6 +140,18 @@ export function crossCheckHoldings(
   const lots = openLotPositions(input.lots, input.accounts.keyByHandle);
   const warnings: MnyWarning[] = [];
 
+  // Money keeps no `LOT` rows for CDs, U.S. savings bonds or money-market funds:
+  // it records their trades in `TRN_INV` but tracks no tax lots for them, so
+  // their open-lot reading is a spurious zero that flagged every such position
+  // as a discrepancy even though the import was correct. For a security the file
+  // records no lot for at all, its own transaction replay -- still Money's data,
+  // read from `TRN_INV` instead of `LOT` -- is the authoritative Money reading.
+  const securitiesWithLots = new Set(
+    input.lots
+      .map((lot) => lot.security)
+      .filter((security): security is number => security !== null),
+  );
+
   const nameByKey = new Map(
     input.accounts.accounts.map((account) => [account.key, account.name]),
   );
@@ -152,10 +164,9 @@ export function crossCheckHoldings(
         replay.get(key) ?? 0,
         QUANTITY_DECIMALS,
       );
-      const lotQuantity = roundToDecimals(
-        lots.get(key) ?? 0,
-        QUANTITY_DECIMALS,
-      );
+      const lotQuantity = securitiesWithLots.has(securityHandle)
+        ? roundToDecimals(lots.get(key) ?? 0, QUANTITY_DECIMALS)
+        : replayQuantity;
       const delta = roundToDecimals(
         replayQuantity - lotQuantity,
         QUANTITY_DECIMALS,

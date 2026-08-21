@@ -518,7 +518,12 @@ export interface MnyHoldingCheck {
   readonly accountKey: string;
   readonly securityHandle: number;
   readonly symbol: string;
-  /** Shares open lots say the account holds (`LOT` rows with no `htrnSell`). */
+  /**
+   * Shares open lots say the account holds (`LOT` rows with no `htrnSell`), or
+   * the replay quantity for a security the file keeps no lot for at all -- CDs,
+   * savings bonds and money-market funds, which Money records in `TRN_INV` but
+   * tracks no tax lots for.
+   */
   readonly lotQuantity: number;
   /** Shares replaying the mapped investment actions produces. */
   readonly replayQuantity: number;

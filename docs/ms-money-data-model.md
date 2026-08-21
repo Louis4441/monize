@@ -532,6 +532,14 @@ Open positions are the sum of `qty` over lots with an empty `htrnSell`. This is
 the most reliable statement of what Money considers held: it sidesteps replaying
 transactions and handles transfers, splits and corporate actions for free.
 
+**Not every held security has a lot.** Money keeps no `LOT` row for a CD, a U.S.
+savings bond or a money-market fund -- it records their trades in `TRN_INV` but
+tracks no tax lots for them. Their open-lot reading is therefore `0` even while
+the position is open, so the verification cross-check falls back to the
+transaction replay (still Money's own data) for any security the file records no
+lot for at all. Treating the absent lot as zero shares flagged every such
+position as a discrepancy the correct import never introduced.
+
 Monize does **not** import holdings from `LOT`. Holdings come only from the
 canonical rebuild over imported transactions -- a second, private fold is what
 left the proof of concept with negative positions. `LOT` is used instead as an
