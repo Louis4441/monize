@@ -272,14 +272,18 @@ export function InvestmentSplitFields({
             value={effectiveRate}
             onChange={(v) => {
               const incoming = v !== undefined && v > 0 ? v : undefined;
-              // The field shows 6dp but the market rate is stored at 10dp, so a
-              // blur on the untouched field re-reports the 6dp rounding of it.
-              // Do not turn that into a user-stated override that truncates the
-              // rate: ignore a re-report matching the effective rate at display
-              // precision (only relevant while the rate is market-derived).
+              // The field shows 6dp but a rate -- market-derived OR stored -- can
+              // carry up to 10dp, so a blur on the untouched field re-reports the
+              // 6dp rounding of it. `NumericInput` suppresses a no-op only when the
+              // re-parsed text equals its value, which a display-truncated >6dp
+              // rate never does, so the re-report arrives here. Do not turn it into
+              // a user edit: that would latch `rateEdited` and stamp the current
+              // settlement pair onto a truncated, possibly stale-pair scalar --
+              // reopening the #1167 bug class through a no-typing focus+blur. Ignore
+              // any incoming value equal to the effective rate at display precision,
+              // whether the rate came from the market or from a stored override.
               if (
                 incoming !== undefined &&
-                statedRate === undefined &&
                 roundToDecimals(Number(effectiveRate) || 0, FX_RATE_DISPLAY_DECIMALS) ===
                   roundToDecimals(incoming, FX_RATE_DISPLAY_DECIMALS)
               ) {

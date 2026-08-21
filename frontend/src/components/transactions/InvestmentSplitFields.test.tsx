@@ -260,6 +260,36 @@ describe('InvestmentSplitFields', () => {
       expect(onChange).not.toHaveBeenCalled();
     });
 
+    it('does not truncate a STORED >6dp rate when the field is only blurred', async () => {
+      // The same display-truncation trap for a rate the split already carries
+      // (issue #1167 review): a stored 10dp rate shows as 6dp, and a no-typing
+      // focus+blur re-reports that truncation. Adopting it would latch
+      // `rateEdited`, so the server stamps the current settlement pair onto a
+      // truncated -- possibly stale-pair -- scalar, reopening the #1167 bug class
+      // through a cosmetic edit. No market rate is offered here, so only the
+      // stored value can fill the field; the guard must still drop the re-report.
+      mockGetLatestRates.mockResolvedValue([]);
+      const onChange = vi.fn();
+      await renderFieldsAsync({
+        value: buyValue({
+          exchangeRate: 1.2345678,
+          exchangeRateFromCurrency: 'USD',
+          exchangeRateToCurrency: 'CAD',
+        }),
+        onChange,
+      });
+      const rateField = await screen.findByLabelText(
+        'Exchange rate (CAD per 1 USD)',
+      );
+      await waitFor(() => expect(rateField).toHaveValue('1.234568'));
+      onChange.mockClear();
+      await act(async () => {
+        fireEvent.focus(rateField);
+        fireEvent.blur(rateField);
+      });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
     it('says the rate is unknown rather than settling at par', async () => {
       mockGetLatestRates.mockResolvedValue([]);
       await renderFieldsAsync({ value: noStatedRate() });

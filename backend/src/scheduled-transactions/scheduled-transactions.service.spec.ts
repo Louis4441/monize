@@ -5055,6 +5055,60 @@ describe("ScheduledTransactionsService", () => {
       expect(savedInvestment.exchangeRate).toBe(1.35);
     });
 
+    it("createOverride() does not persist a client-echoed pair on a security-less override split (R13)", async () => {
+      // The one write shape where the pair travels in client jsonb: a rate-carrying
+      // override split with NO securityId and no source identity. The client's
+      // echoed exchangeRateFromCurrency/ToCurrency must never be trusted -- the
+      // server decides the pair, and with no security to key a value-carry the
+      // split is left unprovenanced so posting re-resolves it (issue #1167 review).
+      stubFindOne(makeScheduled({ isSplit: true, accountId: "acc-cash" }));
+      // A resolver answer exists, but a security-less new line must NOT stamp it.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      overridesRepo.create.mockImplementation((data: any) => data);
+      overridesRepo.save.mockImplementation((data: any) =>
+        Promise.resolve(data),
+      );
+
+      const result = await service.createOverride(userId, stId, {
+        originalDate: "2025-03-01",
+        overrideDate: "2025-03-01",
+        isSplit: true,
+        amount: -675,
+        splits: [
+          {
+            splitKind: "investment" as any,
+            categoryId: null,
+            amount: -600,
+            investment: {
+              action: "INTEREST" as any,
+              // No securityId. The client also echoes a pair that must be dropped.
+              quantity: 1,
+              price: 600,
+              exchangeRate: 1.5,
+              exchangeRateFromCurrency: "JPY",
+              exchangeRateToCurrency: "CAD",
+            },
+          },
+          {
+            splitKind: "category" as any,
+            categoryId: "cat-fees",
+            amount: -75,
+          },
+        ],
+      } as any);
+
+      const savedInvestment = (result.splits as any[])[0].investment;
+      // The server overwrites the client's echoed JPY/CAD with "unprovenanced"
+      // (undefined), so posting re-resolves rather than trusting the client pair.
+      expect(savedInvestment.exchangeRateFromCurrency).toBeUndefined();
+      expect(savedInvestment.exchangeRateToCurrency).toBeUndefined();
+    });
+
     // ---- No re-bless: an edit that resends an unchanged rate must not relabel
     // its pair (issue #1167 review) ----
 

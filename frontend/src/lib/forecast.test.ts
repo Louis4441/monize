@@ -1642,6 +1642,47 @@ describe('getProjectedBalanceAtDate', () => {
     const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
     expect(result).toBe(8500);
   });
+
+  it('returns null when an investment occurrence has unknown current FX (issue #1167 review)', () => {
+    // An explicit null forecast rate means the current settlement pair could not
+    // be resolved. The projected balance the user approves a posting against must
+    // not fold in the stale/raw amount (or 0) -- it is unknowable from here on,
+    // exactly as buildForecast withholds the whole series.
+    const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+    const scheduled = [makeScheduled({
+      id: 'inv-1',
+      accountId: 'brokerage-1',
+      amount: -1500,
+      frequency: 'ONCE',
+      nextDueDate: '2025-01-20',
+      isInvestment: true,
+      investmentFundingAccountId: 'cash-1',
+      investmentForecastExchangeRate: null,
+    } as any)];
+    const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
+    expect(result).toBeNull();
+  });
+
+  it('does not withhold when the forecast-rate field is ABSENT, falling back to the persisted rate (rolling deploy)', () => {
+    // A backend predating the forecast-rate field (#1167) sends no
+    // investmentForecastExchangeRate. Treating absent as unknown would blank the
+    // projection during a rolling deploy; instead it falls back to the persisted
+    // rate that backend would itself post at.
+    const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+    const scheduled = [makeScheduled({
+      id: 'inv-1',
+      accountId: 'brokerage-1',
+      amount: -1500,
+      frequency: 'ONCE',
+      nextDueDate: '2025-01-20',
+      isInvestment: true,
+      investmentFundingAccountId: 'cash-1',
+      investmentExchangeRate: 1,
+      // investmentForecastExchangeRate intentionally omitted (old backend).
+    } as any)];
+    const result = getProjectedBalanceAtDate(cashAccount, '2025-01-25', scheduled, []);
+    expect(result).toBe(8500);
+  });
 });
 
 describe('buildForecast — a missing rate withholds the series', () => {

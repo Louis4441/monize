@@ -1251,7 +1251,10 @@ export class ScheduledTransactionsService {
     incoming: {
       sourceSplitId?: string | null;
       rateExplicit?: boolean;
-      securityId: string;
+      // Null for a security-less investment split (e.g. INTEREST): the source
+      // currency is the account's, resolvable server-side, but there is no
+      // security to key the value-carry fallback by.
+      securityId: string | null;
       rate: number;
     },
     source: {
@@ -1286,6 +1289,11 @@ export class ScheduledTransactionsService {
       return stampCurrent();
     }
     if (incoming.rateExplicit) return stampCurrent();
+    // The value-carry fallback is keyed by security: without one (a security-less
+    // split with no sourceSplitId and no explicit intent) there is nothing to
+    // match against, so the rate is unprovenanced and posting re-resolves it --
+    // never the client-echoed pair.
+    if (incoming.securityId === null) return { from: null, to: null };
     const carried = source.byKey.get(
       this.provenanceKey(incoming.securityId, incoming.rate),
     );
@@ -1833,6 +1841,37 @@ export class ScheduledTransactionsService {
     // before the next schedule needs it (a natural dedup within one list read);
     // same-currency rows short-circuit to 1 with no rate lookup at all.
     const asOf = new Date();
+    // Negative-cache the forecast-rate resolution within this one list read
+    // (issue #1167 review). `resolveInvestmentForecastRate` can perform an
+    // external FX fetch, and a pair that does not resolve persists nothing, so
+    // the "first resolution persists it" dedup does not cover it -- every
+    // schedule sharing an unfetchable pair would re-fetch on every list read.
+    // Key on the full determinant of the result (settlement tuple + stored
+    // rate/pair + action), so two rows that would resolve identically fetch once,
+    // and a null (unfetchable) result is remembered for the rest of the read.
+    const forecastRateCache = new Map<string, Promise<number | null>>();
+    const forecastRateFor = (
+      row: ScheduledTransaction,
+    ): Promise<number | null> => {
+      if (!(row.isInvestment && row.investmentAction)) {
+        return Promise.resolve(null);
+      }
+      const key = [
+        row.accountId,
+        row.investmentFundingAccountId ?? "",
+        row.investmentSecurityId ?? "",
+        row.investmentExchangeRate ?? "",
+        row.investmentExchangeRateFromCurrency ?? "",
+        row.investmentExchangeRateToCurrency ?? "",
+        row.investmentAction,
+      ].join("|");
+      let pending = forecastRateCache.get(key);
+      if (!pending) {
+        pending = this.resolveInvestmentForecastRate(userId, row, asOf);
+        forecastRateCache.set(key, pending);
+      }
+      return pending;
+    };
     const result: (ScheduledTransaction & {
       overrideCount?: number;
       nextOverride?: ScheduledTransactionOverride | null;
@@ -1841,10 +1880,7 @@ export class ScheduledTransactionsService {
       investmentForecastAmount?: number | null;
     })[] = [];
     for (const row of rows) {
-      const investmentForecastExchangeRate =
-        row.isInvestment && row.investmentAction
-          ? await this.resolveInvestmentForecastRate(userId, row, asOf)
-          : null;
+      const investmentForecastExchangeRate = await forecastRateFor(row);
       // A split-investment schedule projects its *effective* total (re-summed
       // with current FX) rather than the stored parent amount (issue #1167);
       // null for every other schedule leaves the forecast on `amount`.
@@ -1865,9 +1901,14 @@ export class ScheduledTransactionsService {
             override,
             asOf,
           );
-        return Object.assign(override, {
+        // Return a new object rather than mutating the loaded entity in place
+        // (immutability rule): the override entities are shared read models, and
+        // stamping a derived field onto them in the loop mutates what other
+        // readers of the same transaction hold.
+        return {
+          ...override,
           investmentForecastAmount: overrideForecastAmount,
-        });
+        };
       };
       const nextOverride = await augmentOverride(row.nextOverride);
       const futureOverrides = row.futureOverrides
@@ -3619,8 +3660,16 @@ export class ScheduledTransactionsService {
       const inv = s.investment;
       if (inv?.exchangeRate === undefined || inv?.exchangeRate === null)
         continue;
-      if (!inv.securityId) continue;
-      const securityId = inv.securityId;
+      // A rate-carrying split with NO securityId must still get a server-decided
+      // pair: the override split's pair travels in the client-supplied jsonb, so
+      // skipping it left the client's echoed `exchangeRateFromCurrency`/`ToCurrency`
+      // persisted verbatim -- the one write shape where provenance was
+      // client-asserted rather than server-derived (issue #1167 review). The pair
+      // is resolvable server-side (source = the account's currency for a
+      // security-less action); `decideSplitProvenance` keys the value-carry by
+      // security and so leaves a security-less new line unprovenanced, but a
+      // sourceSplitId match still carries its recorded pair forward.
+      const securityId = inv.securityId ?? null;
       const pair = await this.decideSplitProvenance(
         {
           sourceSplitId: s.sourceSplitId,

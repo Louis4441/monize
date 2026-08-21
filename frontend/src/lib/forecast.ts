@@ -354,8 +354,16 @@ function normalizeInvestmentForForecast(
   // persisted `investmentExchangeRate` (which may be stale for the current
   // settlement pair). The backend sends `1` for a same-currency pair, a resolved
   // rate for a cross-currency one, and `null` when the current rate is unknown.
-  const rate = transaction.investmentForecastExchangeRate;
-  if (rate == null) {
+  const forecastRate = transaction.investmentForecastExchangeRate;
+  // Absent (undefined) = a backend predating the forecast-rate field (#1167);
+  // fall back to the rate that backend would itself post at, so a rolling deploy
+  // projects with the persisted rate rather than blanking the schedule. An
+  // explicit null = the current backend says the pair is unknown.
+  const rate =
+    forecastRate === undefined
+      ? (transaction.investmentExchangeRate ?? 1)
+      : forecastRate;
+  if (rate === null) {
     // Unknown current FX: remap onto the cash account but do not convert. The
     // forecast builders detect the null rate on an investment schedule and
     // withhold the projection rather than inventing a rate.
@@ -394,13 +402,20 @@ function normalizeInvestmentForForecast(
  * back to the settlement account's currency.
  */
 function hasUnknownForecastRate(transaction: ScheduledTransaction): boolean {
+  // Read `=== null`, not `== null`: an explicit null is the current backend
+  // saying the settlement pair is unknown (withhold), whereas an ABSENT field is
+  // a backend that predates the forecast-rate field (#1167) -- during a rolling
+  // deploy the new frontend can hit it, and treating absent as unknown would
+  // blank every investment schedule's forecast. Absent falls back to the
+  // persisted rate in `convertInvestmentScheduleToCashFlow`, so it is not
+  // withheld here (defensive-read rule).
   if (transaction.isInvestment) {
-    return transaction.investmentForecastExchangeRate == null;
+    return transaction.investmentForecastExchangeRate === null;
   }
   // A split-investment schedule whose effective total could not be resolved (any
   // investment line's current rate unknown) is withheld the same way (#1167).
   if (hasEmbeddedInvestmentSplits(transaction)) {
-    return transaction.investmentForecastAmount == null;
+    return transaction.investmentForecastAmount === null;
   }
   return false;
 }
@@ -808,7 +823,7 @@ export function getProjectedBalanceAtDate(
   futureTransactions: FutureTransaction[] = [],
   excludeScheduledId?: string,
   allAccounts?: Account[],
-): number {
+): number | null {
   const accountsById = new Map<string, Account>();
   accountsById.set(account.id, account);
   if (allAccounts) {
@@ -852,6 +867,12 @@ export function getProjectedBalanceAtDate(
     const occurrences = generateOccurrences(tx, today, endDate);
     const isInbound = inboundTransferIds.has(tx.id);
     for (const occ of occurrences) {
+      // An investment occurrence whose current FX rate is unknown (issue #1167)
+      // makes the balance at/after its date unknowable, exactly as it withholds
+      // the whole series in `buildForecast`. Return null rather than folding a
+      // stale/raw security-currency amount (or 0) into a projected balance the
+      // user approves a posting against.
+      if (occ.unknown) return null;
       balance += isInbound ? -occ.amount : occ.amount;
     }
   }
