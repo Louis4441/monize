@@ -123,6 +123,10 @@
       "status": "Status",
       "actions": "Aktionen"
     },
+    "dateDisplay": {
+      "toggleLabel": "Monat/Jahr-Datumsangaben",
+      "toggleTitle": "Nur Monat und Jahr anzeigen, damit mehr vom Zahlungsempfänger sichtbar ist"
+    },
     "attachmentsCount": "{count, plural, one {# Anhang} other {# Anhänge}}",
     "today": "Heute",
     "export": {

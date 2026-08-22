@@ -123,6 +123,10 @@
       "status": "Estado",
       "actions": "Ações"
     },
+    "dateDisplay": {
+      "toggleLabel": "Datas mês/ano",
+      "toggleTitle": "Mostrar apenas o mês e o ano para caber mais do beneficiário"
+    },
     "attachmentsCount": "{count, plural, one {# anexo} other {# anexos}}",
     "today": "Hoje",
     "export": {
