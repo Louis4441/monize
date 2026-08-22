@@ -232,6 +232,23 @@ describe('ReportSwitcher', () => {
     ).toBeNull();
   });
 
+  it('orders the Favourites section by REPORT_CATEGORIES, not by insertion order', async () => {
+    // favouriteReportIds lists networth before spending, but the source claims
+    // the top section reads in REPORT_CATEGORIES order (spending before
+    // networth) -- guard that claim so a future reorder cannot pass silently.
+    setFavouriteReportIds(['net-worth', 'spending-by-category']);
+    await openSwitcher('monthly-comparison');
+    const favourites = screen.getByRole('group', { name: 'Favourites' });
+    const names = within(favourites)
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent ?? '');
+    const spendingIdx = names.findIndex((n) => /Spending by Category/.test(n));
+    const netWorthIdx = names.findIndex((n) => /Net Worth Over Time/.test(n));
+    expect(spendingIdx).toBeGreaterThanOrEqual(0);
+    expect(netWorthIdx).toBeGreaterThanOrEqual(0);
+    expect(spendingIdx).toBeLessThan(netWorthIdx);
+  });
+
   it('still filters a favourite by its own category name', async () => {
     setFavouriteReportIds(['savings-rate']);
     await openSwitcher('monthly-comparison');
