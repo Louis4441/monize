@@ -596,6 +596,45 @@ export class ScheduledTransactionsService {
   }
 
   /**
+   * The settlement currency pair for a tuple, deduped within one list read
+   * (issue #1167 review). `resolveSettlementCurrencyPair` is 2-3 sequential DB
+   * reads (brokerage / linked-cash / security currency lookups), and every
+   * forecast resolver in `findAll` derives the SAME pair more than once per row:
+   * the stored-current check derives it, and the pair-rate cache key derives it
+   * again. Across N rows sharing one `(accountId, fundingAccountId, securityId)`
+   * that is O(N) identical lookups even though the currencies are constant within
+   * a read. This memo (a Promise per tuple, so concurrent callers join one
+   * in-flight derivation) collapses them to one. The cache is passed in -- never
+   * an instance field -- so it is scoped to a single `findAll`; callers outside a
+   * list read omit it and derive directly, unchanged. This memoizes the pair
+   * DERIVATION only; the pair-rate FETCH stays deduped by `pairRateCache`, and
+   * `InvestmentTransactionsService` remains the sole owner of FX precedence.
+   */
+  private resolveForecastSettlementPair(
+    userId: string,
+    accountId: string,
+    fundingAccountId: string | null | undefined,
+    securityId: string | null | undefined,
+    cache?: Map<string, Promise<{ from: string; to: string }>>,
+  ): Promise<{ from: string; to: string }> {
+    const fetch = () =>
+      this.investmentTransactionsService.resolveSettlementCurrencyPair(
+        userId,
+        accountId,
+        fundingAccountId,
+        securityId,
+      );
+    if (!cache) return fetch();
+    const key = `${accountId}|${fundingAccountId ?? ""}|${securityId ?? ""}`;
+    let pending = cache.get(key);
+    if (!pending) {
+      pending = fetch();
+      cache.set(key, pending);
+    }
+    return pending;
+  }
+
+  /**
    * Whether a stored FX rate may be reused for the current settlement pair
    * (issue #1167). A rate is reused only when its recorded pair still matches
    * the current settlement pair; a rate whose recorded pair no longer matches --
@@ -617,18 +656,19 @@ export class ScheduledTransactionsService {
       fundingAccountId: string | null | undefined;
       securityId: string | null | undefined;
     },
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
   ): Promise<boolean> {
     if (!storedFrom || !storedTo) {
       // No recorded pair: unknown, not current -- re-resolve rather than trust.
       return false;
     }
-    const pair =
-      await this.investmentTransactionsService.resolveSettlementCurrencyPair(
-        userId,
-        settlement.accountId,
-        settlement.fundingAccountId,
-        settlement.securityId,
-      );
+    const pair = await this.resolveForecastSettlementPair(
+      userId,
+      settlement.accountId,
+      settlement.fundingAccountId,
+      settlement.securityId,
+      pairCache,
+    );
     // Same-currency settlement resolves to 1 by definition (issue #1167), so a
     // stored non-1 scalar recorded against an X->X pair is never "the current
     // rate" even when its from/to still equal the pair -- e.g. a 1.50 EUR/CAD
@@ -673,6 +713,7 @@ export class ScheduledTransactionsService {
     storedTo: string | null | undefined,
     asOf: string | Date,
     cache?: Map<string, Promise<number | null>>,
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
   ): Promise<{ rate: number; amount: number } | null> {
     let effectiveRate: number | null = null;
     if (storedRate !== null && storedRate !== undefined) {
@@ -681,6 +722,7 @@ export class ScheduledTransactionsService {
         storedFrom,
         storedTo,
         { accountId, fundingAccountId: null, securityId: securityId ?? null },
+        pairCache,
       );
       if (isCurrent) effectiveRate = Number(storedRate);
     }
@@ -692,6 +734,7 @@ export class ScheduledTransactionsService {
         securityId ?? null,
         asOf,
         cache,
+        pairCache,
       );
     }
     if (effectiveRate === null) {
@@ -1503,6 +1546,9 @@ export class ScheduledTransactionsService {
     // Per-list-read negative cache for the pair-rate fetch (issue #1167 review
     // R14-F1); omitted outside a list read, where the fetch runs directly.
     cache?: Map<string, Promise<number | null>>,
+    // Per-list-read memo for the settlement-pair DERIVATION (issue #1167 review),
+    // shared by the stored-current check and the pair-rate cache key below.
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
   ): Promise<number | null> {
     if (
       stored.rate !== null &&
@@ -1511,6 +1557,7 @@ export class ScheduledTransactionsService {
         stored.from,
         stored.to,
         settlement,
+        pairCache,
       ))
     ) {
       return stored.rate;
@@ -1522,6 +1569,7 @@ export class ScheduledTransactionsService {
       settlement.securityId,
       asOf,
       cache,
+      pairCache,
     );
   }
 
@@ -1543,6 +1591,7 @@ export class ScheduledTransactionsService {
     securityId: string | null | undefined,
     asOf: string | Date,
     cache?: Map<string, Promise<number | null>>,
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
   ): Promise<number | null> {
     const fetch = () =>
       this.investmentTransactionsService.resolveCashExchangeRateOrNull(
@@ -1563,13 +1612,13 @@ export class ScheduledTransactionsService {
     // rate for a cross-currency pair is a property of the pair, and same-currency
     // resolves to 1 inside `fetch()` regardless of which security asked. `asOf`
     // is constant across one findAll, so the pair is the whole key.
-    const pair =
-      await this.investmentTransactionsService.resolveSettlementCurrencyPair(
-        userId,
-        accountId,
-        fundingAccountId,
-        securityId,
-      );
+    const pair = await this.resolveForecastSettlementPair(
+      userId,
+      accountId,
+      fundingAccountId,
+      securityId,
+      pairCache,
+    );
     const key = `${pair.from}->${pair.to}`;
     let pending = cache.get(key);
     if (!pending) {
@@ -1584,6 +1633,7 @@ export class ScheduledTransactionsService {
     transaction: ScheduledTransaction,
     asOf: Date,
     cache?: Map<string, Promise<number | null>>,
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
   ): Promise<number | null> {
     if (!transaction.isInvestment || !transaction.investmentAction) {
       return null;
@@ -1609,6 +1659,7 @@ export class ScheduledTransactionsService {
       },
       asOf,
       cache,
+      pairCache,
     );
   }
 
@@ -1634,6 +1685,7 @@ export class ScheduledTransactionsService {
     transaction: ScheduledTransaction,
     asOf: Date,
     cache?: Map<string, Promise<number | null>>,
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
   ): Promise<number | null> {
     if (!transaction.isSplit || !transaction.splits?.length) {
       return null;
@@ -1674,6 +1726,7 @@ export class ScheduledTransactionsService {
           split.investmentExchangeRateToCurrency,
           asOf,
           cache,
+          pairCache,
         );
         if (eff === null) {
           // Current rate unknown -> the whole projection is unknown.
@@ -1712,6 +1765,7 @@ export class ScheduledTransactionsService {
     override: ScheduledTransactionOverride,
     asOf: Date,
     cache?: Map<string, Promise<number | null>>,
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
   ): Promise<number | null | undefined> {
     // Top-level investment override: same precedence as postInvestment
     // (override value -> base fallback) at the effective (stored-or-resolved) rate.
@@ -1737,6 +1791,7 @@ export class ScheduledTransactionsService {
         },
         asOf,
         cache,
+        pairCache,
       );
       if (rate === null) {
         return null;
@@ -1783,6 +1838,7 @@ export class ScheduledTransactionsService {
           inv.exchangeRateToCurrency,
           asOf,
           cache,
+          pairCache,
         );
         if (eff === null) {
           return null;
@@ -1917,6 +1973,15 @@ export class ScheduledTransactionsService {
     // settlement pair (`asOf` is constant across the read). A same-currency row
     // still short-circuits to 1 with no lookup at all.
     const pairRateCache = new Map<string, Promise<number | null>>();
+    // Dedup the settlement-pair DERIVATION (2-3 DB reads each) across every
+    // forecast resolver in this read (issue #1167 review): the stored-current
+    // check and the pair-rate cache key both derive the same tuple's pair, once
+    // per parent/split/override row, so without this memo a user with many
+    // investment schedules sharing one settlement tuple pays O(rows) identical
+    // account/security lookups even when every rate is already cached. Keyed by
+    // the entity tuple (the derivation's whole input); the rate FETCH stays keyed
+    // by the resolved pair in `pairRateCache`.
+    const pairCache = new Map<string, Promise<{ from: string; to: string }>>();
     // A second, higher-level memo for the parent rate: dedups the stored-current
     // decision as well as the fetch, so two rows with the same settlement tuple,
     // stored rate/pair and action resolve once. It shares `pairRateCache` for the
@@ -1945,6 +2010,7 @@ export class ScheduledTransactionsService {
           row,
           asOf,
           pairRateCache,
+          pairCache,
         );
         forecastRateCache.set(key, pending);
       }
@@ -1968,6 +2034,7 @@ export class ScheduledTransactionsService {
           row,
           asOf,
           pairRateCache,
+          pairCache,
         );
       // Each override that carries investment splits gets its own effective
       // total too (F5-2): a per-occurrence override with investment splits is
@@ -1984,6 +2051,7 @@ export class ScheduledTransactionsService {
             override,
             asOf,
             pairRateCache,
+            pairCache,
           );
         // Return a new object rather than mutating the loaded entity in place
         // (immutability rule): the override entities are shared read models, and

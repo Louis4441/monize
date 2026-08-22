@@ -815,6 +815,94 @@ describe("ScheduledTransactionsService", () => {
       ).toHaveBeenCalledTimes(1);
     });
 
+    it("derives the settlement pair once per tuple across a whole list read (issue #1167 review MEDIUM-3)", async () => {
+      // Two parent investment schedules on the IDENTICAL settlement tuple
+      // (acc-1 / no funding / sec-usd) but DIFFERENT stored rates, so the
+      // high-level forecastRateCache does not merge them and each one runs the
+      // stored-current check AND the pair-rate key derivation -- up to four
+      // resolveSettlementCurrencyPair calls for one tuple. The per-read tuple
+      // memo must collapse them to one; the pair derivation is 2-3 DB reads, so
+      // O(rows) of them is the amplification this fixes.
+      const mk = (id: string, rate: number) =>
+        makeScheduled({
+          id,
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-usd",
+          investmentFundingAccountId: null,
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          // Stale recorded pair -> stored scalar not reused, resolver consulted.
+          investmentExchangeRate: rate,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        });
+      const qb = mockQueryBuilder([mk("st-a", 1.5), mk("st-b", 1.6)]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      await service.findAll(userId);
+
+      // One pair derivation for the shared tuple, not one per row per resolver.
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the pair-derivation memo and the pair-rate cache separate (issue #1167 review MEDIUM-3)", async () => {
+      // Two DISTINCT securities settling the same USD->CAD pair: their tuples
+      // differ, so the tuple memo derives the pair twice (once per tuple), while
+      // the pair-rate cache still asks the provider the USD->CAD question once.
+      // Proves the two caches are distinct and both required -- collapsing them
+      // would either re-derive per row or re-fetch per security.
+      const mk = (id: string, securityId: string) =>
+        makeScheduled({
+          id,
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: securityId,
+          investmentFundingAccountId: null,
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "EUR",
+          investmentExchangeRateToCurrency: "CAD",
+        });
+      const qb = mockQueryBuilder([
+        mk("st-a", "sec-usd-a"),
+        mk("st-b", "sec-usd-b"),
+      ]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      await service.findAll(userId);
+
+      // Two tuples -> two pair derivations (memoized per tuple, not per row)...
+      expect(
+        investmentTransactionsService.resolveSettlementCurrencyPair,
+      ).toHaveBeenCalledTimes(2);
+      // ...but one provider-capable fetch for the shared USD->CAD pair.
+      expect(
+        investmentTransactionsService.resolveCashExchangeRateOrNull,
+      ).toHaveBeenCalledTimes(1);
+    });
+
     it("attaches a null investmentForecastExchangeRate when the current rate is unavailable (issue #1167)", async () => {
       const st = makeScheduled({
         isInvestment: true,
