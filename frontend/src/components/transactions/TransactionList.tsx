@@ -21,6 +21,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getLocalDateString } from '@/lib/utils';
 import { useTableDensity } from '@/hooks/useTableDensity';
 import { useDensityPreference, type DensityView } from '@/store/densityStore';
+import { useCompactMobileDates } from '@/store/dateDisplayStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -187,10 +188,18 @@ export function TransactionList({
 }: TransactionListProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
-  const { formatDate } = useDateFormat();
+  const { formatDate, formatMonth } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { density } = useDensityPreference(densityView);
+  const { compactMobileDates, toggleCompactMobileDates } = useCompactMobileDates();
+
+  // Month/year in the user's own date-format ordering; transactionDate is a
+  // calendar date (YYYY-MM-DD), so the first seven characters are its month.
+  const formatCompactDate = useCallback(
+    (date: string) => formatMonth(date.slice(0, 7)),
+    [formatMonth]
+  );
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; transaction: Transaction | null }>({
     isOpen: false,
     transaction: null,
@@ -515,7 +524,31 @@ export function TransactionList({
                   />
                 </th>
               )}
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.date')}</th>
+              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
+                <span className="inline-flex items-center gap-1">
+                  {t('list.header.date')}
+                  {/* Phones show only Date, Payee and Amount, and the payee is
+                      what runs out of room -- this flips the column to
+                      month/year so the payee gets the width back. Above `sm`
+                      the full date always fits, so the control would be a
+                      no-op there and is not drawn. */}
+                  <button
+                    onClick={toggleCompactMobileDates}
+                    aria-pressed={compactMobileDates}
+                    aria-label={t('list.dateDisplay.toggleLabel')}
+                    title={t('list.dateDisplay.toggleTitle')}
+                    className={`sm:hidden rounded p-0.5 focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                      compactMobileDates
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m-4 12h2a2 2 0 002-2v-2M9 12h6" />
+                    </svg>
+                  </button>
+                </span>
+              </th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell`}>{t('list.header.account')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[900px]:table-cell`}>{t('list.header.category')}</th>
@@ -577,6 +610,8 @@ export function TransactionList({
                     displayAmount={displayAmounts.get(transaction.id)}
                     isDeleting={deletingId === transaction.id}
                     formatDate={formatDate}
+                    compactDates={compactMobileDates}
+                    formatCompactDate={formatCompactDate}
                     formatAmount={formatAmount}
                     formatBalance={formatBalance}
                     onRowClick={handleRowClick}

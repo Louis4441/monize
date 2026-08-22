@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, act, cleanup } from '@/test/render'
 import { TransactionList } from './TransactionList';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 import { useDensityStore } from '@/store/densityStore';
+import { useDateDisplayStore } from '@/store/dateDisplayStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import toast from 'react-hot-toast';
 
@@ -17,6 +18,7 @@ vi.mock('@/lib/transactions', () => ({
 vi.mock('@/hooks/useDateFormat', () => ({
   useDateFormat: () => ({ dateFormat: 'browser', datePattern: 'YYYY-MM-DD',
     formatDate: (d: string) => d,
+    formatMonth: (m: string) => `M:${m}`,
   }),
 }));
 
@@ -3202,6 +3204,58 @@ describe('TransactionList', () => {
         expect(screen.getAllByText('Grocery Store').length).toBe(2);
       });
       expect(screen.queryByTestId('stale-reconciliation-chip')).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe('TransactionList compact mobile dates', () => {
+  afterEach(() => {
+    // `cleanup()` first: vitest runs after-hooks in reverse registration
+    // order, so a store write here would re-render the still-mounted tree
+    // outside act. `src/test/test-hygiene.test.ts` is the rule.
+    cleanup();
+    useDateDisplayStore.setState({ compactMobileDates: false });
+  });
+
+  it('offers the toggle in the Date column header, off by default', () => {
+    render(<TransactionList transactions={[createTransaction()]} />);
+
+    const toggle = screen.getByRole('button', { name: 'Month/year dates' });
+    expect(toggle.closest('th')).toHaveTextContent('Date');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    // Full date, single rendering -- no phone/desktop split.
+    expect(screen.getByText('2024-01-15')).toBeInTheDocument();
+    expect(screen.queryByText('M:2024-01')).not.toBeInTheDocument();
+  });
+
+  it('flips rows to month/year for phones and keeps the full date for wider screens', async () => {
+    render(<TransactionList transactions={[createTransaction()]} />);
+
+    const toggle = screen.getByRole('button', { name: 'Month/year dates' });
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    // Month/year through useDateFormat's formatMonth (the user's own date
+    // format ordering), fed the row's YYYY-MM.
+    const compact = screen.getByText('M:2024-01');
+    expect(compact.className).toContain('sm:hidden');
+
+    // The full date is still rendered, gated to sm and up.
+    const full = screen.getByText('2024-01-15');
+    expect(full.className).toContain('hidden');
+    expect(full.className).toContain('sm:inline');
+  });
+
+  it('remembers the choice in the shared register-wide store', async () => {
+    render(<TransactionList transactions={[createTransaction()]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Month/year dates' }));
+
+    await waitFor(() => {
+      expect(useDateDisplayStore.getState().compactMobileDates).toBe(true);
     });
   });
 });
