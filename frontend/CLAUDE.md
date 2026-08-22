@@ -103,6 +103,8 @@ Both are resolved server-side in one walk up the ancestry: read `category.effect
 
 `components/ui/BrandLogo.tsx` renders a cached favicon with the neutral badge fallback, and owns the one rule that matters: the bytes always come from our own backend, never a third party, so drawing a logo cannot leak which institutions or payees a user has. `InstitutionLogo` and `PayeeLogo` are thin wrappers naming the `/:id/logo` route, gated on `hasLogo` so icon-less rows issue no requests. A 404 lands on `onError` and shows the same badge. A third entity gets a wrapper, not a second component.
 
+**Hiding a logo responsively is spelled `max-sm:hidden`, never a bare `hidden`.** Tailwind emits `.hidden` *first* among the display utilities, so on the fallback badge -- whose own classes include `inline-flex` -- a caller's `hidden sm:inline-flex` never hides anything: the letter circles stayed visible on mobile while the favicons vanished. A `max-*` variant sorts after every base utility and wins below its breakpoint. The brand-logo guard in `ui-conventions.test.ts` fails on a bare `hidden` token in any logo call site's `className`.
+
 ### A status pill is `Badge`; table chrome is `Table.tsx`
 
 `components/ui/Badge.tsx` is the small status pill (previously hand-rolled ~50 times). Pass `variant` and `size`; pass `as="button"` where the pill is also a control, rather than nesting a button in a span. It deliberately does not absorb pills whose colour *means* something -- `CategoryPill`, `AccountTypePill` and `SCHEDULED_KIND_CHIP_CLASSES` are each already one source of truth, exempted by name.
