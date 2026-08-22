@@ -128,7 +128,8 @@
     "backToReports": "보고서로 돌아가기",
     "switchReport": "다른 보고서로 이동",
     "switchPlaceholder": "보고서 검색...",
-    "switchNoMatches": "일치하는 보고서가 없습니다"
+    "switchNoMatches": "일치하는 보고서가 없습니다",
+    "favourites": "즐겨찾기"
   },
   "reportPage": {
     "notFound": "보고서를 찾을 수 없음",

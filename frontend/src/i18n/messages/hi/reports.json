@@ -128,7 +128,8 @@
     "backToReports": "रिपोर्ट पर वापस जाएँ",
     "switchReport": "किसी दूसरी रिपोर्ट पर जाएँ",
     "switchPlaceholder": "रिपोर्ट छाँटें...",
-    "switchNoMatches": "कोई रिपोर्ट मेल नहीं खाती"
+    "switchNoMatches": "कोई रिपोर्ट मेल नहीं खाती",
+    "favourites": "पसंदीदा"
   },
   "reportPage": {
     "notFound": "रिपोर्ट नहीं मिली",

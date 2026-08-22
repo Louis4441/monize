@@ -128,7 +128,8 @@
     "backToReports": "Kembali ke Laporan",
     "switchReport": "Pindah ke laporan lain",
     "switchPlaceholder": "Saring laporan...",
-    "switchNoMatches": "Tidak ada laporan yang cocok"
+    "switchNoMatches": "Tidak ada laporan yang cocok",
+    "favourites": "Favorit"
   },
   "reportPage": {
     "notFound": "Laporan Tidak Ditemukan",

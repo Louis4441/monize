@@ -128,7 +128,8 @@
     "backToReports": "Назад до звітів",
     "switchReport": "Перейти до іншого звіту",
     "switchPlaceholder": "Фільтр звітів...",
-    "switchNoMatches": "Немає відповідних звітів"
+    "switchNoMatches": "Немає відповідних звітів",
+    "favourites": "Обране"
   },
   "reportPage": {
     "notFound": "Звіт не знайдено",

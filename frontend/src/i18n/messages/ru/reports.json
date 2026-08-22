@@ -128,7 +128,8 @@
     "backToReports": "Назад к отчётам",
     "switchReport": "Перейти к другому отчёту",
     "switchPlaceholder": "Фильтр отчётов...",
-    "switchNoMatches": "Нет подходящих отчётов"
+    "switchNoMatches": "Нет подходящих отчётов",
+    "favourites": "Избранное"
   },
   "reportPage": {
     "notFound": "Отчёт не найден",
