@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 /**
- * Whether the transaction register abbreviates its Date column to month/year
- * on phone widths, freeing that width for the payee.
+ * Whether the transaction register drops the year from its Date column on
+ * phone widths, freeing that width for the payee.
  *
  * One global flag rather than a per-view bucket: whether a full date fits
  * beside a payee is a property of the phone in the user's hand, the same for
@@ -51,7 +51,7 @@ export const useDateDisplayStore = create<DateDisplayState>()(
 );
 
 /**
- * The one way a register reads and flips the mobile date abbreviation.
+ * The one way a register reads and flips the mobile date shortening.
  */
 export function useCompactMobileDates() {
   const compactMobileDates = useDateDisplayStore((state) => state.compactMobileDates);

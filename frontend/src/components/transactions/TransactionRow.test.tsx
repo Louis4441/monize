@@ -1077,9 +1077,9 @@ describe('TransactionRow payee brand icon', () => {
 describe('TransactionRow compact mobile dates', () => {
   // The regression this pins: on a phone the register shows only Date, Payee
   // and Amount, the full date takes all the width it asks for, and the payee
-  // is capped at 100px and truncates. The compact option renders month/year
-  // below `sm` and hands the payee the freed width.
-  const formatCompactDate = (d: string) => d.slice(0, 7);
+  // is capped at 100px and truncates. The compact option drops the year below
+  // `sm` and hands the payee the freed width.
+  const formatCompactDate = (d: string) => d.slice(5);
 
   it('renders the full date alone when the option is off', () => {
     const { container } = renderRow();
@@ -1088,12 +1088,14 @@ describe('TransactionRow compact mobile dates', () => {
     expect(dateCell.querySelector('.sm\\:hidden')).toBeNull();
   });
 
-  it('renders month/year for phones and the full date for wider screens when on', () => {
+  it('renders the year-less date for phones and the full one for wider screens', () => {
     const { container } = renderRow({ compactDates: true, formatCompactDate });
     const dateCell = container.querySelector('td')!;
 
+    // The day survives -- it is the year that goes, so a register row still
+    // says which day it happened on.
     const compact = dateCell.querySelector('span.sm\\:hidden')!;
-    expect(compact.textContent).toBe('2025-06');
+    expect(compact.textContent).toBe('06-15');
 
     const full = dateCell.querySelector('span.hidden.sm\\:inline')!;
     expect(full.textContent).toBe('2025-06-15');

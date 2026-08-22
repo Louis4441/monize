@@ -124,8 +124,8 @@
       "actions": "Acciones"
     },
     "dateDisplay": {
-      "toggleLabel": "Fechas mes/año",
-      "toggleTitle": "Mostrar solo el mes y el año para que se vea más del beneficiario"
+      "toggleLabel": "Ocultar el año",
+      "toggleTitle": "Quitar el año de las fechas para que se vea más del beneficiario"
     },
     "attachmentsCount": "{count, plural, one {# adjunto} other {# adjuntos}}",
     "today": "Hoy",

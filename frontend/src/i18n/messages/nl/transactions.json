@@ -124,8 +124,8 @@
       "actions": "Acties"
     },
     "dateDisplay": {
-      "toggleLabel": "Maand/jaar-datums",
-      "toggleTitle": "Toon alleen maand en jaar zodat er meer van de begunstigde past"
+      "toggleLabel": "Jaar verbergen",
+      "toggleTitle": "Het jaar uit de datums weglaten zodat er meer van de begunstigde past"
     },
     "attachmentsCount": "{count, plural, one {# bijlage} other {# bijlagen}}",
     "today": "Vandaag",

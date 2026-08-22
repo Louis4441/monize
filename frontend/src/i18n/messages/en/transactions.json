@@ -124,8 +124,8 @@
       "actions": "Actions"
     },
     "dateDisplay": {
-      "toggleLabel": "Month/year dates",
-      "toggleTitle": "Show only month and year so more of the payee fits"
+      "toggleLabel": "Hide the year",
+      "toggleTitle": "Drop the year from dates so more of the payee fits"
     },
     "attachmentsCount": "{count, plural, one {# attachment} other {# attachments}}",
     "today": "Today",

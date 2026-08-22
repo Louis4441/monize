@@ -124,8 +124,8 @@
       "actions": "Akcje"
     },
     "dateDisplay": {
-      "toggleLabel": "Daty miesiąc/rok",
-      "toggleTitle": "Pokazuj tylko miesiąc i rok, aby zmieściło się więcej nazwy odbiorcy"
+      "toggleLabel": "Ukryj rok",
+      "toggleTitle": "Usuń rok z dat, aby zmieściło się więcej nazwy odbiorcy"
     },
     "attachmentsCount": "{count, plural, one {# załącznik} few {# załączniki} many {# załączników} other {# załącznika}}",
     "today": "Dzisiaj",

@@ -124,8 +124,8 @@
       "actions": "Aktionen"
     },
     "dateDisplay": {
-      "toggleLabel": "Monat/Jahr-Datumsangaben",
-      "toggleTitle": "Nur Monat und Jahr anzeigen, damit mehr vom Zahlungsempfänger sichtbar ist"
+      "toggleLabel": "Jahr ausblenden",
+      "toggleTitle": "Das Jahr aus den Datumsangaben entfernen, damit mehr vom Zahlungsempfänger sichtbar ist"
     },
     "attachmentsCount": "{count, plural, one {# Anhang} other {# Anhänge}}",
     "today": "Heute",

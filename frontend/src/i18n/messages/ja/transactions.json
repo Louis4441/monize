@@ -124,8 +124,8 @@
       "actions": "操作"
     },
     "dateDisplay": {
-      "toggleLabel": "月/年表示",
-      "toggleTitle": "月と年のみ表示して支払先の表示幅を広げます"
+      "toggleLabel": "年を非表示",
+      "toggleTitle": "日付から年を省いて支払先の表示幅を広げます"
     },
     "attachmentsCount": "{count, plural, other {# 件の添付ファイル}}",
     "today": "今日",

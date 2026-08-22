@@ -124,8 +124,8 @@
       "actions": "Aksi"
     },
     "dateDisplay": {
-      "toggleLabel": "Tanggal bulan/tahun",
-      "toggleTitle": "Tampilkan hanya bulan dan tahun agar nama penerima lebih terlihat"
+      "toggleLabel": "Sembunyikan tahun",
+      "toggleTitle": "Hilangkan tahun dari tanggal agar nama penerima lebih terlihat"
     },
     "attachmentsCount": "{count, plural, other {# lampiran}}",
     "today": "Hari ini",

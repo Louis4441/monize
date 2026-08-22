@@ -18,7 +18,9 @@ vi.mock('@/lib/transactions', () => ({
 vi.mock('@/hooks/useDateFormat', () => ({
   useDateFormat: () => ({ dateFormat: 'browser', datePattern: 'YYYY-MM-DD',
     formatDate: (d: string) => d,
-    formatMonth: (m: string) => `M:${m}`,
+    // Stands in for the real helper, which drops the year through the user's
+    // own pattern; under YYYY-MM-DD that leaves MM-DD.
+    formatDateWithoutYear: (d: Date | string) => String(d).slice(5),
   }),
 }));
 
@@ -3220,27 +3222,26 @@ describe('TransactionList compact mobile dates', () => {
   it('offers the toggle in the Date column header, off by default', () => {
     render(<TransactionList transactions={[createTransaction()]} />);
 
-    const toggle = screen.getByRole('button', { name: 'Month/year dates' });
+    const toggle = screen.getByRole('button', { name: 'Hide the year' });
     expect(toggle.closest('th')).toHaveTextContent('Date');
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     // Full date, single rendering -- no phone/desktop split.
     expect(screen.getByText('2024-01-15')).toBeInTheDocument();
-    expect(screen.queryByText('M:2024-01')).not.toBeInTheDocument();
+    expect(screen.queryByText('01-15')).not.toBeInTheDocument();
   });
 
-  it('flips rows to month/year for phones and keeps the full date for wider screens', async () => {
+  it('drops the year for phones and keeps the full date for wider screens', async () => {
     render(<TransactionList transactions={[createTransaction()]} />);
 
-    const toggle = screen.getByRole('button', { name: 'Month/year dates' });
+    const toggle = screen.getByRole('button', { name: 'Hide the year' });
     fireEvent.click(toggle);
 
     await waitFor(() => {
       expect(toggle).toHaveAttribute('aria-pressed', 'true');
     });
 
-    // Month/year through useDateFormat's formatMonth (the user's own date
-    // format ordering), fed the row's YYYY-MM.
-    const compact = screen.getByText('M:2024-01');
+    // The day is kept -- the year is the part a register row can spare.
+    const compact = screen.getByText('01-15');
     expect(compact.className).toContain('sm:hidden');
 
     // The full date is still rendered, gated to sm and up.
@@ -3252,7 +3253,7 @@ describe('TransactionList compact mobile dates', () => {
   it('remembers the choice in the shared register-wide store', async () => {
     render(<TransactionList transactions={[createTransaction()]} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Month/year dates' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
 
     await waitFor(() => {
       expect(useDateDisplayStore.getState().compactMobileDates).toBe(true);

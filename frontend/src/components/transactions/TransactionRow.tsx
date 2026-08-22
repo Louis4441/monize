@@ -153,13 +153,13 @@ export interface TransactionRowProps {
   isDeleting: boolean;
   formatDate: (date: string) => string;
   /**
-   * Abbreviate the date to month/year below the `sm` breakpoint, handing the
-   * freed width to the payee. Both formats are rendered and CSS picks one, so
-   * wider screens keep the full date whatever the flag says. The long-press
-   * action sheet still shows the full date, so the exact day stays reachable.
+   * Drop the year from the date below the `sm` breakpoint, handing the freed
+   * width to the payee. Both formats are rendered and CSS picks one, so wider
+   * screens keep the full date whatever the flag says. The long-press action
+   * sheet still shows the full date, so the year stays reachable.
    */
   compactDates?: boolean;
-  /** Month/year in the user's date-format ordering (useDateFormat's formatMonth). */
+  /** Day and month in the user's own ordering (useDateFormat's formatDateWithoutYear). */
   formatCompactDate?: (date: string) => string;
   formatAmount: (amount: number, currencyCode?: string) => JSX.Element;
   formatBalance: (balance: number, currencyCode?: string) => JSX.Element;

@@ -124,8 +124,8 @@
       "actions": "Hành động"
     },
     "dateDisplay": {
-      "toggleLabel": "Ngày dạng tháng/năm",
-      "toggleTitle": "Chỉ hiển thị tháng và năm để hiện được nhiều tên người nhận hơn"
+      "toggleLabel": "Ẩn năm",
+      "toggleTitle": "Bỏ năm khỏi ngày để hiện được nhiều tên người nhận hơn"
     },
     "attachmentsCount": "{count, plural, other {# tệp đính kèm}}",
     "today": "Hôm nay",

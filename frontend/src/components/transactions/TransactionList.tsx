@@ -188,17 +188,18 @@ export function TransactionList({
 }: TransactionListProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
-  const { formatDate, formatMonth } = useDateFormat();
+  const { formatDate, formatDateWithoutYear } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { density } = useDensityPreference(densityView);
   const { compactMobileDates, toggleCompactMobileDates } = useCompactMobileDates();
 
-  // Month/year in the user's own date-format ordering; transactionDate is a
-  // calendar date (YYYY-MM-DD), so the first seven characters are its month.
+  // The year is the least informative part of a register date -- a page of
+  // rows is mostly one or two years -- so it is what the narrow column gives
+  // up. Day and month keep the user's own ordering and separators.
   const formatCompactDate = useCallback(
-    (date: string) => formatMonth(date.slice(0, 7)),
-    [formatMonth]
+    (date: string) => formatDateWithoutYear(date),
+    [formatDateWithoutYear]
   );
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; transaction: Transaction | null }>({
     isOpen: false,
@@ -528,10 +529,10 @@ export function TransactionList({
                 <span className="inline-flex items-center gap-1">
                   {t('list.header.date')}
                   {/* Phones show only Date, Payee and Amount, and the payee is
-                      what runs out of room -- this flips the column to
-                      month/year so the payee gets the width back. Above `sm`
-                      the full date always fits, so the control would be a
-                      no-op there and is not drawn. */}
+                      what runs out of room -- this drops the year so the payee
+                      gets that width back. Above `sm` the full date always
+                      fits, so the control would be a no-op there and is not
+                      drawn. */}
                   <button
                     onClick={toggleCompactMobileDates}
                     aria-pressed={compactMobileDates}

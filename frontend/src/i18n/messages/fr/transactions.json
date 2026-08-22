@@ -124,8 +124,8 @@
       "actions": "Actions"
     },
     "dateDisplay": {
-      "toggleLabel": "Dates mois/année",
-      "toggleTitle": "Afficher uniquement le mois et l’année pour laisser plus de place au bénéficiaire"
+      "toggleLabel": "Masquer l’année",
+      "toggleTitle": "Retirer l’année des dates pour laisser plus de place au bénéficiaire"
     },
     "attachmentsCount": "{count, plural, one {# pièce jointe} other {# pièces jointes}}",
     "today": "Aujourd'hui",
