@@ -53,6 +53,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { affectedRowCount } from "../common/db/query-result";
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { roundMoney, sumMoney } from "../common/round.util";
+import { mapWithConcurrency } from "../common/concurrency.util";
 import {
   applyFxConversion,
   normalizeFxEntry,
@@ -113,6 +114,16 @@ const INVESTMENT_RELATIONS = [
   "splits.tags",
   "splits.investmentSecurity",
 ];
+
+// Bound on how many scheduled rows resolve their #1167 forecast FX concurrently
+// in findAll (issue #1167 review). Rows are independent and the pair/rate/tuple
+// caches store Promises and are populated with a synchronous get->set (no await
+// between), so concurrent rows join the same in-flight work rather than
+// duplicating a provider fetch or a pair derivation. The cap keeps distinct
+// currency pairs from serializing their external FX lookups end-to-end while
+// staying within provider limits, matching the fan-out bound the FX subsystem
+// already uses.
+const SCHEDULED_FORECAST_CONCURRENCY = 6;
 
 // Each Money-vocabulary refinement (REDEEM, CAPITAL_GAIN_SHORT/LONG,
 // REINVEST_*) validates exactly as its base action does.
@@ -2016,67 +2027,69 @@ export class ScheduledTransactionsService {
       }
       return pending;
     };
-    const result: (ScheduledTransaction & {
-      overrideCount?: number;
-      nextOverride?: ScheduledTransactionOverride | null;
-      futureOverrides?: ScheduledTransactionOverride[];
-      investmentForecastExchangeRate?: number | null;
-      investmentForecastAmount?: number | null;
-    })[] = [];
-    for (const row of rows) {
-      const investmentForecastExchangeRate = await forecastRateFor(row);
-      // A split-investment schedule projects its *effective* total (re-summed
-      // with current FX) rather than the stored parent amount (issue #1167);
-      // null for every other schedule leaves the forecast on `amount`.
-      const investmentForecastAmount =
-        await this.resolveInvestmentForecastSplitAmount(
-          userId,
-          row,
-          asOf,
-          pairRateCache,
-          pairCache,
-        );
-      // Each override that carries investment splits gets its own effective
-      // total too (F5-2): a per-occurrence override with investment splits is
-      // FX-sensitive the same way the base schedule is, and its stored `amount`
-      // is a stale snapshot once a security's currency changes.
-      const augmentOverride = async (
-        override: ScheduledTransactionOverride | null | undefined,
-      ) => {
-        if (!override) return override ?? null;
-        const overrideForecastAmount =
-          await this.resolveOverrideInvestmentForecastAmount(
+    // Resolve rows with bounded concurrency rather than end-to-end sequentially
+    // (issue #1167 review): each row's forecast work is independent and the
+    // shared caches join in-flight work safely (see SCHEDULED_FORECAST_CONCURRENCY),
+    // so N schedules across K distinct currency pairs no longer make K external FX
+    // lookups additive. Output order is preserved by `mapWithConcurrency`, so the
+    // list order is unchanged from the sequential version.
+    return mapWithConcurrency(
+      rows,
+      SCHEDULED_FORECAST_CONCURRENCY,
+      async (row) => {
+        const investmentForecastExchangeRate = await forecastRateFor(row);
+        // A split-investment schedule projects its *effective* total (re-summed
+        // with current FX) rather than the stored parent amount (issue #1167);
+        // null for every other schedule leaves the forecast on `amount`.
+        const investmentForecastAmount =
+          await this.resolveInvestmentForecastSplitAmount(
             userId,
             row,
-            override,
             asOf,
             pairRateCache,
             pairCache,
           );
-        // Return a new object rather than mutating the loaded entity in place
-        // (immutability rule): the override entities are shared read models, and
-        // stamping a derived field onto them in the loop mutates what other
-        // readers of the same transaction hold.
-        return {
-          ...override,
-          investmentForecastAmount: overrideForecastAmount,
+        // Each override that carries investment splits gets its own effective
+        // total too (F5-2): a per-occurrence override with investment splits is
+        // FX-sensitive the same way the base schedule is, and its stored `amount`
+        // is a stale snapshot once a security's currency changes.
+        const augmentOverride = async (
+          override: ScheduledTransactionOverride | null | undefined,
+        ) => {
+          if (!override) return override ?? null;
+          const overrideForecastAmount =
+            await this.resolveOverrideInvestmentForecastAmount(
+              userId,
+              row,
+              override,
+              asOf,
+              pairRateCache,
+              pairCache,
+            );
+          // Return a new object rather than mutating the loaded entity in place
+          // (immutability rule): the override entities are shared read models, and
+          // stamping a derived field onto them in the loop mutates what other
+          // readers of the same transaction hold.
+          return {
+            ...override,
+            investmentForecastAmount: overrideForecastAmount,
+          };
         };
-      };
-      const nextOverride = await augmentOverride(row.nextOverride);
-      const futureOverrides = row.futureOverrides
-        ? await Promise.all(row.futureOverrides.map(augmentOverride))
-        : row.futureOverrides;
-      result.push({
-        ...row,
-        nextOverride,
-        futureOverrides: futureOverrides as
-          | ScheduledTransactionOverride[]
-          | undefined,
-        investmentForecastExchangeRate,
-        investmentForecastAmount,
-      });
-    }
-    return result;
+        const nextOverride = await augmentOverride(row.nextOverride);
+        const futureOverrides = row.futureOverrides
+          ? await Promise.all(row.futureOverrides.map(augmentOverride))
+          : row.futureOverrides;
+        return {
+          ...row,
+          nextOverride,
+          futureOverrides: futureOverrides as
+            | ScheduledTransactionOverride[]
+            | undefined,
+          investmentForecastExchangeRate,
+          investmentForecastAmount,
+        };
+      },
+    );
   }
 
   async findOne(userId: string, id: string): Promise<ScheduledTransaction> {

@@ -903,6 +903,67 @@ describe("ScheduledTransactionsService", () => {
       ).toHaveBeenCalledTimes(1);
     });
 
+    it("resolves independent-pair forecasts concurrently, not end-to-end serially (issue #1167 review MEDIUM-4)", async () => {
+      // Two schedules on DIFFERENT settlement pairs (USD->CAD, EUR->CAD), each an
+      // independent provider-capable FX lookup. Their fetches are represented by
+      // promises that never resolve until we release them: if the list resolved
+      // rows sequentially, only the first fetch would have started while the
+      // second waited; under bounded concurrency both start before either
+      // resolves. Uses deferred promises, not wall-clock timing.
+      const mk = (id: string, securityId: string) =>
+        makeScheduled({
+          id,
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: securityId,
+          investmentFundingAccountId: null,
+          investmentQuantity: 1,
+          investmentPrice: 100,
+          // Stale recorded pair so the stored scalar is not reused; both re-resolve.
+          investmentExchangeRate: 1.5,
+          investmentExchangeRateFromCurrency: "GBP",
+          investmentExchangeRateToCurrency: "CAD",
+        });
+      const qb = mockQueryBuilder([
+        mk("st-a", "sec-usd"),
+        mk("st-b", "sec-eur"),
+      ]);
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+      overridesRepo.createQueryBuilder
+        .mockReturnValueOnce(mockQueryBuilder([]))
+        .mockReturnValueOnce(mockQueryBuilder([]));
+      // Distinct current pairs per security, so the two rows do not share a
+      // pair-rate cache entry and each issues its own provider-capable fetch.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockImplementation(
+        async (_u: string, _a: string, _f: unknown, securityId: string) =>
+          securityId === "sec-usd"
+            ? { from: "USD", to: "CAD" }
+            : { from: "EUR", to: "CAD" },
+      );
+      let started = 0;
+      const releases: Array<(value: number | null) => void> = [];
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockImplementation(
+        () => {
+          started += 1;
+          return new Promise<number | null>((resolve) => {
+            releases.push(resolve);
+          });
+        },
+      );
+
+      const pending = service.findAll(userId);
+      // Flush microtasks so both rows can reach their FX fetch, without resolving
+      // either fetch.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Both independent-pair fetches are in flight at once: sequential resolution
+      // would have started only the first.
+      expect(started).toBe(2);
+
+      releases.forEach((release) => release(1.35));
+      await pending;
+    });
+
     it("attaches a null investmentForecastExchangeRate when the current rate is unavailable (issue #1167)", async () => {
       const st = makeScheduled({
         isInvestment: true,
