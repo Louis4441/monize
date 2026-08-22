@@ -3250,6 +3250,34 @@ describe('TransactionList compact mobile dates', () => {
     expect(full.className).toContain('sm:inline');
   });
 
+  it('closes the gap between the Date and Payee columns, header and cells alike', async () => {
+    const { container } = render(<TransactionList transactions={[createTransaction()]} />);
+
+    const dateHeader = () => container.querySelectorAll('thead th')[0];
+    const payeeHeader = () => container.querySelectorAll('thead th')[2];
+    const dateCell = () => container.querySelectorAll('tbody td')[0];
+    const payeeCell = () => container.querySelectorAll('tbody td')[2];
+
+    // The ordinary inset while the full date is shown.
+    expect(dateHeader().className).not.toContain('max-sm:pr-1');
+    expect(dateCell().className).not.toContain('max-sm:pr-1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
+
+    await waitFor(() => {
+      expect(dateCell().className).toContain('max-sm:pr-1');
+    });
+
+    // Both facing sides move, so the whole gap closes rather than half of it.
+    expect(payeeCell().className).toContain('max-sm:pl-1');
+
+    // And the header moves with its column: a `th` and its `td` that disagree
+    // about padding put the label and the values it labels at different
+    // offsets.
+    expect(dateHeader().className).toContain('max-sm:pr-1');
+    expect(payeeHeader().className).toContain('max-sm:pl-1');
+  });
+
   it('remembers the choice in the shared register-wide store', async () => {
     render(<TransactionList transactions={[createTransaction()]} />);
 

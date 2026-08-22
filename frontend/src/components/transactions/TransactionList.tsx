@@ -15,6 +15,7 @@ import { getErrorMessage } from '@/lib/errors';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ListTopToolbar } from '@/components/ui/ListTopToolbar';
 import { TransactionRow } from './TransactionRow';
+import { registerDateColumnPadding } from './register-date-columns';
 import { TransactionActionSheet } from './TransactionActionSheet';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -193,6 +194,7 @@ export function TransactionList({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { density } = useDensityPreference(densityView);
   const { compactMobileDates, toggleCompactMobileDates } = useCompactMobileDates();
+  const compactPadding = registerDateColumnPadding(compactMobileDates);
 
   // The year is the least informative part of a register date -- a page of
   // rows is mostly one or two years -- so it is what the narrow column gives
@@ -525,7 +527,7 @@ export function TransactionList({
                   />
                 </th>
               )}
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
+              <th className={`${headerPadding} ${compactPadding.date} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
                 <span className="inline-flex items-center gap-1">
                   {t('list.header.date')}
                   {/* Phones show only Date, Payee and Amount, and the payee is
@@ -551,7 +553,7 @@ export function TransactionList({
                 </span>
               </th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell`}>{t('list.header.account')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
+              <th className={`${headerPadding} ${compactPadding.payee} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[900px]:table-cell`}>{t('list.header.category')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden 2xl:table-cell`}>{t('list.header.description')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden 2xl:table-cell`}>{t('list.header.refNumber')}</th>
