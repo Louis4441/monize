@@ -19,7 +19,11 @@ import {
 } from '@/types/account';
 import { StatementCycle, InterestPaid } from '@/types/credit-card-detail';
 import { BalanceForecast } from '@/types/banking-detail';
-import { dedupe, invalidateCache } from './apiCache';
+import {
+  dedupe,
+  invalidateCache,
+  invalidateScheduledFxReadModel,
+} from './apiCache';
 
 export const accountsApi = {
   // Create account
@@ -101,11 +105,11 @@ export const accountsApi = {
     invalidateCache('accounts:');
     // Issue #1167: a funding / linked-cash / brokerage account's currency is one
     // side of a scheduled investment's settlement pair, and the cached
-    // scheduled-transaction read model (`scheduled:all`) holds server-derived FX
-    // fields resolved against that pair. An account-currency edit makes that
-    // payload stale, so force findAll() to resolve those fields again -- the
-    // same reasoning as investmentsApi.updateSecurity's scheduled invalidation.
-    invalidateCache('scheduled:');
+    // scheduled-transaction read model holds server-derived FX fields resolved
+    // against that pair. An account-currency edit makes that payload stale, so
+    // force findAll() to resolve those fields again -- one semantic helper shared
+    // with the security-update and rate-refresh paths.
+    invalidateScheduledFxReadModel();
     return response.data;
   },
 

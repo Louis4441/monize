@@ -35,7 +35,13 @@ import {
   InvestmentRegisterFilterOptions,
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
-import { getCached, setCache, invalidateBalanceCaches, invalidateCache } from './apiCache';
+import {
+  getCached,
+  setCache,
+  invalidateBalanceCaches,
+  invalidateCache,
+  invalidateScheduledFxReadModel,
+} from './apiCache';
 import { API_MAX_PAGE_LIMIT } from './api-page-limits';
 
 export const investmentsApi = {
@@ -519,8 +525,9 @@ export const investmentsApi = {
     // the old pair's rate for up to the 120s TTL while posting already resolves
     // the new pair. Invalidate on every update rather than diffing currencyCode:
     // an occasional extra scheduled refetch is far cheaper than silently gaining
-    // an un-invalidated branch here later.
-    invalidateCache('scheduled:');
+    // an un-invalidated branch here later. One semantic helper shared with the
+    // account-update and rate-refresh paths.
+    invalidateScheduledFxReadModel();
     return response.data;
   },
 

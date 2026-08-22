@@ -108,6 +108,25 @@ export function invalidateBalanceCaches(): void {
   invalidateCache('budgets:');
 }
 
+/**
+ * Drop the scheduled-transaction read model when an upstream FX input changes.
+ *
+ * The `scheduled:all` payload now carries server-derived, current-settlement-pair
+ * FX fields (`investmentForecastExchangeRate` / `investmentForecastAmount`, issue
+ * #1167). Those are resolved from `exchange_rates` snapshots and from the security's
+ * and settlement account's currencies -- none of which a transaction write touches,
+ * so this is deliberately NOT part of `invalidateBalanceCaches`. Call it after any
+ * operation that can change one side of a scheduled investment's settlement pair
+ * or the rate it resolves at: a successful exchange-rate refresh, an account edit
+ * (funding/linked-cash/brokerage currency), or a security edit (currency). Call it
+ * AFTER the mutation succeeds -- the generation-aware primitive then also obsoletes
+ * any scheduled read already in flight, so a request that started before the change
+ * cannot repopulate the cache with the pre-change value.
+ */
+export function invalidateScheduledFxReadModel(): void {
+  invalidateCache('scheduled:');
+}
+
 // Cache + in-flight deduplication. When several callers request the same key
 // before the first response arrives, they all await the same promise instead
 // of triggering parallel network requests. Successful responses are cached
