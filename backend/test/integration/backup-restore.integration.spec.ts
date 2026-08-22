@@ -980,7 +980,7 @@ describe("Backup export/restore round-trip (integration)", () => {
 
   // MZ-1242-R6: monthly_account_balances is a derived cache. A backup taken
   // before the #1242 fix carries a wrong investment market_value; trusting it
-  // on restore would reintroduce the bug on a fixed instance, and migration 162
+  // on restore would reintroduce the bug on a fixed instance, and migration 164
   // (one-time) cannot catch a backup restored after it ran. Restore therefore
   // skips the table and the next net-worth read rebuilds it under the corrected
   // algorithm. A mocked repository cannot prove the round trip, so this is a

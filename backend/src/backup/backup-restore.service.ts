@@ -243,7 +243,7 @@ export class BackupRestoreService {
                 // data. Trusting the backup's rows re-imports whatever
                 // calculation semantics produced them -- so a backup taken
                 // before the #1242 fix would restore its wrong investment
-                // market_value even on a fixed instance, and migration 162 (a
+                // market_value even on a fixed instance, and migration 164 (a
                 // one-time delete) cannot catch a backup restored after it ran
                 // (review MZ-1242-R3). Skip the insert and let
                 // NetWorthService.ensurePopulated rebuild every account from the
