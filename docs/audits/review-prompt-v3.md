@@ -2,19 +2,19 @@
 
 **Status:** active · **Supersedes:** V2 (unversioned, not committed) · **Executable form:** `/audit` (`.claude/commands/audit.md`)
 
-This is the canonical, versioned copy of the comprehensive-review ("audit") prompt used to
-review Monize pull requests and changesets. The `/audit` slash command is the executable
-form of the same prompt; when the two diverge, **this document is authoritative**.
+This document carries the provenance and rationale for the comprehensive-review ("audit")
+prompt. The **operational prompt is `.claude/commands/audit.md`**, and it is self-contained —
+it holds the full text of all ten rules, not a summary of them. Read this document when a
+rule's intent is unclear or when revising the prompt.
 
 ## Why V3 exists
 
-V2 was already wide enough to find new *classes* of problem: it surfaced issues in secondary
-consumers, cache-dependency chains, and two real performance problems. The lesson from V2 was
-therefore **not** "add more `check X / check Y / check Z` sections". V3 keeps V2's breadth and
-instead sharpens **precision**: honest false-positive rejection, and a clean split between
-**confirmed defects** and **design risks**.
+After the last review round, V2 was clearly better: it helped find problems in secondary
+consumers, in cache dependencies, and two material performance problems. The lesson was
+therefore **not** "add more bug classes". V3 instead improves **finding calibration,
+false-positive rejection, and the distinction between defects and design risks**.
 
-The target invariant for the whole prompt:
+The governing rule:
 
 > Find hidden consumers and dependencies aggressively, but require a concrete present-day
 > failure scenario before promoting a concern to a confirmed finding.
@@ -22,68 +22,72 @@ The target invariant for the whole prompt:
 Rigorous in two directions at once:
 
 ```text
-higher recall:    find more hidden consumers, dependencies and semantic migrations
-higher precision: do not promote design smells or hypothetical future drift without a
-                  realistic current failure
+higher recall:
+find more hidden consumers, dependencies and semantic migrations
+
+higher precision:
+do not promote design smells or hypothetical future drift without a realistic current failure
 ```
 
-## The prompt
+V3 must reduce false alarms **without** losing the ability to find:
 
-The operational prompt is `.claude/commands/audit.md`, run as `/audit [target]`. Its phases
-are summarised here so the rationale below is self-contained:
+- secondary raw-vs-effective consumers;
+- derived-cache invalidation omissions;
+- in-flight cache/state races;
+- repeated semantic DB derivation;
+- serial provider amplification.
 
-- **Phase 0 — Baseline & contract map.** Pin the base revision; name the touched Monize
-  contracts and invariant IDs (`docs/system-invariants.md` and the financial/RLS/concurrency
-  contracts).
-- **Phase 1 — Aggressive discovery (recall).** Read-model semantic-migration pass; upstream
-  dependency mutation matrix; shared AI/MCP surface pass.
-- **Phase 2 — Mandatory admission gate (precision).** Six questions per candidate; no
-  present-day failure scenario means `DESIGN RISK`, not a finding.
-- **Phase 3 — PR causality classification.**
-- **Phase 4 — Contract-precedence gate** (DRY does not beat a documented exception).
-- **Phase 5 — Performance calibration** (`N/S/K` model or benchmark, never label-only).
-- **Phase 6 — Consolidation** (one finding per violated invariant, surfaces enumerated).
-- **Phase 7 — External-review ingestion** (reconstruct independently; never inherit).
-- **Phase 8 — Fix-review interaction test** (a fix must not reintroduce a prior bug).
-- **Output** — scope, confirmed findings, design risks, and a mandatory rejected-hypothesis
-  table.
+V3 deliberately does **not** add further sections of the form `check X / check Y / check Z`.
+That was V2's breadth, and it was already sufficient.
 
-## The ten improvements over V2, and what each guards against
+## The ten rules
 
-Each row maps a V2→V3 improvement to the phase that carries it and the failure it prevents.
-The example labels (`C1`, `C3`, `C4`, `R10-F2`, `S1–S7`, `K2`) come from the V2 review round
-that motivated V3; they are illustrative, not references to files in this repository.
+The prompt keeps the source numbering 1–10, so a review's output maps back to a rule by number.
 
-| # | Improvement | Phase | Guards against |
-|---|---|---|---|
-| 1 | Mandatory finding-admission gate | 2 | Promoting a reachable-but-harmless concern to a confirmed finding (C4, S1–S7, K2). |
-| 2 | Explicit contract-precedence gate | 4 | "Fixing" a deliberately-different path for DRY against a documented contract (C3 vs R10-F2). |
-| 3 | PR causality classification | 3 | Charging a PR for a pre-existing `main` bug; **and** missing that a PR *exposed/amplified* a previously-correct consumer. |
-| 4 | Read-model semantic-migration rule | 1a | Leaving old-scalar consumers semantically stale when a new `effective`/`current`/`complete` field is added (C1's real, wider scope). |
-| 5 | Upstream dependency mutation matrix | 1b | Missing a cache-invalidation link (e.g. no `scheduled:` invalidation after a manual FX refresh). |
-| 6 | Performance-finding calibration | 5 | Reporting "N+1" / "sequential async" by label without a call-count model or benchmark. |
-| 7 | One finding per violated invariant | 6 | Inflating the count by reporting the same root cause once per surface. |
-| 8 | Mandatory rejected-hypothesis table | Output | Silent false positives; unaccounted design risks, pre-existing issues, and external claims. |
-| 9 | External-review ingestion protocol | 7 | Inheriting another reviewer's severity / root cause / fix, incl. the `CONFIRMED_WITH_DIFFERENT_ROOT_CAUSE` case. |
-| 10 | Fix-review interaction test | 8 | A remediation that closes a new finding by reverting an older fix. |
+| # | Rule | Guards against |
+|---|---|---|
+| 1 | Mandatory finding-admission gate (six questions; else `DESIGN RISK`) | Promoting a reachable-but-harmless concern to a confirmed finding (C4, S1–S7, K2). |
+| 2 | Explicit contract-precedence gate (`implementation -> acceptance criteria -> specification -> regression tests`) | "Fixing" a deliberately-different path for DRY against a documented contract (C3 vs R10-F2). |
+| 3 | PR causality classification, *before* severity | Charging a PR for a pre-existing `main` bug (`PostTransactionDialog`); and missing that a PR *exposed or amplified* a previously-correct consumer. |
+| 4 | Read-model semantic-migration rule — the stronger form of the secondary-consumer pass | Leaving old-scalar consumers semantically stale when an `effective`/`current`/`complete` field is added (C1's real, wider scope). |
+| 5 | Upstream dependency mutation matrix — mandatory for **every** cached derived financial value | A missing link in `mutation -> invalidation -> in-flight invalidation -> refresh` (the absent `scheduled:` invalidation after a manual FX refresh). |
+| 6 | Performance calibration — a call-count model **or** a benchmark | Reporting "N+1" / "sequential async" by label alone. |
+| 7 | One finding per violated invariant, surfaces enumerated | Inflating the count by reporting the same root cause once per surface. |
+| 8 | Mandatory rejected-hypothesis table | Silent false positives; unaccounted design risks, pre-existing issues, external claims, and suggestions colliding with a repository contract. |
+| 9 | External-review ingestion protocol | Inheriting another reviewer's severity / root cause / fix — including the `CONFIRMED_WITH_DIFFERENT_ROOT_CAUSE` case, where the symptom is right and the scope or cause is wrong. |
+| 10 | Fix-review interaction test | A remediation that closes a new finding by reverting an older fix (mechanically moving Manual Post onto `decideSplitProvenance()` would have reverted R10-F2). |
 
-## Monize-specific grounding
+## On the example labels
 
-V3 is not generic. Discovery and precedence are anchored to this repository's contracts:
+`C1`, `C3`, `C4`, `S1–S7`, `K2`, `R10-F2` and `PostTransactionDialog` come from the V2 review
+round that motivated V3. They are retained because they are the *calibration examples* — each
+names a concrete case where a rule fires — and not because they resolve to files in this
+repository. `R10-F2` is a contract identifier from that round's task series.
 
-- **Semantic-migration pass (1a)** mirrors the project rule that a completeness flag the
-  frontend type omits ships a subtotal under a total's caption — search old-field consumers
-  across backend, the AI executor, MCP tools, dashboard, budgets, reports, CSV/PDF, and
-  `frontend/src/types/*`.
-- **Shared-surface pass (1c)** enforces "every AI tool is implemented once and adapted by both
-  the AI executor and the MCP layer", and the "grep the bulk / AI-action / MCP routes" rule
-  when a single-path refusal is added.
-- **Contract-precedence (4)** protects Monize's deliberate look-alikes: per-ledger
-  reconciliation vs the shared VOID boundary, register-order tiebreaks, and
-  FX-resolution-only-on-structural-change.
-- **Findings** should name the invariant ID from `docs/system-invariants.md` and, where the
-  mistake is mechanical, propose a **source-scanning guard test** (the project's preferred
-  regression form) rather than a single-case test.
+## Monize grounding
+
+The prompt's rules are repository-independent; its "Monize grounding" section names where each
+one bites here, and adds targets without granting exemptions:
+
+- **Contracts to name** — `docs/system-invariants.md` (with its `enforced` / `partial` /
+  `unenforced` status), the financial, concurrency, external-side-effect, RLS and verification
+  contracts, and `docs/adr/`.
+- **Consumers to enumerate (Rule 4)** — backend services, the AI executor
+  (`backend/src/ai/query/tool-executor.service.ts`), MCP tools (`backend/src/mcp/tools/*`),
+  dashboard, budgets, built-in reports, CSV/PDF export, `frontend/src/types/*`; plus the
+  repository's own findings that a completeness flag omitted by a frontend type ships a subtotal
+  under a total's caption, and that the compact LLM shape dropping a flag makes AI/MCP quote a
+  subtotal as settled.
+- **Shared-surface pass** — every AI tool is implemented once on a domain service and adapted by
+  both the AI executor and the MCP layer; when a refusal is added on one path, the bulk,
+  AI-action and MCP routes to the same write are checked too.
+- **Deliberate look-alikes (Rule 2)** — per-ledger reconciliation vs the shared VOID boundary;
+  `applyRegisterOrder`'s credits-before-debits tiebreak; FX re-resolution only on structural
+  change; netting within one category but never across two, with the payee surfaces
+  deliberately not netting.
+- **Test obligation** — name the test that fails on the *original* mistake; prefer a
+  source-scanning guard for a mechanical mistake; treat a green suite after a behavior change as
+  a finding in itself.
 
 ## Usage
 
@@ -95,3 +99,12 @@ V3 is not generic. Discovery and precedence are anchored to this repository's co
 ```
 
 `/audit` reports; it does not commit. Apply fixes only when explicitly asked.
+
+## Revising this prompt
+
+V3's value is its calibration, and calibration degrades by paraphrase. When editing:
+
+- keep the source numbering 1–10 and every verbatim quote block intact;
+- keep the vertical `text` blocks vertical — they are read as structure, not prose;
+- keep the calibration examples; a rule without its example is weaker than it looks;
+- prefer adding to "Monize grounding" over rewriting a rule.
