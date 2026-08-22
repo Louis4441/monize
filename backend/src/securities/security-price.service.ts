@@ -9,6 +9,7 @@ import { Security } from "./entities/security.entity";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { withSystemContext } from "../common/db/with-context";
+import { lockAccountsForBalanceWrite } from "../common/db/locks";
 import {
   QuoteProvider,
   QuoteProviderName,
@@ -2063,21 +2064,36 @@ export class SecurityPriceService {
    * recomputed snapshots but the HTTP manual-price routes did not, so a
    * corrected price left the charts stale.
    *
-   * Invalidation is durable, not just debounced. `sweepStaleSnapshots`
-   * recovers a lost recompute by finding accounts whose `updated_at` is newer
-   * than their snapshots -- but that only works if the mutation advances
-   * `accounts.updated_at`. A manual price moves no balance, so nothing touched
-   * the account row and the sweep had no signal: a crash between the price
-   * commit and the two-second debounce timer left the snapshot stale forever
-   * (review MZ-1242-R2). So this runs **inside the same transaction as the
-   * price write**, advancing `updated_at` on every holding account atomically
-   * with the price change -- the same durable marker an investment-transaction
-   * edit leaves via its balance write. The security is per-user, so every
-   * holder is an account of the same `userId`.
+   * Invalidation is recovered from the data, not just debounced.
+   * `sweepStaleSnapshots` recovers a lost recompute by finding accounts whose
+   * `updated_at` is newer than their snapshots -- but that only works if the
+   * mutation advances `accounts.updated_at`. A manual price moves no balance,
+   * so nothing touched the account row and the sweep had no signal: a crash
+   * between the price commit and the two-second debounce timer left the
+   * snapshot stale (review MZ-1242-R2). So this runs **inside the same
+   * transaction as the price write**, advancing `updated_at` on every holding
+   * account atomically with the price change -- the same marker an
+   * investment-transaction edit leaves via its balance write. The security is
+   * per-user, so every holder is an account of the same `userId`.
+   *
+   * One residual window remains, and it is why this says "recovered from the
+   * data" rather than "crash-durable": both `now()` here and the `accounts`
+   * `updated_at` trigger stamp **transaction-start** time, not the instant of
+   * the write. A concurrent recompute that begins after this transaction starts
+   * but commits its (still-stale) snapshots before it can leave `computed_at`
+   * newer than this marker, and then the sweep's `updated_at > computed_at`
+   * predicate misses the account -- so if the post-commit debounce is also lost
+   * to a crash, that snapshot waits for the next touch of the account instead of
+   * the sweep. The account row lock above serializes this write against such a
+   * recompute of the same account, which is what narrows the window to the
+   * near-impossible; the snapshot self-heals on the account's next change
+   * regardless. Making the marker unconditionally crash-durable would mean
+   * stamping `clock_timestamp()`, which the shared `updated_at` trigger clobbers
+   * back to transaction-start for every table -- out of proportion to a window
+   * this small.
    *
    * Returns the affected account ids so the caller can, after commit, schedule
-   * the debounced recompute as a latency optimization on top of the durable
-   * marker.
+   * the debounced recompute as a latency optimization on top of the marker.
    */
   private async markHoldingAccountsDirty(
     manager: EntityManager,
@@ -2091,6 +2107,15 @@ export class SecurityPriceService {
     );
     const accountIds = (rows ?? []).map((r) => r.account_id);
     if (accountIds.length > 0) {
+      // Take the account row locks in ascending-id order *before* the UPDATE,
+      // exactly as every other account writer does (common/db/locks.ts). The
+      // UPDATE's own `WHERE id = ANY(...)` would otherwise lock rows in scan
+      // order, and the debounced recompute this mutation schedules runs in the
+      // background -- so saving a second manual price while a prior save's
+      // recompute is in flight could lock the same holding accounts in opposite
+      // orders, a 40P01 deadlock surfacing as a generic 500 (review MZ-1242,
+      // same class as audit RV4-005).
+      await lockAccountsForBalanceWrite(manager, accountIds, userId);
       await manager.query(
         `UPDATE accounts SET updated_at = now()
           WHERE id = ANY($1::UUID[]) AND user_id = $2`,
@@ -2102,11 +2127,12 @@ export class SecurityPriceService {
 
   /**
    * Schedule the debounced net-worth recompute for the given accounts, after
-   * the durable marker has committed. Best-effort latency optimization: a
+   * the `updated_at` marker has committed. Best-effort latency optimization: a
    * timer lost to a crash is recovered by `sweepStaleSnapshots` off the
-   * `updated_at` marker `markHoldingAccountsDirty` wrote. Runs in the caller's
-   * identity context (the manual-price routes are authenticated), which the
-   * debounced timer captures.
+   * `updated_at` marker `markHoldingAccountsDirty` wrote (subject to the
+   * residual transaction-start-timestamp window documented there). Runs in the
+   * caller's identity context (the manual-price routes are authenticated),
+   * which the debounced timer captures.
    */
   private scheduleSnapshotRecalc(accountIds: string[], userId: string): void {
     for (const accountId of accountIds) {
@@ -2159,7 +2185,7 @@ export class SecurityPriceService {
             `Failed to persist manual price for security ${securityId} on ${dto.priceDate}`,
           );
         }
-        // Durable stale marker in the same transaction as the price write.
+        // Stale marker in the same transaction as the price write (see markHoldingAccountsDirty).
         const accountIds = await this.markHoldingAccountsDirty(
           m,
           securityId,
@@ -2203,7 +2229,7 @@ export class SecurityPriceService {
       this.dataSource,
       async (m) => {
         const saved = await m.getRepository(SecurityPrice).save(price);
-        // Durable stale marker in the same transaction as the price write.
+        // Stale marker in the same transaction as the price write (see markHoldingAccountsDirty).
         const accountIds = await this.markHoldingAccountsDirty(
           m,
           securityId,
@@ -2237,12 +2263,12 @@ export class SecurityPriceService {
 
     const accountIds = await withScopedDb(this.dataSource, async (m) => {
       await m.getRepository(SecurityPrice).remove(price);
-      // Durable stale marker in the same transaction as the removal.
+      // Stale marker in the same transaction as the removal (see markHoldingAccountsDirty).
       return this.markHoldingAccountsDirty(m, securityId, userId);
     });
 
     // Restore a transaction-derived row for the freed date where one applies.
-    // Its own write commits separately; the durable marker above already
+    // Its own write commits separately; the updated_at marker above already
     // covers the recompute, so a failure here only loses the fallback row.
     await this.upsertTransactionPrice(securityId, priceDate).catch((err) =>
       this.logger.warn(
