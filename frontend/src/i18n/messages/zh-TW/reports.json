@@ -128,7 +128,8 @@
     "backToReports": "返回報表",
     "switchReport": "切換到其他報表",
     "switchPlaceholder": "篩選報表...",
-    "switchNoMatches": "沒有符合的報表"
+    "switchNoMatches": "沒有符合的報表",
+    "favourites": "我的最愛"
   },
   "reportPage": {
     "notFound": "找不到報表",

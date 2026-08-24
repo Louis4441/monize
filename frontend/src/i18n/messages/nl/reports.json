@@ -128,7 +128,8 @@
     "backToReports": "Terug naar rapporten",
     "switchReport": "Naar een ander rapport gaan",
     "switchPlaceholder": "Rapporten filteren...",
-    "switchNoMatches": "Geen rapporten gevonden"
+    "switchNoMatches": "Geen rapporten gevonden",
+    "favourites": "Favorieten"
   },
   "reportPage": {
     "notFound": "Rapport niet gevonden",

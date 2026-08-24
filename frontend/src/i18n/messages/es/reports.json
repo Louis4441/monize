@@ -128,7 +128,8 @@
     "backToReports": "Volver a informes",
     "switchReport": "Cambiar a otro informe",
     "switchPlaceholder": "Filtrar informes...",
-    "switchNoMatches": "Ningún informe coincide"
+    "switchNoMatches": "Ningún informe coincide",
+    "favourites": "Favoritos"
   },
   "reportPage": {
     "notFound": "Informe no encontrado",

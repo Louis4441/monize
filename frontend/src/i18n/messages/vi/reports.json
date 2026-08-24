@@ -128,7 +128,8 @@
     "backToReports": "Quay lại báo cáo",
     "switchReport": "Chuyển sang báo cáo khác",
     "switchPlaceholder": "Lọc báo cáo...",
-    "switchNoMatches": "Không có báo cáo nào khớp"
+    "switchNoMatches": "Không có báo cáo nào khớp",
+    "favourites": "Yêu thích"
   },
   "reportPage": {
     "notFound": "Không tìm thấy báo cáo",

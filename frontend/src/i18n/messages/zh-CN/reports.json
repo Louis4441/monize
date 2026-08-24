@@ -128,7 +128,8 @@
     "backToReports": "返回报告",
     "switchReport": "切换到其他报告",
     "switchPlaceholder": "筛选报告...",
-    "switchNoMatches": "没有匹配的报告"
+    "switchNoMatches": "没有匹配的报告",
+    "favourites": "收藏"
   },
   "reportPage": {
     "notFound": "未找到报告",

@@ -128,7 +128,8 @@
     "backToReports": "Raporlara Geri Dön",
     "switchReport": "Başka bir rapora geç",
     "switchPlaceholder": "Raporları filtrele...",
-    "switchNoMatches": "Eşleşen rapor yok"
+    "switchNoMatches": "Eşleşen rapor yok",
+    "favourites": "Favoriler"
   },
   "reportPage": {
     "notFound": "Rapor Bulunamadı",
