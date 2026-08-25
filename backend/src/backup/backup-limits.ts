@@ -97,7 +97,7 @@ const MEMORY_SHARE_PER_BACKUP = 0.25;
  * measured 7.9 at 24 MiB is the worst of what was measured, not the worst there
  * is.
  */
-export const MEASURED_PEAK_MULTIPLE = 7.899;
+export const MEASURED_PEAK_MULTIPLE = 7.989;
 
 /**
  * How many times the **expanded** payload a restore may occupy at peak.
@@ -406,6 +406,12 @@ export function warnIfRestoreUploadLimitIsUnsafe(
   expandedRaw: string | undefined = process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
 ): void {
   if (rawOverride === undefined || rawOverride.trim() === "") return;
+  // Unknown means unknown. With no cgroup limit visible the ceiling comes from
+  // `UNKNOWN_RESTORE_PEAK_BUDGET_BYTES`, which is a judgement about a machine
+  // nobody has measured -- warning that a bare-metal host "should consider
+  // 128MiB" is advice this cannot support, and a warning that fires where it
+  // cannot know is how operators learn to ignore the ones that can.
+  if (memoryLimitBytes === null) return;
   // Against the ceiling actually in force: an operator who lowered the expanded
   // limit and left the upload limit alone is exactly who this has to warn.
   const safe = safeDerivedUploadLimit(memoryLimitBytes, expandedRaw);

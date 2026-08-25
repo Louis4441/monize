@@ -595,11 +595,33 @@ async function runParent(options: Options): Promise<void> {
               ),
             );
           }
-          const worst = runs.reduce((a, b) =>
-            (b.impliedMultiple ?? Infinity) > (a.impliedMultiple ?? Infinity)
-              ? b
-              : a,
+          // Worst of the runs that PRODUCED a number, and `heap-exhausted` only
+          // when none did. Ordering `null` as `Infinity` made a single exhausted
+          // repeat outrank every measured one, so the case entered the record as
+          // exhausted and its real samples never reached `maxImpliedMultiple` --
+          // the figure `MEASURED_PEAK_MULTIPLE` and every derived ceiling come
+          // from. A discarded measurement is worse than a missing one: nothing
+          // downstream can tell it happened.
+          const measuredRuns = runs.filter(
+            (entry) => entry.impliedMultiple !== null,
           );
+          const worst =
+            measuredRuns.length === 0
+              ? runs[0]
+              : measuredRuns.reduce((a, b) =>
+                  (b.impliedMultiple as number) > (a.impliedMultiple as number)
+                    ? b
+                    : a,
+                );
+          if (measuredRuns.length > 0 && measuredRuns.length < runs.length) {
+            // Marginal rather than impossible, and the record would show only
+            // the number. Say it where whoever runs the sweep can see it.
+            logger.warn(
+              `${spec.id}: ${runs.length - measuredRuns.length} of ` +
+                `${runs.length} runs exhausted the heap; the reported multiple ` +
+                `is from the rest`,
+            );
+          }
           cases.push(worst);
           logger.log(
             worst.outcome === "heap-exhausted"

@@ -172,7 +172,7 @@ describe("backup size limits", () => {
         const container = containerMib * MIB;
         const expanded = deriveRestoreExpandedLimitBytes(container);
         // The margin lives in the headroom share, not in the rounded multiple:
-        // 8 against a measured 7.911 is barely 1%, so what has to hold is that
+        // 8 against a measured 7.99 is barely 0.1%, so what has to hold is that
         // the MEASURED cost of the largest artifact this deployment will admit,
         // plus 15%, still fits the memory left for it.
         expect(MEASURED_PEAK_MULTIPLE * expanded * 1.15).toBeLessThanOrEqual(
@@ -385,9 +385,11 @@ describe("backup size limits", () => {
     it("stays quiet when there is no container limit to compare against", () => {
       const onWarn = jest.fn();
       warnIfRestoreUploadLimitIsUnsafe(8192 * MIB, "8gb", onWarn, null);
-      // Unknown means unknown: 8 GiB may be correct on a bare-metal host.
-      expect(onWarn).toHaveBeenCalledTimes(1);
-      expect(onWarn.mock.calls[0][0]).toContain("128MiB");
+      // Unknown means unknown: 8 GiB may be correct on a bare-metal host, and
+      // the fallback ceiling is a judgement about a machine nobody measured --
+      // not a threshold to hold an operator's own number against. This test
+      // asserted the opposite of its own name and comment for one commit.
+      expect(onWarn).not.toHaveBeenCalled();
     });
   });
 });

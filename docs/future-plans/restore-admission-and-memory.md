@@ -121,7 +121,7 @@ tuning question into a correctness one, so the numbers come first:
 
 | Expanded artifact | Worst implied multiple | At a 304 MiB heap (the model's own headroom) |
 |---|---|---|
-| 24 MiB | 7.91 | completes |
+| 24 MiB | 7.99 | completes |
 | 48 MiB | 7.37 | completes |
 | 96 MiB | 6.89 | **4 of 5 artifacts cannot be decoded at all** |
 
@@ -146,7 +146,7 @@ outranks the original framing of this decision:
   single multiple is right everywhere, and whichever one the code keeps has to be the
   worst over the sizes that deployment admits.
 
-Two candidate shapes, with the measured 7.91 and a 15% margin (9.1):
+Two candidate shapes, with the measured ~7.9 and a 15% margin (about 9.1):
 
 - **Option A, keep the shape, raise the constant.** `PEAK_MULTIPLE = 9` leaves the
   expanded default at a quarter of the container -- 100 MiB on the default pod -- and

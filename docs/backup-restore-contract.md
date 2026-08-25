@@ -468,22 +468,35 @@ Three, for three different failure modes. All configurable, all fail loudly.
 
 | Setting | Bounds | Default |
 |---|---|---|
-| `BACKUP_RESTORE_LIMIT` | the compressed upload | the half-share peak divided by `PEAK_MULTIPLE` (~a sixth), no floor |
-| `BACKUP_RESTORE_EXPANDED_LIMIT` | the **decompressed** payload | a quarter of the container's memory limit |
+| `BACKUP_RESTORE_LIMIT` | the compressed upload | the expanded ceiling below, whether derived or set |
+| `BACKUP_RESTORE_EXPANDED_LIMIT` | the **decompressed** payload | `(container - baseline) * RESTORE_HEADROOM_SHARE / PEAK_MULTIPLE`, no floor |
 | `BACKUP_EXPORT_BUFFER_LIMIT` | the artifact a buffered export may accumulate | a quarter of the container's memory limit |
 
-The expanded and buffered defaults are cgroup-derived with a 64 MiB usability
-floor, a 1024 MiB cap and a 256 MiB fallback when there is no limit to read. There
-are no fixed byte defaults left; the `1024mb` and `512mb` this table used to name
-were the numbers that could not fire.
+The buffered default is cgroup-derived with a 64 MiB usability floor, a 1024 MiB cap
+and a 256 MiB fallback when there is no limit to read. There are no fixed byte
+defaults left; the `1024mb` and `512mb` this table used to name were the numbers that
+could not fire.
 
-**The upload default has no floor, and that is deliberate (F3R6-005).** A usability
-minimum and a safety maximum are different quantities: `max(64 MiB, safe)` let the
-floor win, so on a 128 MiB pod it returned 64 MiB whose modeled peak (192 MiB)
+**The two restore ceilings are one number** — about 28 MiB on the chart's default
+400 MiB backend — and it is solved out of the capacity rather than taken as a share
+of it (issue #1073; the derivation and the measurement behind `PEAK_MULTIPLE = 8` are
+below). The compressed ceiling follows the expanded one because gzip output is never
+smaller than what it expands to: an upload above the expanded ceiling is one this
+deployment could never decompress, whether the operator set that ceiling or the
+container derived it. Two separately derived numbers let a 66 MiB upload be accepted
+against a 100 MiB expanded ceiling and refused at decompression; reading the
+*derived* ceiling instead of the *resolved* one did the same to an operator who
+lowered `BACKUP_RESTORE_EXPANDED_LIMIT`.
+
+**Neither restore default has a floor, and that is deliberate (F3R6-005).** A
+usability minimum and a safety maximum are different quantities: `max(64 MiB, safe)`
+let the floor win, so on a 128 MiB pod the upload limit was 64 MiB whose modeled peak
 exceeded the whole container. The safety bound is the only bound —
-`resolvedLimit * PEAK_MULTIPLE <= container * share` for every container size — so a
-small pod derives a small, safe upload limit and `warnIfRestoreUploadLimitIsCramped`
-says so at startup rather than flooring into a number the pod cannot survive.
+`baseline + PEAK_MULTIPLE * expanded <= container` at every supported pod size,
+asserted in `backup-limits.spec.ts` — so a small pod derives a small, safe ceiling
+and `warnIfRestoreUploadLimitIsCramped` says so at startup. A container with no
+headroom derives `0`, and every restore upload is then refused with a 503 naming the
+two levers rather than a 413 about a size no file could meet.
 
 The compressed limit bounds nothing about what comes out of gzip: a few hundred
 kilobytes of repeated text expands to gigabytes. Decompression is asynchronous
@@ -519,19 +532,19 @@ export holds. That was wrong about what happens next: the request goes on to hol
 the envelope, `decipher.update`'s output, `Buffer.concat`'s result, the decompressed
 payload, the UTF-8 string and the parsed object graph, several of them at once. Half
 of 400 MiB on the wire is `PEAK_MULTIPLE` times that at peak, so a *single* legal
-request could not fit the pod it was sized for. So the **peak** gets the half share
-and the wire gets that divided by `PEAK_MULTIPLE` — one constant, two numbers, and
-the aggregate admission budget below is the same half share, so exactly one
-full-size restore runs at a time.
+request could not fit the pod it was sized for.
 
-`PEAK_MULTIPLE = 3` is a floor, not a measurement: the real multiple depends on
-Node's version, the payload's entropy and the object graph's shape. Measuring it
-wants the cgroup peak-RSS test that has never run here.
+`PEAK_MULTIPLE` was `3` — a floor argued from counting those allocations rather than
+from measuring them. It is now `8`, `Math.ceil(MEASURED_PEAK_MULTIPLE)`, from the
+committed peak-RSS record; the measurement, what it does not cover, and why raising
+the constant alone would have refused every restore are all below.
 
 An operator's explicit value always wins, and one too large for the container is
-warned about at startup — against the same share the default came from, in the same
-units they set, so the derived default never warns about itself and the figure the
-warning suggests is one they can paste back.
+warned about at startup — against the ceiling actually in force, in the same units
+they set, so the derived default never warns about itself and the figure the warning
+suggests is one they can paste back. With no cgroup limit visible there is nothing to
+warn against, and the check stays silent rather than quoting a fallback nobody
+measured.
 
 **The upload limit is the earliest one and therefore the only one that matters for
 an oversized request.** `express.raw` buffers the whole body before the controller,
@@ -759,9 +772,11 @@ not have (`DR-F3R6-002` / `DR-F3R7-003`). What the suite proves instead is the
 property the claim rests on — the export never has the whole of anything in hand:
 reads happen in batches, objects are opened one at a time between writes, bytes go
 out before the last table is read, and a blocked client stops the reads
-(`export-streaming.spec.ts`). `PEAK_MULTIPLE` on the **restore** side is untouched
-and still an estimate: the restore's `express.raw` upload is buffered before any
-of our code runs, so bounding it is a different change with a different shape.
+(`export-streaming.spec.ts`). `PEAK_MULTIPLE` on the **restore** side has since been
+measured (§6, issue #1073) — it was `3` when this paragraph was written and is `8`
+now — but the restore's shape is unchanged: its `express.raw` upload is buffered
+before any of our code runs, so making the restore stream is a different change from
+this one, and it is what would replace a measured multiple with a bound.
 
 ## 7. Automatic backups on disk
 

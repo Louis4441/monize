@@ -641,6 +641,26 @@ describe("restore upload admission wiring", () => {
   });
 
   /**
+   * CORS has to be registered before the gate, because the gate answers requests
+   * itself: a 403/413/503/408 written from inside the middleware chain with no
+   * Access-Control-Allow-Origin reaches a cross-origin browser as an opaque CORS
+   * failure instead of the actionable status it is. Ordering in `main.ts` is not
+   * covered by any test harness, so it is scanned for -- the same reason the
+   * express.raw ordering above is.
+   */
+  it("registers CORS ahead of the admission middleware", () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, "..", "main.ts"),
+      "utf8",
+    );
+    const corsAt = source.indexOf("app.enableCors(");
+    const admissionAt = source.indexOf("restoreAdmission.middleware");
+    expect(corsAt).toBeGreaterThan(-1);
+    expect(admissionAt).toBeGreaterThan(-1);
+    expect(corsAt).toBeLessThan(admissionAt);
+  });
+
+  /**
    * And that the gate is actually built with an authorizer. The hook is optional
    * -- unit tests of the budgeting want it omitted -- so nothing but a scan
    * catches a deployment that quietly went back to admitting everyone.
