@@ -36,16 +36,18 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  *     `test/jest-e2e.json`, which pins `maxWorkers: 1`;
  *  3. `npm test` chains the two suites sequentially rather than running a
  *     bare `jest`;
- *  4. `test:watch`, `test:debug`, `test:unit` and `test:cov` stay on the root
- *     config -- a watcher aimed at `jest-e2e.json` is the same defect through a
- *     different door;
- *  5. every Jest entry point survives both shells npm uses, and no test command
- *     or runner config anywhere in the repository carries a zero-discovery
- *     success flag (REL-001), so a discovery failure cannot report as green.
+ *  4. no script selecting a config that reaches the database-backed suites
+ *     runs them unserialized or under a watcher -- a watcher aimed at
+ *     `jest-e2e.json` is the same defect through a different door;
+ *  5. every Jest entry point survives both shells npm uses, and nothing in the
+ *     tree that can start a runner carries a zero-discovery success flag
+ *     (REL-001), so a discovery failure cannot report as green.
  *
- * Claims 4 and 5 derive their subjects from the manifests and the tracked tree
- * rather than naming scripts, because a guard whose inventory has to be updated
- * by hand fails exactly when someone adds an entry point without thinking of it.
+ * Claims 4 and 5 derive their subjects -- the scripts, the configs they select
+ * and the files that can launch a runner -- from the manifests and the tracked
+ * tree rather than naming them, because a guard whose inventory has to be
+ * updated by hand fails exactly when someone adds an entry point without
+ * thinking of it.
  *
  * The inventory comes from `git ls-files`, so the guard sees the tree CI sees.
  * A brand-new spec is invisible to it until staged -- `git add -N` is enough.
@@ -117,11 +119,21 @@ function discovers(
   const roots = (config.roots ?? ["<rootDir>"]).map((root) =>
     posix.normalize(toPosix(root).replace("<rootDir>", rootDir)),
   );
-  const ignore = config.testPathIgnorePatterns ?? ["/node_modules/"];
-  const regexes =
+  // `<rootDir>` is expanded in every path-bearing pattern, not just in `roots`:
+  // excluding the database-backed tree with
+  // `testPathIgnorePatterns: ["<rootDir>/test/"]` is a correct configuration,
+  // and a model that left the token unexpanded would fail it for the wrong
+  // reason -- a guard that rejects a right answer teaches people to delete it.
+  const expand = (pattern: string): string =>
+    pattern.replace("<rootDir>", rootDir);
+  const ignore = (config.testPathIgnorePatterns ?? ["/node_modules/"]).map(
+    expand,
+  );
+  const regexes = (
     typeof config.testRegex === "string"
       ? [config.testRegex]
-      : (config.testRegex ?? []);
+      : (config.testRegex ?? [])
+  ).map(expand);
 
   const underRoots = roots.some(
     (root) => path === root || path.startsWith(`${root}/`),
@@ -144,14 +156,24 @@ const VIRTUAL_ROOT = "/repo";
 const virtual = (repoRelative: string): string =>
   `${VIRTUAL_ROOT}/${repoRelative}`;
 
-describeTree("jest configuration", () => {
-  const specs = (prefix: string): string[] => {
-    const root = requireRepoRoot(REPO_ROOT);
-    return gitListFiles(root, `-- "backend/${prefix}"`).filter((file) =>
-      file.endsWith(".spec.ts"),
-    );
-  };
+/**
+ * A suite file ends in either .spec.ts or .e2e-spec.ts, and only the first
+ * spelling matches the root config's `testRegex` -- which is exactly why the
+ * inventory must not filter on it. The five e2e-spec suites directly under
+ * `backend/test/` build their schema the same way the integration ones do, so
+ * an inventory that quietly skipped them would leave claim 1 unchecked for the
+ * files it most needs to cover.
+ */
+const SPEC_SUFFIX = /[.-]spec\.ts$/;
 
+const specs = (prefix: string): string[] => {
+  const root = requireRepoRoot(REPO_ROOT);
+  return gitListFiles(root, `-- "backend/${prefix}"`).filter((file) =>
+    SPEC_SUFFIX.test(file),
+  );
+};
+
+describeTree("jest configuration", () => {
   it("keeps every database-backed spec out of the parallel config", () => {
     const testTreeSpecs = specs("test");
     // Guards the guard: an empty inventory would make the assertion vacuous.
@@ -212,6 +234,21 @@ describe("the discovery model", () => {
     );
   });
 
+  it("honours <rootDir> in an ignore pattern", () => {
+    // The other correct way to write this exclusion. A model that left the
+    // token unexpanded would call this config broken and send its author
+    // looking for a defect that is in the guard.
+    const byIgnorePattern = {
+      rootDir: ".",
+      testRegex: ".*\\.spec\\.ts$",
+      testPathIgnorePatterns: ["<rootDir>/test/"],
+    };
+    expect(discovers(byIgnorePattern, "/repo/backend", posixPath)).toBe(false);
+    expect(
+      discovers(byIgnorePattern, "/repo/backend", "/repo/backend/a.spec.ts"),
+    ).toBe(true);
+  });
+
   it("keeps a unit spec discoverable in either shape", () => {
     const unit = "/repo/backend/src/common/thing.spec.ts";
     expect(discovers(packageJson.jest, "/repo/backend", unit)).toBe(true);
@@ -225,7 +262,7 @@ describe("the discovery model", () => {
   });
 });
 
-describe("test scripts", () => {
+describeTree("test scripts", () => {
   /**
    * Derived, not listed. A second hand-maintained inventory of test scripts is
    * a rule that holds until someone adds `test:smoke` and does not think to
@@ -264,20 +301,42 @@ describe("test scripts", () => {
     );
   });
 
-  it("leaves every database-backed entry point to the integration config", () => {
-    // Watch and debug inherit the root config, which `roots` has already made
-    // unit-only. Pointing either at `jest-e2e.json` would put a file watcher on
-    // suites that drop the schema out from under each other -- the original
-    // defect, re-entered through a different door.
-    for (const script of [
-      "test:unit",
-      "test:cov",
-      "test:watch",
-      "test:debug",
-    ]) {
-      expect(packageJson.scripts[script]).not.toContain("jest-e2e.json");
-      expect(packageJson.scripts[script]).not.toContain("--config");
-    }
+  it("never runs a database-backed config in parallel or under a watcher", () => {
+    // Derived from the property, not from the script names: a script that does
+    // not pass `--config` runs the root config, which `roots` has already made
+    // unit-only, so only the ones that select another config can reach the
+    // shared database. Those must pin one worker and must not be watchers --
+    // `test:watch:integration` is the original defect through a different door,
+    // and naming today's four safe scripts would not have caught it.
+    const root = requireRepoRoot(REPO_ROOT);
+    const offenders = jestScripts.flatMap((script) => {
+      const command = packageJson.scripts[script];
+      const selected = /--config[= ]+(\S+)/.exec(command)?.[1];
+      if (!selected) return [];
+      if (!selected.endsWith(".json")) {
+        throw new Error(
+          `${script} selects ${selected}, which this guard cannot read; extend it rather than trusting the script`,
+        );
+      }
+      const configPath = posix.normalize(`backend/${selected}`);
+      const config = JSON.parse(
+        readFileSync(join(root, configPath), "utf8"),
+      ) as JestConfig;
+      const configDir = virtual(posix.dirname(configPath));
+      const reachesDatabaseSuites = specs("test").some((file) =>
+        discovers(config, configDir, virtual(file)),
+      );
+      if (!reachesDatabaseSuites) return [];
+      const problems: string[] = [];
+      if (config.maxWorkers !== 1) {
+        problems.push(`${script} -> ${selected} does not pin maxWorkers: 1`);
+      }
+      if (/(^|\s)--watch\b/.test(command)) {
+        problems.push(`${script} watches ${selected}`);
+      }
+      return problems;
+    });
+    expect(offenders).toEqual([]);
   });
 
   it("quotes nothing the way only one of the two script shells understands", () => {
@@ -295,43 +354,59 @@ describe("test scripts", () => {
 
 /**
  * REL-001 (`docs/release-integrity.md`) is a repository rule, not a backend
- * one: a blanket "succeed if nothing was discovered" flag turns a discovery
- * failure into a green check for whichever runner carries it. So the scan is
- * repository-wide and derived from the tracked tree -- every manifest's scripts
- * and every runner config -- rather than from a list of the scripts that happen
- * to exist today. Jest and Vitest spell it `--passWithNoTests`, Playwright
- * `--pass-with-no-tests`, and Vitest also takes it as a config field.
+ * one: a blanket "succeed if nothing was discovered" turns a discovery failure
+ * into a green check for whichever runner carries it. So the subjects are every
+ * tracked surface that can *start a runner* -- manifests (scripts and the
+ * inline `jest` block alike), runner configs, workflows, shell scripts and
+ * Dockerfiles -- listed from the tree rather than named here, because the whole
+ * point is to cover the entry point nobody thought to add.
+ *
+ * Prose is deliberately out of scope: `docs/release-integrity.md` quotes the
+ * flag while forbidding it, and a scan that read documents would fail on the
+ * document that states the rule.
+ *
+ * Both spellings of both forms count. Jest and Vitest take `--passWithNoTests`,
+ * Playwright `--pass-with-no-tests`, and the config field is `passWithNoTests:
+ * true` in a JS config and `"passWithNoTests": true` in a JSON one -- the
+ * quoted spelling being the likelier of the two here, since the config this
+ * rule names (`test/jest-e2e.json`) is JSON.
  */
 describeTree("zero-discovery flags", () => {
   const CLI_FLAG = /--pass-?with-?no-?tests/i;
-  const CONFIG_FIELD = /passWithNoTests\s*:\s*true/;
+  const CONFIG_FIELD = /"?passWithNoTests"?\s*:\s*true/;
 
-  it("are absent from every test command and runner config in the tree", () => {
+  it("are absent from every surface that can start a runner", () => {
     const root = requireRepoRoot(REPO_ROOT);
 
-    const manifests = gitListFiles(root, '-- "*package.json"');
-    expect(manifests.length).toBeGreaterThan(1);
-    const scriptOffenders = manifests.flatMap((manifest) => {
-      const scripts = (
-        JSON.parse(readFileSync(join(root, manifest), "utf8")) as {
-          scripts?: Record<string, string>;
-        }
-      ).scripts;
-      return Object.entries(scripts ?? {})
-        .filter(([, command]) => CLI_FLAG.test(command))
-        .map(([name]) => `${manifest} -> ${name}`);
-    });
-    expect(scriptOffenders).toEqual([]);
-
-    const configs = gitListFiles(
+    const subjects = gitListFiles(
       root,
-      '-- "*vitest.config.*" "*playwright.config.*" "*jest.config.*" "*jest-e2e.json"',
+      [
+        "--",
+        '"*package.json"',
+        '"*jest.config.*"',
+        '"*jest-e2e.json"',
+        '"*vitest.config.*"',
+        '"*playwright.config.*"',
+        '".github/workflows/*"',
+        '"*.sh"',
+        '"*Dockerfile*"',
+      ].join(" "),
     );
-    expect(configs.length).toBeGreaterThan(1);
-    const configOffenders = configs.filter((config) => {
-      const source = readFileSync(join(root, config), "utf8");
-      return CONFIG_FIELD.test(source) || CLI_FLAG.test(source);
+    // Guards the guard twice over: an empty or narrowed pathspec would make the
+    // scan vacuous, and these four are the surfaces the rule exists for.
+    expect(subjects).toEqual(
+      expect.arrayContaining([
+        "backend/package.json",
+        "backend/test/jest-e2e.json",
+        "frontend/vitest.config.ts",
+        ".github/workflows/ci.yml",
+      ]),
+    );
+
+    const offenders = subjects.filter((subject) => {
+      const source = readFileSync(join(root, subject), "utf8");
+      return CLI_FLAG.test(source) || CONFIG_FIELD.test(source);
     });
-    expect(configOffenders).toEqual([]);
+    expect(offenders).toEqual([]);
   });
 });

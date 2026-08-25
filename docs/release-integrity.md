@@ -55,11 +55,15 @@ silently becoming three. Only an explicit inventory catches partial loss.
 It previously carried an unconditional `--passWithNoTests` under 21 suites --
 a blanket net under a populated suite, exactly the case REL-001 forbids -- so an
 empty match now exits non-zero and fails the `backend-integration-tests` job.
-`backend/src/common/jest-config.guard.spec.ts` fails if the flag reappears
-anywhere in the repository -- it reads every tracked `package.json`'s scripts
-and every tracked Jest, Vitest and Playwright config, matching
-`--passWithNoTests`, Playwright's `--pass-with-no-tests` spelling and Vitest's
-`passWithNoTests: true` config field. The subjects come from `git ls-files`
+`backend/src/common/jest-config.guard.spec.ts` fails if the flag reappears on
+any tracked surface that can start a runner: every `package.json` (scripts and
+an inline `jest` block alike), every Jest, Vitest and Playwright config, every
+workflow under `.github/workflows/`, every `*.sh` and every Dockerfile. It
+matches `--passWithNoTests`, Playwright's `--pass-with-no-tests` spelling, and
+the config field in both its JS (`passWithNoTests: true`) and JSON
+(`"passWithNoTests": true`) forms -- the latter being the spelling the config
+this rule names would actually take. Prose is out of scope, since this document
+quotes the flag in order to forbid it. The subjects come from `git ls-files`
 rather than a list, so a runner added later is covered without anyone
 remembering this rule. That is what moves REL-001 from a rule someone remembers
 to one the pipeline enforces. No runner carries such a flag today either:
@@ -217,7 +221,7 @@ fail, not when a document describes it.
 
 | Rule | Status on `main` | Blocking evidence |
 | --- | --- | --- |
-| REL-001 no blanket pass-with-no-tests | **enforced** | `backend/src/common/jest-config.guard.spec.ts` scans every tracked manifest's scripts and every tracked runner config, in all three spellings |
+| REL-001 no blanket pass-with-no-tests | **enforced** | `backend/src/common/jest-config.guard.spec.ts` scans every tracked manifest, runner config, workflow, shell script and Dockerfile, in every spelling |
 | REL-002 mandatory suites asserted by name | **not enforced** | no inventory step precedes the runner |
 | REL-003 one revision across tag, image, gate | **partially enforced** | image bound to tested SHA; release tag resolves to the untested bump commit |
 | REL-004 post-gate commit proven or verified | **not enforced** | nothing checks the bump commit's parent or diff scope |
