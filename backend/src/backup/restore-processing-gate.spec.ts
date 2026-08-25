@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ServiceUnavailableException } from "@nestjs/common";
 import {
+  MEASURED_PEAK_MULTIPLE,
   PEAK_MULTIPLE,
   resolveRestoreExpandedLimitBytes,
   restoreProcessBaselineBytes,
@@ -399,38 +400,61 @@ describe("computeRestoreProcessingSlots", () => {
     expect(computeRestoreProcessingSlots(400 * MIB)).toBeLessThanOrEqual(1);
   });
 
-  it("allows more on a much larger container", () => {
-    expect(computeRestoreProcessingSlots(8192 * MIB)).toBeGreaterThan(1);
+  /**
+   * Since the expanded ceiling is solved out of the container's headroom (issue
+   * #1073), one slot is the answer almost everywhere **by construction**: a bigger
+   * pod buys a bigger artifact rather than a second concurrent restore. More slots
+   * appear only once the ceiling hits `MAX_DERIVED_LIMIT_BYTES` and stops growing
+   * with the pod -- or when an operator lowers `BACKUP_RESTORE_EXPANDED_LIMIT`,
+   * which is the deliberate lever for trading artifact size for concurrency.
+   */
+  it("serialises by construction, and parallelises only once the cap binds", () => {
+    expect(computeRestoreProcessingSlots(8192 * MIB)).toBe(1);
+    expect(computeRestoreProcessingSlots(32768 * MIB)).toBeGreaterThan(1);
+    // The operator's lever: a smaller artifact ceiling on the same pod.
+    expect(
+      computeRestoreProcessingSlots(8192 * MIB, 128 * MIB),
+    ).toBeGreaterThan(1);
   });
 
   /**
-   * DOC-F3RB-R9-001. The gate bounds concurrency; it does not establish that one
-   * restore fits, because every ceiling in the chain is derived by dividing by
-   * `PEAK_MULTIPLE` and so cannot vouch for it. This pins how thin that leaves the
-   * margin, so the number is a test failure rather than a claim in a comment: on
-   * the default pod a *true* multiple only 1.3% above the assumed one puts a single
-   * admitted restore over the container.
+   * DOC-F3RB-R9-001, now the property rather than the defect.
+   *
+   * This test used to pin how thin the old model's margin was: on the default pod
+   * it left 4 MiB of 400, and a true multiple 1.3% above the assumed 3 put a
+   * single admitted restore over the container. The measurement (issue #1073) put
+   * the real multiple near 8, so that margin was fiction -- four of five 96 MiB
+   * artifacts could not be decoded inside the headroom the model was handing out.
+   *
+   * What has to hold now: the break-even multiple -- the one at which one admitted
+   * restore stops fitting -- is above what was measured, with the margin the
+   * derivation claims. The gate still bounds only concurrency; the difference is
+   * that the ceiling it admits was solved out of the capacity instead of being a
+   * share of it, so the two are no longer the same number in disguise.
    */
-  it("admits one restore whose real peak can still exceed the container", () => {
+  it("admits one restore whose measured peak fits, with margin", () => {
     const container = 400 * MIB;
     const expanded = resolveRestoreExpandedLimitBytes(undefined, container);
     const baseline = restoreProcessBaselineBytes(container);
 
     expect(computeRestoreProcessingSlots(container)).toBe(1);
+    expect(baseline + PEAK_MULTIPLE * expanded).toBeLessThanOrEqual(container);
 
-    // Under the model it fits, and barely -- 4 MiB of 400.
-    const modeled = baseline + PEAK_MULTIPLE * expanded;
-    expect(modeled).toBeLessThanOrEqual(container);
-    expect((container - modeled) / container).toBeLessThan(0.05);
-
-    // The multiple at which one admitted restore stops fitting.
     const breakEven = (container - baseline) / expanded;
-    expect(breakEven).toBeCloseTo(3.04, 2);
-    expect(breakEven).toBeGreaterThan(PEAK_MULTIPLE);
+    expect(breakEven).toBeGreaterThan(MEASURED_PEAK_MULTIPLE * 1.15);
+    expect(breakEven).toBeGreaterThanOrEqual(PEAK_MULTIPLE);
+  });
 
-    // So a workload whose real multiple is 3.1 -- above the documented floor,
-    // below anything the codebase has measured -- OOMs at one slot.
-    expect(baseline + 3.1 * expanded).toBeGreaterThan(container);
+  /**
+   * The other half of the same fix: a container with no headroom admits nothing.
+   * `computeRestoreProcessingSlots` used to return `1` for a non-positive
+   * per-restore peak -- a guard against absurd input that, once the ceiling could
+   * legitimately derive to zero, admitted a restore on exactly the deployments
+   * that cannot run one.
+   */
+  it("admits nothing where the ceiling derives to zero", () => {
+    expect(computeRestoreProcessingSlots(128 * MIB)).toBe(0);
+    expect(computeRestoreProcessingSlots(400 * MIB, 0)).toBe(0);
   });
 
   /**

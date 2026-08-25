@@ -48,8 +48,22 @@ import { readFileSync } from "fs";
  * measured their own deployment knows better than a ratio. The Helm chart sets
  * them explicitly beside `resources.limits.memory` so the two cannot drift apart
  * silently, and an override the container cannot absorb gets a startup warning
- * (`warnIfLimitExceedsMemory`) against the same share its default was derived
- * from -- a quarter for the two buffered limits, a half for the upload.
+ * against the threshold its own default was derived from -- a quarter of the
+ * container for the buffered export (`warnIfLimitExceedsMemory`), and for the two
+ * restore ceilings the measured peak budget (`warnIfRestoreUploadLimitIsUnsafe`).
+ * A check compared against the wrong threshold warns on every deployment, which
+ * is how the upload check came to be missing rather than merely unwired.
+ *
+ * ## The restore ceilings are derived from a measurement, and from the capacity
+ *
+ * `PEAK_MULTIPLE` was `3`, argued from allocation counting, and the expanded
+ * ceiling was a quarter of the container -- so the same unmeasured constant sat in
+ * the cost and in every ceiling derived from it. Issue #1073 measured it at 6.9 to
+ * 7.9 and showed the old ceilings admitted restores the process cannot finish. Now
+ * the ceiling is solved out of the capacity
+ * (`deriveRestoreExpandedLimitBytes`), and the compressed upload ceiling is that
+ * same number -- gzip output is never smaller than what it expands to, so a larger
+ * upload is one this deployment could never decompress.
  */
 
 /** Bytes in a mebibyte, spelled out where the defaults are set. */
@@ -69,54 +83,72 @@ const MIB = 1024 * 1024;
 const MEMORY_SHARE_PER_BACKUP = 0.25;
 
 /**
- * Share of the container a compressed restore upload may occupy.
+ * The worst multiple actually measured, over the sizes and shapes swept.
  *
- * The same figure `resolveRestoreUploadLimitBytes` derives its default from, so
- * the derived default can never warn about itself -- exported for the startup
- * check, which has to compare an operator's override against the same threshold
- * the derivation used rather than against the buffered-export quarter. Checking a
- * half-share limit against a quarter-share threshold would have warned on every
- * deployment, which is why this check was missing rather than merely unwired.
+ * From `restore-peak-rss.record.json` (`maxImpliedMultiple`), produced by
+ * `restore-peak-rss.harness.ts` and checked against this constant by
+ * `restore-peak-rss.record.spec.ts`. Peak resident memory above the process
+ * baseline, per byte of **expanded** payload.
+ *
+ * It is a **lower bound** in two directions, which is what the margin below is
+ * for: the measurement covers the decode phases only (attachment staging and the
+ * insert transaction are not in it), and the multiple *rises* as the artifact
+ * shrinks, because part of the cost does not scale with the payload. So the
+ * measured 7.9 at 24 MiB is the worst of what was measured, not the worst there
+ * is.
  */
-export const MEMORY_SHARE_PER_RESTORE_UPLOAD = 0.5;
+export const MEASURED_PEAK_MULTIPLE = 7.899;
 
 /**
- * How many times its wire size a restore may occupy at peak.
+ * How many times the **expanded** payload a restore may occupy at peak.
  *
- * A restore does not cost what it uploads. An encrypted upload holds the envelope,
+ * A restore does not cost what it uploads, and it does not cost what it
+ * decompresses either. An encrypted upload holds the envelope,
  * `decipher.update`'s output, `Buffer.concat`'s new buffer, the decompressed
- * payload, the UTF-8 string and the parsed object graph, and several of those are
- * live at the same moment. So the compressed upload ceiling and the aggregate
- * admission budget are two different numbers with this ratio between them: the
- * *peak* gets `MEMORY_SHARE_PER_RESTORE_UPLOAD` of the container, and the wire
- * gets that divided by this.
+ * payload, the UTF-8 string, the parsed object graph and the remapped copy of
+ * that graph, and several of those are live at the same moment.
  *
- * The first version of the admission gate skipped this and budgeted wire bytes
- * directly, which counted the smallest of those buffers -- three 60 MiB uploads
- * declared 180 MiB, fitted a 200 MiB budget, and could pass 540 MiB in flight. The
- * per-request ceiling had the same hole one level up: half a 400 MiB container to
- * the wire meant 600 MiB at peak for a single legal request.
+ * This was `3`, argued from counting those allocations rather than from measuring
+ * them, and every ceiling in the restore path was derived by dividing by it -- so
+ * none of them could vouch for it. The measurement (DR-F3RB-004, issue #1073) put
+ * the decode phases alone at 6.9 to 7.9, so the old number admitted restores this
+ * process cannot finish: four of five 96 MiB artifacts could not be decoded inside
+ * the 304 MiB the old model left free on the chart's default pod.
  *
- * Three is a floor rather than a measurement -- the true multiple depends on
- * Node's version, the payload's entropy and the object graph's shape, so this is
- * chosen to be defensible without one. Raising it refuses legitimate restores;
- * treating it as 1 is the defect it replaced. The measurement wants the
- * cgroup-constrained peak-RSS test that this environment cannot run.
+ * Rounded up to an integer deliberately: byte budgets computed from it stay
+ * integers, and the rounding is a small first slice of margin. The rest of the
+ * margin is `RESTORE_HEADROOM_SHARE`, kept separate so each number answers one
+ * question -- this one is "what does a restore cost", that one is "how much of the
+ * container may a restore have".
  */
-export const PEAK_MULTIPLE = 3;
+export const PEAK_MULTIPLE = Math.ceil(MEASURED_PEAK_MULTIPLE);
 
 /**
- * The share the upload limit's startup warning is measured against.
+ * The fraction of the container's spare memory a restore may be offered.
  *
- * `warnIfLimitExceedsMemory` compares the number the operator *set* -- wire bytes
- * -- so the threshold has to be in wire bytes too: the peak share divided by the
- * multiple, which is exactly what the default derives to. So the derived default
- * never warns about itself, and the figure the warning suggests is one the operator
- * can paste into `BACKUP_RESTORE_LIMIT`. Suggesting the peak share instead would
- * hand them a number that OOM-kills the pod.
+ * The margin over the measurement, and it is not decoration: the measured
+ * multiple omits the database phase and grows on smaller artifacts, so the
+ * derivation has to leave room for both. Fifteen per cent of the headroom stays
+ * unspoken for, which on the chart's default pod is about 40 MiB.
+ *
+ * `restore-peak-rss.record.spec.ts` asserts the resulting ceiling keeps at least
+ * a 15% margin over the measurement, so this cannot be quietly raised to make a
+ * bigger artifact fit.
  */
-export const UPLOAD_WARNING_SHARE =
-  MEMORY_SHARE_PER_RESTORE_UPLOAD / PEAK_MULTIPLE;
+export const RESTORE_HEADROOM_SHARE = 0.85;
+
+/**
+ * Peak memory a restore is assumed to be able to use when no container limit is
+ * visible -- bare metal, a development machine, `docker run` with no `--memory`.
+ *
+ * Nothing can be derived in that case, so this is a judgement rather than a
+ * calculation: a machine running PostgreSQL and this process can spare a gibibyte
+ * for the peak of a rare, deliberate operation. It is a *peak* budget rather than
+ * an artifact ceiling -- the expanded ceiling is this divided by `PEAK_MULTIPLE`,
+ * which lands near where the old fixed fallback did while being arithmetically
+ * coherent, where the old one modeled a 2.3 GiB peak without saying so.
+ */
+const UNKNOWN_RESTORE_PEAK_BUDGET_BYTES = 1024 * MIB;
 
 /**
  * Floor and cap on a derived default.
@@ -192,6 +224,44 @@ export function deriveDefaultLimitBytes(
 }
 
 /**
+ * The largest expanded payload whose modeled peak fits this container.
+ *
+ * **Derived from the capacity, not from a share of it.** The old derivation took a
+ * quarter of the container as the expanded ceiling and then modeled the peak as
+ * `PEAK_MULTIPLE` times it -- so the same unmeasured constant sat in the numerator
+ * of the cost and the denominator of every ceiling, and raising it to the measured
+ * value would have made `computeRestoreProcessingSlots` return zero on every
+ * ordinary pod. Solving for the ceiling instead keeps one measured input in the
+ * chain and makes "one restore fits" true by construction rather than by luck:
+ *
+ *     expanded = (container - baseline) * RESTORE_HEADROOM_SHARE / PEAK_MULTIPLE
+ *
+ * **No usability floor.** A usability minimum and a safety maximum are different
+ * quantities, and resolving them with `max()` lets the floor win over the safety
+ * (F3R6-005, which the upload limit learned first). A small container gets a small
+ * ceiling and a startup warning saying so; it does not get a ceiling its own model
+ * cannot survive.
+ *
+ * **Zero is a real answer.** A container whose baseline exceeds it has no room for
+ * any restore, and saying so is what turns an OOM kill mid-restore into a 503 the
+ * operator can act on (F3RB-005).
+ */
+export function deriveRestoreExpandedLimitBytes(
+  memoryLimitBytes: number | null = detectProcessMemoryLimitBytes(),
+): number {
+  const peakBudget =
+    memoryLimitBytes === null
+      ? UNKNOWN_RESTORE_PEAK_BUDGET_BYTES
+      : (memoryLimitBytes - restoreProcessBaselineBytes(memoryLimitBytes)) *
+        RESTORE_HEADROOM_SHARE;
+  if (peakBudget <= 0) return 0;
+  return Math.min(
+    MAX_DERIVED_LIMIT_BYTES,
+    Math.floor(peakBudget / PEAK_MULTIPLE),
+  );
+}
+
+/**
  * The **resolved** decompression ceiling `gunzip` will enforce -- the operator's
  * `BACKUP_RESTORE_EXPANDED_LIMIT` if set, else the derived default.
  *
@@ -205,21 +275,30 @@ export function resolveRestoreExpandedLimitBytes(
   raw: string | undefined = process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
   memoryLimitBytes: number | null = detectProcessMemoryLimitBytes(),
 ): number {
-  return resolveByteLimit(raw, deriveDefaultLimitBytes(memoryLimitBytes));
+  return resolveByteLimit(
+    raw,
+    deriveRestoreExpandedLimitBytes(memoryLimitBytes),
+  );
 }
 
 /**
  * Memory the ordinary Node/Nest process needs, reserved before restores get any.
  *
- * `max(96 MiB, a fifth of the container)`: a fixed floor because the V8/Nest
+ * `max(140 MiB, a fifth of the container)`: a fixed floor because the V8/Nest
  * baseline does not shrink to nothing on a small pod, and a share because a large
- * pod runs more concurrent non-restore work. This is an **estimate**, not a
- * measurement -- the same open risk as `PEAK_MULTIPLE` (DR-F3R7-003) -- but
- * subtracting a defensible baseline is closer than subtracting nothing, which is
- * what the slot math did before.
+ * pod runs more concurrent non-restore work.
+ *
+ * The floor is 140 MiB because that is what `helm/values.yaml` **requests** for
+ * ordinary backend use, and the two numbers disagreeing was the clearest argument
+ * in issue #1073 for measuring anything at all: this file reserved 96 MiB while
+ * the chart promised the scheduler 140 MiB. The chart's figure wins because it is
+ * a commitment the cluster acts on, and reserving more is the safe direction. The
+ * peak-RSS harness measured about 69 MiB for a *bare* decode process, which is a
+ * floor on this rather than a value for it -- it runs no HTTP server, no TypeORM
+ * pool and no scheduler.
  */
 export function restoreProcessBaselineBytes(memoryLimitBytes: number): number {
-  return Math.max(96 * MIB, Math.floor(memoryLimitBytes * 0.2));
+  return Math.max(140 * MIB, Math.floor(memoryLimitBytes * 0.2));
 }
 
 const UNITS: Record<string, number> = {
@@ -300,37 +379,65 @@ export function resolveRestoreUploadLimitBytes(
   raw: string | undefined = process.env.BACKUP_RESTORE_LIMIT,
   memoryLimitBytes: number | null = detectProcessMemoryLimitBytes(),
 ): number {
-  const derived =
-    memoryLimitBytes === null
-      ? UNKNOWN_MEMORY_FALLBACK_BYTES
-      : safeDerivedUploadLimit(memoryLimitBytes);
-  return resolveByteLimit(raw, derived);
+  return resolveByteLimit(raw, safeDerivedUploadLimit(memoryLimitBytes));
 }
 
 /**
- * The largest upload whose peak stays inside the container's restore share.
+ * Warn when a configured `BACKUP_RESTORE_LIMIT` is larger than this container can
+ * decompress.
  *
- * **No floor.** The other derived ceilings apply `MIN_DERIVED_LIMIT_BYTES` so a
- * small container does not inherit a limit too low to be usable -- but a usability
- * minimum and a safety maximum are different quantities, and resolving them with
- * `max()` lets the floor win over the safety. On a 128 MiB pod the safe upload is
- * `128 * 0.5 / 3 = 21 MiB`; flooring that to 64 MiB models a 192 MiB peak, which
- * exceeds the whole container. So the safety bound is the only bound here: the
- * result is exactly `container * share / PEAK_MULTIPLE`, capped, never floored
- * above it. `resolvedLimit * PEAK_MULTIPLE <= container * share` holds for every
- * container size.
- *
- * When that leaves a very small limit the deployment can still restore small
- * backups; `warnIfRestoreUploadLimitIsCramped` says so at startup rather than
- * flooring into a number the pod cannot survive. Raising the memory limit, or
- * setting `BACKUP_RESTORE_LIMIT` on a pod whose real headroom this cannot see, is
- * the operator's lever.
+ * Replaces a share-based check: the upload ceiling is no longer a share of
+ * anything, it is the expanded ceiling, so the threshold is that number and the
+ * figure suggested is one the operator can paste back. Silent when the derived
+ * default is in use -- a derivation must never warn about itself, which is the
+ * mistake that once kept this check out of `main.ts` entirely.
  */
-export function safeDerivedUploadLimit(memoryLimitBytes: number): number {
-  const safe = Math.floor(
-    (memoryLimitBytes * MEMORY_SHARE_PER_RESTORE_UPLOAD) / PEAK_MULTIPLE,
+export function warnIfRestoreUploadLimitIsUnsafe(
+  limitBytes: number,
+  rawOverride: string | undefined,
+  onWarn: (message: string) => void,
+  memoryLimitBytes: number | null = detectProcessMemoryLimitBytes(),
+): void {
+  if (rawOverride === undefined || rawOverride.trim() === "") return;
+  const safe = safeDerivedUploadLimit(memoryLimitBytes);
+  if (limitBytes <= safe) return;
+  const mib = (bytes: number) => `${Math.round(bytes / MIB)}MiB`;
+  onWarn(
+    `BACKUP_RESTORE_LIMIT is ${mib(limitBytes)}, but this container can only ` +
+      `decompress about ${mib(safe)} of artifact: a restore's peak memory is ` +
+      `roughly ${PEAK_MULTIPLE} times its expanded payload (measured), and an ` +
+      `upload larger than the expanded ceiling cannot decompress inside it at ` +
+      `all. A request near this ceiling will be OOM-killed or refused mid-restore ` +
+      `rather than rejected up front. Consider ${mib(safe)} or less, or raise the ` +
+      `container memory limit.`,
   );
-  return Math.min(MAX_DERIVED_LIMIT_BYTES, Math.max(1, safe));
+}
+
+/**
+ * The largest compressed upload worth buffering: the expanded ceiling itself.
+ *
+ * This used to be its own share of the container (`container * 0.5 /
+ * PEAK_MULTIPLE`), which made two ceilings out of one fact and let them disagree:
+ * on the default pod the wire limit was 66 MiB while the expanded ceiling was
+ * 100 MiB, so a 66 MiB upload was accepted and then refused at decompression
+ * whenever it expanded past 100 MiB -- which a backup artifact always does.
+ *
+ * Deriving it from the expanded ceiling is not a convenience, it is provable:
+ * gzip output is never smaller than what it expands to, so **any** upload larger
+ * than the expanded ceiling is one this deployment cannot decompress. Refusing it
+ * before `express.raw` buffers it is strictly better than refusing it after.
+ *
+ * **No floor**, for the reason `deriveRestoreExpandedLimitBytes` states: a
+ * usability minimum resolved with `max()` beats the safety bound it was supposed
+ * to respect. A container with no room for any restore derives `0` here, and the
+ * request is refused by the processing gate with a message naming the levers.
+ * `warnIfRestoreUploadLimitIsCramped` says so at startup where the number is
+ * merely small.
+ */
+export function safeDerivedUploadLimit(
+  memoryLimitBytes: number | null,
+): number {
+  return deriveRestoreExpandedLimitBytes(memoryLimitBytes);
 }
 
 /**
@@ -338,8 +445,14 @@ export function safeDerivedUploadLimit(memoryLimitBytes: number): number {
  * refused, so the operator should know rather than discover it on a failed
  * restore. Not a floor on the value -- flooring is exactly the bug above -- only
  * the threshold for a startup warning.
+ *
+ * Lowered from 32 MiB when the measurement (issue #1073) brought the derived
+ * ceiling on the chart's own default pod down to about 28 MiB. A warning that
+ * fires on the default configuration is a warning nobody reads, and the pod it
+ * would fire on is correctly configured -- what is small there is the artifact,
+ * and `resources.limits.memory` is the lever the message already names.
  */
-export const CRAMPED_UPLOAD_LIMIT_BYTES = 32 * MIB;
+export const CRAMPED_UPLOAD_LIMIT_BYTES = 16 * MIB;
 
 /**
  * Warns when the derived upload limit is safe but small enough to refuse ordinary

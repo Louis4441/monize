@@ -234,21 +234,39 @@ developer laptop.
   the other fails. `docs/verification-contract.md` gains the row naming this test kind
   and its owning job.
 
-### WP2 -- constants and derivation (DR-F3RB-004, code)
+### WP2 -- constants and derivation (DR-F3RB-004, code) -- DONE
 
-Blocked on WP1. Implements D3 and D4.
+Option B, approved. `PEAK_MULTIPLE` is now `Math.ceil(MEASURED_PEAK_MULTIPLE)` = 8,
+the expanded ceiling is solved out of the headroom
+(`deriveRestoreExpandedLimitBytes`), the compressed ceiling is that same number, and
+the process baseline's floor moved to the chart's own 140 MiB request (D4).
 
-- Replace the fixed-share expanded-limit derivation with the headroom solve; keep the
-  environment override as the operator's last word.
-- Fold the safety margin in as a named constant with the measurement in its comment,
-  not a bare number.
-- Rewrite the arithmetic guard in `restore-processing-gate.spec.ts`: it currently pins
-  the *defect* (break-even 3.04, one restore that can still exceed the container). It
-  must end up pinning the property -- measured multiple plus margin stays below
-  break-even on every supported pod size, with the minimum spare asserted.
-- Release note: any operator whose pod is smaller than the measurement wants gets a
-  smaller expanded ceiling or a refusal, and must hear it from the notes rather than
-  from a failed restore.
+| Pod | Largest artifact | Slots | Modeled total |
+|---|---|---|---|
+| 128 MiB | none, refused with 503 | 0 | -- |
+| 256 MiB | 12 MiB | 1 | 239 MiB |
+| 400 MiB (default) | 27.6 MiB | 1 | 361 MiB |
+| 1 GiB | 87 MiB | 1 | 901 MiB |
+| 8 GiB | 696 MiB | 1 | 7209 MiB |
+| 32 GiB | 1 GiB (the cap) | 3 | 30 GiB |
+
+Four consequences worth naming, because each is a behaviour change:
+
+- **A 256 MiB pod can now restore** (small artifacts) where it previously derived zero
+  slots and refused everything.
+- **A 128 MiB pod refuses everything**, as before, but now because the baseline
+  exceeds the pod rather than because of a share calculation.
+- **One slot is structural.** Concurrency now comes only from the 1 GiB cap or from an
+  operator lowering `BACKUP_RESTORE_EXPANDED_LIMIT` on purpose.
+- **The cramped-upload warning threshold dropped to 16 MiB**, because the derived
+  default on the chart's own default pod is 28 MiB and a warning that fires on the
+  default configuration is a warning nobody reads.
+
+The three defect-pinning tests were rewritten to the property: the break-even
+multiple now exceeds the measured one with margin, the record is the source of the
+constant in both directions, and the record must *demonstrate* -- not merely exceed
+-- what the derivation admits. The one remaining gap is the release note for
+operators, whose artifacts above the new ceiling will start being refused.
 
 ### WP3 -- bounded, abort-aware processing queue (DR-F3RB-002)
 

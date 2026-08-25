@@ -85,10 +85,10 @@ interface Waiter {
  * The upload admission gate (`restore-upload-admission.ts`) bounds concurrent
  * compressed bodies. It cannot bound what those bodies cost once they decompress,
  * because a small gzip expands to a large payload: expansion is capped by
- * `BACKUP_RESTORE_EXPANDED_LIMIT`, not by the compressed length. So four 1 MiB
- * uploads, each expanding to the ~100 MiB expanded ceiling, pass upload admission
- * on their 3 MiB claims and then hold ~400 MiB of decompressed data between them
- * on a 400 MiB pod. The wire budget never saw it.
+ * `BACKUP_RESTORE_EXPANDED_LIMIT`, not by the compressed length. So a handful of
+ * 1 MiB uploads, each expanding to the whole expanded ceiling, pass upload
+ * admission on their small claims and then hold a multiple of that ceiling in
+ * decompressed data between them. The wire budget never saw it.
  *
  * A restore's processing peak is dominated by the *expanded* payload and the
  * strings and object graph derived from it -- roughly `PEAK_MULTIPLE` times the
@@ -99,26 +99,28 @@ interface Waiter {
  * finish rather than being admitted beside it. A restore is a rare, deliberate,
  * destructive operation, so serialising it costs a wait, not a feature.
  *
- * **What this gate does not do is prove that one restore fits.** It bounds
- * concurrency, and only concurrency. An earlier version of this comment called the
- * cap insensitive to `PEAK_MULTIPLE`'s true value, on the grounds that one restore
- * fitting was already guaranteed by the upload and expanded limits -- circular, since
- * `safeDerivedUploadLimit` *is* `container * share / PEAK_MULTIPLE`. Every ceiling in
- * the chain is derived by dividing by the same unmeasured constant, so none of them
- * can vouch for it. `computeRestoreProcessingSlots` divides by
- * `PEAK_MULTIPLE * expandedLimit` directly.
+ * **This gate bounds concurrency, and only concurrency.** What makes one restore
+ * fit is the ceiling it is admitted with, and that used to be circular: an earlier
+ * version of this comment called the cap insensitive to `PEAK_MULTIPLE`'s true
+ * value on the grounds that one restore fitting was already guaranteed by the
+ * upload and expanded limits -- while `safeDerivedUploadLimit` *was*
+ * `container * share / PEAK_MULTIPLE`. Every ceiling in the chain was derived by
+ * dividing by the same unmeasured constant, so none of them could vouch for it.
  *
- * The margin that leaves is thin and worth stating in numbers. On the default
- * 400 MiB pod: expanded limit 100 MiB, modeled peak 300 MiB, baseline 96 MiB, so
- * one slot with 4 MiB spare -- and a *true* multiple above **3.04** puts one
- * admitted restore over the container. On a 512 MiB or 1 GiB pod the break-even is
- * 3.20. `PEAK_MULTIPLE = 3` is documented as a defensible floor rather than a
- * measurement, so the honest reading is that the gate is safe *if that floor holds
- * for the workload*, and nothing here establishes that it does. Measuring it is
- * https://github.com/kenlasko/monize/issues/1073, planned in
- * `docs/future-plans/restore-admission-and-memory.md`; until then an operator whose
- * restore is OOM-killed at one slot is hitting this, not a bug in the gate, and the
- * lever is a larger pod or a lower `BACKUP_RESTORE_EXPANDED_LIMIT`.
+ * That is now measured and the derivation inverted (issue #1073). The multiple is
+ * about 8, not 3 -- the old model handed out a 100 MiB expanded ceiling on the
+ * chart's default pod, and four of five 96 MiB artifacts could not be decoded
+ * inside the 304 MiB it left free. So `deriveRestoreExpandedLimitBytes` solves the
+ * ceiling out of the capacity instead (`(container - baseline) * share /
+ * PEAK_MULTIPLE`), which makes one slot the answer by construction on any pod with
+ * headroom, and makes `0` the answer where there is none. A bigger pod buys a
+ * bigger artifact rather than a second concurrent restore; an operator who wants
+ * concurrency lowers `BACKUP_RESTORE_EXPANDED_LIMIT` deliberately.
+ *
+ * What is still not established: the measurement covers the decode phases only, so
+ * the multiple is a lower bound, and no run has been cgroup-constrained -- "refused
+ * rather than OOM-killed" rests on the model, not on a demonstration. The margin is
+ * `RESTORE_HEADROOM_SHARE`, and `backup-limits.spec.ts` holds the derivation to it.
  *
  * ## The wait is bounded, and a caller who left does not run (DR-F3RB-002)
  *
@@ -335,10 +337,13 @@ export class RestoreProcessingGate {
  * A `0` reaches the gate as zero and `acquire` refuses with a 503 (F3RB-005). This
  * comment used to say the gate raised such a zero back to one, so that a `0` here
  * meant "run one anyway and warn" -- describing the floor that F3RB-005 removed two
- * functions above, which it outlived by several commits. Note what the honest zero
- * means for the 128 and 256 MiB pods: both model a 192 MiB
- * peak against a 96 MiB baseline and get zero slots, so they refuse every restore
- * until the operator lowers `BACKUP_RESTORE_EXPANDED_LIMIT` or raises the pod.
+ * functions above, which it outlived by several commits.
+ *
+ * Which containers get that zero moved with the measurement (issue #1073): now it
+ * is those with no headroom left after the process baseline, which the baseline's
+ * 140 MiB floor makes any pod at or below about 160 MiB. A 256 MiB pod gets one
+ * slot and a ~12 MiB artifact ceiling, where the old share-based derivation gave it
+ * zero -- a smaller promise, kept, instead of a larger one that OOM-killed the pod.
  */
 export function computeRestoreProcessingSlots(
   memoryLimitBytes: number | null,
@@ -351,8 +356,13 @@ export function computeRestoreProcessingSlots(
     : restoreProcessBaselineBytes(memoryLimitBytes),
 ): number {
   if (memoryLimitBytes === null) return 1;
+  // A ceiling of zero is the derivation saying this container has no room for any
+  // restore, so the honest slot count is zero too. This used to return `1` for a
+  // non-positive peak -- a guard against absurd input that, once the expanded
+  // ceiling could legitimately derive to zero, admitted a restore on exactly the
+  // deployments that cannot run one.
+  if (expandedLimitBytes <= 0) return 0;
   const perRestorePeak = PEAK_MULTIPLE * expandedLimitBytes;
-  if (perRestorePeak <= 0) return 1;
   const available = memoryLimitBytes - baselineBytes;
   return Math.max(0, Math.floor(available / perRestorePeak));
 }

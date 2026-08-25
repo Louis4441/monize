@@ -26,7 +26,7 @@ import {
   decryptBackup,
   isEncryptedBackup,
 } from "./backup-crypto.util";
-import { resolveConfiguredBackupLimit } from "./backup-limits";
+import { resolveRestoreExpandedLimitBytes } from "./backup-limits";
 import { resolveStoredBackupPassword } from "./backup-password.util";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { RESTORE_PLAN } from "./restore-plan";
@@ -72,12 +72,18 @@ export class BackupRestoreService {
 
   /**
    * Ceiling on a restore's decompressed payload (see backup-limits.ts).
+   *
+   * The **same** resolver `computeRestoreProcessingSlots` budgets against. It used
+   * to be `resolveConfiguredBackupLimit`, which derives a quarter of the container
+   * -- the same number the slot math derived, so the two agreed by coincidence.
+   * Once the expanded ceiling became capacity-first (issue #1073) that coincidence
+   * would have broken: the gate would admit one restore modeled at the new
+   * ceiling while `gunzip` allowed the old one. A slot count that budgets against
+   * a limit the parser does not enforce is F3R7-002 again.
    */
   get restoreExpandedLimitBytes(): number {
-    return resolveConfiguredBackupLimit(
-      "BACKUP_RESTORE_EXPANDED_LIMIT",
+    return resolveRestoreExpandedLimitBytes(
       process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
-      (message) => this.logger.warn(message),
     );
   }
 

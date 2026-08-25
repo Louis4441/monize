@@ -8,12 +8,11 @@ import * as pg from "pg";
 import { AppModule } from "./app.module";
 import {
   PEAK_MULTIPLE,
-  UPLOAD_WARNING_SHARE,
   detectProcessMemoryLimitBytes,
   resolveRestoreExpandedLimitBytes,
   resolveRestoreUploadLimitBytes,
-  warnIfLimitExceedsMemory,
   warnIfRestoreUploadLimitIsCramped,
+  warnIfRestoreUploadLimitIsUnsafe,
 } from "./backup/backup-limits";
 import { createRestoreUploadAdmission } from "./backup/restore-upload-admission";
 import {
@@ -194,12 +193,11 @@ async function bootstrap() {
   // it from a restart. Checked against the same share the default is derived from,
   // in the same units the operator sets, so the derived default never warns about
   // itself and the figure suggested is one they can paste back.
-  warnIfLimitExceedsMemory(
-    "BACKUP_RESTORE_LIMIT",
+  warnIfRestoreUploadLimitIsUnsafe(
     backupRestoreLimit,
+    process.env.BACKUP_RESTORE_LIMIT,
     (message) => bootstrapLogger.warn(message),
-    undefined,
-    UPLOAD_WARNING_SHARE,
+    memoryLimitBytes,
   );
   // On a small container the safe upload limit can drop below what ordinary
   // backups need. It stays safe rather than flooring into a number the pod cannot

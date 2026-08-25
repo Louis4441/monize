@@ -62,15 +62,23 @@ backend:
   # request can be refused with a readable error.
   #
   # Leave these unset and the backend derives them from the container's cgroup
-  # memory limit, which tracks whatever you set above. exportBuffer and
-  # restoreExpanded derive to about a quarter of it. restoreUpload is not a
-  # quarter and not a fixed fraction: it bounds *compressed wire bytes*, and the
-  # request that uploads them goes on to hold the envelope, the decrypted
-  # plaintext, the decompressed payload, the string and the parsed object graph.
-  # So it derives to the half-share peak divided by a peak multiple (~a sixth on a
-  # normal pod), and on a small container it drops below that rather than flooring
-  # into a number the pod cannot survive -- the backend warns at startup when the
-  # derived value is small enough to refuse ordinary backups.
+  # memory limit, which tracks whatever you set above. exportBuffer derives to
+  # about a quarter of it.
+  #
+  # The two restore ceilings are derived differently, and from a measurement. A
+  # restore holds the envelope, the decrypted plaintext, the decompressed payload,
+  # the UTF-8 string, the parsed object graph and the remapped copy of it -- about
+  # EIGHT times the expanded payload at peak, measured (issue #1073), where the
+  # model used to assume three. So restoreExpanded is solved out of the capacity
+  # instead of taken as a share of it: the memory left after the ordinary process
+  # is reserved, less a margin, divided by eight. On this chart's default 400Mi
+  # backend that is about 28 MiB, and restoreUpload derives to the same number --
+  # gzip output is never smaller than what it expands to, so a larger upload is one
+  # the deployment could not decompress anyway.
+  #
+  # On a container too small for any restore it derives to zero and restores are
+  # refused with a 503 naming the lever, rather than flooring into a number the pod
+  # cannot survive. The backend warns at startup when the derived value is small.
   #
   # The compressed limit does not bound decompressed memory: a small gzip expands
   # to the restoreExpanded ceiling regardless of its wire size. Concurrent restore
@@ -97,9 +105,9 @@ backend:
   backupLimits:
     # -- Artifact a buffered export may accumulate (e.g. "96mb")
     exportBuffer: ""
-    # -- Decompressed size a restore payload may reach (e.g. "96mb")
+    # -- Decompressed size a restore payload may reach (e.g. "28mb")
     restoreExpanded: ""
-    # -- Compressed upload the restore endpoint accepts (e.g. "64mb")
+    # -- Compressed upload the restore endpoint accepts (e.g. "28mb")
     restoreUpload: ""
 
   # -- How many restores may WAIT for a processing slot, and for how long

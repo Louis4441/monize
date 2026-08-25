@@ -1,14 +1,18 @@
 import {
-  MEMORY_SHARE_PER_RESTORE_UPLOAD,
+  MEASURED_PEAK_MULTIPLE,
   PEAK_MULTIPLE,
-  UPLOAD_WARNING_SHARE,
+  RESTORE_HEADROOM_SHARE,
   deriveDefaultLimitBytes,
+  deriveRestoreExpandedLimitBytes,
   detectProcessMemoryLimitBytes,
   parseByteSize,
   resolveByteLimit,
+  resolveRestoreExpandedLimitBytes,
   resolveRestoreUploadLimitBytes,
+  restoreProcessBaselineBytes,
   warnIfLimitExceedsMemory,
   warnIfRestoreUploadLimitIsCramped,
+  warnIfRestoreUploadLimitIsUnsafe,
 } from "./backup-limits";
 
 const MIB = 1024 * 1024;
@@ -121,76 +125,135 @@ describe("backup size limits", () => {
    * therefore the only limit that can protect the process from an oversized
    * upload. It defaulted to the string "500mb" against a 400 MiB pod.
    */
-  describe("resolveRestoreUploadLimitBytes", () => {
-    /**
-     * The wire bytes are not the cost (F3R5-002).
-     *
-     * This was half the container on the reasoning that a compressed upload is one
-     * buffer. The request that uploads it then holds the envelope, the decipher
-     * output, the concatenated plaintext, the decompressed payload, the string and
-     * the parsed graph -- so half of a 400 MiB container to the wire is
-     * PEAK_MULTIPLE times that at peak, and a single legal request could not fit
-     * the pod it was sized for.
-     */
-    it("leaves room for the peak, not just the wire bytes", () => {
-      const container = 400 * MIB;
-      const limit = resolveRestoreUploadLimitBytes(undefined, container);
+  describe("the restore ceilings, derived from the measurement", () => {
+    /** Memory left for a restore after the ordinary process is reserved. */
+    const headroom = (container: number) =>
+      container - restoreProcessBaselineBytes(container);
 
-      // The *peak* is what has to fit the share the container allots.
-      expect(limit * PEAK_MULTIPLE).toBeLessThanOrEqual(
-        Math.floor(container * MEMORY_SHARE_PER_RESTORE_UPLOAD),
-      );
-      // And the old figure would not have: 200 MiB of wire is 600 MiB at peak on
-      // a 400 MiB pod.
-      expect(limit).toBeLessThan(200 * MIB);
+    /**
+     * The invariant the whole derivation exists for, at every supported pod size:
+     * the modeled peak of what the deployment will admit has to fit the memory it
+     * actually has. The old chain could not state this, because the expanded
+     * ceiling was a share of the container and the peak was a multiple of the
+     * ceiling -- the same constant on both sides.
+     */
+    it.each([256, 400, 512, 1024, 2048, 8192])(
+      "keeps the modeled peak inside the container at %i MiB",
+      (containerMib) => {
+        const container = containerMib * MIB;
+        const expanded = deriveRestoreExpandedLimitBytes(container);
+        expect(
+          restoreProcessBaselineBytes(container) + PEAK_MULTIPLE * expanded,
+        ).toBeLessThanOrEqual(container);
+      },
+    );
+
+    /**
+     * A container smaller than the modeled process baseline is left out of the
+     * table above deliberately: nothing about a restore can fit there, so the
+     * assertion to make is that the derivation says zero rather than that the
+     * arithmetic closes. On a 128 MiB pod the baseline alone (140 MiB, the
+     * chart's own request) is already over the limit.
+     */
+    it("has nothing to offer a container below the process baseline", () => {
+      const container = 128 * MIB;
+      expect(restoreProcessBaselineBytes(container)).toBeGreaterThan(container);
+      expect(deriveRestoreExpandedLimitBytes(container)).toBe(0);
     });
 
-    it("still allows a usable upload on the chart's default backend", () => {
-      // A ceiling small enough to refuse ordinary backups is an outage, not a
-      // protection. On a 400 MiB pod the safe value is ~66 MiB, which is roomy.
-      expect(
-        resolveRestoreUploadLimitBytes(undefined, 400 * MIB),
-      ).toBeGreaterThanOrEqual(64 * MIB);
+    /**
+     * And it keeps a real margin over the measurement rather than sitting exactly
+     * on it: the measured multiple omits the database phase and rises on smaller
+     * artifacts, so a derivation with no slack would be a coin flip.
+     */
+    it.each([256, 400, 512, 1024])(
+      "leaves at least 15%% of margin over the measured cost at %i MiB",
+      (containerMib) => {
+        const container = containerMib * MIB;
+        const expanded = deriveRestoreExpandedLimitBytes(container);
+        // The margin lives in the headroom share, not in the rounded multiple:
+        // 8 against a measured 7.911 is barely 1%, so what has to hold is that
+        // the MEASURED cost of the largest artifact this deployment will admit,
+        // plus 15%, still fits the memory left for it.
+        expect(MEASURED_PEAK_MULTIPLE * expanded * 1.15).toBeLessThanOrEqual(
+          headroom(container),
+        );
+      },
+    );
+
+    /**
+     * F3R6-005, restated for the new derivation: a usability floor must never win
+     * over the safety maximum. `MIN_DERIVED_LIMIT_BYTES` (64 MiB) deliberately
+     * does not apply here -- a 256 MiB pod gets 12 MiB, not a floor whose modeled
+     * peak exceeds the container.
+     */
+    it("applies no usability floor", () => {
+      expect(deriveRestoreExpandedLimitBytes(256 * MIB)).toBeLessThan(64 * MIB);
+      expect(deriveRestoreExpandedLimitBytes(400 * MIB)).toBeLessThan(64 * MIB);
+    });
+
+    /**
+     * Zero is a real answer, not a failure to compute one: a container smaller
+     * than the process baseline has no room for any restore, and the honest number
+     * is what turns an OOM kill mid-restore into a 503 naming the lever.
+     */
+    it("derives zero where no restore fits", () => {
+      expect(deriveRestoreExpandedLimitBytes(128 * MIB)).toBe(0);
+      expect(resolveRestoreUploadLimitBytes(undefined, 128 * MIB)).toBe(0);
     });
 
     it("scales with the container rather than being fixed", () => {
-      const small = resolveRestoreUploadLimitBytes(undefined, 512 * MIB);
-      const large = resolveRestoreUploadLimitBytes(undefined, 4096 * MIB);
-      expect(large).toBeGreaterThan(small);
+      expect(deriveRestoreExpandedLimitBytes(1024 * MIB)).toBeGreaterThan(
+        deriveRestoreExpandedLimitBytes(400 * MIB),
+      );
+    });
+
+    it("caps a very large container, so the ceiling stays a guard", () => {
+      expect(deriveRestoreExpandedLimitBytes(64 * 1024 * MIB)).toBe(1024 * MIB);
+    });
+
+    /**
+     * The wire ceiling IS the expanded ceiling. Two separately derived numbers let
+     * the deployment accept a 66 MiB upload whose 100 MiB expanded ceiling it then
+     * refused at decompression -- and gzip output is never smaller than what it
+     * expands to, so any upload above the expanded ceiling is one this deployment
+     * could not decompress even in principle.
+     */
+    it("refuses on the wire exactly what it could not decompress", () => {
+      for (const containerMib of [256, 400, 1024]) {
+        const container = containerMib * MIB;
+        expect(resolveRestoreUploadLimitBytes(undefined, container)).toBe(
+          deriveRestoreExpandedLimitBytes(container),
+        );
+      }
     });
 
     it("honours an explicit operator value", () => {
       expect(resolveRestoreUploadLimitBytes("64mb", 400 * MIB)).toBe(64 * MIB);
-    });
-
-    it("falls back when the container limit is unknown", () => {
-      expect(resolveRestoreUploadLimitBytes(undefined, null)).toBe(256 * MIB);
+      expect(resolveRestoreExpandedLimitBytes("64mb", 400 * MIB)).toBe(
+        64 * MIB,
+      );
     });
 
     /**
-     * F3R6-005: a usability floor must never win over the safety maximum. The old
-     * derivation applied `max(64 MiB, safe)`, so on a 128 MiB pod it returned
-     * 64 MiB whose modeled peak (192 MiB) exceeded the whole container.
+     * With no visible limit nothing can be derived, so the fallback is a peak
+     * *budget* divided by the multiple rather than an artifact ceiling picked
+     * directly. The old fixed 256 MiB fallback modeled a 2.3 GiB peak without
+     * saying so.
      */
-    it.each([64, 128, 192, 256, 400, 512])(
-      "keeps the modeled peak inside the container's share at %i MiB",
-      (containerMib) => {
-        const container = containerMib * MIB;
-        const limit = resolveRestoreUploadLimitBytes(undefined, container);
-        // The invariant the floor used to break.
-        expect(limit * PEAK_MULTIPLE).toBeLessThanOrEqual(
-          Math.floor(container * MEMORY_SHARE_PER_RESTORE_UPLOAD),
-        );
-        // And never zero: some restore, however small, must be possible.
-        expect(limit).toBeGreaterThan(0);
-      },
-    );
+    it("falls back to a coherent budget when the container limit is unknown", () => {
+      const expanded = resolveRestoreUploadLimitBytes(undefined, null);
+      expect(expanded).toBe(128 * MIB);
+      expect(expanded * PEAK_MULTIPLE).toBe(1024 * MIB);
+    });
 
-    it("derives a smaller, still-safe limit on a cramped container", () => {
-      // 128 MiB: safe = 128 * 0.5 / 3 = 21 MiB, not the old floored 64 MiB.
-      const limit = resolveRestoreUploadLimitBytes(undefined, 128 * MIB);
-      expect(limit).toBeLessThan(64 * MIB);
-      expect(limit * PEAK_MULTIPLE).toBeLessThanOrEqual(64 * MIB);
+    it("spends only the headroom share it says it does", () => {
+      const container = 400 * MIB;
+      expect(
+        PEAK_MULTIPLE * deriveRestoreExpandedLimitBytes(container),
+      ).toBeLessThanOrEqual(
+        Math.floor(headroom(container) * RESTORE_HEADROOM_SHARE),
+      );
     });
   });
 
@@ -250,44 +313,44 @@ describe("backup size limits", () => {
     });
 
     /**
-     * The upload limit is derived from half the container, and this check
-     * defaulted to a quarter -- so wiring it up as-is would have warned on every
-     * deployment about a number the code itself chose. That is why the check was
-     * missing from `main.ts` rather than merely unwired, and why the threshold is
-     * a parameter: a limit is compared against the share its own default came
-     * from.
+     * A derivation must never warn about itself: the threshold is the number the
+     * derivation produced, in the units the operator sets. Checking a wire limit
+     * against a share it was never derived from would warn on every deployment,
+     * which is how this check came to be missing from `main.ts` rather than merely
+     * unwired.
      */
     it("does not warn about a limit it derived itself", () => {
       const onWarn = jest.fn();
       const container = 400 * MIB;
-      warnIfLimitExceedsMemory(
-        "BACKUP_RESTORE_LIMIT",
+      warnIfRestoreUploadLimitIsUnsafe(
         resolveRestoreUploadLimitBytes(undefined, container),
+        undefined,
         onWarn,
         container,
-        UPLOAD_WARNING_SHARE,
       );
       expect(onWarn).not.toHaveBeenCalled();
     });
 
-    it("still warns about an upload override the container cannot absorb", () => {
+    it("still warns about an upload override the container cannot decompress", () => {
       const onWarn = jest.fn();
-      warnIfLimitExceedsMemory(
-        "BACKUP_RESTORE_LIMIT",
-        2048 * MIB,
-        onWarn,
-        400 * MIB,
-        UPLOAD_WARNING_SHARE,
-      );
+      const container = 400 * MIB;
+      warnIfRestoreUploadLimitIsUnsafe(2048 * MIB, "2gb", onWarn, container);
       expect(onWarn).toHaveBeenCalledTimes(1);
       const message = onWarn.mock.calls[0][0] as string;
       expect(message).toContain("BACKUP_RESTORE_LIMIT");
-      // The figure suggested is in the units the operator sets -- wire bytes --
-      // and equals the derived default. Suggesting the peak share instead would
-      // tell them a number that OOM-kills the pod.
+      // The figure suggested is the derived ceiling, which the operator can paste
+      // back -- not a share of the container, which would OOM-kill the pod.
       expect(message).toContain(
-        `${Math.round(resolveRestoreUploadLimitBytes(undefined, 400 * MIB) / MIB)}MiB`,
+        `${Math.round(deriveRestoreExpandedLimitBytes(container) / MIB)}MiB`,
       );
+    });
+
+    it("stays quiet when there is no container limit to compare against", () => {
+      const onWarn = jest.fn();
+      warnIfRestoreUploadLimitIsUnsafe(8192 * MIB, "8gb", onWarn, null);
+      // Unknown means unknown: 8 GiB may be correct on a bare-metal host.
+      expect(onWarn).toHaveBeenCalledTimes(1);
+      expect(onWarn.mock.calls[0][0]).toContain("128MiB");
     });
   });
 });

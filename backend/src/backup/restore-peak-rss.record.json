@@ -12,6 +12,7 @@
   },
   "targetExpandedBytesSwept": [
     25165824,
+    29360128,
     50331648,
     100663296
   ],
@@ -19,7 +20,7 @@
   "sweeps": [
     {
       "targetExpandedBytes": 25165824,
-      "childHeapMib": 304,
+      "childHeapMib": 260,
       "cases": [
         {
           "id": "repetitive-plain",
@@ -27,12 +28,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 4669693,
+          "wireBytes": 4669371,
           "expandedBytes": 25165870,
-          "baselineRssBytes": 72450048,
-          "peakRssBytes": 266272768,
-          "highWaterRssBytes": 266272768,
-          "impliedMultiple": 7.7018088387168815
+          "baselineRssBytes": 73117696,
+          "peakRssBytes": 271843328,
+          "highWaterRssBytes": 271843328,
+          "impliedMultiple": 7.896632701353063
         },
         {
           "id": "repetitive-encrypted",
@@ -40,12 +41,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 4669308,
+          "wireBytes": 4669928,
           "expandedBytes": 25165870,
-          "baselineRssBytes": 72060928,
-          "peakRssBytes": 271138816,
-          "highWaterRssBytes": 271138816,
-          "impliedMultiple": 7.910630071600942
+          "baselineRssBytes": 72413184,
+          "peakRssBytes": 271196160,
+          "highWaterRssBytes": 271196160,
+          "impliedMultiple": 7.8989113430213225
         },
         {
           "id": "mixed-plain",
@@ -53,12 +54,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 8444471,
+          "wireBytes": 8443696,
           "expandedBytes": 25166291,
-          "baselineRssBytes": 72699904,
-          "peakRssBytes": 259014656,
-          "highWaterRssBytes": 259014656,
-          "impliedMultiple": 7.403345689676719
+          "baselineRssBytes": 72302592,
+          "peakRssBytes": 258809856,
+          "highWaterRssBytes": 258809856,
+          "impliedMultiple": 7.410995287307136
         },
         {
           "id": "mixed-encrypted",
@@ -66,12 +67,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 8444433,
+          "wireBytes": 8444352,
           "expandedBytes": 25166291,
-          "baselineRssBytes": 73068544,
-          "peakRssBytes": 270700544,
-          "highWaterRssBytes": 270700544,
-          "impliedMultiple": 7.853044375907439
+          "baselineRssBytes": 73625600,
+          "peakRssBytes": 272072704,
+          "highWaterRssBytes": 272932864,
+          "impliedMultiple": 7.88543309778942
         },
         {
           "id": "attachments-encrypted",
@@ -79,15 +80,15 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 18992192,
+          "wireBytes": 18992162,
           "expandedBytes": 25208522,
-          "baselineRssBytes": 72937472,
-          "peakRssBytes": 233316352,
-          "highWaterRssBytes": 233316352,
-          "impliedMultiple": 6.362089772657041
+          "baselineRssBytes": 72949760,
+          "peakRssBytes": 233918464,
+          "highWaterRssBytes": 233918464,
+          "impliedMultiple": 6.385487574400435
         }
       ],
-      "maxImpliedMultiple": 7.911,
+      "maxImpliedMultiple": 7.899,
       "exhausted": []
     },
     {
@@ -100,12 +101,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 4669693,
+          "wireBytes": 4669371,
           "expandedBytes": 25165870,
-          "baselineRssBytes": 72871936,
-          "peakRssBytes": 268853248,
-          "highWaterRssBytes": 268853248,
-          "impliedMultiple": 7.787583421514933
+          "baselineRssBytes": 72646656,
+          "peakRssBytes": 264835072,
+          "highWaterRssBytes": 264835072,
+          "impliedMultiple": 7.636867551171488
         },
         {
           "id": "repetitive-encrypted",
@@ -113,12 +114,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 4669308,
+          "wireBytes": 4669928,
           "expandedBytes": 25165870,
-          "baselineRssBytes": 72675328,
-          "peakRssBytes": 270491648,
-          "highWaterRssBytes": 270491648,
-          "impliedMultiple": 7.860499954899234
+          "baselineRssBytes": 72589312,
+          "peakRssBytes": 270540800,
+          "highWaterRssBytes": 270540800,
+          "impliedMultiple": 7.8658710388315605
         },
         {
           "id": "mixed-plain",
@@ -126,12 +127,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 8444471,
+          "wireBytes": 8443696,
           "expandedBytes": 25166291,
-          "baselineRssBytes": 72060928,
-          "peakRssBytes": 260853760,
-          "highWaterRssBytes": 260853760,
-          "impliedMultiple": 7.5018139144937965
+          "baselineRssBytes": 72773632,
+          "peakRssBytes": 267718656,
+          "highWaterRssBytes": 267718656,
+          "impliedMultiple": 7.746275523874377
         },
         {
           "id": "mixed-encrypted",
@@ -139,12 +140,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 8444433,
+          "wireBytes": 8444352,
           "expandedBytes": 25166291,
-          "baselineRssBytes": 72687616,
-          "peakRssBytes": 269819904,
-          "highWaterRssBytes": 269819904,
-          "impliedMultiple": 7.8331879735476315
+          "baselineRssBytes": 72855552,
+          "peakRssBytes": 269230080,
+          "highWaterRssBytes": 269230080,
+          "impliedMultiple": 7.803077855215137
         },
         {
           "id": "attachments-encrypted",
@@ -152,20 +153,20 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 18992192,
+          "wireBytes": 18992162,
           "expandedBytes": 25208522,
-          "baselineRssBytes": 72486912,
-          "peakRssBytes": 233013248,
-          "highWaterRssBytes": 233013248,
-          "impliedMultiple": 6.367939223092889
+          "baselineRssBytes": 72732672,
+          "peakRssBytes": 224886784,
+          "highWaterRssBytes": 224886784,
+          "impliedMultiple": 6.0358204261241495
         }
       ],
-      "maxImpliedMultiple": 7.86,
+      "maxImpliedMultiple": 7.866,
       "exhausted": []
     },
     {
-      "targetExpandedBytes": 50331648,
-      "childHeapMib": 304,
+      "targetExpandedBytes": 29360128,
+      "childHeapMib": 260,
       "cases": [
         {
           "id": "repetitive-plain",
@@ -173,12 +174,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 9339292,
-          "expandedBytes": 50331670,
-          "baselineRssBytes": 72630272,
-          "peakRssBytes": 432791552,
-          "highWaterRssBytes": 432791552,
-          "impliedMultiple": 7.155758590962708
+          "wireBytes": 5447882,
+          "expandedBytes": 29360230,
+          "baselineRssBytes": 72679424,
+          "peakRssBytes": 299028480,
+          "highWaterRssBytes": 299028480,
+          "impliedMultiple": 7.7093761186475716
         },
         {
           "id": "repetitive-encrypted",
@@ -186,12 +187,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 9339411,
-          "expandedBytes": 50331670,
-          "baselineRssBytes": 72101888,
-          "peakRssBytes": 442785792,
-          "highWaterRssBytes": 442785792,
-          "impliedMultiple": 7.364824254788287
+          "wireBytes": 5447884,
+          "expandedBytes": 29360230,
+          "baselineRssBytes": 72859648,
+          "peakRssBytes": 298250240,
+          "highWaterRssBytes": 298250240,
+          "impliedMultiple": 7.676731142773745
         },
         {
           "id": "mixed-plain",
@@ -199,12 +200,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 16880839,
-          "expandedBytes": 50332160,
-          "baselineRssBytes": 72839168,
-          "peakRssBytes": 423952384,
-          "highWaterRssBytes": 423952384,
-          "impliedMultiple": 6.975921875794721
+          "wireBytes": 9849971,
+          "expandedBytes": 29360402,
+          "baselineRssBytes": 72814592,
+          "peakRssBytes": 284528640,
+          "highWaterRssBytes": 284528640,
+          "impliedMultiple": 7.210870205387515
         },
         {
           "id": "mixed-encrypted",
@@ -212,12 +213,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 16881056,
-          "expandedBytes": 50332160,
-          "baselineRssBytes": 72278016,
-          "peakRssBytes": 435757056,
-          "highWaterRssBytes": 435757056,
-          "impliedMultiple": 7.221606225522608
+          "wireBytes": 9849838,
+          "expandedBytes": 29360402,
+          "baselineRssBytes": 72835072,
+          "peakRssBytes": 296235008,
+          "highWaterRssBytes": 296235008,
+          "impliedMultiple": 7.608885464170416
         },
         {
           "id": "attachments-encrypted",
@@ -225,15 +226,161 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 37934751,
-          "expandedBytes": 50351323,
-          "baselineRssBytes": 72704000,
-          "peakRssBytes": 374091776,
-          "highWaterRssBytes": 374091776,
-          "impliedMultiple": 5.9856972576470335
+          "wireBytes": 22157584,
+          "expandedBytes": 29409930,
+          "baselineRssBytes": 72626176,
+          "peakRssBytes": 253063168,
+          "highWaterRssBytes": 253063168,
+          "impliedMultiple": 6.1352404442989155
         }
       ],
-      "maxImpliedMultiple": 7.365,
+      "maxImpliedMultiple": 7.709,
+      "exhausted": []
+    },
+    {
+      "targetExpandedBytes": 29360128,
+      "childHeapMib": 1024,
+      "cases": [
+        {
+          "id": "repetitive-plain",
+          "profile": "repetitive",
+          "encrypted": false,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 5447882,
+          "expandedBytes": 29360230,
+          "baselineRssBytes": 72245248,
+          "peakRssBytes": 290947072,
+          "highWaterRssBytes": 290947072,
+          "impliedMultiple": 7.448913853876485
+        },
+        {
+          "id": "repetitive-encrypted",
+          "profile": "repetitive",
+          "encrypted": true,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 5447884,
+          "expandedBytes": 29360230,
+          "baselineRssBytes": 72409088,
+          "peakRssBytes": 298110976,
+          "highWaterRssBytes": 298110976,
+          "impliedMultiple": 7.687333784510543
+        },
+        {
+          "id": "mixed-plain",
+          "profile": "mixed",
+          "encrypted": false,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 9849971,
+          "expandedBytes": 29360402,
+          "baselineRssBytes": 72114176,
+          "peakRssBytes": 284069888,
+          "highWaterRssBytes": 284069888,
+          "impliedMultiple": 7.21910115535884
+        },
+        {
+          "id": "mixed-encrypted",
+          "profile": "mixed",
+          "encrypted": true,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 9849838,
+          "expandedBytes": 29360402,
+          "baselineRssBytes": 73121792,
+          "peakRssBytes": 297050112,
+          "highWaterRssBytes": 297050112,
+          "impliedMultiple": 7.626881948006026
+        },
+        {
+          "id": "attachments-encrypted",
+          "profile": "attachments",
+          "encrypted": true,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 22157584,
+          "expandedBytes": 29409930,
+          "baselineRssBytes": 72818688,
+          "peakRssBytes": 253591552,
+          "highWaterRssBytes": 253591552,
+          "impliedMultiple": 6.146660804700997
+        }
+      ],
+      "maxImpliedMultiple": 7.687,
+      "exhausted": []
+    },
+    {
+      "targetExpandedBytes": 50331648,
+      "childHeapMib": 260,
+      "cases": [
+        {
+          "id": "repetitive-plain",
+          "profile": "repetitive",
+          "encrypted": false,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 9339122,
+          "expandedBytes": 50331670,
+          "baselineRssBytes": 72876032,
+          "peakRssBytes": 427319296,
+          "highWaterRssBytes": 427319296,
+          "impliedMultiple": 7.042151869786955
+        },
+        {
+          "id": "repetitive-encrypted",
+          "profile": "repetitive",
+          "encrypted": true,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 9339358,
+          "expandedBytes": 50331670,
+          "baselineRssBytes": 72265728,
+          "peakRssBytes": 446128128,
+          "highWaterRssBytes": 446128128,
+          "impliedMultiple": 7.4279752688516
+        },
+        {
+          "id": "mixed-plain",
+          "profile": "mixed",
+          "encrypted": false,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 16881607,
+          "expandedBytes": 50332160,
+          "baselineRssBytes": 72097792,
+          "peakRssBytes": 417103872,
+          "highWaterRssBytes": 417103872,
+          "impliedMultiple": 6.8545852194700165
+        },
+        {
+          "id": "mixed-encrypted",
+          "profile": "mixed",
+          "encrypted": true,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 16881189,
+          "expandedBytes": 50332160,
+          "baselineRssBytes": 72257536,
+          "peakRssBytes": 442806272,
+          "highWaterRssBytes": 442806272,
+          "impliedMultiple": 7.362067036264686
+        },
+        {
+          "id": "attachments-encrypted",
+          "profile": "attachments",
+          "encrypted": true,
+          "outcome": "measured",
+          "runtime": "compiled",
+          "wireBytes": 37934791,
+          "expandedBytes": 50351323,
+          "baselineRssBytes": 72867840,
+          "peakRssBytes": 375508992,
+          "highWaterRssBytes": 375508992,
+          "impliedMultiple": 6.0105898706971415
+        }
+      ],
+      "maxImpliedMultiple": 7.428,
       "exhausted": []
     },
     {
@@ -246,12 +393,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 9339292,
+          "wireBytes": 9339122,
           "expandedBytes": 50331670,
-          "baselineRssBytes": 73334784,
-          "peakRssBytes": 427397120,
-          "highWaterRssBytes": 427397120,
-          "impliedMultiple": 7.034583513720089
+          "baselineRssBytes": 72663040,
+          "peakRssBytes": 431280128,
+          "highWaterRssBytes": 432230400,
+          "impliedMultiple": 7.1250782658314336
         },
         {
           "id": "repetitive-encrypted",
@@ -259,12 +406,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 9339411,
+          "wireBytes": 9339358,
           "expandedBytes": 50331670,
-          "baselineRssBytes": 72470528,
-          "peakRssBytes": 439578624,
-          "highWaterRssBytes": 439578624,
-          "impliedMultiple": 7.293779363967061
+          "baselineRssBytes": 72519680,
+          "peakRssBytes": 441729024,
+          "highWaterRssBytes": 441729024,
+          "impliedMultiple": 7.335527392593967
         },
         {
           "id": "mixed-plain",
@@ -272,12 +419,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 16880839,
+          "wireBytes": 16881607,
           "expandedBytes": 50332160,
-          "baselineRssBytes": 72597504,
-          "peakRssBytes": 417583104,
-          "highWaterRssBytes": 417583104,
-          "impliedMultiple": 6.8541783225675195
+          "baselineRssBytes": 72450048,
+          "peakRssBytes": 417701888,
+          "highWaterRssBytes": 417701888,
+          "impliedMultiple": 6.859467982299985
         },
         {
           "id": "mixed-encrypted",
@@ -285,12 +432,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 16881056,
+          "wireBytes": 16881189,
           "expandedBytes": 50332160,
-          "baselineRssBytes": 72450048,
-          "peakRssBytes": 435687424,
-          "highWaterRssBytes": 435687424,
-          "impliedMultiple": 7.21680484207314
+          "baselineRssBytes": 72695808,
+          "peakRssBytes": 438870016,
+          "highWaterRssBytes": 438870016,
+          "impliedMultiple": 7.275153857891257
         },
         {
           "id": "attachments-encrypted",
@@ -298,20 +445,20 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 37934751,
+          "wireBytes": 37934791,
           "expandedBytes": 50351323,
-          "baselineRssBytes": 72769536,
-          "peakRssBytes": 374394880,
-          "highWaterRssBytes": 374394880,
-          "impliedMultiple": 5.990415465349342
+          "baselineRssBytes": 72093696,
+          "peakRssBytes": 374001664,
+          "highWaterRssBytes": 374001664,
+          "impliedMultiple": 5.9960285055469145
         }
       ],
-      "maxImpliedMultiple": 7.294,
+      "maxImpliedMultiple": 7.336,
       "exhausted": []
     },
     {
       "targetExpandedBytes": 100663296,
-      "childHeapMib": 304,
+      "childHeapMib": 260,
       "cases": [
         {
           "id": "repetitive-plain",
@@ -371,15 +518,15 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 75869440,
+          "wireBytes": 75869474,
           "expandedBytes": 100702572,
-          "baselineRssBytes": 72052736,
-          "peakRssBytes": 646275072,
-          "highWaterRssBytes": 646275072,
-          "impliedMultiple": 5.702161569418505
+          "baselineRssBytes": 72744960,
+          "peakRssBytes": 644059136,
+          "highWaterRssBytes": 644059136,
+          "impliedMultiple": 5.6732828631229
         }
       ],
-      "maxImpliedMultiple": 5.702,
+      "maxImpliedMultiple": 5.673,
       "exhausted": [
         "repetitive-plain",
         "repetitive-encrypted",
@@ -397,12 +544,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 18677862,
+          "wireBytes": 18678249,
           "expandedBytes": 100663630,
-          "baselineRssBytes": 72896512,
-          "peakRssBytes": 746459136,
-          "highWaterRssBytes": 746459136,
-          "impliedMultiple": 6.691221288165348
+          "baselineRssBytes": 72679424,
+          "peakRssBytes": 743395328,
+          "highWaterRssBytes": 743395328,
+          "impliedMultiple": 6.662941759600762
         },
         {
           "id": "repetitive-encrypted",
@@ -410,12 +557,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 18677015,
+          "wireBytes": 18678334,
           "expandedBytes": 100663630,
-          "baselineRssBytes": 73236480,
-          "peakRssBytes": 766402560,
-          "highWaterRssBytes": 766402560,
-          "impliedMultiple": 6.8859634805539995
+          "baselineRssBytes": 72859648,
+          "peakRssBytes": 766607360,
+          "highWaterRssBytes": 766607360,
+          "impliedMultiple": 6.8917414561743895
         },
         {
           "id": "mixed-plain",
@@ -423,12 +570,12 @@
           "encrypted": false,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 33696946,
+          "wireBytes": 33696815,
           "expandedBytes": 100663600,
-          "baselineRssBytes": 72364032,
-          "peakRssBytes": 732246016,
-          "highWaterRssBytes": 732246016,
-          "impliedMultiple": 6.555318744809444
+          "baselineRssBytes": 72830976,
+          "peakRssBytes": 732307456,
+          "highWaterRssBytes": 732307456,
+          "impliedMultiple": 6.551290436662309
         },
         {
           "id": "mixed-encrypted",
@@ -436,12 +583,12 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 33697669,
+          "wireBytes": 33696469,
           "expandedBytes": 100663600,
-          "baselineRssBytes": 73220096,
-          "peakRssBytes": 766640128,
-          "highWaterRssBytes": 766640128,
-          "impliedMultiple": 6.888488311564458
+          "baselineRssBytes": 72970240,
+          "peakRssBytes": 766480384,
+          "highWaterRssBytes": 766480384,
+          "impliedMultiple": 6.889383491152711
         },
         {
           "id": "attachments-encrypted",
@@ -449,17 +596,17 @@
           "encrypted": true,
           "outcome": "measured",
           "runtime": "compiled",
-          "wireBytes": 75869440,
+          "wireBytes": 75869474,
           "expandedBytes": 100702572,
-          "baselineRssBytes": 72826880,
-          "peakRssBytes": 655454208,
-          "highWaterRssBytes": 655454208,
-          "impliedMultiple": 5.785625098036225
+          "baselineRssBytes": 73023488,
+          "peakRssBytes": 647274496,
+          "highWaterRssBytes": 647274496,
+          "impliedMultiple": 5.702446289058039
         }
       ],
-      "maxImpliedMultiple": 6.888,
+      "maxImpliedMultiple": 6.892,
       "exhausted": []
     }
   ],
-  "maxImpliedMultiple": 7.911
+  "maxImpliedMultiple": 7.899
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  MEASURED_PEAK_MULTIPLE,
   PEAK_MULTIPLE,
   resolveRestoreExpandedLimitBytes,
   restoreProcessBaselineBytes,
@@ -12,12 +13,15 @@ import { computeRestoreProcessingSlots } from "./restore-processing-gate";
  * derived from `PEAK_MULTIPLE` (DR-F3RB-004, issue #1073).
  *
  * `restore-peak-rss.harness.ts` produces the record; this holds it to its own
- * claims and states, as failing-or-passing assertions rather than prose, the gap
- * between what the code models and what the measurement found. Two of these tests
- * pin a **defect**: they assert that the modeled multiple is below the measured
- * one, which is the situation today. When the derivation is fixed they must be
- * rewritten to assert the property instead -- that is the intended churn, and the
- * comment on each says so.
+ * claims, and holds the constants in `backup-limits.ts` to the record. Two of
+ * these tests used to pin a **defect** -- that the modeled multiple was below the
+ * measured one, and that the model's own headroom could not decode what it
+ * admitted. The derivation has since been solved out of the capacity, so both now
+ * assert the property, which is what the churn was for.
+ *
+ * The constant is checked against the record in both directions on purpose: a
+ * measurement nobody derives from is decoration, and a constant nobody measured is
+ * what this whole finding was about.
  */
 
 interface CaseResult {
@@ -106,51 +110,51 @@ describe("the committed restore peak-RSS record", () => {
     }
   });
 
-  /**
-   * DEFECT PINNED. `PEAK_MULTIPLE = 3` is a floor argued from allocation
-   * counting; the measurement puts the decode phase alone at roughly twice that.
-   * Rewrite this to `expect(PEAK_MULTIPLE).toBeGreaterThanOrEqual(...)` when the
-   * derivation is fixed -- the failure of this test is then the good news.
-   */
-  it("shows the modeled multiple is below the measured one", () => {
-    expect(record.maxImpliedMultiple).not.toBeNull();
-    expect(record.maxImpliedMultiple as number).toBeGreaterThan(PEAK_MULTIPLE);
+  it("is the source of the constant the code budgets with", () => {
+    // Both directions. The constant may not drift from the record, and the record
+    // may not be regenerated downwards without the constant following it.
+    expect(MEASURED_PEAK_MULTIPLE).toBeCloseTo(
+      record.maxImpliedMultiple as number,
+      3,
+    );
+    expect(PEAK_MULTIPLE).toBeGreaterThanOrEqual(MEASURED_PEAK_MULTIPLE);
   });
 
   /**
-   * DEFECT PINNED, and the sharp end of it: 304 MiB is exactly the headroom the
-   * model leaves on the chart's default 400 MiB pod (400 minus the 96 MiB
-   * baseline), and four of the five artifacts cannot be decoded inside it at all.
-   * So "one slot with 4 MiB spare" describes a restore that does not complete.
+   * The defect this record was taken to expose, and the fix stated against the
+   * same numbers. The old model admitted a 100 MiB artifact into 304 MiB of
+   * headroom on the chart's default pod, and the sweep at that heap cap shows four
+   * of five 96 MiB artifacts could not be decoded there at all. What the
+   * derivation admits now is small enough that the measurement it was taken from
+   * completed comfortably.
    */
-  it("shows the model's own headroom cannot decode the artifact it admits", () => {
+  it("admits only an artifact the measurement shows can be decoded", () => {
     const container = 400 * MIB;
     const headroomMib = Math.round(
       (container - restoreProcessBaselineBytes(container)) / MIB,
     );
-    expect(headroomMib).toBe(304);
-    // The gate admits one restore at that container size, sized by the derived
-    // expanded ceiling -- so those are the two numbers the sweep has to match.
+    const admitted = resolveRestoreExpandedLimitBytes(undefined, container);
     expect(computeRestoreProcessingSlots(container)).toBe(1);
-    const modeledCeiling = resolveRestoreExpandedLimitBytes(
-      undefined,
-      container,
-    );
 
-    // The largest size swept stands in for that ceiling; assert it is actually
-    // close to it, or this test would pass on an artifact nobody would admit.
-    const largestSwept = Math.max(
-      ...record.sweeps.map((sweep) => sweep.targetExpandedBytes),
-    );
-    expect(largestSwept / modeledCeiling).toBeGreaterThan(0.9);
+    // The old ceiling, which the record shows does not decode inside the old
+    // headroom. Both numbers come from the record rather than from memory.
+    const failedAt = record.sweeps.find((sweep) => sweep.exhausted.length > 0);
+    expect(failedAt).toBeDefined();
+    const failing = failedAt as Sweep;
+    expect(admitted).toBeLessThan(failing.targetExpandedBytes);
 
-    const atHeadroom = record.sweeps.find(
+    // And the record has to *demonstrate* what is admitted, not merely be smaller
+    // than what failed: some artifact at least as large as the new ceiling was
+    // decoded inside a heap no larger than the headroom this pod leaves free.
+    // Without this the derivation could shrink to any number and still pass.
+    const demonstrated = record.sweeps.filter(
       (sweep) =>
-        sweep.childHeapMib === headroomMib &&
-        sweep.targetExpandedBytes === largestSwept,
+        sweep.exhausted.length === 0 &&
+        sweep.childHeapMib !== null &&
+        sweep.childHeapMib <= headroomMib &&
+        sweep.targetExpandedBytes >= admitted,
     );
-    expect(atHeadroom).toBeDefined();
-    expect((atHeadroom as Sweep).exhausted.length).toBeGreaterThan(0);
+    expect(demonstrated.length).toBeGreaterThan(0);
   });
 
   /**

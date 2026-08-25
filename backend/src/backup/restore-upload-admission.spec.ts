@@ -3,9 +3,9 @@ import * as fs from "fs";
 import * as path from "path";
 import type { IncomingMessage, ServerResponse } from "http";
 import {
-  MEMORY_SHARE_PER_RESTORE_UPLOAD,
   PEAK_MULTIPLE,
   resolveRestoreUploadLimitBytes,
+  restoreProcessBaselineBytes,
 } from "./backup-limits";
 import {
   DEFAULT_RECEIVE_TIMEOUT_MS,
@@ -501,13 +501,14 @@ describe("restore upload admission peak budgeting", () => {
   const WIRE_LIMIT = resolveRestoreUploadLimitBytes(undefined, CONTAINER);
   const BUDGET = WIRE_LIMIT * PEAK_MULTIPLE;
 
-  it("keeps a single full-size upload's peak inside the container's share", () => {
+  it("keeps a single full-size upload's peak inside the container", () => {
     // The arithmetic that was wrong one level up: half of a 400 MiB container to
     // the *wire* is PEAK_MULTIPLE times that at peak, so one legal request could
-    // not fit the pod it was sized for. The wire limit is now the peak share
-    // divided by the multiple.
-    expect(BUDGET).toBeLessThanOrEqual(
-      Math.floor(CONTAINER * MEMORY_SHARE_PER_RESTORE_UPLOAD),
+    // not fit the pod it was sized for. The wire ceiling is now the expanded
+    // ceiling, which is itself solved out of the memory left after the process
+    // baseline -- so what has to fit is the whole modeled peak, not a share.
+    expect(restoreProcessBaselineBytes(CONTAINER) + BUDGET).toBeLessThanOrEqual(
+      CONTAINER,
     );
 
     const admission = createRestoreUploadAdmission(WIRE_LIMIT, BUDGET);

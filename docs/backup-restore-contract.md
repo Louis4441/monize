@@ -608,19 +608,46 @@ PEAK_MULTIPLE`), so none of them can vouch for it. On the default 400 MiB pod th
 model leaves 4 MiB spare and a true multiple above 3.04 puts a single admitted
 restore over the container (3.20 on a 512 MiB or 1 GiB pod), so an operator whose
 restore is OOM-killed at one slot is hitting the estimate, not a bug in the gate.
-**The multiple has now been measured, and it is about 2.3× the modeled one.**
+**The multiple was measured, and the derivation inverted (issue #1073).**
 `backend/src/backup/restore-peak-rss.harness.ts` decodes generated artifacts in a
 fresh process and records the peak; the committed result
 (`backend/src/backup/restore-peak-rss.record.json`) puts the **decode phases alone**
 at an implied multiple of 6.9 to 7.9 — rising as the artifact shrinks, because part of
-the cost does not scale with the payload — and shows that four of five 96 MiB
-artifacts cannot be decoded at all inside 304 MiB, which is exactly the headroom the
-model leaves on the chart's default pod. So the derived ceilings currently admit a
-restore this process cannot finish. Attachment staging and the insert transaction are
-not in that figure, so it is a lower bound; no run has been cgroup-constrained, so
-"refused rather than killed" is still unproven. Fixing the derivation is the next step
-in `docs/future-plans/restore-admission-and-memory.md` (issue #1073), and it lowers
-what a default pod will accept.
+the cost does not scale with the payload — and shows four of five 96 MiB artifacts
+failing to decode inside the headroom the old model left on the chart's default pod.
+`PEAK_MULTIPLE` is now `8`, from `MEASURED_PEAK_MULTIPLE` rounded up, and
+`restore-peak-rss.record.spec.ts` holds the two to each other in both directions.
+
+Raising the constant alone would have refused every restore on an ordinary pod,
+because the expanded ceiling was a *share* of the container while the peak was a
+*multiple* of the ceiling — the same number on both sides of the inequality. So the
+ceiling is solved out of the capacity instead (`deriveRestoreExpandedLimitBytes`):
+
+    expanded = (container - baseline) * RESTORE_HEADROOM_SHARE / PEAK_MULTIPLE
+
+with no usability floor (F3R6-005: a floor resolved with `max()` beats the safety
+bound it was meant to respect), a 1 GiB cap, and `0` where the container has no
+headroom at all. One slot is then the answer by construction wherever there is
+headroom: a bigger pod buys a bigger artifact, not a second concurrent restore, and
+an operator wanting concurrency lowers `BACKUP_RESTORE_EXPANDED_LIMIT` deliberately.
+The process baseline's floor moved from 96 MiB to the 140 MiB the chart *requests*,
+because two numbers describing the same thing and disagreeing was the clearest
+argument in the issue for measuring anything.
+
+**The compressed ceiling is now the same number as the expanded one.** They were
+derived separately, so the default pod accepted a 66 MiB upload against a 100 MiB
+expanded ceiling it would then blow past on decompression. gzip output is never
+smaller than what it expands to, so an upload above the expanded ceiling is one this
+deployment could never decompress — refusing it before `express.raw` buffers it is
+strictly better than refusing it after.
+
+What this costs, plainly: the default 400 MiB pod now accepts about 28 MiB of
+expanded artifact rather than a nominal 100 MiB. The nominal figure was never real —
+attempting it lost the pod — so the trade is a readable refusal for an OOM kill, and
+`resources.limits.memory` is the lever the startup warning already names. What is
+still open: the measurement covers the decode phases only, so the multiple is a lower
+bound, and no run has been cgroup-constrained, so "refused rather than killed" rests
+on the model rather than on a demonstration.
 
 **The queue behind those slots is bounded, deadlined and cancellation-aware
 (DR-F3RB-002).** It was a plain array of resolve callbacks: no limit, no deadline,

@@ -2159,9 +2159,7 @@ export class NetWorthService {
     // history.
     const windowStart = months[0] ?? startDate;
     const windowEnd =
-      months.length > 0
-        ? this.monthEndDate(months[months.length - 1])
-        : today;
+      months.length > 0 ? this.monthEndDate(months[months.length - 1]) : today;
     const { stored: storedPrices, txFallback: txPrices } =
       await this.loadValuationSeries(securityIds, windowStart, windowEnd);
 
