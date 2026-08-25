@@ -593,14 +593,24 @@ restore's peak is `PEAK_MULTIPLE` × the **resolved** `BACKUP_RESTORE_EXPANDED_L
 version modeled every restore at the derived default and admitted five 2 GiB
 restores on a 16 GiB pod — and the ordinary process baseline
 (`restoreProcessBaselineBytes`) is subtracted before dividing. When one modeled
-restore does not fit at all, the count is `0`: the gate still floors capacity at
-one, because a running process must be able to attempt a restore, but startup warns
-that a restore may exceed memory and names the levers (raise the container limit, or
-lower `BACKUP_RESTORE_EXPANDED_LIMIT`). The cap is robust to `PEAK_MULTIPLE` being an
-estimate — serialising to one is safe under any true multiple *as long as one
-restore fits*, which is exactly the condition the warning surfaces when it does not.
+restore does not fit at all, the count is `0` and **stays** `0` (F3RB-005): `acquire`
+refuses with a 503 naming the levers (raise the container limit, or lower
+`BACKUP_RESTORE_EXPANDED_LIMIT`), and startup logs the same thing as an error. There
+is no floor left — an earlier version of this paragraph said the gate raised such a
+zero back to one so a running process could always attempt a restore, which is the
+behaviour F3RB-005 removed: admitting work the model says cannot fit turned a fixable
+misconfiguration into an OOM kill mid-restore.
+
+What the gate does **not** establish is that one restore fits. It bounds concurrency,
+and only concurrency: every ceiling in the chain is derived by dividing by
+`PEAK_MULTIPLE` (`safeDerivedUploadLimit` is literally `container * share /
+PEAK_MULTIPLE`), so none of them can vouch for it. On the default 400 MiB pod the
+model leaves 4 MiB spare and a true multiple above 3.04 puts a single admitted
+restore over the container (3.20 on a 512 MiB or 1 GiB pod), so an operator whose
+restore is OOM-killed at one slot is hitting the estimate, not a bug in the gate.
 The baseline and the multiple are both estimates, not measurements; settling them
-needs the cgroup peak-RSS test that has never run here.
+needs the cgroup peak-RSS test that has never run here — issue #1073, planned in
+`docs/future-plans/restore-admission-and-memory.md`.
 
 **A budget checked after the allocation is not a budget.** The support export
 always discards `attachment_blobs`, which is base64 — thirty 10 MiB receipts are
