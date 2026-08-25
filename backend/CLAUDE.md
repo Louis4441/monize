@@ -17,7 +17,7 @@ npm run start:dev          # Dev server with HMR
 npm run build              # Production build
 npm run lint               # ESLint --fix
 npm run typecheck          # tsc over src AND test (CI gate; plain `tsc --noEmit` skips test/)
-npm run test               # test:unit then test:integration -- needs PostgreSQL
+npm run test               # test:unit then test:integration -- needs PostgreSQL; takes no args
 npm run test:unit          # Unit tests only (src/**/*.spec.ts); no database needed
 npm run test:integration   # test/integration/*.spec.ts against real PG, one worker
 npm run test:cov           # Coverage report (95% lines, 94% stmts, 95% funcs, 85% branches)
@@ -37,12 +37,26 @@ those suites race each other -- `pg_type_typname_nsp_index` conflicts, or a
 config in `package.json` therefore pins `roots: ["<rootDir>/src"]`: a bare
 `jest` (and `test:watch`, `test:debug`) discovers unit specs only. Integration
 specs are owned by `test/jest-e2e.json`, which pins `maxWorkers: 1`, and
-`npm test` chains `test:unit && test:integration` so the default command runs
-everything without ever running the two in parallel. That makes `npm test`
-require a reachable PostgreSQL (`pretest:integration` creates `monize_test` if
-it is missing); `npm run test:unit` is the offline path.
-`src/common/jest-config.guard.spec.ts` fails if any of those four facts stops
-being true.
+`npm test` runs `test:unit` then `test:integration` (through
+`backend/scripts/test-chain.mjs`) so the default command runs everything without ever
+running the two in parallel. That makes `npm test` require a reachable
+PostgreSQL (`pretest:integration` creates `monize_test` if it is missing);
+`npm run test:unit` is the offline path.
+`src/common/jest-config.guard.spec.ts` fails if any of those facts stops being
+true.
+
+**`npm test` takes no Jest arguments, and says so rather than ignoring them.**
+npm appends `npm test -- <args>` to the *end* of the script, so in a chained
+command they become the next `npm run`'s flags: npm swallows them, Jest never
+sees them, and the filtered run silently becomes a full one. Filtered runs go
+through `npm run test:unit -- <args>` or `npm run test:integration -- <args>`.
+
+**Discovery lives in a config, not in a script.** `--testPathPatterns` and `-t`
+may narrow what a config found; `--roots`, `--rootDir`, `--testRegex`,
+`--testMatch`, `--testPathIgnorePatterns`, `--projects` and `--preset` redefine
+it, and the guard rejects any script that passes one -- `jest --roots ./src
+./test` would sweep the database-backed suites back into the parallel run with
+every config in the repository still correct.
 
 **The serialization is not a preference, and it stays until the suites stop
 sharing a database.** A `dropSchema: true` suite is safe to run beside another

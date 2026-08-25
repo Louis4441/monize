@@ -1,3 +1,4 @@
+import { spawnSync } from "child_process";
 import { readFileSync } from "fs";
 import { join, posix } from "path";
 
@@ -25,20 +26,22 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  * entry point was broken, which is exactly the kind of thing prose does not
  * fix. This is the version the machine checks.
  *
- * Five claims, because excluding the integration specs from the parallel config
+ * Six claims, because excluding the integration specs from the parallel config
  * is only correct if they still run somewhere, still run serially, and no other
  * entry point walks back in:
  *
+ *  0. every spec that builds a live schema lives under `test/`, which is what
+ *     makes a directory-shaped split meaningful in the first place;
  *  1. no tracked spec under `test/` is discoverable by the root config, and
  *     every tracked spec under `src/` still is (an exclusion that also drops
  *     unit coverage would otherwise pass claim 1 trivially);
  *  2. every tracked spec under `test/integration/` is discoverable by
  *     `test/jest-e2e.json`, which pins `maxWorkers: 1`;
- *  3. `npm test` chains the two suites sequentially rather than running a
- *     bare `jest`;
- *  4. no script selecting a config that reaches the database-backed suites
- *     runs them unserialized or under a watcher -- a watcher aimed at
- *     `jest-e2e.json` is the same defect through a different door;
+ *  3. `npm test` runs the two suites in order and refuses arguments, proved by
+ *     running the chain script rather than by reading it;
+ *  4. no script reaching the database-backed suites runs them unserialized or
+ *     under a watcher, and none redefines discovery on the command line, which
+ *     would step around every config-shaped check here;
  *  5. every Jest entry point survives both shells npm uses, and nothing in the
  *     tree that can start a runner carries a zero-discovery success flag
  *     (REL-001), so a discovery failure cannot report as green.
@@ -65,6 +68,8 @@ type JestConfig = {
   testMatch?: string[];
   testPathIgnorePatterns?: string[];
   maxWorkers?: number;
+  projects?: unknown[];
+  preset?: string;
 };
 
 const packageJson = JSON.parse(
@@ -107,9 +112,9 @@ function discovers(
   configDir: string,
   absolutePath: string,
 ): boolean {
-  if (config.testMatch) {
+  if (config.testMatch || config.projects || config.preset) {
     throw new Error(
-      `config at ${configDir} uses testMatch; this guard models testRegex only`,
+      `config at ${configDir} uses testMatch, projects or preset; this guard models roots + testRegex only, and an unmodelled discovery source must fail rather than be assumed harmless`,
     );
   }
   const path = toPosix(absolutePath);
@@ -124,8 +129,12 @@ function discovers(
   // `testPathIgnorePatterns: ["<rootDir>/test/"]` is a correct configuration,
   // and a model that left the token unexpanded would fail it for the wrong
   // reason -- a guard that rejects a right answer teaches people to delete it.
+  // `replaceAll`, because a pattern may name the token twice and a first-only
+  // substitution leaves the second literal -- which makes the model under-match
+  // and turns the central "no test/ spec in the parallel config" assertion
+  // vacuously green.
   const expand = (pattern: string): string =>
-    pattern.replace("<rootDir>", rootDir);
+    pattern.replaceAll("<rootDir>", rootDir);
   const ignore = (config.testPathIgnorePatterns ?? ["/node_modules/"]).map(
     expand,
   );
@@ -174,6 +183,40 @@ const specs = (prefix: string): string[] => {
 };
 
 /**
+ * What makes a suite unsafe to run beside another is that it builds a real
+ * schema, not which directory it sits in. So the inventory is by content: a
+ * spec reaching one of the helpers that configures a live PostgreSQL, or naming
+ * the options themselves. "They all live under `backend/test/`" is then a
+ * *conclusion* the guard checks rather than an assumption it rests on -- a
+ * database-backed spec written under `src/` would be swept into the parallel
+ * run, and a directory-shaped inventory would never have noticed.
+ */
+const DATABASE_MARKERS =
+  /helpers\/(integration-setup|test-database|rls-setup)|INTEGRATION_TYPEORM_OPTIONS|dropSchema/;
+
+/**
+ * Markers count as code, not as prose: a spec that *mentions* `dropSchema` in a
+ * comment builds no schema. This file is excluded outright for the same reason
+ * one level up -- it has to name the markers in order to look for them, and a
+ * scanner that matches itself reports the wrong file every time.
+ */
+const withoutComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+
+const SCANNER = "backend/src/common/jest-config.guard.spec.ts";
+
+const databaseBackedSpecs = (): string[] => {
+  const root = requireRepoRoot(REPO_ROOT);
+  return specs("")
+    .filter((file) => file !== SCANNER)
+    .filter((file) =>
+      DATABASE_MARKERS.test(
+        withoutComments(readFileSync(join(root, file), "utf8")),
+      ),
+    );
+};
+
+/**
  * What runs is the command merged with the config, and Jest resolves that merge
  * in the command's favour. A guard that reads only the JSON therefore describes
  * a file rather than an invocation: `--maxWorkers=2` beside a config pinning
@@ -202,7 +245,52 @@ export function jestCliMaxWorkers(command: string): string | null {
   return match?.[4] ?? null;
 }
 
+/**
+ * Discovery belongs in a config, never in a script. `--testPathPatterns` and
+ * `-t` may only *narrow* what a config already found, which is why
+ * `test:integration` is allowed to use one; the options below **redefine** what
+ * is found, so `jest --roots ./src ./test` would sweep the database-backed tree
+ * back into the parallel run with every config in the repository still correct.
+ *
+ * Modelling those merges faithfully means reimplementing Jest's argv parser --
+ * `--roots` alone takes a variadic list -- and a half-modelled override reads as
+ * safe. So they are refused outright: put the discovery in a config the guard
+ * can read, and the guard will hold you to it.
+ */
+export function redefinesJestDiscovery(command: string): string[] {
+  const banned = [
+    "--roots",
+    "--rootDir",
+    "--root-dir",
+    "--testRegex",
+    "--test-regex",
+    "--testMatch",
+    "--test-match",
+    "--testPathIgnorePatterns",
+    "--test-path-ignore-patterns",
+    "--projects",
+    "--preset",
+  ];
+  return banned.filter((option) =>
+    new RegExp(`(^|\\s)${option}(=|\\s|$)`).test(command),
+  );
+}
+
 describeTree("jest configuration", () => {
+  it("keeps every database-backed spec under test/, where the split can hold", () => {
+    // The directory is the mechanism the split relies on, so it is checked
+    // rather than assumed: a spec that builds a live schema under `src/` would
+    // be discovered by the parallel config no matter how good the rest of this
+    // file is.
+    const dbSpecs = databaseBackedSpecs();
+    expect(dbSpecs.length).toBeGreaterThan(30);
+
+    const misplaced = dbSpecs.filter(
+      (file) => !file.startsWith("backend/test/"),
+    );
+    expect(misplaced).toEqual([]);
+  });
+
   it("keeps every database-backed spec out of the parallel config", () => {
     const testTreeSpecs = specs("test");
     // Guards the guard: an empty inventory would make the assertion vacuous.
@@ -349,10 +437,32 @@ describeTree("test scripts", () => {
   });
 
   it("runs the unit suite and then the integration suite by default", () => {
-    const stages = packageJson.scripts.test.split("&&").map((s) => s.trim());
-    expect(stages).toHaveLength(2);
-    expect(stages[0]).toMatch(/^npm run test:unit\b/);
-    expect(stages[1]).toMatch(/^npm run test:integration\b/);
+    // Run rather than read: the ordering and the argument refusal are the
+    // script's behaviour, and a source scan would only prove the text.
+    expect(packageJson.scripts.test).toBe("node scripts/test-chain.mjs");
+    const chain = join(BACKEND_DIR, "scripts", "test-chain.mjs");
+
+    const dryRun = spawnSync(process.execPath, [chain], {
+      encoding: "utf8",
+      env: { ...process.env, TEST_CHAIN_DRY_RUN: "1" },
+    });
+    expect(dryRun.status).toBe(0);
+    expect(dryRun.stdout.trim().split("\n")).toEqual([
+      "test:unit",
+      "test:integration",
+    ]);
+
+    // npm appends `npm test -- <args>` to the end of the script, where they
+    // become the second stage's npm flags rather than Jest's: a filter that
+    // silently runs everything. Refused loudly instead.
+    const withArguments = spawnSync(
+      process.execPath,
+      [chain, "--testPathPatterns=foo"],
+      { encoding: "utf8" },
+    );
+    expect(withArguments.status).toBe(1);
+    expect(withArguments.stderr).toContain("npm test takes no arguments");
+
     expect(packageJson.scripts["test:integration"]).toContain(
       "--config ./test/jest-e2e.json",
     );
@@ -368,8 +478,15 @@ describeTree("test scripts", () => {
     const root = requireRepoRoot(REPO_ROOT);
     const offenders = jestScripts.flatMap((script) => {
       const command = packageJson.scripts[script];
+      // Before anything else: a script that redefines discovery on the command
+      // line escapes every config-shaped check below, so it is refused rather
+      // than half-modelled -- `jest --roots ./src ./test` reaches the shared
+      // database with every config in the repository still correct.
+      const widening = redefinesJestDiscovery(command).map(
+        (option) => `${script} redefines discovery with ${option}`,
+      );
       const selected = /--config[= ]+(\S+)/.exec(command)?.[1];
-      if (!selected) return [];
+      if (!selected) return widening;
       if (!selected.endsWith(".json")) {
         throw new Error(
           `${script} selects ${selected}, which this guard cannot read; extend it rather than trusting the script`,
@@ -380,11 +497,11 @@ describeTree("test scripts", () => {
         readFileSync(join(root, configPath), "utf8"),
       ) as JestConfig;
       const configDir = virtual(posix.dirname(configPath));
-      const reachesDatabaseSuites = specs("test").some((file) =>
+      const reachesDatabaseSuites = databaseBackedSpecs().some((file) =>
         discovers(config, configDir, virtual(file)),
       );
-      if (!reachesDatabaseSuites) return [];
-      const problems: string[] = [];
+      if (!reachesDatabaseSuites) return widening;
+      const problems: string[] = [...widening];
       if (config.maxWorkers !== 1) {
         problems.push(`${script} -> ${selected} does not pin maxWorkers: 1`);
       }
@@ -466,10 +583,21 @@ describeTree("zero-discovery flags", () => {
       ]),
     );
 
-    const offenders = subjects.filter((subject) => {
-      const source = readFileSync(join(root, subject), "utf8");
-      return CLI_FLAG.test(source) || CONFIG_FIELD.test(source);
-    });
+    // A config a script actually selects is in scope whatever it is called: the
+    // pathspec above recognizes today's filenames, and `test:foo --config
+    // ./test/jest-integration.json` would otherwise carry the flag unscanned.
+    const selected = Object.values(packageJson.scripts)
+      .map((command) => /--config[= ]+(\S+)/.exec(command)?.[1])
+      .filter((path): path is string => path !== undefined)
+      .map((path) => posix.normalize(`backend/${path}`));
+    expect(selected).toContain("backend/test/jest-e2e.json");
+
+    const offenders = [...new Set([...subjects, ...selected])].filter(
+      (subject) => {
+        const source = readFileSync(join(root, subject), "utf8");
+        return CLI_FLAG.test(source) || CONFIG_FIELD.test(source);
+      },
+    );
     expect(offenders).toEqual([]);
   });
 });
