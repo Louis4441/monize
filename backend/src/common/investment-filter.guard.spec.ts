@@ -119,10 +119,17 @@ describe("investment scope is decided in one place", () => {
  * `_NO_SPLITS` variant, which is exactly the defect.
  *
  * Two exemptions, both derived from the query rather than kept as a list of file
- * names a new query could quietly join: one restricted to `is_transfer = true`
- * (an investment cash leg is never a transfer), and one that declares itself a
+ * names a new query could quietly join: one restricted to transfers (an
+ * investment cash leg is never a transfer), and one that declares itself a
  * PARENT-IDENTITY REPORT, whose subject is the stored row rather than its cash
  * meaning.
+ *
+ * "Restricted to transfers" is positive proof, not the presence of the token:
+ * the monthly category breakdown admits `is_transfer = false` rows AND, in an OR
+ * branch, categorized transfer outflows, so matching `is_transfer = true`
+ * anywhere exempted a split-joining ledger query from the whole scan -- deleting
+ * its exclusion would have left the guard green (re-audit F-GUARD-001). A query
+ * that mentions both forms is not restricted to either.
  */
 type QueryShape =
   | "transfer-only"
@@ -134,7 +141,9 @@ export function classifyLedgerQuery(query: string): {
   shape: QueryShape;
   missing: string[];
 } {
-  if (/is_transfer\s*=\s*true/.test(query)) {
+  const readsTransfers = /is_transfer\s*=\s*true/.test(query);
+  const readsNonTransfers = /is_transfer\s*=\s*false/.test(query);
+  if (readsTransfers && !readsNonTransfers) {
     return { shape: "transfer-only", missing: [] };
   }
 
@@ -197,6 +206,26 @@ describe("every built-in report query applies the investment exclusion", () => {
     expect(failures).toEqual([]);
   });
 
+  it("never exempts a query that joins split rows", () => {
+    // The shape F-GUARD-001 slipped through: a split-joining aggregate that
+    // mentions `is_transfer = true` in an OR branch is not transfer-only.
+    const exempted: string[] = [];
+
+    for (const file of reportServices) {
+      for (const query of ledgerQueries(readFileSync(file, "utf8"))) {
+        if (!/JOIN transaction_splits/.test(query)) continue;
+        const { shape } = classifyLedgerQuery(query);
+        if (shape !== "split-aware") {
+          exempted.push(
+            `${relative(SRC_ROOT, file)}: ${query.trim().split("\n")[0]} -- classified ${shape}`,
+          );
+        }
+      }
+    }
+
+    expect(exempted).toEqual([]);
+  });
+
   it("scans both shapes, so neither branch is vacuous", () => {
     const shapes = new Set<QueryShape>();
     for (const file of reportServices) {
@@ -254,6 +283,25 @@ describe("classifyLedgerQuery", () => {
     expect(missing).toEqual(["the split-aware INVESTMENT_EXCLUSION"]);
   });
 
+  it("does not exempt a mixed predicate that merely mentions a transfer", () => {
+    // The real monthly-category-breakdown shape: ordinary rows plus categorized
+    // transfer outflows, joined to splits.
+    const query = `
+      FROM transactions t
+      LEFT JOIN transaction_splits ts ON ts.transaction_id = t.id
+      WHERE t.user_id = $1
+        AND (
+          t.is_transfer = false
+          OR (t.is_transfer = true AND t.category_id IS NOT NULL AND t.amount < 0)
+        )
+    `;
+
+    const { shape, missing } = classifyLedgerQuery(query);
+
+    expect(shape).toBe("split-aware");
+    expect(missing).toEqual(["the split-aware INVESTMENT_EXCLUSION"]);
+  });
+
   it("exempts a transfer-only rollup", () => {
     const query = `
       FROM transactions t
@@ -278,5 +326,42 @@ describe("classifyLedgerQuery", () => {
         "FROM transactions t -- PARENT-IDENTITY REPORT: no exclusion at all",
       ).missing,
     ).toEqual(["an investment exclusion"]);
+  });
+});
+
+/**
+ * The register of what INV-REPORT-001 does NOT yet cover, which is why the
+ * invariant's status is `partial` rather than `enforced`.
+ *
+ * `backend/src/reports/` executes user-defined custom reports over the same
+ * ledger through hydrated TypeORM entities, and applies no investment
+ * provenance at all: a free-standing BUY's generated cash leg is reported as
+ * `Uncategorized` spending, and an embedded investment split child is counted
+ * beside its ordinary sibling (re-audit F-CUSTOM-001). The behaviour predates
+ * the #1257 work and is unchanged by it.
+ *
+ * The pin is written so it fails when the gap CLOSES: whoever migrates that
+ * engine gets a red test naming the document to update, so the catalog cannot
+ * keep describing a gap that is gone.
+ */
+describe("known gap: the custom report engine", () => {
+  const CUSTOM_REPORTS = join(SRC_ROOT, "reports", "reports.service.ts");
+  const PROVENANCE_MARKERS = [
+    "investment_transactions",
+    "applyInvestmentTransactionFilters",
+    "investmentExclusionSql",
+    "reportableTransactionAmountSql",
+  ];
+
+  it("still applies no investment provenance -- keep INV-REPORT-001 at `partial` until it does", () => {
+    const source = readFileSync(CUSTOM_REPORTS, "utf8");
+    const applied = PROVENANCE_MARKERS.filter((marker) =>
+      source.includes(marker),
+    );
+
+    // When this fails because `applied` is no longer empty: the gap is closed.
+    // Update INV-REPORT-001 in docs/system-invariants.md to `enforced`, name the
+    // custom-report tests that prove it, and delete this block.
+    expect(applied).toEqual([]);
   });
 });

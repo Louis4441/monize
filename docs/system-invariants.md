@@ -66,7 +66,7 @@ implied.
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
-| INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
+| INV-REPORT-001 | A report's account scope is investment linkage, not account type | partial |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
@@ -526,7 +526,28 @@ Required tests      Present: the two source scans above, and
                     changes no report's answer. Unit specs mock manager.query and can only
                     assert the text of the SQL, which is why the behavioural
                     proof is the integration suite.
-Status              enforced
+Unenforced paths    backend/src/reports/ -- the USER-DEFINED custom report
+                    engine. It reads the same ledger through hydrated TypeORM
+                    entities (getFilteredTransactions -> aggregateData) and
+                    applies no investment provenance at all, so a free-standing
+                    BUY's generated cash leg is reported as `Uncategorized`
+                    spending and an embedded investment split child is counted
+                    beside its ordinary sibling: the canonical -560 parent
+                    reports 560 there, not 60 (re-audit F-CUSTOM-001). The
+                    behaviour predates the #1257 work and is byte-identical at
+                    the merge base, so it is existing debt rather than a
+                    regression -- but the statement above is written as a product
+                    rule and that engine breaks it, which is why the status below
+                    is `partial`. The gap is pinned by a known-gap block in
+                    backend/src/common/investment-filter.guard.spec.ts that fails
+                    when the engine STARTS applying provenance, so closing it
+                    forces this entry to be updated rather than left stale.
+                    Migrating it means sharing these rules, not copying another
+                    account-type predicate: exclude generated cash by
+                    transaction_id, exclude embedded investment children at
+                    split-row granularity, keep the ordinary siblings, and leave
+                    the report's own transfer configuration alone.
+Status              partial
 ```
 
 The defect this records was not a subtle one: with `AND a.account_type !=

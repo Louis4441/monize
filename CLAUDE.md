@@ -356,7 +356,13 @@ that reached for the no-splits variant is exactly the defect.
 `backend/src/common/investment-filter.guard.spec.ts` fails on either shape and
 on a built-in-report ledger query that carries no exclusion, and
 `backend/test/integration/report-investment-cash.integration.spec.ts` holds the
-behaviour against a real database. The same rule governs what "Uncategorized"
+behaviour against a real database. That guard's transfer-only exemption is
+positive proof, never the presence of the token -- the monthly breakdown reads
+ordinary rows *and* categorized transfer outflows, so a substring match exempted
+a split-joining query from the whole scan. **`backend/src/reports/`, the
+user-defined custom report engine, is the one ledger reader still outside all of
+this**, which is why INV-REPORT-001 is `partial`; a known-gap block in that guard
+spec fails when it is migrated, so the catalog cannot go stale. The same rule governs what "Uncategorized"
 means: an auto-generated trade leg is not a row the user forgot to file, and a
 bulk update filtered to uncategorized must not reach it.
 
