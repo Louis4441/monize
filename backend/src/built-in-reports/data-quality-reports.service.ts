@@ -10,7 +10,10 @@ import {
   DuplicateGroup,
   DuplicateTransactionItem,
 } from "./dto";
-import { investmentExclusionSql } from "../common/investment-filter.util";
+import {
+  investmentExclusionSql,
+  reportableTransactionAmountSql,
+} from "../common/investment-filter.util";
 
 /**
  * Investment scope is LINKAGE, never account type (INV-REPORT-001, issue #1257):
@@ -23,6 +26,15 @@ const INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
   accountAlias: "a",
   transactionAlias: "t",
 });
+
+/**
+ * "Uncategorized" means ordinary cash the user has not filed, so the figure is
+ * the ordinary part of the row and a parent whose only lines are an embedded
+ * investment or a transfer represents none: NULL, and the `IS NOT NULL`
+ * predicate drops it (branch audit F-RPT-001). Without this a `-500` embedded
+ * BUY passthrough was listed as money the user forgot to categorize.
+ */
+const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
 
 @Injectable()
 export class DataQualityReportsService {
@@ -46,7 +58,7 @@ export class DataQualityReportsService {
         t.id,
         t.transaction_date,
         t.currency_code,
-        t.amount,
+        ${REPORTABLE_TX_AMOUNT} as amount,
         COALESCE(p.name, t.payee_name) as payee_name,
         t.description,
         a.name as account_name,
@@ -60,6 +72,7 @@ export class DataQualityReportsService {
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
         AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
+        AND ${REPORTABLE_TX_AMOUNT} IS NOT NULL
         AND t.category_id IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM transaction_splits ts
@@ -117,10 +130,10 @@ export class DataQualityReportsService {
       SELECT
         t.currency_code,
         COUNT(*) as total_count,
-        COUNT(*) FILTER (WHERE t.amount < 0) as expense_count,
-        COALESCE(SUM(ABS(t.amount)) FILTER (WHERE t.amount < 0), 0) as expense_total,
-        COUNT(*) FILTER (WHERE t.amount > 0) as income_count,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.amount > 0), 0) as income_total
+        COUNT(*) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} < 0) as expense_count,
+        COALESCE(SUM(ABS(${REPORTABLE_TX_AMOUNT})) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} < 0), 0) as expense_total,
+        COUNT(*) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} > 0) as income_count,
+        COALESCE(SUM(${REPORTABLE_TX_AMOUNT}) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} > 0), 0) as income_total
       FROM transactions t
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE t.user_id = $1
@@ -129,6 +142,7 @@ export class DataQualityReportsService {
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
         AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
+        AND ${REPORTABLE_TX_AMOUNT} IS NOT NULL
         AND t.category_id IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM transaction_splits ts
@@ -235,6 +249,13 @@ export class DataQualityReportsService {
         -- the user at a row they cannot act on here. Same exclusion as the rest
         -- of this service.
         AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
+        -- PARENT-IDENTITY REPORT: this detector's subject is the stored row, not
+        -- its cash meaning, so it deliberately compares t.amount rather than the
+        -- reportable ordinary amount every other query here derives (branch
+        -- audit DR-001). A split parent the user entered twice IS a duplicate,
+        -- and the remedy is deleting one whole transaction -- a per-child figure
+        -- would name a row nobody can delete. Which is also why it needs no
+        -- split-provenance clause: a row it admits is one the user owns.
       ORDER BY t.transaction_date ASC, t.amount ASC
     `;
 

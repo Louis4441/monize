@@ -96,6 +96,44 @@ export function investmentLinkedSplitExclusion(splitAlias: string): string {
 }
 
 /**
+ * The ordinary cash a single `transactions` row represents.
+ *
+ * A report that joins `transaction_splits` classifies each line on its own and
+ * needs nothing more. A report that reads only the parent -- Spending by Payee,
+ * Recurring Expenses, Bill Payment History, the Uncategorized list -- cannot:
+ * `t.amount` on a split parent is the sum of ALL its children, and an embedded
+ * investment line's `transaction_id` is null, so the linkage exclusion above
+ * cannot see it. Such a query admitted a `-560` parent made of `-60` groceries
+ * and a `-500` embedded BUY as `560` of spending (branch audit F-RPT-001).
+ *
+ * Excluding the whole parent instead is the opposite error -- it loses the `60`
+ * the user really did spend -- so the amount is derived at split-row
+ * granularity: the sum of the children that are neither a transfer nor an
+ * investment.
+ *
+ * NULL means "this row represents no ordinary cash at all" (a pure investment or
+ * transfer passthrough). Every arithmetic comparison against NULL is NULL, which
+ * a WHERE clause reads as false, so a caller filtering on `< 0` or `IS NOT NULL`
+ * drops those rows without a second predicate. A caller that must keep them --
+ * one whose subject is the stored row rather than its cash meaning -- says so.
+ */
+export function reportableTransactionAmountSql(
+  transactionAlias: string,
+  splitAlias: string = "reportable_split",
+): string {
+  return `CASE
+          WHEN ${transactionAlias}.is_split = true THEN (
+            SELECT SUM(${splitAlias}.amount)
+              FROM transaction_splits ${splitAlias}
+             WHERE ${splitAlias}.transaction_id = ${transactionAlias}.id
+               AND ${splitAlias}.transfer_account_id IS NULL
+               AND ${investmentLinkedSplitExclusion(splitAlias)}
+          )
+          ELSE ${transactionAlias}.amount
+        END`;
+}
+
+/**
  * The conjunction a raw-SQL report inserts in place of the old
  * `AND a.account_type != 'INVESTMENT'`. Carries no bound parameters, so a
  * call site's `$n` numbering is unaffected.

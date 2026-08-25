@@ -203,6 +203,78 @@ describe("built-in reports and investment cash accounts (integration)", () => {
   }
 
   /**
+   * A split parent in the cash sleeve carrying an embedded investment line,
+   * shaped as `createEmbeddedForSplit` writes it: the investment line has no
+   * category, its InvestmentTransaction points at the SPLIT (`transaction_id`
+   * stays null), and the parent's amount is the sum of all its children.
+   *
+   * `ordinaryAmount: 0` builds the pure passthrough -- a parent whose only line
+   * is the investment one, which `transaction-split.service` allows.
+   */
+  async function createEmbeddedInvestmentParent(options: {
+    date?: string;
+    ordinaryAmount?: number;
+    investmentAmount?: number;
+    payeeName?: string;
+  }): Promise<Transaction> {
+    const ordinary = options.ordinaryAmount ?? -60;
+    const investment = options.investmentAmount ?? -500;
+    const parent = await insertTransaction({
+      transactionDate: options.date ?? "2026-03-10",
+      amount: ordinary + investment,
+      isSplit: true,
+      categoryId: null,
+      payeeName: options.payeeName ?? "Brokerage statement",
+    });
+
+    const lines: TransactionSplit[] = [];
+    if (ordinary !== 0) {
+      lines.push(
+        dataSource.manager.create(TransactionSplit, {
+          transactionId: parent.id,
+          kind: SplitKind.CATEGORY,
+          categoryId: groceriesCategoryId,
+          amount: ordinary,
+        } as Partial<TransactionSplit>),
+      );
+    }
+    const investmentLine = dataSource.manager.create(TransactionSplit, {
+      transactionId: parent.id,
+      kind: SplitKind.INVESTMENT,
+      categoryId: null,
+      amount: investment,
+    } as Partial<TransactionSplit>);
+    lines.push(investmentLine);
+    await dataSource.manager.save(lines);
+
+    await dataSource.manager.save(
+      dataSource.manager.create(InvestmentTransaction, {
+        userId,
+        accountId: brokerageId,
+        transactionSplitId: investmentLine.id,
+        securityId,
+        action: InvestmentAction.BUY,
+        transactionDate: options.date ?? "2026-03-10",
+        quantity: 10,
+        price: Math.abs(investment) / 10,
+        commission: 0,
+        totalAmount: investment,
+        exchangeRate: 1,
+        status: TransactionStatus.UNRECONCILED,
+      } as Partial<InvestmentTransaction>),
+    );
+
+    return parent;
+  }
+
+  /** A date N whole months before today, for the reports that window on now(). */
+  function monthsBeforeToday(months: number): string {
+    const d = new Date();
+    d.setMonth(d.getMonth() - months);
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
    * The scenario from issue #1257: $1,000 of employment income paid straight
    * into the cash sleeve of an investment account.
    */
@@ -680,19 +752,89 @@ describe("built-in reports and investment cash accounts (integration)", () => {
     });
 
     it("does not count an investment line embedded in a split", async () => {
-      // Shaped as `createEmbeddedForSplit` writes it: the investment line
-      // carries no category and its InvestmentTransaction points at the split
-      // (`transaction_id` stays null, the parent's amount is the cash side).
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+      });
+
+      const byCategory = await withUserContext(userId, () =>
+        spending.getSpendingByCategory(userId, START, END),
+      );
+
+      expect(byCategory.data).toEqual([
+        expect.objectContaining({ categoryId: groceriesCategoryId, total: 60 }),
+      ]);
+      expect(byCategory.totalSpending).toBe(60);
+
+      const cashFlow = await withUserContext(userId, () =>
+        income.getIncomeVsExpenses(userId, START, END),
+      );
+      expect(cashFlow.totals.expenses).toBe(60);
+    });
+
+    /**
+     * The reports that read only the parent row. `t.amount` there is the sum of
+     * ALL children and an embedded investment line's `transaction_id` is null,
+     * so the transaction-level linkage cannot see it: without a derived amount
+     * these reported the whole `-560` as ordinary cash (branch audit F-RPT-001).
+     * Excluding the parent instead would lose the 60 the user did spend, so both
+     * wrong answers are asserted against.
+     */
+    it("reports only the ordinary line of a mixed split by payee", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+        payeeName: "Brokerage statement",
+      });
+
+      const byPayee = await withUserContext(userId, () =>
+        spending.getSpendingByPayee(userId, START, END),
+      );
+
+      expect(byPayee.data).toEqual([
+        expect.objectContaining({
+          payeeName: "Brokerage statement",
+          total: 60,
+        }),
+      ]);
+      expect(byPayee.totalSpending).toBe(60);
+    });
+
+    it("does not call a pure embedded-investment passthrough uncategorized", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: 0,
+        investmentAmount: -500,
+        payeeName: "Broker",
+      });
+      const unfiled = await insertTransaction({
+        amount: -25,
+        categoryId: null,
+        payeeName: "Unfiled sleeve fee",
+      });
+
+      const result = await withUserContext(userId, () =>
+        dataQuality.getUncategorizedTransactions(userId, START, END),
+      );
+
+      expect(result.transactions.map((t) => t.id)).toEqual([unfiled.id]);
+      expect(result.summary.totalCount).toBe(1);
+      expect(result.summary.expenseCount).toBe(1);
+      expect(result.summary.expenseTotal).toBe(25);
+    });
+
+    it("reports the ordinary part of a mixed uncategorized split, not the parent total", async () => {
+      // -60 unfiled ordinary cash beside a -500 embedded BUY: the row IS
+      // uncategorized, but for 60, not 560.
       const parent = await insertTransaction({
         amount: -560,
         isSplit: true,
         categoryId: null,
         payeeName: "Brokerage statement",
       });
-      const groceries = dataSource.manager.create(TransactionSplit, {
+      const unfiledLine = dataSource.manager.create(TransactionSplit, {
         transactionId: parent.id,
         kind: SplitKind.CATEGORY,
-        categoryId: groceriesCategoryId,
+        categoryId: null,
         amount: -60,
       } as Partial<TransactionSplit>);
       const investmentLine = dataSource.manager.create(TransactionSplit, {
@@ -701,7 +843,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
         categoryId: null,
         amount: -500,
       } as Partial<TransactionSplit>);
-      await dataSource.manager.save([groceries, investmentLine]);
+      await dataSource.manager.save([unfiledLine, investmentLine]);
       await dataSource.manager.save(
         dataSource.manager.create(InvestmentTransaction, {
           userId,
@@ -719,19 +861,85 @@ describe("built-in reports and investment cash accounts (integration)", () => {
         } as Partial<InvestmentTransaction>),
       );
 
-      const byCategory = await withUserContext(userId, () =>
-        spending.getSpendingByCategory(userId, START, END),
+      const result = await withUserContext(userId, () =>
+        dataQuality.getUncategorizedTransactions(userId, START, END),
       );
 
-      expect(byCategory.data).toEqual([
-        expect.objectContaining({ categoryId: groceriesCategoryId, total: 60 }),
+      expect(result.transactions).toEqual([
+        expect.objectContaining({ id: parent.id, amount: -60 }),
       ]);
-      expect(byCategory.totalSpending).toBe(60);
+      expect(result.summary.expenseTotal).toBe(60);
+    });
 
-      const cashFlow = await withUserContext(userId, () =>
-        income.getIncomeVsExpenses(userId, START, END),
+    it("does not learn recurring spending from embedded BUY cash", async () => {
+      // Dates are derived from today because getRecurringExpenses windows on
+      // now() -- a pinned month would fall out of range as the clock moves.
+      for (const months of [1, 2, 3]) {
+        await createEmbeddedInvestmentParent({
+          date: monthsBeforeToday(months),
+          ordinaryAmount: 0,
+          investmentAmount: -500,
+          payeeName: "Broker",
+        });
+      }
+
+      const result = await withUserContext(userId, () =>
+        taxRecurring.getRecurringExpenses(userId, 3),
       );
-      expect(cashFlow.totals.expenses).toBe(60);
+
+      expect(result.data).toEqual([]);
+      expect(result.summary.totalRecurring).toBe(0);
+    });
+
+    it("counts a mixed recurring parent at its ordinary amount", async () => {
+      for (const months of [1, 2, 3]) {
+        await createEmbeddedInvestmentParent({
+          date: monthsBeforeToday(months),
+          ordinaryAmount: -60,
+          investmentAmount: -500,
+          payeeName: "Brokerage statement",
+        });
+      }
+
+      const result = await withUserContext(userId, () =>
+        taxRecurring.getRecurringExpenses(userId, 3),
+      );
+
+      expect(result.data).toEqual([
+        expect.objectContaining({
+          payeeName: "Brokerage statement",
+          occurrences: 3,
+          totalAmount: 180,
+          averageAmount: 60,
+        }),
+      ]);
+    });
+
+    /**
+     * The declared exception (branch audit DR-001): the duplicate finder's
+     * subject is the stored row, so a split parent entered twice is a duplicate
+     * at its stored amount -- the remedy is deleting one whole transaction, and
+     * a per-child figure would name a row nobody can delete.
+     */
+    it("still reports a duplicated split parent at its stored amount", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+        payeeName: "Brokerage statement",
+      });
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+        payeeName: "Brokerage statement",
+      });
+
+      const result = await withUserContext(userId, () =>
+        dataQuality.getDuplicateTransactions(userId, START, END),
+      );
+
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0].transactions).toHaveLength(2);
+      expect(result.groups[0].transactions[0].amount).toBe(-560);
     });
   });
 });

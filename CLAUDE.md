@@ -341,6 +341,18 @@ check alone gets wrong (its `transaction_id` is null; the split carries the cash
 so it is excluded by both of its representations -- the split's `kind` and an
 `investment_transactions` row pointing at the split -- and **at split-row
 granularity**: excluding the parent would take the ordinary sibling line with it.
+
+**A report that reads only the parent row cannot exclude a line, so it excludes
+an amount.** `t.amount` on a split parent is the sum of every child, so Spending
+by Payee, Recurring Expenses, Bill Payment History and the Uncategorized list all
+reported a `-560` parent made of `-60` groceries and a `-500` embedded BUY as
+`560` of spending. They derive their figure through
+`reportableTransactionAmountSql` -- the children that are neither transfer nor
+investment, `NULL` when the row represents no ordinary cash at all. Duplicate
+Transactions is the one exception and says so in its SQL (`PARENT-IDENTITY
+REPORT`): its subject is the stored row, not its cash meaning. The guard checks
+the *representation*, not the presence of a token, because a parent-only query
+that reached for the no-splits variant is exactly the defect.
 `backend/src/common/investment-filter.guard.spec.ts` fails on either shape and
 on a built-in-report ledger query that carries no exclusion, and
 `backend/test/integration/report-investment-cash.integration.spec.ts` holds the

@@ -19,7 +19,10 @@ import {
   MonthlySpendingItem,
   MonthlyCategorySpending,
 } from "./dto";
-import { investmentExclusionSql } from "../common/investment-filter.util";
+import {
+  investmentExclusionSql,
+  reportableTransactionAmountSql,
+} from "../common/investment-filter.util";
 
 /**
  * Investment scope is LINKAGE, never account type (INV-REPORT-001, issue #1257):
@@ -37,6 +40,13 @@ const INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
   accountAlias: "a",
   transactionAlias: "t",
 });
+
+/**
+ * The ordinary cash the parent row represents. A payee total reads only the
+ * parent, so a split's embedded investment or transfer line has to come out of
+ * the amount rather than out of the row (branch audit F-RPT-001).
+ */
+const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
 
 /**
  * Spending in a category is the DEBITS NET OF THE CREDITS filed against it: a
@@ -229,12 +239,12 @@ export class SpendingReportsService {
         t.payee_id,
         t.payee_name,
         t.currency_code,
-        SUM(ABS(t.amount)) as total
+        SUM(ABS(${REPORTABLE_TX_AMOUNT})) as total
       FROM transactions t
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE t.user_id = $1
         AND t.transaction_date <= $2
-        AND t.amount < 0
+        AND ${REPORTABLE_TX_AMOUNT} < 0
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL

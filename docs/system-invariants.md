@@ -462,8 +462,20 @@ Enforcement         One predicate, in backend/src/common/investment-filter.util.
                     at SPLIT-ROW granularity, so an ordinary sibling line on the
                     same split parent survives (excluding the parent would lose
                     it; keying only on transaction_id would miss the embedded
-                    line entirely, since its transaction_id is null). Applied by
-                    all fifteen ledger queries under
+                    line entirely, since its transaction_id is null).
+                    A report that reads only the parent row cannot classify a
+                    line at all -- t.amount there is the sum of every child --
+                    so it derives its figure through
+                    reportableTransactionAmountSql: the sum of the children that
+                    are neither transfer nor investment, NULL when the row
+                    represents no ordinary cash. Spending by Payee, Recurring
+                    Expenses, Bill Payment History and the Uncategorized list
+                    and summary read that instead of t.amount. Duplicate
+                    Transactions is the one declared exception, marked in its SQL
+                    as a PARENT-IDENTITY REPORT: its subject is the stored row,
+                    so a split parent entered twice is a duplicate at its stored
+                    amount and the remedy is deleting one whole transaction.
+                    Applied by all fifteen ledger queries under
                     backend/src/built-in-reports/ and by the "Uncategorized"
                     filters on the register (transactions.service.ts), the
                     register summary (transaction-analytics.service.ts) and the
@@ -474,8 +486,16 @@ Enforcement         One predicate, in backend/src/common/investment-filter.util.
                     backend/src/common/investment-filter.guard.spec.ts: no
                     account-type exclusion anywhere in src/, and every
                     built-in-report query that is not transfer-only carries the
-                    exclusion (the transfer-only exemption is derived from the
-                    query, since an investment cash leg is never a transfer).
+                    exclusion IN THE REPRESENTATION ITS SHAPE NEEDS -- a query
+                    joining transaction_splits must use the split-aware
+                    conjunction, and a parent-only query must derive its amount,
+                    since accepting the bare substring passed exactly the defect
+                    the branch audit found (F-RPT-001). Both exemptions are
+                    derived from the query rather than kept as a list of file
+                    names: transfer-only (an investment cash leg is never a
+                    transfer) and the declared PARENT-IDENTITY marker. The
+                    classifier carries its own negative controls, so the scan is
+                    known to fire rather than merely known to pass.
 Concurrency scope   -- (read path)
 Retry semantics     -- (read path)
 Crash semantics     -- (read path)
@@ -488,7 +508,13 @@ Required tests      Present: the two source scans above, and
                     and asserts both directions -- $1,000 of sleeve income
                     reaching Cash Flow and Income by Source, the generated leg
                     staying out of spending, payees, Uncategorized and
-                    duplicates, a brokerage-sleeve row staying out, generated
+                    duplicates, the parent-only consumers reporting a mixed
+                    split at its ordinary 60 rather than the parent's 560 or
+                    nothing at all (by payee, as recurring spending, and in the
+                    Uncategorized list and summary), a pure embedded-investment
+                    passthrough being absent from Uncategorized and never
+                    learned as a recurring expense, a brokerage-sleeve row
+                    staying out, generated
                     cash staying out of an ORDINARY funding account's report
                     (BUY debit and DIVIDEND credit), a SELL credit staying out
                     of income, ordinary cash on a standalone INVESTMENT account
@@ -504,11 +530,17 @@ Status              enforced
 ```
 
 The defect this records was not a subtle one: with `AND a.account_type !=
-'INVESTMENT'` in place, sixteen of the seventeen integration cases above fail,
-and the seventeenth passes only because every report was uniformly empty for
-that account. The focused audit of issue #1257 recorded the same root as
+'INVESTMENT'` in place, sixteen of the twenty-three integration cases above
+fail, and the rest pass only because every report was uniformly empty for that
+account. The focused audit of issue #1257 recorded the same root as
 `F-1257-001` (MEDIUM, derived reporting only -- no stored balance is wrong) and
 the naive-repair trap as `DR-1257-001`.
+
+The parent-only half was found by a second audit, of the fix itself
+(`F-RPT-001`), and is worth recording as its own lesson: removing a filter that
+was hiding too much exposes every row it was also hiding *correctly*. The
+account-type predicate had been doing two jobs, and only one of them was wrong.
+Five of the cases above fail on the first fix and pass on the second.
 
 ## Scheduled occurrences
 
