@@ -567,13 +567,34 @@ it has promised. Three properties, each of which was wrong once:
   armed only while receiving: a timeout on *processing* would be the
   release-too-early defect with a delay.
 
-What is still not fixed: an unauthenticated client can occupy the budget for that
-bounded interval, so it can make a legitimate caller retry. Remaining options, none
-implemented, in rough order of preference: a smaller body limit at the ingress ahead
-of the process, a two-step restore session that issues a short-lived upload token
-after authorization, and streaming the upload through decryption and gzip into a
-bounded temporary file or an incremental parser instead of the JavaScript heap. The
-last of those is also what would replace `PEAK_MULTIPLE` with a real bound.
+**Authorization now runs before the reservation (DR-F3RB-003).** An unauthenticated
+client used to be able to occupy the budget for that bounded interval, so it could
+make a legitimate caller retry — during exactly the incident a restore is for.
+Authentication cannot move earlier, because Nest's guards run after parsing, so
+authorization moved instead: a caller asks `POST /backup/restore/ticket` (ordinary
+authenticated JSON, behind the JWT guard, CSRF and the throttler) for a short-lived
+signed ticket, and the admission middleware verifies it **before reserving anything**.
+An upload with no ticket is refused `401` having claimed no memory at all.
+
+The ticket is an HMAC over `{userId, expiresAt}` keyed by a value derived from
+`JWT_SECRET` with a domain separator, not a database row
+(`backend/src/backup/restore-upload-ticket.ts`). Three reasons, and one honest cost:
+it verifies on any replica, where an in-memory single-use set would fail on the
+multi-replica deployments that matter; verification is one HMAC, so the check in front
+of the body parser stays synchronous and allocation-free, where a database round trip
+there would be a new lever for the load the gate exists to refuse; and rotating
+`JWT_SECRET` invalidates outstanding tickets, which is correct for a five-minute
+credential. The cost is that it is **not single-use** — it can be replayed until it
+expires. What that buys is bounded: the ticket authorizes *occupying upload budget*,
+not restoring anything, since the restore still needs the caller's JWT, the CSRF pair
+and (for an OIDC account) a single-use re-authentication artifact.
+
+Two things remain unaddressed, and both are named rather than implied. Ingress-level
+body and rate limits are a deployment concern the chart cannot express portably
+(`helm/README.md` says which annotation to set, and that the Gateway API path has no
+equivalent). And the memory shape itself: streaming the upload through decryption and
+gzip into a bounded temporary file or an incremental parser is what would replace
+`PEAK_MULTIPLE` with a real bound rather than a measured one.
 
 **The compressed budget does not bound decompressed memory (F3R6-004).** A small
 gzip expands to the `BACKUP_RESTORE_EXPANDED_LIMIT` ceiling regardless of its wire

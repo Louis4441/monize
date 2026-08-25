@@ -5,6 +5,11 @@ import {
 } from "@nestjs/common";
 import { BackupController } from "./backup.controller";
 import { RestoreQueueBusyException } from "./restore-processing-gate";
+import {
+  RESTORE_TICKET_HEADER,
+  createRestoreTicketAuthorizer,
+  verifyRestoreUploadTicket,
+} from "./restore-upload-ticket";
 import { RESTORE_RETRY_AFTER_SECONDS } from "./restore-queue-config";
 import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
@@ -261,6 +266,64 @@ describe("BackupController", () => {
       // A mangled password here is a confusing 401 rather than data loss, but
       // the request must still be refused rather than guessed at.
       expect(mockBackupService.restoreData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("mintRestoreUploadTicket", () => {
+    const secret = "a-jwt-secret-of-at-least-32-characters!!";
+    let previous: string | undefined;
+
+    beforeEach(() => {
+      previous = process.env.JWT_SECRET;
+      process.env.JWT_SECRET = secret;
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = previous;
+    });
+
+    /**
+     * DR-F3RB-003: this route exists so authorization can happen before the
+     * upload's memory is reserved, which is before any Nest guard runs. So the
+     * ticket it hands out has to be one the middleware actually accepts -- an
+     * assertion on the shape of the response would pass on a ticket nothing can
+     * verify.
+     */
+    it("mints a ticket the admission authorizer accepts", () => {
+      const result = controller.mintRestoreUploadTicket({
+        user: { id: userId },
+      });
+      expect(result.header).toBe(RESTORE_TICKET_HEADER);
+      expect(result.expiresInSeconds).toBeGreaterThan(0);
+
+      const authorize = createRestoreTicketAuthorizer(secret);
+      expect(
+        authorize({
+          headers: { [RESTORE_TICKET_HEADER]: result.ticket },
+        } as never),
+      ).toEqual({ ok: true });
+    });
+
+    it("mints for the caller, not for whoever asks about them", () => {
+      const mine = controller.mintRestoreUploadTicket({ user: { id: userId } });
+      const theirs = controller.mintRestoreUploadTicket({
+        user: { id: "another-user" },
+      });
+      expect(mine.ticket).not.toBe(theirs.ticket);
+      expect(verifyRestoreUploadTicket(mine.ticket, secret)).toMatchObject({
+        ok: true,
+        payload: { userId },
+      });
+    });
+
+    it("refuses rather than signing with nothing", () => {
+      delete process.env.JWT_SECRET;
+      // A ticket signed with an empty key is forgeable by anyone, so an
+      // unverifiable deployment must refuse. Startup already blocks this state;
+      // the route does not rely on that being true.
+      expect(() =>
+        controller.mintRestoreUploadTicket({ user: { id: userId } }),
+      ).toThrow(ServiceUnavailableException);
     });
   });
 

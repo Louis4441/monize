@@ -201,6 +201,23 @@ and the limit. For the support export they can also narrow it with an account
 selection or a date range. If real exports are being refused, raise the memory
 limit **and** the ceiling: raising either alone achieves nothing.
 
+**A restore upload needs a ticket, and the ingress should have a body limit.**
+The backend's upload admission has to run in front of its body parser, which is in
+front of every guard — so it cannot authenticate the request whose memory it is
+budgeting for. Since Monize 1.16 it does not have to: the client first asks
+`POST /api/v1/backup/restore/ticket` (ordinary authenticated JSON) for a short-lived
+signed ticket, and an upload without one is refused `401` before a byte is buffered.
+Nothing to configure — it is on whenever `JWT_SECRET` is set, which is always.
+
+What the chart cannot do for you is stop that traffic before it reaches the pod. If
+you terminate with an Ingress, set a body-size limit on it to match your
+`backupLimits.restoreUpload` (nginx: `nginx.ingress.kubernetes.io/proxy-body-size`;
+Traefik: a `buffering` middleware with `maxRequestBodyBytes`) through
+`ingress.annotations`. The default path in this chart is an HTTPRoute, and the Gateway
+API has no portable request-body limit — so on that path the process's own admission
+gate is the only limit, which is why it exists. Rate-limiting the restore path at the
+edge is worth doing for the same reason.
+
 **Restores queue, and the queue is bounded.** The compressed upload budget cannot
 bound decompressed memory — a small gzip expands to the expanded ceiling whatever
 its wire size — so restore *processing* is capped separately, at one concurrent

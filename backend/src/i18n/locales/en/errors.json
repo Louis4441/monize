@@ -210,7 +210,8 @@
     "folderUnusable": "Folder \"{{ path }}\" cannot be used as a directory ({{ reason }}).",
     "restoreNoMemoryHeadroom": "This deployment has no memory headroom for a restore: one restore's modeled peak does not fit the container. Raise the container memory limit or lower BACKUP_RESTORE_EXPANDED_LIMIT.",
     "restoreQueueFull": "Too many restores are already waiting for this deployment's restore capacity. Retry in a moment.",
-    "restoreQueueWaitTimeout": "Timed out waiting for restore capacity: another restore is still running. Retry in a moment."
+    "restoreQueueWaitTimeout": "Timed out waiting for restore capacity: another restore is still running. Retry in a moment.",
+    "restoreTicketUnavailable": "This deployment cannot authorize restore uploads."
   },
   "budgets": {
     "notFound": "Budget with ID {{ id }} not found",

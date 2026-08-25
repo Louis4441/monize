@@ -20,6 +20,7 @@ import {
   restoreProcessingGate,
 } from "./backup/restore-processing-gate";
 import { resolveRestoreQueueConfig } from "./backup/restore-queue-config";
+import { createRestoreTicketAuthorizer } from "./backup/restore-upload-ticket";
 import { OAuthProviderService } from "./oauth/oauth-provider.service";
 import { oauthDebugLogger } from "./oauth/oauth-debug-logger.middleware";
 import { isOidcProviderPath } from "./oauth/oidc-provider-paths";
@@ -259,6 +260,11 @@ async function bootstrap() {
     // replica serves.
     backupRestoreLimit * PEAK_MULTIPLE,
     (message) => bootstrapLogger.warn(`Restore upload refused: ${message}`),
+    undefined,
+    // Authorization ahead of the reservation (DR-F3RB-003): an unauthenticated
+    // request is refused 401 having claimed no memory at all. The ticket comes
+    // from POST /api/v1/backup/restore/ticket, which is behind the JWT guard.
+    createRestoreTicketAuthorizer(process.env.JWT_SECRET),
   );
   app.use("/api/v1/backup/restore", restoreAdmission.middleware);
   app.use(

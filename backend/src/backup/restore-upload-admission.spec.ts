@@ -1,7 +1,6 @@
-import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as path from "path";
-import type { IncomingMessage, ServerResponse } from "http";
+import type { IncomingMessage } from "http";
 import {
   PEAK_MULTIPLE,
   resolveRestoreUploadLimitBytes,
@@ -12,65 +11,9 @@ import {
   createRestoreUploadAdmission,
   releaseRestoreReservation,
 } from "./restore-upload-admission";
+import { bodyArrived, request, response } from "./__fixtures__/http-doubles";
 
 const MIB = 1024 * 1024;
-
-/**
- * A request carrying only what the middleware reads, plus the `end` event that
- * tells the gate the body has arrived.
- *
- * Method and content-type default to what a real restore upload sends, because
- * the gate budgets exactly what the parser downstream will buffer -- see the
- * "requests the parser will not buffer" block for the other side of that.
- */
-function request(
-  headers: Record<string, string | string[]> = {},
-  method = "POST",
-) {
-  const emitter = new EventEmitter();
-  const req = Object.assign(emitter, {
-    method,
-    headers: { "content-type": "application/gzip", ...headers },
-    destroyed: false,
-    destroy() {
-      req.destroyed = true;
-    },
-  });
-  return req as unknown as IncomingMessage & {
-    destroyed: boolean;
-    emit: (event: string) => boolean;
-  };
-}
-
-/** The body finished arriving, so the handler now owns it. */
-function bodyArrived(req: unknown) {
-  (req as unknown as EventEmitter).emit("end");
-}
-
-/**
- * A response that records what was written and can emit `finish`/`close`, which
- * is how a reservation is released. Not a mock of the calls -- the property under
- * test is that the budget goes back down, and only the event does that.
- */
-function response() {
-  const emitter = new EventEmitter();
-  const headers: Record<string, string> = {};
-  const res = Object.assign(emitter, {
-    statusCode: 200,
-    setHeader(name: string, value: string) {
-      headers[name.toLowerCase()] = value;
-    },
-    end(body?: string) {
-      res.body = body;
-    },
-  }) as EventEmitter & {
-    statusCode: number;
-    setHeader: (n: string, v: string) => void;
-    end: (b?: string) => void;
-    body?: string;
-  };
-  return { res: res as unknown as ServerResponse, raw: res, headers };
-}
 
 describe("restore upload admission", () => {
   const LIMIT = 200 * MIB;
@@ -655,5 +598,25 @@ describe("restore upload admission wiring", () => {
     expect(admissionAt).toBeGreaterThan(-1);
     expect(parserAt).toBeGreaterThan(-1);
     expect(admissionAt).toBeLessThan(parserAt);
+  });
+
+  /**
+   * And that the gate is actually built with an authorizer. The hook is optional
+   * -- unit tests of the budgeting want it omitted -- so nothing but a scan
+   * catches a deployment that quietly went back to admitting everyone.
+   */
+  it("builds the gate with the ticket authorizer", () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, "..", "main.ts"),
+      "utf8",
+    );
+    // The CALL, not the import -- which is why the needle carries its argument:
+    // matching the bare identifier finds the import line and passes on a file
+    // that imports the authorizer and never uses it.
+    const call = "createRestoreTicketAuthorizer(process.env.JWT_SECRET)";
+    expect(source).toContain(call);
+    expect(source.indexOf(call)).toBeGreaterThan(
+      source.indexOf("createRestoreUploadAdmission("),
+    );
   });
 });

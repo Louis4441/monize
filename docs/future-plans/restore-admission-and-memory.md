@@ -1,6 +1,14 @@
 # Restore admission and memory: plan for DR-F3RB-002..004 (issue #1073)
 
-Status: plan, not implemented. Scope approved (`approved-to-build` on issue #1073).
+Status: **WP1-WP4 implemented**; WP5's release note and the full-path,
+cgroup-constrained measurement remain. Scope approved (`approved-to-build` on issue
+#1073), and Option B in D3 approved before implementation because it lowers what a
+default deployment accepts.
+
+Kept as written where the decisions were made, and corrected where implementation
+changed one: D2 recommended a stored single-use ticket, and WP4 explains why the
+shipped ticket is signed instead. A plan quietly edited to match the code stops being
+a record of why.
 
 Three findings from audit 03 that the restore path still carries. They are one plan
 because they are one chain: the memory constants decide the gate's capacity, the
@@ -13,7 +21,7 @@ occupy.
 | DR-F3RB-003 | Upload admission necessarily precedes authentication, so an unauthenticated request can occupy the budget until the receive deadline | design plus deployment |
 | DR-F3RB-004 | `PEAK_MULTIPLE` and `restoreProcessBaselineBytes` are estimates; every ceiling in the chain is derived by dividing by the same estimate, so none of them can vouch for it | measurement |
 
-## 0. The state today, in numbers
+## 0. The state before this work, in numbers
 
 The subjects are `backend/src/backup/backup-limits.ts`,
 `backend/src/backup/restore-processing-gate.ts`,
@@ -72,7 +80,9 @@ reservation:
 1. **A short-lived upload ticket.** `POST /api/v1/backup/restore/ticket` is an
    ordinary authenticated JSON route (JWT guard, CSRF, throttler, demo guard all
    apply). It mints a single-use, per-user, TTL-bounded ticket bound to the declared
-   content length. The raw upload carries it in a header, and the admission
+   content length. (**Superseded by WP4**: the shipped ticket is signed rather than
+   stored, and therefore replayable inside its TTL rather than single-use. The
+   reasoning is there.) The raw upload carries it in a header, and the admission
    middleware validates it *before* reserving budget. An unauthenticated request then
    cannot occupy the budget at all: it is refused with 401 having reserved nothing.
 2. **Ingress limits in the chart.** A body-size limit matching `BACKUP_RESTORE_LIMIT`
@@ -302,23 +312,50 @@ Test matrix (each of these is a way the current code is wrong or could become wr
 | FIFO order under mixed aborts | Remaining waiters keep their order |
 | Every path | `waitingCount` and `activeCount` return to 0; no leak |
 
-### WP4 -- upload ticket and ingress limits (DR-F3RB-003)
+### WP4 -- upload ticket and ingress limits (DR-F3RB-003) -- DONE
 
-Implements D2.
+Implements D2, with one design decision changed on the way: the ticket is **signed,
+not stored**.
 
-- The ticket route, the store, and the validator hook on
-  `createRestoreUploadAdmission` -- authorization runs before the reservation, and the
-  refusal is 401 with nothing reserved.
-- The client sends the ticket alongside the existing restore headers. The OIDC
-  re-authentication ordering in `backend/src/backup/backup-restore.service.ts` is
-  untouched: the ticket authorizes the *upload*, the OIDC artifact authorizes the
-  *destruction*, and section 5 of the contract already fixes the second one's place.
-- Chart: body-size and rate limits on the restore path, with the values table in
-  `helm/README.md` matching `helm/values.yaml` (CI checks that pairing).
-- Tests: an upload with no ticket, an expired ticket, another user's ticket, and a
-  replayed ticket each refused before `reservedBytes()` moves; a valid one admitted;
-  and the multi-replica case argued in the store's design rather than mocked away
-  (`docs/verification-contract.md`: a mock proves the call, not the property).
+D2 preferred a database row consumed by a conditional `UPDATE`, for single use. What
+that would have bought is narrower than it looked, and what it costs is real: a row
+means a migration, an RLS decision, a backup classification and a `with-context`
+allowlist entry, and the *verification* would then be a database round trip in front
+of the body parser -- a new lever for exactly the load the gate exists to refuse. The
+in-memory alternative is worse still: the ticket is minted on the pod that served the
+JSON request and the upload can land on another, so it would fail on the multi-replica
+deployments where it matters.
+
+So the ticket is an HMAC over `{userId, expiresAt}`, keyed by a value derived from
+`JWT_SECRET` with a domain separator. It verifies on any replica, costs one hash, and
+rotating `JWT_SECRET` invalidates outstanding tickets. The honest cost is that it can
+be replayed inside its five-minute window, and the ticket authorizes *occupying upload
+budget* -- not restoring anything, which still needs the JWT, the CSRF pair and the
+OIDC re-authentication artifact. Stated in the module comment and in the contract
+rather than left for a reader to discover.
+
+Shipped:
+
+- `restore-upload-ticket.ts` (mint, verify, and the authorizer the gate calls),
+  `POST /backup/restore/ticket` on `BackupController`, and the `authorize` hook on
+  `createRestoreUploadAdmission` -- called before the size check and before any
+  reservation, so a refused request has claimed nothing.
+- The frontend mints a ticket immediately before uploading and sends it under the
+  header name **the server returned**, so the two cannot drift.
+- `helm/README.md` documents the ingress body-size and rate limits per controller,
+  and says plainly that the chart's default HTTPRoute path has no portable
+  equivalent -- which is why the in-process gate exists.
+- Tests: a forged expiry, a foreign key, an expired ticket, a missing one and a
+  repeated header at the token level; at the gate, that a refused request reserves
+  nothing and that twenty of them in a row still reserve nothing; a source guard that
+  the gate is actually built with the authorizer (the hook is optional, so nothing
+  else would catch a deployment that quietly went back to admitting everyone); and on
+  the client, that the ticket is requested *before* the upload and that no upload is
+  sent when the ticket is refused.
+
+The OIDC re-authentication ordering in `backend/src/backup/backup-restore.service.ts`
+is untouched: the ticket authorizes the *upload*, the OIDC artifact authorizes the
+*destruction*, and section 5 of the contract fixes the second one's place.
 
 ### WP5 -- documentation, and one correction landed with this plan
 

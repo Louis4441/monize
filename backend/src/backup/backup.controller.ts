@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import {
@@ -31,6 +32,10 @@ import {
   CLIENT_CLOSED_REQUEST,
   RestoreQueueBusyException,
 } from "./restore-processing-gate";
+import {
+  RESTORE_TICKET_HEADER,
+  mintRestoreUploadTicket,
+} from "./restore-upload-ticket";
 
 /**
  * Drop trailing `=` padding without a regular expression.
@@ -164,6 +169,35 @@ export class BackupController {
     @Body() dto: CreateSupportBackupDto,
   ) {
     return this.supportBackupService.preview(req.user.id, dto);
+  }
+
+  @Post("restore/ticket")
+  @DemoRestricted()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Mint a short-lived ticket authorizing one restore upload",
+    description:
+      "The restore upload's memory admission has to run in front of the body parser, which is in front of every Nest guard -- so it cannot authenticate the request it is budgeting for (DR-F3RB-003). This route can: it is ordinary authenticated JSON, and it hands back a signed ticket the admission middleware verifies before reserving anything. Without one, an upload is refused 401 having claimed no memory.",
+  })
+  @ApiResponse({ status: 200, description: "Ticket minted" })
+  mintRestoreUploadTicket(@Request() req) {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      // Startup refuses to run without it, so this is unreachable in a live
+      // deployment -- but a ticket signed with an empty key would be forgeable by
+      // anyone, so the failure has to be loud rather than convenient.
+      throw new ServiceUnavailableException(
+        tr(
+          "errors.backup.restoreTicketUnavailable",
+          "This deployment cannot authorize restore uploads.",
+        ),
+      );
+    }
+    const { ticket, expiresInSeconds } = mintRestoreUploadTicket(
+      req.user.id,
+      secret,
+    );
+    return { ticket, expiresInSeconds, header: RESTORE_TICKET_HEADER };
   }
 
   @Post("restore")
