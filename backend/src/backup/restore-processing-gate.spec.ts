@@ -2,9 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ServiceUnavailableException } from "@nestjs/common";
 import {
-  MEASURED_PEAK_MULTIPLE,
-  PEAK_MULTIPLE,
   resolveRestoreExpandedLimitBytes,
+  restorePeakBytes,
   restoreProcessBaselineBytes,
 } from "./backup-limits";
 import {
@@ -411,7 +410,10 @@ describe("computeRestoreProcessingSlots", () => {
   it("serialises by construction, and parallelises only once the cap binds", () => {
     expect(computeRestoreProcessingSlots(8192 * MIB)).toBe(1);
     expect(computeRestoreProcessingSlots(32768 * MIB)).toBeGreaterThan(1);
-    // The operator's lever: a smaller artifact ceiling on the same pod.
+    // The operator's lever: a smaller artifact ceiling on the same pod. Each of
+    // those restores still pays the fixed cost, so the slot count grows more
+    // slowly than the ceiling shrinks -- which is the honest arithmetic, and was
+    // not visible while the model scaled purely with the payload.
     expect(
       computeRestoreProcessingSlots(8192 * MIB, 128 * MIB),
     ).toBeGreaterThan(1);
@@ -438,11 +440,13 @@ describe("computeRestoreProcessingSlots", () => {
     const baseline = restoreProcessBaselineBytes(container);
 
     expect(computeRestoreProcessingSlots(container)).toBe(1);
-    expect(baseline + PEAK_MULTIPLE * expanded).toBeLessThanOrEqual(container);
-
-    const breakEven = (container - baseline) / expanded;
-    expect(breakEven).toBeGreaterThan(MEASURED_PEAK_MULTIPLE * 1.15);
-    expect(breakEven).toBeGreaterThanOrEqual(PEAK_MULTIPLE);
+    // The measured cost of what is admitted, plus 15%, inside what is left after
+    // the process baseline. Stated against `restorePeakBytes` rather than a
+    // multiple because the cost has a fixed part: a model that scales entirely
+    // with the payload is right at one artifact size and wrong at the others.
+    expect(restorePeakBytes(expanded) * 1.15).toBeLessThanOrEqual(
+      container - baseline,
+    );
   });
 
   /**
@@ -455,6 +459,9 @@ describe("computeRestoreProcessingSlots", () => {
   it("admits nothing where the ceiling derives to zero", () => {
     expect(computeRestoreProcessingSlots(128 * MIB)).toBe(0);
     expect(computeRestoreProcessingSlots(400 * MIB, 0)).toBe(0);
+    // And where the fixed cost alone exceeds the headroom, which is a bigger pod
+    // than it sounds: 200 MiB leaves 60 MiB, against ~78 MiB of fixed cost.
+    expect(computeRestoreProcessingSlots(200 * MIB)).toBe(0);
   });
 
   /**
@@ -513,10 +520,12 @@ describe("computeRestoreProcessingSlots", () => {
     // 5 was the pre-fix answer (16 / (3 * 1 GiB)); the honest answer with the
     // real 2 GiB limit and a baseline is far smaller.
     expect(withOverride).toBeLessThan(5);
-    // And every admitted restore's peak fits: slots * 3 * 2GiB <= container.
-    expect(withOverride * PEAK_MULTIPLE * 2 * 1024 * MIB).toBeLessThanOrEqual(
-      container,
-    );
+    // And every admitted restore's peak fits, each paying the fixed cost:
+    // baseline + slots * restorePeakBytes(2 GiB) <= container.
+    expect(
+      restoreProcessBaselineBytes(container) +
+        withOverride * restorePeakBytes(2 * 1024 * MIB),
+    ).toBeLessThanOrEqual(container);
   });
 
   /**

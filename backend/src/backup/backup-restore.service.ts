@@ -84,6 +84,8 @@ export class BackupRestoreService {
   get restoreExpandedLimitBytes(): number {
     return resolveRestoreExpandedLimitBytes(
       process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
+      undefined,
+      (message) => this.logger.warn(message),
     );
   }
 

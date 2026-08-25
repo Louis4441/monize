@@ -174,26 +174,34 @@ a configured value is too large to protect the process it is running in.
 | `1Gi` | `256Mi` |
 | `4Gi` | `1Gi` (the cap) |
 
-**The restore ceilings are smaller, and they are measured rather than assumed.** A
-restore's peak memory is about eight times its expanded payload — measured, in issue
-#1073, where the model previously assumed three — so `restoreExpanded` is solved out
-of what the container has left rather than taken as a share of it: the limit minus
-the ordinary process baseline (`max(140Mi, a fifth)`), less a 15% margin, divided by
-eight. `restoreUpload` derives to the same number, because gzip output is never
-smaller than what it expands to.
+**The restore ceilings are smaller, and they are measured rather than assumed.**
+Measured (issue #1073), a restore's peak memory is about **6.1× its expanded payload
+plus a fixed 78Mi** — the fixed part being zlib's windows and the heap V8 grows to
+parse and rewrite a document at all. The model previously assumed three times the
+payload and no fixed part, which admitted restores the process could not finish. So
+`restoreExpanded` is solved out of what the container has left rather than taken as a
+share of it: the limit, minus the ordinary process baseline (`max(140Mi, a fifth)`),
+less a 15% margin, minus the fixed cost, divided by 6.1. `restoreUpload` follows it,
+because gzip output is never smaller than what it expands to.
 
 | `backend.resources.limits.memory` | Largest restorable artifact | Concurrent restores |
 |---|---|---|
-| `128Mi` | none — restores refused with a 503 | 0 |
-| `256Mi` | ~12Mi | 1 |
-| `400Mi` (default) | ~28Mi | 1 |
-| `1Gi` | ~87Mi | 1 |
-| `8Gi` | ~696Mi | 1 |
+| `200Mi` and below | none — restores refused with a 503 | 0 |
+| `256Mi` | ~3Mi | 1 |
+| `400Mi` (default) | ~23Mi | 1 |
+| `1Gi` | ~101Mi | 1 |
+| `8Gi` | ~903Mi | 1 |
 
-A bigger pod buys a bigger artifact rather than a second concurrent restore. If you
-would rather have concurrency, set `restoreExpanded` lower yourself: the slot count
-is `headroom / (8 × restoreExpanded)`. And if a real backup is being refused, raise
-`resources.limits.memory` — raising `restoreUpload` alone gets you an OOM-killed pod
+**A pod that leaves less than about 78Mi free after the baseline cannot restore at
+all**, however small the backup, because the fixed cost is spent before the first
+byte of payload. That is a refusal with a message naming the lever, not an OOM kill
+mid-restore.
+
+A bigger pod otherwise buys a bigger artifact rather than a second concurrent
+restore. If you would rather have concurrency, set `restoreExpanded` lower yourself —
+though each concurrent restore pays the fixed 78Mi again, so the slot count grows
+more slowly than the ceiling shrinks. And if a real backup is being refused, raise
+`resources.limits.memory`: raising `restoreUpload` alone gets you an OOM-killed pod
 instead of a refusal, which is the failure the ceiling exists to prevent.
 
 A user whose dataset exceeds the ceiling gets a readable refusal naming the size

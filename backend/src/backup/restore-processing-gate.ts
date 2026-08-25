@@ -1,8 +1,8 @@
 import { HttpException, ServiceUnavailableException } from "@nestjs/common";
 import { tr } from "../i18n/translate";
 import {
-  PEAK_MULTIPLE,
   resolveRestoreExpandedLimitBytes,
+  restorePeakBytes,
   restoreProcessBaselineBytes,
 } from "./backup-limits";
 import {
@@ -365,7 +365,10 @@ export function computeRestoreProcessingSlots(
   // ceiling could legitimately derive to zero, admitted a restore on exactly the
   // deployments that cannot run one.
   if (expandedLimitBytes <= 0) return 0;
-  const perRestorePeak = PEAK_MULTIPLE * expandedLimitBytes;
+  // `restorePeakBytes`, not a multiple: the fixed part of a restore's cost is paid
+  // per restore, so two concurrent ones pay it twice. Multiplying the payload
+  // alone made small artifacts look nearly free and admitted more of them than fit.
+  const perRestorePeak = restorePeakBytes(expandedLimitBytes);
   const available = memoryLimitBytes - baselineBytes;
   return Math.max(0, Math.floor(available / perRestorePeak));
 }

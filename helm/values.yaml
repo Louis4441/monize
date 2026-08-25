@@ -68,13 +68,14 @@ backend:
   # The two restore ceilings are derived differently, and from a measurement. A
   # restore holds the envelope, the decrypted plaintext, the decompressed payload,
   # the UTF-8 string, the parsed object graph and the remapped copy of it -- about
-  # EIGHT times the expanded payload at peak, measured (issue #1073), where the
-  # model used to assume three. So restoreExpanded is solved out of the capacity
-  # instead of taken as a share of it: the memory left after the ordinary process
-  # is reserved, less a margin, divided by eight. On this chart's default 400Mi
-  # backend that is about 28 MiB, and restoreUpload derives to the same number --
-  # gzip output is never smaller than what it expands to, so a larger upload is one
-  # the deployment could not decompress anyway.
+  # 6.1x the expanded payload PLUS a fixed ~78Mi, measured (issue #1073), where the
+  # model used to assume three times the payload and nothing fixed. So
+  # restoreExpanded is solved out of the capacity instead of taken as a share of
+  # it: the memory left after the ordinary process is reserved, less a margin, less
+  # that fixed cost, divided by 6.1. On this chart's default 400Mi backend that is
+  # about 23 MiB, and restoreUpload follows it -- gzip output is never smaller than
+  # what it expands to, so a larger upload is one the deployment could not
+  # decompress anyway.
   #
   # On a container too small for any restore it derives to zero and restores are
   # refused with a 503 naming the lever, rather than flooring into a number the pod
@@ -105,9 +106,9 @@ backend:
   backupLimits:
     # -- Artifact a buffered export may accumulate (e.g. "96mb")
     exportBuffer: ""
-    # -- Decompressed size a restore payload may reach (e.g. "28mb")
+    # -- Decompressed size a restore payload may reach (e.g. "23mb")
     restoreExpanded: ""
-    # -- Compressed upload the restore endpoint accepts (e.g. "28mb")
+    # -- Compressed upload the restore endpoint accepts (e.g. "23mb")
     restoreUpload: ""
 
   # -- How many restores may WAIT for a processing slot, and for how long

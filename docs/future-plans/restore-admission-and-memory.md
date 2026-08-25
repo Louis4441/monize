@@ -254,23 +254,32 @@ the process baseline's floor moved to the chart's own 140 MiB request (D4).
 
 | Pod | Largest artifact | Slots | Modeled total |
 |---|---|---|---|
-| 128 MiB | none, refused with 503 | 0 | -- |
-| 256 MiB | 12 MiB | 1 | 239 MiB |
-| 400 MiB (default) | 27.6 MiB | 1 | 361 MiB |
-| 1 GiB | 87 MiB | 1 | 901 MiB |
-| 8 GiB | 696 MiB | 1 | 7209 MiB |
-| 32 GiB | 1 GiB (the cap) | 3 | 30 GiB |
+| 200 MiB and below | none, refused with 503 | 0 | -- |
+| 256 MiB | 3.5 MiB | 1 | 239 MiB |
+| 400 MiB (default) | 23.6 MiB | 1 | 361 MiB |
+| 1 GiB | 101.8 MiB | 1 | 901 MiB |
+| 8 GiB | 903 MiB | 1 | 7209 MiB |
+| 32 GiB | 1 GiB (the cap) | 4 | 31 GiB |
+
+The cost model behind those numbers is a **line**, not a multiple:
+`6.081 * expanded + 78 MiB`, fitted to the committed record as an upper envelope
+rather than a best fit. Review caught the multiple-only version admitting restores
+the same record says cannot be decoded -- a 200 MiB pod was handed a 6 MiB ceiling
+whose measured decode needs about 116 MiB against 60 MiB of headroom.
 
 Four consequences worth naming, because each is a behaviour change:
 
-- **A 256 MiB pod can now restore** (small artifacts) where it previously derived zero
-  slots and refused everything.
-- **A 128 MiB pod refuses everything**, as before, but now because the baseline
-  exceeds the pod rather than because of a share calculation.
+- **A 256 MiB pod can now restore** (a ~3.5 MiB artifact) where it previously derived
+  zero slots and refused everything.
+- **Pods at or below about 220 MiB refuse everything**, because the fixed part of a
+  restore's cost does not fit their headroom -- which the measurement says is the
+  truth, and a refusal is what an operator can act on.
+- **A 1 GiB pod gets a larger ceiling than the multiple-only model gave it** (101 MiB
+  against 87), because that model charged the fixed overhead again for every byte.
 - **One slot is structural.** Concurrency now comes only from the 1 GiB cap or from an
   operator lowering `BACKUP_RESTORE_EXPANDED_LIMIT` on purpose.
 - **The cramped-upload warning threshold dropped to 16 MiB**, because the derived
-  default on the chart's own default pod is 28 MiB and a warning that fires on the
+  default on the chart's own default pod is ~23 MiB and a warning that fires on the
   default configuration is a warning nobody reads.
 
 The three defect-pinning tests were rewritten to the property: the break-even
@@ -376,9 +385,11 @@ restore**:
 > eight -- so the old ceilings admitted restores the process could not finish, and on
 > the default 400Mi backend a large one lost the pod instead of being refused. The
 > ceilings are now derived from the container's memory and that measurement: a default
-> pod accepts about 28MiB of uncompressed backup instead of a nominal 100MiB, a 256Mi
-> pod can restore small backups where it previously refused everything, and a pod
-> under about 160Mi refuses restores with an error naming the fix. If a real backup
+> pod accepts about 23MiB of uncompressed backup instead of a nominal 100MiB, a 256Mi
+> pod can restore small ones where it previously refused everything, and a pod under
+> about 220Mi refuses restores with an error naming the fix -- a restore costs a
+> fixed ~78MiB before it costs anything per byte, and a pod that small never had the
+> room. If a real backup
 > starts being refused, raise `backend.resources.limits.memory` (or the container's
 > memory limit) -- raising the backup ceiling alone is what used to restart the pod.
 > Restores also queue with a bound and a deadline now, a caller who disconnects while

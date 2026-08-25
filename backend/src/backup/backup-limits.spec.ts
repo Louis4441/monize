@@ -1,10 +1,11 @@
 import {
-  MEASURED_PEAK_MULTIPLE,
-  PEAK_MULTIPLE,
+  MEASURED_PEAK_FIXED_BYTES,
+  MEASURED_PEAK_SLOPE,
   RESTORE_HEADROOM_SHARE,
   deriveDefaultLimitBytes,
   deriveRestoreExpandedLimitBytes,
   detectProcessMemoryLimitBytes,
+  restorePeakBytes,
   parseByteSize,
   resolveByteLimit,
   resolveRestoreExpandedLimitBytes,
@@ -143,10 +144,45 @@ describe("backup size limits", () => {
         const container = containerMib * MIB;
         const expanded = deriveRestoreExpandedLimitBytes(container);
         expect(
-          restoreProcessBaselineBytes(container) + PEAK_MULTIPLE * expanded,
+          restoreProcessBaselineBytes(container) + restorePeakBytes(expanded),
         ).toBeLessThanOrEqual(container);
       },
     );
+
+    /**
+     * The fixed part of the cost is what decides whether a small container can
+     * restore at all, and modelling the cost as a bare multiple of the payload
+     * hid it: the derivation handed a 200 MiB pod a 6 MiB ceiling whose measured
+     * decode needs about 116 MiB against 60 MiB of headroom. Refusing outright is
+     * the honest answer, and the one the operator can act on.
+     */
+    it.each([128, 160, 200])(
+      "admits nothing at %i MiB, where the fixed cost alone does not fit",
+      (containerMib) => {
+        const container = containerMib * MIB;
+        expect(deriveRestoreExpandedLimitBytes(container)).toBe(0);
+        // Not a rounding artefact: the fixed cost genuinely exceeds the headroom.
+        const headroom = container - restoreProcessBaselineBytes(container);
+        expect(headroom * RESTORE_HEADROOM_SHARE).toBeLessThanOrEqual(
+          MEASURED_PEAK_FIXED_BYTES,
+        );
+      },
+    );
+
+    /**
+     * And the other end of the same correction: charging the fixed cost once
+     * instead of inside a per-byte multiple gives a big pod a *larger* ceiling
+     * than the multiple did (87 MiB -> 101 MiB at 1 GiB), because it was paying
+     * that overhead again for every byte.
+     */
+    it("does not charge the fixed cost per byte on a large container", () => {
+      const container = 1024 * MIB;
+      const expanded = deriveRestoreExpandedLimitBytes(container);
+      expect(expanded).toBeGreaterThan(100 * MIB);
+      expect(
+        restoreProcessBaselineBytes(container) + restorePeakBytes(expanded),
+      ).toBeLessThanOrEqual(container);
+    });
 
     /**
      * A container smaller than the modeled process baseline is left out of the
@@ -171,15 +207,25 @@ describe("backup size limits", () => {
       (containerMib) => {
         const container = containerMib * MIB;
         const expanded = deriveRestoreExpandedLimitBytes(container);
-        // The margin lives in the headroom share, not in the rounded multiple:
-        // 8 against a measured 7.99 is barely 0.1%, so what has to hold is that
-        // the MEASURED cost of the largest artifact this deployment will admit,
-        // plus 15%, still fits the memory left for it.
-        expect(MEASURED_PEAK_MULTIPLE * expanded * 1.15).toBeLessThanOrEqual(
+        // The margin lives in the headroom share. What has to hold is that the
+        // MEASURED cost of the largest artifact this deployment will admit, plus
+        // 15%, still fits the memory left for it -- the measurement covers the
+        // decode phases only, so the slack is what the database phase runs in.
+        expect(restorePeakBytes(expanded) * 1.15).toBeLessThanOrEqual(
           headroom(container),
         );
       },
     );
+
+    it("keeps the cost model in one place", () => {
+      // Slope and fixed part, applied the same way everywhere. A caller
+      // re-deriving `slope * expanded` without the fixed term is the defect this
+      // model replaced.
+      expect(restorePeakBytes(0)).toBe(MEASURED_PEAK_FIXED_BYTES);
+      expect(restorePeakBytes(10 * MIB)).toBe(
+        Math.ceil(MEASURED_PEAK_SLOPE * 10 * MIB) + MEASURED_PEAK_FIXED_BYTES,
+      );
+    });
 
     /**
      * F3R6-005, restated for the new derivation: a usability floor must never win
@@ -274,22 +320,24 @@ describe("backup size limits", () => {
 
     /**
      * With no visible limit nothing can be derived, so the fallback is a peak
-     * *budget* divided by the multiple rather than an artifact ceiling picked
-     * directly. The old fixed 256 MiB fallback modeled a 2.3 GiB peak without
-     * saying so.
+     * *budget* the cost model is solved against, rather than an artifact ceiling
+     * picked directly. The old fixed 256 MiB fallback modeled a 2.3 GiB peak
+     * without saying so.
      */
     it("falls back to a coherent budget when the container limit is unknown", () => {
       const expanded = resolveRestoreUploadLimitBytes(undefined, null);
-      expect(expanded).toBe(128 * MIB);
-      expect(expanded * PEAK_MULTIPLE).toBe(1024 * MIB);
+      expect(expanded).toBeGreaterThan(0);
+      // Whatever it works out to, the model's own cost for it fits the budget
+      // the fallback names -- which is the property, not the number.
+      expect(restorePeakBytes(expanded)).toBeLessThanOrEqual(1024 * MIB);
     });
 
     it("spends only the headroom share it says it does", () => {
       const container = 400 * MIB;
       expect(
-        PEAK_MULTIPLE * deriveRestoreExpandedLimitBytes(container),
+        restorePeakBytes(deriveRestoreExpandedLimitBytes(container)),
       ).toBeLessThanOrEqual(
-        Math.floor(headroom(container) * RESTORE_HEADROOM_SHARE),
+        Math.ceil(headroom(container) * RESTORE_HEADROOM_SHARE),
       );
     });
   });

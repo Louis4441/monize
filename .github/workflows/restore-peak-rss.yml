@@ -16,11 +16,18 @@ on:
   workflow_dispatch:
     inputs:
       target-mib:
-        description: Expanded artifact size to decode, in MiB
-        default: "96"
+        description: >-
+          Comma-separated expanded artifact sizes to decode, in MiB. Include one
+          at or near the ceiling the deployment actually admits (~24 on the
+          chart's default pod) or the record cannot demonstrate what it admits.
+        default: "24,28,48,96"
       heap-caps:
-        description: Comma-separated --max-old-space-size values in MiB
-        default: "304,512,1024"
+        description: >-
+          Comma-separated --max-old-space-size values in MiB. Include one at or
+          below the headroom a real pod leaves (400Mi minus the 140Mi baseline =
+          260) -- restore-peak-rss.record.spec.ts requires a sweep there, so a
+          record produced without one fails the guard it exists to satisfy.
+        default: "260,1024"
       repeat:
         description: Runs per case; the worst is kept
         default: "3"

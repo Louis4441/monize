@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  MEASURED_PEAK_MULTIPLE,
-  PEAK_MULTIPLE,
+  MEASURED_PEAK_FIXED_BYTES,
+  MEASURED_PEAK_SLOPE,
   resolveRestoreExpandedLimitBytes,
+  restorePeakBytes,
   restoreProcessBaselineBytes,
 } from "./backup-limits";
 import { computeRestoreProcessingSlots } from "./restore-processing-gate";
@@ -110,14 +111,78 @@ describe("the committed restore peak-RSS record", () => {
     }
   });
 
-  it("is the source of the constant the code budgets with", () => {
-    // Both directions. The constant may not drift from the record, and the record
-    // may not be regenerated downwards without the constant following it.
-    expect(MEASURED_PEAK_MULTIPLE).toBeCloseTo(
-      record.maxImpliedMultiple as number,
-      3,
+  /**
+   * The cost model has to bound the record it was fitted to -- every case, not
+   * the average. A line through the middle of the points is wrong half the time,
+   * and the half it is wrong about is the half that OOM-kills a pod.
+   */
+  it("bounds every measured case it was fitted to", () => {
+    const measured = measuredCases().filter(
+      (entry) => entry.outcome === "measured",
     );
-    expect(PEAK_MULTIPLE).toBeGreaterThanOrEqual(MEASURED_PEAK_MULTIPLE);
+    expect(measured.length).toBeGreaterThan(10);
+    for (const entry of measured) {
+      const cost = entry.peakRssBytes - entry.baselineRssBytes;
+      expect(restorePeakBytes(entry.expandedBytes)).toBeGreaterThanOrEqual(
+        cost,
+      );
+    }
+  });
+
+  /**
+   * And it must not bound them by being enormous: an intercept nobody can spend
+   * would "pass" the test above while refusing every restore. Compared against
+   * the *worst* case at each artifact size, not against every case -- an envelope
+   * necessarily sits well above the cheapest shapes (an incompressible
+   * attachment payload costs about two thirds of what a repetitive one does at
+   * the same expanded size), and holding it to those would be asking the model
+   * to be two models.
+   */
+  it("bounds them without being vacuous", () => {
+    // Keyed on the nominal size in MiB, not the exact byte count: the profiles
+    // land a few bytes apart at the same nominal size, and keying on bytes puts
+    // each shape in its own group -- so the cheap shape would be compared against
+    // a line the expensive one set, which is the comparison this test is not
+    // making.
+    const worstBySize = new Map<number, { expanded: number; cost: number }>();
+    for (const entry of measuredCases()) {
+      if (entry.outcome !== "measured") continue;
+      const cost = entry.peakRssBytes - entry.baselineRssBytes;
+      const key = Math.round(entry.expandedBytes / MIB);
+      const current = worstBySize.get(key);
+      if (!current || cost > current.cost) {
+        worstBySize.set(key, { expanded: entry.expandedBytes, cost });
+      }
+    }
+    expect(worstBySize.size).toBeGreaterThanOrEqual(3);
+    for (const { expanded, cost } of worstBySize.values()) {
+      expect(restorePeakBytes(expanded) / cost).toBeLessThan(1.25);
+    }
+  });
+
+  it("is the source of both constants the code budgets with", () => {
+    // The slope is the record's own least-squares slope, and the fixed part is
+    // what lifts that line above every point. Recomputed here so the constants
+    // cannot drift from the file they claim to come from.
+    const points = measuredCases()
+      .filter((entry) => entry.outcome === "measured")
+      .map((entry) => ({
+        x: entry.expandedBytes,
+        y: entry.peakRssBytes - entry.baselineRssBytes,
+      }));
+    const n = points.length;
+    const sx = points.reduce((sum, p) => sum + p.x, 0);
+    const sy = points.reduce((sum, p) => sum + p.y, 0);
+    const sxx = points.reduce((sum, p) => sum + p.x * p.x, 0);
+    const sxy = points.reduce((sum, p) => sum + p.x * p.y, 0);
+    const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    const intercept = Math.max(...points.map((p) => p.y - slope * p.x));
+
+    expect(MEASURED_PEAK_SLOPE).toBeCloseTo(slope, 2);
+    // The committed fixed part covers the envelope this record needs, and is not
+    // wildly above it either.
+    expect(MEASURED_PEAK_FIXED_BYTES).toBeGreaterThanOrEqual(intercept);
+    expect(MEASURED_PEAK_FIXED_BYTES).toBeLessThan(intercept * 1.25);
   });
 
   /**
@@ -138,6 +203,7 @@ describe("the committed restore peak-RSS record", () => {
 
     // The old ceiling, which the record shows does not decode inside the old
     // headroom. Both numbers come from the record rather than from memory.
+    void headroomMib;
     const failedAt = record.sweeps.find((sweep) => sweep.exhausted.length > 0);
     expect(failedAt).toBeDefined();
     const failing = failedAt as Sweep;
