@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Achterstallig",
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Handmatig",
+    "amountUnavailable": "Niet beschikbaar",
+    "csvAmountUnavailable": "Niet beschikbaar (geen actuele wisselkoers)",
     "pdfTitle": "Rapport aankomende rekeningen",
     "pdfSubtitle": "{month} | {count} actieve rekeningen",
     "pdfActiveBills": "Actieve rekeningen",

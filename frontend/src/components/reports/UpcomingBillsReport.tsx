@@ -30,6 +30,11 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import {
+  scheduleEffectiveAmount,
+  sumEffectiveAmounts,
+} from '@/lib/scheduled-effective-amount';
 
 interface CalendarDay {
   date: Date;
@@ -41,7 +46,14 @@ interface CalendarDay {
 interface UpcomingBill {
   scheduledTransaction: ScheduledTransaction;
   dueDate: Date;
-  amount: number;
+  /**
+   * What this occurrence would post today, from the server's effective-amount
+   * contract; `null` when it cannot be determined (issue #1247). Never the
+   * persisted `amount`, which for an FX-sensitive schedule was calculated at an
+   * older rate -- this report used to disagree with the cash-flow forecast about
+   * the same bill by the drift since.
+   */
+  amount: number | null;
   isOverdue: boolean;
 }
 
@@ -134,11 +146,15 @@ export function UpcomingBillsReport() {
 
     scheduledTransactions.forEach((st) => {
       const occurrences = getNextOccurrences(st, 3);
+      // Every projected occurrence of one schedule carries the base effective
+      // amount: this report projects the recurrence forward, and per-occurrence
+      // overrides beyond the next one are not in this payload.
+      const effective = scheduleEffectiveAmount(st).amount;
       occurrences.forEach((dueDate) => {
         bills.push({
           scheduledTransaction: st,
           dueDate,
-          amount: st.amount,
+          amount: effective,
           isOverdue: dueDate < today,
         });
       });
@@ -159,11 +175,20 @@ export function UpcomingBillsReport() {
 
     // A transfer moves money between the user's own accounts, so it is counted
     // as something coming up but never added to a money total -- summing it
-    // beside bills and deposits would overstate both.
+    // beside bills and deposits would overstate both. An occurrence whose
+    // current amount is unknown makes the total unknown rather than smaller
+    // (issue #1247); the known part is kept separately and never shown under
+    // the total's own caption.
     const totalOf = (bills: UpcomingBill[]) =>
-      bills
-        .filter((b) => !b.scheduledTransaction.isTransfer)
-        .reduce((sum, b) => sum + Math.abs(b.amount), 0);
+      sumEffectiveAmounts(
+        bills.filter((b) => !b.scheduledTransaction.isTransfer),
+        (b) => ({
+          amount: b.amount,
+          currencyCode: b.scheduledTransaction.currencyCode,
+          complete: b.amount !== null,
+        }),
+        Math.abs,
+      );
 
     return {
       overdueCount: overdue.length,
@@ -189,7 +214,10 @@ export function UpcomingBillsReport() {
     const rows: (string | number)[][] = upcomingBills.map((bill) => [
       bill.scheduledTransaction.name,
       format(bill.dueDate, 'yyyy-MM-dd'),
-      bill.amount,
+      // An amount nobody can work out is exported as an explicit marker, not as
+      // an empty cell (indistinguishable from zero once a spreadsheet totals the
+      // column) and not as the stale stored figure (issue #1247).
+      bill.amount ?? t('upcomingBills.csvAmountUnavailable'),
       bill.scheduledTransaction.frequency,
       bill.scheduledTransaction.account?.name || '',
       bill.isOverdue ? t('upcomingBills.csvStatusOverdue') : bill.scheduledTransaction.autoPost ? t('upcomingBills.csvStatusAuto') : t('upcomingBills.csvStatusManual'),
@@ -208,7 +236,17 @@ export function UpcomingBillsReport() {
     const pdfCards = [
       { label: t('upcomingBills.pdfActiveBills'), value: String(scheduledTransactions.length), color: '#111827' },
       ...(summary.overdueCount > 0 ? [{ label: t('upcomingBills.pdfOverdue'), value: String(summary.overdueCount), color: '#dc2626' }] : []),
-      { label: t('upcomingBills.pdfThisMonth'), value: `${summary.thisMonthCount} (${formatCurrency(summary.thisMonthTotal)})`, color: '#2563eb' },
+      {
+        label: t('upcomingBills.pdfThisMonth'),
+        // The total is withheld when any occurrence in it is unknown -- a PDF is
+        // a record, so a figure in it must not be a partial sum wearing a
+        // total's caption (issue #1247).
+        value:
+          summary.thisMonthTotal.total === null
+            ? `${summary.thisMonthCount} (${t('upcomingBills.amountUnavailable')})`
+            : `${summary.thisMonthCount} (${formatCurrency(summary.thisMonthTotal.total)})`,
+        color: '#2563eb',
+      },
     ];
     await exportToPdf({
       title: t('upcomingBills.pdfTitle'),
@@ -251,7 +289,11 @@ export function UpcomingBillsReport() {
               {summary.overdueCount}
             </div>
             <div className="text-sm text-red-600 dark:text-red-400">
-              {formatCurrency(summary.overdueTotal)}
+              {summary.overdueTotal.total === null ? (
+                <UnknownAmount />
+              ) : (
+                formatCurrency(summary.overdueTotal.total)
+              )}
             </div>
           </div>
         )}
@@ -261,7 +303,11 @@ export function UpcomingBillsReport() {
             {summary.thisMonthCount}
           </div>
           <div className="text-sm text-blue-600 dark:text-blue-400">
-            {formatCurrency(summary.thisMonthTotal)}
+            {summary.thisMonthTotal.total === null ? (
+              <UnknownAmount />
+            ) : (
+              formatCurrency(summary.thisMonthTotal.total)
+            )}
           </div>
         </div>
       </div>
@@ -438,7 +484,11 @@ export function UpcomingBillsReport() {
                   <div className={`font-medium ${
                     SCHEDULED_KIND_AMOUNT_CLASSES[scheduledKind(bill.scheduledTransaction)]
                   }`}>
-                    {formatCurrency(Math.abs(bill.amount))}
+                    {bill.amount === null ? (
+                      <UnknownAmount />
+                    ) : (
+                      formatCurrency(Math.abs(bill.amount))
+                    )}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {format(bill.dueDate, 'MMM d, yyyy')}

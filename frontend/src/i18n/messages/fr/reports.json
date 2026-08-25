@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "En retard",
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manuel",
+    "amountUnavailable": "Non disponible",
+    "csvAmountUnavailable": "Non disponible (aucun taux de change actuel)",
     "pdfTitle": "Rapport des factures à venir",
     "pdfSubtitle": "{month} | {count} factures actives",
     "pdfActiveBills": "Factures actives",

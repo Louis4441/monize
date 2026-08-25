@@ -18,6 +18,7 @@
     "colAmount": "Valor",
     "typeIncome": "Receita",
     "typeExpense": "Despesa",
+    "amountUnavailable": "Valor não disponível",
     "button": "Ver Faturas &amp; Depósitos"
   },
   "mortgageReminder": {

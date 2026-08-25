@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Quá hạn",
     "csvStatusAuto": "Tự động",
     "csvStatusManual": "Thủ công",
+    "amountUnavailable": "Không có",
+    "csvAmountUnavailable": "Không có (không có tỷ giá hiện tại)",
     "pdfTitle": "Báo cáo hóa đơn sắp tới",
     "pdfSubtitle": "{month} | {count} hóa đơn đang hoạt động",
     "pdfActiveBills": "Hóa đơn đang hoạt động",

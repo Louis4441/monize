@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Прострочений",
     "csvStatusAuto": "Авто",
     "csvStatusManual": "Вручну",
+    "amountUnavailable": "Недоступно",
+    "csvAmountUnavailable": "Недоступно (немає поточного курсу обміну)",
     "pdfTitle": "Звіт про майбутні рахунки",
     "pdfSubtitle": "{month} | {count} активних рахунків",
     "pdfActiveBills": "Активні рахунки",

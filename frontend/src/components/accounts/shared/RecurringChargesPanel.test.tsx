@@ -124,6 +124,58 @@ describe('RecurringChargesPanel', () => {
     expect(transfer.className).toContain('text-blue-600');
   });
 
+  // Issue #1247: the amount shown is what the next occurrence would post today,
+  // in the settlement currency, not the persisted snapshot.
+  it("shows the server's effective amount for an FX-sensitive schedule", async () => {
+    mockGetScheduled.mockResolvedValue([
+      schedule({
+        id: 'st-inv',
+        payeeName: 'Monthly ETF buy',
+        payeeId: null,
+        // The security-currency cash impact, pinned at 1.50 when it was EUR.
+        amount: -1000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        // The security is USD now, and USD -> CAD resolves at 1.35.
+        effectiveAmount: -1350,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+      }),
+    ]);
+    await renderPanel();
+    await waitFor(() =>
+      expect(screen.getByText('Monthly ETF buy')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText('-$1350.00')).toBeInTheDocument();
+    expect(screen.queryByText('-$1000.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('-$1500.00')).not.toBeInTheDocument();
+  });
+
+  it('marks an unresolvable occurrence unavailable, not stale', async () => {
+    mockGetScheduled.mockResolvedValue([
+      schedule({
+        id: 'st-inv',
+        payeeName: 'Monthly ETF buy',
+        payeeId: null,
+        amount: -1000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        effectiveAmount: null,
+        effectiveAmountComplete: false,
+        effectiveCurrencyCode: 'CAD',
+      }),
+    ]);
+    await renderPanel();
+    await waitFor(() =>
+      expect(screen.getByText('Monthly ETF buy')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+    expect(screen.queryByText('-$1000.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('-$1500.00')).not.toBeInTheDocument();
+  });
+
   it('flags detected charges not already scheduled', async () => {
     await renderPanel();
     await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());

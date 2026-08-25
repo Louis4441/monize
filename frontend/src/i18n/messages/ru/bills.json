@@ -6,6 +6,7 @@
     "summaryActiveBills": "Активные счета",
     "summaryActiveDeposits": "Активные поступления",
     "summaryMonthlyNet": "Чистый ежемесячный итог",
+    "summaryAmountUnavailable": "Недоступно",
     "summaryDueNow": "К оплате сейчас",
     "loadingText": "Загрузка запланированных проводок...",
     "chartUnavailable": "График временно недоступен"

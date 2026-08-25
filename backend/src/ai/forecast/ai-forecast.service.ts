@@ -200,8 +200,15 @@ export class AiForecastService {
     for (const st of aggregates.scheduledTransactions.slice(0, 20)) {
       const type = st.isIncome ? "INCOME" : "EXPENSE";
       if (!st.isTransfer) {
+        // An amount the server could not resolve is stated as unknown rather
+        // than quoted from the persisted snapshot, which was calculated at an
+        // older exchange rate (issue #1247).
+        const amount =
+          st.amount === null
+            ? "unknown (no current exchange rate)"
+            : st.amount.toFixed(2);
         sections.push(
-          `${sanitizePromptValue(st.name)}: ${st.amount.toFixed(2)} (${st.frequency}, next: ${st.nextDueDate}, ${type}, category: ${sanitizePromptValue(st.categoryName || "unknown")})`,
+          `${sanitizePromptValue(st.name)}: ${amount} (${st.frequency}, next: ${st.nextDueDate}, ${type}, category: ${sanitizePromptValue(st.categoryName || "unknown")})`,
         );
       }
     }

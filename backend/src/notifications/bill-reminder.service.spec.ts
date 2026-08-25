@@ -3,6 +3,8 @@ import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { BillReminderService } from "./bill-reminder.service";
+import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
+import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import { EmailService } from "./email.service";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
@@ -29,6 +31,7 @@ describe("BillReminderService", () => {
   let preferencesRepo: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
   let configService: Record<string, jest.Mock>;
+  let investmentTransactionsService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     // The claim double is shared across tests, so recorded calls and any queued
@@ -61,6 +64,17 @@ describe("BillReminderService", () => {
       get: jest.fn(),
     };
 
+    // Issue #1247: the reminder's amounts come from the real effective-amount
+    // resolver, so the double is the FX source beneath it, not the resolver
+    // itself. Same-currency by default -- a plain bill's effective amount then
+    // equals its stored one, which is what the pre-existing expectations assert.
+    investmentTransactionsService = {
+      resolveSettlementCurrencyPair: jest
+        .fn()
+        .mockResolvedValue({ from: "USD", to: "USD" }),
+      resolveCashExchangeRateOrNull: jest.fn().mockResolvedValue(1),
+    };
+
     const { dataSource } = createScopedDbMocks([
       [ScheduledTransaction, scheduledTransactionsRepo],
       [User, usersRepo],
@@ -70,6 +84,11 @@ describe("BillReminderService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillReminderService,
+        ScheduledEffectiveAmountService,
+        {
+          provide: InvestmentTransactionsService,
+          useValue: investmentTransactionsService,
+        },
         jobClaimProvider(jobClaims),
         { provide: DataSource, useValue: dataSource },
         { provide: EmailService, useValue: emailService },
@@ -279,7 +298,10 @@ describe("BillReminderService", () => {
 
         expect(scheduledTransactionsRepo.find).toHaveBeenCalledWith({
           where: { isActive: true, autoPost: false },
-          relations: ["payee", "overrides"],
+          // `splits` is loaded because the effective-amount resolver decides from
+          // them whether a schedule's cash total re-prices at the current FX rate
+          // (issue #1247).
+          relations: ["payee", "overrides", "splits"],
         });
         expect(emailService.sendMail).not.toHaveBeenCalled();
       });
@@ -612,6 +634,83 @@ describe("BillReminderService", () => {
 
           const htmlArg = emailService.sendMail.mock.calls[0][2];
           expect(htmlArg).toContain("€250.75");
+        });
+
+        it("says the amount is unavailable rather than naming a stale one (issue #1247)", async () => {
+          // The issue's schedule: 10 x 100 pinned at 1.50 while the security was
+          // priced in EUR. The security is USD now and no USD -> CAD rate
+          // resolves, so the amount is unknown -- and the reminder must say so
+          // rather than repeating the CAD 1,500 snapshot the user would pay.
+          const bill = makeBill({
+            userId: userId1,
+            nextDueDate: daysFromNow(1),
+            reminderDaysBefore: 3,
+            name: "Monthly ETF buy",
+            amount: -1000,
+            currencyCode: "CAD",
+            isInvestment: true,
+            investmentAction: "BUY" as never,
+            investmentSecurityId: "SEC-1",
+            investmentQuantity: 10,
+            investmentPrice: 100,
+            investmentCommission: 0,
+            investmentExchangeRate: 1.5,
+            investmentExchangeRateFromCurrency: "EUR",
+            investmentExchangeRateToCurrency: "CAD",
+          });
+
+          scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
+          usersRepo.findOne.mockResolvedValue(mockUser1);
+          investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+            { from: "USD", to: "CAD" },
+          );
+          investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+            null,
+          );
+
+          await service.sendBillReminders();
+
+          const htmlArg = emailService.sendMail.mock.calls[0][2];
+          expect(htmlArg).toContain("Amount unavailable");
+          expect(htmlArg).not.toContain("1,500");
+          expect(htmlArg).not.toContain("1,000");
+        });
+
+        it("quotes the re-priced amount when the current rate is known (issue #1247)", async () => {
+          const bill = makeBill({
+            userId: userId1,
+            nextDueDate: daysFromNow(1),
+            reminderDaysBefore: 3,
+            name: "Monthly ETF buy",
+            amount: -1000,
+            currencyCode: "CAD",
+            isInvestment: true,
+            investmentAction: "BUY" as never,
+            investmentSecurityId: "SEC-1",
+            investmentQuantity: 10,
+            investmentPrice: 100,
+            investmentCommission: 0,
+            investmentExchangeRate: 1.5,
+            investmentExchangeRateFromCurrency: "EUR",
+            investmentExchangeRateToCurrency: "CAD",
+          });
+
+          scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
+          usersRepo.findOne.mockResolvedValue(mockUser1);
+          investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+            { from: "USD", to: "CAD" },
+          );
+          investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+            1.35,
+          );
+
+          await service.sendBillReminders();
+
+          const htmlArg = emailService.sendMail.mock.calls[0][2];
+          expect(htmlArg).toContain("1,350.00");
+          expect(htmlArg).not.toContain("1,500.00");
         });
 
         it("passes appUrl from config to email template", async () => {

@@ -6,6 +6,7 @@
     "summaryActiveBills": "活跃账单",
     "summaryActiveDeposits": "活跃存款",
     "summaryMonthlyNet": "月净额",
+    "summaryAmountUnavailable": "不可用",
     "summaryDueNow": "当前到期",
     "loadingText": "正在加载定期交易...",
     "chartUnavailable": "图表暂时不可用"

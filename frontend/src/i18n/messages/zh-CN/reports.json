@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "逾期",
     "csvStatusAuto": "自动",
     "csvStatusManual": "手动",
+    "amountUnavailable": "不可用",
+    "csvAmountUnavailable": "不可用（无当前汇率）",
     "pdfTitle": "即将到期账单报告",
     "pdfSubtitle": "{month} | {count} 个活跃账单",
     "pdfActiveBills": "活跃账单",

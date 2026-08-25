@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Vencida",
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manual",
+    "amountUnavailable": "No disponible",
+    "csvAmountUnavailable": "No disponible (sin tipo de cambio actual)",
     "pdfTitle": "Informe de facturas próximas",
     "pdfSubtitle": "{month} | {count} facturas activas",
     "pdfActiveBills": "Facturas activas",

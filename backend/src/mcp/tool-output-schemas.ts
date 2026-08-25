@@ -540,7 +540,10 @@ const scheduledItem = looseObject({
   accountName: str,
   payeeName: strNull,
   categoryName: strNull,
-  amount: num,
+  // The effective amount this occurrence would post today, null when its current
+  // settlement rate is unknown -- never the stale persisted amount (issue #1247).
+  amount: numNull,
+  amountComplete: bool,
   currency: str,
   frequency: str,
   nextDueDate: str,
@@ -555,8 +558,14 @@ export const getUpcomingBillsOutput = {
   daysWindow: num,
   itemCount: num,
   overdueCount: num,
-  totalUpcomingBills: num,
-  totalUpcomingDeposits: num,
+  // Null when any item in the bucket has an unknown current amount; the partial
+  // sum then travels in the `known*Subtotal` field beside it (issue #1247).
+  totalUpcomingBills: numNull,
+  totalUpcomingDeposits: numNull,
+  knownUpcomingBillsSubtotal: num.optional(),
+  knownUpcomingDepositsSubtotal: num.optional(),
+  amountsComplete: bool,
+  unknownAmountItems: z.array(str).optional(),
   items: z.array(scheduledItem),
 };
 
@@ -610,7 +619,10 @@ export const getBudgetStatusOutput = {
   velocity: z
     .object({
       dailyBurnRate: num,
+      // Null when an upcoming bill's current amount is unknown (issue #1247);
+      // `upcomingBillsComplete` says so explicitly.
       safeDailySpend: num,
+      upcomingBillsComplete: bool,
       projectedTotal: num,
       projectedVariance: num,
       daysRemaining: num,

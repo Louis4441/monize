@@ -121,6 +121,29 @@ export interface ScheduledTransaction {
   // then shows the projection as unavailable). Absent/`null` for schedules that
   // carry no investment splits.
   investmentForecastAmount?: number | null;
+  // Read-only, server-resolved: the cash amount this schedule's un-overridden
+  // occurrences would post TODAY, in `effectiveCurrencyCode` (issue #1247).
+  //
+  // This is the one figure every surface presenting or aggregating a scheduled
+  // occurrence's money must read. `amount` is a snapshot taken at whatever FX
+  // rate was current when it was written, so for an FX-sensitive schedule (a
+  // top-level investment, or a split parent carrying an investment line) it can
+  // be stale by the drift since -- which is how one schedule came to read
+  // 1,500 CAD on five screens and 1,350 CAD on the forecast that predicts its
+  // posting.
+  //
+  // `null` (with `effectiveAmountComplete` false) means the current amount
+  // cannot be determined -- render it as unavailable, or withhold the total it
+  // belongs to. It NEVER means "fall back to `amount`". Read the flag as
+  // `=== false` and the amount as `== null`: absent is an older backend that did
+  // not compute it, which is "no information", not "known good".
+  //
+  // For a top-level investment schedule `effectiveCurrencyCode` is the
+  // *settlement* account's currency (the cash lands there), which may differ
+  // from `currencyCode` (the brokerage account's).
+  effectiveAmount?: number | null;
+  effectiveAmountComplete?: boolean;
+  effectiveCurrencyCode?: string;
   tagIds?: string[];
   splits?: ScheduledTransactionSplit[];
   overrideCount?: number;
@@ -235,6 +258,12 @@ export interface ScheduledTransactionOverride {
   // investment split (forecast uses `amount`) or when any line's current rate is
   // unknown (forecast withholds this occurrence).
   investmentForecastAmount?: number | null;
+  // The cash amount THIS occurrence would post today (issue #1247), resolved
+  // server-side with the same override-then-base precedence the posting applies.
+  // `null` with `effectiveAmountComplete` false means unknown -- never a licence
+  // to read `amount`. Its currency is the parent's `effectiveCurrencyCode`.
+  effectiveAmount?: number | null;
+  effectiveAmountComplete?: boolean;
   createdAt: string;
   updatedAt: string;
 }

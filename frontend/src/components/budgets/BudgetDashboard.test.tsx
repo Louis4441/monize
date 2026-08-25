@@ -102,6 +102,8 @@ const mockVelocity: BudgetVelocity = {
   paceStatus: 'under',
   upcomingBills: [],
   totalUpcomingBills: 0,
+  knownUpcomingBillsSubtotal: 0,
+  upcomingBillsComplete: true,
   trulyAvailable: 0,
 };
 

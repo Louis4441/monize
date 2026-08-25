@@ -3,6 +3,8 @@ import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { BudgetsService } from "./budgets.service";
+import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
+import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
 import {
   BudgetCategory,
@@ -41,6 +43,7 @@ describe("BudgetsService", () => {
   let categoriesRepository: Record<string, jest.Mock>;
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let overridesRepository: Record<string, jest.Mock>;
+  let investmentTransactionsService: Record<string, jest.Mock>;
 
   const mockBudget: Budget = {
     id: "budget-1",
@@ -214,9 +217,29 @@ describe("BudgetsService", () => {
     // EntityManager directly (it used to be queryRunner.manager.save).
     scopedManager.save.mockImplementation((entity: unknown) => entity);
 
+    // Issue #1247: the settlement pair the effective-amount resolver derives.
+    // Same-currency by default, so a plain schedule's effective amount equals its
+    // stored one; the stale/unknown-rate cases override these per test.
+    investmentTransactionsService = {
+      resolveSettlementCurrencyPair: jest
+        .fn()
+        .mockResolvedValue({ from: "USD", to: "USD" }),
+      resolveCashExchangeRateOrNull: jest.fn().mockResolvedValue(1),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetsService,
+        // The real effective-amount resolver over a mocked
+        // InvestmentTransactionsService (issue #1247): the budget's upcoming-bill
+        // figures ARE its output, so a double would test nothing. The default
+        // pair is same-currency, so a plain schedule's effective amount equals
+        // its stored one and every pre-existing expectation still holds.
+        ScheduledEffectiveAmountService,
+        {
+          provide: InvestmentTransactionsService,
+          useValue: investmentTransactionsService,
+        },
         { provide: DataSource, useValue: scopedDataSource },
         { provide: getRepositoryToken(Budget), useValue: budgetsRepository },
         {
@@ -850,6 +873,124 @@ describe("BudgetsService", () => {
       expect(result.currentSpent).toBe(150);
       expect(result.budgetTotal).toBe(100);
     });
+
+    // ---- Effective amounts and completeness (issue #1247) ----
+
+    /**
+     * A budget with one 600 category, 200 spent, and whatever upcoming bills the
+     * scheduled-transaction query returns.
+     */
+    const stubVelocityBudget = (bills: unknown[]) => {
+      budgetsRepository.findOne.mockResolvedValue({
+        ...mockBudget,
+        categories: [
+          {
+            ...mockBudgetCategory,
+            id: "bc-1",
+            categoryId: "cat-1",
+            amount: 600,
+            isIncome: false,
+            category: { name: "Groceries" },
+          },
+        ],
+      });
+      transactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({
+          getRawMany: jest
+            .fn()
+            .mockResolvedValue([{ categoryId: "cat-1", total: "-200" }]),
+        }),
+      );
+      splitsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([]) }),
+      );
+      scheduledTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({
+          getMany: jest.fn().mockResolvedValue(bills),
+        }),
+      );
+    };
+
+    /** The issue's schedule: 10 x 100, pinned at 1.50 while priced in EUR. */
+    const staleInvestmentBill = () => ({
+      id: "st-inv",
+      userId: "user-1",
+      name: "Monthly ETF buy",
+      amount: -1000,
+      currencyCode: "CAD",
+      nextDueDate: "2026-02-20",
+      categoryId: null,
+      isActive: true,
+      isSplit: false,
+      isInvestment: true,
+      investmentAction: "BUY",
+      investmentSecurityId: "SEC-1",
+      investmentQuantity: 10,
+      investmentPrice: 100,
+      investmentCommission: 0,
+      investmentExchangeRate: 1.5,
+      investmentExchangeRateFromCurrency: "EUR",
+      investmentExchangeRateToCurrency: "CAD",
+      splits: [],
+    });
+
+    it("counts an upcoming bill at its current amount, not its persisted one", async () => {
+      stubVelocityBudget([staleInvestmentBill()]);
+      // The security is USD now, and USD -> CAD is 1.35.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.upcomingBills[0].amount).toBe(1350);
+      // What the persisted 1.50 rate would have given.
+      expect(result.upcomingBills[0].amount).not.toBe(1500);
+      expect(result.totalUpcomingBills).toBe(1350);
+      expect(result.upcomingBillsComplete).toBe(true);
+      // 600 budgeted - 200 spent - 1350 upcoming.
+      expect(result.trulyAvailable).toBe(-950);
+    });
+
+    it("withholds the upcoming total and truly-available when a bill's rate is unknown", async () => {
+      stubVelocityBudget([
+        staleInvestmentBill(),
+        {
+          id: "st-rent",
+          userId: "user-1",
+          name: "Rent",
+          amount: -1200,
+          currencyCode: "CAD",
+          nextDueDate: "2026-02-25",
+          categoryId: "cat-1",
+          isActive: true,
+          isSplit: false,
+          isInvestment: false,
+          splits: [],
+        },
+      ]);
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.upcomingBills[0].amount).toBeNull();
+      expect(result.upcomingBills[0].amountComplete).toBe(false);
+      expect(result.totalUpcomingBills).toBeNull();
+      // The part that did resolve, under its own name -- never the total's.
+      expect(result.knownUpcomingBillsSubtotal).toBe(1200);
+      expect(result.upcomingBillsComplete).toBe(false);
+      // Both derived figures are unknown, not larger.
+      expect(result.trulyAvailable).toBeNull();
+      expect(result.safeDailySpend).toBeNull();
+    });
   });
 
   describe("getAlerts", () => {
@@ -987,7 +1128,12 @@ describe("BudgetsService", () => {
         createMockQueryBuilder({
           getMany: jest.fn().mockResolvedValue([
             {
+              // A stored override always carries an id and the original date it
+              // replaces (the `(scheduled_transaction_id, original_date)` unique
+              // index), and the effective-amount resolver files it under them.
+              id: "ovr-1",
               scheduledTransactionId: "st-1",
+              originalDate: tomorrowStr,
               overrideDate: tomorrowStr,
               amount: -312.65,
             },
@@ -1006,6 +1152,75 @@ describe("BudgetsService", () => {
         expect.objectContaining({
           message: expect.stringContaining("312.65"),
         }),
+      );
+    });
+
+    it("says the amount is unavailable rather than naming a stale one (issue #1247)", async () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+      scheduledTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({
+          getMany: jest.fn().mockResolvedValue([
+            {
+              id: "st-inv",
+              userId: "user-1",
+              name: "Monthly ETF buy",
+              payee: null,
+              payeeName: null,
+              // -1,000 in the security's currency, pinned at 1.50 EUR/CAD.
+              amount: -1000,
+              currencyCode: "CAD",
+              nextDueDate: tomorrowStr,
+              isActive: true,
+              autoPost: false,
+              reminderDaysBefore: 3,
+              isSplit: false,
+              isInvestment: true,
+              investmentAction: "BUY",
+              investmentSecurityId: "SEC-1",
+              investmentQuantity: 10,
+              investmentPrice: 100,
+              investmentCommission: 0,
+              investmentExchangeRate: 1.5,
+              investmentExchangeRateFromCurrency: "EUR",
+              investmentExchangeRateToCurrency: "CAD",
+              splits: [],
+            },
+          ]),
+          leftJoinAndSelect: jest.fn().mockReturnThis(),
+        }),
+      );
+      budgetAlertsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({ getMany: jest.fn().mockResolvedValue([]) }),
+      );
+      overridesRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({ getMany: jest.fn().mockResolvedValue([]) }),
+      );
+      budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
+        ...data,
+        id: "new-alert-1",
+      }));
+      budgetAlertsRepository.find.mockResolvedValue([]);
+      // The security is USD now and no USD -> CAD rate can be resolved.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      await service.getAlerts("user-1");
+
+      const saved = budgetAlertsRepository.save.mock.calls[0][0] as BudgetAlert;
+      expect(saved.message).toContain("Amount unavailable");
+      // Not the persisted snapshot, at either rate.
+      expect(saved.message).not.toContain("1,500");
+      expect(saved.message).not.toContain("1,000");
+      expect((saved.data as Record<string, unknown>).amount).toBeNull();
+      expect((saved.data as Record<string, unknown>).amountComplete).toBe(
+        false,
       );
     });
 

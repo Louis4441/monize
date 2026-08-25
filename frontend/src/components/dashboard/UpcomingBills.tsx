@@ -17,6 +17,8 @@ import {
 } from '@/lib/scheduled-kind';
 import { sumConverted } from '@/lib/currency-total';
 import { PartialTotal } from '@/components/ui/PartialTotal';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import { nextOccurrenceEffectiveAmount } from '@/lib/scheduled-effective-amount';
 import { WidgetHeading } from './widget-meta';
 import { CARD_CLASS } from '@/components/ui/Card';
 
@@ -70,6 +72,8 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
     const result = new Set<string>();
     // Running balance per account: start with currentBalance + futureTransactionsSum
     const runningBalances = new Map<string, number>();
+    /** Accounts whose projection hit an unknown amount and cannot continue. */
+    const unknown = new Set<string>();
 
     for (const item of upcomingItems) {
       const account = accountMap.get(item.accountId);
@@ -85,7 +89,16 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
         );
       }
 
-      const effectiveAmount = item.nextOverride?.amount ?? item.amount;
+      // A running balance built from an unknown amount is not a smaller
+      // balance, it is an unknown one -- so the projection stops for that
+      // account rather than carrying on as if the item cost nothing and
+      // flagging (or clearing) the rows after it (issue #1247).
+      const { amount: effectiveAmount } = nextOccurrenceEffectiveAmount(item);
+      if (effectiveAmount === null) {
+        unknown.add(item.accountId);
+        continue;
+      }
+      if (unknown.has(item.accountId)) continue;
       const newBalance = runningBalances.get(item.accountId)! + effectiveAmount;
       runningBalances.set(item.accountId, newBalance);
 
@@ -123,12 +136,21 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
     return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30';
   };
 
-  const getEffectiveAmount = (item: ScheduledTransaction): number => {
-    return item.nextOverride?.amount ?? item.amount;
-  };
+  // The amount this occurrence would post TODAY, from the server's
+  // effective-amount contract -- `null` when it cannot be determined (issue
+  // #1247). Never `nextOverride?.amount ?? amount`: for an FX-sensitive schedule
+  // that scalar was written at an older rate, which is how this widget came to
+  // disagree with the cash-flow forecast about the same bill.
+  const getEffective = (item: ScheduledTransaction) =>
+    nextOccurrenceEffectiveAmount(item);
 
+  // The kind is a question about direction, and an FX rate is positive, so the
+  // stored sign classifies the row correctly even when the magnitude is unknown.
   const getItemType = (item: ScheduledTransaction): ScheduledKind =>
-    scheduledKind({ amount: getEffectiveAmount(item), isTransfer: item.isTransfer });
+    scheduledKind({
+      amount: getEffective(item).amount ?? Number(item.amount),
+      isTransfer: item.isTransfer,
+    });
 
   const getTypeBadge = (type: ScheduledKind) => {
     switch (type) {
@@ -144,13 +166,16 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   };
 
   const getAmountDisplay = (item: ScheduledTransaction) => {
-    const amount = getEffectiveAmount(item);
+    const effective = getEffective(item);
     const type = getItemType(item);
     // A reminder carries no sign: its amount is a placeholder the user will fill
     // in when the real one arrives, so it is neither money out nor money in.
     const sign = type === 'bill' ? '-' : type === 'deposit' ? '+' : '';
     return {
-      text: `${sign}${formatCurrency(amount, item.currencyCode)}`,
+      text:
+        effective.amount === null
+          ? null
+          : `${sign}${formatCurrency(effective.amount, effective.currencyCode)}`,
       className: SCHEDULED_KIND_AMOUNT_CLASSES[type],
     };
   };
@@ -193,10 +218,16 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   // rate is excluded and its currency named, so "due" is marked as a subtotal
   // rather than quietly understating what is owed. Transfers and zero-amount
   // reminders are classified out by scheduledKind, not summed.
+  // An item whose current amount is unknown is excluded and counted, so the
+  // figure is marked a subtotal rather than quietly understating what is owed
+  // (issue #1247). It goes through `sumConverted`'s non-finite branch -- a value
+  // failure with no currency to blame, which is exactly what an unresolvable
+  // settlement rate is; the missing-rate branch below still names a currency
+  // when it is the *display* conversion that has no rate.
   const totalDue = sumConverted(
     upcomingItems.filter((item) => getItemType(item) === 'bill'),
-    (item) => getEffectiveAmount(item),
-    (item) => item.currencyCode,
+    (item) => getEffective(item).amount ?? NaN,
+    (item) => getEffective(item).currencyCode,
     (amount, currency) => {
       const converted = convertToDefault(amount, currency);
       return converted === null ? null : Math.abs(converted);
@@ -204,8 +235,8 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   );
   const totalIncoming = sumConverted(
     upcomingItems.filter((item) => getItemType(item) === 'deposit'),
-    (item) => getEffectiveAmount(item),
-    (item) => item.currencyCode,
+    (item) => getEffective(item).amount ?? NaN,
+    (item) => getEffective(item).currencyCode,
     convertToDefault,
   );
 
@@ -282,7 +313,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
                   </span>
                 )}
                 <div className={`font-semibold ${amountDisplay.className} whitespace-nowrap`}>
-                  {amountDisplay.text}
+                  {amountDisplay.text ?? <UnknownAmount />}
                 </div>
               </div>
             </div>

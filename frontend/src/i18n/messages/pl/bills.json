@@ -6,6 +6,7 @@
     "summaryActiveBills": "Aktywne rachunki",
     "summaryActiveDeposits": "Aktywne wpłaty",
     "summaryMonthlyNet": "Saldo miesięczne",
+    "summaryAmountUnavailable": "Niedostępna",
     "summaryDueNow": "Do zapłaty teraz",
     "loadingText": "Wczytywanie zaplanowanych transakcji...",
     "chartUnavailable": "Wykres chwilowo niedostępny"

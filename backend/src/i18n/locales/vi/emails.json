@@ -18,6 +18,7 @@
     "colAmount": "Số tiền",
     "typeIncome": "Thu nhập",
     "typeExpense": "Chi phí",
+    "amountUnavailable": "Không có số tiền",
     "button": "Xem hóa đơn &amp; tiền gửi"
   },
   "mortgageReminder": {

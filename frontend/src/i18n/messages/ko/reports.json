@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "연체",
     "csvStatusAuto": "자동",
     "csvStatusManual": "수동",
+    "amountUnavailable": "확인할 수 없음",
+    "csvAmountUnavailable": "확인할 수 없음 (현재 환율 없음)",
     "pdfTitle": "예정 청구서 보고서",
     "pdfSubtitle": "{month} | 활성 청구서 {count}건",
     "pdfActiveBills": "활성 청구서",

@@ -18,6 +18,7 @@
     "colAmount": "Importo",
     "typeIncome": "Entrata",
     "typeExpense": "Uscita",
+    "amountUnavailable": "Importo non disponibile",
     "button": "Visualizza fatture &amp; versamenti"
   },
   "mortgageReminder": {

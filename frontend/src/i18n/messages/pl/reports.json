@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Zaległe",
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Ręczne",
+    "amountUnavailable": "Niedostępna",
+    "csvAmountUnavailable": "Niedostępna (brak aktualnego kursu wymiany)",
     "pdfTitle": "Raport nadchodzących rachunków",
     "pdfSubtitle": "{month} | {count} aktywnych rachunków",
     "pdfActiveBills": "Aktywne rachunki",

@@ -45,7 +45,10 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     forwardRef(() => NetWorthModule),
     forwardRef(() => SecuritiesModule),
     ActionHistoryModule,
-    NotificationsModule,
+    // forwardRef: NotificationsModule now reaches back here through
+    // ScheduledTransactionsModule (issue #1247), so this edge closes a
+    // module cycle -- see `src/module-graph.spec.ts`.
+    forwardRef(() => NotificationsModule),
     DelegationModule,
     forwardRef(() => LoanRateChangesModule),
     forwardRef(() => CurrenciesModule),

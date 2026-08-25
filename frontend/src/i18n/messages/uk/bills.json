@@ -6,6 +6,7 @@
     "summaryActiveBills": "Активні рахунки",
     "summaryActiveDeposits": "Активні надходження",
     "summaryMonthlyNet": "Місячний підсумок",
+    "summaryAmountUnavailable": "Недоступно",
     "summaryDueNow": "До сплати зараз",
     "loadingText": "Завантаження запланованих транзакцій...",
     "chartUnavailable": "Графік тимчасово недоступний"

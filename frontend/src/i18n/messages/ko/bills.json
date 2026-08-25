@@ -6,6 +6,7 @@
     "summaryActiveBills": "활성 청구서",
     "summaryActiveDeposits": "활성 입금",
     "summaryMonthlyNet": "월 순액",
+    "summaryAmountUnavailable": "확인할 수 없음",
     "summaryDueNow": "현재 만기",
     "loadingText": "예정된 거래를 불러오는 중...",
     "chartUnavailable": "차트를 일시적으로 사용할 수 없습니다"

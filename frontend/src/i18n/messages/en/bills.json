@@ -6,6 +6,7 @@
     "summaryActiveBills": "Active Bills",
     "summaryActiveDeposits": "Active Deposits",
     "summaryMonthlyNet": "Monthly Net",
+    "summaryAmountUnavailable": "Not available",
     "summaryDueNow": "Due Now",
     "loadingText": "Loading scheduled transactions...",
     "chartUnavailable": "Chart temporarily unavailable"

@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "अतिदेय",
     "csvStatusAuto": "स्वतः",
     "csvStatusManual": "मैन्युअल",
+    "amountUnavailable": "उपलब्ध नहीं",
+    "csvAmountUnavailable": "उपलब्ध नहीं (कोई वर्तमान विनिमय दर नहीं)",
     "pdfTitle": "आगामी बिल रिपोर्ट",
     "pdfSubtitle": "{month} | {count} सक्रिय बिल",
     "pdfActiveBills": "सक्रिय बिल",

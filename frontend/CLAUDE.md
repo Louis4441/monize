@@ -196,6 +196,14 @@ Whether a picker *offers* to create is a property of the surface, not the field:
 
 `balanceColor` (`lib/format.ts`) is the one rule: negative is red, everything else neutral. Do not add `|| isLiability` (or any `accountType` test) -- a credit card at a credit balance is not in the red, and the sign already carries the meaning. `gainLossColor` is the sibling for a *change* in value (green when up), not for a balance.
 
+### A scheduled occurrence's amount is `nextOccurrenceEffectiveAmount`, never `nextOverride?.amount ?? amount`
+
+`ScheduledTransaction.amount` was computed at whatever FX rate was current when it was written, so for a top-level investment schedule (whose `amount` is the *security-currency* cash impact) or a split parent carrying an investment line it is a stale snapshot -- and it is labelled with the brokerage account's `currencyCode`, not the settlement currency the cash lands in. Read `effectiveAmount` / `effectiveAmountComplete` / `effectiveCurrencyCode` through `lib/scheduled-effective-amount.ts` (`scheduleEffectiveAmount`, `overrideEffectiveAmount`, `nextOccurrenceEffectiveAmount`, `sumEffectiveAmounts`).
+
+`null` means the server could not work the amount out. Render `UnknownAmount` (`components/ui/UnknownAmount.tsx`) -- never the stored figure and never a zero -- and withhold any total containing it, keeping the partial sum under its own name. An **absent** field is an older backend mid rolling deploy, which the helper already reads as unknown for an FX-sensitive schedule and as the stored amount for everything else.
+
+`lib/scheduled-effective-amount.guard.test.ts` scans `src/` for the `override.amount ?? …amount` fingerprint and checks that each migrated surface still imports the helper. `PostTransactionDialog` is the one exemption: it seeds the POST form's editable field, which is the write path. Issue #1247, INV-OCCURRENCE-003.
+
 ### A scheduled transaction has four kinds, not two -- `scheduledKind`
 
 `amount < 0` / `> 0` answers half the question: a **transfer** between own accounts is neither bill nor deposit, and exactly **zero** is a deliberate placeholder for an amount unknown until it arrives. A sign ternary paints the zero green, and a `!st.isTransfer` filter deleted a scheduled transfer from both calendars (issue #1124).

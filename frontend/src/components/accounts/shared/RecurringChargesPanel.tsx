@@ -13,6 +13,8 @@ import { Modal } from '@/components/ui/Modal';
 import { createLogger } from '@/lib/logger';
 import type { RecurringChargeInfo, Transaction } from '@/types/transaction';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
+import { nextOccurrenceEffectiveAmount } from '@/lib/scheduled-effective-amount';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 
 // The scheduled-transaction form is heavy and only needed once the user opens
 // the "create bill" modal, so load it lazily.
@@ -42,6 +44,10 @@ function normaliseName(value: string | null | undefined): string {
 /**
  * Colour a scheduled bill's amount by kind, matching the app convention:
  * transfers blue, income (positive) green, expense (negative) red.
+ *
+ * Keyed off the stored sign rather than the effective amount deliberately: an
+ * exchange rate is positive, so it cannot flip the direction, and the direction
+ * is known even when the magnitude is not (issue #1247).
  */
 function scheduledAmountClass(s: ScheduledTransaction): string {
   if (s.isTransfer) return 'text-blue-600 dark:text-blue-400';
@@ -206,8 +212,23 @@ export function RecurringChargesPanel({ accountId, currencyCode }: RecurringChar
                       <div
                         className={`text-sm font-medium tabular-nums ${scheduledAmountClass(s)}`}
                       >
-                        {scheduledAmountSign(s)}
-                        {formatCurrency(Math.abs(Number(s.amount)), s.currencyCode)}
+                        {/* The amount the next occurrence would post today, from
+                            the server's effective-amount contract -- not the
+                            persisted `amount`, which for an FX-sensitive schedule
+                            was calculated at an older rate (issue #1247). */}
+                        {(() => {
+                          const effective = nextOccurrenceEffectiveAmount(s);
+                          if (effective.amount === null) return <UnknownAmount />;
+                          return (
+                            <>
+                              {scheduledAmountSign(s)}
+                              {formatCurrency(
+                                Math.abs(effective.amount),
+                                effective.currencyCode,
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </li>
                   ))}

@@ -237,6 +237,11 @@
     "explanation": "Total parcial: não foi possível incluir {count, plural, one {# montante} other {# montantes}}, pelo que o valor apresentado os exclui. Não há taxa para {displayCurrency} disponível para {currencies}.",
     "explanationExcluded": "Total parcial: não foi possível apurar {count, plural, one {# montante} other {# montantes}}, pelo que o valor apresentado os exclui."
   },
+  "unknownAmount": {
+    "marker": "—",
+    "srLabel": "Valor não disponível",
+    "scheduledFx": "Não é possível determinar o valor atual: não há taxa de câmbio disponível para o par de moedas de liquidação deste item agendado. O valor guardado foi calculado com uma taxa anterior, pelo que não é mostrado."
+  },
   "density": {
     "title": "Alternar densidade das linhas",
     "normal": "Normal",

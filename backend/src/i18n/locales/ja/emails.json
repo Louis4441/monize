@@ -18,6 +18,7 @@
     "colAmount": "金額",
     "typeIncome": "収入",
     "typeExpense": "支出",
+    "amountUnavailable": "金額を取得できません",
     "button": "支払い予定を確認する"
   },
   "mortgageReminder": {

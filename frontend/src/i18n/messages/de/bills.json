@@ -6,6 +6,7 @@
     "summaryActiveBills": "Aktive Rechnungen",
     "summaryActiveDeposits": "Aktive Einzahlungen",
     "summaryMonthlyNet": "Monatliches Netto",
+    "summaryAmountUnavailable": "Nicht verfügbar",
     "summaryDueNow": "Jetzt fällig",
     "loadingText": "Terminierte Buchungen werden geladen...",
     "chartUnavailable": "Diagramm vorübergehend nicht verfügbar"

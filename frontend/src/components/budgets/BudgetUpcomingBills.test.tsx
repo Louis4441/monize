@@ -353,6 +353,85 @@ describe('BudgetUpcomingBills', () => {
     expect(screen.getByText('$2150.00')).toBeInTheDocument();
   });
 
+  // ---- Effective amounts (issue #1247) ----
+
+  it("counts a bill at the server's effective amount, not its persisted one", () => {
+    const bills = [
+      createBill({
+        id: 'st-inv',
+        name: 'Monthly ETF buy',
+        // The security-currency cash impact, pinned at 1.50 when it was EUR.
+        amount: -1000,
+        isInvestment: true,
+        // The security is USD now, and USD -> CAD resolves at 1.35.
+        effectiveAmount: -1350,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'USD',
+        nextDueDate: '2026-02-25',
+      }),
+    ];
+
+    render(
+      <BudgetUpcomingBills
+        scheduledTransactions={bills}
+        currentSpent={0}
+        totalBudgeted={2000}
+        periodEnd="2026-02-28"
+        formatCurrency={mockFormat}
+      />,
+    );
+
+    // The row and the total both read 1,350; neither reads the stale figure.
+    expect(screen.getAllByText('$1350.00').length).toBeGreaterThan(0);
+    expect(screen.queryByText('$1000.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('$1500.00')).not.toBeInTheDocument();
+    // 2000 budgeted - 0 spent - 1350 upcoming.
+    expect(screen.getByText('$650.00')).toBeInTheDocument();
+  });
+
+  it('withholds the total and truly-available when a bill is unresolvable', () => {
+    const bills = [
+      createBill({
+        id: 'st-inv',
+        name: 'Monthly ETF buy',
+        amount: -1000,
+        isInvestment: true,
+        effectiveAmount: null,
+        effectiveAmountComplete: false,
+        effectiveCurrencyCode: 'USD',
+        nextDueDate: '2026-02-25',
+      }),
+      createBill({
+        id: 'st-net',
+        name: 'Internet',
+        amount: -80,
+        effectiveAmount: -80,
+        effectiveAmountComplete: true,
+        nextDueDate: '2026-02-26',
+      }),
+    ];
+
+    render(
+      <BudgetUpcomingBills
+        scheduledTransactions={bills}
+        currentSpent={0}
+        totalBudgeted={2000}
+        periodEnd="2026-02-28"
+        formatCurrency={mockFormat}
+      />,
+    );
+
+    // Row, total and truly-available all carry the unavailable marker rather
+    // than a number built on a stale figure or a silent zero.
+    expect(screen.getAllByTestId('unknown-amount').length).toBe(3);
+    expect(screen.queryByText('$1000.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('$1500.00')).not.toBeInTheDocument();
+    // 2000 - 0 - 80 would be the answer if the unknown bill counted as free.
+    expect(screen.queryByText('$1920.00')).not.toBeInTheDocument();
+    // The known bill still shows its own amount.
+    expect(screen.getByText('$80.00')).toBeInTheDocument();
+  });
+
   it('excludes bills with positive override amount', () => {
     const bills = [
       createBill({

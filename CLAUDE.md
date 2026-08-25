@@ -231,6 +231,12 @@ A transfer is the same rule twice, plus conservation: two same-currency accounts
 
 A preview that resolves a rate as `?? 1` while the commit resolves a real one has the user approve one figure and receive another (this has happened twice). Call the same resolver from both.
 
+### A stored amount is a snapshot of a rate; the *current* amount is resolved
+
+`ScheduledTransaction.amount` was computed at whatever FX rate was current when it was written, so for an FX-sensitive schedule (a top-level investment, or a split parent carrying an investment line) it stops describing the occurrence the moment a referenced security's or account's currency changes. Ask `ScheduledEffectiveAmountService.resolveMany` (`backend/src/scheduled-transactions/scheduled-effective-amount.service.ts`) and read `effectiveAmount` / `effectiveAmountComplete` / `effectiveCurrencyCode`; on the client that means `nextOccurrenceEffectiveAmount` (`frontend/src/lib/scheduled-effective-amount.ts`), never `nextOverride?.amount ?? amount`. `null` means unknown and is never a licence to fall back to the snapshot -- a total containing it is withheld and the occurrence renders as unavailable (`UnknownAmount`).
+
+**The fix for one surface is not the fix.** Issue #1167 taught the cash-flow forecast to re-resolve and left the same decision duplicated in the dashboard, the budget, the reports, the exports, the AI assistant, MCP, the bill reminder and the alert -- so one schedule read 1,500 CAD on five screens and 1,350 CAD on the forecast that predicts its posting (#1247). When you fix a derived-figure defect, grep every consumer of the raw field in the same commit and give them all one server-authoritative answer; `frontend/src/lib/scheduled-effective-amount.guard.test.ts` is the scan that keeps them there. INV-OCCURRENCE-003 in `docs/system-invariants.md` records the contract and the one consumer still outstanding.
+
 ### Missing data: a subtotal is not a total (CRITICAL)
 
 A field named `total*`, `portfolioValue`, `transferValue`, `gain`, `tax`, or `estimated*` may only carry a value when **every** component is known. If any component is unknown, the total is `null`, and the partial sum, if returned at all, goes in a separate explicitly named field (`knownMarketValueSubtotal`), never in the total's field. Never default an unknown price, cost basis, or rate to `0` (or an exchange rate to `1`), and never treat a missing period price as a 0% return.

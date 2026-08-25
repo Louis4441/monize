@@ -364,6 +364,127 @@ describe('UpcomingBills', () => {
     expect(screen.queryByText(/\+\d+ more/)).not.toBeInTheDocument();
   });
 
+  // ---- Effective amounts (issue #1247) ----
+
+  it("shows the server's effective amount for an FX-sensitive schedule", () => {
+    const transactions = [
+      {
+        id: '1',
+        name: 'Monthly ETF buy',
+        // The security-currency cash impact, pinned at 1.50 when it was EUR.
+        amount: -1000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        // The security is USD now, and USD -> CAD resolves at 1.35.
+        effectiveAmount: -1350,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    // The row and the Total Due line both read 1,350.
+    expect(screen.getAllByText('-$1350.00')).toHaveLength(2);
+    // Neither the pre-FX impact nor the stale 1.50 figure.
+    expect(screen.queryByText('-$1000.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('-$1500.00')).not.toBeInTheDocument();
+  });
+
+  it('marks an unresolvable occurrence unavailable and its total partial', () => {
+    const transactions = [
+      {
+        id: '1',
+        name: 'Monthly ETF buy',
+        amount: -1000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        effectiveAmount: null,
+        effectiveAmountComplete: false,
+        effectiveCurrencyCode: 'CAD',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+      {
+        id: '2',
+        name: 'Netflix',
+        amount: -15.99,
+        currencyCode: 'CAD',
+        effectiveAmount: -15.99,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    // The row itself carries the unavailable marker, not a stale figure.
+    expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThan(0);
+    expect(screen.queryByText('-$1000.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('-$1500.00')).not.toBeInTheDocument();
+    // The Total Due row shows the part that resolved, marked as a subtotal.
+    expect(screen.getByTestId('partial-total')).toBeInTheDocument();
+    // The row and the subtotal, both 15.99: nothing invented the missing item.
+    expect(screen.getAllByText('-$15.99')).toHaveLength(2);
+  });
+
+  it('does not let an unknown amount move an account into the negative-balance warning', () => {
+    // A running balance built from an unknown amount is unknown, so the
+    // projection stops for that account rather than treating the item as free.
+    const transactions = [
+      {
+        id: '1',
+        name: 'Monthly ETF buy',
+        accountId: 'acc-1',
+        amount: -1000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        effectiveAmount: null,
+        effectiveAmountComplete: false,
+        effectiveCurrencyCode: 'CAD',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+      {
+        id: '2',
+        name: 'Netflix',
+        accountId: 'acc-1',
+        amount: -15.99,
+        currencyCode: 'CAD',
+        effectiveAmount: -15.99,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        nextDueDate: futureDateStr(2),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+    const accounts = [
+      {
+        id: 'acc-1',
+        accountType: 'CHECKING',
+        currentBalance: 10,
+        futureTransactionsSum: 0,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={accounts} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    // With the unknown item skipped and the projection stopped, no row claims a
+    // measured overdraft.
+    expect(
+      screen.queryByTitle('This payment may overdraw the account'),
+    ).not.toBeInTheDocument();
+  });
+
   it('prioritizes manual items over auto-post items on the same day', () => {
     const dateStr = futureDateStr(1);
     const transactions = [

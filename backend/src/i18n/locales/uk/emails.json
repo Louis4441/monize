@@ -18,6 +18,7 @@
     "colAmount": "Сума",
     "typeIncome": "Дохід",
     "typeExpense": "Витрата",
+    "amountUnavailable": "Суму неможливо визначити",
     "button": "Переглянути рахунки &amp; депозити"
   },
   "mortgageReminder": {

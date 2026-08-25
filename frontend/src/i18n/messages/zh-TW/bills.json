@@ -6,6 +6,7 @@
     "summaryActiveBills": "有效帳單",
     "summaryActiveDeposits": "有效存款",
     "summaryMonthlyNet": "每月淨額",
+    "summaryAmountUnavailable": "不可用",
     "summaryDueNow": "即將到期",
     "loadingText": "正在載入排程交易...",
     "chartUnavailable": "圖表暫時無法使用"

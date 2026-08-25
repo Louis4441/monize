@@ -6,6 +6,7 @@
     "summaryActiveBills": "[XX-Active Bills-XX]",
     "summaryActiveDeposits": "[XX-Active Deposits-XX]",
     "summaryMonthlyNet": "[XX-Monthly Net-XX]",
+    "summaryAmountUnavailable": "[XX-Not available-XX]",
     "summaryDueNow": "[XX-Due Now-XX]",
     "loadingText": "[XX-Loading scheduled transactions...-XX]",
     "chartUnavailable": "[XX-Chart temporarily unavailable-XX]"

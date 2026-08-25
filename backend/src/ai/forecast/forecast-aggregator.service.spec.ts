@@ -1,6 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { ForecastAggregatorService } from "./forecast-aggregator.service";
+import { ScheduledEffectiveAmountService } from "../../scheduled-transactions/scheduled-effective-amount.service";
+import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
 import { AccountsService } from "../../accounts/accounts.service";
@@ -91,6 +93,18 @@ describe("ForecastAggregatorService", () => {
           provide: TransactionAnalyticsService,
           useValue: mockTransactionAnalytics,
         },
+        // The real effective-amount resolver over a mocked FX source (issue
+        // #1247): the amounts these assertions read ARE its output.
+        ScheduledEffectiveAmountService,
+        {
+          provide: InvestmentTransactionsService,
+          useValue: {
+            resolveSettlementCurrencyPair: jest
+              .fn()
+              .mockResolvedValue({ from: "USD", to: "USD" }),
+            resolveCashExchangeRateOrNull: jest.fn().mockResolvedValue(1),
+          },
+        },
       ],
     }).compile();
 
@@ -174,6 +188,9 @@ describe("ForecastAggregatorService", () => {
     it("fetches active scheduled transactions with categories", async () => {
       mockScheduledTransactionRepo.find.mockResolvedValue([
         {
+          // A real row always has an id, and the effective-amount resolver files
+          // its answer under it (issue #1247).
+          id: "st-rent",
           name: "Rent",
           amount: -1500,
           frequency: "MONTHLY",
@@ -182,6 +199,7 @@ describe("ForecastAggregatorService", () => {
           isTransfer: false,
         },
         {
+          id: "st-salary",
           name: "Salary",
           amount: 5000,
           frequency: "BIWEEKLY",
@@ -331,6 +349,7 @@ describe("ForecastAggregatorService", () => {
     it("marks scheduled transactions with positive amounts as income", async () => {
       mockScheduledTransactionRepo.find.mockResolvedValue([
         {
+          id: "st-freelance",
           name: "Freelance Payment",
           amount: 2000,
           frequency: "MONTHLY",
@@ -348,6 +367,7 @@ describe("ForecastAggregatorService", () => {
     it("includes transfer flag on scheduled transactions", async () => {
       mockScheduledTransactionRepo.find.mockResolvedValue([
         {
+          id: "st-savings",
           name: "Savings Transfer",
           amount: -500,
           frequency: "MONTHLY",

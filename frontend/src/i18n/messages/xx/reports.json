@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "[XX-Overdue-XX]",
     "csvStatusAuto": "[XX-Auto-XX]",
     "csvStatusManual": "[XX-Manual-XX]",
+    "amountUnavailable": "[XX-Not available-XX]",
+    "csvAmountUnavailable": "[XX-Not available (no current exchange rate)-XX]",
     "pdfTitle": "[XX-Upcoming Bills Report-XX]",
     "pdfSubtitle": "[XX-{month} | {count} active bills-XX]",
     "pdfActiveBills": "[XX-Active Bills-XX]",

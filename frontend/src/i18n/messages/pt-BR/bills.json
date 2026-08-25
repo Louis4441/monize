@@ -6,6 +6,7 @@
     "summaryActiveBills": "Faturas ativas",
     "summaryActiveDeposits": "Depósitos ativos",
     "summaryMonthlyNet": "Líquido mensal",
+    "summaryAmountUnavailable": "Não disponível",
     "summaryDueNow": "A vencer agora",
     "loadingText": "Carregando transações agendadas...",
     "chartUnavailable": "Gráfico temporariamente indisponível"

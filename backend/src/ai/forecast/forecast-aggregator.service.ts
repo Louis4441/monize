@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
+import { ScheduledEffectiveAmountService } from "../../scheduled-transactions/scheduled-effective-amount.service";
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
 import { RecurringCharge } from "../../transactions/recurring-charges.util";
@@ -29,9 +30,17 @@ export interface AccountBalanceSummary {
   }>;
 }
 
+/**
+ * One scheduled schedule as the forecast prompt describes it. `amount` is the
+ * effective amount -- what the occurrence would post today -- as a positive
+ * magnitude, and `null` when the server could not determine it (issue #1247):
+ * the prompt must say "unknown" rather than quote a snapshot taken at an older
+ * exchange rate.
+ */
 export interface ScheduledTransactionSummary {
   name: string;
-  amount: number;
+  amount: number | null;
+  amountComplete: boolean;
   frequency: string;
   nextDueDate: string;
   categoryName: string | null;
@@ -70,6 +79,10 @@ export class ForecastAggregatorService {
     @Inject(forwardRef(() => AccountsService))
     private readonly accountsService: AccountsService,
     private readonly transactionAnalytics: TransactionAnalyticsService,
+    // The amount a forecast prompt quotes is the amount the occurrence would
+    // post, from the one shared resolver (issue #1247).
+    @Inject(forwardRef(() => ScheduledEffectiveAmountService))
+    private readonly effectiveAmounts: ScheduledEffectiveAmountService,
   ) {}
 
   async computeAggregates(
@@ -221,18 +234,29 @@ export class ForecastAggregatorService {
     const scheduled = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(ScheduledTransaction).find({
         where: { userId, isActive: true },
-        relations: ["category"],
+        // `splits` decides whether the cash total re-prices at the current FX
+        // rate, which the effective-amount resolver needs (issue #1247).
+        relations: ["category", "splits"],
         order: { nextDueDate: "ASC" },
       }),
     );
+    const effective = await this.effectiveAmounts.resolveMany(
+      userId,
+      scheduled,
+    );
 
     return scheduled.map((st) => {
+      // The direction still comes from the stored sign (an FX rate is positive,
+      // so it cannot flip one); the magnitude comes from the resolver, and is
+      // null when the current rate for it cannot be determined.
       const amount = Number(st.amount);
       const isIncome = st.category?.isIncome === true || amount > 0;
+      const effectiveAmount = effective.get(st.id)!.base.amount;
 
       return {
         name: st.name,
-        amount: Math.abs(amount),
+        amount: effectiveAmount === null ? null : Math.abs(effectiveAmount),
+        amountComplete: effectiveAmount !== null,
         frequency: st.frequency,
         nextDueDate: st.nextDueDate
           ? new Date(st.nextDueDate).toISOString().substring(0, 10)

@@ -6,6 +6,7 @@
     "summaryActiveBills": "Tagihan Aktif",
     "summaryActiveDeposits": "Setoran Aktif",
     "summaryMonthlyNet": "Bersih Bulanan",
+    "summaryAmountUnavailable": "Tidak tersedia",
     "summaryDueNow": "Jatuh Tempo Sekarang",
     "loadingText": "Memuat transaksi terjadwal...",
     "chartUnavailable": "Grafik sementara tidak tersedia"

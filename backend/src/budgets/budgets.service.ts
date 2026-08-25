@@ -18,6 +18,10 @@ import { TransactionSplit } from "../transactions/entities/transaction-split.ent
 import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
+import {
+  ScheduledEffectiveAmountService,
+  overrideEffectiveKey,
+} from "../scheduled-transactions/scheduled-effective-amount.service";
 import { CreateBudgetDto } from "./dto/create-budget.dto";
 import { UpdateBudgetDto } from "./dto/update-budget.dto";
 import { CreateBudgetCategoryDto } from "./dto/create-budget-category.dto";
@@ -40,7 +44,16 @@ import { ActionHistoryService } from "../action-history/action-history.service";
 export interface UpcomingBill {
   id: string;
   name: string;
-  amount: number;
+  /**
+   * The positive magnitude this occurrence would actually cost today -- the
+   * server-resolved effective amount, not the persisted snapshot (issue #1247).
+   * `null` when a component of it (a current cross-currency settlement rate) is
+   * unknown; the persisted `amount` is never substituted, because a budget that
+   * quietly counts a stale figure understates or overstates what is available.
+   */
+  amount: number | null;
+  /** `amount !== null`. */
+  amountComplete: boolean;
   dueDate: string;
   categoryId: string | null;
 }
@@ -72,6 +85,10 @@ export class BudgetsService {
   constructor(
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
+    // "What does this scheduled occurrence cost today" has one server-side
+    // answer (issue #1247); the budget asks it rather than reading the persisted
+    // snapshot, so its figures cannot disagree with the cash-flow forecast.
+    private effectiveAmounts: ScheduledEffectiveAmountService,
   ) {}
 
   async create(
@@ -426,6 +443,10 @@ export class BudgetsService {
       m
         .getRepository(ScheduledTransaction)
         .createQueryBuilder("st")
+        // The splits decide whether a schedule's cash total is FX-sensitive
+        // (an embedded investment line re-prices at the current rate), so the
+        // effective-amount resolver cannot answer without them (issue #1247).
+        .leftJoinAndSelect("st.splits", "splits")
         .where("st.user_id = :userId", { userId })
         .andWhere("st.is_active = true")
         .andWhere("st.amount < 0")
@@ -435,16 +456,30 @@ export class BudgetsService {
         .getMany(),
     );
 
-    return scheduledTransactions.map((st) => ({
-      id: st.id,
-      name: st.name,
-      amount: Math.abs(Number(st.amount)),
-      dueDate:
-        typeof st.nextDueDate === "string"
-          ? st.nextDueDate
-          : formatDateYMD(st.nextDueDate as Date),
-      categoryId: st.categoryId,
-    }));
+    // The stored sign selects the outflows (an FX rate is positive, so it cannot
+    // flip one), but the magnitude comes from the shared resolver -- the same one
+    // the cash-flow forecast and the posting use, so the budget cannot disagree
+    // with them about what a bill costs (issue #1247). Resolved outside the read
+    // transaction: the rate path can fetch and persist.
+    const effective = await this.effectiveAmounts.resolveMany(
+      userId,
+      scheduledTransactions,
+    );
+
+    return scheduledTransactions.map((st) => {
+      const base = effective.get(st.id)!.base;
+      return {
+        id: st.id,
+        name: st.name,
+        amount: base.amount === null ? null : Math.abs(base.amount),
+        amountComplete: base.complete,
+        dueDate:
+          typeof st.nextDueDate === "string"
+            ? st.nextDueDate
+            : formatDateYMD(st.nextDueDate as Date),
+        categoryId: st.categoryId,
+      };
+    });
   }
 
   async getVelocity(
@@ -455,15 +490,24 @@ export class BudgetsService {
     projectedTotal: number;
     budgetTotal: number;
     projectedVariance: number;
-    safeDailySpend: number;
+    /** `null` when `trulyAvailable` is unknown -- it is derived from it. */
+    safeDailySpend: number | null;
     daysElapsed: number;
     daysRemaining: number;
     totalDays: number;
     currentSpent: number;
     paceStatus: "under" | "on_track" | "over";
     upcomingBills: UpcomingBill[];
-    totalUpcomingBills: number;
-    trulyAvailable: number;
+    /**
+     * `null` when any upcoming bill's current amount is unknown (issue #1247):
+     * the partial sum then travels in `knownUpcomingBillsSubtotal`, and
+     * `upcomingBillsComplete` is false.
+     */
+    totalUpcomingBills: number | null;
+    knownUpcomingBillsSubtotal: number;
+    upcomingBillsComplete: boolean;
+    /** `null` when the upcoming-bills total is unknown. */
+    trulyAvailable: number | null;
   }> {
     const budget = await this.findOne(userId, budgetId);
     const { periodStart, periodEnd } = this.getCurrentPeriodDates(budget);
@@ -495,15 +539,35 @@ export class BudgetsService {
     const budgetTotal = sumMoney(expenseCategories.map((c) => c.budgeted));
 
     const upcomingBills = await this.getUpcomingBills(userId, periodEnd);
-    const totalUpcomingBills = sumMoney(upcomingBills.map((b) => b.amount));
+    // One unknown bill makes "what is truly available" unknowable, not smaller:
+    // the partial sum is kept beside the total under its own name and never
+    // stands in for it (issue #1247, `docs/financial-semantics.md`).
+    const knownUpcomingBills = upcomingBills.filter(
+      (b): b is UpcomingBill & { amount: number } => b.amount !== null,
+    );
+    const upcomingBillsComplete =
+      knownUpcomingBills.length === upcomingBills.length;
+    const knownUpcomingBillsSubtotal = sumMoney(
+      knownUpcomingBills.map((b) => b.amount),
+    );
+    const totalUpcomingBills = upcomingBillsComplete
+      ? knownUpcomingBillsSubtotal
+      : null;
 
     const dailyBurnRate = currentSpent / daysElapsed;
     const projectedTotal = dailyBurnRate * totalDays;
     const projectedVariance = projectedTotal - budgetTotal;
     const remaining = roundMoney(budgetTotal - currentSpent);
-    const trulyAvailable = remaining - totalUpcomingBills;
+    const trulyAvailable =
+      totalUpcomingBills === null
+        ? null
+        : roundMoney(remaining - totalUpcomingBills);
     const safeDailySpend =
-      daysRemaining > 0 ? Math.max(0, trulyAvailable / daysRemaining) : 0;
+      trulyAvailable === null
+        ? null
+        : daysRemaining > 0
+          ? Math.max(0, trulyAvailable / daysRemaining)
+          : 0;
 
     let paceStatus: "under" | "on_track" | "over";
     const paceRatio = budgetTotal > 0 ? projectedTotal / budgetTotal : 0;
@@ -520,15 +584,18 @@ export class BudgetsService {
       projectedTotal: roundMoney(projectedTotal),
       budgetTotal,
       projectedVariance: roundMoney(projectedVariance),
-      safeDailySpend: roundMoney(safeDailySpend),
+      safeDailySpend:
+        safeDailySpend === null ? null : roundMoney(safeDailySpend),
       daysElapsed,
       daysRemaining,
       totalDays,
       currentSpent,
       paceStatus,
       upcomingBills,
-      totalUpcomingBills: roundMoney(totalUpcomingBills),
-      trulyAvailable: roundMoney(trulyAvailable),
+      totalUpcomingBills,
+      knownUpcomingBillsSubtotal,
+      upcomingBillsComplete,
+      trulyAvailable,
     };
   }
 
@@ -569,6 +636,9 @@ export class BudgetsService {
         .getRepository(ScheduledTransaction)
         .createQueryBuilder("st")
         .leftJoinAndSelect("st.payee", "payee")
+        // See getUpcomingBills: the effective-amount resolver needs the splits to
+        // tell an FX-sensitive cash total from a fixed one (issue #1247).
+        .leftJoinAndSelect("st.splits", "splits")
         .where("st.user_id = :userId", { userId })
         .andWhere("st.is_active = true")
         .andWhere("st.auto_post = false")
@@ -650,7 +720,26 @@ export class BudgetsService {
       overrideMap.set(`${o.scheduledTransactionId}:${overrideDate}`, o);
     }
 
-    for (const bill of eligibleBills) {
+    // The alert says what the bill will cost, so it asks the shared resolver
+    // rather than reading the persisted snapshot (issue #1247). Hydrating each
+    // bill's matching override lets the resolver apply the same
+    // override-then-base precedence the posting does.
+    const eligibleWithOverrides = eligibleBills.map((bill) => {
+      const dueDate =
+        typeof bill.nextDueDate === "string"
+          ? bill.nextDueDate
+          : formatDateYMD(bill.nextDueDate as Date);
+      return {
+        ...bill,
+        nextOverride: overrideMap.get(`${bill.id}:${dueDate}`) ?? null,
+      };
+    });
+    const effective = await this.effectiveAmounts.resolveMany(
+      userId,
+      eligibleWithOverrides,
+    );
+
+    for (const bill of eligibleWithOverrides) {
       const dueDate =
         typeof bill.nextDueDate === "string"
           ? bill.nextDueDate
@@ -659,10 +748,16 @@ export class BudgetsService {
       if (existingBillKeys.has(`${bill.id}:${dueDate}`)) continue;
 
       const payeeName = bill.payee?.name || bill.payeeName || bill.name;
-      const override = overrideMap.get(`${bill.id}:${dueDate}`);
-      const amount = Math.abs(
-        Number(override?.amount != null ? override.amount : bill.amount),
-      );
+      const resolved = effective.get(bill.id)!;
+      const occurrence = bill.nextOverride
+        ? (resolved.overrides.get(overrideEffectiveKey(bill.nextOverride))
+            ?.effective ?? resolved.base)
+        : resolved.base;
+      // An amount we cannot work out is stated as unavailable. Naming a stale
+      // figure in an alert the user acts on is the defect; withholding the
+      // alert entirely would hide a payment that is genuinely due.
+      const amount =
+        occurrence.amount === null ? null : Math.abs(occurrence.amount);
       const daysUntilDue = Math.ceil(
         (new Date(dueDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
       );
@@ -676,13 +771,17 @@ export class BudgetsService {
       alert.alertType = AlertType.BILL_DUE;
       alert.severity = severity;
       alert.title = `${payeeName} due${daysUntilDue === 0 ? " today" : daysUntilDue === 1 ? " tomorrow" : ` in ${daysUntilDue} days`}`;
-      alert.message = `${formatCurrency(amount, bill.currencyCode)} due on ${dueDate}`;
+      alert.message =
+        amount === null
+          ? `Amount unavailable (no current exchange rate), due on ${dueDate}`
+          : `${formatCurrency(amount, occurrence.currencyCode)} due on ${dueDate}`;
       alert.data = {
         billId: bill.id,
         payeeName,
         amount,
+        amountComplete: amount !== null,
         dueDate,
-        currencyCode: bill.currencyCode,
+        currencyCode: occurrence.currencyCode,
       };
       alert.isRead = false;
       alert.isEmailSent = false;

@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Überfällig",
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manuell",
+    "amountUnavailable": "Nicht verfügbar",
+    "csvAmountUnavailable": "Nicht verfügbar (kein aktueller Wechselkurs)",
     "pdfTitle": "Bevorstehende Rechnungen",
     "pdfSubtitle": "{month} | {count} aktive Rechnungen",
     "pdfActiveBills": "Aktive Rechnungen",

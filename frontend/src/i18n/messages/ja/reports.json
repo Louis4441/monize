@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "期限超過",
     "csvStatusAuto": "自動",
     "csvStatusManual": "手動",
+    "amountUnavailable": "取得できません",
+    "csvAmountUnavailable": "取得できません（現在の為替レートなし）",
     "pdfTitle": "支払い予定レポート",
     "pdfSubtitle": "{month} | {count} 件の有効な請求書",
     "pdfActiveBills": "有効な請求書",

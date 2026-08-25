@@ -265,6 +265,32 @@ Ten shares stored at 100.00 that come back as ten at 120.00 -- with the total
 silently recomputed -- is a money field changed by nobody, and the user has no
 way to tell it happened.
 
+```text
+FIN-005
+`scheduled_transactions.amount` is a snapshot taken at whatever exchange rate was
+current when it was written, not a description of what the occurrence will post.
+For an FX-sensitive schedule -- a top-level investment, whose `amount` is the
+security-currency cash impact, or a split parent carrying an investment line --
+it stops describing the occurrence the moment a referenced security's or
+account's currency changes.
+
+The current amount is resolved, once, by
+`ScheduledEffectiveAmountService.resolveMany`: the stored rate when its recorded
+pair is still the settlement pair (because that is what posting will reuse),
+otherwise a freshly resolved rate, and `null` when a genuine cross-currency pair
+has no determinable rate. Every surface that presents or aggregates an
+occurrence's cash amount reads that answer, in the settlement currency it names,
+and reports `null` as unavailable. A total containing an unknown component is
+`null` with the partial sum in a separately named field.
+```
+
+The persisted scalar is never the fallback. Substituting it turns "we do not know
+what this will cost" into a confident wrong number -- 1,500 CAD for an occurrence
+that posts 1,350 -- and it did so on five product surfaces at once while the
+cash-flow forecast beside them was right (issue #1247). INV-OCCURRENCE-003 in
+`docs/system-invariants.md` records the enforcement and the one consumer still
+outstanding.
+
 ## 8. Import and restore: zero, null, absent
 
 The MS Money importer is deliberately not uniform, and the distinction is worth

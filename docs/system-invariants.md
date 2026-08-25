@@ -68,6 +68,7 @@ implied.
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
+| INV-OCCURRENCE-003 | Every surface reports a scheduled occurrence's *current* amount | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
 | INV-AUTH-001 | A refresh token rotates once, or the family is revoked | enforced |
 | INV-AUTH-002 | A failed-login counter records every failure | enforced |
@@ -480,6 +481,56 @@ Failure response    a stored ten-at-100.00 stays ten at 100.00 across a reopen.
 Required tests      Present: OverrideEditorDialog.test.tsx -- reopen with a stored
                     price and a differing quote asserts the stored price stands,
                     plus the typed-total-before-close case.
+Status              enforced
+```
+
+### INV-OCCURRENCE-003 -- one effective amount, everywhere
+
+```text
+Statement           Every surface that presents or aggregates the cash amount of a
+                    scheduled occurrence reports the amount that occurrence would
+                    post *today*, and reports it as unavailable when that cannot
+                    be determined. The persisted amount is never substituted.
+Source of truth     ScheduledEffectiveAmountService.resolveMany (backend
+                    scheduled-transactions/scheduled-effective-amount.service.ts),
+                    which owns the #1167 stored-if-current-else-resolve decision
+                    and the combination of rate and stored scalar. It is the only
+                    place that decision is made; scheduled_transactions.amount is
+                    a snapshot at whatever rate was current when it was written.
+Enforcement         Server: findAll emits effectiveAmount /
+                    effectiveAmountComplete / effectiveCurrencyCode per schedule
+                    and per override; getLlmUpcomingBillsAndDeposits (AI + MCP),
+                    BudgetsService.getUpcomingBills / getVelocity /
+                    ensureBillAlerts, BillReminderService and
+                    ForecastAggregatorService all read the resolver.
+                    Client: lib/scheduled-effective-amount.ts is the only reader
+                    of those fields, and
+                    lib/scheduled-effective-amount.guard.test.ts scans src/ for
+                    the `override.amount ?? …amount` fingerprint and for each
+                    migrated surface still importing the helper.
+Aggregation rule    A total is null when any component is unknown; the partial sum
+                    travels in a separately named field (knownUpcoming*Subtotal,
+                    knownSubtotal) and never under the total's caption.
+Concurrency scope   per occurrence; the resolver's FX caches are per read
+Failure response    the occurrence renders as unavailable (UnknownAmount /
+                    "Amount unavailable") and every total containing it is
+                    withheld -- never the stale figure, never a measured zero.
+Required tests      Present: scheduled-effective-amount.service.spec.ts (the
+                    issue's stale-pair and unknown-pair scenarios, split parents,
+                    overrides), findAll and getLlmUpcomingBillsAndDeposits cases
+                    in scheduled-transactions.service.spec.ts,
+                    budgets.service.spec.ts getVelocity + alert cases,
+                    bill-reminder.service.spec.ts, and the frontend suites for
+                    scheduled-utils, UpcomingBills, BudgetUpcomingBills,
+                    BudgetVelocityWidget, UpcomingBillsReport,
+                    RecurringChargesPanel and ScheduledTransactionList.
+Known gap           accounts/balance-forecast.service.ts still projects an
+                    account's balance from the persisted amount. Its investment
+                    handling applies a security-currency figure to the brokerage
+                    account rather than the settlement account, so switching only
+                    the amount would trade one wrong number for another; the
+                    account-remapping fix has to land with it. Tracked as a
+                    follow-up to issue #1247.
 Status              enforced
 ```
 

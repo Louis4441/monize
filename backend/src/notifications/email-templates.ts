@@ -19,7 +19,13 @@ export function testEmailTemplate(
 
 interface BillData {
   payee: string;
-  amount: number;
+  /**
+   * What this occurrence would cost today, as a positive magnitude, or `null`
+   * when the server could not determine it (issue #1247). A reminder that
+   * printed the persisted snapshot instead would tell the recipient to pay a
+   * figure nothing in the app will post.
+   */
+  amount: number | null;
   dueDate: string;
   currencyCode: string;
   isIncome: boolean;
@@ -41,7 +47,7 @@ export function billReminderTemplate(
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb;">
             <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: white; background: ${b.isIncome ? "#059669" : "#dc2626"};">${b.isIncome ? t("emails.billReminder.typeIncome", "Income") : t("emails.billReminder.typeExpense", "Expense")}</span>
           </td>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: ${b.isIncome ? "#059669" : "#dc2626"}; font-weight: 500;">${formatCurrency(Math.abs(b.amount), b.currencyCode)}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: ${b.isIncome ? "#059669" : "#dc2626"}; font-weight: 500;">${b.amount === null ? escapeHtml(t("emails.billReminder.amountUnavailable", "Amount unavailable")) : formatCurrency(Math.abs(b.amount), b.currencyCode)}</td>
         </tr>`,
     )
     .join("");

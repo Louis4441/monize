@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Em Atraso",
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manual",
+    "amountUnavailable": "Não disponível",
+    "csvAmountUnavailable": "Não disponível (sem taxa de câmbio atual)",
     "pdfTitle": "Relatório de Faturas Futuras",
     "pdfSubtitle": "{month} | {count} faturas ativas",
     "pdfActiveBills": "Faturas Ativas",

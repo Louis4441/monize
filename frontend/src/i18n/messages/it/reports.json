@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "In scadenza",
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manuale",
+    "amountUnavailable": "Non disponibile",
+    "csvAmountUnavailable": "Non disponibile (nessun tasso di cambio attuale)",
     "pdfTitle": "Report fatture in scadenza",
     "pdfSubtitle": "{month} | {count} fatture attive",
     "pdfActiveBills": "Fatture attive",

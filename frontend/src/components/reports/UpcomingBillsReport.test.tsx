@@ -584,6 +584,104 @@ describe('UpcomingBillsReport', () => {
     });
   });
 
+  // ---- Effective amounts (issue #1247) ----
+
+  describe('effective amounts', () => {
+    it("uses the server's effective amount in the list and the totals", async () => {
+      mockGetAll.mockResolvedValue([
+        makeTransaction({
+          id: 'st-inv',
+          name: 'Monthly ETF buy',
+          frequency: 'ONCE',
+          nextDueDate: '2026-02-19',
+          // The security-currency cash impact, pinned at 1.50 when it was EUR.
+          amount: -1000,
+          isInvestment: true,
+          // The security is USD now, and USD -> CAD resolves at 1.35.
+          effectiveAmount: -1350,
+          effectiveAmountComplete: true,
+          effectiveCurrencyCode: 'CAD',
+        }),
+      ]);
+      render(<UpcomingBillsReport />);
+      await waitFor(() => {
+        expect(screen.getByText('This Month')).toBeInTheDocument();
+      });
+
+      const thisMonthCard = screen.getByText('This Month').parentElement!;
+      expect(thisMonthCard).toHaveTextContent('$1350');
+      // Neither the pre-FX impact nor the stale 1.50 figure.
+      expect(thisMonthCard).not.toHaveTextContent('$1000');
+      expect(thisMonthCard).not.toHaveTextContent('$1500');
+    });
+
+    it('withholds a total containing an unresolvable occurrence', async () => {
+      mockGetAll.mockResolvedValue([
+        makeTransaction({
+          id: 'st-inv',
+          name: 'Monthly ETF buy',
+          frequency: 'ONCE',
+          nextDueDate: '2026-02-19',
+          amount: -1000,
+          isInvestment: true,
+          effectiveAmount: null,
+          effectiveAmountComplete: false,
+          effectiveCurrencyCode: 'CAD',
+        }),
+        makeTransaction({
+          id: 'st-rent',
+          name: 'Rent',
+          frequency: 'ONCE',
+          nextDueDate: '2026-02-20',
+          amount: -1500,
+          effectiveAmount: -1500,
+          effectiveAmountComplete: true,
+        }),
+      ]);
+      render(<UpcomingBillsReport />);
+      await waitFor(() => {
+        expect(screen.getByText('This Month')).toBeInTheDocument();
+      });
+
+      const thisMonthCard = screen.getByText('This Month').parentElement!;
+      // Not the known part on its own under a total's caption, and not the
+      // stale figure either.
+      expect(thisMonthCard).not.toHaveTextContent('$1500');
+      expect(thisMonthCard).not.toHaveTextContent('$2500');
+      expect(thisMonthCard).not.toHaveTextContent('$3000');
+      expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThan(0);
+    });
+
+    it('exports an explicit marker rather than a stale or empty amount', async () => {
+      mockGetAll.mockResolvedValue([
+        makeTransaction({
+          id: 'st-inv',
+          name: 'Monthly ETF buy',
+          frequency: 'ONCE',
+          nextDueDate: '2026-02-19',
+          amount: -1000,
+          isInvestment: true,
+          effectiveAmount: null,
+          effectiveAmountComplete: false,
+          effectiveCurrencyCode: 'CAD',
+        }),
+      ]);
+      render(<UpcomingBillsReport />);
+      await waitFor(() => {
+        expect(screen.getByTestId('export-csv')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('export-csv'));
+      });
+
+      const [, , rows] = mockExportToCsv.mock.calls[0];
+      // The amount column carries the marker, not -1000 and not an empty cell a
+      // spreadsheet would total as zero.
+      expect(rows[0][2]).toBe('Not available (no current exchange rate)');
+    });
+  });
+
   describe('This Month Summary', () => {
     it('shows this month count and total', async () => {
       // Feb 19 is this month (Feb 2026), not overdue

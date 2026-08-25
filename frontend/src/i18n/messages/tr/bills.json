@@ -6,6 +6,7 @@
     "summaryActiveBills": "Aktif Faturalar",
     "summaryActiveDeposits": "Aktif Mevduatlar",
     "summaryMonthlyNet": "Aylık Net",
+    "summaryAmountUnavailable": "Kullanılamıyor",
     "summaryDueNow": "Şimdi Vadesi Gelen",
     "loadingText": "Zamanlanmış işlemler yükleniyor...",
     "chartUnavailable": "Grafik geçici olarak kullanılamıyor"

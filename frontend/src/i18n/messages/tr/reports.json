@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Gecikmiş",
     "csvStatusAuto": "Otomatik",
     "csvStatusManual": "Manuel",
+    "amountUnavailable": "Kullanılamıyor",
+    "csvAmountUnavailable": "Kullanılamıyor (geçerli döviz kuru yok)",
     "pdfTitle": "Yaklaşan Faturalar Raporu",
     "pdfSubtitle": "{month} | {count} aktif fatura",
     "pdfActiveBills": "Aktif Faturalar",

@@ -18,6 +18,7 @@
     "colAmount": "Betrag",
     "typeIncome": "Einnahme",
     "typeExpense": "Ausgabe",
+    "amountUnavailable": "Betrag nicht verfügbar",
     "button": "Rechnungen &amp; Einzahlungen anzeigen"
   },
   "mortgageReminder": {

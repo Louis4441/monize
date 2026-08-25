@@ -1,9 +1,13 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, forwardRef } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import {
+  ScheduledEffectiveAmountService,
+  overrideEffectiveKey,
+} from "../scheduled-transactions/scheduled-effective-amount.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { User } from "../users/entities/user.entity";
 import { EmailService } from "./email.service";
@@ -43,6 +47,10 @@ export class BillReminderService {
     private configService: ConfigService,
     private readonly i18n: I18nService,
     private readonly jobClaims: JobClaimService,
+    // The amount a reminder quotes is the amount the posting will use, from the
+    // one shared resolver rather than the persisted snapshot (issue #1247).
+    @Inject(forwardRef(() => ScheduledEffectiveAmountService))
+    private readonly effectiveAmounts: ScheduledEffectiveAmountService,
   ) {}
 
   /**
@@ -81,7 +89,10 @@ export class BillReminderService {
       withScopedDb(this.dataSource, (manager) =>
         manager.getRepository(ScheduledTransaction).find({
           where: { isActive: true, autoPost: false },
-          relations: ["payee", "overrides"],
+          // `splits` is what tells the effective-amount resolver whether a
+          // schedule's cash total re-prices at the current FX rate (issue
+          // #1247); without it an embedded-investment schedule looks fixed.
+          relations: ["payee", "overrides", "splits"],
         }),
       ),
     );
@@ -233,18 +244,33 @@ export class BillReminderService {
         return false;
       }
 
+      // What each occurrence would actually post, from the one server-side
+      // resolver the forecast and the posting use (issue #1247). The persisted
+      // `amount` is a snapshot at whatever rate was current when it was written,
+      // so a reminder built from it can name a figure the posting will not use.
+      // The direction (income vs expense) still comes from the stored sign: an
+      // FX rate is positive, so it cannot flip one, and the sign is known even
+      // when the magnitude is not.
+      const effective = await this.effectiveAmounts.resolveMany(userId, [
+        ...bills,
+      ]);
       const billData = bills.map((b) => {
         const dueDateStr = String(b.nextDueDate).split("T")[0];
         const ov = b.overrides?.find(
           (o) => String(o.originalDate).split("T")[0] === dueDateStr,
         );
-        const rawAmount = Number(ov?.amount ?? b.amount);
+        const resolved = effective.get(b.id)!;
+        const occurrence = ov
+          ? (resolved.overrides.get(overrideEffectiveKey(ov))?.effective ??
+            resolved.base)
+          : resolved.base;
         return {
           payee: b.payee?.name || b.payeeName || b.name,
-          amount: Math.abs(rawAmount),
+          amount:
+            occurrence.amount === null ? null : Math.abs(occurrence.amount),
           dueDate: ov ? String(ov.overrideDate).split("T")[0] : dueDateStr,
-          currencyCode: b.currencyCode,
-          isIncome: rawAmount > 0,
+          currencyCode: occurrence.currencyCode,
+          isIncome: Number(ov?.amount ?? b.amount) > 0,
         };
       });
 

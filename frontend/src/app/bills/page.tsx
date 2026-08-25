@@ -46,6 +46,7 @@ import {
 } from '@/lib/bills-filters';
 import { parseLocalDate } from '@/lib/utils';
 import { SCHEDULED_KIND_CHIP_CLASSES, scheduledKind } from '@/lib/scheduled-kind';
+import { scheduleEffectiveAmount } from '@/lib/scheduled-effective-amount';
 import { advanceByFrequency, isOneTime, monthlyEquivalent } from '@/lib/frequency';
 import type { FutureTransaction } from '@/lib/forecast';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -506,19 +507,30 @@ function BillsContent() {
     let monthlyBills = 0;
     let monthlyDeposits = 0;
     let dueCount = 0;
+    // One schedule whose current amount cannot be worked out makes the monthly
+    // net unknowable rather than smaller (issue #1247). The count of schedules is
+    // unaffected: how many bills there are is still known.
+    let monthlyAmountsComplete = true;
 
     for (const t of scheduledTransactions) {
-      const amount = Number(t.amount);
+      // The amount this schedule would post today, not the persisted snapshot:
+      // for an FX-sensitive schedule that scalar was calculated at an older rate.
+      // The KIND still comes from the stored sign -- an exchange rate is
+      // positive, so it cannot turn a bill into a deposit.
+      const effective = scheduleEffectiveAmount(t).amount;
+      const amount = effective ?? Number(t.amount);
       // Transfers move money between the user's own accounts and a zero-amount
       // reminder states no amount, so neither is a bill or a deposit here.
       const kind = t.isActive ? scheduledKind(t) : null;
 
       if (kind === 'bill') {
         totalBills++;
-        monthlyBills += monthlyEquivalent(Math.abs(amount), t.frequency);
+        if (effective === null) monthlyAmountsComplete = false;
+        else monthlyBills += monthlyEquivalent(Math.abs(amount), t.frequency);
       } else if (kind === 'deposit') {
         totalDeposits++;
-        monthlyDeposits += monthlyEquivalent(amount, t.frequency);
+        if (effective === null) monthlyAmountsComplete = false;
+        else monthlyDeposits += monthlyEquivalent(amount, t.frequency);
       }
 
       if (t.isActive && t.nextDueDate) {
@@ -531,7 +543,14 @@ function BillsContent() {
       }
     }
 
-    return { totalBills, totalDeposits, monthlyBills, monthlyDeposits, dueCount };
+    return {
+      totalBills,
+      totalDeposits,
+      monthlyBills,
+      monthlyDeposits,
+      monthlyAmountsComplete,
+      dueCount,
+    };
   }, [scheduledTransactions]);
 
   // Generate upcoming occurrences for calendar view
@@ -622,9 +641,19 @@ function BillsContent() {
           <SummaryCard label={t('page.summaryActiveDeposits')} value={summary.totalDeposits} icon={SummaryIcons.plus} />
           <SummaryCard
             label={t('page.summaryMonthlyNet')}
-            value={formatCurrency(summary.monthlyDeposits - summary.monthlyBills)}
+            value={
+              summary.monthlyAmountsComplete
+                ? formatCurrency(summary.monthlyDeposits - summary.monthlyBills)
+                : t('page.summaryAmountUnavailable')
+            }
             icon={SummaryIcons.money}
-            valueColor={summary.monthlyDeposits - summary.monthlyBills >= 0 ? 'green' : 'red'}
+            valueColor={
+              !summary.monthlyAmountsComplete
+                ? 'default'
+                : summary.monthlyDeposits - summary.monthlyBills >= 0
+                  ? 'green'
+                  : 'red'
+            }
           />
           <SummaryCard
             label={t('page.summaryDueNow')}

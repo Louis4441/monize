@@ -1555,6 +1555,8 @@
     "csvStatusOverdue": "Terlambat",
     "csvStatusAuto": "Otomatis",
     "csvStatusManual": "Manual",
+    "amountUnavailable": "Tidak tersedia",
+    "csvAmountUnavailable": "Tidak tersedia (tidak ada nilai tukar saat ini)",
     "pdfTitle": "Laporan Tagihan yang Akan Datang",
     "pdfSubtitle": "{month} | {count} tagihan aktif",
     "pdfActiveBills": "Tagihan Aktif",

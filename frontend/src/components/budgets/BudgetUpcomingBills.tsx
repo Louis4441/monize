@@ -6,6 +6,11 @@ import { gainLossColor } from '@/lib/format';
 import { SCHEDULED_KIND_AMOUNT_CLASSES, scheduledKind } from '@/lib/scheduled-kind';
 import { differenceInDays, startOfDay, parseISO } from 'date-fns';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
+import {
+  nextOccurrenceEffectiveAmount,
+  sumEffectiveAmounts,
+} from '@/lib/scheduled-effective-amount';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 
 interface BudgetUpcomingBillsProps {
   scheduledTransactions: ScheduledTransaction[];
@@ -25,9 +30,13 @@ export function BudgetUpcomingBills({
   const today = startOfDay(new Date());
   const endDate = parseISO(periodEnd);
 
-  const getEffectiveAmount = (st: ScheduledTransaction): number => {
-    return st.nextOverride?.amount ?? st.amount;
-  };
+  // What this occurrence would cost TODAY, from the server's effective-amount
+  // contract (issue #1247). Never `nextOverride?.amount ?? amount`: that scalar
+  // was computed at whatever FX rate was current when it was written, so an
+  // FX-sensitive schedule made this panel disagree with the cash-flow forecast
+  // -- and with what the posting will actually book.
+  const getEffective = (st: ScheduledTransaction) =>
+    nextOccurrenceEffectiveAmount(st);
 
   const upcomingBills = useMemo(() => {
     return scheduledTransactions
@@ -39,7 +48,12 @@ export function BudgetUpcomingBills({
         // contributes 0 to the total below -- the placeholder is not a claim
         // about what the payment will cost. Deposits and transfers are not
         // budgeted spending and stay out.
-        const kind = scheduledKind({ amount: getEffectiveAmount(st), isTransfer: st.isTransfer });
+        // The kind is a question about direction, and an FX rate is positive, so
+        // the stored sign classifies correctly even when the magnitude is unknown.
+        const kind = scheduledKind({
+          amount: getEffective(st).amount ?? Number(st.amount),
+          isTransfer: st.isTransfer,
+        });
         if (kind !== 'bill' && kind !== 'reminder') return false;
         const dueDate = parseISO(st.nextDueDate);
         const daysUntil = differenceInDays(dueDate, today);
@@ -52,13 +66,20 @@ export function BudgetUpcomingBills({
       );
   }, [scheduledTransactions, today, endDate]);
 
-  const totalUpcoming = useMemo(
-    () => upcomingBills.reduce((sum, bill) => sum + Math.abs(getEffectiveAmount(bill)), 0),
+  // One bill with an unknown current amount makes both this total and "truly
+  // available" unknowable, not smaller (issue #1247). The partial sum is kept
+  // separately and shown as a subtotal through `PartialTotal`, which is also what
+  // tells the reader a figure is missing rather than zero.
+  const upcomingTotal = useMemo(
+    () => sumEffectiveAmounts(upcomingBills, getEffective, Math.abs),
     [upcomingBills],
   );
 
   const t = useTranslations('budgets');
-  const trulyAvailable = totalBudgeted - currentSpent - totalUpcoming;
+  const trulyAvailable =
+    upcomingTotal.total === null
+      ? null
+      : totalBudgeted - currentSpent - upcomingTotal.total;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 sm:p-6">
@@ -87,11 +108,18 @@ export function BudgetUpcomingBills({
               <span
                 className={`font-medium ml-2 whitespace-nowrap ${
                   SCHEDULED_KIND_AMOUNT_CLASSES[
-                    scheduledKind({ amount: getEffectiveAmount(bill), isTransfer: bill.isTransfer })
+                    scheduledKind({
+                      amount: getEffective(bill).amount ?? Number(bill.amount),
+                      isTransfer: bill.isTransfer,
+                    })
                   ]
                 }`}
               >
-                {formatCurrency(Math.abs(getEffectiveAmount(bill)))}
+                {getEffective(bill).amount === null ? (
+                  <UnknownAmount />
+                ) : (
+                  formatCurrency(Math.abs(getEffective(bill).amount!))
+                )}
               </span>
             </div>
           ))}
@@ -105,20 +133,30 @@ export function BudgetUpcomingBills({
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600 dark:text-gray-400">{t('upcomingBills.totalUpcoming')}</span>
-          <span className="font-semibold text-red-600 dark:text-red-400">
-            {formatCurrency(totalUpcoming)}
-          </span>
+          {/* A total is only a total when every component is known. One bill
+              whose current amount could not be resolved makes this unknowable,
+              and the per-bill rows above already mark which one (issue #1247). */}
+          {upcomingTotal.total === null ? (
+            <UnknownAmount />
+          ) : (
+            <span className="font-semibold text-red-600 dark:text-red-400">
+              {formatCurrency(upcomingTotal.total)}
+            </span>
+          )}
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600 dark:text-gray-400">{t('upcomingBills.trulyAvailable')}</span>
-          <span
-            className={`font-semibold ${
-              gainLossColor(trulyAvailable)
-            }`}
-          >
-            {formatCurrency(Math.abs(trulyAvailable))}
-            {trulyAvailable < 0 && t('upcomingBills.over')}
-          </span>
+          {/* Derived from the total above, so it is unknown for the same reason.
+              Showing a number here would be the whole defect: a budget that
+              silently counted a stale bill (issue #1247). */}
+          {trulyAvailable === null ? (
+            <UnknownAmount />
+          ) : (
+            <span className={`font-semibold ${gainLossColor(trulyAvailable)}`}>
+              {formatCurrency(Math.abs(trulyAvailable))}
+              {trulyAvailable < 0 && t('upcomingBills.over')}
+            </span>
+          )}
         </div>
       </div>
     </div>
