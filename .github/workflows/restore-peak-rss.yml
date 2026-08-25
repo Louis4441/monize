@@ -1,0 +1,66 @@
+# Measures what a restore actually costs, on demand (DR-F3RB-004, issue #1073).
+#
+# Deliberately not a pull-request gate. Peak RSS on a shared runner is not
+# reproducible to the megabyte, and a memory gate that flakes teaches people to
+# re-run it rather than to read it. What IS a gate is the cheap guard beside the
+# committed record (backend/src/backup/restore-peak-rss.record.spec.ts), which
+# fails when the constants and the record disagree.
+#
+# The measurement it takes is a lower bound: the decode phases only, and without
+# a cgroup limit unless the runner has one. The heap-cap sweep is the part that
+# answers "does a restore fit at all" -- 304 MiB is the headroom the model leaves
+# on the chart's default 400 MiB pod.
+name: Restore Peak RSS
+
+on:
+  workflow_dispatch:
+    inputs:
+      target-mib:
+        description: Expanded artifact size to decode, in MiB
+        default: "96"
+      heap-caps:
+        description: Comma-separated --max-old-space-size values in MiB
+        default: "304,512,1024"
+      repeat:
+        description: Runs per case; the worst is kept
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Peak RSS over the restore decode path
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 24
+      - run: npm ci
+      # Compiled, not ts-node: the TypeScript compiler would otherwise allocate
+      # inside the process being measured, which is how the first run of this
+      # harness produced numbers that meant nothing.
+      - run: npm run build
+      - name: Measure
+        run: |
+          node dist/backup/restore-peak-rss.harness.js \
+            --target-mib='${{ inputs.target-mib }}' \
+            --repeat='${{ inputs.repeat }}' \
+            --child-heap-mib='${{ inputs.heap-caps }}' \
+            --record=peak-rss-record.json
+      - name: Upload the record
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: restore-peak-rss-record
+          path: backend/peak-rss-record.json

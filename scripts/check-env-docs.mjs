@@ -49,6 +49,12 @@ const IGNORED = new Set([
   '__NEXT_PRIVATE_PREBUNDLED_REACT',
   // Auto-injected at build time via next.config.js from package.json
   'NEXT_PUBLIC_APP_VERSION',
+  // Passed by the peak-RSS harness to its own forked children (which artifact to
+  // decode, whether to relay their stderr). Not deployment configuration: the
+  // harness is a measurement tool nothing in the server imports, and documenting
+  // these in .env.example would invite an operator to set them.
+  'MONIZE_PEAK_RSS_ARTIFACT',
+  'MONIZE_PEAK_RSS_DEBUG',
 ]);
 
 const REFERENCE_PATTERNS = [

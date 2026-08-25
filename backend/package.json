@@ -32,7 +32,8 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
     "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts",
-    "mny:inspect": "ts-node -r tsconfig-paths/register src/import/mny/mny-inspect.ts"
+    "mny:inspect": "ts-node -r tsconfig-paths/register src/import/mny/mny-inspect.ts",
+    "backup:peak-rss": "ts-node -r tsconfig-paths/register src/backup/restore-peak-rss.harness.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
@@ -165,7 +166,8 @@
       "!src/database/add-*.ts",
       "!src/database/fix-*.ts",
       "!src/database/migrations/**",
-      "!src/**/__fixtures__/**"
+      "!src/**/__fixtures__/**",
+      "!src/**/*.harness.ts"
     ],
     "coverageDirectory": "./coverage",
     "transformIgnorePatterns": [

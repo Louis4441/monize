@@ -608,9 +608,19 @@ PEAK_MULTIPLE`), so none of them can vouch for it. On the default 400 MiB pod th
 model leaves 4 MiB spare and a true multiple above 3.04 puts a single admitted
 restore over the container (3.20 on a 512 MiB or 1 GiB pod), so an operator whose
 restore is OOM-killed at one slot is hitting the estimate, not a bug in the gate.
-The baseline and the multiple are both estimates, not measurements; settling them
-needs the cgroup peak-RSS test that has never run here — issue #1073, planned in
-`docs/future-plans/restore-admission-and-memory.md`.
+**The multiple has now been measured, and it is about 2.3× the modeled one.**
+`backend/src/backup/restore-peak-rss.harness.ts` decodes generated artifacts in a
+fresh process and records the peak; the committed result
+(`backend/src/backup/restore-peak-rss.record.json`) puts the **decode phases alone**
+at an implied multiple of 6.9 to 7.9 — rising as the artifact shrinks, because part of
+the cost does not scale with the payload — and shows that four of five 96 MiB
+artifacts cannot be decoded at all inside 304 MiB, which is exactly the headroom the
+model leaves on the chart's default pod. So the derived ceilings currently admit a
+restore this process cannot finish. Attachment staging and the insert transaction are
+not in that figure, so it is a lower bound; no run has been cgroup-constrained, so
+"refused rather than killed" is still unproven. Fixing the derivation is the next step
+in `docs/future-plans/restore-admission-and-memory.md` (issue #1073), and it lowers
+what a default pod will accept.
 
 **The queue behind those slots is bounded, deadlined and cancellation-aware
 (DR-F3RB-002).** It was a plain array of resolve callbacks: no limit, no deadline,

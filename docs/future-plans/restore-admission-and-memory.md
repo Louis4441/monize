@@ -104,32 +104,67 @@ wrong quietly:
 
 ### D3. Break the circularity (DR-F3RB-004): derive capacity first, then the ceiling
 
-Measuring `PEAK_MULTIPLE` is necessary but not sufficient. Today the *same* constant
-appears in the numerator of the peak and the denominator of every ceiling, so a
-measurement that comes back at 3.5 does not merely tighten a number -- it invalidates
-the derivation. Two candidate shapes:
+**The measurement has now been taken** (WP1 below; the record is
+`backend/src/backup/restore-peak-rss.record.json`). It changes this decision from a
+tuning question into a correctness one, so the numbers come first:
 
-- **Option A, keep the shape, raise the inputs.** Set `PEAK_MULTIPLE` to the measured
-  maximum plus a margin and let the existing formulas fall out. On the default pod a
-  measured 3.5 with a 15% margin gives an expanded limit of 100 MiB and a modeled
-  total of 499 MiB against a 400 MiB container: `computeRestoreProcessingSlots`
-  returns 0 and **every restore is refused** until the operator raises the pod. Honest,
-  and a regression for every existing deployment.
+| Expanded artifact | Worst implied multiple | At a 304 MiB heap (the model's own headroom) |
+|---|---|---|
+| 24 MiB | 7.91 | completes |
+| 48 MiB | 7.37 | completes |
+| 96 MiB | 6.89 | **4 of 5 artifacts cannot be decoded at all** |
+
+`PEAK_MULTIPLE = 3` is therefore short by a factor of about 2.3, and that is measured
+over the **decode phases only** -- attachment staging and the insert transaction are
+not in it, so every figure above is a lower bound. Three consequences, each of which
+outranks the original framing of this decision:
+
+- **The default pod cannot restore what it admits.** On a 400 MiB container the
+  derived expanded ceiling is 100 MiB and the gate admits one restore; decoding a
+  96 MiB artifact needs about 700 MiB of resident memory. "One slot with 4 MiB spare"
+  describes a restore that does not finish.
+- **The cost is the artifact's, not the heap limit's.** Above the point where the
+  decode completes, the peak barely moves between a 512 MiB and a 1 GiB heap cap. So
+  this is not V8 hoarding because it was allowed to, and capping the heap is not a
+  mitigation: it converts an OOM-killed pod into a process-fatal JavaScript heap
+  failure, which loses the server either way. Worth knowing separately: **nothing in
+  this repository sets `--max-old-space-size`**, so V8 sizes its old space from *host*
+  memory rather than from the cgroup limit.
+- **The relationship is affine, not proportional.** The multiple *rises* as the
+  artifact shrinks, because part of the cost does not scale with the payload. So no
+  single multiple is right everywhere, and whichever one the code keeps has to be the
+  worst over the sizes that deployment admits.
+
+Two candidate shapes, with the measured 7.91 and a 15% margin (9.1):
+
+- **Option A, keep the shape, raise the constant.** `PEAK_MULTIPLE = 9` leaves the
+  expanded default at a quarter of the container -- 100 MiB on the default pod -- and
+  models a 900 MiB peak against 304 MiB of headroom, so
+  `computeRestoreProcessingSlots` returns 0 and **every restore is refused** until the
+  operator raises the pod. Honest, and a hard regression for every existing
+  deployment.
 - **Option B, solve for the ceiling (recommended).** Derive the expanded limit from
   the headroom instead of from a fixed share:
   `expanded = (container - baseline) / (measuredMultiple * safetyMargin)`, with **no
   usability floor** -- the same lesson `safeDerivedUploadLimit` already carries, where
   resolving a usability minimum and a safety maximum with `max()` let the floor win
-  over the safety. On a 400 MiB pod with a measured 3.0 and a 1.15 margin that is
-  88 MiB expanded, a 264 MiB peak, 40 MiB spare and one slot. On a 128 MiB pod it is
-  about 9 MiB expanded and one slot -- small restores work, where today both the
-  128 and 256 MiB pods refuse every restore. `warnIfRestoreUploadLimitIsCramped` is
-  already the pattern for telling the operator their ceiling is small.
+  over the safety. On a 400 MiB pod that is about 33 MiB expanded, a 264 MiB modeled
+  peak, 40 MiB spare and one slot. The compressed ceiling has to come down with it:
+  66 MiB of wire cannot expand to under 33 MiB, so a limit that admits it is a
+  promise the decompressor will break.
 
-Under Option B the chain has one measured input and the slot count is at least one
-whenever the container exceeds the baseline, by construction rather than by luck.
+Under Option B the chain has one measured input, and the slot count is at least one
+whenever the container exceeds the baseline -- by construction rather than by luck.
 The invariant to assert, for every supported pod size: `baseline + slots * measured *
 expanded <= container`, with a stated minimum spare.
+
+**The cost of Option B is user-visible and belongs to the issue's owner**: on a
+default 400 MiB pod the largest restorable artifact drops from a nominal 100 MiB
+expanded to about 33 MiB. The counter-argument is that the nominal figure was never
+real -- an operator attempting it today loses the pod mid-restore -- so the choice is
+between a readable refusal and an OOM kill, not between 100 MiB and 33 MiB. An
+operator who needs the larger artifact raises `resources.limits.memory`, and the
+startup warning already names that lever.
 
 ### D4. Reconcile the baseline with the chart
 
@@ -143,10 +178,39 @@ disagrees is the clearest argument in the issue for measuring at all.
 Ordered by dependency. WP1 gates the constants in WP2; WP3 and WP4 are independent of
 the measurement and can land first.
 
-### WP1 -- the cgroup-constrained peak-RSS harness (DR-F3RB-004, measurement)
+### WP1 -- the peak-RSS harness and its record (DR-F3RB-004) -- DONE
 
-Not a unit test: it needs a container with a real memory limit, and it must not run
-in `test:unit` where a 400 MiB cap would fail the suite on a developer laptop.
+Shipped as `backend/src/backup/restore-peak-rss.harness.ts` (run it with the
+`backup:peak-rss` script), the committed record
+`backend/src/backup/restore-peak-rss.record.json`, its guard
+`backend/src/backup/restore-peak-rss.record.spec.ts`, and a `workflow_dispatch` job in
+`.github/workflows/restore-peak-rss.yml`. Results are in D3 above.
+
+Two things the harness had to learn the hard way, both now written into it:
+
+- **Measure the compiled build.** Under ts-node the TypeScript compiler allocates
+  inside the process being measured; the first run reported multiples above 6 that
+  were partly its own. The child process runs `dist/` wherever it exists, with
+  `execArgv: []` so `fork` does not pass `-r ts-node/register` on, and the record
+  carries the runtime per case so a wrongly-taken measurement cannot be mistaken for
+  evidence.
+- **`ru_maxrss` is not a baseline.** It is a high-water mark a process can start with
+  already set, so subtracting it hid however much the child had allocated below that
+  mark. The measurement now samples its own RSS and keeps `ru_maxrss` beside it for
+  comparison only. And a child that dies for a reason *other* than memory is recorded
+  as `failed`, which aborts the sweep -- reporting it as `heap-exhausted` is how a
+  harness bug becomes a measurement, and that happened once here.
+
+What is still missing, and why the record says so rather than implying otherwise: the
+database phase (attachment staging, the insert transaction) is not measured, and no
+run has been cgroup-constrained, because this environment has no Docker daemon. The
+heap-cap sweep substitutes for part of the second question -- it shows what does not
+complete inside the model's own headroom -- but it does not show whether the pod is
+refused or killed. Remaining below, unchanged in intent:
+
+Not a unit test: a full-path measurement needs a container with a real memory limit,
+and it must not run in `test:unit` where a 400 MiB cap would fail the suite on a
+developer laptop.
 
 - A script under `scripts/` that runs the real restore path in a
   `docker run --memory=<limit>` container, samples `process.memoryUsage.rss()` on an
