@@ -13,6 +13,24 @@ import {
 } from "./dto";
 import { formatDateYMD } from "../common/date-utils";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
+import { investmentExclusionSql } from "../common/investment-filter.util";
+
+/**
+ * Investment scope is LINKAGE, never account type (INV-REPORT-001, issue #1257):
+ * the cash sleeve of an INVESTMENT account holds ordinary money, while the cash
+ * leg a trade generated is not spending or income. Both halves of the predicate,
+ * and why the account type cannot express either, live in
+ * `common/investment-filter.util.ts`.
+ */
+const INVESTMENT_EXCLUSION = investmentExclusionSql({
+  accountAlias: "a",
+  transactionAlias: "t",
+  splitAlias: "ts",
+});
+const INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
+  accountAlias: "a",
+  transactionAlias: "t",
+});
 
 @Injectable()
 export class TaxRecurringReportsService {
@@ -46,7 +64,7 @@ export class TaxRecurringReportsService {
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
-        AND a.account_type != 'INVESTMENT'
+        AND ${INVESTMENT_EXCLUSION}
         AND (ts.transfer_account_id IS NULL OR ts.id IS NULL)
     `;
 
@@ -206,7 +224,7 @@ export class TaxRecurringReportsService {
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
-        AND a.account_type != 'INVESTMENT'
+        AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
         AND (COALESCE(p.name, t.payee_name) IS NOT NULL AND TRIM(COALESCE(p.name, t.payee_name)) != '')
       GROUP BY t.payee_id, LOWER(TRIM(COALESCE(p.name, t.payee_name))), COALESCE(p.name, t.payee_name), c.name, t.currency_code
       HAVING COUNT(*) >= $4
@@ -381,7 +399,7 @@ export class TaxRecurringReportsService {
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
-        AND a.account_type != 'INVESTMENT'
+        AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
     `;
 
     const params: (string | undefined)[] = [userId, endDate];

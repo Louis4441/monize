@@ -5,7 +5,12 @@ import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { getAllCategoryIdsWithChildren } from "../common/category-tree.util";
-import { applyInvestmentTransactionFilters } from "../common/investment-filter.util";
+import {
+  applyInvestmentTransactionFilters,
+  brokerageExclusionForEntity,
+  investmentLinkedSplitExclusion,
+  investmentLinkedTransactionExclusion,
+} from "../common/investment-filter.util";
 import {
   joinSplitsForAnalytics,
   SPLIT_AMOUNT,
@@ -596,9 +601,7 @@ export class TransactionAnalyticsService {
     // counts/totals match the transaction list.
     queryBuilder.leftJoin("transaction.account", "summaryAccount");
 
-    queryBuilder.andWhere(
-      "(summaryAccount.accountSubType IS NULL OR summaryAccount.accountSubType != 'INVESTMENT_BROKERAGE')",
-    );
+    queryBuilder.andWhere(brokerageExclusionForEntity("summaryAccount"));
 
     // Always expand split transactions so mixed-sign splits are bucketed
     // into income/expense per split. A split parent carries `amount =
@@ -618,8 +621,7 @@ export class TransactionAnalyticsService {
     // leak into expense/income totals as "uncategorised" spending.
     if (excludeInvestmentLinked) {
       queryBuilder.andWhere(
-        // includes VOID rows: records read -- identity, not effect.
-        "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = transaction.id)",
+        investmentLinkedTransactionExclusion("transaction"),
       );
     }
 
@@ -695,14 +697,18 @@ export class TransactionAnalyticsService {
                 new Brackets((unc) => {
                   unc
                     .where(
-                      "transaction.categoryId IS NULL AND transaction.isSplit = false AND transaction.isTransfer = false AND summaryAccount.accountType != 'INVESTMENT'",
+                      `transaction.categoryId IS NULL AND transaction.isSplit = false AND transaction.isTransfer = false AND ${investmentLinkedTransactionExclusion(
+                        "transaction",
+                      )}`,
                     )
                     // A split transaction counts as uncategorised when any of
                     // its non-transfer split lines has no category (transfer
                     // splits are already excluded by the base query), matching
                     // the category breakdown grouping.
                     .orWhere(
-                      "transaction.isSplit = true AND transaction.isTransfer = false AND summaryAccount.accountType != 'INVESTMENT' AND splits.categoryId IS NULL",
+                      `transaction.isSplit = true AND transaction.isTransfer = false AND splits.categoryId IS NULL AND ${investmentLinkedSplitExclusion(
+                        "splits",
+                      )}`,
                     );
                 }),
               );
@@ -1675,10 +1681,7 @@ export class TransactionAnalyticsService {
         .andWhere("(t.payeeId IS NOT NULL OR t.payeeName IS NOT NULL)")
         // Exclude investment-linked cash debits so regular BUY activity
         // isn't flagged as a subscription-like "recurring charge".
-        .andWhere(
-          // includes VOID rows: records read -- identity, not effect.
-          "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = t.id)",
-        )
+        .andWhere(investmentLinkedTransactionExclusion("t"))
         .setParameters(
           options.uncategorizedLabel
             ? { uncategorizedLabel: options.uncategorizedLabel }

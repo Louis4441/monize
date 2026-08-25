@@ -317,6 +317,29 @@ A refund, return, chargeback or cashback filed against an expense category is a 
 
 Dropping the sign filter means income now reaches the aggregate and has to leave by a different door: a bucket whose net is not spending is not a row in a spending report -- one predicate, not a per-call-site `> 0`. Netting is **within** one category, never across two; both halves come from the same filtered aggregate. (The payee surfaces are deliberately unchanged: `PayeeInfoWidget` prints received credits as their own line beside the spend, so netting them into the headline would count them twice.)
 
+### An INVESTMENT account is a pair, so account type is never the report's filter
+
+`INVESTMENT` is the `account_type` of *both* halves of a linked pair -- the
+`INVESTMENT_CASH` sleeve holding ordinary money and the `INVESTMENT_BROKERAGE`
+sleeve holding securities -- so `AND a.account_type != 'INVESTMENT'` deleted a
+real ledger from fifteen report queries: salary paid into a brokerage's cash
+side vanished from Cash Flow, Income by Source, spending, tax and the
+Uncategorized list (issue #1257). It never described the rows it was meant to
+remove either: the cash leg a BUY/SELL/DIVIDEND posts lives in that same cash
+account, carries no category and no transfer flag.
+
+What a row *is* decides it, and the predicate is written once in
+`backend/src/common/investment-filter.util.ts` -- `investmentExclusionSql` for
+raw SQL, `applyInvestmentTransactionFilters` for a QueryBuilder, both built from
+the same fragments so the two dialects cannot drift. Use those; never spell an
+account-type or sub-type exclusion by hand.
+`backend/src/common/investment-filter.guard.spec.ts` fails on either shape and
+on a built-in-report ledger query that carries no exclusion, and
+`backend/test/integration/report-investment-cash.integration.spec.ts` holds the
+behaviour against a real database. The same rule governs what "Uncategorized"
+means: an auto-generated trade leg is not a row the user forgot to file, and a
+bulk update filtered to uncategorized must not reach it.
+
 ## Environment
 
 Key env vars (see `.env.example` for full list):

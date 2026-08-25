@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger, forwardRef } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../../common/db/scoped-db";
+import { investmentLinkedTransactionExclusion } from "../../common/investment-filter.util";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
 import { AccountsService } from "../../accounts/accounts.service";
@@ -142,9 +143,7 @@ export class ForecastAggregatorService {
         // Exclude investment-linked cash transactions so BUY/SELL/DIVIDEND
         // side-effects don't skew the historical income/expense baseline
         // used to train the forecast.
-        .andWhere(
-          "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = t.id)",
-        )
+        .andWhere(investmentLinkedTransactionExclusion("t"))
         .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
         .addGroupBy("cat.name")
         .addGroupBy("cat.isIncome")
@@ -265,9 +264,7 @@ export class ForecastAggregatorService {
         .andWhere("t.parentTransactionId IS NULL")
         // Exclude investment-linked cash credits (SELL / DIVIDEND) so
         // they don't inflate the income baseline.
-        .andWhere(
-          "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = t.id)",
-        )
+        .andWhere(investmentLinkedTransactionExclusion("t"))
         .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
         .orderBy("month", "ASC")
         .getRawMany(),

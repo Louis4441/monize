@@ -10,6 +10,19 @@ import {
   DuplicateGroup,
   DuplicateTransactionItem,
 } from "./dto";
+import { investmentExclusionSql } from "../common/investment-filter.util";
+
+/**
+ * Investment scope is LINKAGE, never account type (INV-REPORT-001, issue #1257):
+ * the cash sleeve of an INVESTMENT account holds ordinary money, while the cash
+ * leg a trade generated is not spending or income. Both halves of the predicate,
+ * and why the account type cannot express either, live in
+ * `common/investment-filter.util.ts`.
+ */
+const INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
+  accountAlias: "a",
+  transactionAlias: "t",
+});
 
 @Injectable()
 export class DataQualityReportsService {
@@ -46,7 +59,7 @@ export class DataQualityReportsService {
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
-        AND a.account_type != 'INVESTMENT'
+        AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
         AND t.category_id IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM transaction_splits ts
@@ -115,7 +128,7 @@ export class DataQualityReportsService {
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
-        AND a.account_type != 'INVESTMENT'
+        AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
         AND t.category_id IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM transaction_splits ts
@@ -216,6 +229,12 @@ export class DataQualityReportsService {
         AND t.is_transfer = false
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
+        -- The cash leg of a trade is owned by its investment transaction and
+        -- cannot be edited or deleted from the cash register, so offering two
+        -- identical legs (two partial fills at one price) as duplicates points
+        -- the user at a row they cannot act on here. Same exclusion as the rest
+        -- of this service.
+        AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
       ORDER BY t.transaction_date ASC, t.amount ASC
     `;
 

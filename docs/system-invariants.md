@@ -66,6 +66,7 @@ implied.
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
+| INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
@@ -429,6 +430,63 @@ Status              enforced
 At a real rate of 1.3500, a false 100.00 CAD would understate a 135.00 CAD
 position by 35.00 and report it as measured -- which is what the null return and
 the scan now prevent.
+
+### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
+
+```text
+Statement           A report over the transaction ledger includes an ordinary
+                    categorized cash row whatever account it sits in, and
+                    excludes a row that is an investment movement. Membership is
+                    decided by what the row IS -- the cash leg of an investment
+                    transaction, or a row in a securities sleeve -- never by the
+                    account's type. An INVESTMENT account is a pair, and its
+                    INVESTMENT_CASH sleeve is ordinary money: salary, interest,
+                    fees, transfers in and out.
+Source of truth     investment_transactions.transaction_id /
+                    .transaction_split_id for the linkage; accounts.
+                    account_sub_type for the sleeve. Not accounts.account_type,
+                    which is the same value for both halves of the pair.
+Enforcement         One predicate, in backend/src/common/investment-filter.util.ts:
+                    investmentExclusionSql for raw-SQL report queries,
+                    applyInvestmentTransactionFilters for QueryBuilder callers,
+                    both built from the same fragments so the two dialects
+                    cannot drift. Applied by all fifteen ledger queries under
+                    backend/src/built-in-reports/ and by the "Uncategorized"
+                    filters on the register (transactions.service.ts), the
+                    register summary (transaction-analytics.service.ts) and the
+                    bulk-update filter (transaction-bulk-update.service.ts) --
+                    the last one a write path, where the old predicate let a
+                    "select all uncategorized" sweep reach the cash legs a trade
+                    owns. Two scans in
+                    backend/src/common/investment-filter.guard.spec.ts: no
+                    account-type exclusion anywhere in src/, and every
+                    built-in-report query that is not transfer-only carries the
+                    exclusion (the transfer-only exemption is derived from the
+                    query, since an investment cash leg is never a transfer).
+Concurrency scope   -- (read path)
+Retry semantics     -- (read path)
+Crash semantics     -- (read path)
+Failure response    -- a report answers; it does not refuse.
+Required tests      Present: the two source scans above, and
+                    backend/test/integration/report-investment-cash.integration
+                    .spec.ts, which reproduces issue #1257 against a real
+                    database using the real writer
+                    (InvestmentTransactionsService.create posts the cash leg)
+                    and asserts both directions -- $1,000 of sleeve income
+                    reaching Cash Flow and Income by Source, the generated leg
+                    staying out of spending, payees, Uncategorized and
+                    duplicates, a brokerage-sleeve row staying out, an embedded
+                    investment split not becoming an Uncategorized bucket, and
+                    the catalogue-wide claim that adding a trade changes no
+                    report's answer. Unit specs mock manager.query and can only
+                    assert the text of the SQL, which is why the behavioural
+                    proof is the integration suite.
+Status              enforced
+```
+
+The defect this records was not a subtle one: with `AND a.account_type !=
+'INVESTMENT'` in place, nine of the ten integration cases above fail, and the
+tenth passes only because every report was uniformly empty for that account.
 
 ## Scheduled occurrences
 
