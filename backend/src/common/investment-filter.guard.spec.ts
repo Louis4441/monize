@@ -330,38 +330,50 @@ describe("classifyLedgerQuery", () => {
 });
 
 /**
- * The register of what INV-REPORT-001 does NOT yet cover, which is why the
- * invariant's status is `partial` rather than `enforced`.
- *
- * `backend/src/reports/` executes user-defined custom reports over the same
- * ledger through hydrated TypeORM entities, and applies no investment
- * provenance at all: a free-standing BUY's generated cash leg is reported as
- * `Uncategorized` spending, and an embedded investment split child is counted
- * beside its ordinary sibling (re-audit F-CUSTOM-001). The behaviour predates
- * the #1257 work and is unchanged by it.
- *
- * The pin is written so it fails when the gap CLOSES: whoever migrates that
- * engine gets a red test naming the document to update, so the catalog cannot
- * keep describing a gap that is gone.
+ * The custom report engine reaches the same ledger through hydrated TypeORM
+ * entities and aggregates in TypeScript, so the raw-SQL fragments cannot reach
+ * it. It gets the same rule in the other dialect
+ * (`isEmbeddedInvestmentSplit` / `ordinarySplitLines` /
+ * `reportableTransactionAmount`), and these are its scans -- a report engine that
+ * classifies in a loop needs the loop checked, not a query string.
  */
-describe("known gap: the custom report engine", () => {
+describe("the custom report engine classifies by provenance", () => {
   const CUSTOM_REPORTS = join(SRC_ROOT, "reports", "reports.service.ts");
-  const PROVENANCE_MARKERS = [
-    "investment_transactions",
-    "applyInvestmentTransactionFilters",
-    "investmentExclusionSql",
-    "reportableTransactionAmountSql",
-  ];
+  const source = readFileSync(CUSTOM_REPORTS, "utf8");
 
-  it("still applies no investment provenance -- keep INV-REPORT-001 at `partial` until it does", () => {
-    const source = readFileSync(CUSTOM_REPORTS, "utf8");
-    const applied = PROVENANCE_MARKERS.filter((marker) =>
-      source.includes(marker),
-    );
+  it("excludes the sleeve and generated cash in its selector", () => {
+    expect(source).toContain("applyInvestmentTransactionFilters");
+    // The linked investment row is what makes the second representation of an
+    // embedded split readable in TypeScript.
+    expect(source).toContain("splits.investmentTransaction");
+  });
 
-    // When this fails because `applied` is no longer empty: the gap is closed.
-    // Update INV-REPORT-001 in docs/system-invariants.md to `enforced`, name the
-    // custom-report tests that prove it, and delete this block.
-    expect(applied).toEqual([]);
+  it("iterates split lines only through ordinarySplitLines", () => {
+    // The shape that counted a securities purchase as Uncategorized spending.
+    const bareIteration = /for\s*\(\s*const\s+\w+\s+of\s+tx\.splits\s*\)/g;
+
+    expect(source.match(bareIteration)).toBeNull();
+  });
+
+  it("asks for the reportable amount in every aggregator that reads a parent amount", () => {
+    // Bodies are cut at the next method signature at the same indentation --
+    // enough to attribute a `tx.amount` read to the aggregator that makes it.
+    const bodies = source
+      .split(/\n {2}private aggregate/)
+      .slice(1)
+      .map((chunk) => `aggregate${chunk.split("\n  private ")[0]}`);
+
+    expect(bodies.length).toBeGreaterThan(4);
+
+    const offenders = bodies
+      .filter((body) => /Number\(tx\.amount\)/.test(body))
+      .filter(
+        (body) =>
+          !body.includes("reportableTransactionAmount") &&
+          !body.includes("ordinarySplitLines"),
+      )
+      .map((body) => body.split("(")[0]);
+
+    expect(offenders).toEqual([]);
   });
 });

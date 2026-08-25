@@ -359,10 +359,13 @@ on a built-in-report ledger query that carries no exclusion, and
 behaviour against a real database. That guard's transfer-only exemption is
 positive proof, never the presence of the token -- the monthly breakdown reads
 ordinary rows *and* categorized transfer outflows, so a substring match exempted
-a split-joining query from the whole scan. **`backend/src/reports/`, the
-user-defined custom report engine, is the one ledger reader still outside all of
-this**, which is why INV-REPORT-001 is `partial`; a known-gap block in that guard
-spec fails when it is migrated, so the catalog cannot go stale. The same rule governs what "Uncategorized"
+a split-joining query from the whole scan. The custom report engine
+(`backend/src/reports/`) aggregates hydrated entities in TypeScript, so it uses
+the same rule's other dialect -- `ordinarySplitLines` and
+`reportableTransactionAmount`, which live beside the SQL -- and its own scans
+check the loop rather than a query string. The two dialects differ by exactly one
+clause on purpose: the SQL drops transfer children, while a custom report keeps
+its own `includeTransfers` decision. The same rule governs what "Uncategorized"
 means: an auto-generated trade leg is not a row the user forgot to file, and a
 bulk update filtered to uncategorized must not reach it.
 

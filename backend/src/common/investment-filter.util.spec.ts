@@ -1,6 +1,9 @@
 import { SplitKind } from "../transactions/entities/split-kind.enum";
 import {
   applyInvestmentTransactionFilters,
+  isEmbeddedInvestmentSplit,
+  ordinarySplitLines,
+  reportableTransactionAmount,
   brokerageExclusionForEntity,
   brokerageExclusionForSql,
   investmentExclusionSql,
@@ -150,5 +153,134 @@ describe("investmentExclusionSql", () => {
     expect(investmentLinkedSplitExclusion("ts")).toContain(
       "investment_transactions its ",
     );
+  });
+});
+
+/**
+ * The hydrated-entity dialect, used by the custom report engine. Same two
+ * questions as the SQL fragments: what a line is, and what ordinary cash a whole
+ * transaction represents.
+ */
+describe("isEmbeddedInvestmentSplit", () => {
+  it("recognises the declared kind", () => {
+    expect(
+      isEmbeddedInvestmentSplit({ amount: -500, kind: "investment" }),
+    ).toBe(true);
+    expect(isEmbeddedInvestmentSplit({ amount: -60, kind: "category" })).toBe(
+      false,
+    );
+  });
+
+  it("recognises a linked investment row on a line that does not declare itself", () => {
+    expect(
+      isEmbeddedInvestmentSplit({
+        amount: -500,
+        kind: "category",
+        investmentTransaction: { id: "inv-1" },
+      }),
+    ).toBe(true);
+  });
+
+  it("reads a line that hydrated neither field as ordinary", () => {
+    // A caller that did not join the relation still gets the `kind` half; a
+    // line with neither is an ordinary category line.
+    expect(isEmbeddedInvestmentSplit({ amount: -60 })).toBe(false);
+  });
+
+  it("uses the same kind value as the SQL fragment", () => {
+    expect(
+      isEmbeddedInvestmentSplit({ amount: -1, kind: SplitKind.INVESTMENT }),
+    ).toBe(true);
+  });
+});
+
+describe("reportableTransactionAmount", () => {
+  const investmentLine = { amount: -500, kind: SplitKind.INVESTMENT };
+  const groceries = { amount: -60, kind: SplitKind.CATEGORY };
+
+  it("returns a non-split row's own amount", () => {
+    expect(reportableTransactionAmount({ amount: -125, isSplit: false })).toBe(
+      -125,
+    );
+  });
+
+  it("returns the ordinary part of a mixed split, not the parent total", () => {
+    expect(
+      reportableTransactionAmount({
+        amount: -560,
+        isSplit: true,
+        splits: [groceries, investmentLine],
+      }),
+    ).toBe(-60);
+  });
+
+  it("returns null for a pure investment passthrough", () => {
+    // Not zero: the row represents no ordinary cash, which a caller drops
+    // rather than adding 0 to a bucket.
+    expect(
+      reportableTransactionAmount({
+        amount: -500,
+        isSplit: true,
+        splits: [investmentLine],
+      }),
+    ).toBeNull();
+  });
+
+  it("keeps a transfer line, because that decision belongs to the caller", () => {
+    // The SQL twin drops transfer children; a custom report carries its own
+    // includeTransfers configuration, so this one leaves them alone.
+    expect(
+      reportableTransactionAmount({
+        amount: -260,
+        isSplit: true,
+        splits: [groceries, { amount: -200, kind: SplitKind.TRANSFER }],
+      }),
+    ).toBe(-260);
+  });
+
+  it("falls back to the parent amount when a split parent hydrated no lines", () => {
+    expect(
+      reportableTransactionAmount({ amount: -560, isSplit: true, splits: [] }),
+    ).toBe(-560);
+  });
+
+  it("sums in integer arithmetic, so 4dp lines do not drift", () => {
+    expect(
+      reportableTransactionAmount({
+        amount: -0.3,
+        isSplit: true,
+        splits: [{ amount: -0.1 }, { amount: -0.2 }],
+      }),
+    ).toBe(-0.3);
+  });
+
+  it("reads amounts that arrive as decimal strings", () => {
+    expect(
+      reportableTransactionAmount({
+        amount: "-560.0000",
+        isSplit: true,
+        splits: [
+          { amount: "-60.0000", kind: SplitKind.CATEGORY },
+          { amount: "-500.0000", kind: SplitKind.INVESTMENT },
+        ],
+      }),
+    ).toBe(-60);
+  });
+});
+
+describe("ordinarySplitLines", () => {
+  it("drops only the investment lines and keeps their siblings", () => {
+    const groceries = { amount: -60, kind: SplitKind.CATEGORY };
+    const transfer = { amount: -200, kind: SplitKind.TRANSFER };
+    const investment = { amount: -500, kind: SplitKind.INVESTMENT };
+
+    expect(
+      ordinarySplitLines({ splits: [groceries, transfer, investment] }),
+    ).toEqual([groceries, transfer]);
+  });
+
+  it("answers an empty list for a transaction with no splits", () => {
+    expect(ordinarySplitLines({})).toEqual([]);
+    expect(ordinarySplitLines({ splits: null })).toEqual([]);
   });
 });

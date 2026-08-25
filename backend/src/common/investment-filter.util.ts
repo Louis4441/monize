@@ -1,5 +1,6 @@
 import { SelectQueryBuilder } from "typeorm";
 import { SplitKind } from "../transactions/entities/split-kind.enum";
+import { roundMoney, sumMoney } from "./round.util";
 
 /**
  * Which transaction rows are an investment movement rather than ordinary cash,
@@ -156,6 +157,78 @@ export function investmentExclusionSql(opts: {
     clauses.push(investmentLinkedSplitExclusion(opts.splitAlias));
   }
   return clauses.join("\n        AND ");
+}
+
+/* ------------------------------------------------------------------------- *
+ * The same rule for a caller holding hydrated entities rather than SQL.
+ *
+ * The custom report engine (`src/reports/`) reads the ledger through TypeORM
+ * entities and aggregates in TypeScript, so it cannot use the fragments above.
+ * These are the same two questions in the other dialect, kept in this file so
+ * the pair is read together: a line's provenance, and the ordinary cash a whole
+ * transaction represents.
+ *
+ * Deliberately structural rather than the entity types: this file is imported by
+ * `common/` consumers and the rule is about three fields, not about an entity
+ * (the same reasoning as `DeletableRow` in `deletion-balance.util.ts`).
+ * ------------------------------------------------------------------------- */
+
+/** A hydrated split line, as far as this rule is concerned. */
+export interface SplitLineLike {
+  amount: number | string;
+  kind?: string | null;
+  /** Hydrate `splits.investmentTransaction` to make this half readable. */
+  investmentTransaction?: { id: string } | null;
+}
+
+/** A hydrated transaction and its lines. */
+export interface SplitParentLike {
+  isSplit?: boolean | null;
+  amount: number | string;
+  splits?: SplitLineLike[] | null;
+}
+
+/**
+ * Both representations, as in `investmentLinkedSplitExclusion`: the declared
+ * kind and a linked investment row. A caller that did not hydrate the relation
+ * still gets the `kind` half.
+ */
+export function isEmbeddedInvestmentSplit(line: SplitLineLike): boolean {
+  return (
+    line.kind === SplitKind.INVESTMENT || line.investmentTransaction != null
+  );
+}
+
+/** The lines of a split that are not an embedded investment action. */
+export function ordinarySplitLines<T extends SplitLineLike>(parent: {
+  splits?: T[] | null;
+}): T[] {
+  return (parent.splits ?? []).filter(
+    (line) => !isEmbeddedInvestmentSplit(line),
+  );
+}
+
+/**
+ * The TypeScript twin of `reportableTransactionAmountSql`, and the same NULL
+ * semantics: `null` means the transaction represents no ordinary cash at all,
+ * which is different from representing zero.
+ *
+ * The SQL form also drops transfer children, because no built-in report that
+ * uses it includes transfers. This one does not: a custom report carries its own
+ * `includeTransfers` configuration, and that decision stays where the user made
+ * it. So the two differ by exactly the transfer clause, and neither of them
+ * decides investment provenance twice.
+ */
+export function reportableTransactionAmount(
+  parent: SplitParentLike,
+): number | null {
+  const lines = parent.splits ?? [];
+  if (!parent.isSplit || lines.length === 0) {
+    return roundMoney(Number(parent.amount));
+  }
+  const ordinary = ordinarySplitLines(parent);
+  if (ordinary.length === 0) return null;
+  return sumMoney(ordinary.map((line) => Number(line.amount)));
 }
 
 /**

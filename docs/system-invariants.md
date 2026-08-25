@@ -66,7 +66,7 @@ implied.
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
-| INV-REPORT-001 | A report's account scope is investment linkage, not account type | partial |
+| INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
@@ -513,7 +513,10 @@ Required tests      Present: the two source scans above, and
                     nothing at all (by payee, as recurring spending, and in the
                     Uncategorized list and summary), a pure embedded-investment
                     passthrough being absent from Uncategorized and never
-                    learned as a recurring expense, a brokerage-sleeve row
+                    learned as a recurring expense, the custom report engine
+                    answering the same 60 through five groupings and agreeing
+                    with the built-in report over one fixture, a brokerage-sleeve
+                    row
                     staying out, generated
                     cash staying out of an ORDINARY funding account's report
                     (BUY debit and DIVIDEND credit), a SELL credit staying out
@@ -526,28 +529,34 @@ Required tests      Present: the two source scans above, and
                     changes no report's answer. Unit specs mock manager.query and can only
                     assert the text of the SQL, which is why the behavioural
                     proof is the integration suite.
-Unenforced paths    backend/src/reports/ -- the USER-DEFINED custom report
+Also covered        backend/src/reports/ -- the USER-DEFINED custom report
                     engine. It reads the same ledger through hydrated TypeORM
-                    entities (getFilteredTransactions -> aggregateData) and
-                    applies no investment provenance at all, so a free-standing
-                    BUY's generated cash leg is reported as `Uncategorized`
-                    spending and an embedded investment split child is counted
-                    beside its ordinary sibling: the canonical -560 parent
-                    reports 560 there, not 60 (re-audit F-CUSTOM-001). The
-                    behaviour predates the #1257 work and is byte-identical at
-                    the merge base, so it is existing debt rather than a
-                    regression -- but the statement above is written as a product
-                    rule and that engine breaks it, which is why the status below
-                    is `partial`. The gap is pinned by a known-gap block in
-                    backend/src/common/investment-filter.guard.spec.ts that fails
-                    when the engine STARTS applying provenance, so closing it
-                    forces this entry to be updated rather than left stale.
-                    Migrating it means sharing these rules, not copying another
-                    account-type predicate: exclude generated cash by
-                    transaction_id, exclude embedded investment children at
-                    split-row granularity, keep the ordinary siblings, and leave
-                    the report's own transfer configuration alone.
-Status              partial
+                    entities and aggregates in TypeScript, so no SQL fragment
+                    reaches it; it gets the same rule in the other dialect
+                    (isEmbeddedInvestmentSplit / ordinarySplitLines /
+                    reportableTransactionAmount, beside the SQL in
+                    investment-filter.util.ts). Its selector applies
+                    applyInvestmentTransactionFilters and hydrates
+                    splits.investmentTransaction; its six aggregators iterate
+                    ordinary lines and ask for the reportable amount rather than
+                    reading a parent's own. Until this was done a generated BUY
+                    leg was reported as `Uncategorized` spending and the
+                    canonical -560 parent reported 560 rather than 60 (re-audit
+                    F-CUSTOM-001) -- existing debt rather than a regression: that
+                    engine is byte-identical at the merge base. The two dialects
+                    differ by exactly one clause, deliberately: the SQL form
+                    drops transfer children because no built-in report using it
+                    includes transfers, while a custom report carries its own
+                    includeTransfers configuration and that decision stays where
+                    the user made it.
+                    The category-keyed aggregates (ai/insights,
+                    budgets/budget-generator, the payee totals) are structurally
+                    unable to admit either row and are deliberately not listed as
+                    mechanism: each INNER JOINs a category, and a generated cash
+                    leg has none while a split parent's own category_id is NULL.
+                    If one of those joins is ever loosened to a LEFT JOIN it
+                    needs this predicate in the same change.
+Status              enforced
 ```
 
 The defect this records was not a subtle one: with `AND a.account_type !=

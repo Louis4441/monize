@@ -7,6 +7,11 @@ import { tr } from "../i18n/translate";
 import { Brackets, DataSource, Repository } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import {
+  applyInvestmentTransactionFilters,
+  ordinarySplitLines,
+  reportableTransactionAmount,
+} from "../common/investment-filter.util";
+import {
   CustomReport,
   TimeframeType,
   GroupByType,
@@ -391,6 +396,9 @@ export class ReportsService {
         .leftJoinAndSelect("transaction.payee", "payee")
         .leftJoinAndSelect("transaction.tags", "tags")
         .leftJoinAndSelect("transaction.splits", "splits")
+        // Hydrated so an embedded investment line is recognisable by BOTH of its
+        // representations, exactly as the raw-SQL reports recognise it.
+        .leftJoinAndSelect("splits.investmentTransaction", "splitInvestmentTx")
         .leftJoinAndSelect("splits.category", "splitCategory")
         .leftJoinAndSelect("splitCategory.parent", "splitCategoryParent")
         .leftJoinAndSelect("splits.tags", "splitTags")
@@ -410,6 +418,16 @@ export class ReportsService {
         .andWhere("transaction.transactionDate >= :startDate", { startDate })
         .andWhere("transaction.transactionDate <= :endDate", { endDate })
         .andWhere("transaction.status != 'VOID'");
+
+      // INV-REPORT-001: a custom report reads the same ledger as the built-in
+      // ones, so it owes the same answer. This half excludes the securities
+      // sleeve and the cash leg a free-standing trade generated -- including
+      // when an explicit funding account put that leg in an ordinary account,
+      // where no account-type predicate could see it. The embedded-split half
+      // cannot be done here (the parent is a real row carrying real ordinary
+      // cash beside the investment line), so it happens per line during
+      // aggregation.
+      applyInvestmentTransactionFilters(queryBuilder, "account", "transaction");
 
       // Advanced filter groups take precedence over legacy filters
       if (filters.filterGroups && filters.filterGroups.length > 0) {
@@ -660,7 +678,9 @@ export class ReportsService {
             ? transferPayeeLabel(tx.amount, tx.linkedTransaction.account.name)
             : undefined;
         if (tx.isSplit && tx.splits && tx.splits.length > 0) {
-          for (const split of tx.splits) {
+          // Only the lines that are ordinary cash: an embedded investment line
+          // is the trade's own cash side, not a row of this report.
+          for (const split of ordinarySplitLines(tx)) {
             result.push({
               id: tx.id,
               label:
@@ -706,7 +726,7 @@ export class ReportsService {
 
     for (const tx of transactions) {
       if (tx.isSplit && tx.splits && tx.splits.length > 0) {
-        for (const split of tx.splits) {
+        for (const split of ordinarySplitLines(tx)) {
           amounts.push(Math.abs(Number(split.amount)));
         }
       } else {
@@ -741,8 +761,10 @@ export class ReportsService {
 
     for (const tx of transactions) {
       if (tx.isSplit && tx.splits && tx.splits.length > 0) {
-        // Handle split transactions
-        for (const split of tx.splits) {
+        // Handle split transactions. An embedded investment line carries no
+        // category by definition, so counting it here filed a securities
+        // purchase under "Uncategorized" spending (re-audit F-CUSTOM-001).
+        for (const split of ordinarySplitLines(tx)) {
           const categoryId = split.categoryId || "uncategorized";
           const existing = dataMap.get(categoryId) || { sum: 0, count: 0 };
           existing.sum = roundMoney(
@@ -798,13 +820,18 @@ export class ReportsService {
     >();
 
     for (const tx of transactions) {
+      // `tx.amount` on a split parent is the sum of EVERY line, so a payee total
+      // has to ask for the ordinary part; `null` means this row represents no
+      // ordinary cash at all.
+      const reportable = reportableTransactionAmount(tx);
+      if (reportable === null) continue;
       const payeeId = tx.payeeId || "unknown";
       const existing = dataMap.get(payeeId) || {
         sum: 0,
         count: 0,
         payeeName: tx.payeeName ?? undefined,
       };
-      existing.sum = roundMoney(existing.sum + Math.abs(Number(tx.amount)));
+      existing.sum = roundMoney(existing.sum + Math.abs(reportable));
       existing.count += 1;
       if (!existing.payeeName && tx.payeeName) {
         existing.payeeName = tx.payeeName;
@@ -839,10 +866,14 @@ export class ReportsService {
     >();
 
     for (const tx of transactions) {
-      // Collect all tags: transaction-level + split-level
+      const reportable = reportableTransactionAmount(tx);
+      if (reportable === null) continue;
+      // Collect all tags: transaction-level + split-level. A tag on an embedded
+      // investment line describes the trade, not ordinary cash, so the lines
+      // that are not reportable do not open a bucket either.
       const allTags = [...(tx.tags || [])];
       if (tx.splits) {
-        for (const split of tx.splits) {
+        for (const split of ordinarySplitLines(tx)) {
           if (split.tags) {
             for (const tag of split.tags) {
               if (!allTags.some((t) => t.id === tag.id)) {
@@ -860,7 +891,7 @@ export class ReportsService {
           count: 0,
           tagName: "Untagged",
         };
-        existing.sum = roundMoney(existing.sum + Math.abs(Number(tx.amount)));
+        existing.sum = roundMoney(existing.sum + Math.abs(reportable));
         existing.count += 1;
         dataMap.set("untagged", existing);
       } else {
@@ -871,7 +902,7 @@ export class ReportsService {
             tagName: tag.name,
             color: tag.color ?? undefined,
           };
-          existing.sum = roundMoney(existing.sum + Math.abs(Number(tx.amount)));
+          existing.sum = roundMoney(existing.sum + Math.abs(reportable));
           existing.count += 1;
           dataMap.set(tag.id, existing);
         }
@@ -906,6 +937,8 @@ export class ReportsService {
     >();
 
     for (const tx of transactions) {
+      const reportable = reportableTransactionAmount(tx);
+      if (reportable === null) continue;
       const date = parseISO(tx.transactionDate);
       let key: string;
       let label: string;
@@ -930,7 +963,7 @@ export class ReportsService {
       }
 
       const existing = dataMap.get(key) || { sum: 0, count: 0, label };
-      existing.sum = roundMoney(existing.sum + Math.abs(Number(tx.amount)));
+      existing.sum = roundMoney(existing.sum + Math.abs(reportable));
       existing.count += 1;
       dataMap.set(key, existing);
     }

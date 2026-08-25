@@ -34,6 +34,15 @@ import {
   InvestmentAction,
   InvestmentTransaction,
 } from "@/securities/entities/investment-transaction.entity";
+import { ReportsService } from "@/reports/reports.service";
+import {
+  CustomReport,
+  DirectionFilter,
+  GroupByType,
+  MetricType,
+  ReportViewType,
+  TimeframeType,
+} from "@/reports/entities/custom-report.entity";
 import { withUserContext } from "@/common/db/with-context";
 import {
   createIntegrationModule,
@@ -70,6 +79,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
   let taxRecurring: TaxRecurringReportsService;
   let dataQuality: DataQualityReportsService;
   let breakdown: MonthlyCategoryBreakdownService;
+  let customReports: ReportsService;
   let investments: InvestmentTransactionsService;
   let dataSource: DataSource;
 
@@ -106,6 +116,9 @@ describe("built-in reports and investment cash accounts (integration)", () => {
     taxRecurring = new TaxRecurringReportsService(dataSource, currency);
     dataQuality = new DataQualityReportsService(dataSource, currency);
     breakdown = new MonthlyCategoryBreakdownService(dataSource, currency);
+    // `execute` uses neither the budgets service (only the BUDGET_VARIANCE
+    // metric does) nor action history (only the writes do).
+    customReports = new ReportsService(dataSource, {} as never, {} as never);
   });
 
   afterAll(async () => {
@@ -115,6 +128,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
   beforeEach(async () => {
     await cleanTables(dataSource, [
       "action_history",
+      "custom_reports",
       "holdings",
       "security_prices",
       "securities",
@@ -461,6 +475,163 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       expect(cashFlow.totals.expenses).toBe(100);
       expect(bySource.totalIncome).toBe(cashFlow.totals.income);
       expect(byCategory.totalSpending).toBe(cashFlow.totals.expenses);
+    });
+  });
+
+  /**
+   * The user-defined custom report engine reads the same ledger through
+   * hydrated TypeORM entities and aggregates in TypeScript, so none of the SQL
+   * fragments reach it. It was the one report surface left outside
+   * INV-REPORT-001 (re-audit F-CUSTOM-001): a generated BUY leg was reported as
+   * `Uncategorized` spending, and an embedded investment line was counted beside
+   * its ordinary sibling.
+   */
+  describe("custom reports", () => {
+    async function runCustomReport(overrides: {
+      groupBy?: GroupByType;
+      metric?: MetricType;
+      direction?: DirectionFilter;
+      includeTransfers?: boolean;
+    }) {
+      const report = await dataSource.manager.save(
+        dataSource.manager.create(CustomReport, {
+          userId,
+          name: "Spending",
+          viewType: ReportViewType.TABLE,
+          timeframeType: TimeframeType.CUSTOM,
+          groupBy: overrides.groupBy ?? GroupByType.CATEGORY,
+          filters: {},
+          config: {
+            metric: overrides.metric ?? MetricType.TOTAL_AMOUNT,
+            includeTransfers: overrides.includeTransfers ?? false,
+            direction: overrides.direction ?? DirectionFilter.EXPENSES_ONLY,
+            customStartDate: START,
+            customEndDate: END,
+          },
+        } as Partial<CustomReport>),
+      );
+
+      return withUserContext(userId, () =>
+        customReports.execute(userId, report.id),
+      );
+    }
+
+    it("does not report a generated BUY leg as Uncategorized spending", async () => {
+      await insertTransaction({
+        amount: -60,
+        categoryId: groceriesCategoryId,
+        payeeName: "Corner Store",
+      });
+      await createBuy();
+
+      const result = await runCustomReport({ groupBy: GroupByType.CATEGORY });
+
+      expect(result.data).toEqual([
+        expect.objectContaining({ id: groceriesCategoryId, value: 60 }),
+      ]);
+      expect(result.summary.total).toBe(60);
+    });
+
+    it("does not report a generated leg in an ordinary funding account either", async () => {
+      await insertTransaction({
+        accountId: chequingId,
+        amount: -40,
+        categoryId: groceriesCategoryId,
+        payeeName: "Bakery",
+      });
+      await createTrade(InvestmentAction.BUY, {
+        quantity: 10,
+        price: 100,
+        fundingAccountId: chequingId,
+      });
+
+      const result = await runCustomReport({ groupBy: GroupByType.CATEGORY });
+
+      expect(result.summary.total).toBe(40);
+    });
+
+    it("counts only the ordinary line of a mixed split, grouped by category", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+      });
+
+      const result = await runCustomReport({ groupBy: GroupByType.CATEGORY });
+
+      // Not 560, and not 0: the groceries line survives its investment sibling.
+      expect(result.data).toEqual([
+        expect.objectContaining({ id: groceriesCategoryId, value: 60 }),
+      ]);
+      expect(result.summary.total).toBe(60);
+    });
+
+    it("counts only the ordinary line when grouped by payee, month and tag", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+        payeeName: "Brokerage statement",
+      });
+
+      for (const groupBy of [
+        GroupByType.PAYEE,
+        GroupByType.MONTH,
+        GroupByType.TAG,
+      ]) {
+        const result = await runCustomReport({ groupBy });
+        expect(result.summary.total).toBe(60);
+      }
+    });
+
+    it("omits a pure embedded-investment passthrough entirely", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: 0,
+        investmentAmount: -500,
+        payeeName: "Broker",
+      });
+
+      for (const groupBy of [
+        GroupByType.CATEGORY,
+        GroupByType.PAYEE,
+        GroupByType.MONTH,
+        GroupByType.TAG,
+        GroupByType.NONE,
+      ]) {
+        const result = await runCustomReport({ groupBy });
+        expect(result.data).toEqual([]);
+      }
+    });
+
+    it("lists the ordinary lines of a mixed split without aggregating", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+        payeeName: "Brokerage statement",
+      });
+
+      const result = await runCustomReport({
+        groupBy: GroupByType.NONE,
+        metric: MetricType.NONE,
+      });
+
+      expect(result.data).toEqual([expect.objectContaining({ value: 60 })]);
+    });
+
+    it("still counts ordinary cash in the sleeve, and agrees with the built-in report", async () => {
+      await insertTransaction({
+        amount: -60,
+        categoryId: groceriesCategoryId,
+        payeeName: "Corner Store",
+      });
+      await createBuy();
+
+      const custom = await runCustomReport({ groupBy: GroupByType.CATEGORY });
+      const builtIn = await withUserContext(userId, () =>
+        spending.getSpendingByCategory(userId, START, END),
+      );
+
+      // The two engines answer the same question about one ledger, so a
+      // divergence here is the defect whichever side moved.
+      expect(custom.summary.total).toBe(builtIn.totalSpending);
     });
   });
 
