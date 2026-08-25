@@ -157,9 +157,13 @@ count.** `test:integration` previously carried an unconditional
 `--passWithNoTests`, so a renamed directory or an edited `testPathPatterns` regex
 turned a discovery failure into a green check across all six kinds at once. That
 flag has since been removed from `backend/package.json`, so an empty match now
-exits non-zero and fails the job. What is still owed is the weaker guard against a
-regex that matches *some* suites but silently drops a class: nothing asserts that
-the number of suites under `backend/test/integration/` does not shrink.
+exits non-zero and fails the job, and
+`backend/src/common/jest-config.guard.spec.ts` fails if any test script re-adds
+it. What is still owed is the weaker guard against a regex that matches *some*
+suites but silently drops a class: that guard asserts every tracked suite under
+`backend/test/integration/` is discoverable by `test/jest-e2e.json`, but nothing
+asserts what the runner executed, and the CLI `--testPathPatterns` filter is
+outside its model.
 `docs/release-integrity.md` REL-001 and REL-002 cover the history and the
 consequence, which is a verification one, not merely CI hygiene.
 

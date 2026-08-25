@@ -45,20 +45,27 @@ REL-002 is the stronger of the two, and the reason is worth stating: removing
 the flag makes *zero* tests fail, but it does nothing about twenty tests
 silently becoming three. Only an explicit inventory catches partial loss.
 
-**Current state:** `backend/package.json` runs integration tests with an
-unconditional `--passWithNoTests`:
+**Current state:** the flag is gone and its return is a test failure.
+`backend/package.json` runs integration tests as:
 
 ```json
-"test:integration": "jest --config ./test/jest-e2e.json --testPathPatterns='test/integration/.*\\.spec\\.ts$' --runInBand --passWithNoTests",
+"test:integration": "jest --config ./test/jest-e2e.json --testPathPatterns=\"test/integration/.*\\.spec\\.ts$\" --runInBand",
 ```
 
-There are 21 real suites under `backend/test/integration/`, so the flag is not
-covering a package that has no tests by design -- it is a blanket net under a
-populated suite, which is exactly the case REL-001 forbids. `.github/workflows/ci.yml`
-invokes it unconditionally in the `backend-integration-tests` job. No other
-runner in the pipeline has an equivalent flag: `test:unit` and the frontend's
-`vitest run --coverage` have none, and Playwright fails by default when it
-discovers no spec files.
+It previously carried an unconditional `--passWithNoTests` under 21 suites --
+a blanket net under a populated suite, exactly the case REL-001 forbids -- so an
+empty match now exits non-zero and fails the `backend-integration-tests` job.
+`backend/src/common/jest-config.guard.spec.ts` fails if any Jest-invoking script
+re-adds the flag, which is what moves REL-001 from a rule someone remembers to
+one the pipeline enforces. No other runner has an equivalent flag either:
+`test:unit` and the frontend's `vitest run --coverage` have none, and Playwright
+fails by default when it discovers no spec files.
+
+REL-002 is still owed. The same guard asserts that the 35 suites tracked under
+`backend/test/integration/` are all discoverable by `test/jest-e2e.json`, which
+catches a config that stops matching a class of specs; it does not assert what
+the runner actually executed, and the CLI `--testPathPatterns` filter sits
+outside the model. A shrinking suite that is genuinely deleted still passes.
 
 ## 2. The tested revision and the released revision must be the same
 
@@ -205,7 +212,7 @@ fail, not when a document describes it.
 
 | Rule | Status on `main` | Blocking evidence |
 | --- | --- | --- |
-| REL-001 no blanket pass-with-no-tests | **not enforced** | `--passWithNoTests` in `backend/package.json` `test:integration` |
+| REL-001 no blanket pass-with-no-tests | **enforced** | flag absent from `backend/package.json`; `backend/src/common/jest-config.guard.spec.ts` fails if a test script re-adds it |
 | REL-002 mandatory suites asserted by name | **not enforced** | no inventory step precedes the runner |
 | REL-003 one revision across tag, image, gate | **partially enforced** | image bound to tested SHA; release tag resolves to the untested bump commit |
 | REL-004 post-gate commit proven or verified | **not enforced** | nothing checks the bump commit's parent or diff scope |
