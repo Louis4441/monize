@@ -1720,6 +1720,95 @@ describe("ReportsService", () => {
         expect(andWhereCalls).not.toContain("transaction.amount < 0");
       });
 
+      /**
+       * INV-REPORT-001 for the custom engine. Generated investment cash is
+       * never ordinary cash; the securities sleeve is dropped only from a report
+       * that did not ask for it, and "asked for it" has to mirror
+       * getFilteredTransactions' own precedence -- filter groups REPLACE the
+       * legacy filters, and a condition with no values restricts nothing.
+       */
+      describe("investment provenance", () => {
+        const brokerageClause =
+          "(account.accountSubType IS NULL OR account.accountSubType != 'INVESTMENT_BROKERAGE')";
+        const linkageClause =
+          "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = transaction.id)";
+
+        const andWheres = (qb: Record<string, jest.Mock>) =>
+          qb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
+
+        it("always excludes the cash leg a trade generated", async () => {
+          const { qb } = setupExecuteMocks({ filters: {} });
+
+          await service.execute("user-1", "report-1");
+
+          expect(andWheres(qb)).toContain(linkageClause);
+        });
+
+        it("excludes the securities sleeve from an unscoped report", async () => {
+          const { qb } = setupExecuteMocks({ filters: {} });
+
+          await service.execute("user-1", "report-1");
+
+          expect(andWheres(qb)).toContain(brokerageClause);
+        });
+
+        it("keeps the sleeve when the report names accounts", async () => {
+          const { qb } = setupExecuteMocks({
+            filters: { accountIds: ["acc-1"] },
+          });
+
+          await service.execute("user-1", "report-1");
+
+          expect(andWheres(qb)).not.toContain(brokerageClause);
+          expect(andWheres(qb)).toContain(linkageClause);
+        });
+
+        it("keeps the sleeve when a filter group names accounts", async () => {
+          const { qb } = setupExecuteMocks({
+            filters: {
+              filterGroups: [
+                { conditions: [{ field: "account", value: ["acc-1"] }] },
+              ],
+            },
+          });
+
+          await service.execute("user-1", "report-1");
+
+          expect(andWheres(qb)).not.toContain(brokerageClause);
+        });
+
+        it("ignores a stale accountIds when filter groups are in charge", async () => {
+          // getFilteredTransactions applies the groups and ignores accountIds,
+          // so this report restricts nothing by account.
+          const { qb } = setupExecuteMocks({
+            filters: {
+              accountIds: ["acc-1"],
+              filterGroups: [
+                { conditions: [{ field: "category", value: ["cat-1"] }] },
+              ],
+            },
+          });
+
+          await service.execute("user-1", "report-1");
+
+          expect(andWheres(qb)).toContain(brokerageClause);
+        });
+
+        it("ignores an account condition carrying no values", async () => {
+          // What the filter builder saves for a half-finished condition: it adds
+          // no SQL, so it is not a scope.
+          const { qb } = setupExecuteMocks({
+            filters: {
+              filterGroups: [{ conditions: [{ field: "account", value: [] }] }],
+            },
+          });
+
+          await service.execute("user-1", "report-1");
+
+          expect(andWheres(qb)).toContain(brokerageClause);
+        });
+      });
+
       it("filters out transfers when includeTransfers is false", async () => {
         const { qb } = setupExecuteMocks({
           config: { ...defaultConfig, includeTransfers: false },

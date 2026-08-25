@@ -381,16 +381,29 @@ export class ReportsService {
   }
 
   /**
-   * Whether the report scopes itself to particular accounts, through either the
-   * legacy `accountIds` filter or an advanced filter group.
+   * Whether the report actually restricts itself to particular accounts.
+   *
+   * Mirrors `getFilteredTransactions`' own precedence rather than checking both
+   * shapes: advanced filter groups REPLACE the legacy filters, so a report that
+   * has groups and a stale `accountIds` restricts nothing by account. And an
+   * account condition carrying no values adds no SQL at all -- which is what the
+   * filter builder saves for a half-finished condition -- so an empty one is not
+   * a scope either.
    */
   private namesAnyAccount(filters: CustomReport["filters"]): boolean {
-    if (filters.accountIds && filters.accountIds.length > 0) return true;
-    return (filters.filterGroups ?? []).some((group) =>
-      (group.conditions ?? []).some(
-        (condition) => condition.field === "account",
-      ),
-    );
+    const groups = filters.filterGroups ?? [];
+    if (groups.length > 0) {
+      return groups.some((group) =>
+        (group.conditions ?? []).some(
+          (condition) =>
+            condition.field === "account" &&
+            (Array.isArray(condition.value)
+              ? condition.value.length > 0
+              : Boolean(condition.value)),
+        ),
+      );
+    }
+    return (filters.accountIds ?? []).length > 0;
   }
 
   private async getFilteredTransactions(

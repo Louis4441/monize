@@ -1899,9 +1899,15 @@ export class TransactionsService {
         new Brackets((outer) => {
           let hasCondition = false;
           if (hasUncategorized) {
-            // The same meaning as the list's own uncategorized arm: a trade's
-            // cash leg is not a row the user forgot to file. Without this the
-            // running balance summed a row the list above it does not show.
+            // A trade's cash leg is not a row the user forgot to file, so the
+            // running balance must not sum a row the list above it does not
+            // show. This arm is NOT otherwise identical to the list's: the list
+            // also matches a split parent with an uncategorized child, and this
+            // one does not, so such a parent is missing from the prior-page sum
+            // (pre-existing, and not fixable by copying the branch --
+            // `computeSplitAwareSum` adds the WHOLE parent amount for a
+            // pure-uncategorized filter, which would be wrong in the other
+            // direction).
             outer.where(
               `bf.categoryId IS NULL AND bf.isSplit = false AND bf.isTransfer = false AND ${investmentLinkedTransactionExclusion(
                 "bf",
