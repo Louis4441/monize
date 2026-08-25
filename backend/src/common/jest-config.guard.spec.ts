@@ -136,9 +136,9 @@ function discovers(
 /**
  * Every inventory below is repository-relative, and the configs are evaluated
  * against a fixed virtual root rather than this machine's checkout path. A
- * failure therefore names `backend/test/integration/foo.integration.spec.ts`
- * rather than someone's home directory, and reads the same on CI, in the dev
- * container and on a Windows checkout.
+ * failure therefore names the offending spec by its path from the repository
+ * root rather than by someone's home directory, and reads the same on CI, in
+ * the dev container and on a Windows checkout.
  */
 const VIRTUAL_ROOT = "/repo";
 const virtual = (repoRelative: string): string =>
