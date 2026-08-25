@@ -240,7 +240,7 @@ export class TaxRecurringReportsService {
         AND (COALESCE(p.name, t.payee_name) IS NOT NULL AND TRIM(COALESCE(p.name, t.payee_name)) != '')
       GROUP BY t.payee_id, LOWER(TRIM(COALESCE(p.name, t.payee_name))), COALESCE(p.name, t.payee_name), c.name, t.currency_code
       HAVING COUNT(*) >= $4
-      ORDER BY SUM(ABS(${REPORTABLE_TX_AMOUNT})) DESC
+      ORDER BY total_amount DESC
     `;
 
     interface RawRecurring {

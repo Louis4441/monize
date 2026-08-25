@@ -383,25 +383,33 @@ export class ReportsService {
   /**
    * Whether the report actually restricts itself to particular accounts.
    *
-   * Mirrors `getFilteredTransactions`' own precedence rather than checking both
-   * shapes: advanced filter groups REPLACE the legacy filters, so a report that
-   * has groups and a stale `accountIds` restricts nothing by account. And an
-   * account condition carrying no values adds no SQL at all -- which is what the
-   * filter builder saves for a half-finished condition -- so an empty one is not
-   * a scope either.
+   * Three ways to get this wrong, all of them ways to answer a report with rows
+   * it did not ask for or to drop rows it did:
+   *
+   * - Advanced filter groups REPLACE the legacy filters in
+   *   `getFilteredTransactions`, so a report holding groups and a stale
+   *   `accountIds` restricts nothing by account.
+   * - An account condition carrying no values adds no SQL at all (what the
+   *   filter builder saves for a half-finished condition), so it is not a scope.
+   * - Conditions WITHIN a group are OR'd. `[account = Chequing, payee = Acme]`
+   *   admits every account for that payee, so only a group whose conditions are
+   *   ALL account conditions restricts by account. Groups are AND'ed with each
+   *   other, so one such group is enough.
    */
   private namesAnyAccount(filters: CustomReport["filters"]): boolean {
     const groups = filters.filterGroups ?? [];
     if (groups.length > 0) {
-      return groups.some((group) =>
-        (group.conditions ?? []).some(
-          (condition) =>
-            condition.field === "account" &&
-            (Array.isArray(condition.value)
-              ? condition.value.length > 0
-              : Boolean(condition.value)),
-        ),
-      );
+      return groups.some((group) => {
+        const conditions = (group.conditions ?? []).filter((condition) =>
+          Array.isArray(condition.value)
+            ? condition.value.length > 0
+            : Boolean(condition.value),
+        );
+        return (
+          conditions.length > 0 &&
+          conditions.every((condition) => condition.field === "account")
+        );
+      });
     }
     return (filters.accountIds ?? []).length > 0;
   }

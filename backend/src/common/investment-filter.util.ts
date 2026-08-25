@@ -16,8 +16,11 @@ import { roundMoney, sumMoney } from "./round.util";
  * Two layers, and neither substitutes for the other:
  *
  *  - `accountSubType != 'INVESTMENT_BROKERAGE'` keeps the securities sleeve's
- *    register out of a cash report. A standalone investment account (subtype
- *    NULL, as .mny imports produce) IS its own cash side, so it stays in.
+ *    register out of a cash report. A standalone investment account -- type
+ *    INVESTMENT with a NULL sub-type, which the ordinary account-create path
+ *    produces and which `net-worth.service.ts` and `monthly-comparison.service.ts`
+ *    already branch on -- IS its own cash side, so it stays in. (A .mny import is
+ *    NOT such a case: `map-reference.ts` always emits the CASH/BROKERAGE pair.)
  *  - `NOT EXISTS (investment_transactions ...)` catches the cash-side rows that
  *    BUY / SELL / DIVIDEND post into the linked cash account
  *    (`createCashTransactionInTransaction`). Those carry no category and no

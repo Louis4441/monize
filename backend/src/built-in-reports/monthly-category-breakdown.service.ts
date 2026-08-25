@@ -82,8 +82,10 @@ export class MonthlyCategoryBreakdownService {
 
     // Aggregate deposits (amount > 0) and withdrawals (amount < 0) per
     // category, month and currency. Transfers, voided rows, child rows of a
-    // split, investment accounts and the synthetic asset-value-change category
-    // are excluded -- mirroring the other category reports.
+    // split, investment MOVEMENTS (the securities sleeve, a trade's generated
+    // cash leg, an embedded investment split line -- never an account's type)
+    // and the synthetic asset-value-change category are excluded -- mirroring
+    // the other category reports.
     let query = `
       SELECT
         TO_CHAR(t.transaction_date, 'YYYY-MM') as month,

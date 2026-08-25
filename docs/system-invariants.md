@@ -442,7 +442,10 @@ Statement           A report over the transaction ledger includes an ordinary
                     account's type. An INVESTMENT account is a pair, and its
                     INVESTMENT_CASH sleeve is ordinary money: salary, interest,
                     fees, transfers in and out; a standalone INVESTMENT account
-                    (no sub-type, as .mny imports produce) IS its own cash side.
+                    (account_type INVESTMENT with a NULL sub-type, which the
+                    ordinary account-create path produces and which net_worth and
+                    the monthly comparison already branch on) IS its own cash
+                    side.
                     The claim is symmetric, and the account type fails in both
                     directions: an investment action with an explicit
                     fundingAccountId posts its generated cash into an ORDINARY
@@ -535,9 +538,15 @@ Also covered        backend/src/reports/ -- the USER-DEFINED custom report
                     reaches it; it gets the same rule in the other dialect
                     (isEmbeddedInvestmentSplit / ordinarySplitLines /
                     reportableTransactionAmount, beside the SQL in
-                    investment-filter.util.ts). Its selector applies
-                    applyInvestmentTransactionFilters and hydrates
-                    splits.investmentTransaction; its six aggregators iterate
+                    investment-filter.util.ts). Its selector always excludes the
+                    generated cash leg (investmentLinkedTransactionExclusion) and
+                    excludes the securities sleeve
+                    (brokerageExclusionForEntity) only from a report that did not
+                    NAME an account -- built-in reports have no account picker,
+                    this one does, and answering an explicitly scoped report with
+                    nothing is worse than showing the rows that were asked for.
+                    It hydrates splits.investmentTransaction; its six aggregators
+                    iterate
                     ordinary lines and ask for the reportable amount rather than
                     reading a parent's own. Until this was done a generated BUY
                     leg was reported as `Uncategorized` spending and the

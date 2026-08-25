@@ -126,14 +126,13 @@ export class DataQualityReportsService {
       accountId: row.account_id,
     }));
 
-    let summaryQuery = `
+    // The reportable amount is derived ONCE, in a CTE: six of these in one
+    // aggregate is six correlated sub-queries per split parent, and the six
+    // answers have to be the same number anyway.
+    let summarySource = `
       SELECT
         t.currency_code,
-        COUNT(*) as total_count,
-        COUNT(*) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} < 0) as expense_count,
-        COALESCE(SUM(ABS(${REPORTABLE_TX_AMOUNT})) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} < 0), 0) as expense_total,
-        COUNT(*) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} > 0) as income_count,
-        COALESCE(SUM(${REPORTABLE_TX_AMOUNT}) FILTER (WHERE ${REPORTABLE_TX_AMOUNT} > 0), 0) as income_total
+        ${REPORTABLE_TX_AMOUNT} as amount
       FROM transactions t
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE t.user_id = $1
@@ -142,7 +141,6 @@ export class DataQualityReportsService {
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
         AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
-        AND ${REPORTABLE_TX_AMOUNT} IS NOT NULL
         AND t.category_id IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM transaction_splits ts
@@ -153,11 +151,26 @@ export class DataQualityReportsService {
 
     const summaryParams: string[] = [userId, endDate];
     if (startDate) {
-      summaryQuery += ` AND t.transaction_date >= $3`;
+      summarySource += ` AND t.transaction_date >= $3`;
       summaryParams.push(startDate);
     }
 
-    summaryQuery += ` GROUP BY t.currency_code`;
+    // `amount IS NOT NULL` is the same predicate the list applies: a row whose
+    // only lines are an embedded investment or a transfer represents no ordinary
+    // cash, so it is not something the user forgot to categorize.
+    const summaryQuery = `
+      WITH reportable AS (${summarySource})
+      SELECT
+        currency_code,
+        COUNT(*) as total_count,
+        COUNT(*) FILTER (WHERE amount < 0) as expense_count,
+        COALESCE(SUM(ABS(amount)) FILTER (WHERE amount < 0), 0) as expense_total,
+        COUNT(*) FILTER (WHERE amount > 0) as income_count,
+        COALESCE(SUM(amount) FILTER (WHERE amount > 0), 0) as income_total
+      FROM reportable
+      WHERE amount IS NOT NULL
+      GROUP BY currency_code
+    `;
 
     interface RawSummary {
       currency_code: string;

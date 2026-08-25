@@ -173,12 +173,32 @@ export function classifyLedgerQuery(query: string): {
   return { shape: "parent-only", missing };
 }
 
-/** Every `FROM transactions` query in a file, cut at its template literal's end. */
+/**
+ * Every template literal in a file that reads the transaction ledger, WHOLE.
+ *
+ * Cutting forward from `FROM transactions` to the end of the literal misses the
+ * SELECT list, and a query whose derivation appears only there -- the
+ * uncategorized summary, once it moved its amount into a CTE -- then reads as
+ * missing it. Backticks delimit the literals, so the odd chunks of a split on
+ * them are the literals themselves.
+ */
 function ledgerQueries(source: string): string[] {
   return source
-    .split("FROM transactions")
-    .slice(1)
-    .map((segment) => segment.split("`")[0]);
+    .split("`")
+    .filter(
+      (chunk, index) => index % 2 === 1 && chunk.includes("FROM transactions"),
+    )
+    .map((chunk) => chunk);
+}
+
+/** Enough of a query to recognise it in a failure message. */
+function firstMeaningfulLine(query: string): string {
+  return (
+    query
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0 && !line.startsWith("--")) ?? "(empty)"
+  );
 }
 
 describe("every built-in report query applies the investment exclusion", () => {
@@ -198,7 +218,7 @@ describe("every built-in report query applies the investment exclusion", () => {
         const { missing } = classifyLedgerQuery(query);
         if (missing.length === 0) continue;
         failures.push(
-          `${relative(SRC_ROOT, file)}: ${query.trim().split("\n")[0]} -- missing ${missing.join(", ")}`,
+          `${relative(SRC_ROOT, file)}: ${firstMeaningfulLine(query)} -- missing ${missing.join(", ")}`,
         );
       }
     }
@@ -217,7 +237,7 @@ describe("every built-in report query applies the investment exclusion", () => {
         const { shape } = classifyLedgerQuery(query);
         if (shape !== "split-aware") {
           exempted.push(
-            `${relative(SRC_ROOT, file)}: ${query.trim().split("\n")[0]} -- classified ${shape}`,
+            `${relative(SRC_ROOT, file)}: ${firstMeaningfulLine(query)} -- classified ${shape}`,
           );
         }
       }
