@@ -34,6 +34,7 @@ import {
   InvestmentAction,
   InvestmentTransaction,
 } from "@/securities/entities/investment-transaction.entity";
+import { TransactionAnalyticsService } from "@/transactions/transaction-analytics.service";
 import { ReportsService } from "@/reports/reports.service";
 import {
   CustomReport,
@@ -80,6 +81,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
   let dataQuality: DataQualityReportsService;
   let breakdown: MonthlyCategoryBreakdownService;
   let customReports: ReportsService;
+  let analytics!: TransactionAnalyticsService;
   let investments: InvestmentTransactionsService;
   let dataSource: DataSource;
 
@@ -119,6 +121,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
     // `execute` uses neither the budgets service (only the BUDGET_VARIANCE
     // metric does) nor action history (only the writes do).
     customReports = new ReportsService(dataSource, {} as never, {} as never);
+    analytics = new TransactionAnalyticsService(dataSource);
   });
 
   afterAll(async () => {
@@ -632,6 +635,99 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       // The two engines answer the same question about one ledger, so a
       // divergence here is the defect whichever side moved.
       expect(custom.summary.total).toBe(builtIn.totalSpending);
+    });
+  });
+
+  /**
+   * The register's own analytics read the same rows. Their grouped totals are
+   * drill-downs: a bucket links to the register filtered the same way, so a
+   * figure the filtered list cannot show is a dead end (found by /code-review
+   * over this branch).
+   */
+  describe("register analytics", () => {
+    it("does not file an embedded investment line under Uncategorized", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+      });
+
+      const grouped = await withUserContext(userId, () =>
+        analytics.getGroupedTotals(userId, {
+          groupBy: "category",
+          startDate: START,
+          endDate: END,
+        }),
+      );
+
+      // Exactly the groceries line: the -500 investment line would otherwise
+      // open an "Uncategorized" bucket whose drill-down is empty.
+      expect(grouped).toEqual([
+        expect.objectContaining({ id: groceriesCategoryId, total: -60 }),
+      ]);
+    });
+
+    it("agrees with its own summary about what the ordinary cash was", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+      });
+
+      const summary = await withUserContext(userId, () =>
+        analytics.getSummary(userId, undefined, START, END),
+      );
+
+      expect(summary.totalExpenses).toBe(60);
+      expect(summary.totalIncome).toBe(0);
+    });
+
+    it("detects a recurring charge at its ordinary amount, not the parent's", async () => {
+      // Three monthly mixed parents: 60 of ordinary spending each, beside a
+      // -500 embedded BUY. The AI assistant and MCP read this detector, and the
+      // built-in Recurring Expenses report answers 60 for the same rows.
+      for (const months of [1, 2, 3]) {
+        await createEmbeddedInvestmentParent({
+          date: monthsBeforeToday(months),
+          ordinaryAmount: -60,
+          investmentAmount: -500,
+          payeeName: "Brokerage statement",
+        });
+      }
+
+      const charges = await withUserContext(userId, () =>
+        analytics.getRecurringCharges(
+          userId,
+          monthsBeforeToday(6),
+          monthsBeforeToday(0),
+        ),
+      );
+
+      expect(charges).toEqual([
+        expect.objectContaining({ payeeName: "Brokerage statement" }),
+      ]);
+      // Every occurrence is the ordinary 60, never the parent's 560.
+      expect(charges[0].amounts).toEqual([60, 60, 60]);
+      expect(charges[0].currentAmount).toBe(60);
+    });
+
+    it("leaves a pure investment passthrough out of recurring charges", async () => {
+      for (const months of [1, 2, 3]) {
+        await createEmbeddedInvestmentParent({
+          date: monthsBeforeToday(months),
+          ordinaryAmount: 0,
+          investmentAmount: -500,
+          payeeName: "Broker",
+        });
+      }
+
+      const charges = await withUserContext(userId, () =>
+        analytics.getRecurringCharges(
+          userId,
+          monthsBeforeToday(6),
+          monthsBeforeToday(0),
+        ),
+      );
+
+      expect(charges).toEqual([]);
     });
   });
 

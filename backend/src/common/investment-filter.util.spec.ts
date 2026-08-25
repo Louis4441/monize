@@ -238,9 +238,25 @@ describe("reportableTransactionAmount", () => {
     ).toBe(-260);
   });
 
-  it("falls back to the parent amount when a split parent hydrated no lines", () => {
+  it("answers null for a hydrated split parent with no lines, as the SQL twin does", () => {
+    // `SUM` over no rows is NULL there, so it is null here.
     expect(
       reportableTransactionAmount({ amount: -560, isSplit: true, splits: [] }),
+    ).toBeNull();
+  });
+
+  it("falls back to the parent amount when the caller did not hydrate the lines", () => {
+    // Absent is not a fact about the transaction: answering null would hide real
+    // money from a caller that simply did not select splits.
+    expect(reportableTransactionAmount({ amount: -560, isSplit: true })).toBe(
+      -560,
+    );
+    expect(
+      reportableTransactionAmount({
+        amount: -560,
+        isSplit: true,
+        splits: null,
+      }),
     ).toBe(-560);
   });
 

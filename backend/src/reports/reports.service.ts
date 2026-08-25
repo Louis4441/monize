@@ -7,7 +7,8 @@ import { tr } from "../i18n/translate";
 import { Brackets, DataSource, Repository } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import {
-  applyInvestmentTransactionFilters,
+  brokerageExclusionForEntity,
+  investmentLinkedTransactionExclusion,
   ordinarySplitLines,
   reportableTransactionAmount,
 } from "../common/investment-filter.util";
@@ -379,6 +380,19 @@ export class ReportsService {
     return { startDate, endDate, label };
   }
 
+  /**
+   * Whether the report scopes itself to particular accounts, through either the
+   * legacy `accountIds` filter or an advanced filter group.
+   */
+  private namesAnyAccount(filters: CustomReport["filters"]): boolean {
+    if (filters.accountIds && filters.accountIds.length > 0) return true;
+    return (filters.filterGroups ?? []).some((group) =>
+      (group.conditions ?? []).some(
+        (condition) => condition.field === "account",
+      ),
+    );
+  }
+
   private async getFilteredTransactions(
     userId: string,
     startDate: string,
@@ -420,14 +434,24 @@ export class ReportsService {
         .andWhere("transaction.status != 'VOID'");
 
       // INV-REPORT-001: a custom report reads the same ledger as the built-in
-      // ones, so it owes the same answer. This half excludes the securities
-      // sleeve and the cash leg a free-standing trade generated -- including
-      // when an explicit funding account put that leg in an ordinary account,
-      // where no account-type predicate could see it. The embedded-split half
-      // cannot be done here (the parent is a real row carrying real ordinary
-      // cash beside the investment line), so it happens per line during
-      // aggregation.
-      applyInvestmentTransactionFilters(queryBuilder, "account", "transaction");
+      // ones, so it owes the same answer. The cash leg a free-standing trade
+      // generated is never ordinary cash -- including when an explicit funding
+      // account put that leg in an ordinary account, where no account-type
+      // predicate could see it.
+      queryBuilder.andWhere(
+        investmentLinkedTransactionExclusion("transaction"),
+      );
+      // The securities sleeve is dropped only from a report that did not ask for
+      // it. Built-in reports have no account picker, so there the sleeve is
+      // noise in a whole-ledger figure; here the user may have named that
+      // account, and answering an explicitly scoped report with nothing is worse
+      // than showing the rows they asked to see.
+      if (!this.namesAnyAccount(filters)) {
+        queryBuilder.andWhere(brokerageExclusionForEntity("account"));
+      }
+      // The embedded-investment half cannot be expressed here at all: the parent
+      // is a real row carrying real ordinary cash beside the investment line, so
+      // it is classified per line during aggregation.
 
       // Advanced filter groups take precedence over legacy filters
       if (filters.filterGroups && filters.filterGroups.length > 0) {

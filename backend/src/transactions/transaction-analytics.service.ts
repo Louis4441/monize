@@ -10,6 +10,7 @@ import {
   brokerageExclusionForEntity,
   investmentLinkedSplitExclusion,
   investmentLinkedTransactionExclusion,
+  reportableTransactionAmountSql,
 } from "../common/investment-filter.util";
 import {
   joinSplitsForAnalytics,
@@ -33,6 +34,14 @@ import {
   UNKNOWN_CATEGORY_LABEL,
 } from "../categories/category-name.util";
 import { roundMoney, sumMoney } from "../common/round.util";
+
+/**
+ * The ordinary-cash amount of one transaction, for the recurring-charge
+ * detector: it reads one row per payment and joins no splits, so a split
+ * parent's own amount (the sum of every line, embedded investment included) is
+ * not what recurred.
+ */
+const RECURRING_REPORTABLE_AMOUNT = reportableTransactionAmountSql("t");
 
 export interface FxFeeMonthlySummaryRow {
   /** Calendar month in 'YYYY-MM'. */
@@ -613,6 +622,13 @@ export class TransactionAnalyticsService {
     queryBuilder.andWhere(
       "(splits.transferAccountId IS NULL OR splits.id IS NULL)",
     );
+    // ...and an embedded investment line is the trade's own cash side, not
+    // ordinary cash. Unconditional, unlike excludeInvestmentLinked below: that
+    // flag is about whole rows a caller may want to see, while this line's
+    // amount would otherwise land in the NULL "Uncategorized" bucket of every
+    // grouped total -- whose drill-down (the register filtered to
+    // uncategorized) excludes it, so the two disagreed by the trade amount.
+    queryBuilder.andWhere(investmentLinkedSplitExclusion("splits"));
 
     // Optionally exclude cash-side transactions created as a side-effect
     // of an investment BUY/SELL/DIVIDEND. Those transactions live in the
@@ -1662,8 +1678,11 @@ export class TransactionAnalyticsService {
         .addSelect("chargePayee.id", "payeeId")
         .addSelect(categoryNameSelect, "categoryName")
         .addSelect("cat.id", "categoryId")
+        // A split parent's own amount is the sum of every line, so the charge
+        // has to be the ordinary part -- otherwise this answers 560 where the
+        // built-in Recurring Expenses report answers 60 for the same rows.
         .addSelect(
-          "ARRAY_AGG(ABS(t.amount) ORDER BY t.transactionDate ASC)",
+          `ARRAY_AGG(ABS(${RECURRING_REPORTABLE_AMOUNT}) ORDER BY t.transactionDate ASC)`,
           "amounts",
         )
         .addSelect(
@@ -1674,7 +1693,7 @@ export class TransactionAnalyticsService {
         .where("t.userId = :userId", { userId })
         .andWhere("t.transactionDate >= :startDate", { startDate })
         .andWhere("t.transactionDate <= :endDate", { endDate })
-        .andWhere("t.amount < 0")
+        .andWhere(`${RECURRING_REPORTABLE_AMOUNT} < 0`)
         .andWhere("t.status != 'VOID'")
         .andWhere("t.isTransfer = false")
         .andWhere("t.parentTransactionId IS NULL")

@@ -209,7 +209,7 @@ export function ordinarySplitLines<T extends SplitLineLike>(parent: {
 }
 
 /**
- * The TypeScript twin of `reportableTransactionAmountSql`, and the same NULL
+ * The TypeScript twin of `reportableTransactionAmountSql`, with the same NULL
  * semantics: `null` means the transaction represents no ordinary cash at all,
  * which is different from representing zero.
  *
@@ -222,8 +222,13 @@ export function ordinarySplitLines<T extends SplitLineLike>(parent: {
 export function reportableTransactionAmount(
   parent: SplitParentLike,
 ): number | null {
-  const lines = parent.splits ?? [];
-  if (!parent.isSplit || lines.length === 0) {
+  if (!parent.isSplit) return roundMoney(Number(parent.amount));
+  // `undefined` is "the caller did not hydrate the lines", which is not a fact
+  // about the transaction -- answering null there would hide real money from a
+  // caller that simply did not ask for splits. An EMPTY array is hydrated and
+  // says there are no lines, which is what the SQL twin's `SUM` over no rows
+  // answers: no ordinary cash.
+  if (parent.splits === undefined || parent.splits === null) {
     return roundMoney(Number(parent.amount));
   }
   const ordinary = ordinarySplitLines(parent);

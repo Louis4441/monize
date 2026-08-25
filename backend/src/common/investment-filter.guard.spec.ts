@@ -341,8 +341,12 @@ describe("the custom report engine classifies by provenance", () => {
   const CUSTOM_REPORTS = join(SRC_ROOT, "reports", "reports.service.ts");
   const source = readFileSync(CUSTOM_REPORTS, "utf8");
 
-  it("excludes the sleeve and generated cash in its selector", () => {
-    expect(source).toContain("applyInvestmentTransactionFilters");
+  it("excludes generated cash unconditionally, and the sleeve where it was not asked for", () => {
+    // The two fragments rather than the combined helper: a report that NAMES the
+    // brokerage account keeps its rows, because answering an explicitly scoped
+    // report with nothing is worse than showing what was asked for.
+    expect(source).toContain("investmentLinkedTransactionExclusion");
+    expect(source).toContain("brokerageExclusionForEntity");
     // The linked investment row is what makes the second representation of an
     // embedded split readable in TypeScript.
     expect(source).toContain("splits.investmentTransaction");

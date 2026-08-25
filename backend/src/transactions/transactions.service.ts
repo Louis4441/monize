@@ -1899,8 +1899,13 @@ export class TransactionsService {
         new Brackets((outer) => {
           let hasCondition = false;
           if (hasUncategorized) {
+            // The same meaning as the list's own uncategorized arm: a trade's
+            // cash leg is not a row the user forgot to file. Without this the
+            // running balance summed a row the list above it does not show.
             outer.where(
-              "bf.categoryId IS NULL AND bf.isSplit = false AND bf.isTransfer = false",
+              `bf.categoryId IS NULL AND bf.isSplit = false AND bf.isTransfer = false AND ${investmentLinkedTransactionExclusion(
+                "bf",
+              )}`,
             );
             hasCondition = true;
           }
