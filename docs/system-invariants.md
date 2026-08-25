@@ -501,8 +501,9 @@ Enforcement         Server: findAll emits effectiveAmount /
                     effectiveAmountComplete / effectiveCurrencyCode per schedule
                     and per override; getLlmUpcomingBillsAndDeposits (AI + MCP),
                     BudgetsService.getUpcomingBills / getVelocity /
-                    ensureBillAlerts, BillReminderService and
-                    ForecastAggregatorService all read the resolver.
+                    ensureBillAlerts, BillReminderService,
+                    ForecastAggregatorService and BalanceForecastService all read
+                    the resolver.
                     Client: lib/scheduled-effective-amount.ts is the only reader
                     of those fields, and
                     lib/scheduled-effective-amount.guard.test.ts scans src/ for
@@ -524,13 +525,32 @@ Required tests      Present: scheduled-effective-amount.service.spec.ts (the
                     scheduled-utils, UpcomingBills, BudgetUpcomingBills,
                     BudgetVelocityWidget, UpcomingBillsReport,
                     RecurringChargesPanel and ScheduledTransactionList.
-Known gap           accounts/balance-forecast.service.ts still projects an
-                    account's balance from the persisted amount. Its investment
-                    handling applies a security-currency figure to the brokerage
-                    account rather than the settlement account, so switching only
-                    the amount would trade one wrong number for another; the
-                    account-remapping fix has to land with it. Tracked as a
-                    follow-up to issue #1247.
+Settlement account  An occurrence is charged to the account that actually moves
+                    the cash. `ScheduledEffectiveAmounts.settlementAccountId`
+                    carries it, derived through
+                    `InvestmentTransactionsService.resolveSettlementAccountId` --
+                    the same decision the posting makes, and the one the currency
+                    pair is derived from, so the account and its currency cannot
+                    disagree. A scheduled investment's `accountId` is the
+                    brokerage, so `BalanceForecastService` keyed on that column
+                    charged the brokerage for cash it never moved and left the
+                    funding account's own chart missing the outflow it pays; the
+                    amount alone could not have fixed it.
+Cumulative series   A projected balance is cumulative, so an occurrence nobody can
+                    price makes every point after it wrong. `BalanceForecastResult`
+                    withholds the forward line (`complete: false`, only today's
+                    anchor) and names the schedules in `gaps`; the client draws
+                    `BalanceForecastUnavailable` instead of a stub line and reports
+                    the projected-balance card as unavailable rather than falling
+                    back to today's figure. Completeness is decided while walking
+                    the horizon, so an unpriceable schedule with no occurrence
+                    inside the window does not withhold anything.
+                    A `crossCurrencyTransfer` gap is a separate cause with its own
+                    copy: the schedule's amount is the SOURCE account's, the
+                    arriving amount is resolved at posting, and this endpoint
+                    applies no rate -- so the destination's projection reports it
+                    rather than adding a foreign number (INV-FX-001's rule applied
+                    to a projection).
 Status              enforced
 ```
 

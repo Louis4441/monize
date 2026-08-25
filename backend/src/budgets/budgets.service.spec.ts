@@ -5,6 +5,10 @@ import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { BudgetsService } from "./budgets.service";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
+import {
+  createInvestmentFxMock,
+  InvestmentFxMock,
+} from "../test-helpers/investment-fx-testing";
 import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
 import {
   BudgetCategory,
@@ -43,7 +47,7 @@ describe("BudgetsService", () => {
   let categoriesRepository: Record<string, jest.Mock>;
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let overridesRepository: Record<string, jest.Mock>;
-  let investmentTransactionsService: Record<string, jest.Mock>;
+  let investmentTransactionsService: InvestmentFxMock;
 
   const mockBudget: Budget = {
     id: "budget-1",
@@ -220,12 +224,7 @@ describe("BudgetsService", () => {
     // Issue #1247: the settlement pair the effective-amount resolver derives.
     // Same-currency by default, so a plain schedule's effective amount equals its
     // stored one; the stale/unknown-rate cases override these per test.
-    investmentTransactionsService = {
-      resolveSettlementCurrencyPair: jest
-        .fn()
-        .mockResolvedValue({ from: "USD", to: "USD" }),
-      resolveCashExchangeRateOrNull: jest.fn().mockResolvedValue(1),
-    };
+    investmentTransactionsService = createInvestmentFxMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

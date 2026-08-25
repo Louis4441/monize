@@ -34,5 +34,12 @@
       "yearly": "Hàng năm",
       "irregular": "Không đều"
     }
+  },
+  "forecastUnavailable": {
+    "intro": "Số dư dự kiến không được hiển thị vì có ít nhất một mục đã lên lịch sắp tới chưa xác định được số tiền. Dự báo chuyển số dư của mỗi ngày sang ngày kế tiếp, nên một số tiền chưa xác định sẽ làm sai mọi ngày sau đó.",
+    "missingRatePair": "{name}: không có tỷ giá từ {from} sang {to}, nên số tiền mà lần phát sinh này sẽ ghi nhận là chưa xác định.",
+    "missingRate": "{name}: không có tỷ giá thanh toán cho lần phát sinh này, nên số tiền là chưa xác định.",
+    "crossCurrencyTransfer": "{name}: một chuyển khoản đến từ tài khoản bằng {from} trong khi tài khoản này bằng {to}. Số tiền vào đây được xác định khi chuyển khoản được ghi nhận, nên không thể dự báo trước.",
+    "howToFix": "Cách xử lý khi thiếu tỷ giá: mở Tiền tệ và làm mới tỷ giá, hoặc kiểm tra chứng khoán và tài khoản thanh toán của nó có đúng loại tiền bạn mong đợi."
   }
 }

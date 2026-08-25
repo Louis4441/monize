@@ -74,6 +74,33 @@ export interface ScheduledEffectiveAmounts {
   /** The base schedule's occurrences (every occurrence with no override). */
   base: EffectiveScheduledAmount;
   /**
+   * The account the occurrence's cash actually moves through, and therefore the
+   * account whose balance `base.amount` belongs to (issue #1247).
+   *
+   * For a top-level investment schedule that is the *settlement* account -- the
+   * named funding account, or the brokerage's linked cash account -- not
+   * `accountId`, which is the brokerage. An account-level projection keyed on
+   * `accountId` charged the brokerage for cash it never moved and left the
+   * funding account's own chart missing the outflow it pays. For every other
+   * schedule it is `accountId` unchanged.
+   *
+   * `base.currencyCode` is this account's currency by construction, which is what
+   * makes it safe to add to that account's running balance.
+   */
+  settlementAccountId: string;
+  /**
+   * The settlement currency pair a top-level investment schedule converts across,
+   * or `null` where there is no single pair to name -- a non-investment schedule,
+   * or a split parent whose investment lines each settle their own security's
+   * currency.
+   *
+   * Carried so a consumer that has to report an unresolvable rate can say WHICH
+   * pair failed rather than only that something did: "no rate from USD to CAD"
+   * is a sentence the reader can act on, "the amount is unavailable" is not
+   * (issue #1247).
+   */
+  settlementPair: { from: string; to: string } | null;
+  /**
    * The FX rate the forecast and the posting would apply to a top-level
    * investment schedule (issue #1167). `null` for a non-investment schedule and
    * for an investment schedule whose current rate is unknown.
@@ -175,6 +202,10 @@ export class ScheduledEffectiveAmountService {
     // fetch, so the parent path and the amount paths never fetch the same pair
     // twice.
     const forecastRateCache = new Map<string, Promise<number | null>>();
+    // The settlement-ACCOUNT derivation, memoized per tuple for the same reason
+    // the pair is: it is 1-2 account reads and every row sharing a tuple asks the
+    // identical question (issue #1247).
+    const accountCache = new Map<string, Promise<string>>();
     const forecastRateFor = (
       row: ScheduledTransaction,
     ): Promise<number | null> => {
@@ -227,6 +258,16 @@ export class ScheduledEffectiveAmountService {
           investmentForecastAmount,
           pairCache,
         );
+        const settlementAccountId = await this.settlementAccountFor(
+          userId,
+          row,
+          accountCache,
+        );
+        const settlementPair = await this.settlementPairFor(
+          userId,
+          row,
+          pairCache,
+        );
 
         // Prefer the overrides the caller hydrated for the projection
         // (`futureOverrides` / `nextOverride`); fall back to the plain relation
@@ -267,6 +308,8 @@ export class ScheduledEffectiveAmountService {
           id: row.id,
           value: {
             base,
+            settlementAccountId,
+            settlementPair,
             investmentForecastExchangeRate,
             investmentForecastAmount,
             overrides,
@@ -419,6 +462,66 @@ export class ScheduledEffectiveAmountService {
       pairCache,
     );
     return pair.to;
+  }
+
+  /**
+   * The settlement pair for a top-level investment schedule, `null` where there
+   * is no single one to name. Reads the same memoized derivation every rate path
+   * on the row already went through, so it costs nothing within one read.
+   */
+  private async settlementPairFor(
+    userId: string,
+    row: ScheduledTransaction,
+    pairCache?: Map<string, Promise<{ from: string; to: string }>>,
+  ): Promise<{ from: string; to: string } | null> {
+    const action = row.investmentAction as InvestmentAction | null;
+    if (!row.isInvestment || !action) return null;
+    return this.resolveForecastSettlementPair(
+      userId,
+      row.accountId,
+      FUNDING_ACCOUNT_ACTIONS.has(action)
+        ? row.investmentFundingAccountId
+        : null,
+      row.investmentSecurityId,
+      pairCache,
+    );
+  }
+
+  /**
+   * The account a schedule's cash moves through: the settlement account for an
+   * investment schedule, the schedule's own account otherwise.
+   *
+   * Asks `InvestmentTransactionsService`, which owns that decision for the
+   * posting path too, so the projection cannot charge a different account than
+   * the posting will. A schedule with no action has no settlement pair to speak
+   * of, so it keeps its own account (and is reported unknown by the rate).
+   */
+  private settlementAccountFor(
+    userId: string,
+    row: ScheduledTransaction,
+    cache?: Map<string, Promise<string>>,
+  ): Promise<string> {
+    const action = row.investmentAction as InvestmentAction | null;
+    if (!row.isInvestment || !action) {
+      return Promise.resolve(row.accountId);
+    }
+    const fundingAccountId = FUNDING_ACCOUNT_ACTIONS.has(action)
+      ? row.investmentFundingAccountId
+      : null;
+    const fetch = () =>
+      this.investmentTransactionsService.resolveSettlementAccountId(
+        userId,
+        row.accountId,
+        fundingAccountId,
+      );
+    if (!cache) return fetch();
+    const key = `${row.accountId}|${fundingAccountId ?? ""}`;
+    let pending = cache.get(key);
+    if (!pending) {
+      pending = fetch();
+      cache.set(key, pending);
+    }
+    return pending;
   }
 
   /**

@@ -5,6 +5,10 @@ import { I18nService } from "nestjs-i18n";
 import { BillReminderService } from "./bill-reminder.service";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
+import {
+  createInvestmentFxMock,
+  InvestmentFxMock,
+} from "../test-helpers/investment-fx-testing";
 import { EmailService } from "./email.service";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
@@ -31,7 +35,7 @@ describe("BillReminderService", () => {
   let preferencesRepo: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
   let configService: Record<string, jest.Mock>;
-  let investmentTransactionsService: Record<string, jest.Mock>;
+  let investmentTransactionsService: InvestmentFxMock;
 
   beforeEach(async () => {
     // The claim double is shared across tests, so recorded calls and any queued
@@ -68,12 +72,7 @@ describe("BillReminderService", () => {
     // resolver, so the double is the FX source beneath it, not the resolver
     // itself. Same-currency by default -- a plain bill's effective amount then
     // equals its stored one, which is what the pre-existing expectations assert.
-    investmentTransactionsService = {
-      resolveSettlementCurrencyPair: jest
-        .fn()
-        .mockResolvedValue({ from: "USD", to: "USD" }),
-      resolveCashExchangeRateOrNull: jest.fn().mockResolvedValue(1),
-    };
+    investmentTransactionsService = createInvestmentFxMock();
 
     const { dataSource } = createScopedDbMocks([
       [ScheduledTransaction, scheduledTransactionsRepo],

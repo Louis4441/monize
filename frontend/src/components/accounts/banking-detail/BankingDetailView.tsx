@@ -14,6 +14,8 @@ import { BankingSummaryCards } from './BankingSummaryCards';
 import { CashFlowMiniReport } from './CashFlowMiniReport';
 import { TopGroupsPanel } from '../shared/TopGroupsPanel';
 import type { Account } from '@/types/account';
+import type { BalanceForecastGap } from '@/types/banking-detail';
+import { BalanceForecastUnavailable } from '@/components/accounts/shared/BalanceForecastUnavailable';
 import type { GroupedTotal, MonthlyTotal } from '@/types/transaction';
 
 const logger = createLogger('BankingDetailView');
@@ -64,6 +66,9 @@ export function BankingDetailView({ account }: BankingDetailViewProps) {
 
   const [historicalBalances, setHistoricalBalances] = useState<DailyBalancePoint[]>([]);
   const [forecastPoints, setForecastPoints] = useState<DailyBalancePoint[]>([]);
+  // Issue #1247: a projected balance the server could not complete is withheld,
+  // not truncated. `gaps` is why, so the panel can name the schedule and the fix.
+  const [forecastGaps, setForecastGaps] = useState<BalanceForecastGap[]>([]);
   const [moneyIn, setMoneyIn] = useState(0);
   const [moneyOut, setMoneyOut] = useState(0);
   const [monthly, setMonthly] = useState<MonthlyTotal[]>([]);
@@ -131,9 +136,21 @@ export function BankingDetailView({ account }: BankingDetailViewProps) {
 
       if (cancelled) return;
       setHistoricalBalances(balances.map((r) => ({ date: r.date, balance: r.balance })));
+      // An incomplete forecast carries only today's anchor. Adopting it would
+      // draw a line that stops at today and make `projectedBalance` read as a
+      // measured projection equal to the current balance (issue #1247).
+      // `complete === false` is the server SAYING it withheld the line. Anything
+      // else -- true, or the field absent from an older backend mid rolling
+      // deploy -- means it did not, and that response's points are the ones it
+      // has always sent: withholding them here would invent a problem the
+      // response never reported (issue #1247).
+      const forecastWithheld = forecast?.complete === false;
       setForecastPoints(
-        forecast ? forecast.points.map((p) => ({ date: p.date, balance: p.balance })) : [],
+        forecast && !forecastWithheld
+          ? forecast.points.map((p) => ({ date: p.date, balance: p.balance }))
+          : [],
       );
+      setForecastGaps(forecastWithheld ? (forecast?.gaps ?? []) : []);
       setMoneyIn(summary?.totalIncome ?? 0);
       setMoneyOut(summary?.totalExpenses ?? 0);
       setMonthly(monthlyTotals);
@@ -156,9 +173,13 @@ export function BankingDetailView({ account }: BankingDetailViewProps) {
     [historicalBalances, forecastPoints],
   );
 
-  // Projected balance is the end of the forecast (falls back to current).
-  const projectedBalance =
-    forecastPoints.length && forecastPoints[forecastPoints.length - 1].balance !== null
+  // Projected balance is the end of the forecast. Unknown when the server could
+  // not complete it: falling back to the current balance would present today's
+  // figure as a projection, which is the trap issue #1247 is about.
+  const forecastUnavailable = forecastGaps.length > 0;
+  const projectedBalance = forecastUnavailable
+    ? null
+    : forecastPoints.length && forecastPoints[forecastPoints.length - 1].balance !== null
       ? (forecastPoints[forecastPoints.length - 1].balance as number)
       : Number(account.currentBalance) || 0;
 
@@ -209,7 +230,13 @@ export function BankingDetailView({ account }: BankingDetailViewProps) {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           {t('chart.title')}
         </h2>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6 space-y-4">
+          {/* The history still draws; only the forward line is withheld, so the
+              panel sits above it and says which schedule stopped the projection
+              and how to fix it (issue #1247). */}
+          {!isLoading && forecastUnavailable && (
+            <BalanceForecastUnavailable gaps={forecastGaps} />
+          )}
           {!isLoading && chartData.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-center py-8">{t('chart.empty')}</p>
           ) : (

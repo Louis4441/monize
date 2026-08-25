@@ -1,6 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ScheduledEffectiveAmountService } from "./scheduled-effective-amount.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
+import {
+  createInvestmentFxMock,
+  InvestmentFxMock,
+} from "../test-helpers/investment-fx-testing";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
 import { SplitKind } from "../transactions/entities/split-kind.enum";
@@ -20,10 +24,7 @@ import { InvestmentAction } from "../securities/entities/investment-transaction.
 describe("ScheduledEffectiveAmountService", () => {
   const userId = "11111111-1111-1111-1111-111111111111";
   let service: ScheduledEffectiveAmountService;
-  let investmentTransactionsService: {
-    resolveSettlementCurrencyPair: jest.Mock;
-    resolveCashExchangeRateOrNull: jest.Mock;
-  };
+  let investmentTransactionsService: InvestmentFxMock;
 
   /** The issue's schedule: a monthly 10 x 100 BUY settling into CAD. */
   const investmentSchedule = (
@@ -81,10 +82,12 @@ describe("ScheduledEffectiveAmountService", () => {
     }) as unknown as ScheduledTransaction;
 
   beforeEach(async () => {
-    investmentTransactionsService = {
-      resolveSettlementCurrencyPair: jest.fn(),
-      resolveCashExchangeRateOrNull: jest.fn(),
-    };
+    // The FX source beneath the real resolver. This suite drives the pair and
+    // the rate per case, so the defaults are cleared to make an accidental
+    // reliance on them a visible failure rather than a silent pass.
+    investmentTransactionsService = createInvestmentFxMock();
+    investmentTransactionsService.resolveSettlementCurrencyPair.mockReset();
+    investmentTransactionsService.resolveCashExchangeRateOrNull.mockReset();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

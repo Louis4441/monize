@@ -15,6 +15,10 @@ import { Tag } from "../tags/entities/tag.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
+import {
+  createInvestmentFxMock,
+  InvestmentFxMock,
+} from "../test-helpers/investment-fx-testing";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
@@ -38,7 +42,12 @@ describe("ScheduledTransactionsService", () => {
   let tagRepo: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
   let transactionsService: Record<string, jest.Mock>;
-  let investmentTransactionsService: Record<string, jest.Mock>;
+  // The FX trio the effective-amount resolver reads, plus the `create` the
+  // posting path calls. Typed, so a return shape the real service cannot
+  // produce is a compile error rather than fiction a test asserts on.
+  let investmentTransactionsService: InvestmentFxMock & {
+    create: jest.Mock;
+  };
   // The withScopedDb manager, exposed under the legacy name so the pre-RLS
   // queryRunner.manager assertions keep reading naturally.
   let mockQueryRunner: Record<string, any>;
@@ -182,16 +191,8 @@ describe("ScheduledTransactionsService", () => {
     };
 
     investmentTransactionsService = {
+      ...createInvestmentFxMock(),
       create: jest.fn().mockResolvedValue({ id: "inv-tx-1" }),
-      // Issue #1167: the settlement currency pair a stored rate is validated
-      // against. Defaults to a same-currency pair (no cross-currency FX); the
-      // provenance tests below override it per case.
-      resolveSettlementCurrencyPair: jest
-        .fn()
-        .mockResolvedValue({ from: "USD", to: "USD" }),
-      // Issue #1167: the forecast rate the read model attaches. Defaults to 1
-      // (same currency); forecast tests override it per case.
-      resolveCashExchangeRateOrNull: jest.fn().mockResolvedValue(1),
     };
 
     mockActionHistoryService = {

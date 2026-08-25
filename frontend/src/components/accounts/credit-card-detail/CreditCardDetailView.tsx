@@ -16,6 +16,8 @@ import { InterestAndFeesPanel } from './InterestAndFeesPanel';
 import { RecurringChargesPanel } from '@/components/accounts/shared/RecurringChargesPanel';
 import { PayoffCalculator } from './PayoffCalculator';
 import type { Account } from '@/types/account';
+import type { BalanceForecastGap } from '@/types/banking-detail';
+import { BalanceForecastUnavailable } from '@/components/accounts/shared/BalanceForecastUnavailable';
 import type { GroupedTotal } from '@/types/transaction';
 import type { StatementCycle, InterestPaid } from '@/types/credit-card-detail';
 
@@ -41,6 +43,9 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
   const [interest, setInterest] = useState<InterestPaid | null>(null);
   const [historicalBalances, setHistoricalBalances] = useState<DailyBalancePoint[]>([]);
   const [forecastPoints, setForecastPoints] = useState<DailyBalancePoint[]>([]);
+  // Issue #1247: an incomplete projection is withheld, not truncated; `gaps` says
+  // which schedule stopped it so the reader is not left with a blank forward line.
+  const [forecastGaps, setForecastGaps] = useState<BalanceForecastGap[]>([]);
   // Deriving loading from the last-resolved id avoids a synchronous setState in
   // the effect (matching LineOfCreditView).
   const [loadedForId, setLoadedForId] = useState<string | null>(null);
@@ -94,9 +99,20 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
       setSpending(totalsData);
       setInterest(interestData);
       setHistoricalBalances(balancesData.map((r) => ({ date: r.date, balance: r.balance })));
+      // An incomplete forecast carries only today's anchor; adopting it would
+      // draw a line that stops at today with nothing saying why (issue #1247).
+      // `complete === false` is the server SAYING it withheld the line. Anything
+      // else -- true, or the field absent from an older backend mid rolling
+      // deploy -- means it did not, and that response's points are the ones it
+      // has always sent: withholding them here would invent a problem the
+      // response never reported (issue #1247).
+      const forecastWithheld = forecastData?.complete === false;
       setForecastPoints(
-        forecastData ? forecastData.points.map((p) => ({ date: p.date, balance: p.balance })) : [],
+        forecastData && !forecastWithheld
+          ? forecastData.points.map((p) => ({ date: p.date, balance: p.balance }))
+          : [],
       );
+      setForecastGaps(forecastWithheld ? (forecastData?.gaps ?? []) : []);
       setLoadedForId(account.id);
     })();
     return () => {
@@ -139,7 +155,10 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           {t('chart.title')}
         </h2>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6 space-y-4">
+          {!isLoading && forecastGaps.length > 0 && (
+            <BalanceForecastUnavailable gaps={forecastGaps} />
+          )}
           {!isLoading && dailyBalances.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-center py-8">{t('chart.empty')}</p>
           ) : (
