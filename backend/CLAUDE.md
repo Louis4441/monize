@@ -17,8 +17,9 @@ npm run start:dev          # Dev server with HMR
 npm run build              # Production build
 npm run lint               # ESLint --fix
 npm run typecheck          # tsc over src AND test (CI gate; plain `tsc --noEmit` skips test/)
-npm run test               # jest with no filter -- see the note below, this is NOT green
-npm run test:unit          # Unit tests only (src/**/*.spec.ts)
+npm run test               # test:unit then test:integration -- needs PostgreSQL
+npm run test:unit          # Unit tests only (src/**/*.spec.ts); no database needed
+npm run test:integration   # test/integration/*.spec.ts against real PG, one worker
 npm run test:cov           # Coverage report (95% lines, 94% stmts, 95% funcs, 85% branches)
 npm run test:e2e           # E2E tests (test/**/*.spec.ts, 30s timeout, sequential)
 npm run i18n:pseudo        # Regenerate the xx pseudo-locale from en
@@ -26,6 +27,22 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 npm run migration:lint     # Idempotency lint over database/migrations (CI gate)
 npm run migration:lint:test # Self-test for the migration lint
 ```
+
+### The parallel config cannot see `test/`, and `npm test` serializes the two suites
+
+`test/integration/*` rebuilds the schema of the one shared `monize_test`
+database (`synchronize` + `dropSchema`), so two Jest workers running any two of
+those suites race each other -- `pg_type_typname_nsp_index` conflicts, or a
+"connection terminated" reported by whichever spec was innocent. The root Jest
+config in `package.json` therefore pins `roots: ["<rootDir>/src"]`: a bare
+`jest` (and `test:watch`, `test:debug`) discovers unit specs only. Integration
+specs are owned by `test/jest-e2e.json`, which pins `maxWorkers: 1`, and
+`npm test` chains `test:unit && test:integration` so the default command runs
+everything without ever running the two in parallel. That makes `npm test`
+require a reachable PostgreSQL (`pretest:integration` creates `monize_test` if
+it is missing); `npm run test:unit` is the offline path.
+`src/common/jest-config.guard.spec.ts` fails if any of those four facts stops
+being true.
 
 ### `test/*.e2e-spec.ts` is not a gate, and three of the four suites are broken
 

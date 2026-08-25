@@ -265,6 +265,13 @@ differences produce failures that look like regressions and are not.
   completed periods against fixtures; under another offset they land on the wrong
   side of a boundary. `insights-aggregator.service.spec.ts` and
   `net-worth.service.spec.ts` are the ones that bite.
+- `npm test` in `backend/` runs `test:unit && test:integration` -- the two CI
+  commands above, in that order, never concurrently. The integration suites share
+  one `monize_test` and rebuild its schema (`synchronize` + `dropSchema`), so a
+  second Jest worker is a race rather than a speedup: the parallel config pins
+  `roots: ["<rootDir>/src"]` and `test/jest-e2e.json` pins `maxWorkers: 1`, both
+  asserted by `backend/src/common/jest-config.guard.spec.ts`. The default command
+  therefore needs a reachable PostgreSQL; `npm run test:unit` is the offline path.
 - `--workers=1` for the whole E2E suite. `playwright.config.ts` sets one worker
   only when `CI` is set, and `e2e/tests/zz-danger-zone.spec.ts` deletes the
   shared account -- the `zz-` prefix orders it last, which only means anything
