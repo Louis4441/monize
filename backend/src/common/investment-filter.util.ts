@@ -1,4 +1,5 @@
 import { SelectQueryBuilder } from "typeorm";
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 
 /**
  * Which transaction rows are an investment movement rather than ordinary cash,
@@ -68,9 +69,30 @@ export function investmentLinkedTransactionExclusion(
   return `NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = ${transactionAlias}.id)`;
 }
 
-/** Excludes an investment line embedded in a split transaction. */
+/**
+ * Excludes an investment line embedded in a split transaction, by BOTH of the
+ * representations that describe one: the split's declared `kind`, and an
+ * `investment_transactions` row pointing at that split. `createEmbeddedForSplit`
+ * writes both (`transaction_id` stays null and the split amount IS the cash
+ * side), so either clause alone would be the whole answer today -- and either
+ * one alone becomes wrong the moment the two disagree: a split declared
+ * investment whose row has been removed, or a row pointing at a split that does
+ * not declare itself. `kind` also answers for free on the common path, before
+ * the sub-query runs.
+ *
+ * `IS DISTINCT FROM` rather than `!=` because a LEFT JOIN that matched no split
+ * leaves `kind` NULL, and `NULL != 'investment'` is NULL, which a WHERE clause
+ * reads as false -- that comparison would drop every non-split transaction from
+ * the report.
+ *
+ * Deliberately `includes VOID` rows: this reads what a row IS -- its identity --
+ * not what it moved.
+ */
 export function investmentLinkedSplitExclusion(splitAlias: string): string {
-  return `NOT EXISTS (SELECT 1 FROM investment_transactions its WHERE its.transaction_split_id = ${splitAlias}.id)`;
+  return [
+    `${splitAlias}.kind IS DISTINCT FROM '${SplitKind.INVESTMENT}'`,
+    `NOT EXISTS (SELECT 1 FROM investment_transactions its WHERE its.transaction_split_id = ${splitAlias}.id)`,
+  ].join("\n        AND ");
 }
 
 /**

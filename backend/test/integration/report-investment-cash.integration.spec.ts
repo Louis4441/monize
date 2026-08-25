@@ -215,23 +215,57 @@ describe("built-in reports and investment cash accounts (integration)", () => {
     });
   }
 
-  /** A BUY funded from the sleeve, so its cash leg lands in the sleeve. */
+  /**
+   * A trade through the real writer. With no funding account the cash leg lands
+   * in the linked sleeve; with one it lands in that account instead -- which is
+   * how investment-generated cash reaches an ordinary chequing ledger, where no
+   * account-type predicate could ever have recognised it.
+   */
+  async function createTrade(
+    action: InvestmentAction,
+    overrides: {
+      date?: string;
+      quantity?: number;
+      price?: number;
+      fundingAccountId?: string;
+    } = {},
+  ): Promise<InvestmentTransaction> {
+    return withUserContext(userId, () =>
+      investments.create(userId, {
+        accountId: brokerageId,
+        action,
+        transactionDate: overrides.date ?? "2026-03-12",
+        securityId,
+        quantity: overrides.quantity ?? 10,
+        price: overrides.price ?? 50,
+        commission: 0,
+        ...(overrides.fundingAccountId
+          ? { fundingAccountId: overrides.fundingAccountId }
+          : {}),
+      } as any),
+    );
+  }
+
   async function createBuy(
     date = "2026-03-12",
     quantity = 10,
     price = 50,
   ): Promise<InvestmentTransaction> {
-    return withUserContext(userId, () =>
-      investments.create(userId, {
-        accountId: brokerageId,
-        action: InvestmentAction.BUY,
-        transactionDate: date,
-        securityId,
-        quantity,
-        price,
-        commission: 0,
-      } as any),
-    );
+    return createTrade(InvestmentAction.BUY, { date, quantity, price });
+  }
+
+  /** The cash row a trade generated, asserted to be where the test expects. */
+  async function generatedLeg(
+    trade: InvestmentTransaction,
+    expectedAccountId: string,
+  ): Promise<Transaction> {
+    const leg = await dataSource.manager.findOneOrFail(Transaction, {
+      where: { id: trade.transactionId as string },
+    });
+    expect(leg.accountId).toBe(expectedAccountId);
+    expect(leg.categoryId).toBeNull();
+    expect(leg.isTransfer).toBe(false);
+    return leg;
   }
 
   describe("the reported bug", () => {
@@ -315,6 +349,46 @@ describe("built-in reports and investment cash accounts (integration)", () => {
 
       const payees = result.data.map((row) => row.payeeName);
       expect(payees).toEqual(["Corner Store"]);
+    });
+  });
+
+  /**
+   * The Cash Flow page issues three requests -- the monthly aggregate, the
+   * inflow breakdown and the outflow breakdown -- and every one of them carried
+   * the account-type predicate. A per-query fix that left them disagreeing would
+   * show a chart and two tables that do not add up, so the reconciliation is
+   * asserted rather than assumed.
+   */
+  describe("the Cash Flow page's three queries", () => {
+    it("reconcile with each other over the same range", async () => {
+      await insertSleeveSalary();
+      await insertTransaction({
+        amount: -60,
+        categoryId: groceriesCategoryId,
+        payeeName: "Corner Store",
+      });
+      await insertTransaction({
+        accountId: chequingId,
+        amount: -40,
+        categoryId: groceriesCategoryId,
+        payeeName: "Bakery",
+      });
+      await createBuy();
+
+      const [cashFlow, bySource, byCategory] = await withUserContext(
+        userId,
+        async () =>
+          Promise.all([
+            income.getIncomeVsExpenses(userId, START, END),
+            income.getIncomeBySource(userId, START, END),
+            spending.getSpendingByCategory(userId, START, END),
+          ]),
+      );
+
+      expect(cashFlow.totals.income).toBe(1000);
+      expect(cashFlow.totals.expenses).toBe(100);
+      expect(bySource.totalIncome).toBe(cashFlow.totals.income);
+      expect(byCategory.totalSpending).toBe(cashFlow.totals.expenses);
     });
   });
 
@@ -461,6 +535,148 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       );
 
       expect(result.groups).toEqual([]);
+    });
+
+    it("keeps a trade's cash leg out of an ordinary funding account's report", async () => {
+      // The inverse of issue #1257, same root: an explicit funding account puts
+      // generated investment cash in a CHEQUING ledger, where the old
+      // account-type predicate could not see it at all. Before the fix this
+      // month reported 1000 of expenses that nobody spent.
+      await insertTransaction({
+        accountId: chequingId,
+        amount: -60,
+        categoryId: groceriesCategoryId,
+        payeeName: "Corner Store",
+      });
+      const buy = await createTrade(InvestmentAction.BUY, {
+        quantity: 10,
+        price: 100,
+        fundingAccountId: chequingId,
+      });
+      const leg = await generatedLeg(buy, chequingId);
+      expect(Number(leg.amount)).toBe(-1000);
+
+      const cashFlow = await withUserContext(userId, () =>
+        income.getIncomeVsExpenses(userId, START, END),
+      );
+
+      expect(cashFlow.totals.expenses).toBe(60);
+      expect(cashFlow.totals.income).toBe(0);
+    });
+
+    it("keeps a dividend paid into an ordinary account out of income", async () => {
+      const dividend = await createTrade(InvestmentAction.DIVIDEND, {
+        quantity: 1,
+        price: 30,
+        fundingAccountId: chequingId,
+      });
+      const leg = await generatedLeg(dividend, chequingId);
+      expect(Number(leg.amount)).toBe(30);
+
+      const cashFlow = await withUserContext(userId, () =>
+        income.getIncomeVsExpenses(userId, START, END),
+      );
+      const bySource = await withUserContext(userId, () =>
+        income.getIncomeBySource(userId, START, END),
+      );
+
+      expect(cashFlow.totals.income).toBe(0);
+      expect(bySource.data).toEqual([]);
+      expect(bySource.totalIncome).toBe(0);
+    });
+
+    it("keeps a SELL's cash credit out of income", async () => {
+      await insertSleeveSalary();
+      const sell = await createTrade(InvestmentAction.SELL, {
+        quantity: 4,
+        price: 75,
+      });
+      const leg = await generatedLeg(sell, cashSleeveId);
+      expect(Number(leg.amount)).toBe(300);
+
+      const cashFlow = await withUserContext(userId, () =>
+        income.getIncomeVsExpenses(userId, START, END),
+      );
+
+      expect(cashFlow.totals.income).toBe(1000);
+    });
+
+    it("counts ordinary cash on a standalone investment account", async () => {
+      // A .mny import produces these: account_type INVESTMENT with no sub-type,
+      // holding both securities and its own cash. It IS the cash side, so the
+      // brokerage-sleeve exclusion must not reach it.
+      const standalone = await createTestAccount(dataSource, userId, {
+        name: "Legacy Brokerage",
+        openingBalance: 0,
+        currentBalance: 0,
+      });
+      await dataSource.manager.update(Account, standalone.id, {
+        accountType: AccountType.INVESTMENT,
+        accountSubType: null,
+      });
+      await insertTransaction({
+        accountId: standalone.id,
+        amount: 250,
+        categoryId: salaryCategoryId,
+        payeeName: "Acme Payroll",
+      });
+
+      const cashFlow = await withUserContext(userId, () =>
+        income.getIncomeVsExpenses(userId, START, END),
+      );
+
+      expect(cashFlow.totals.income).toBe(250);
+    });
+
+    it("still excludes a VOID row in the sleeve", async () => {
+      await insertSleeveSalary();
+      await insertTransaction({
+        amount: 5000,
+        categoryId: salaryCategoryId,
+        payeeName: "Voided bonus",
+        status: TransactionStatus.VOID,
+      });
+
+      const cashFlow = await withUserContext(userId, () =>
+        income.getIncomeVsExpenses(userId, START, END),
+      );
+
+      expect(cashFlow.totals.income).toBe(1000);
+    });
+
+    it("still excludes a transfer split line in the sleeve", async () => {
+      const parent = await insertTransaction({
+        amount: -260,
+        isSplit: true,
+        categoryId: null,
+        payeeName: "Sleeve sweep",
+      });
+      const groceries = dataSource.manager.create(TransactionSplit, {
+        transactionId: parent.id,
+        kind: SplitKind.CATEGORY,
+        categoryId: groceriesCategoryId,
+        amount: -60,
+      } as Partial<TransactionSplit>);
+      const transferOut = dataSource.manager.create(TransactionSplit, {
+        transactionId: parent.id,
+        kind: SplitKind.TRANSFER,
+        transferAccountId: chequingId,
+        amount: -200,
+      } as Partial<TransactionSplit>);
+      await dataSource.manager.save([groceries, transferOut]);
+      // The counterpart leg the transfer writer creates in the target account.
+      await insertTransaction({
+        accountId: chequingId,
+        amount: 200,
+        isTransfer: true,
+        categoryId: null,
+      });
+
+      const byCategory = await withUserContext(userId, () =>
+        spending.getSpendingByCategory(userId, START, END),
+      );
+
+      expect(byCategory.totalSpending).toBe(60);
     });
 
     it("does not count an investment line embedded in a split", async () => {

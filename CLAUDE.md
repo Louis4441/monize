@@ -326,13 +326,21 @@ real ledger from fifteen report queries: salary paid into a brokerage's cash
 side vanished from Cash Flow, Income by Source, spending, tax and the
 Uncategorized list (issue #1257). It never described the rows it was meant to
 remove either: the cash leg a BUY/SELL/DIVIDEND posts lives in that same cash
-account, carries no category and no transfer flag.
+account, carries no category and no transfer flag -- and when the action names an
+explicit `fundingAccountId`, that leg lands in an *ordinary* account where no
+account-type predicate could ever see it, reporting an investment purchase as
+spending nobody did.
 
 What a row *is* decides it, and the predicate is written once in
 `backend/src/common/investment-filter.util.ts` -- `investmentExclusionSql` for
 raw SQL, `applyInvestmentTransactionFilters` for a QueryBuilder, both built from
 the same fragments so the two dialects cannot drift. Use those; never spell an
 account-type or sub-type exclusion by hand.
+An investment line embedded in a split is the case a transaction-level linkage
+check alone gets wrong (its `transaction_id` is null; the split carries the cash),
+so it is excluded by both of its representations -- the split's `kind` and an
+`investment_transactions` row pointing at the split -- and **at split-row
+granularity**: excluding the parent would take the ordinary sibling line with it.
 `backend/src/common/investment-filter.guard.spec.ts` fails on either shape and
 on a built-in-report ledger query that carries no exclusion, and
 `backend/test/integration/report-investment-cash.integration.spec.ts` holds the

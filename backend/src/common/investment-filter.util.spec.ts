@@ -1,3 +1,4 @@
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 import {
   applyInvestmentTransactionFilters,
   brokerageExclusionForEntity,
@@ -79,6 +80,7 @@ describe("investmentExclusionSql", () => {
     expect(sql).toContain(investmentLinkedTransactionExclusion("t"));
     expect(sql).toContain(investmentLinkedSplitExclusion("ts"));
     expect(sql.match(/NOT EXISTS/g)).toHaveLength(2);
+    expect(sql).toContain("ts.kind IS DISTINCT FROM 'investment'");
   });
 
   it("omits the split clause when the query joins no splits", () => {
@@ -115,7 +117,30 @@ describe("investmentExclusionSql", () => {
       splitAlias: "ts",
     });
 
-    expect(sql.match(/\bAND\b/g)).toHaveLength(2);
+    // brokerage, generated cash leg, embedded split kind, embedded split row.
+    expect(sql.match(/\bAND\b/g)).toHaveLength(3);
+  });
+
+  it("names the split kind from the enum, not a hand-written literal", () => {
+    expect(investmentLinkedSplitExclusion("ts")).toContain(
+      `IS DISTINCT FROM '${SplitKind.INVESTMENT}'`,
+    );
+  });
+
+  // A LEFT JOIN that matched no split leaves kind NULL, and `NULL != 'x'` is
+  // NULL -- read as false, which would drop every non-split row from the report.
+  it("compares the split kind with IS DISTINCT FROM, never !=", () => {
+    const clause = investmentLinkedSplitExclusion("ts");
+
+    expect(clause).toContain("ts.kind IS DISTINCT FROM");
+    expect(clause).not.toContain("ts.kind !=");
+  });
+
+  it("excludes an embedded investment split by both of its representations", () => {
+    const clause = investmentLinkedSplitExclusion("ts");
+
+    expect(clause).toContain("ts.kind");
+    expect(clause).toContain("its.transaction_split_id = ts.id");
   });
 
   it("uses distinct sub-query aliases so both NOT EXISTS clauses can coexist", () => {

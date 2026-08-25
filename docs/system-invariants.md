@@ -441,7 +441,13 @@ Statement           A report over the transaction ledger includes an ordinary
                     transaction, or a row in a securities sleeve -- never by the
                     account's type. An INVESTMENT account is a pair, and its
                     INVESTMENT_CASH sleeve is ordinary money: salary, interest,
-                    fees, transfers in and out.
+                    fees, transfers in and out; a standalone INVESTMENT account
+                    (no sub-type, as .mny imports produce) IS its own cash side.
+                    The claim is symmetric, and the account type fails in both
+                    directions: an investment action with an explicit
+                    fundingAccountId posts its generated cash into an ORDINARY
+                    account, where an account-type predicate cannot see it at
+                    all.
 Source of truth     investment_transactions.transaction_id /
                     .transaction_split_id for the linkage; accounts.
                     account_sub_type for the sleeve. Not accounts.account_type,
@@ -450,7 +456,14 @@ Enforcement         One predicate, in backend/src/common/investment-filter.util.
                     investmentExclusionSql for raw-SQL report queries,
                     applyInvestmentTransactionFilters for QueryBuilder callers,
                     both built from the same fragments so the two dialects
-                    cannot drift. Applied by all fifteen ledger queries under
+                    cannot drift. An embedded investment split is excluded by
+                    both of its representations -- the split's declared kind and
+                    an investment_transactions row pointing at that split -- and
+                    at SPLIT-ROW granularity, so an ordinary sibling line on the
+                    same split parent survives (excluding the parent would lose
+                    it; keying only on transaction_id would miss the embedded
+                    line entirely, since its transaction_id is null). Applied by
+                    all fifteen ledger queries under
                     backend/src/built-in-reports/ and by the "Uncategorized"
                     filters on the register (transactions.service.ts), the
                     register summary (transaction-analytics.service.ts) and the
@@ -475,18 +488,27 @@ Required tests      Present: the two source scans above, and
                     and asserts both directions -- $1,000 of sleeve income
                     reaching Cash Flow and Income by Source, the generated leg
                     staying out of spending, payees, Uncategorized and
-                    duplicates, a brokerage-sleeve row staying out, an embedded
-                    investment split not becoming an Uncategorized bucket, and
-                    the catalogue-wide claim that adding a trade changes no
-                    report's answer. Unit specs mock manager.query and can only
+                    duplicates, a brokerage-sleeve row staying out, generated
+                    cash staying out of an ORDINARY funding account's report
+                    (BUY debit and DIVIDEND credit), a SELL credit staying out
+                    of income, ordinary cash on a standalone INVESTMENT account
+                    counting, the VOID and transfer-split exclusions still
+                    holding, an embedded investment split not becoming an
+                    Uncategorized bucket while its ordinary sibling still
+                    counts, the three Cash Flow queries reconciling with each
+                    other, and the catalogue-wide claim that adding a trade
+                    changes no report's answer. Unit specs mock manager.query and can only
                     assert the text of the SQL, which is why the behavioural
                     proof is the integration suite.
 Status              enforced
 ```
 
 The defect this records was not a subtle one: with `AND a.account_type !=
-'INVESTMENT'` in place, nine of the ten integration cases above fail, and the
-tenth passes only because every report was uniformly empty for that account.
+'INVESTMENT'` in place, sixteen of the seventeen integration cases above fail,
+and the seventeenth passes only because every report was uniformly empty for
+that account. The focused audit of issue #1257 recorded the same root as
+`F-1257-001` (MEDIUM, derived reporting only -- no stored balance is wrong) and
+the naive-repair trap as `DR-1257-001`.
 
 ## Scheduled occurrences
 
