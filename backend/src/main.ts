@@ -411,6 +411,10 @@ async function bootstrap() {
         "X-CSRF-Token",
         "X-Restore-Password",
         "X-Restore-OIDC-Token",
+        // Without this a cross-origin restore upload never leaves the browser:
+        // the preflight refuses the header, so the upload is "blocked by CORS"
+        // rather than refused with the 403 that says what to do.
+        "X-Restore-Upload-Ticket",
         "Mcp-Session-Id",
       ],
       exposedHeaders: ["Mcp-Session-Id"],

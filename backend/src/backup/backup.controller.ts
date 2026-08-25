@@ -177,7 +177,7 @@ export class BackupController {
   @ApiOperation({
     summary: "Mint a short-lived ticket authorizing one restore upload",
     description:
-      "The restore upload's memory admission has to run in front of the body parser, which is in front of every Nest guard -- so it cannot authenticate the request it is budgeting for (DR-F3RB-003). This route can: it is ordinary authenticated JSON, and it hands back a signed ticket the admission middleware verifies before reserving anything. Without one, an upload is refused 401 having claimed no memory.",
+      "The restore upload's memory admission has to run in front of the body parser, which is in front of every Nest guard -- so it cannot authenticate the request it is budgeting for (DR-F3RB-003). This route can: it is ordinary authenticated JSON, and it hands back a signed ticket the admission middleware verifies before reserving anything. Without one, an upload is refused 403 having claimed no memory -- 403 rather than 401 because the session is fine and it is this request that carries no authorization, and because a client reads a 401 as an expired session and retries the whole upload.",
   })
   @ApiResponse({ status: 200, description: "Ticket minted" })
   mintRestoreUploadTicket(@Request() req) {

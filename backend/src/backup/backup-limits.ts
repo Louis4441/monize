@@ -131,9 +131,9 @@ export const PEAK_MULTIPLE = Math.ceil(MEASURED_PEAK_MULTIPLE);
  * derivation has to leave room for both. Fifteen per cent of the headroom stays
  * unspoken for, which on the chart's default pod is about 40 MiB.
  *
- * `restore-peak-rss.record.spec.ts` asserts the resulting ceiling keeps at least
- * a 15% margin over the measurement, so this cannot be quietly raised to make a
- * bigger artifact fit.
+ * `backup-limits.spec.ts` asserts the resulting ceiling keeps at least a 15%
+ * margin over the measurement at every supported pod size, so this cannot be
+ * quietly raised to make a bigger artifact fit.
  */
 export const RESTORE_HEADROOM_SHARE = 0.85;
 
@@ -362,24 +362,30 @@ export function resolveByteLimit(
  * them at once. Half of a 400 MiB container to the wire is `PEAK_MULTIPLE` times
  * that at peak, so a single legal request could not fit the pod it was sized for.
  *
- * So the *peak* gets `MEMORY_SHARE_PER_RESTORE_UPLOAD` of the container and the
- * wire gets that divided by `PEAK_MULTIPLE` -- about 66 MiB of compressed upload on
- * the chart's default backend, peaking at the same 200 MiB the aggregate admission
- * budget allows. The two numbers are derived from one share so they cannot disagree.
+ * It was then its own share divided by the multiple, which was safe but still two
+ * ceilings for one fact -- 66 MiB of wire against a 100 MiB expanded ceiling, so an
+ * upload could be accepted and then refused on decompression. It is now
+ * `safeDerivedUploadLimit`: the expanded ceiling in force, whether derived or set
+ * by the operator. About 28 MiB on the chart's default backend.
  *
  * That is a much smaller default than before, and deliberately: a compressed
  * backup near the old figure could not be restored on the default pod at all. An
  * operator whose users have large artifacts -- likelier now that attachment bytes
- * travel inside them -- raises `BACKUP_RESTORE_LIMIT` *and* the pod's memory, and
- * gets a startup warning if they do only the first.
+ * travel inside them -- raises the pod's memory, which raises both ceilings
+ * together, and gets a startup warning if they raise `BACKUP_RESTORE_LIMIT` past
+ * what the container can decompress.
  *
  * Returned as bytes; `express.raw` accepts a number.
  */
 export function resolveRestoreUploadLimitBytes(
   raw: string | undefined = process.env.BACKUP_RESTORE_LIMIT,
   memoryLimitBytes: number | null = detectProcessMemoryLimitBytes(),
+  expandedRaw: string | undefined = process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
 ): number {
-  return resolveByteLimit(raw, safeDerivedUploadLimit(memoryLimitBytes));
+  return resolveByteLimit(
+    raw,
+    safeDerivedUploadLimit(memoryLimitBytes, expandedRaw),
+  );
 }
 
 /**
@@ -397,9 +403,12 @@ export function warnIfRestoreUploadLimitIsUnsafe(
   rawOverride: string | undefined,
   onWarn: (message: string) => void,
   memoryLimitBytes: number | null = detectProcessMemoryLimitBytes(),
+  expandedRaw: string | undefined = process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
 ): void {
   if (rawOverride === undefined || rawOverride.trim() === "") return;
-  const safe = safeDerivedUploadLimit(memoryLimitBytes);
+  // Against the ceiling actually in force: an operator who lowered the expanded
+  // limit and left the upload limit alone is exactly who this has to warn.
+  const safe = safeDerivedUploadLimit(memoryLimitBytes, expandedRaw);
   if (limitBytes <= safe) return;
   const mib = (bytes: number) => `${Math.round(bytes / MIB)}MiB`;
   onWarn(
@@ -414,7 +423,7 @@ export function warnIfRestoreUploadLimitIsUnsafe(
 }
 
 /**
- * The largest compressed upload worth buffering: the expanded ceiling itself.
+ * The largest compressed upload worth buffering: the expanded ceiling **in force**.
  *
  * This used to be its own share of the container (`container * 0.5 /
  * PEAK_MULTIPLE`), which made two ceilings out of one fact and let them disagree:
@@ -427,17 +436,25 @@ export function warnIfRestoreUploadLimitIsUnsafe(
  * than the expanded ceiling is one this deployment cannot decompress. Refusing it
  * before `express.raw` buffers it is strictly better than refusing it after.
  *
+ * **The resolved ceiling, not the derived one.** Reading the derivation instead
+ * reintroduced the same accept-then-refuse defect one level along: an operator who
+ * lowers `BACKUP_RESTORE_EXPANDED_LIMIT` -- the documented lever for trading
+ * artifact size against concurrency -- would leave the wire limit at the derived
+ * 27.6 MiB while `gunzip` enforced their 8 MiB. Same class of bug as F3R7-002: a
+ * limit that budgets against a number the parser does not enforce.
+ *
  * **No floor**, for the reason `deriveRestoreExpandedLimitBytes` states: a
  * usability minimum resolved with `max()` beats the safety bound it was supposed
- * to respect. A container with no room for any restore derives `0` here, and the
- * request is refused by the processing gate with a message naming the levers.
+ * to respect. A container with no room for any restore resolves `0` here, and the
+ * admission middleware refuses with the 503 that names the levers.
  * `warnIfRestoreUploadLimitIsCramped` says so at startup where the number is
  * merely small.
  */
 export function safeDerivedUploadLimit(
   memoryLimitBytes: number | null,
+  expandedRaw: string | undefined = process.env.BACKUP_RESTORE_EXPANDED_LIMIT,
 ): number {
-  return deriveRestoreExpandedLimitBytes(memoryLimitBytes);
+  return resolveRestoreExpandedLimitBytes(expandedRaw, memoryLimitBytes);
 }
 
 /**

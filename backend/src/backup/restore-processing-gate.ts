@@ -340,10 +340,13 @@ export class RestoreProcessingGate {
  * functions above, which it outlived by several commits.
  *
  * Which containers get that zero moved with the measurement (issue #1073): now it
- * is those with no headroom left after the process baseline, which the baseline's
- * 140 MiB floor makes any pod at or below about 160 MiB. A 256 MiB pod gets one
- * slot and a ~12 MiB artifact ceiling, where the old share-based derivation gave it
- * zero -- a smaller promise, kept, instead of a larger one that OOM-killed the pod.
+ * is those with no headroom left after the process baseline -- at or below the
+ * baseline's own 140 MiB floor, since a pod above it has *some* headroom and the
+ * ceiling derived from it is never rounded up to zero. A 160 MiB pod therefore gets
+ * one slot and a ceiling of about 2 MiB, which is honest rather than useful; a
+ * 256 MiB pod gets one slot and ~12 MiB, where the old share-based derivation gave
+ * it zero -- a smaller promise, kept, instead of a larger one that OOM-killed the
+ * pod.
  */
 export function computeRestoreProcessingSlots(
   memoryLimitBytes: number | null,

@@ -51,12 +51,21 @@ jobs:
       # inside the process being measured, which is how the first run of this
       # harness produced numbers that meant nothing.
       - run: npm run build
+      # Inputs reach the shell as environment variables, never as interpolated
+      # text: `${{ inputs.x }}` inside a run block is substituted before bash
+      # parses the line, so anyone who can dispatch this workflow could run
+      # arbitrary commands on the runner. The harness parses these itself, and
+      # ignores anything that is not a positive number.
       - name: Measure
+        env:
+          TARGET_MIB: ${{ inputs.target-mib }}
+          REPEAT: ${{ inputs.repeat }}
+          HEAP_CAPS: ${{ inputs.heap-caps }}
         run: |
           node dist/backup/restore-peak-rss.harness.js \
-            --target-mib='${{ inputs.target-mib }}' \
-            --repeat='${{ inputs.repeat }}' \
-            --child-heap-mib='${{ inputs.heap-caps }}' \
+            --target-mib="$TARGET_MIB" \
+            --repeat="$REPEAT" \
+            --child-heap-mib="$HEAP_CAPS" \
             --record=peak-rss-record.json
       - name: Upload the record
         if: always()

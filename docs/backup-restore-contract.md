@@ -574,7 +574,11 @@ Authentication cannot move earlier, because Nest's guards run after parsing, so
 authorization moved instead: a caller asks `POST /backup/restore/ticket` (ordinary
 authenticated JSON, behind the JWT guard, CSRF and the throttler) for a short-lived
 signed ticket, and the admission middleware verifies it **before reserving anything**.
-An upload with no ticket is refused `401` having claimed no memory at all.
+An upload with no ticket is refused `403` having claimed no memory at all — `403`
+rather than `401` because the caller's session is valid and it is this request that
+carries no upload authorization, and because a client that reads `401` as an expired
+session retries the request after refreshing its token: a silent re-upload of the
+whole artifact, or a logout mid-restore.
 
 The ticket is an HMAC over `{userId, expiresAt}` keyed by a value derived from
 `JWT_SECRET` with a domain separator, not a database row
@@ -622,13 +626,13 @@ zero back to one so a running process could always attempt a restore, which is t
 behaviour F3RB-005 removed: admitting work the model says cannot fit turned a fixable
 misconfiguration into an OOM kill mid-restore.
 
-What the gate does **not** establish is that one restore fits. It bounds concurrency,
-and only concurrency: every ceiling in the chain is derived by dividing by
-`PEAK_MULTIPLE` (`safeDerivedUploadLimit` is literally `container * share /
-PEAK_MULTIPLE`), so none of them can vouch for it. On the default 400 MiB pod the
-model leaves 4 MiB spare and a true multiple above 3.04 puts a single admitted
-restore over the container (3.20 on a 512 MiB or 1 GiB pod), so an operator whose
-restore is OOM-killed at one slot is hitting the estimate, not a bug in the gate.
+What the gate establishes is concurrency, and only concurrency. It used to establish
+nothing else either, and could not: every ceiling in the chain was derived by dividing
+by `PEAK_MULTIPLE` — `safeDerivedUploadLimit` *was* `container * share /
+PEAK_MULTIPLE` — so none of them could vouch for it, and on the default 400 MiB pod
+the model left 4 MiB spare against a break-even multiple of 3.04. What makes one
+restore fit now is the ceiling it is admitted with, and that ceiling is solved out of
+the capacity (below).
 **The multiple was measured, and the derivation inverted (issue #1073).**
 `backend/src/backup/restore-peak-rss.harness.ts` decodes generated artifacts in a
 fresh process and records the peak; the committed result

@@ -197,6 +197,23 @@ export function createRestoreUploadAdmission(
         return;
       }
 
+      // A ceiling of zero is the derivation saying this container has no room for
+      // any restore. Falling through would answer 413 "exceeds the restore size
+      // limit" for every upload, naming no lever and reading as "your file is too
+      // big" when the truth is that no file would fit -- and the startup log and
+      // the processing gate both promise a 503 that names what to change. No
+      // Retry-After: retrying an unchanged deployment cannot help.
+      if (perRequestLimitBytes <= 0) {
+        refuse(
+          res,
+          503,
+          "This deployment has no memory headroom for a restore: one restore's " +
+            "modeled peak does not fit the container. Raise the container memory " +
+            "limit or lower BACKUP_RESTORE_EXPANDED_LIMIT.",
+        );
+        return;
+      }
+
       const declared = contentLengthOf(req);
 
       if (declared !== null && declared > perRequestLimitBytes) {

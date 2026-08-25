@@ -144,9 +144,12 @@ describe("createRestoreTicketAuthorizer", () => {
     const result = authorize(requestWith());
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("unreachable");
-    expect(result.status).toBe(401);
-    // The remedy has to be in the message: a 401 on a route the client believes
-    // it is authenticated for is otherwise unexplainable.
+    // 403, not 401. The client's interceptor reads a 401 as an expired session
+    // and retries the request after refreshing the token -- which here means
+    // re-uploading the whole artifact, or logging the user out mid-restore.
+    expect(result.status).toBe(403);
+    // The remedy has to be in the message: a refusal on a route the client
+    // believes it is authenticated for is otherwise unexplainable.
     expect(result.message).toContain("restore/ticket");
   });
 

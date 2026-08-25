@@ -84,7 +84,8 @@ reservation:
    stored, and therefore replayable inside its TTL rather than single-use. The
    reasoning is there.) The raw upload carries it in a header, and the admission
    middleware validates it *before* reserving budget. An unauthenticated request then
-   cannot occupy the budget at all: it is refused with 401 having reserved nothing.
+   cannot occupy the budget at all: it is refused having reserved nothing. (Shipped
+   as `403`, not the `401` written here -- see WP4.)
 2. **Ingress limits in the chart.** A body-size limit matching `BACKUP_RESTORE_LIMIT`
    and a per-IP connection/rate limit on the restore path, so the process is not the
    first thing a flood reaches. Cheap, real, and only helps deployments that use the

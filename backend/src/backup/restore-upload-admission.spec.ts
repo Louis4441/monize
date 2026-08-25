@@ -344,6 +344,46 @@ describe("restore upload admission", () => {
  * the first, which is the situation the gate exists to prevent, reachable by
  * disconnect timing.
  */
+/**
+ * A container with no headroom derives a ceiling of zero, and the deployment then
+ * cannot restore anything at all. That is a real state (a 128 MiB pod), and the
+ * startup log, the processing gate and the contract all promise the same answer for
+ * it: a 503 naming the two levers. Falling through to the size check answered 413
+ * "exceeds the restore size limit" instead -- true in the letter, useless in
+ * practice, and reading as "your file is too big" when no file would fit.
+ */
+describe("restore upload admission on a container with no headroom", () => {
+  it("refuses with the lever, not with a size complaint", () => {
+    const admission = createRestoreUploadAdmission(0, 0);
+    const next = jest.fn();
+    const { res, raw, headers } = response();
+
+    admission.middleware(request({ "content-length": "1024" }), res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(raw.statusCode).toBe(503);
+    expect(raw.body).toMatch(/BACKUP_RESTORE_EXPANDED_LIMIT/);
+    expect(raw.body).toMatch(/container memory/i);
+    // No Retry-After: nothing about waiting changes this one.
+    expect(headers["retry-after"]).toBeUndefined();
+    expect(admission.reservedBytes()).toBe(0);
+  });
+
+  it("refuses a chunked upload the same way", () => {
+    // No Content-Length means no declared size to compare, so this is the path
+    // that would otherwise have claimed `perRequestLimitBytes * PEAK_MULTIPLE`
+    // -- which is zero, and would have been admitted.
+    const admission = createRestoreUploadAdmission(0, 0);
+    const next = jest.fn();
+    const { res, raw } = response();
+
+    admission.middleware(request(), res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(raw.statusCode).toBe(503);
+  });
+});
+
 describe("restore upload admission lifecycle", () => {
   const LIMIT = 200 * MIB;
 

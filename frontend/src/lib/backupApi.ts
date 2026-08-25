@@ -312,7 +312,7 @@ export const backupApi = {
     // The upload's memory admission runs in front of the body parser, which is in
     // front of every backend guard -- so it cannot authenticate the request it is
     // budgeting for. This ticket is how authorization gets there first: an upload
-    // without one is refused 401 before a byte is buffered. Minted here rather
+    // without one is refused 403 before a byte is buffered. Minted here rather
     // than at page load because it is short-lived, and the file picker and any
     // password prompt happen before this call.
     const ticket = await backupApi.mintRestoreUploadTicket();

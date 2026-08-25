@@ -206,7 +206,7 @@ The backend's upload admission has to run in front of its body parser, which is 
 front of every guard — so it cannot authenticate the request whose memory it is
 budgeting for. Since Monize 1.16 it does not have to: the client first asks
 `POST /api/v1/backup/restore/ticket` (ordinary authenticated JSON) for a short-lived
-signed ticket, and an upload without one is refused `401` before a byte is buffered.
+signed ticket, and an upload without one is refused `403` before a byte is buffered.
 Nothing to configure — it is on whenever `JWT_SECRET` is set, which is always.
 
 What the chart cannot do for you is stop that traffic before it reaches the pod. If

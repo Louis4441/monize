@@ -228,6 +228,43 @@ describe("backup size limits", () => {
       }
     });
 
+    /**
+     * The lever the docs offer for trading artifact size against concurrency is
+     * `BACKUP_RESTORE_EXPANDED_LIMIT`. Reading the *derived* ceiling for the wire
+     * limit left it at 27.6 MiB while `gunzip` enforced the operator's 8 MiB, so a
+     * 27 MiB upload was accepted and then refused on decompression -- the exact
+     * accept-then-refuse defect the single-ceiling change was made to close, one
+     * level along, and the same class as F3R7-002.
+     */
+    it("follows an operator's expanded limit onto the wire", () => {
+      const container = 400 * MIB;
+      expect(resolveRestoreUploadLimitBytes(undefined, container, "8mb")).toBe(
+        8 * MIB,
+      );
+      // And upwards too, where the operator raised it on a pod that can take it.
+      expect(
+        resolveRestoreUploadLimitBytes(undefined, 4096 * MIB, "300mb"),
+      ).toBe(300 * MIB);
+    });
+
+    /**
+     * The startup warning has to be measured against the ceiling in force for the
+     * same reason: an operator who lowered the expanded limit and left
+     * `BACKUP_RESTORE_LIMIT` alone is exactly the one it exists to tell.
+     */
+    it("warns about an upload limit above the operator's own expanded limit", () => {
+      const onWarn = jest.fn();
+      warnIfRestoreUploadLimitIsUnsafe(
+        27 * MIB,
+        "27mb",
+        onWarn,
+        400 * MIB,
+        "8mb",
+      );
+      expect(onWarn).toHaveBeenCalledTimes(1);
+      expect(onWarn.mock.calls[0][0]).toContain("8MiB");
+    });
+
     it("honours an explicit operator value", () => {
       expect(resolveRestoreUploadLimitBytes("64mb", 400 * MIB)).toBe(64 * MIB);
       expect(resolveRestoreExpandedLimitBytes("64mb", 400 * MIB)).toBe(

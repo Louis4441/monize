@@ -15,7 +15,7 @@ describe("restore upload admission authorization", () => {
   const LIMIT = 50 * MIB;
   const admit = () => ({ ok: true }) as const;
   const refuse = () =>
-    ({ ok: false, status: 401, message: "no ticket" }) as const;
+    ({ ok: false, status: 403, message: "no ticket" }) as const;
 
   it("reserves nothing for a request it refuses", () => {
     const admission = createRestoreUploadAdmission(
@@ -37,7 +37,7 @@ describe("restore upload admission authorization", () => {
     // parser it would have allocated in.
     expect(admission.reservedBytes()).toBe(0);
     expect(next).not.toHaveBeenCalled();
-    expect(res.statusCode).toBe(401);
+    expect(res.statusCode).toBe(403);
     expect(headers["retry-after"]).toBeUndefined();
   });
 
@@ -113,7 +113,7 @@ describe("restore upload admission authorization", () => {
       res,
       jest.fn(),
     );
-    expect(res.statusCode).toBe(401);
+    expect(res.statusCode).toBe(403);
   });
 
   it("admits everything when no authorizer is supplied", () => {

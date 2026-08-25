@@ -17,7 +17,14 @@ import type { IncomingMessage } from "http";
  * asks an ordinary authenticated JSON route (`POST /backup/restore/ticket`, behind
  * the JWT guard, CSRF and the throttler) for a ticket, and the admission middleware
  * verifies it **before reserving anything**. A request with no ticket is refused
- * 401 having claimed no memory at all.
+ * having claimed no memory at all.
+ *
+ * **The refusal is 403, not 401**, and the difference is not pedantry: the caller's
+ * session is present and valid -- it is this *request* that carries no upload
+ * authorization. A 401 would also be read by the client's interceptor as an expired
+ * session, which retries the original request after refreshing the token: a silent
+ * re-upload of the whole artifact, and a logout mid-restore if the refresh fails.
+ * A status is part of the contract with the client, not just a number.
  *
  * ## Signed, not stored
  *
@@ -203,7 +210,10 @@ export function createRestoreTicketAuthorizer(
     // either way -- ask for a new ticket.
     return {
       ok: false,
-      status: 401,
+      // 403 rather than 401: the session is fine, this request is not authorized.
+      // See the note at the top of this file -- a 401 makes the client retry the
+      // whole upload after a token refresh, or log the user out mid-restore.
+      status: 403,
       message:
         "A restore upload needs a current upload ticket. Request one from " +
         "POST /api/v1/backup/restore/ticket and retry.",
