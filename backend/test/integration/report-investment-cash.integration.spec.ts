@@ -35,6 +35,7 @@ import {
   InvestmentTransaction,
 } from "@/securities/entities/investment-transaction.entity";
 import { TransactionAnalyticsService } from "@/transactions/transaction-analytics.service";
+import { ForecastAggregatorService } from "@/ai/forecast/forecast-aggregator.service";
 import { ReportsService } from "@/reports/reports.service";
 import {
   CustomReport,
@@ -624,6 +625,52 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       expect(result.data).toEqual([expect.objectContaining({ value: 60 })]);
     });
 
+    it("leaves a transfer split line out when the report excludes transfers", async () => {
+      // `transaction.isTransfer` is false on a split parent carrying a transfer
+      // LINE, so the parent-level filter never saw it and the -200 counted as
+      // spending.
+      const parent = await insertTransaction({
+        amount: -260,
+        isSplit: true,
+        categoryId: null,
+        payeeName: "Sleeve sweep",
+      });
+      await dataSource.manager.save([
+        dataSource.manager.create(TransactionSplit, {
+          transactionId: parent.id,
+          kind: SplitKind.CATEGORY,
+          categoryId: groceriesCategoryId,
+          amount: -60,
+        } as Partial<TransactionSplit>),
+        dataSource.manager.create(TransactionSplit, {
+          transactionId: parent.id,
+          kind: SplitKind.TRANSFER,
+          transferAccountId: chequingId,
+          amount: -200,
+        } as Partial<TransactionSplit>),
+      ]);
+      // The counterpart leg the transfer writer creates in the target account.
+      await insertTransaction({
+        accountId: chequingId,
+        amount: 200,
+        isTransfer: true,
+        categoryId: null,
+      });
+
+      const excluded = await runCustomReport({
+        groupBy: GroupByType.CATEGORY,
+        includeTransfers: false,
+      });
+      expect(excluded.summary.total).toBe(60);
+
+      // ...and the user can still ask for them.
+      const included = await runCustomReport({
+        groupBy: GroupByType.CATEGORY,
+        includeTransfers: true,
+      });
+      expect(included.summary.total).toBe(260);
+    });
+
     it("honours a brokerage account named inside a mixed OR group", async () => {
       // Conditions in a group are OR'd, so this filter explicitly asks for
       // brokerage rows. A whole-report boolean read it as "not an account
@@ -840,6 +887,55 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       );
 
       expect(charges).toEqual([]);
+    });
+  });
+
+  /**
+   * The AI forecast trains on this baseline, and it reads one row per payment
+   * with no split join -- so a split parent's own amount taught it a household
+   * spend nobody made.
+   */
+  describe("forecast baseline", () => {
+    it("learns the ordinary part of a mixed split, not the parent total", async () => {
+      await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: -500,
+      });
+      await insertSleeveSalary();
+
+      // `getMonthlyHistory` is private and the public entry point needs the
+      // accounts and analytics services; the SQL is the subject here, and only a
+      // real database can execute it.
+      const forecast = new ForecastAggregatorService(
+        dataSource,
+        {} as never,
+        {} as never,
+      );
+      const history = await withUserContext(userId, () =>
+        (
+          forecast as unknown as {
+            getMonthlyHistory: (
+              userId: string,
+              startDate: string,
+              endDate: string,
+            ) => Promise<
+              Array<{
+                month: string;
+                totalIncome: number;
+                totalExpenses: number;
+              }>
+            >;
+          }
+        ).getMonthlyHistory(userId, START, END),
+      );
+
+      expect(history).toEqual([
+        expect.objectContaining({
+          month: MONTH,
+          totalIncome: 1000,
+          totalExpenses: 60,
+        }),
+      ]);
     });
   });
 

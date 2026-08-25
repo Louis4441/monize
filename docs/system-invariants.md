@@ -567,14 +567,18 @@ Also covered        backend/src/reports/ -- the USER-DEFINED custom report
                     whole-report boolean cannot tell `account = Brokerage OR
                     category = Salary` from `account = Chequing OR payee = Acme`
                     (F-CUSTOM-OR-001).
-Outside this rule   Transfer SPLIT LINES in the custom report engine.
-                    `includeTransfers` is applied there to the PARENT only, so a
-                    transfer line inside a non-transfer parent is counted today
-                    (a -260 parent of -60 groceries and a -200 transfer reports
-                    260). Unchanged from before this work, a transfer-policy
-                    question rather than an investment-provenance one, and
-                    tracked separately -- named here so the `enforced` status
-                    below is not read as covering it.
+                    Transfer SPLIT LINES are the report's own decision, not this
+                    invariant's: `includeTransfers` is applied per LINE in that
+                    engine (`narrowSplitLines`), because a split parent carrying
+                    a transfer line is not itself a transfer -- so a -260 parent
+                    of -60 groceries and a -200 transfer reported 260 until it
+                    was. Investment provenance is a property of the data; which
+                    transfers to count is a property of the report.
+                    The AI forecast baseline
+                    (ai/forecast/forecast-aggregator.service.ts) reads one row
+                    per payment with no split join, so it derives the reportable
+                    amount too: it had been training on a -560 parent as 560 of
+                    household spending.
                     The category-keyed aggregates (ai/insights,
                     budgets/budget-generator, the payee totals) are structurally
                     unable to admit either row and are deliberately not listed as

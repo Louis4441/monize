@@ -217,12 +217,12 @@ export function ordinarySplitLines<T extends SplitLineLike>(parent: {
  * which is different from representing zero.
  *
  * The SQL form also drops transfer children, because no built-in report that
- * uses it includes transfers. This one does not, and deliberately says nothing
- * about transfers at all: the custom report engine decides them at the PARENT
- * level from its own `includeTransfers` configuration, and a transfer split LINE
- * inside a non-transfer parent is counted there today. That is pre-existing
- * behaviour and a separate decision from investment provenance -- what this
- * function must not do is quietly make it, in either direction.
+ * uses it includes transfers. This one deliberately says nothing about them: a
+ * custom report carries its own `includeTransfers` configuration, so its engine
+ * narrows the lines it does not want (`narrowSplitLines`) BEFORE asking this
+ * function, and passes whatever is left. Investment provenance is a property of
+ * the data; which transfers to count is a property of the report, and this
+ * function must not quietly decide the second one in either direction.
  */
 export function reportableTransactionAmount(
   parent: SplitParentLike,

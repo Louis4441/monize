@@ -24,6 +24,7 @@ import {
   SortDirection,
 } from "./entities/custom-report.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
+import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { CreateCustomReportDto } from "./dto/create-custom-report.dto";
@@ -231,12 +232,8 @@ export class ReportsService {
       report.config,
     );
     // A split parent reached the aggregators whatever its own sign, so its lines
-    // are narrowed to the requested direction here, where each line's own amount
-    // is readable.
-    const transactions = this.applyDirectionToSplitLines(
-      selected,
-      report.config.direction,
-    );
+    // are narrowed here, where each line's own amount and kind are readable.
+    const transactions = this.narrowSplitLines(selected, report.config);
 
     // Only fetch category/payee maps when the report groups by them (avoid over-fetching)
     const categoryMap = new Map<string, Category>();
@@ -388,27 +385,47 @@ export class ReportsService {
   }
 
   /**
-   * Narrows each split parent to the lines matching the requested direction, and
-   * drops a parent left with none.
+   * Narrows each split parent to the lines this report asked for, and drops a
+   * parent left with none.
    *
-   * Non-split rows were already filtered in SQL by their own amount. This runs
-   * BEFORE the aggregators ask for ordinary lines, so a mixed-sign split
-   * contributes exactly the lines the user asked to see -- which is also what
-   * the built-in split-row-granular reports do with the same rows.
+   * Two decisions the SQL could only make about the PARENT, and a split parent
+   * is not its lines:
+   *
+   * - **Direction.** `transaction.amount` is the sum of every line, so its sign
+   *   is nobody's direction: a -60 expense beside a +500 embedded SELL is a +440
+   *   parent (audit F-CUSTOM-DIR-001).
+   * - **Transfers.** `transaction.isTransfer` is false on a split parent that
+   *   carries a transfer LINE, so `includeTransfers: false` counted a -200
+   *   transfer inside a -260 parent as 260 of spending.
+   *
+   * Both are the user's own configuration, applied to the representation the
+   * decision belongs to -- which is what the built-in split-row-granular reports
+   * have always done with the same rows. Investment provenance is NOT decided
+   * here: the aggregators ask `ordinarySplitLines` for that, because it is a
+   * property of the data rather than of the report.
    */
-  private applyDirectionToSplitLines(
+  private narrowSplitLines(
     transactions: Transaction[],
-    direction: DirectionFilter,
+    config: ReportConfig,
   ): Transaction[] {
-    if (direction === DirectionFilter.BOTH) return transactions;
+    const narrowsDirection = config.direction !== DirectionFilter.BOTH;
+    if (!narrowsDirection && config.includeTransfers) return transactions;
 
-    const matches = (amount: number): boolean =>
-      direction === DirectionFilter.INCOME_ONLY ? amount > 0 : amount < 0;
+    const wanted = (split: TransactionSplit): boolean => {
+      if (!config.includeTransfers && split.transferAccountId != null) {
+        return false;
+      }
+      if (!narrowsDirection) return true;
+      const amount = Number(split.amount);
+      return config.direction === DirectionFilter.INCOME_ONLY
+        ? amount > 0
+        : amount < 0;
+    };
 
     return transactions.flatMap((tx) => {
       if (!tx.isSplit || !tx.splits || tx.splits.length === 0) return [tx];
 
-      const splits = tx.splits.filter((split) => matches(Number(split.amount)));
+      const splits = tx.splits.filter(wanted);
       if (splits.length === 0) return [];
 
       // A shallow copy: the entity is not re-saved, and the aggregators read

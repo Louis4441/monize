@@ -1,7 +1,10 @@
 import { Injectable, Inject, Logger, forwardRef } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../../common/db/scoped-db";
-import { investmentLinkedTransactionExclusion } from "../../common/investment-filter.util";
+import {
+  investmentLinkedTransactionExclusion,
+  reportableTransactionAmountSql,
+} from "../../common/investment-filter.util";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
 import { AccountsService } from "../../accounts/accounts.service";
@@ -61,6 +64,14 @@ export interface ForecastAggregates {
 }
 
 export { RecurringCharge };
+
+/**
+ * The forecast trains on one row per payment and joins no splits, so a split
+ * parent's own amount -- the sum of every line, an embedded investment line
+ * included -- is not what the household spent. A -60 grocery split beside a -500
+ * embedded BUY taught the baseline 560 of monthly spending (re-audit).
+ */
+const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
 
 @Injectable()
 export class ForecastAggregatorService {
@@ -127,11 +138,11 @@ export class ForecastAggregatorService {
         .addSelect("COALESCE(cat.name, 'Uncategorized')", "categoryName")
         .addSelect("COALESCE(cat.isIncome, false)", "isIncome")
         .addSelect(
-          "SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END)",
+          `SUM(CASE WHEN ${REPORTABLE_TX_AMOUNT} > 0 THEN ${REPORTABLE_TX_AMOUNT} ELSE 0 END)`,
           "income",
         )
         .addSelect(
-          "SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END)",
+          `SUM(CASE WHEN ${REPORTABLE_TX_AMOUNT} < 0 THEN ABS(${REPORTABLE_TX_AMOUNT}) ELSE 0 END)`,
           "expenses",
         )
         .where("t.userId = :userId", { userId })
@@ -253,12 +264,12 @@ export class ForecastAggregatorService {
         .getRepository(Transaction)
         .createQueryBuilder("t")
         .select("TO_CHAR(t.transactionDate, 'YYYY-MM')", "month")
-        .addSelect("SUM(t.amount)", "total")
+        .addSelect(`SUM(${REPORTABLE_TX_AMOUNT})`, "total")
         .addSelect("COUNT(DISTINCT t.payeeName)", "sourceCount")
         .where("t.userId = :userId", { userId })
         .andWhere("t.transactionDate >= :startDate", { startDate })
         .andWhere("t.transactionDate <= :endDate", { endDate })
-        .andWhere("t.amount > 0")
+        .andWhere(`${REPORTABLE_TX_AMOUNT} > 0`)
         .andWhere("t.status != 'VOID'")
         .andWhere("t.isTransfer = false")
         .andWhere("t.parentTransactionId IS NULL")

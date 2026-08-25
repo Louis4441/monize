@@ -228,7 +228,8 @@ describe("reportableTransactionAmount", () => {
 
   it("keeps a transfer line, because that decision belongs to the caller", () => {
     // The SQL twin drops transfer children; a custom report carries its own
-    // includeTransfers configuration, so this one leaves them alone.
+    // includeTransfers configuration and narrows the lines itself before calling
+    // this, so this one leaves whatever it is given alone.
     expect(
       reportableTransactionAmount({
         amount: -260,
