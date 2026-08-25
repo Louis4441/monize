@@ -158,8 +158,9 @@ count.** `test:integration` previously carried an unconditional
 turned a discovery failure into a green check across all six kinds at once. That
 flag has since been removed from `backend/package.json`, so an empty match now
 exits non-zero and fails the job, and
-`backend/src/common/jest-config.guard.spec.ts` fails if any test script re-adds
-it. What is still owed is the weaker guard against a regex that matches *some*
+`backend/src/common/jest-config.guard.spec.ts` fails if the flag reappears in
+any tracked manifest's scripts or any tracked runner config, in the Jest, Vitest
+and Playwright spellings alike. What is still owed is the weaker guard against a regex that matches *some*
 suites but silently drops a class: that guard asserts every tracked suite under
 `backend/test/integration/` is discoverable by `test/jest-e2e.json`, but nothing
 asserts what the runner executed, and the CLI `--testPathPatterns` filter is

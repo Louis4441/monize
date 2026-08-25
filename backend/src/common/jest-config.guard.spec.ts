@@ -39,8 +39,13 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  *  4. `test:watch`, `test:debug`, `test:unit` and `test:cov` stay on the root
  *     config -- a watcher aimed at `jest-e2e.json` is the same defect through a
  *     different door;
- *  5. the scripts survive both shells npm uses and carry no
- *     `--passWithNoTests`, so a discovery failure cannot report as green.
+ *  5. every Jest entry point survives both shells npm uses, and no test command
+ *     or runner config anywhere in the repository carries a zero-discovery
+ *     success flag (REL-001), so a discovery failure cannot report as green.
+ *
+ * Claims 4 and 5 derive their subjects from the manifests and the tracked tree
+ * rather than naming scripts, because a guard whose inventory has to be updated
+ * by hand fails exactly when someone adds an entry point without thinking of it.
  *
  * The inventory comes from `git ls-files`, so the guard sees the tree CI sees.
  * A brand-new spec is invisible to it until staged -- `git add -N` is enough.
@@ -128,12 +133,23 @@ function discovers(
   return regexes.some((pattern) => new RegExp(pattern).test(path));
 }
 
+/**
+ * Every inventory below is repository-relative, and the configs are evaluated
+ * against a fixed virtual root rather than this machine's checkout path. A
+ * failure therefore names `backend/test/integration/foo.integration.spec.ts`
+ * rather than someone's home directory, and reads the same on CI, in the dev
+ * container and on a Windows checkout.
+ */
+const VIRTUAL_ROOT = "/repo";
+const virtual = (repoRelative: string): string =>
+  `${VIRTUAL_ROOT}/${repoRelative}`;
+
 describeTree("jest configuration", () => {
   const specs = (prefix: string): string[] => {
     const root = requireRepoRoot(REPO_ROOT);
-    return gitListFiles(root, `-- "backend/${prefix}"`)
-      .filter((file) => file.endsWith(".spec.ts"))
-      .map((file) => join(root, file));
+    return gitListFiles(root, `-- "backend/${prefix}"`).filter((file) =>
+      file.endsWith(".spec.ts"),
+    );
   };
 
   it("keeps every database-backed spec out of the parallel config", () => {
@@ -142,7 +158,7 @@ describeTree("jest configuration", () => {
     expect(testTreeSpecs.length).toBeGreaterThan(30);
 
     const discovered = testTreeSpecs.filter((file) =>
-      discovers(packageJson.jest, BACKEND_DIR, file),
+      discovers(packageJson.jest, virtual("backend"), virtual(file)),
     );
     expect(discovered).toEqual([]);
   });
@@ -152,23 +168,23 @@ describeTree("jest configuration", () => {
     expect(srcSpecs.length).toBeGreaterThan(100);
 
     const missed = srcSpecs.filter(
-      (file) => !discovers(packageJson.jest, BACKEND_DIR, file),
+      (file) => !discovers(packageJson.jest, virtual("backend"), virtual(file)),
     );
     expect(missed).toEqual([]);
   });
 
   it("leaves the integration specs owned by a single-worker config", () => {
-    const testDir = join(BACKEND_DIR, "test");
     const integrationSpecs = specs("test/integration");
     expect(integrationSpecs.length).toBeGreaterThan(30);
 
     const missed = integrationSpecs.filter(
-      (file) => !discovers(e2eConfig, testDir, file),
+      (file) => !discovers(e2eConfig, virtual("backend/test"), virtual(file)),
     );
     expect(missed).toEqual([]);
     // `dropSchema` against one shared database: a second worker is a race, not
     // a speedup. Pinned in the config so every entry point inherits it rather
-    // than each call site remembering `--runInBand`.
+    // than each call site remembering `--runInBand`. It stays until the suites
+    // get a database per worker; nothing else makes them safe to parallelize.
     expect(e2eConfig.maxWorkers).toBe(1);
   });
 });
@@ -211,20 +227,32 @@ describe("the discovery model", () => {
 
 describe("test scripts", () => {
   /**
-   * The scripts that invoke Jest. Listed rather than scanned because
-   * `pretest:integration` embeds a JavaScript program whose string literals
-   * legitimately use single quotes; a blanket scan would read those as shell
-   * quoting and be wrong about the one script that is not a Jest invocation.
+   * Derived, not listed. A second hand-maintained inventory of test scripts is
+   * a rule that holds until someone adds `test:smoke` and does not think to
+   * come here -- which is the failure mode this whole file exists to remove.
+   * The token match picks up `jest` and `node_modules/.bin/jest` alike, and
+   * leaves out `pretest:integration`, which runs a `node -e` program whose
+   * string literals legitimately use single quotes, and `test`, which only
+   * delegates to the two scripts below.
    */
-  const JEST_SCRIPTS = [
-    "test",
-    "test:unit",
-    "test:integration",
-    "test:cov",
-    "test:watch",
-    "test:debug",
-    "test:e2e",
-  ];
+  const jestScripts = Object.entries(packageJson.scripts)
+    .filter(([, command]) => /(^|[\s/\\])jest(\s|$)/.test(command))
+    .map(([name]) => name);
+
+  it("derives a non-empty set of Jest entry points", () => {
+    // If the token match ever stops finding anything, every assertion below
+    // would pass over an empty list.
+    expect(jestScripts).toEqual(
+      expect.arrayContaining([
+        "test:unit",
+        "test:integration",
+        "test:cov",
+        "test:watch",
+        "test:debug",
+        "test:e2e",
+      ]),
+    );
+  });
 
   it("runs the unit suite and then the integration suite by default", () => {
     const stages = packageJson.scripts.test.split("&&").map((s) => s.trim());
@@ -258,16 +286,52 @@ describe("test scripts", () => {
     // single-quoted `--testPathPatterns` therefore reaches Jest with the quotes
     // inside the pattern and matches nothing -- a discovery failure dressed up
     // as an empty run. Double quotes are a delimiter in both shells.
-    for (const script of JEST_SCRIPTS) {
-      expect(packageJson.scripts[script]).not.toContain("'");
-    }
+    const quoted = jestScripts.filter((script) =>
+      packageJson.scripts[script].includes("'"),
+    );
+    expect(quoted).toEqual([]);
   });
+});
 
-  it("never lets an empty match pass for a green run", () => {
-    // REL-001 (docs/release-integrity.md): a blanket `--passWithNoTests` turns a
-    // discovery failure into a green check across every test kind the job owns.
-    for (const script of JEST_SCRIPTS) {
-      expect(packageJson.scripts[script]).not.toContain("--passWithNoTests");
-    }
+/**
+ * REL-001 (`docs/release-integrity.md`) is a repository rule, not a backend
+ * one: a blanket "succeed if nothing was discovered" flag turns a discovery
+ * failure into a green check for whichever runner carries it. So the scan is
+ * repository-wide and derived from the tracked tree -- every manifest's scripts
+ * and every runner config -- rather than from a list of the scripts that happen
+ * to exist today. Jest and Vitest spell it `--passWithNoTests`, Playwright
+ * `--pass-with-no-tests`, and Vitest also takes it as a config field.
+ */
+describeTree("zero-discovery flags", () => {
+  const CLI_FLAG = /--pass-?with-?no-?tests/i;
+  const CONFIG_FIELD = /passWithNoTests\s*:\s*true/;
+
+  it("are absent from every test command and runner config in the tree", () => {
+    const root = requireRepoRoot(REPO_ROOT);
+
+    const manifests = gitListFiles(root, '-- "*package.json"');
+    expect(manifests.length).toBeGreaterThan(1);
+    const scriptOffenders = manifests.flatMap((manifest) => {
+      const scripts = (
+        JSON.parse(readFileSync(join(root, manifest), "utf8")) as {
+          scripts?: Record<string, string>;
+        }
+      ).scripts;
+      return Object.entries(scripts ?? {})
+        .filter(([, command]) => CLI_FLAG.test(command))
+        .map(([name]) => `${manifest} -> ${name}`);
+    });
+    expect(scriptOffenders).toEqual([]);
+
+    const configs = gitListFiles(
+      root,
+      '-- "*vitest.config.*" "*playwright.config.*" "*jest.config.*" "*jest-e2e.json"',
+    );
+    expect(configs.length).toBeGreaterThan(1);
+    const configOffenders = configs.filter((config) => {
+      const source = readFileSync(join(root, config), "utf8");
+      return CONFIG_FIELD.test(source) || CLI_FLAG.test(source);
+    });
+    expect(configOffenders).toEqual([]);
   });
 });

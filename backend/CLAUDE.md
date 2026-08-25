@@ -44,6 +44,12 @@ it is missing); `npm run test:unit` is the offline path.
 `src/common/jest-config.guard.spec.ts` fails if any of those four facts stops
 being true.
 
+**The serialization is not a preference, and it stays until the suites stop
+sharing a database.** A `dropSchema: true` suite is safe to run beside another
+only when each worker owns its own database or schema; until that exists, one
+worker is the mechanism, and `--runInBand` at a call site is not a substitute
+for the config pinning it.
+
 ### `test/*.e2e-spec.ts` is not a gate, and three of the four suites are broken
 
 CI runs `test:unit` and `test:integration` (filtered to `test/integration/*.spec.ts`). Nothing runs `test:e2e`, and separate rot accumulated behind a since-fixed compile error (`npm run typecheck` now closes the compile half in CI):
