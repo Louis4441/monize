@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { PEAK_MULTIPLE } from "./backup-limits";
+import { RESTORE_RETRY_AFTER_SECONDS } from "./restore-queue-config";
 
 /**
  * Aggregate admission for restore uploads, in front of the body parser.
@@ -184,7 +185,7 @@ export function createRestoreUploadAdmission(
           res,
           503,
           "Another restore is in progress. Retry in a moment.",
-          30,
+          RESTORE_RETRY_AFTER_SECONDS,
         );
         return;
       }
@@ -222,7 +223,7 @@ export function createRestoreUploadAdmission(
           res,
           408,
           "Backup upload timed out before the body arrived.",
-          30,
+          RESTORE_RETRY_AFTER_SECONDS,
         );
         release();
         req.destroy();

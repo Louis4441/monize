@@ -8,10 +8,26 @@ import {
 } from "./backup-limits";
 import {
   RestoreProcessingGate,
+  RestoreQueueBusyException,
+  RestoreWaitAbandonedException,
   computeRestoreProcessingSlots,
 } from "./restore-processing-gate";
+import {
+  RESTORE_RETRY_AFTER_SECONDS,
+  type RestoreQueueConfig,
+} from "./restore-queue-config";
 
 const MIB = 1024 * 1024;
+
+/**
+ * A queue small enough to fill in a test, with a deadline long enough that no
+ * test depends on it firing. The two tests that are *about* those bounds set
+ * their own.
+ */
+const SMALL_QUEUE: RestoreQueueConfig = {
+  queueLimit: 4,
+  waitTimeoutMs: 60_000,
+};
 
 /** A promise plus the function that settles it, so a test controls timing. */
 function deferred<T = void>() {
@@ -156,6 +172,224 @@ describe("RestoreProcessingGate", () => {
 
     first.resolve();
     await p1;
+  });
+
+  /**
+   * DR-F3RB-002, the defect itself. The queue was an array of resolve callbacks
+   * with no removal path, so a client could hang up while queued and its
+   * **destructive** restore still ran when a slot freed -- replacing data of a
+   * caller who was no longer there to see the result.
+   */
+  it("drops a queued waiter whose client disconnected, and never runs it", async () => {
+    const gate = new RestoreProcessingGate(1, SMALL_QUEUE);
+    const first = deferred();
+    const abandoned = new AbortController();
+    let secondRan = false;
+
+    const p1 = gate.run(async () => {
+      await first.promise;
+    });
+    const p2 = gate.run(
+      async () => {
+        secondRan = true;
+      },
+      { signal: abandoned.signal },
+    );
+    const rejected = expect(p2).rejects.toBeInstanceOf(
+      RestoreWaitAbandonedException,
+    );
+
+    await flush();
+    expect(gate.waitingCount).toBe(1);
+
+    abandoned.abort();
+    await rejected;
+    // Left in the queue it would have swallowed the slot `drain` counts out.
+    expect(gate.waitingCount).toBe(0);
+
+    first.resolve();
+    await p1;
+    expect(secondRan).toBe(false);
+    expect(gate.activeCount).toBe(0);
+    // And the slot it never took is still there for the next caller.
+    await expect(gate.run(async () => "ok")).resolves.toBe("ok");
+  });
+
+  /**
+   * The other half of the asymmetry, and the more expensive one to get wrong: a
+   * restore holding a slot is part-way through deleting and re-inserting the
+   * user's data, so a socket event must not cancel it.
+   */
+  it("ignores an abort once the slot is granted", async () => {
+    const gate = new RestoreProcessingGate(1, SMALL_QUEUE);
+    const first = deferred();
+    const second = deferred();
+    const abandoned = new AbortController();
+    let secondFinished = false;
+
+    const p1 = gate.run(async () => {
+      await first.promise;
+    });
+    const p2 = gate.run(
+      async () => {
+        await second.promise;
+        secondFinished = true;
+        return "completed";
+      },
+      { signal: abandoned.signal },
+    );
+
+    await flush();
+    first.resolve();
+    await flush();
+    // The waiter has the slot now.
+    expect(gate.activeCount).toBe(1);
+
+    abandoned.abort();
+    await flush();
+    expect(secondFinished).toBe(false);
+
+    second.resolve();
+    await expect(p2).resolves.toBe("completed");
+    await p1;
+    expect(secondFinished).toBe(true);
+    expect(gate.activeCount).toBe(0);
+  });
+
+  it("never queues a caller that is already gone", async () => {
+    const gate = new RestoreProcessingGate(1, SMALL_QUEUE);
+    const first = deferred();
+    const p1 = gate.run(async () => first.promise);
+    await flush();
+
+    const abandoned = new AbortController();
+    abandoned.abort();
+    let ran = false;
+    await expect(
+      gate.run(
+        async () => {
+          ran = true;
+        },
+        { signal: abandoned.signal },
+      ),
+    ).rejects.toBeInstanceOf(RestoreWaitAbandonedException);
+    expect(ran).toBe(false);
+    expect(gate.waitingCount).toBe(0);
+
+    first.resolve();
+    await p1;
+  });
+
+  it("refuses with a retryable 503 once the queue is full", async () => {
+    const gate = new RestoreProcessingGate(1, {
+      ...SMALL_QUEUE,
+      queueLimit: 2,
+    });
+    const first = deferred();
+    const held = [
+      gate.run(async () => first.promise),
+      gate.run(async () => "queued one"),
+      gate.run(async () => "queued two"),
+    ];
+    await flush();
+    expect(gate.waitingCount).toBe(2);
+
+    let ran = false;
+    const refused = gate.run(async () => {
+      ran = true;
+    });
+    await expect(refused).rejects.toBeInstanceOf(RestoreQueueBusyException);
+    await expect(refused).rejects.toMatchObject({
+      // Transient: capacity exists, this request could not have it now. The
+      // controller turns this into the Retry-After header.
+      retryAfterSeconds: RESTORE_RETRY_AFTER_SECONDS,
+    });
+    expect(ran).toBe(false);
+    // The refusal did not join the queue it was refused for.
+    expect(gate.waitingCount).toBe(2);
+
+    first.resolve();
+    await Promise.all(held);
+    expect(gate.activeCount).toBe(0);
+  });
+
+  it("refuses with a retryable 503 when the wait runs out", async () => {
+    // A real 5 ms deadline rather than fake timers: the assertion is on the
+    // promise the timer settles, so there is nothing to poll and no flake.
+    const gate = new RestoreProcessingGate(1, {
+      queueLimit: 4,
+      waitTimeoutMs: 5,
+    });
+    const first = deferred();
+    const p1 = gate.run(async () => first.promise);
+    await flush();
+
+    let ran = false;
+    await expect(
+      gate.run(async () => {
+        ran = true;
+      }),
+    ).rejects.toBeInstanceOf(RestoreQueueBusyException);
+    expect(ran).toBe(false);
+    expect(gate.waitingCount).toBe(0);
+
+    first.resolve();
+    await p1;
+    expect(gate.activeCount).toBe(0);
+  });
+
+  it("keeps the order of the waiters an abort leaves behind", async () => {
+    const gate = new RestoreProcessingGate(1, SMALL_QUEUE);
+    const first = deferred();
+    const started: string[] = [];
+    const abandoned = new AbortController();
+
+    const p1 = gate.run(async () => {
+      started.push("first");
+      await first.promise;
+    });
+    const pa = gate.run(async () => {
+      started.push("a");
+    });
+    const pb = gate.run(
+      async () => {
+        started.push("b");
+      },
+      { signal: abandoned.signal },
+    );
+    const pc = gate.run(async () => {
+      started.push("c");
+    });
+    const rejected = expect(pb).rejects.toBeInstanceOf(
+      RestoreWaitAbandonedException,
+    );
+
+    await flush();
+    expect(gate.waitingCount).toBe(3);
+    abandoned.abort();
+    await rejected;
+    expect(gate.waitingCount).toBe(2);
+
+    first.resolve();
+    await Promise.all([p1, pa, pc]);
+    // The middle waiter is gone; the two around it kept their places.
+    expect(started).toEqual(["first", "a", "c"]);
+    expect(gate.activeCount).toBe(0);
+    expect(gate.waitingCount).toBe(0);
+  });
+
+  /**
+   * The zero-capacity 503 must stay distinguishable from the transient ones: it
+   * is a deployment to fix, and a client that retries it unchanged learns
+   * nothing. The header is the difference, so the type carrying the header is
+   * the thing to assert.
+   */
+  it("does not offer a retry for zero modeled capacity", async () => {
+    const gate = new RestoreProcessingGate(4);
+    gate.configure(0);
+    const refused = gate.run(async () => "ran");
+    await expect(refused).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(refused).rejects.not.toBeInstanceOf(RestoreQueueBusyException);
   });
 });
 

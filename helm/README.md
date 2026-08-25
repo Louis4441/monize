@@ -108,7 +108,9 @@ ingress:
 | `backend.mnyImport.MNY_IMPORT_LIMIT_MB` | Largest Microsoft Money (.mny) file the import wizard accepts | `300` |
 | `backend.backupLimits.exportBuffer` | JSON a buffered export may accumulate | derived from the memory limit |
 | `backend.backupLimits.restoreExpanded` | Decompressed size a restore payload may reach | derived from the memory limit |
-| `backend.backupLimits.restoreUpload` | Compressed upload the restore endpoint accepts | `500mb` |
+| `backend.backupLimits.restoreUpload` | Compressed upload the restore endpoint accepts | derived from the memory limit |
+| `backend.restoreQueue.limit` | Restores that may wait for a processing slot before a 503 | `4` |
+| `backend.restoreQueue.waitMs` | Milliseconds a restore may wait for a processing slot | `120000` |
 
 > **`latest` with `IfNotPresent` does not pick up new builds.** The two defaults
 > combine into a deployment that keeps whatever image the node already cached: a
@@ -174,6 +176,20 @@ A user whose dataset exceeds the ceiling gets a readable refusal naming the size
 and the limit. For the support export they can also narrow it with an account
 selection or a date range. If real exports are being refused, raise the memory
 limit **and** the ceiling: raising either alone achieves nothing.
+
+**Restores queue, and the queue is bounded.** The compressed upload budget cannot
+bound decompressed memory — a small gzip expands to the expanded ceiling whatever
+its wire size — so restore *processing* is capped separately, at one concurrent
+restore on the default pod. A second restore waits rather than decompressing
+beside the first, because the caller has already uploaded the artifact and a 503
+would make them upload it again. `backend.restoreQueue` bounds that wait in both
+directions: past `limit` waiters a request is refused with 503 and `Retry-After`
+instead of joining the queue, and past `waitMs` a waiting request is refused the
+same way. A caller who disconnects while queued is dropped, and its restore never
+runs — the operation is destructive, so running it for somebody who left is worse
+than refusing it. A disconnect *after* the slot is granted changes nothing: that
+restore is part-way through replacing the user's data and runs to completion. The
+startup log prints the slot count with both bounds beside it.
 
 **The frontend needs headroom too.** Every `/api/*` call is forwarded by the
 Next.js proxy, which buffers the request body before sending it on, so a `.mny`

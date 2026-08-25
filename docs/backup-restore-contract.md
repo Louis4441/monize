@@ -612,6 +612,36 @@ The baseline and the multiple are both estimates, not measurements; settling the
 needs the cgroup peak-RSS test that has never run here — issue #1073, planned in
 `docs/future-plans/restore-admission-and-memory.md`.
 
+**The queue behind those slots is bounded, deadlined and cancellation-aware
+(DR-F3RB-002).** It was a plain array of resolve callbacks: no limit, no deadline,
+and no removal when the request disconnected — so a client could hang up while
+queued and its **destructive** restore still ran when a slot freed. Three bounds,
+and one asymmetry that is the whole design:
+
+- **`BACKUP_RESTORE_QUEUE_LIMIT`** (default 4) caps the waiters. A request arriving
+  at a full queue is refused with 503 and `Retry-After` rather than joining it.
+- **`BACKUP_RESTORE_QUEUE_WAIT_MS`** (default 120000) caps one wait, so nobody holds
+  a socket and an upload reservation for a slot indefinitely. Same refusal.
+- **A waiter whose caller disconnected leaves the queue and never runs.** The
+  controller derives that signal from the response socket closing before the
+  response finished, and the request answers 499 nobody reads.
+
+The asymmetry: cancellation governs the **wait** and stops at the slot boundary. A
+queued restore has done nothing and may be dropped; a restore holding a slot is
+part-way through deleting and re-inserting the user's data, so no socket event
+cancels it — the gate unsubscribes from the signal the instant it grants the slot.
+This is the same receiving/processing split the upload reservation already draws,
+and both halves are tested (`restore-processing-gate.spec.ts` for the gate,
+`backup.controller.spec.ts` for where the signal comes from).
+
+Why queue at all rather than refuse the second restore outright: the caller has
+already uploaded up to `BACKUP_RESTORE_LIMIT` of artifact through a gate that
+budgeted memory for it, and an immediate 503 makes them upload it again. The three
+transient refusals — upload budget occupied, queue full, wait timed out — state one
+fact ("capacity exists, not for you now") and carry one `RESTORE_RETRY_AFTER_SECONDS`.
+The zero-capacity 503 carries no `Retry-After`, deliberately: retrying it without
+changing the deployment cannot help.
+
 **A budget checked after the allocation is not a budget.** The support export
 always discards `attachment_blobs`, which is base64 — thirty 10 MiB receipts are
 ~400 MiB of text — and `collectRawExport` loaded it anyway before any ceiling was

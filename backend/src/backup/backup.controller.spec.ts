@@ -1,6 +1,11 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { BackupController } from "./backup.controller";
+import { RestoreQueueBusyException } from "./restore-processing-gate";
+import { RESTORE_RETRY_AFTER_SECONDS } from "./restore-queue-config";
 import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { SupportBackupService } from "./support-backup/support-backup.service";
@@ -282,6 +287,9 @@ describe("BackupController", () => {
         password: "mypassword",
         oidcIdToken: undefined,
         backupPassword: undefined,
+        // Bounds the wait for a processing slot only (DR-F3RB-002); the tests
+        // below pin what it does and does not cancel.
+        queueAbortSignal: expect.any(AbortSignal),
       });
       expect(result).toEqual(mockResult);
     });
@@ -307,7 +315,119 @@ describe("BackupController", () => {
         password: undefined,
         oidcIdToken: "oidc-token-value",
         backupPassword: undefined,
+        queueAbortSignal: expect.any(AbortSignal),
       });
+    });
+
+    /**
+     * DR-F3RB-002 at the controller: the signal the gate waits on has to come
+     * from somewhere, and the only thing that knows the caller left is the
+     * response socket. `close` before the response finished is that fact.
+     */
+    it("aborts the queue wait when the caller disconnects", async () => {
+      let captured: AbortSignal | undefined;
+      mockBackupService.restoreData.mockImplementation(
+        (_userId: string, input: { queueAbortSignal?: AbortSignal }) => {
+          captured = input.queueAbortSignal;
+          return Promise.resolve({ message: "ok", restored: {} });
+        },
+      );
+      const listeners: Array<() => void> = [];
+      const res = {
+        writableEnded: false,
+        headersSent: false,
+        once: (event: string, listener: () => void) => {
+          if (event === "close") listeners.push(listener);
+        },
+        removeListener: () => undefined,
+      };
+
+      await controller.restoreBackup({
+        user: { id: userId },
+        body: Buffer.from("data"),
+        headers: {},
+        res,
+      });
+
+      expect(captured?.aborted).toBe(false);
+      for (const listener of listeners) listener();
+      expect(captured?.aborted).toBe(true);
+    });
+
+    /**
+     * A response that finished is not a caller who left. Firing the signal on
+     * every `close` would abort the wait of the next restore queued behind a
+     * request that completed normally.
+     */
+    it("does not abort when the response completed", async () => {
+      let captured: AbortSignal | undefined;
+      mockBackupService.restoreData.mockImplementation(
+        (_userId: string, input: { queueAbortSignal?: AbortSignal }) => {
+          captured = input.queueAbortSignal;
+          return Promise.resolve({ message: "ok", restored: {} });
+        },
+      );
+      const listeners: Array<() => void> = [];
+      const res = {
+        writableEnded: true,
+        headersSent: false,
+        once: (event: string, listener: () => void) => {
+          if (event === "close") listeners.push(listener);
+        },
+        removeListener: () => undefined,
+      };
+
+      await controller.restoreBackup({
+        user: { id: userId },
+        body: Buffer.from("data"),
+        headers: {},
+        res,
+      });
+
+      for (const listener of listeners) listener();
+      expect(captured?.aborted).toBe(false);
+    });
+
+    /**
+     * The two 503s on this route differ by one header, and a Nest exception
+     * cannot set one -- so the controller does, for the transient case only.
+     * Without this the client cannot tell a full queue from a deployment that
+     * will refuse every restore until an operator changes it.
+     */
+    it("sets Retry-After on a transient refusal and not on a permanent one", async () => {
+      const headers: Record<string, string> = {};
+      const res = {
+        writableEnded: false,
+        headersSent: false,
+        once: () => undefined,
+        removeListener: () => undefined,
+        setHeader: (name: string, value: string) => {
+          headers[name] = value;
+        },
+      };
+      const request = {
+        user: { id: userId },
+        body: Buffer.from("data"),
+        headers: {},
+        res,
+      };
+
+      mockBackupService.restoreData.mockRejectedValue(
+        new RestoreQueueBusyException("busy"),
+      );
+      await expect(controller.restoreBackup(request)).rejects.toBeInstanceOf(
+        RestoreQueueBusyException,
+      );
+      expect(headers["Retry-After"]).toBe(String(RESTORE_RETRY_AFTER_SECONDS));
+
+      delete headers["Retry-After"];
+      mockBackupService.restoreData.mockRejectedValue(
+        new ServiceUnavailableException("no headroom"),
+      );
+      await expect(controller.restoreBackup(request)).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+      expect(headers["Retry-After"]).toBeUndefined();
     });
 
     it("should throw BadRequestException if body is not a buffer", async () => {

@@ -20,6 +20,7 @@ import {
   computeRestoreProcessingSlots,
   restoreProcessingGate,
 } from "./backup/restore-processing-gate";
+import { resolveRestoreQueueConfig } from "./backup/restore-queue-config";
 import { OAuthProviderService } from "./oauth/oauth-provider.service";
 import { oauthDebugLogger } from "./oauth/oauth-debug-logger.middleware";
 import { isOidcProviderPath } from "./oauth/oidc-provider-paths";
@@ -221,8 +222,19 @@ async function bootstrap() {
     memoryLimitBytes,
     restoreExpandedLimit,
   );
-  restoreProcessingGate.configure(honestSlots);
-  bootstrapLogger.log(`Concurrent restore processing slots: ${honestSlots}`);
+  // The queue behind those slots is bounded and deadlined (DR-F3RB-002): an
+  // unbounded array of waiters is a way to hold sockets and upload reservations,
+  // and a waiter whose client disconnected used to run its destructive restore
+  // anyway when a slot freed.
+  const restoreQueue = resolveRestoreQueueConfig(process.env, (message) =>
+    bootstrapLogger.warn(message),
+  );
+  restoreProcessingGate.configure(honestSlots, restoreQueue);
+  bootstrapLogger.log(
+    `Concurrent restore processing slots: ${honestSlots} ` +
+      `(queue limit ${restoreQueue.queueLimit}, ` +
+      `wait ${Math.round(restoreQueue.waitTimeoutMs / 1000)}s)`,
+  );
   if (honestSlots < 1) {
     // Zero means zero (F3RB-005): the gate refuses a restore with 503 rather
     // than admitting one that its own model says cannot fit. Flooring to one

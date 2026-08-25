@@ -102,6 +102,26 @@ backend:
     # -- Compressed upload the restore endpoint accepts (e.g. "64mb")
     restoreUpload: ""
 
+  # -- How many restores may WAIT for a processing slot, and for how long
+  #
+  # Restore processing is capped separately from the upload: a small gzip expands
+  # to the expanded ceiling regardless of its wire size, so the compressed budget
+  # cannot bound decompressed memory. On the default pod that cap is one, and a
+  # second restore waits rather than decompressing beside the first.
+  #
+  # Waiting rather than being refused outright is deliberate -- the caller has
+  # already uploaded the artifact, and a 503 makes them upload it again -- but a
+  # wait that is neither bounded nor deadlined holds a socket and the upload's
+  # memory reservation for as long as the client keeps them. A request arriving at
+  # a full queue, or one whose wait runs out, is refused with 503 and a
+  # Retry-After; a caller who disconnects while queued is dropped and its restore
+  # never runs.
+  restoreQueue:
+    # -- Restores that may wait for a processing slot before a 503 (e.g. "4")
+    limit: ""
+    # -- Milliseconds a restore may wait for a processing slot (e.g. "120000")
+    waitMs: ""
+
   # -- Microsoft Money (.mny) import
   mnyImport:
     # -- Largest .mny file the wizard accepts, in megabytes. A Money Plus Sunset
