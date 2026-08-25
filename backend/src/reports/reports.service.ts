@@ -223,12 +223,19 @@ export class ReportsService {
     );
 
     // Query transactions with filters
-    const transactions = await this.getFilteredTransactions(
+    const selected = await this.getFilteredTransactions(
       userId,
       startDate,
       endDate,
       report.filters,
       report.config,
+    );
+    // A split parent reached the aggregators whatever its own sign, so its lines
+    // are narrowed to the requested direction here, where each line's own amount
+    // is readable.
+    const transactions = this.applyDirectionToSplitLines(
+      selected,
+      report.config.direction,
     );
 
     // Only fetch category/payee maps when the report groups by them (avoid over-fetching)
@@ -381,37 +388,69 @@ export class ReportsService {
   }
 
   /**
-   * Whether the report actually restricts itself to particular accounts.
+   * Narrows each split parent to the lines matching the requested direction, and
+   * drops a parent left with none.
    *
-   * Three ways to get this wrong, all of them ways to answer a report with rows
-   * it did not ask for or to drop rows it did:
-   *
-   * - Advanced filter groups REPLACE the legacy filters in
-   *   `getFilteredTransactions`, so a report holding groups and a stale
-   *   `accountIds` restricts nothing by account.
-   * - An account condition carrying no values adds no SQL at all (what the
-   *   filter builder saves for a half-finished condition), so it is not a scope.
-   * - Conditions WITHIN a group are OR'd. `[account = Chequing, payee = Acme]`
-   *   admits every account for that payee, so only a group whose conditions are
-   *   ALL account conditions restricts by account. Groups are AND'ed with each
-   *   other, so one such group is enough.
+   * Non-split rows were already filtered in SQL by their own amount. This runs
+   * BEFORE the aggregators ask for ordinary lines, so a mixed-sign split
+   * contributes exactly the lines the user asked to see -- which is also what
+   * the built-in split-row-granular reports do with the same rows.
    */
-  private namesAnyAccount(filters: CustomReport["filters"]): boolean {
+  private applyDirectionToSplitLines(
+    transactions: Transaction[],
+    direction: DirectionFilter,
+  ): Transaction[] {
+    if (direction === DirectionFilter.BOTH) return transactions;
+
+    const matches = (amount: number): boolean =>
+      direction === DirectionFilter.INCOME_ONLY ? amount > 0 : amount < 0;
+
+    return transactions.flatMap((tx) => {
+      if (!tx.isSplit || !tx.splits || tx.splits.length === 0) return [tx];
+
+      const splits = tx.splits.filter((split) => matches(Number(split.amount)));
+      if (splits.length === 0) return [];
+
+      // A shallow copy: the entity is not re-saved, and the aggregators read
+      // only `splits` plus the parent's own scalar fields.
+      return [{ ...tx, splits } as Transaction];
+    });
+  }
+
+  /**
+   * The accounts this report explicitly names.
+   *
+   * Not "does the report restrict itself to accounts": a boolean cannot express
+   * a mixed OR group, and both of its answers are wrong for one shape.
+   * Conditions WITHIN a group are OR'd, groups are AND'ed, so
+   * `[account = Brokerage, category = Salary]` explicitly asks for Brokerage
+   * rows while `[account = Chequing, payee = Acme]` asks for none -- and a single
+   * boolean that admits the first also admits the second (or refuses both).
+   * The ids let the caller ask the question per row instead.
+   *
+   * Advanced filter groups REPLACE the legacy filters in
+   * `getFilteredTransactions`, so a report holding groups and a stale
+   * `accountIds` names nothing; and a condition carrying no values (what the
+   * filter builder saves for a half-finished one) adds no SQL, so it names
+   * nothing either.
+   */
+  private explicitAccountIds(filters: CustomReport["filters"]): string[] {
     const groups = filters.filterGroups ?? [];
-    if (groups.length > 0) {
-      return groups.some((group) => {
-        const conditions = (group.conditions ?? []).filter((condition) =>
-          Array.isArray(condition.value)
-            ? condition.value.length > 0
-            : Boolean(condition.value),
-        );
-        return (
-          conditions.length > 0 &&
-          conditions.every((condition) => condition.field === "account")
-        );
-      });
-    }
-    return (filters.accountIds ?? []).length > 0;
+    const named =
+      groups.length > 0
+        ? groups.flatMap((group) =>
+            (group.conditions ?? [])
+              .filter((condition) => condition.field === "account")
+              .flatMap((condition) =>
+                Array.isArray(condition.value)
+                  ? condition.value.filter(Boolean)
+                  : condition.value
+                    ? [condition.value]
+                    : [],
+              ),
+          )
+        : (filters.accountIds ?? []);
+    return [...new Set(named)];
   }
 
   private async getFilteredTransactions(
@@ -462,13 +501,28 @@ export class ReportsService {
       queryBuilder.andWhere(
         investmentLinkedTransactionExclusion("transaction"),
       );
-      // The securities sleeve is dropped only from a report that did not ask for
-      // it. Built-in reports have no account picker, so there the sleeve is
-      // noise in a whole-ledger figure; here the user may have named that
-      // account, and answering an explicitly scoped report with nothing is worse
-      // than showing the rows they asked to see.
-      if (!this.namesAnyAccount(filters)) {
+      // The securities sleeve is noise in a whole-ledger figure -- built-in
+      // reports have no account picker, so they always drop it -- but here the
+      // user may have named that very account, and answering an explicitly
+      // scoped report with nothing is worse than showing the rows they asked to
+      // see. The exception is per ROW, not per report: a filter group reading
+      // `account = Brokerage OR category = Salary` names Brokerage, while
+      // `account = Chequing OR payee = Acme` does not name it, and a
+      // whole-report boolean cannot tell those apart (audit F-CUSTOM-OR-001).
+      const explicitAccountIds = this.explicitAccountIds(filters);
+      if (explicitAccountIds.length === 0) {
         queryBuilder.andWhere(brokerageExclusionForEntity("account"));
+      } else {
+        queryBuilder.andWhere(
+          new Brackets((scope) => {
+            scope
+              .where(brokerageExclusionForEntity("account"))
+              .orWhere(
+                "transaction.accountId IN (:...explicitReportAccountIds)",
+                { explicitReportAccountIds: explicitAccountIds },
+              );
+          }),
+        );
       }
       // The embedded-investment half cannot be expressed here at all: the parent
       // is a real row carrying real ordinary cash beside the investment line, so
@@ -507,11 +561,20 @@ export class ReportsService {
         }
       }
 
-      // Filter by direction
+      // Filter by direction. A split parent's own amount is the SUM of its
+      // lines, so its sign is not the direction of any particular line: a -60
+      // expense beside a +500 embedded SELL is a +440 parent, and rejecting it
+      // here threw away the expense before provenance ever ran (audit
+      // F-CUSTOM-DIR-001). Split parents therefore pass this gate and are
+      // narrowed per line in `applyDirectionToSplitLines`.
       if (config.direction === DirectionFilter.INCOME_ONLY) {
-        queryBuilder.andWhere("transaction.amount > 0");
+        queryBuilder.andWhere(
+          "(transaction.isSplit = true OR transaction.amount > 0)",
+        );
       } else if (config.direction === DirectionFilter.EXPENSES_ONLY) {
-        queryBuilder.andWhere("transaction.amount < 0");
+        queryBuilder.andWhere(
+          "(transaction.isSplit = true OR transaction.amount < 0)",
+        );
       }
 
       // Filter transfers

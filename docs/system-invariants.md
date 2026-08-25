@@ -555,9 +555,26 @@ Also covered        backend/src/reports/ -- the USER-DEFINED custom report
                     engine is byte-identical at the merge base. The two dialects
                     differ by exactly one clause, deliberately: the SQL form
                     drops transfer children because no built-in report using it
-                    includes transfers, while a custom report carries its own
-                    includeTransfers configuration and that decision stays where
-                    the user made it.
+                    includes transfers, while this one says nothing about
+                    transfers at all. Direction (Income/Expenses only) is
+                    applied to the split LINES in that engine, never to the
+                    parent's own amount: a -60 expense beside a +500 embedded
+                    SELL is a +440 parent, and rejecting that row on its sum
+                    discarded the expense before provenance could run (audit
+                    F-CUSTOM-DIR-001). The securities-sleeve exception is per
+                    ROW, keyed on the accounts the report explicitly names,
+                    because conditions inside a filter group are OR'd and a
+                    whole-report boolean cannot tell `account = Brokerage OR
+                    category = Salary` from `account = Chequing OR payee = Acme`
+                    (F-CUSTOM-OR-001).
+Outside this rule   Transfer SPLIT LINES in the custom report engine.
+                    `includeTransfers` is applied there to the PARENT only, so a
+                    transfer line inside a non-transfer parent is counted today
+                    (a -260 parent of -60 groceries and a -200 transfer reports
+                    260). Unchanged from before this work, a transfer-policy
+                    question rather than an investment-provenance one, and
+                    tracked separately -- named here so the `enforced` status
+                    below is not read as covering it.
                     The category-keyed aggregates (ai/insights,
                     budgets/budget-generator, the payee totals) are structurally
                     unable to admit either row and are deliberately not listed as

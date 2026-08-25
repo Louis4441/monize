@@ -233,6 +233,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
     ordinaryAmount?: number;
     investmentAmount?: number;
     payeeName?: string;
+    action?: InvestmentAction;
   }): Promise<Transaction> {
     const ordinary = options.ordinaryAmount ?? -60;
     const investment = options.investmentAmount ?? -500;
@@ -270,12 +271,15 @@ describe("built-in reports and investment cash accounts (integration)", () => {
         accountId: brokerageId,
         transactionSplitId: investmentLine.id,
         securityId,
-        action: InvestmentAction.BUY,
+        action: options.action ?? InvestmentAction.BUY,
         transactionDate: options.date ?? "2026-03-10",
         quantity: 10,
         price: Math.abs(investment) / 10,
         commission: 0,
-        totalAmount: investment,
+        // A MAGNITUDE, as `calculateTotalAmount` stores it; the split line's own
+        // amount carries the cash direction (negative for a BUY, positive for a
+        // SELL).
+        totalAmount: Math.abs(investment),
         exchangeRate: 1,
         status: TransactionStatus.UNRECONCILED,
       } as Partial<InvestmentTransaction>),
@@ -495,6 +499,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       metric?: MetricType;
       direction?: DirectionFilter;
       includeTransfers?: boolean;
+      filters?: CustomReport["filters"];
     }) {
       const report = await dataSource.manager.save(
         dataSource.manager.create(CustomReport, {
@@ -503,7 +508,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
           viewType: ReportViewType.TABLE,
           timeframeType: TimeframeType.CUSTOM,
           groupBy: overrides.groupBy ?? GroupByType.CATEGORY,
-          filters: {},
+          filters: overrides.filters ?? {},
           config: {
             metric: overrides.metric ?? MetricType.TOTAL_AMOUNT,
             includeTransfers: overrides.includeTransfers ?? false,
@@ -617,6 +622,113 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       });
 
       expect(result.data).toEqual([expect.objectContaining({ value: 60 })]);
+    });
+
+    it("honours a brokerage account named inside a mixed OR group", async () => {
+      // Conditions in a group are OR'd, so this filter explicitly asks for
+      // brokerage rows. A whole-report boolean read it as "not an account
+      // scope" and excluded the sleeve globally, making the arm unmatchable
+      // (audit F-CUSTOM-OR-001).
+      await insertTransaction({
+        accountId: brokerageId,
+        amount: -75,
+        categoryId: groceriesCategoryId,
+        payeeName: "Brokerage fee",
+      });
+
+      const result = await runCustomReport({
+        groupBy: GroupByType.CATEGORY,
+        filters: {
+          filterGroups: [
+            {
+              conditions: [
+                { field: "account", value: [brokerageId] },
+                { field: "category", value: [salaryCategoryId] },
+              ],
+            },
+          ],
+        },
+      });
+
+      expect(result.summary.total).toBe(75);
+    });
+
+    it("does not admit the sleeve through an unrelated OR arm", async () => {
+      // The negative control for the case above: Groceries matches, but the
+      // brokerage account was never named, so its row stays out.
+      await insertTransaction({
+        accountId: brokerageId,
+        amount: -75,
+        categoryId: groceriesCategoryId,
+        payeeName: "Brokerage fee",
+      });
+      await insertTransaction({
+        accountId: chequingId,
+        amount: -40,
+        categoryId: groceriesCategoryId,
+        payeeName: "Bakery",
+      });
+
+      const result = await runCustomReport({
+        groupBy: GroupByType.CATEGORY,
+        filters: {
+          filterGroups: [
+            {
+              conditions: [
+                { field: "account", value: [chequingId] },
+                { field: "category", value: [groceriesCategoryId] },
+              ],
+            },
+          ],
+        },
+      });
+
+      expect(result.summary.total).toBe(40);
+    });
+
+    it("keeps an expense whose parent an embedded SELL turned positive", async () => {
+      // -60 groceries beside a +500 embedded SELL is a +440 parent. Direction
+      // was decided on that sum, so EXPENSES_ONLY threw the row away before
+      // provenance could remove the SELL (audit F-CUSTOM-DIR-001).
+      await createTrade(InvestmentAction.BUY, {
+        date: "2026-03-05",
+        quantity: 10,
+        price: 50,
+      });
+      const parent = await createEmbeddedInvestmentParent({
+        ordinaryAmount: -60,
+        investmentAmount: 500,
+        action: InvestmentAction.SELL,
+      });
+      expect(Number(parent.amount)).toBe(440);
+
+      const custom = await runCustomReport({
+        groupBy: GroupByType.CATEGORY,
+        direction: DirectionFilter.EXPENSES_ONLY,
+      });
+      const builtIn = await withUserContext(userId, () =>
+        spending.getSpendingByCategory(userId, START, END),
+      );
+
+      expect(custom.summary.total).toBe(60);
+      // The same ledger through the other engine: same answer.
+      expect(custom.summary.total).toBe(builtIn.totalSpending);
+    });
+
+    it("keeps income whose parent an embedded BUY turned negative", async () => {
+      const parent = await createEmbeddedInvestmentParent({
+        ordinaryAmount: 60,
+        investmentAmount: -500,
+        payeeName: "Brokerage statement",
+      });
+      expect(Number(parent.amount)).toBe(-440);
+
+      const result = await runCustomReport({
+        groupBy: GroupByType.CATEGORY,
+        direction: DirectionFilter.INCOME_ONLY,
+      });
+
+      expect(result.summary.total).toBe(60);
     });
 
     it("still counts ordinary cash in the sleeve, and agrees with the built-in report", async () => {
@@ -951,9 +1063,12 @@ describe("built-in reports and investment cash accounts (integration)", () => {
     });
 
     it("counts ordinary cash on a standalone investment account", async () => {
-      // A .mny import produces these: account_type INVESTMENT with no sub-type,
-      // holding both securities and its own cash. It IS the cash side, so the
-      // brokerage-sleeve exclusion must not reach it.
+      // account_type INVESTMENT with no sub-type: the shape the ordinary
+      // account-create path produces, and which net-worth and the monthly
+      // comparison already branch on. It holds both securities and its own
+      // cash, so it IS the cash side and the sleeve exclusion must not reach
+      // it. (A .mny import is NOT such a case -- `map-reference.ts` always
+      // emits the linked CASH/BROKERAGE pair.)
       const standalone = await createTestAccount(dataSource, userId, {
         name: "Legacy Brokerage",
         openingBalance: 0,
