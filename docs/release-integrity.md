@@ -64,8 +64,10 @@ the config field in both its JS (`passWithNoTests: true`) and JSON
 (`"passWithNoTests": true`) forms -- the latter being the spelling the config
 this rule names would actually take. Prose is out of scope, since this document
 quotes the flag in order to forbid it. The subjects come from `git ls-files`
-rather than a list, so a runner added later is covered without anyone
-remembering this rule. That is what moves REL-001 from a rule someone remembers
+rather than a list, so a *file* added later to one of those families is covered
+without anyone remembering this rule -- a runner launched from a family the
+pathspec does not name (a `.cjs` hook, say) still is not, and widening it is the
+cost of putting a runner there. That is what moves REL-001 from a rule someone remembers
 to one the pipeline enforces. No runner carries such a flag today either:
 `test:unit` and the frontend's `vitest run --coverage` have none, and Playwright
 fails by default when it discovers no spec files.

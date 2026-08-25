@@ -50,13 +50,14 @@ only when each worker owns its own database or schema; until that exists, one
 worker is the mechanism, and `--runInBand` at a call site is not a substitute
 for the config pinning it.
 
-### `test/*.e2e-spec.ts` is not a gate, and three of the four suites are broken
+### `test/*.e2e-spec.ts` is not a gate, and three of the five suites are broken
 
 CI runs `test:unit` and `test:integration` (filtered to `test/integration/*.spec.ts`). Nothing runs `test:e2e`, and separate rot accumulated behind a since-fixed compile error (`npm run typecheck` now closes the compile half in CI):
 
 | Suite | State | Why |
 |---|---|---|
 | `test/payee-detail.e2e-spec.ts` | passes (9 tests) | fine; this is the spec that caught the raw-select transformer class of bug |
+| `test/category-detail.e2e-spec.ts` | passes (9 tests) | fine; same shape as the payee one |
 | `test/payees.e2e-spec.ts` | fails | calls services directly, so no request scope; never converted for RLS (`withScopedDb` throws without ambient context) |
 | `test/auth.e2e-spec.ts` | fails | `AuthController` gained a `TokenService` dependency its test module does not provide |
 | `test/transactions.e2e-spec.ts` | fails | `DelegateTransferMaskInterceptor` gained a `CrossOwnerAccessService` dependency its test module does not provide |

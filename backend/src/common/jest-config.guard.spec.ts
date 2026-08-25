@@ -173,6 +173,35 @@ const specs = (prefix: string): string[] => {
   );
 };
 
+/**
+ * What runs is the command merged with the config, and Jest resolves that merge
+ * in the command's favour. A guard that reads only the JSON therefore describes
+ * a file rather than an invocation: `--maxWorkers=2` beside a config pinning
+ * `maxWorkers: 1` is the race back, with every artifact looking correct on its
+ * own. These two helpers model the only CLI options that can move this
+ * invariant, and they are unit-tested against Jest's accepted spellings because
+ * a near-miss reads as safe -- `--watch\b` does not match `--watchAll`, since
+ * the boundary it asks for is between two word characters.
+ */
+export function enablesJestWatch(command: string): boolean {
+  return command
+    .split(/\s+/)
+    .some((argument) => /^--watch(All|-all)?(=true)?$/.test(argument));
+}
+
+/**
+ * The worker count the command imposes on whatever the config says, or `null`
+ * when it imposes none. `--runInBand` is one worker by definition, so it is a
+ * pin rather than an override.
+ */
+export function jestCliMaxWorkers(command: string): string | null {
+  if (/(^|\s)--runInBand(\s|$)/.test(command)) return "1";
+  const match = /(^|\s)(--maxWorkers|--max-workers|-w)(=|\s+)(\S+)/.exec(
+    command,
+  );
+  return match?.[4] ?? null;
+}
+
 describeTree("jest configuration", () => {
   it("keeps every database-backed spec out of the parallel config", () => {
     const testTreeSpecs = specs("test");
@@ -262,6 +291,34 @@ describe("the discovery model", () => {
   });
 });
 
+describe("the command-line model", () => {
+  it.each(["--watch", "--watchAll", "--watch-all", "--watchAll=true"])(
+    "reads %s as watch mode",
+    (flag) => {
+      expect(
+        enablesJestWatch(`jest --config ./test/jest-e2e.json ${flag}`),
+      ).toBe(true);
+    },
+  );
+
+  it.each(["--watch=false", "--watchAll=false", "--watchman", ""])(
+    "does not read %s as watch mode",
+    (flag) => {
+      expect(enablesJestWatch(`jest ${flag}`)).toBe(false);
+    },
+  );
+
+  it.each([
+    ["jest --maxWorkers=2", "2"],
+    ["jest --max-workers 2", "2"],
+    ["jest -w 50%", "50%"],
+    ["jest --runInBand", "1"],
+    ["jest --coverage", null],
+  ])("reads the worker count %s imposes", (command, expected) => {
+    expect(jestCliMaxWorkers(command)).toBe(expected);
+  });
+});
+
 describeTree("test scripts", () => {
   /**
    * Derived, not listed. A second hand-maintained inventory of test scripts is
@@ -331,7 +388,13 @@ describeTree("test scripts", () => {
       if (config.maxWorkers !== 1) {
         problems.push(`${script} -> ${selected} does not pin maxWorkers: 1`);
       }
-      if (/(^|\s)--watch\b/.test(command)) {
+      const cliWorkers = jestCliMaxWorkers(command);
+      if (cliWorkers !== null && cliWorkers !== "1") {
+        problems.push(
+          `${script} overrides ${selected} with max workers ${cliWorkers}`,
+        );
+      }
+      if (enablesJestWatch(command)) {
         problems.push(`${script} watches ${selected}`);
       }
       return problems;
