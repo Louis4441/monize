@@ -411,7 +411,7 @@ export class BackupRestoreService {
         throw new BadRequestException(
           tr(
             "errors.backup.decompressTooLarge",
-            `Backup is too large to restore: it expands past the configured limit of ${this.restoreExpandedLimitBytes} bytes. Raise BACKUP_RESTORE_EXPANDED_LIMIT if this is a genuine backup.`,
+            `Backup is too large to restore: it expands past this deployment's limit of ${this.restoreExpandedLimitBytes} bytes. That ceiling is derived from the container's memory and a measured cost per byte, so raising it alone models a restore the process cannot finish -- raise the container memory limit instead (Kubernetes: backend.resources.limits.memory).`,
             { limit: this.restoreExpandedLimitBytes },
           ),
         );

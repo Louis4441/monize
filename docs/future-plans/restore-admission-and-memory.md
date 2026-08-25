@@ -357,7 +357,35 @@ The OIDC re-authentication ordering in `backend/src/backup/backup-restore.servic
 is untouched: the ticket authorizes the *upload*, the OIDC artifact authorizes the
 *destruction*, and section 5 of the contract fixes the second one's place.
 
-### WP5 -- documentation, and one correction landed with this plan
+### WP5 -- documentation, translations, and the note for operators
+
+Done: every locale carries the three new refusal strings, and the "too large to
+restore" message was **corrected in all nineteen** -- it told the operator to raise
+`BACKUP_RESTORE_EXPANDED_LIMIT`, which under the new derivation drives the slot count
+to zero and refuses every restore. An error message that recommends the harmful
+action is worse than the refusal it explains.
+
+Not done, because it belongs to whoever cuts the release: `docs/release-notes/` holds
+one file per shipped version, named for the exact version, and inventing the next
+version number here would be guessing. Draft copy to paste, under **Backup and
+restore**:
+
+> **A restore's memory cost was measured, and the ceilings moved.** The restore path
+> assumed a restore costs three times its uncompressed size. Measured, it costs about
+> eight -- so the old ceilings admitted restores the process could not finish, and on
+> the default 400Mi backend a large one lost the pod instead of being refused. The
+> ceilings are now derived from the container's memory and that measurement: a default
+> pod accepts about 28MiB of uncompressed backup instead of a nominal 100MiB, a 256Mi
+> pod can restore small backups where it previously refused everything, and a pod
+> under about 160Mi refuses restores with an error naming the fix. If a real backup
+> starts being refused, raise `backend.resources.limits.memory` (or the container's
+> memory limit) -- raising the backup ceiling alone is what used to restart the pod.
+> Restores also queue with a bound and a deadline now, a caller who disconnects while
+> queued no longer has their restore run without them, and an upload must carry a
+> short-lived ticket from the authenticated session, so an anonymous request can no
+> longer occupy the restore path.
+
+### WP5b -- documentation, and one correction landed with this plan
 
 - Section 6 of `docs/backup-restore-contract.md` said the gate "still floors capacity
   at one" -- describing a floor that F3RB-005 removed. Corrected in the same commit as
