@@ -659,7 +659,16 @@ describe("built-in reports and investment cash accounts (integration)", () => {
 
     it("keeps a SELL's cash credit out of income", async () => {
       await insertSleeveSalary();
+      // Buy before selling: a SELL with no holding behind it is a state the
+      // production writer would not have produced, so the fixture would not be
+      // evidence about a report.
+      await createTrade(InvestmentAction.BUY, {
+        date: "2026-03-05",
+        quantity: 10,
+        price: 50,
+      });
       const sell = await createTrade(InvestmentAction.SELL, {
+        date: "2026-03-12",
         quantity: 4,
         price: 75,
       });
@@ -671,6 +680,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       );
 
       expect(cashFlow.totals.income).toBe(1000);
+      expect(cashFlow.totals.expenses).toBe(0);
     });
 
     it("counts ordinary cash on a standalone investment account", async () => {
