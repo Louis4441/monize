@@ -14,6 +14,7 @@
  */
 
 import { roundMoney } from "../common/round.util";
+import { paymentsToClear } from "./amortization-count.util";
 
 export type MortgagePaymentFrequency =
   | "MONTHLY"
@@ -267,27 +268,13 @@ function calculateAcceleratedPayments(
   isCanadian: boolean,
   isVariableRate: boolean,
 ): number {
-  if (annualRate === 0) {
-    return Math.ceil(principal / paymentAmount);
-  }
-
   const periodicRate = getPeriodicRate(
     annualRate,
     periodsPerYear,
     isCanadian,
     isVariableRate,
   );
-  const minPayment = principal * periodicRate;
-
-  if (paymentAmount <= minPayment) {
-    return Infinity;
-  }
-
-  // Use amortization formula to find number of payments
-  const numerator = -Math.log(1 - (principal * periodicRate) / paymentAmount);
-  const denominator = Math.log(1 + periodicRate);
-
-  return Math.ceil(numerator / denominator);
+  return paymentsToClear(principal, periodicRate, paymentAmount);
 }
 
 /**
@@ -403,26 +390,6 @@ function balanceAfterPayments(
 }
 
 /**
- * How many payments `paymentAmount` needs to clear `principal`, as a whole
- * number of periods. `Infinity` when the installment never covers the interest.
- *
- *   n = -ln(1 - P*r / A) / ln(1 + r)
- */
-function paymentsToClear(
-  principal: number,
-  periodicRate: number,
-  paymentAmount: number,
-): number {
-  if (paymentAmount <= 0) return Infinity;
-  if (periodicRate === 0) return Math.ceil(principal / paymentAmount);
-  if (paymentAmount <= principal * periodicRate) return Infinity;
-  return Math.ceil(
-    -Math.log(1 - (principal * periodicRate) / paymentAmount) /
-      Math.log(1 + periodicRate),
-  );
-}
-
-/**
  * The last payment of a schedule, the number of payments it really takes, and
  * the lifetime interest that follows from both.
  *
@@ -450,7 +417,8 @@ function paymentsToClear(
  * @param paymentAmount - The regular installment
  * @param totalPayments - Whole number of payments, finite and at least 1
  * @returns The final payment, the effective payment count, and the sum of every
- *          period's interest. All three are -1 when the payment never amortizes.
+ *          period's interest. All three are -1 when the schedule is unknowable:
+ *          a non-finite count, or an installment that never covers the interest.
  */
 export function calculateResidualPayoff(
   principal: number,
@@ -476,13 +444,21 @@ export function calculateResidualPayoff(
     };
   }
 
+  // An installment that never covers the interest has no payoff at all, so the
+  // caller's finite count describes nothing. Falling back to it produced a
+  // precise, enormous total for an unknowable schedule -- the inverse of
+  // defaulting an unknown to zero, and worse, because the number looks measured.
+  const clearing = paymentsToClear(principal, periodicRate, paymentAmount);
+  if (!isFinite(clearing)) {
+    return {
+      residualPayoffAmount: -1,
+      effectivePayments: -1,
+      totalInterest: -1,
+    };
+  }
   // The schedule ends at whichever comes first: the caller's count, or the
   // period the installment actually clears the balance in.
-  const clearing = paymentsToClear(principal, periodicRate, paymentAmount);
-  const effectivePayments = Math.max(
-    1,
-    Math.min(totalPayments, isFinite(clearing) ? clearing : totalPayments),
-  );
+  const effectivePayments = Math.max(1, Math.min(totalPayments, clearing));
 
   const balanceBeforeFinal = balanceAfterPayments(
     principal,

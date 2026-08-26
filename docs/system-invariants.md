@@ -629,14 +629,27 @@ Concurrency scope   --
 Retry semantics     --
 Crash semantics     -- (projection only; nothing is persisted)
 Failure response    --
+                    Each occurrence is derived from the anchor by index rather
+                    than accumulated from the one before it: `advanceDate`'s
+                    Date.setMonth(+1) overflows a 31st into the following month
+                    and then holds every later occurrence on the new day, which
+                    skipped February and paid 11 times a year -- the same defect
+                    from the other direction. The day is clamped to the target
+                    month's length, as a standing order is.
+                    ONE_OFF is excluded from RecurringExtra.frequency by TYPE
+                    (RecurringOverpaymentFrequency), not by convention: it is a
+                    single dated payment and belongs in lumpSums, and accepted as
+                    a cadence it collapsed into the legacy per-payment branch.
 Required tests      Present: the recurringOccurrencesDue block and the
                     "recurring overpayment cadence in a schedule" block in
                     frontend/src/lib/loan-schedule.test.ts assert the per-year
-                    counts across weekly, biweekly and monthly loans, the
-                    cumulative "every occurrence paid exactly once" invariant,
-                    and the window rules. The goal-seek replay cases in
-                    loan-overpayment-solver.test.ts assert a solved amount still
-                    reaches its target when replayed through the same cadence.
+                    counts across weekly, biweekly and monthly loans and across
+                    every anchor day a month can start on, the cumulative "every
+                    occurrence paid exactly once" invariant, the month-end clamp,
+                    the backwards-rowDate refusal, and the window rules. The
+                    goal-seek replay cases in loan-overpayment-solver.test.ts
+                    assert a solved amount still reaches its target when replayed
+                    through the same cadence.
 Status              enforced
 ```
 
@@ -658,23 +671,39 @@ Enforcement         The horizon itself is derived from the frequency
                     or biweekly mortgage completes -- a flat 600-payment default
                     cut those short, omitting 44% of a 30-year weekly
                     mortgage's lifetime interest and reporting no payoff date. Where truncation is still possible,
-                    consumers gate on paidOff: compareSchedules().interestSaved
-                    and PastImpactResult.interestAlreadySaved are null,
-                    deriveLoanFigures withholds the payoff date and remaining
-                    interest, ScenarioComparisonChart draws only outcomes passing
-                    hasKnownInterestSaved, and the goal-seek solver returns
+                    consumers gate on paidOff. compareSchedules returns null for
+                    ALL FOUR of interestSaved, paymentsSaved, monthsSaved and
+                    installmentReduction (a horizon's row count, a missing payoff
+                    date read as 0 months, and an installment taken from a
+                    mid-schedule row are the same defect as the interest);
+                    PastImpactResult.interestAlreadySaved and monthsAlreadySaved
+                    are null; deriveLoanFigures withholds the payoff date and
+                    remaining interest; ScenarioComparisonChart draws only
+                    outcomes passing hasKnownInterestSaved and the panel names
+                    what it left out; the goal-seek solver returns
                     baseline-incomplete rather than a saving against a subtotal
-                    (meetsInterestTarget requires paidOff).
+                    (meetsInterestTarget requires paidOff); and both loan reports
+                    (DebtPayoffTimelineReport, LoanAmortizationReport) withhold
+                    the projected payoff date and relabel the interest figure
+                    "Interest Over Projection" instead of "Est. Total Interest".
 Concurrency scope   --
 Retry semantics     --
 Crash semantics     -- (projection only)
 Failure response    null, plus an explicit unknown in the UI -- never 0.00.
 Required tests      Present: "projection horizon" and "a truncated schedule is
                     not a lifetime total" in loan-schedule.test.ts (the four
-                    ordinary long terms, and interestSaved null when either side
+                    ordinary long terms, and every saving null when either side
                     truncates); "a target cannot be met by a truncated schedule"
                     in loan-overpayment-solver.test.ts; the two unknown-saving
-                    cases in loan-past-impact.test.ts.
+                    cases in loan-past-impact.test.ts; the Unknown-card and
+                    em-dash cases in ComparisonSummaryCards.test.tsx,
+                    PastImpactSection.test.tsx and loan-scenario-labels.test.ts;
+                    the two chart-exclusion messages in
+                    SavedScenariosPanel.test.tsx.
+Missing             A source scan asserting no NEW consumer presents a lifetime
+                    figure without the gate. The list above is prose, which the
+                    repository's own ranking puts last -- the reports were found
+                    ungated by review, not by a test.
 Status              enforced
 ```
 
@@ -694,6 +723,16 @@ Enforcement         The convention is the nominal annual rate divided by the
                     takes periodsPerYear and compounds at the payment frequency,
                     so the displayed EAR describes the rate the schedule charges
                     rather than a monthly one nothing used.
+                    The frequency a periodic rate is divided by must itself be
+                    real: SetupLoanPaymentsDto accepts SEMIMONTHLY and the
+                    service casts it into calculatePaymentSplit, where
+                    getPeriodsPerYear had no such case and fell through to its
+                    default of 12 -- a semi-monthly loan's interest split was
+                    computed at twice the correct rate. The case exists now, and
+                    loan-payment-frequency.guard.spec.ts reads the DTO's @IsIn
+                    list out of the source and fails on any accepted value
+                    without its own period count, because a cast cannot be
+                    type-checked.
 Concurrency scope   --
 Failure response    --
 Required tests      Present: the "periodic-rate convention" block in
@@ -703,7 +742,9 @@ Required tests      Present: the "periodic-rate convention" block in
                     spell out the REJECTED contract and assert the implementation
                     differs from it -- backend/frontend parity mirrors one
                     formula, so it can only detect drift, never validate the
-                    choice.
+                    choice. Plus loan-payment-frequency.guard.spec.ts (the DTO
+                    scan) and the effectiveAnnualRate block in
+                    loan-schedule.test.ts.
 Status              enforced
 ```
 
@@ -724,12 +765,26 @@ Enforcement         calculateResidualPayoff
                     rounded a fractional payoff count up. The frontend schedule
                     already capped its final principal at the balance, so the two
                     surfaces disagreed.
+                    `totalPayments` is a ceiling, not a promise: an installment
+                    that clears the balance sooner makes the caller's count too
+                    high, so calculateResidualPayoff derives the effective count
+                    (paymentsToClear) and returns it, and the result's
+                    totalPayments and endDate come from that one number. An
+                    installment that never covers the interest yields -1 for all
+                    three rather than a precise, enormous total.
+                    paymentsToClear itself lives once, in
+                    amortization-count.util.ts: the same formula had three copies
+                    and two of them ran on identical inputs in a single call.
 Concurrency scope   --
-Failure response    -1 for both figures when the payment never amortizes.
+Failure response    -1 for all three figures when the schedule is unknowable: a
+                    non-finite count, or an installment that never amortizes.
 Required tests      Present: "final payment and lifetime interest" in
                     mortgage-amortization.util.spec.ts, whose expectations come
                     from an independent period-by-period simulation in the spec
-                    rather than from the implementation.
+                    rather than from the implementation, including both
+                    directions of the count (an installment clearing early, and
+                    a rounding remainder absorbed by the last payment) and the
+                    non-amortizing case at a finite count.
 Status              enforced
 ```
 

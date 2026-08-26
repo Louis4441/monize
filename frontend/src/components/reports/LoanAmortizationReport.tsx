@@ -118,9 +118,17 @@ export function LoanAmortizationReport() {
     loadTransactions();
   }, [selectedAccountId, accounts]);
 
-  // Build payment history from actual transactions + projected future payments
-  const paymentHistory = useMemo((): PaymentRow[] => {
-    if (!selectedAccount) return [];
+  // Build payment history from actual transactions + projected future payments.
+  // `projectionPaidOff` travels with the rows because the summary below cannot
+  // tell a completed projection from one truncated at the horizon by looking at
+  // them -- and only the first yields a payoff date or a lifetime interest total
+  // (INV-LOAN-002).
+  const { paymentHistory, projectionPaidOff } = useMemo((): {
+    paymentHistory: PaymentRow[];
+    projectionPaidOff: boolean;
+  } => {
+    if (!selectedAccount) return { paymentHistory: [], projectionPaidOff: false };
+    let projectionPaidOff = false;
 
     // --- Historical payments from actual transactions ---
     const history = deriveLoanPaymentHistory(selectedAccount, transactions, [], interestTransactions);
@@ -138,6 +146,7 @@ export function LoanAmortizationReport() {
     const projectionInput = buildLoanProjectionInput(selectedAccount, history);
     if (projectionInput) {
       const projection = generateLoanSchedule(projectionInput);
+      projectionPaidOff = projection.paidOff;
 
       for (const row of projection.rows) {
         payments.push({
@@ -152,7 +161,7 @@ export function LoanAmortizationReport() {
       }
     }
 
-    return payments;
+    return { paymentHistory: payments, projectionPaidOff };
   }, [selectedAccount, transactions, interestTransactions]);
 
   const historicalCount = useMemo(() => paymentHistory.filter((r) => !r.isProjected).length, [paymentHistory]);
@@ -176,9 +185,25 @@ export function LoanAmortizationReport() {
       lastPaymentDate: lastRow.date,
       originalBalance,
       hasProjection,
-      projectedPayoffDate: hasProjection ? lastRow.date : null,
+      // Only a completed projection has a payoff date; truncated at the horizon
+      // the last row is 50 years out with a balance still owing.
+      projectedPayoffDate: hasProjection && projectionPaidOff ? lastRow.date : null,
+      /** Whether `totalInterest` is the loan's lifetime interest rather than the
+       *  interest over a projection that never reached payoff. */
+      hasLifetimeTotal: !hasProjection || projectionPaidOff,
     };
-  }, [paymentHistory, selectedAccount, historicalCount, hasProjection]);
+  }, [paymentHistory, selectedAccount, historicalCount, hasProjection, projectionPaidOff]);
+
+  // See DebtPayoffTimelineReport: the caption names what the figure is, and an
+  // interest total over a projection that never paid off is not a lifetime one.
+  const interestLabel = (
+    s: { hasProjection: boolean; hasLifetimeTotal: boolean } | null,
+  ) =>
+    !s?.hasProjection
+      ? t('loanAmortization.totalInterestPaid')
+      : s.hasLifetimeTotal
+        ? t('loanAmortization.estTotalInterest')
+        : t('loanAmortization.interestOverProjection');
 
   const getExportData = (formatted: boolean) => {
     const headers = [t('loanAmortization.colNumber'), t('loanAmortization.colDate'), t('loanAmortization.colPayment'), t('loanAmortization.colPrincipal'), t('loanAmortization.colInterest'), t('loanAmortization.colBalance'), t('loanAmortization.colType')];
@@ -212,7 +237,7 @@ export function LoanAmortizationReport() {
         { label: t('loanAmortization.currentBalance'), value: formatCurrency(Math.abs(selectedAccount.currentBalance), currency), color: '#dc2626' },
         { label: t('loanAmortization.originalAmount'), value: formatCurrency(summary?.originalBalance || Math.abs(selectedAccount.openingBalance), currency), color: '#111827' },
         { label: t('loanAmortization.interestRate'), value: selectedAccount.interestRate ? `${selectedAccount.interestRate}%` : t('loanAmortization.notSet'), color: '#111827' },
-        { label: summary?.hasProjection ? t('loanAmortization.estTotalInterest') : t('loanAmortization.totalInterestPaid'), value: formatCurrency(summary?.totalInterest || 0, currency), color: '#ea580c' },
+        { label: interestLabel(summary), value: formatCurrency(summary?.totalInterest || 0, currency), color: '#ea580c' },
         { label: t('loanAmortization.paymentsMade'), value: String(historicalCount), color: '#16a34a' },
       );
       if (summary?.hasProjection && summary.projectedPayoffDate) {
@@ -339,7 +364,7 @@ export function LoanAmortizationReport() {
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              {summary?.hasProjection ? t('loanAmortization.estTotalInterest') : t('loanAmortization.totalInterestPaid')}
+              {interestLabel(summary)}
             </div>
             <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
               {formatCurrency(summary?.totalInterest || 0)}

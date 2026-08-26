@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Carregar cenário \"{name}\"",
       "budgetSummary": "Orçamento {amount}/mês",
-      "chartExcludedUnknown": "{count, plural, one {# cenário não é mostrado: sua economia de juros é desconhecida.} other {# cenários não são mostrados: sua economia de juros é desconhecida.}}"
+      "chartExcludedUnknown": "{count, plural, one {# cenário não é mostrado: sua economia de juros é desconhecida.} other {# cenários não são mostrados: sua economia de juros é desconhecida.}}",
+      "chartNeedsTwoKnown": "O gráfico de comparação precisa de pelo menos dois cenários com economia de juros conhecida."
     },
     "scenarioChart": {
       "title": "Comparação de cenários",

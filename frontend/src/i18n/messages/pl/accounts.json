@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Wczytaj scenariusz „{name}“",
       "budgetSummary": "Budżet {amount}/mies.",
-      "chartExcludedUnknown": "{count, plural, one {# scenariusz nie jest pokazany: jego oszczędność odsetek jest nieznana.} few {# scenariusze nie są pokazane: ich oszczędność odsetek jest nieznana.} many {# scenariuszy nie jest pokazanych: ich oszczędność odsetek jest nieznana.} other {# scenariusza nie jest pokazane: ich oszczędność odsetek jest nieznana.}}"
+      "chartExcludedUnknown": "{count, plural, one {# scenariusz nie jest pokazany: jego oszczędność odsetek jest nieznana.} few {# scenariusze nie są pokazane: ich oszczędność odsetek jest nieznana.} many {# scenariuszy nie jest pokazanych: ich oszczędność odsetek jest nieznana.} other {# scenariusza nie jest pokazane: ich oszczędność odsetek jest nieznana.}}",
+      "chartNeedsTwoKnown": "Wykres porównania wymaga co najmniej dwóch scenariuszy ze znaną oszczędnością odsetek."
     },
     "scenarioChart": {
       "title": "Porównanie scenariuszy",

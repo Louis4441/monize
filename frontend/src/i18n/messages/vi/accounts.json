@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Tải kịch bản \"{name}\"",
       "budgetSummary": "Ngân sách {amount}/tháng",
-      "chartExcludedUnknown": "{count, plural, other {# kịch bản không được hiển thị: khoản lãi tiết kiệm chưa xác định.}}"
+      "chartExcludedUnknown": "{count, plural, other {# kịch bản không được hiển thị: khoản lãi tiết kiệm chưa xác định.}}",
+      "chartNeedsTwoKnown": "Biểu đồ so sánh cần ít nhất hai kịch bản có khoản lãi tiết kiệm đã xác định."
     },
     "scenarioChart": {
       "title": "So sánh kịch bản",

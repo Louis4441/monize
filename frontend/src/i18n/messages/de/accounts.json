@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Szenario „{name}“ laden",
       "budgetSummary": "Budget {amount}/Monat",
-      "chartExcludedUnknown": "{count, plural, one {# Szenario wird nicht angezeigt: seine Zinsersparnis ist unbekannt.} other {# Szenarien werden nicht angezeigt: ihre Zinsersparnis ist unbekannt.}}"
+      "chartExcludedUnknown": "{count, plural, one {# Szenario wird nicht angezeigt: seine Zinsersparnis ist unbekannt.} other {# Szenarien werden nicht angezeigt: ihre Zinsersparnis ist unbekannt.}}",
+      "chartNeedsTwoKnown": "Das Vergleichsdiagramm benötigt mindestens zwei Szenarien mit bekannter Zinsersparnis."
     },
     "scenarioChart": {
       "title": "Szenariovergleich",

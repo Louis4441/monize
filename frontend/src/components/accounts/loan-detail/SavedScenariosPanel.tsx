@@ -260,14 +260,18 @@ export function SavedScenariosPanel({
         />
       )}
 
-      {/* Shown whether or not the chart is open: when every scenario's saving is
-          unknown the toggle is gone entirely, and that is exactly when the
-          reader needs the reason. */}
+      {/* Shown whether or not the chart is open: when too few scenarios are
+          drawable the toggle is gone entirely, and that is exactly when the
+          reader needs the reason. Two messages, because the two situations are
+          different -- naming only the unknown ones while the chart is suppressed
+          would say "1 of 2 is missing" when in fact both are. */}
       {chartExcludedCount > 0 && (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          {t('loanDetail.scenarios.chartExcludedUnknown', {
-            count: chartExcludedCount,
-          })}
+          {chartAvailable
+            ? t('loanDetail.scenarios.chartExcludedUnknown', {
+                count: chartExcludedCount,
+              })
+            : t('loanDetail.scenarios.chartNeedsTwoKnown')}
         </p>
       )}
 

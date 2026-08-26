@@ -244,12 +244,18 @@ export function computePastImpact(
   // the loan has not made. A loan already paid off contributes a known zero of
   // remaining interest rather than an unknown (there is nothing left to
   // project), which is why the settled case is not gated on a projection.
-  const remainingInterestKnown = isPaidOff || currentProjection?.paidOff === true;
-  const projectedRemainingInterest = isPaidOff
+  //
+  // The remaining interest is resolved to `null` rather than to a `?? 0`
+  // fallback, so the subtraction below cannot compile without the gate. An
+  // unreachable "unknown means zero" branch is still the defect waiting for the
+  // next edit of the condition.
+  const projectedRemainingInterest: number | null = isPaidOff
     ? 0
-    : (currentProjection?.totalInterest ?? 0);
+    : currentProjection?.paidOff
+      ? currentProjection.totalInterest
+      : null;
   const interestAlreadySaved =
-    originalSchedule.paidOff && remainingInterestKnown
+    originalSchedule.paidOff && projectedRemainingInterest !== null
       ? Math.max(
           0,
           round2(

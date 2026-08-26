@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "시나리오 \"{name}\" 불러오기",
       "budgetSummary": "예산 {amount}/월",
-      "chartExcludedUnknown": "{count, plural, other {# 개 시나리오는 표시되지 않습니다: 이자 절감액을 알 수 없습니다.}}"
+      "chartExcludedUnknown": "{count, plural, other {# 개 시나리오는 표시되지 않습니다: 이자 절감액을 알 수 없습니다.}}",
+      "chartNeedsTwoKnown": "비교 차트에는 이자 절감액을 알 수 있는 시나리오가 2개 이상 필요합니다."
     },
     "scenarioChart": {
       "title": "시나리오 비교",

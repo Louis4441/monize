@@ -353,12 +353,33 @@ omitting 44% of the lifetime figure under a total's label.
 
 When a schedule stops because it hit the horizon (`paidOff === false`), its
 accumulated interest is the interest over that horizon, not the loan's lifetime
-interest. Per `docs/financial-calculation-contract.md` section 1 that is a
-subtotal: `LoanScheduleResult.totalInterest` carries it, and every consumer that
-presents a lifetime figure or a saving derived from one gates on `paidOff`
-first -- `compareSchedules().interestSaved` and
-`PastImpactResult.interestAlreadySaved` are `null` rather than a difference of
-horizons, and the goal-seek solver refuses a target it cannot prove was met.
+interest -- and its `numPayments` is a row count, its `payoffDate` is absent, and
+its `finalPaymentAmount` is the installment at a mid-schedule row rather than at
+its last payment. Per `docs/financial-calculation-contract.md` section 1 those
+are subtotals: `LoanScheduleResult` carries them, and every consumer presenting a
+lifetime figure, or a saving derived from one, gates on `paidOff` first.
+`compareSchedules` returns `null` for all four of `interestSaved`,
+`paymentsSaved`, `monthsSaved` and `installmentReduction`;
+`PastImpactResult.interestAlreadySaved` and `monthsAlreadySaved` are `null`; the
+goal-seek solver refuses a target it cannot prove was met; and both loan reports
+withhold the projected payoff date and relabel the interest figure rather than
+leaving "Est. Total Interest" over it.
+
+Gating one of a set and leaving its siblings is the trap: `monthsSaved` came back
+`0` from `monthsBetween(null, ...)`, which reads as "the overpayment bought no
+time" rather than "not known", and sat next to an honest "Interest Saved:
+Unknown" on the same card.
+
+### The last payment is a residual, and the count that reaches it is derived
+
+`totalPayments` from a caller is a ceiling, not a promise: an installment large
+enough to clear the balance sooner makes it too high, and one that never covers
+the interest makes it meaningless. `calculateResidualPayoff` derives the
+effective count with `paymentsToClear` (`backend/src/accounts/amortization-count.util.ts`
+-- one implementation of `n = -ln(1 - P*r/A) / ln(1+r)`, which had three) and
+returns it, so `totalPayments`, `endDate` and the totals all come from one
+number. A non-amortizing installment yields `-1` for all three rather than a
+precise, enormous figure for a schedule with no end.
 
 ### A recurring overpayment cadence is a calendar, not a payment interval
 
@@ -371,7 +392,13 @@ overstated to match.
 So occurrences are dated: they fall on the cadence anchor (the overpayment's
 start date, never before the first projected payment) and every cadence step
 after it, and each one is applied at the first loan payment on or after its due
-date. `recurringOccurrencesDue` in `frontend/src/lib/loan-schedule.ts` is the
+date. Each is derived from the anchor **by index**, not accumulated from the one
+before it, and its day is clamped to the target month's length -- `setMonth(+1)`
+overflows a 31st into the following month and then keeps every later occurrence
+on the new day, which skipped February and paid 11 times a year. That is
+deliberately not the month-end question `advanceDate` leaves open for loan
+*payments*, which follow the lender's own schedule: a cadence has no lender, and
+its count per year is the invariant. `recurringOccurrencesDue` in `frontend/src/lib/loan-schedule.ts` is the
 only place that decision is made, and it makes the cadence exact in both
 directions: `MONTHLY`, `QUARTERLY` and `ANNUALLY` are calendar cadences, so they
 contribute exactly 12, 4 and 1 occurrences per calendar year on a weekly,

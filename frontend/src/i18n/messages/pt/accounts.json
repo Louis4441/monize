@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Carregar cenário \"{name}\"",
       "budgetSummary": "Orçamento {amount}/mês",
-      "chartExcludedUnknown": "{count, plural, one {# cenário não é mostrado: a sua poupança de juros é desconhecida.} other {# cenários não são mostrados: a sua poupança de juros é desconhecida.}}"
+      "chartExcludedUnknown": "{count, plural, one {# cenário não é mostrado: a sua poupança de juros é desconhecida.} other {# cenários não são mostrados: a sua poupança de juros é desconhecida.}}",
+      "chartNeedsTwoKnown": "O gráfico de comparação necessita de pelo menos dois cenários com uma poupança de juros conhecida."
     },
     "scenarioChart": {
       "title": "Comparação de cenários",

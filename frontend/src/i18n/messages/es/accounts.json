@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Cargar escenario «{name}»",
       "budgetSummary": "Presupuesto {amount}/mes",
-      "chartExcludedUnknown": "{count, plural, one {# escenario no se muestra: su ahorro de intereses es desconocido.} other {# escenarios no se muestran: su ahorro de intereses es desconocido.}}"
+      "chartExcludedUnknown": "{count, plural, one {# escenario no se muestra: su ahorro de intereses es desconocido.} other {# escenarios no se muestran: su ahorro de intereses es desconocido.}}",
+      "chartNeedsTwoKnown": "El gráfico de comparación necesita al menos dos escenarios con un ahorro de intereses conocido."
     },
     "scenarioChart": {
       "title": "Comparación de escenarios",

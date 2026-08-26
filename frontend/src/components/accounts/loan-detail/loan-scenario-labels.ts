@@ -86,10 +86,12 @@ export function createScenarioLabels({
 
   const timeSavedLabel = (comparison: ScenarioComparison | null): string => {
     if (!comparison) return '—';
-    if (comparison.installmentReduction > 0.005) {
+    // Null (either schedule truncated) falls through to the unknown branch
+    // below rather than headlining a drop measured from a mid-schedule payment.
+    if ((comparison.installmentReduction ?? 0) > 0.005) {
       return t('loanDetail.comparison.installmentDrop', {
         payment: formatCurrency(comparison.scenario.finalPaymentAmount, currencyCode),
-        reduction: formatCurrency(comparison.installmentReduction, currencyCode),
+        reduction: formatCurrency(comparison.installmentReduction ?? 0, currencyCode),
       });
     }
     // Unknown when either schedule stopped at the projection horizon; the em

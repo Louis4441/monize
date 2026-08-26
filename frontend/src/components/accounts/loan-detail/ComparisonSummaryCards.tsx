@@ -46,8 +46,10 @@ export function ComparisonSummaryCards({
     : t('loanDetail.comparison.beyondProjection');
 
   // Lower-installment scenarios keep the end date (no time saved); their headline
-  // outcome is the smaller installment instead.
-  const isLowerInstallment = comparison.installmentReduction > 0.005;
+  // outcome is the smaller installment instead. Null means the schedules cannot
+  // be compared at all (one stopped at the projection horizon), so there is no
+  // installment drop to headline -- the time-saved card renders Unknown instead.
+  const isLowerInstallment = (comparison.installmentReduction ?? 0) > 0.005;
 
   const opAmount = recurringOverpayment?.amount ?? 0;
   const opFrequency = recurringOverpayment?.frequency;
@@ -100,7 +102,7 @@ export function ComparisonSummaryCards({
           label={t('loanDetail.comparison.newInstallment')}
           value={t('loanDetail.comparison.installmentDrop', {
             payment: formatCurrency(scenario.finalPaymentAmount, currencyCode),
-            reduction: formatCurrency(comparison.installmentReduction, currencyCode),
+            reduction: formatCurrency(comparison.installmentReduction ?? 0, currencyCode),
           })}
           valueClass="text-green-600 dark:text-green-400"
         />

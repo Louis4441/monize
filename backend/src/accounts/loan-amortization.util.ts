@@ -8,10 +8,25 @@
  */
 
 import { roundMoney } from "../common/round.util";
+import { paymentsToClear } from "./amortization-count.util";
 
+/**
+ * Payment frequencies the generic loan helpers understand.
+ *
+ * These are the *scheduled transaction* recurrence spellings, because that is
+ * what reaches them: `SetupLoanPaymentsDto.paymentFrequency` is cast straight
+ * into `calculatePaymentSplit`. Note `SEMIMONTHLY` has no underscore here and
+ * `SEMI_MONTHLY` does in `MortgagePaymentFrequency` -- two enums, two spellings,
+ * and the mismatch is why this one was missing: the DTO accepted `SEMIMONTHLY`,
+ * `getPeriodsPerYear` fell through to its `default: 12`, and a semi-monthly
+ * loan's interest split was computed at twice the correct rate.
+ * `loan-payment-frequency.guard.spec.ts` now fails if the DTO admits a value
+ * that is not a case below.
+ */
 export type PaymentFrequency =
   | "WEEKLY"
   | "BIWEEKLY"
+  | "SEMIMONTHLY"
   | "MONTHLY"
   | "QUARTERLY"
   | "YEARLY";
@@ -45,6 +60,8 @@ export function getPeriodsPerYear(frequency: PaymentFrequency): number {
       return 52;
     case "BIWEEKLY":
       return 26;
+    case "SEMIMONTHLY":
+      return 24;
     case "MONTHLY":
       return 12;
     case "QUARTERLY":
@@ -121,28 +138,13 @@ export function calculateTotalPayments(
   paymentAmount: number,
   frequency: PaymentFrequency,
 ): number {
-  // Handle 0% interest rate
-  if (annualRate === 0) {
-    return Math.ceil(principal / paymentAmount);
-  }
-
-  const periodsPerYear = getPeriodsPerYear(frequency);
-  const periodicRate = annualRate / 100 / periodsPerYear;
-
-  // Check if payment is sufficient to cover interest
-  const minPayment = principal * periodicRate;
-  if (paymentAmount <= minPayment) {
-    // Payment doesn't cover interest - loan will never be paid off
-    // Return a large number to indicate this
-    return Infinity;
-  }
-
-  // Use amortization formula: n = -ln(1 - (P * r) / A) / ln(1 + r)
-  const numerator = -Math.log(1 - (principal * periodicRate) / paymentAmount);
-  const denominator = Math.log(1 + periodicRate);
-  const payments = numerator / denominator;
-
-  return Math.ceil(payments);
+  // One implementation of the count, shared with the mortgage helpers; Infinity
+  // when the payment never covers the interest.
+  return paymentsToClear(
+    principal,
+    annualRate / 100 / getPeriodsPerYear(frequency),
+    paymentAmount,
+  );
 }
 
 /**

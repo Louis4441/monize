@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Charger le scénario « {name} »",
       "budgetSummary": "Budget {amount}/mois",
-      "chartExcludedUnknown": "{count, plural, one {# scénario n'est pas affiché : son économie d'intérêts est inconnue.} other {# scénarios ne sont pas affichés : leur économie d'intérêts est inconnue.}}"
+      "chartExcludedUnknown": "{count, plural, one {# scénario n'est pas affiché : son économie d'intérêts est inconnue.} other {# scénarios ne sont pas affichés : leur économie d'intérêts est inconnue.}}",
+      "chartNeedsTwoKnown": "Le graphique de comparaison nécessite au moins deux scénarios dont l'économie d'intérêts est connue."
     },
     "scenarioChart": {
       "title": "Comparaison des scénarios",

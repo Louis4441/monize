@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Muat skenario \"{name}\"",
       "budgetSummary": "Anggaran {amount}/bulan",
-      "chartExcludedUnknown": "{count, plural, other {# skenario tidak ditampilkan: penghematan bunganya tidak diketahui.}}"
+      "chartExcludedUnknown": "{count, plural, other {# skenario tidak ditampilkan: penghematan bunganya tidak diketahui.}}",
+      "chartNeedsTwoKnown": "Grafik perbandingan memerlukan setidaknya dua skenario dengan penghematan bunga yang diketahui."
     },
     "scenarioChart": {
       "title": "Perbandingan skenario",

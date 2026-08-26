@@ -61,6 +61,15 @@ export type OverpaymentFrequency =
   | 'QUARTERLY'
   | 'ANNUALLY';
 
+/**
+ * The frequencies that genuinely recur. `ONE_OFF` is a single dated payment,
+ * modelled as a `LumpSum`, so it is not a cadence a `RecurringExtra` can carry.
+ */
+export type RecurringOverpaymentFrequency = Exclude<
+  OverpaymentFrequency,
+  'ONE_OFF'
+>;
+
 /** Overpayments per year for each recurring frequency (ONE_OFF is not recurring). */
 export function overpaymentsPerYear(frequency: OverpaymentFrequency): number {
   switch (frequency) {
@@ -111,8 +120,14 @@ export interface RecurringExtra {
    * loan payment as-is (legacy "extra per payment"); a set frequency dates the
    * occurrences on the calendar and applies the full amount at the first loan
    * payment on or after each due date.
+   *
+   * `ONE_OFF` is excluded by the type rather than by convention: it is a single
+   * dated payment, so it belongs in `lumpSums`. Accepted here it collapsed into
+   * the legacy no-cadence branch and paid the full amount on EVERY payment --
+   * a lump sum of 5000 becoming 60,000 a year. The backend enum does not admit
+   * it, but nothing in the types said so.
    */
-  frequency?: OverpaymentFrequency;
+  frequency?: RecurringOverpaymentFrequency;
   /**
    * Whether this overpayment shortens the term or lowers the installment.
    * Defaults to SHORTEN_TERM when omitted.
@@ -257,8 +272,9 @@ export interface LoanScheduleResult {
    * interest only when `paidOff` is true; when the schedule stopped at the
    * projection horizon it is the interest over that horizon -- a subtotal, per
    * `docs/financial-calculation-contract.md` section 1. Every consumer that
-   * presents a lifetime figure, or a saving derived from one, gates on `paidOff`
-   * first (`deriveLoanFigures` and `compareSchedules` are the two that do).
+   * presents a lifetime figure, or a saving derived from one, must gate on
+   * `paidOff` first. Which consumers do is recorded, with an honest status, in
+   * INV-LOAN-002 -- not counted here, where the number would rot.
    */
   totalInterest: number;
   /** Regular payments + extra principal contributed across the schedule */
@@ -270,6 +286,12 @@ export interface LoanScheduleResult {
    * The regular installment in effect at the end of the schedule. Equal to the
    * contractual payment for SHORTEN_TERM; the recomputed lower payment for
    * LOWER_INSTALLMENT (PL *obniżenie raty*).
+   *
+   * "The end of the schedule" is the last row projected, which is the last
+   * PAYMENT only when `paidOff` is true. On a schedule truncated by the horizon
+   * this is a mid-schedule installment, so anything presenting it as final --
+   * `compareSchedules().installmentReduction` is the one that does -- gates on
+   * `paidOff` first.
    */
   finalPaymentAmount: number;
 }
@@ -299,9 +321,15 @@ export interface ScenarioComparison {
   /**
    * How much lower the scenario's ending installment is than the baseline's.
    * Zero for SHORTEN_TERM (the installment is unchanged); positive for
-   * LOWER_INSTALLMENT (PL *obniżenie raty*).
+   * LOWER_INSTALLMENT (PL *obniżenie raty*); `null` when either schedule stopped
+   * at the projection horizon.
+   *
+   * A truncated schedule has no ending installment: `finalPaymentAmount` is
+   * whatever the re-levelled payment happened to be at the horizon's last row,
+   * mid-schedule. Reporting a drop from it put "New Installment: X (-Y)" beside
+   * "Unknown" for time and interest saved on the same card row.
    */
-  installmentReduction: number;
+  installmentReduction: number | null;
 }
 
 /**
@@ -482,7 +510,7 @@ export function advanceDate(date: Date, frequency: ScheduleFrequency): Date {
 
 /** Cadence step of each recurring overpayment frequency: days, or months. */
 const OVERPAYMENT_CADENCE: Record<
-  Exclude<OverpaymentFrequency, 'ONE_OFF'>,
+  RecurringOverpaymentFrequency,
   { days?: number; months?: number }
 > = {
   WEEKLY: { days: 7 },
@@ -570,10 +598,8 @@ export function recurringOccurrencesDue(
   extra: RecurringExtra,
   firstPaymentDate: Date,
 ): RecurringOccurrenceCounter {
-  const cadence =
-    extra.frequency && extra.frequency !== 'ONE_OFF'
-      ? OVERPAYMENT_CADENCE[extra.frequency]
-      : null;
+  // ONE_OFF cannot reach here: RecurringExtra.frequency excludes it by type.
+  const cadence = extra.frequency ? OVERPAYMENT_CADENCE[extra.frequency] : null;
 
   if (!cadence) {
     return {
@@ -593,6 +619,11 @@ export function recurringOccurrencesDue(
 
   let nextIndex = 0;
   let lastRowDate: string | null = null;
+  // The pending occurrence's ISO date, cached because most rows consume nothing:
+  // re-deriving and re-formatting it per row cost one date-fns `format` on every
+  // one of a weekly loan's 2600 projected payments, and the goal-seek solver
+  // builds ~24 schedules per keystroke.
+  let pendingDueIso: string | null = null;
 
   return {
     dueBy: (rowDate) => {
@@ -608,17 +639,20 @@ export function recurringOccurrencesDue(
       lastRowDate = rowDate;
       let count = 0;
       for (;;) {
-        const dueIso = format(
-          overpaymentOccurrenceDate(anchor, cadence, nextIndex),
-          'yyyy-MM-dd',
-        );
+        if (pendingDueIso === null) {
+          pendingDueIso = format(
+            overpaymentOccurrenceDate(anchor, cadence, nextIndex),
+            'yyyy-MM-dd',
+          );
+        }
         // Not yet due: it stays pending for a later payment.
-        if (dueIso > rowDate) break;
-        // Past the window: nothing further is ever due, and the cursor stays
-        // parked so subsequent rows count nothing.
-        if (extra.endDate && dueIso > extra.endDate) break;
+        if (pendingDueIso > rowDate) break;
+        // Past the window: nothing further is ever due, and the pending date
+        // stays parked so subsequent rows count nothing.
+        if (extra.endDate && pendingDueIso > extra.endDate) break;
         count++;
         nextIndex++;
+        pendingDueIso = null;
       }
       return count;
     },
@@ -1189,11 +1223,12 @@ export function compareSchedules(
     interestSaved: comparable
       ? round2(baseline.totalInterest - scenario.totalInterest)
       : null,
-    // The ending installment is a property of each schedule on its own, known
-    // whether or not either paid off, so the reduction stays a number.
-    installmentReduction: round2(
-      baseline.finalPaymentAmount - scenario.finalPaymentAmount,
-    ),
+    // A truncated schedule's `finalPaymentAmount` is the installment at its last
+    // PROJECTED row, not its last payment -- there is no last payment -- so a
+    // drop measured from it is as unknown as the rest.
+    installmentReduction: comparable
+      ? round2(baseline.finalPaymentAmount - scenario.finalPaymentAmount)
+      : null,
   };
 }
 

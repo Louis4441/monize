@@ -547,7 +547,25 @@ describe("Mortgage Amortization Utility", () => {
       expect(result.residualPayoffAmount).toBeCloseTo(1000, 4);
     });
 
-    it("reports unknown totals when the payment never amortizes", () => {
+    it("reports unknown totals when the installment never covers the interest", () => {
+      // The count is finite here, so the old `isFinite(clearing) ? ... :
+      // totalPayments` fallback billed 300 installments against a balance that
+      // never falls and reported 1,089,423.31 of "lifetime" interest -- a precise
+      // number for a schedule that has no end.
+      expect(calculateResidualPayoff(100000, 0.01, 500, 300)).toEqual({
+        residualPayoffAmount: -1,
+        effectivePayments: -1,
+        totalInterest: -1,
+      });
+      // A zero or negative installment is the same answer.
+      expect(calculateResidualPayoff(100000, 0.01, 0, 300)).toEqual({
+        residualPayoffAmount: -1,
+        effectivePayments: -1,
+        totalInterest: -1,
+      });
+    });
+
+    it("reports unknown totals when the payment count is not finite", () => {
       expect(calculateResidualPayoff(300000, 0.004, 100, Infinity)).toEqual({
         residualPayoffAmount: -1,
         effectivePayments: -1,

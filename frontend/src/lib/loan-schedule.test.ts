@@ -7,6 +7,7 @@ import {
   calculateMortgagePaymentAmount,
   calculatePaymentForTerm,
   compareSchedules,
+  effectiveAnnualRate,
   effectiveAnnualRateOn,
   generateLoanSchedule,
   getPeriodicRate,
@@ -14,7 +15,7 @@ import {
   maxPaymentsForHorizon,
   recurringOccurrencesDue,
   LoanScheduleInput,
-  OverpaymentFrequency,
+  RecurringOverpaymentFrequency,
 } from './loan-schedule';
 
 function baseInput(overrides: Partial<LoanScheduleInput> = {}): LoanScheduleInput {
@@ -96,6 +97,40 @@ describe('getPeriodicRate', () => {
   it('returns 0 for a 0% annual rate', () => {
     expect(getPeriodicRate(0, 12, true, false)).toBe(0);
     expect(getPeriodicRate(0, 12, false, false)).toBe(0);
+  });
+});
+
+describe('effectiveAnnualRate', () => {
+  // Parity with backend calculateEffectiveAnnualRate (which rounds to 2dp for
+  // its API contract; this returns the raw percentage). Fixtures derived here,
+  // not read back from either implementation.
+  it('compounds at the payment frequency outside the Canadian fixed branch', () => {
+    for (const periodsPerYear of [12, 24, 26, 52]) {
+      expect(effectiveAnnualRate(6, periodsPerYear, false, false)).toBeCloseTo(
+        (Math.pow(1 + 0.06 / periodsPerYear, periodsPerYear) - 1) * 100,
+        10,
+      );
+    }
+    // More compounding periods cost more.
+    expect(effectiveAnnualRate(6, 12, false, false)).toBeLessThan(
+      effectiveAnnualRate(6, 52, false, false),
+    );
+  });
+
+  it('compounds semi-annually for Canadian fixed, whatever the frequency', () => {
+    const expected = (Math.pow(1 + 0.05 / 2, 2) - 1) * 100;
+    expect(effectiveAnnualRate(5, 12, true, false)).toBeCloseTo(expected, 10);
+    expect(effectiveAnnualRate(5, 26, true, false)).toBeCloseTo(expected, 10);
+    // A Canadian VARIABLE mortgage is on the nominal convention, like any other.
+    expect(effectiveAnnualRate(5, 26, true, true)).toBeCloseTo(
+      (Math.pow(1 + 0.05 / 26, 26) - 1) * 100,
+      10,
+    );
+  });
+
+  it('is 0 for a 0% rate on either branch', () => {
+    expect(effectiveAnnualRate(0, 12, true, false)).toBe(0);
+    expect(effectiveAnnualRate(0, 26, false, false)).toBe(0);
   });
 });
 
@@ -584,9 +619,10 @@ describe('compareSchedules', () => {
     expect(comparison.monthsSaved).toBeNull();
     expect(comparison.paymentsSaved).toBeNull();
     expect(comparison.interestSaved).toBeNull();
-    // The ending installment is a property of each schedule alone, so it stays
-    // a number.
-    expect(comparison.installmentReduction).toBe(0);
+    // The ending installment is not a property of a truncated schedule either:
+    // `finalPaymentAmount` is then the installment at the last PROJECTED row,
+    // mid-schedule, so a drop measured from it is unknown too.
+    expect(comparison.installmentReduction).toBeNull();
   });
 });
 
@@ -991,7 +1027,7 @@ describe('recurringOccurrencesDue', () => {
     for (const [frequency, stepDays] of [
       ['WEEKLY', 7],
       ['BIWEEKLY', 14],
-    ] as [OverpaymentFrequency, number][]) {
+    ] as [RecurringOverpaymentFrequency, number][]) {
       const counter = recurringOccurrencesDue({ amount: 1, frequency }, first);
       expect(counter.dueBy('2026-01-01')).toBe(1);
       const dayBefore = new Date(2026, 0, 1 + stepDays - 1);
@@ -1010,7 +1046,7 @@ describe('recurringOccurrencesDue', () => {
     for (const [frequency, expected] of [
       ['QUARTERLY', 4],
       ['ANNUALLY', 1],
-    ] as [OverpaymentFrequency, number][]) {
+    ] as [RecurringOverpaymentFrequency, number][]) {
       const counter = recurringOccurrencesDue({ amount: 1, frequency }, first);
       expect(counter.dueBy('2026-12-31')).toBe(expected);
       expect(counter.dueBy('2027-12-31')).toBe(expected);

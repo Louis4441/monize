@@ -589,7 +589,8 @@
       "overpaymentWithFrequency": "[XX-{amount} ({frequency})-XX]",
       "loadAria": "[XX-Load scenario \"{name}\"-XX]",
       "budgetSummary": "[XX-Budget {amount}/month-XX]",
-      "chartExcludedUnknown": "[XX-{count, plural, one {# scenario is not shown: its interest saving is unknown.} other {# scenarios are not shown: their interest saving is unknown.}}-XX]"
+      "chartExcludedUnknown": "[XX-{count, plural, one {# scenario is not shown: its interest saving is unknown.} other {# scenarios are not shown: their interest saving is unknown.}}-XX]",
+      "chartNeedsTwoKnown": "[XX-The comparison chart needs at least two scenarios with a known interest saving.-XX]"
     },
     "pastImpact": {
       "title": "[XX-Impact of Overpayments Made-XX]",

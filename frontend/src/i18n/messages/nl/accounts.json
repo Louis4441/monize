@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Scenario \"{name}\" laden",
       "budgetSummary": "Budget {amount}/maand",
-      "chartExcludedUnknown": "{count, plural, one {# scenario wordt niet weergegeven: de rentebesparing is onbekend.} other {# scenario’s worden niet weergegeven: hun rentebesparing is onbekend.}}"
+      "chartExcludedUnknown": "{count, plural, one {# scenario wordt niet weergegeven: de rentebesparing is onbekend.} other {# scenario’s worden niet weergegeven: hun rentebesparing is onbekend.}}",
+      "chartNeedsTwoKnown": "De vergelijkingsgrafiek heeft minstens twee scenario’s met een bekende rentebesparing nodig."
     },
     "scenarioChart": {
       "title": "Scenariovergelijking",

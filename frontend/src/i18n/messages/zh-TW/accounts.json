@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "載入方案「{name}」",
       "budgetSummary": "預算 {amount}/月",
-      "chartExcludedUnknown": "{count, plural, other {有 # 個方案未顯示：其節省的利息未知。}}"
+      "chartExcludedUnknown": "{count, plural, other {有 # 個方案未顯示：其節省的利息未知。}}",
+      "chartNeedsTwoKnown": "對比圖表需要至少兩個已知節省利息的方案。"
     },
     "scenarioChart": {
       "title": "方案比較",

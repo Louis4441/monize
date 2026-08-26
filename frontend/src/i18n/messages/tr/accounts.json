@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "\"{name}\" senaryosunu yükle",
       "budgetSummary": "Bütçe {amount}/ay",
-      "chartExcludedUnknown": "{count, plural, other {# senaryo gösterilmiyor: faiz tasarrufu bilinmiyor.}}"
+      "chartExcludedUnknown": "{count, plural, other {# senaryo gösterilmiyor: faiz tasarrufu bilinmiyor.}}",
+      "chartNeedsTwoKnown": "Karşılaştırma grafiği, faiz tasarrufu bilinen en az iki senaryo gerektirir."
     },
     "scenarioChart": {
       "title": "Senaryo karşılaştırması",

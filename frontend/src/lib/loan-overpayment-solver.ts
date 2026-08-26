@@ -1,8 +1,8 @@
 import {
   LoanScheduleInput,
   LoanScheduleResult,
-  OverpaymentFrequency,
   OverpaymentMode,
+  RecurringOverpaymentFrequency,
   generateLoanSchedule,
 } from '@/lib/loan-schedule';
 
@@ -51,19 +51,23 @@ export interface SolveResult {
   interestSaved: number | null;
 }
 
+const MIN_ITERATIONS = 24;
+
 /**
- * Bisection steps needed to bracket the answer inside one `step`.
+ * Bisection steps: enough to bracket the answer inside one `step`.
  *
- * A flat 60 was ~3x more work than the result can use: the search halves
- * `[0, hi0]`, so after N steps the bracket is `hi0 / 2^N`, and the answer is
- * rounded up to `step` afterwards anyway -- for a 300k balance and a step of 1
- * that is reached in 19. The count matters because the horizon fix made each
- * schedule up to 4.3x longer (2600 rows on a weekly loan against 600), and
+ * The search halves `[0, hi0]`, so after N steps the bracket is `hi0 / 2^N`;
+ * for a 300k balance and a step of 1 that is under a step by 19. The count
+ * matters because the projection horizon is now derived from the frequency, so
+ * a weekly loan's schedule is 2600 rows rather than 600, and
  * `OverpaymentSimulator.apply` runs a whole solve synchronously on every
  * keystroke in the goal fields.
  *
- * Four extra steps of margin, and a floor of 24, so the bracket is comfortably
- * under a step for any realistic balance.
+ * Bracketing inside a step is NOT enough on its own to make the answer minimal:
+ * `roundUpTo(hi, step)` equals `roundUpTo(a*, step)` only when no multiple of
+ * `step` sits in `(a*, hi]`, and a non-zero bracket leaves that possible (a
+ * 317k balance returned 585 where 584 also reached the target). `minimizeToStep`
+ * closes the gap exactly instead of paying for a 1e-13 bracket.
  */
 function iterationsFor(upper: number, step: number): number {
   const resolution = step > 0 ? step : 1;
@@ -74,7 +78,29 @@ function iterationsFor(upper: number, step: number): number {
   );
 }
 
-const MIN_ITERATIONS = 24;
+/**
+ * The smallest multiple of `step` at or below `amount` that still meets the
+ * goal.
+ *
+ * Bisection leaves a bracket narrower than one step, but a multiple of `step`
+ * can fall inside it, so the rounded-up answer can be one step above the true
+ * minimum. Monotonicity bounds this: `lo` (which does not meet the goal) is
+ * within the bracket of `hi`, so at most two steps down are possible. The cap is
+ * a backstop against a non-monotonic predicate rather than an expected path.
+ */
+function minimizeToStep(
+  amount: number,
+  step: number,
+  meets: (candidate: number) => boolean,
+): number {
+  const resolution = step > 0 ? step : 1;
+  let best = amount;
+  for (let i = 0; i < 4 && best - resolution > 0; i++) {
+    if (!meets(best - resolution)) break;
+    best -= resolution;
+  }
+  return best;
+}
 
 /** Optional constraints on the recurring extra being solved. A date range
  *  limits when it applies (so a short window makes tighter targets
@@ -83,7 +109,7 @@ const MIN_ITERATIONS = 24;
 export interface SolveWindow {
   startDate?: string;
   endDate?: string;
-  frequency?: OverpaymentFrequency;
+  frequency?: RecurringOverpaymentFrequency;
 }
 
 /**
@@ -191,7 +217,9 @@ function solveTargetInterestWithBaseline(
     if (meetsInterestTarget(scheduleWith(base, mid, mode, window), targetInterest)) hi = mid;
     else lo = mid;
   }
-  const amount = roundUpTo(hi, step);
+  const amount = minimizeToStep(roundUpTo(hi, step), step, (candidate) =>
+    meetsInterestTarget(scheduleWith(base, candidate, mode, window), targetInterest),
+  );
   const result = scheduleWith(base, amount, mode, window);
   return {
     status: 'ok',
@@ -268,7 +296,9 @@ export function solveRecurringForPayoffMonth(
     if (paysOffBy(scheduleWith(base, mid, mode, window))) hi = mid;
     else lo = mid;
   }
-  const amount = roundUpTo(hi, step);
+  const amount = minimizeToStep(roundUpTo(hi, step), step, (candidate) =>
+    paysOffBy(scheduleWith(base, candidate, mode, window)),
+  );
   const result = scheduleWith(base, amount, mode, window);
   return {
     status: 'ok',

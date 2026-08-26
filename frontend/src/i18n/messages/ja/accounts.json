@@ -509,7 +509,8 @@
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "シナリオ「{name}」を読み込む",
       "budgetSummary": "予算 {amount}/月",
-      "chartExcludedUnknown": "{count, plural, other {# 件のシナリオは表示されません: 利息の節約額が不明です。}}"
+      "chartExcludedUnknown": "{count, plural, other {# 件のシナリオは表示されません: 利息の節約額が不明です。}}",
+      "chartNeedsTwoKnown": "比較チャートには、利息の節約額が判明しているシナリオが2件以上必要です。"
     },
     "scenarioChart": {
       "title": "シナリオ比較",

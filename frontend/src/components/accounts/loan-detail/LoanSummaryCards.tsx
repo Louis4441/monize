@@ -48,10 +48,12 @@ export function LoanSummaryCards({
 
   // The card is shown only for Canadian fixed-rate mortgages, where the
   // semi-annual compounding the law requires makes the effective rate differ
-  // visibly from the quoted one. The value itself comes from the shared
-  // `effectiveAnnualRate` rather than an inline formula: this was a third copy
-  // of the compounding convention (INV-LOAN-003), so the frequency-aware fix
-  // never reached the surface an existing mortgage's owner actually reads.
+  // visibly from the quoted one -- and that branch is frequency-independent by
+  // law, so calling the shared `effectiveAnnualRate` changes no displayed
+  // number. It removes a third inline copy of the compounding convention
+  // (INV-LOAN-003) and nothing else: a DRY change, not a behaviour fix. The
+  // frequency is still passed rather than hardcoded, because it is the correct
+  // argument if this card ever shows a non-Canadian mortgage.
   const isCanadianFixed = account.isCanadianMortgage && !account.isVariableRate;
   const effectiveRate =
     isCanadianFixed && account.interestRate
