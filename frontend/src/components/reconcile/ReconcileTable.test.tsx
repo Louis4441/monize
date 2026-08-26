@@ -5,7 +5,12 @@ import type { ComponentProps } from 'react';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 
 vi.mock('@/hooks/useDateFormat', () => ({
-  useDateFormat: () => ({ dateFormat: 'browser', datePattern: 'YYYY-MM-DD', formatDate: (d: string) => String(d) }),
+  useDateFormat: () => ({
+    dateFormat: 'browser',
+    datePattern: 'YYYY-MM-DD',
+    formatDate: (d: string) => String(d),
+    formatDateWithoutYear: (d: string) => String(d).slice(5),
+  }),
 }));
 
 function row(overrides: Partial<Transaction> & { id: string }): Transaction {
@@ -201,6 +206,90 @@ describe('ReconcileTable', () => {
       renderTable({ lastReconciledDate: null, overdueBefore: '' });
       expect(screen.queryByText('Missed')).not.toBeInTheDocument();
       expect(renderedIds()).toHaveLength(3);
+    });
+  });
+
+  // Below `sm` the table must FIT the phone, not merely scroll: mobile Chrome
+  // sizes the viewport that position:fixed elements attach to from the page's
+  // widest content, overflow-x-auto included, so a table wider than the screen
+  // made the edit modal render hundreds of pixels off it. These pin the
+  // affordances that keep the table narrower than a phone; jsdom cannot
+  // measure the layout itself, so the width property is held end to end by
+  // the mobile reconcile spec in e2e/tests/mobile.spec.ts.
+  describe('mobile layout', () => {
+    const collapsedAt = (cell: HTMLElement) => {
+      const classes = cell.className.split(/\s+/);
+      return classes.includes('hidden') && classes.includes('sm:table-cell');
+    };
+
+    it('collapses the Category and Status columns below sm, and only those', () => {
+      renderTable();
+      const [headerRow] = screen.getAllByRole('row');
+      const headerCells = within(headerRow).getAllByRole('columnheader');
+      expect(headerCells).toHaveLength(7);
+      expect(headerCells.map(collapsedAt)).toEqual([
+        false, // select
+        false, // date
+        false, // payee
+        true, // category
+        false, // amount
+        true, // status
+        false, // actions
+      ]);
+
+      const rowEl = screen.getByTestId('reconcile-row-tx-a');
+      const cells = within(rowEl).getAllByRole('cell');
+      expect(cells).toHaveLength(7);
+      expect(cells.map(collapsedAt)).toEqual([
+        false, // select
+        false, // date
+        false, // payee
+        true, // category
+        false, // amount
+        true, // status
+        false, // actions
+      ]);
+    });
+
+    it('drops the year from the date below sm and keeps the full date above', () => {
+      renderTable({ transactions: [row({ id: 'tx-a', transactionDate: '2026-02-01' })] });
+      const compact = screen.getByText('02-01');
+      const full = screen.getByText('2026-02-01');
+      expect(compact.className.split(/\s+/)).toContain('sm:hidden');
+      expect(full.className.split(/\s+/)).toEqual(
+        expect.arrayContaining(['hidden', 'sm:inline']),
+      );
+    });
+
+    it('lets the stale chip wrap under the date instead of widening the column', () => {
+      renderTable({ lastReconciledDate: '2026-02-05', overdueBefore: '2026-01-01' });
+      const rowEl = screen.getByTestId('reconcile-row-tx-a');
+      const chip = within(rowEl).getByText('Missed');
+      const line = chip.parentElement!;
+      expect(line.className.split(/\s+/)).toContain('flex-wrap');
+    });
+
+    it('caps the payee column on phones so one long name cannot widen the table', () => {
+      renderTable();
+      const rowEl = screen.getByTestId('reconcile-row-tx-a');
+      const payeeCell = within(rowEl).getByText('Grocery').closest('td')!;
+      expect(payeeCell.className.split(/\s+/)).toEqual(
+        expect.arrayContaining(['max-w-[110px]', 'sm:max-w-none', 'overflow-hidden']),
+      );
+    });
+
+    it('keeps the group rows aligned with the data rows when columns collapse', () => {
+      // The group heading spans whole columns, so it cannot use one colSpan
+      // sized for the desktop column count: each collapsing column gets its
+      // own filler cell that collapses with it.
+      renderTable({ groupByFlow: true });
+      const groupRow = screen.getByText('Money in (1)').closest('tr')!;
+      const label = within(groupRow).getByRole('columnheader');
+      expect(label).toHaveAttribute('colspan', '3');
+      const fillers = within(groupRow)
+        .getAllByRole('cell')
+        .filter((cell) => collapsedAt(cell));
+      expect(fillers).toHaveLength(2);
     });
   });
 });

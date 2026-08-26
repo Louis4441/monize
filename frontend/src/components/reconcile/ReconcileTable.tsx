@@ -51,6 +51,14 @@ const STALE_ROW_CLASS =
  * Rows the account should already have reconciled are highlighted through the
  * shared `classifyStaleRow`, against the dates the server supplied, so the
  * highlight here and the count in the header badge always mean the same thing.
+ *
+ * Below `sm` the table must FIT the phone, not merely scroll: mobile Chrome
+ * sizes the viewport that `position: fixed` elements attach to from the page's
+ * widest content, and `overflow-x-auto` does not stop a wide table counting --
+ * so an overflowing table here made every modal on the page (the edit form)
+ * render hundreds of pixels past the screen. Category and Status therefore
+ * collapse on phones and the date drops its year, the same trade the register
+ * makes (`TransactionRow`), rather than relying on horizontal scroll.
  */
 export function ReconcileTable({
   transactions,
@@ -70,7 +78,7 @@ export function ReconcileTable({
 }: ReconcileTableProps) {
   const t = useTranslations('reconcile');
   const tc = useTranslations('common');
-  const { formatDate } = useDateFormat();
+  const { formatDate, formatDateWithoutYear } = useDateFormat();
   // Blank-payee transfer legs resolve "Transfer to/from <account>" at render
   // time (issue #1214); the sort below is handed the same resolver so the
   // Payee column orders by exactly the text it shows.
@@ -122,7 +130,7 @@ export function ReconcileTable({
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-700/50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-10">
+            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-10">
               <span className="sr-only">{t('list.colSelect')}</span>
             </th>
             <SortableHeader
@@ -130,7 +138,7 @@ export function ReconcileTable({
               sortField={sortField}
               sortDirection={sortDirection}
               onSort={onSort}
-              className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+              className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
             >
               {t('list.colDate')}
             </SortableHeader>
@@ -139,7 +147,7 @@ export function ReconcileTable({
               sortField={sortField}
               sortDirection={sortDirection}
               onSort={onSort}
-              className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+              className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
             >
               {t('list.colPayee')}
             </SortableHeader>
@@ -148,7 +156,7 @@ export function ReconcileTable({
               sortField={sortField}
               sortDirection={sortDirection}
               onSort={onSort}
-              className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+              className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
             >
               {t('list.colCategory')}
             </SortableHeader>
@@ -158,7 +166,7 @@ export function ReconcileTable({
               sortDirection={sortDirection}
               onSort={onSort}
               align="right"
-              className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+              className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
             >
               {t('list.colAmount')}
             </SortableHeader>
@@ -168,11 +176,11 @@ export function ReconcileTable({
               sortDirection={sortDirection}
               onSort={onSort}
               align="center"
-              className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+              className="hidden sm:table-cell px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
             >
               {t('list.colStatus')}
             </SortableHeader>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               <span className="sr-only">{t('list.colActions')}</span>
             </th>
           </tr>
@@ -183,22 +191,27 @@ export function ReconcileTable({
             className="divide-y divide-gray-200 dark:divide-gray-700"
           >
             {group.flow && (
+              /* One cell per column rather than a colSpan over several: the
+                 Category and Status columns collapse below `sm`, and a span
+                 counted for seven columns misaligns the subtotal on five. */
               <tr className="bg-gray-100 dark:bg-gray-700/60">
                 <th
-                  colSpan={4}
+                  colSpan={3}
                   scope="colgroup"
-                  className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase"
+                  className="px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase"
                 >
                   {group.flow === 'credit'
                     ? t('list.groupCredits', { count: group.rows.length })
                     : t('list.groupDebits', { count: group.rows.length })}
                 </th>
-                <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">
+                <td className="hidden sm:table-cell" />
+                <td className="px-2 sm:px-4 py-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">
                   {t('list.groupSubtotal', {
                     amount: formatCurrency(group.subtotal),
                   })}
                 </td>
-                <td colSpan={2} />
+                <td className="hidden sm:table-cell" />
+                <td />
               </tr>
             )}
             {group.rows.map((transaction) => {
@@ -218,7 +231,7 @@ export function ReconcileTable({
                   }`}
                   onClick={() => onToggle(transaction.id)}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-2 sm:px-4 py-3">
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -230,9 +243,16 @@ export function ReconcileTable({
                       className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
                     />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                    <span className="flex items-center gap-2">
-                      {formatDate(transaction.transactionDate)}
+                  <td className="px-2 sm:px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                    {/* flex-wrap so the stale chip drops under the date on a
+                        phone instead of widening the column past it. */}
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="sm:hidden whitespace-nowrap">
+                        {formatDateWithoutYear(transaction.transactionDate)}
+                      </span>
+                      <span className="hidden sm:inline whitespace-nowrap">
+                        {formatDate(transaction.transactionDate)}
+                      </span>
                       {staleReason && (
                         <span
                           className="inline-flex items-center rounded-full bg-amber-200 dark:bg-amber-800 px-2 py-0.5 text-xs font-medium text-amber-900 dark:text-amber-100"
@@ -249,14 +269,14 @@ export function ReconcileTable({
                       )}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                  <td className="px-2 sm:px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-[110px] sm:max-w-none overflow-hidden">
                     {payeeDisplay(transaction) || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                  <td className="hidden sm:table-cell px-2 sm:px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                     {transaction.category?.name || '-'}
                   </td>
                   <td
-                    className={`px-4 py-3 text-sm text-right whitespace-nowrap font-medium ${
+                    className={`px-2 sm:px-4 py-3 text-sm text-right whitespace-nowrap font-medium ${
                       Number(transaction.amount) >= 0
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-red-600 dark:text-red-400'
@@ -264,14 +284,14 @@ export function ReconcileTable({
                   >
                     {formatCurrency(Number(transaction.amount))}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="hidden sm:table-cell px-2 sm:px-4 py-3 text-center">
                     <StatusCellButton
                       status={transaction.status}
                       dense
                       onCycle={() => onCycleStatus(transaction)}
                     />
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-2 sm:px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     {transaction.status === TransactionStatus.RECONCILED &&
                     reconciledLocked ? (
                       <span className="block text-right text-xs text-gray-400 dark:text-gray-500">
