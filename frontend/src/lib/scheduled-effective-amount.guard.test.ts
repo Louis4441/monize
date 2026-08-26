@@ -155,6 +155,60 @@ describe('scheduled occurrence expansion guard', () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * A standalone sign or colour helper that reads the SCHEDULE's amount is the
+   * same defect wearing a function name.
+   *
+   * `RecurringChargesPanel` had `scheduledAmountClass(s)` and
+   * `scheduledAmountSign(s)` keyed off `Number(s.amount) < 0` while printing
+   * `nextOccurrenceEffectiveAmount(s)` beside them -- so an inflow of 20 rendered
+   * as "-$20.00" in red. Importing the effective-amount helper is not proof of
+   * migration; nothing may derive direction from the template in a file that
+   * displays an occurrence's magnitude.
+   */
+  it('never derives a sign or colour from the schedule amount', () => {
+    // The one place the fallback is allowed to live, and it takes the SERVER's
+    // provable-sign answer rather than reaching for the template itself.
+    const DIRECTION_DECIDERS = new Set(['/src/lib/scheduled-kind.ts']);
+    const TEMPLATE_SIGN =
+      /Number\(\s*\w+\??\.amount\s*\)[\s)]*[<>]|\w+\??\.amount\s*[<>]\s*0/;
+    const offenders: string[] = [];
+
+    for (const [path, contents] of productionSources()) {
+      if (DIRECTION_DECIDERS.has(path)) continue;
+      // Only the files that show an occurrence's own magnitude: elsewhere a
+      // signed comparison is about a posted row, which is a different question.
+      if (
+        !/nextOccurrenceEffectiveAmount|scheduleEffectiveAmount|overrideEffectiveAmount|occurrenceKind/.test(
+          contents,
+        )
+      ) {
+        continue;
+      }
+      contents.split('\n').forEach((line, index) => {
+        if (isComment(line)) return;
+        if (TEMPLATE_SIGN.test(line)) offenders.push(`${path}:${index + 1}`);
+      });
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('bans a template-sign helper, and nothing correct', () => {
+    const TEMPLATE_SIGN =
+      /Number\(\s*\w+\??\.amount\s*\)[\s)]*[<>]|\w+\??\.amount\s*[<>]\s*0/;
+    expect(TEMPLATE_SIGN.test("return Number(s.amount) < 0 ? '-' : '+';")).toBe(
+      true,
+    );
+    expect(TEMPLATE_SIGN.test('if (st.amount < 0) return red;')).toBe(true);
+    expect(
+      TEMPLATE_SIGN.test('const kind = occurrenceKind(effective, st);'),
+    ).toBe(false);
+    expect(
+      TEMPLATE_SIGN.test('formatCurrency(Math.abs(occurrence.amount))'),
+    ).toBe(false);
+  });
+
   it('bans the composed-kind shape, and nothing correct', () => {
     const composed = [
       'const kind = scheduledKind({',

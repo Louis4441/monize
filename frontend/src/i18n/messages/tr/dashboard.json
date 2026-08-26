@@ -38,7 +38,8 @@
       "bill": "Fatura",
       "deposit": "Ödeme",
       "transfer": "Transfer",
-      "reminder": "Hatırlatma"
+      "reminder": "Hatırlatma",
+      "unknown": "Bilinmiyor"
     }
   },
   "gettingStarted": {

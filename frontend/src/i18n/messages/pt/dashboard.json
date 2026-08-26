@@ -38,7 +38,8 @@
       "bill": "Fatura",
       "deposit": "Depósito",
       "transfer": "Transferência",
-      "reminder": "Lembrete"
+      "reminder": "Lembrete",
+      "unknown": "Desconhecido"
     }
   },
   "gettingStarted": {

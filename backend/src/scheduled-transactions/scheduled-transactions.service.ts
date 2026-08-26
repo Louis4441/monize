@@ -71,7 +71,20 @@ import {
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { tr } from "../i18n/translate";
 
-export type LlmScheduledKind = "bill" | "deposit" | "transfer" | "investment";
+/**
+ * What one scheduled occurrence is, for a model reading the list.
+ *
+ * `unknown` is a real answer, not a gap: an unpriceable mixed-sign split posts on
+ * either side of zero, so neither "bill" nor "deposit" is derivable and asserting
+ * one gives the model a classification to reason from that the data cannot
+ * support (issue #1247 re-audit).
+ */
+export type LlmScheduledKind =
+  | "bill"
+  | "deposit"
+  | "transfer"
+  | "investment"
+  | "unknown";
 
 export interface LlmScheduledItem {
   id: string;
@@ -190,6 +203,14 @@ export interface ScheduledOccurrenceReadModel {
   dueDate: string;
   amount: number | null;
   amountComplete: boolean;
+  /**
+   * The signed amount that decides this occurrence's direction, or `null` when
+   * the direction cannot be derived (an unpriceable mixed-sign split posts on
+   * either side of zero). A client must not substitute the schedule's stored
+   * amount for a `null` here -- that is the substitution `occurrenceKind` exists
+   * to prevent.
+   */
+  directionAmount: number | null;
   currencyCode: string;
   overrideId: string | null;
   /** True when an override moved this occurrence off its recurrence slot. */
@@ -1455,6 +1476,7 @@ export class ScheduledTransactionsService {
           investmentForecastAmount: own?.investmentForecastAmount ?? null,
           effectiveAmount: own?.effective.amount ?? null,
           effectiveAmountComplete: own?.effective.complete ?? false,
+          effectiveDirectionAmount: own?.effective.directionAmount ?? null,
         };
       };
       return {
@@ -1468,6 +1490,9 @@ export class ScheduledTransactionsService {
         effectiveAmount: resolved.base.amount,
         effectiveAmountComplete: resolved.base.complete,
         effectiveCurrencyCode: resolved.base.currencyCode,
+        // Whether the direction is derivable at all, so a client never has to
+        // reach for the snapshot's sign (issue #1247 re-audit).
+        effectiveDirectionAmount: resolved.base.directionAmount,
       };
     });
   }
@@ -1615,12 +1640,24 @@ export class ScheduledTransactionsService {
 
     const bills = items.filter((i) => i.kind === "bill");
     const deposits = items.filter((i) => i.kind === "deposit");
+    // An occurrence whose direction is not derivable could belong to EITHER
+    // bucket, so it withholds both totals rather than being quietly left out of
+    // both -- its amount is null, which is what `totalOfKnownAmounts` withholds
+    // on. It stays out of the two item lists, because a list of bills that
+    // includes something that might be a deposit is a worse answer than a named
+    // unknown (issue #1247 re-audit).
+    const unclassified = items.filter((i) => i.kind === "unknown");
     // A bucket's total exists only when every item in it resolved; the partial
     // sum travels in its own explicitly-named field so nothing reads it as a
-    // total. Each bucket answers for itself -- an unknown deposit does not make
-    // the bills total unknowable.
-    const billsTotal = totalOfKnownAmounts(bills, (a) => Math.abs(a));
-    const depositsTotal = totalOfKnownAmounts(deposits, (a) => a);
+    // total. Each bucket otherwise answers for itself -- an unknown deposit does
+    // not make the bills total unknowable.
+    const billsTotal = totalOfKnownAmounts([...bills, ...unclassified], (a) =>
+      Math.abs(a),
+    );
+    const depositsTotal = totalOfKnownAmounts(
+      [...deposits, ...unclassified],
+      (a) => a,
+    );
     const unknownAmountItems = items
       .filter((i) => !i.amountComplete)
       .map((i) => i.name);
@@ -1672,6 +1709,7 @@ export class ScheduledTransactionsService {
       dueDate: occurrence.dueDate,
       amount: occurrence.amount,
       amountComplete: occurrence.complete,
+      directionAmount: occurrence.directionAmount,
       currencyCode: occurrence.currencyCode,
       overrideId: occurrence.overrideId,
       moved: occurrence.moved,
@@ -3437,6 +3475,7 @@ function classifyScheduledKind(
   const row = occurrence.schedule;
   if (row.isTransfer) return "transfer";
   if (row.isInvestment) return "investment";
+  if (occurrence.directionAmount === null) return "unknown";
   return occurrence.directionAmount < 0 ? "bill" : "deposit";
 }
 

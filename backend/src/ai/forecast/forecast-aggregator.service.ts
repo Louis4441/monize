@@ -49,7 +49,12 @@ export interface ScheduledTransactionSummary {
   frequency: string;
   nextDueDate: string;
   categoryName: string | null;
-  isIncome: boolean;
+  /**
+   * `null` when the occurrence's direction cannot be derived: an unpriceable
+   * mixed-sign split can post on either side of zero, so the prompt must say so
+   * rather than let the model treat a guess as a classification.
+   */
+  isIncome: boolean | null;
   isTransfer: boolean;
 }
 
@@ -285,8 +290,16 @@ export class ForecastAggregatorService {
       // amount can land on the other side of zero from its stored snapshot --
       // "an FX rate is positive, so it cannot flip a sign" holds for one scalar
       // times one rate, not for a parent whose investment line alone re-prices.
+      // The category is an independent semantic and still wins where it is set.
+      // Otherwise the occurrence's own direction decides -- and `null` there is
+      // "not derivable", which travels to the prompt rather than collapsing to
+      // "expense".
       const isIncome =
-        st.category?.isIncome === true || occurrence.directionAmount > 0;
+        st.category?.isIncome === true
+          ? true
+          : occurrence.directionAmount === null
+            ? null
+            : occurrence.directionAmount > 0;
 
       return {
         name: st.name,

@@ -38,7 +38,8 @@
       "bill": "Hóa đơn",
       "deposit": "Tiền gửi",
       "transfer": "Chuyển khoản",
-      "reminder": "Nhắc nhở"
+      "reminder": "Nhắc nhở",
+      "unknown": "Không rõ"
     }
   },
   "gettingStarted": {

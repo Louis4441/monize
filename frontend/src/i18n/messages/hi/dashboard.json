@@ -38,7 +38,8 @@
       "bill": "बिल",
       "deposit": "जमा",
       "transfer": "स्थानांतरण",
-      "reminder": "अनुस्मारक"
+      "reminder": "अनुस्मारक",
+      "unknown": "अज्ञात"
     }
   },
   "gettingStarted": {

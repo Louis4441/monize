@@ -38,7 +38,8 @@
       "bill": "Rachunek",
       "deposit": "Wpłata",
       "transfer": "Przelew",
-      "reminder": "Przypomnienie"
+      "reminder": "Przypomnienie",
+      "unknown": "Nieznany"
     }
   },
   "gettingStarted": {

@@ -70,7 +70,10 @@ function scheduledAmountClass(s: ScheduledTransaction): string {
 /** Signed prefix for a scheduled bill amount; transfers carry no +/-. */
 function scheduledAmountSign(s: ScheduledTransaction): string {
   const kind = occurrenceKind(nextOccurrenceEffectiveAmount(s), s);
-  if (kind === 'transfer' || kind === 'reminder') return '';
+  // A transfer carries no direction by nature, a reminder states no amount, and
+  // `unknown` means the server could not derive which way this occurrence goes --
+  // printing either sign there would be a guess with a symbol in front of it.
+  if (kind === 'transfer' || kind === 'reminder' || kind === 'unknown') return '';
   return kind === 'bill' ? '-' : '+';
 }
 

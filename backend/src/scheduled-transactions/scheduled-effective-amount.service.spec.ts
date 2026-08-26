@@ -190,6 +190,7 @@ describe("ScheduledEffectiveAmountService", () => {
         amount: -1000,
         currencyCode: "CAD",
         complete: true,
+        directionAmount: -1000,
       });
     });
   });
@@ -202,6 +203,7 @@ describe("ScheduledEffectiveAmountService", () => {
         amount: -1200,
         currencyCode: "CAD",
         complete: true,
+        directionAmount: -1200,
       });
       expect(
         investmentTransactionsService.resolveCashExchangeRateOrNull,
@@ -357,6 +359,7 @@ describe("ScheduledEffectiveAmountService", () => {
         amount: -1350,
         currencyCode: "CAD",
         complete: true,
+        directionAmount: -1350,
       });
     });
 

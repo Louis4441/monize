@@ -55,6 +55,27 @@ export interface EffectiveScheduledAmount {
   currencyCode: string;
   /** `amount !== null`. A total containing an incomplete item is incomplete. */
   complete: boolean;
+  /**
+   * The signed amount that decides DIRECTION -- outflow or inflow -- or `null`
+   * when the direction itself cannot be derived.
+   *
+   * `amount` whenever it is known. When it is not, the stored scalar's sign
+   * stands in only where that sign is *provable* without the missing rate:
+   *
+   *  - a top-level investment schedule is one scalar times one rate, and a rate
+   *    is positive, so the sign cannot move;
+   *  - a split whose lines all point the same way stays on that side of zero,
+   *    because an investment line's own cash impact is signed by its ACTION
+   *    (a BUY removes cash at any rate) and the rate only scales the magnitude.
+   *
+   * A **mixed-sign** aggregate is the case where it is not provable, and it is
+   * the case the whole `directionAmount` idea exists for: a +10 parent made of a
+   * fixed +100 beside an unpriceable BUY posts -20 at one rate and +20 at
+   * another, a 40 swing across zero. Copying the parent's `+10` there asserts a
+   * deposit the data cannot support, so this is `null` and every consumer says
+   * "unknown" rather than picking a side.
+   */
+  directionAmount: number | null;
 }
 
 /** The effective amount for one per-occurrence override. */
@@ -368,32 +389,50 @@ export class ScheduledEffectiveAmountService {
         pairCache,
       );
       if (investmentForecastExchangeRate === null) {
-        return { amount: null, currencyCode, complete: false };
+        // One scalar times one rate, and a rate is positive: the magnitude is
+        // unknown but the SIDE of zero is not.
+        return {
+          amount: null,
+          currencyCode,
+          complete: false,
+          directionAmount: Number(row.amount),
+        };
       }
+      const amount = roundMoney(
+        Number(row.amount) * investmentForecastExchangeRate,
+      );
       return {
-        amount: roundMoney(Number(row.amount) * investmentForecastExchangeRate),
+        amount,
         currencyCode,
         complete: true,
+        directionAmount: amount,
       };
     }
     if (hasEmbeddedInvestmentSplits(row)) {
       if (investmentForecastAmount === null) {
+        // A mixed-sign parent's direction is decided by the missing rate, so it
+        // is unknown; a same-signed one stays on its side whatever the rate is.
+        const provable = signIsProvable(splitLineSigns(row.splits ?? []));
         return {
           amount: null,
           currencyCode: row.currencyCode,
           complete: false,
+          directionAmount: provable ? Number(row.amount) : null,
         };
       }
       return {
         amount: investmentForecastAmount,
         currencyCode: row.currencyCode,
         complete: true,
+        directionAmount: investmentForecastAmount,
       };
     }
+    const stored = roundMoney(Number(row.amount));
     return {
-      amount: roundMoney(Number(row.amount)),
+      amount: stored,
       currencyCode: row.currencyCode,
       complete: true,
+      directionAmount: stored,
     };
   }
 
@@ -413,23 +452,38 @@ export class ScheduledEffectiveAmountService {
   ): EffectiveScheduledAmount {
     if (investmentForecastAmount !== undefined) {
       if (investmentForecastAmount === null) {
+        // Same rule as the base: the sign survives a missing rate only where the
+        // parts agree. A top-level investment override is one scalar times one
+        // rate; an investment-carrying override split is provable only if its own
+        // lines point the same way.
+        const provable = override.isSplit
+          ? signIsProvable(splitLineSigns(overrideSplitLines(override)))
+          : true;
+        const scalar =
+          override.amount !== null && override.amount !== undefined
+            ? Number(override.amount)
+            : base.directionAmount;
         return {
           amount: null,
           currencyCode: base.currencyCode,
           complete: false,
+          directionAmount: provable ? scalar : null,
         };
       }
       return {
         amount: investmentForecastAmount,
         currencyCode: base.currencyCode,
         complete: true,
+        directionAmount: investmentForecastAmount,
       };
     }
     if (override.amount !== null && override.amount !== undefined) {
+      const own = roundMoney(Number(override.amount));
       return {
-        amount: roundMoney(Number(override.amount)),
+        amount: own,
         currencyCode: base.currencyCode,
         complete: true,
+        directionAmount: own,
       };
     }
     return base;
@@ -1104,6 +1158,82 @@ export class ScheduledEffectiveAmountService {
  * its own security's currency -- so the server sends one recomputed effective
  * total rather than a rate.
  */
+/**
+ * The sign each line of a split contributes, without needing any FX rate.
+ *
+ * A fixed line contributes the sign of its own amount. An investment line
+ * contributes the sign of its cash impact, which `computeInvestmentCashImpact`
+ * derives from the ACTION (a BUY removes cash, a SELL brings it in) -- the rate
+ * that is missing only scales the magnitude, and a rate is positive, so it cannot
+ * move the sign. Zero lines contribute nothing either way.
+ */
+function splitLineSigns(
+  lines: ReadonlyArray<{
+    amount?: number | string | null;
+    kind?: SplitKind;
+    investmentAction?: InvestmentAction | null;
+    investmentQuantity?: number | string | null;
+    investmentPrice?: number | string | null;
+    investmentCommission?: number | string | null;
+  }>,
+): number[] {
+  return lines
+    .map((line) => {
+      if (line.kind === SplitKind.INVESTMENT && line.investmentAction) {
+        return Math.sign(
+          computeInvestmentCashImpact(
+            line.investmentAction,
+            Number(line.investmentQuantity ?? 0),
+            Number(line.investmentPrice ?? 0),
+            Number(line.investmentCommission ?? 0),
+          ),
+        );
+      }
+      return Math.sign(Number(line.amount ?? 0));
+    })
+    .filter((sign) => sign !== 0);
+}
+
+/**
+ * An override's split lines in the shape `splitLineSigns` reads.
+ *
+ * An override stores its splits as JSON with the investment payload nested under
+ * `investment`, where a base schedule's splits carry the same fields flat -- the
+ * two shapes are why this adapter exists rather than one union type.
+ */
+function overrideSplitLines(override: ScheduledTransactionOverride): Array<{
+  amount?: number | string | null;
+  kind?: SplitKind;
+  investmentAction?: InvestmentAction | null;
+  investmentQuantity?: number | string | null;
+  investmentPrice?: number | string | null;
+  investmentCommission?: number | string | null;
+}> {
+  return (override.splits ?? []).map((split) => {
+    const inv = split.investment;
+    return inv
+      ? {
+          kind: SplitKind.INVESTMENT,
+          investmentAction: inv.action as InvestmentAction,
+          investmentQuantity: inv.quantity,
+          investmentPrice: inv.price,
+          investmentCommission: inv.commission,
+        }
+      : { amount: split.amount };
+  });
+}
+
+/**
+ * Whether an unpriceable total's sign is provable from the signs of its parts.
+ *
+ * True when every part points the same way (or there are no parts at all, which
+ * is the single-scalar case). False for a mixed-sign aggregate, where the missing
+ * rate decides which side of zero the total lands on.
+ */
+function signIsProvable(signs: readonly number[]): boolean {
+  return signs.length === 0 || signs.every((sign) => sign === signs[0]);
+}
+
 export function hasEmbeddedInvestmentSplits(
   transaction: Pick<ScheduledTransaction, "isSplit" | "splits">,
 ): boolean {

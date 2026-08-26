@@ -483,21 +483,179 @@ describe("ScheduledOccurrenceService", () => {
       expect(occurrences[0].amount).toBe(-1500);
     });
 
-    it("falls back to the stored sign when the occurrence cannot be priced", async () => {
-      // An unpriceable bill is still a bill: `Number(null)` would make it a
-      // zero-amount reminder and drop it from an outflow-only surface.
+    it("reports an unpriceable MIXED-SIGN occurrence as direction-unknown", async () => {
+      // The case the whole idea exists for. A +10 parent made of a fixed -1,200
+      // beside a SELL line worth +1,210 posts on either side of zero depending on
+      // the rate nobody has: the direction is not derivable, and copying the
+      // parent's `+10` would assert a deposit the data cannot support.
       fx.resolveCashExchangeRateOrNull.mockResolvedValue(null);
-      candidateRead([mixedSignSplit(-200, -1200)]);
+      candidateRead([mixedSignSplit(10, -1200)]);
 
       const occurrences = await service.findOccurrences(
         userId,
-        { through: "2026-03-31", maxOccurrences: 1 },
+        { from: "2026-03-01", through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      // Kept, not dropped: it MIGHT be an outflow, and its amount is unknown, so
+      // the consumer's total is withheld either way.
+      expect(occurrences).toHaveLength(1);
+      expect(occurrences[0].amount).toBeNull();
+      expect(occurrences[0].directionAmount).toBeNull();
+    });
+
+    it("keeps the stored sign for an unpriceable SAME-SIGNED split", async () => {
+      // Every line points the same way -- a fixed -1,200 beside a BUY, whose cash
+      // impact is negative at any rate -- so the total stays negative whatever the
+      // missing rate turns out to be. The sign is provable; only the magnitude is
+      // not.
+      fx.resolveCashExchangeRateOrNull.mockResolvedValue(null);
+      const buySplit = investmentSchedule({
+        id: "st-split-buy",
+        name: "Buy shares and pay the fee",
+        amount: -2200,
+        isInvestment: false,
+        investmentAction: null,
+        investmentSecurityId: null,
+        isSplit: true,
+        splits: [
+          { id: "sp-1", kind: "category", amount: -1200 },
+          {
+            id: "sp-2",
+            kind: "investment",
+            amount: -1000,
+            investmentAction: "BUY",
+            investmentSecurityId: "SEC-1",
+            investmentQuantity: 10,
+            investmentPrice: 100,
+            investmentCommission: 0,
+            investmentExchangeRate: 1,
+            investmentExchangeRateFromCurrency: "EUR",
+            investmentExchangeRateToCurrency: "CAD",
+          },
+        ],
+      } as unknown as Partial<ScheduledTransaction>);
+      candidateRead([buySplit]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { from: "2026-03-01", through: "2026-03-31", maxOccurrences: 1 },
         { outflowsOnly: true },
       );
 
       expect(occurrences).toHaveLength(1);
       expect(occurrences[0].amount).toBeNull();
-      expect(occurrences[0].directionAmount).toBe(-200);
+      expect(occurrences[0].directionAmount).toBe(-2200);
+    });
+
+    it("keeps the stored sign for an unpriceable TOP-LEVEL investment", async () => {
+      // One scalar times one rate, and a rate is positive: the sign cannot move.
+      fx.resolveCashExchangeRateOrNull.mockResolvedValue(null);
+      candidateRead([investmentSchedule()]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { from: "2026-03-01", through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      expect(occurrences).toHaveLength(1);
+      expect(occurrences[0].amount).toBeNull();
+      expect(occurrences[0].directionAmount).toBe(-1000);
+    });
+
+    it("keeps a schedule whose override introduces the investment split", async () => {
+      // The override carries the shape, not just the amount: `isSplit` with an
+      // embedded investment line and `amount` NULL, because the lines carry it.
+      // A prefilter that asked only about `ovr.amount` dropped this row before the
+      // override was ever loaded.
+      const deposit = investmentSchedule({
+        id: "st-plain-shape",
+        name: "Quarterly rebate",
+        amount: 100,
+        isInvestment: false,
+        investmentAction: null,
+        investmentSecurityId: null,
+        isSplit: false,
+        splits: [],
+      } as unknown as Partial<ScheduledTransaction>);
+      overridesRepo.find.mockResolvedValue([
+        {
+          id: "ovr-shape",
+          scheduledTransactionId: "st-plain-shape",
+          originalDate: "2026-03-15",
+          overrideDate: "2026-03-15",
+          amount: null,
+          isSplit: true,
+          splits: [
+            { amount: -100 },
+            {
+              investment: {
+                action: "BUY",
+                securityId: "SEC-1",
+                quantity: 10,
+                price: 100,
+                commission: 0,
+                exchangeRate: 1,
+                exchangeRateFromCurrency: "EUR",
+                exchangeRateToCurrency: "CAD",
+              },
+            },
+          ],
+        } as unknown as ScheduledTransactionOverride,
+      ]);
+      candidateRead([deposit]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { from: "2026-03-01", through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      expect(occurrences).toHaveLength(1);
+      // -100 fixed plus a BUY of 10 x 100 at 1.35 = -1,450.
+      expect(occurrences[0].amount).toBe(-1450);
+      expect(occurrences[0].directionAmount).toBe(-1450);
+      const predicates = (
+        scheduledRepo.createQueryBuilder.mock.results[0].value.andWhere.mock
+          .calls as unknown[][]
+      ).map((c) => String(c[0]));
+      expect(predicates.some((p) => p.includes("ovr.is_split = true"))).toBe(
+        true,
+      );
+    });
+
+    it("excludes an occurrence an override turned into a deposit", async () => {
+      // The mirror of the kept case: a negative base whose override is positive is
+      // not an outflow, and the post-pricing filter is what establishes that.
+      const bill = investmentSchedule({
+        id: "st-plain-neg",
+        name: "Monthly fee",
+        amount: -100,
+        isInvestment: false,
+        investmentAction: null,
+        investmentSecurityId: null,
+        isSplit: false,
+        splits: [],
+      } as unknown as Partial<ScheduledTransaction>);
+      overridesRepo.find.mockResolvedValue([
+        {
+          id: "ovr-credit",
+          scheduledTransactionId: "st-plain-neg",
+          originalDate: "2026-03-15",
+          overrideDate: "2026-03-15",
+          amount: 75,
+        } as unknown as ScheduledTransactionOverride,
+      ]);
+      candidateRead([bill]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { from: "2026-03-01", through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      expect(occurrences).toEqual([]);
     });
   });
 });

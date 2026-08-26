@@ -196,6 +196,9 @@ describe('RecurringChargesPanel', () => {
         isInvestment: true,
         effectiveAmount: null,
         effectiveAmountComplete: false,
+        // A top-level investment is one scalar times one positive rate, so the
+        // server can still prove which way it goes.
+        effectiveDirectionAmount: -1000,
         effectiveCurrencyCode: 'CAD',
       }),
     ]);
@@ -207,6 +210,34 @@ describe('RecurringChargesPanel', () => {
     expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
     const row = screen.getByText('Monthly ETF buy').closest('li')!;
     expect(row.innerHTML).toContain('text-red-600');
+  });
+
+  it('shows no sign or colour for a direction the server could not derive', async () => {
+    // A mixed-sign split whose investment line cannot be priced posts on either
+    // side of zero: '+' green or '-' red would both be a guess with a symbol in
+    // front of it (issue #1247 re-audit).
+    mockGetScheduled.mockResolvedValue([
+      schedule({
+        id: 'st-split',
+        payeeName: 'Sell shares, pay the fee',
+        payeeId: null,
+        amount: 10,
+        isSplit: true,
+        effectiveAmount: null,
+        effectiveAmountComplete: false,
+        effectiveDirectionAmount: null,
+        effectiveCurrencyCode: 'CAD',
+      }),
+    ]);
+    await renderPanel();
+    await waitFor(() =>
+      expect(screen.getByText('Sell shares, pay the fee')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+    const row = screen.getByText('Sell shares, pay the fee').closest('li')!;
+    expect(row.innerHTML).not.toContain('text-red-600');
+    expect(row.innerHTML).not.toContain('text-green-600');
   });
 
   it('prints the date the occurrence actually falls on, not the recurrence slot', async () => {

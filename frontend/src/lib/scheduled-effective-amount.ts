@@ -20,6 +20,12 @@ export interface EffectiveScheduledAmount {
   currencyCode: string;
   /** `amount !== null`. A total containing an incomplete item is incomplete. */
   complete: boolean;
+  /**
+   * The signed amount that decides direction, `null` when it is not derivable,
+   * and `undefined` when the server did not say (an older backend mid rolling
+   * deploy, which is no information rather than a licence to guess).
+   */
+  directionAmount?: number | null;
 }
 
 /**
@@ -61,6 +67,7 @@ export function scheduleEffectiveAmount(
       amount: st.effectiveAmount,
       currencyCode,
       complete: st.effectiveAmount !== null,
+      directionAmount: st.effectiveDirectionAmount,
     };
   }
   if (isFxSensitive(st)) {
@@ -85,6 +92,7 @@ export function overrideEffectiveAmount(
       amount: override.effectiveAmount,
       currencyCode: base.currencyCode,
       complete: override.effectiveAmount !== null,
+      directionAmount: override.effectiveDirectionAmount,
     };
   }
   // Older backend. An FX-sensitive schedule's override is re-priced the same way

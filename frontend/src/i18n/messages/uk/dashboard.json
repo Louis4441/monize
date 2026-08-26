@@ -38,7 +38,8 @@
       "bill": "Рахунок",
       "deposit": "Надходження",
       "transfer": "Переказ",
-      "reminder": "Нагадування"
+      "reminder": "Нагадування",
+      "unknown": "Невідомо"
     }
   },
   "gettingStarted": {

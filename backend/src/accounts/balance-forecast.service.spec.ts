@@ -381,7 +381,12 @@ describe("BalanceForecastService", () => {
           [
             "st-inv",
             {
-              base: { amount: -1350, currencyCode: "USD", complete: true },
+              base: {
+                amount: -1350,
+                currencyCode: "USD",
+                complete: true,
+                directionAmount: -1350,
+              },
               settlementAccountId: "acc-1",
               settlementPair: { from: "EUR", to: "USD" },
               investmentForecastExchangeRate: 1.35,

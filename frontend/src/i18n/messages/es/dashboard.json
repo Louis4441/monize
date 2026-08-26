@@ -38,7 +38,8 @@
       "bill": "Factura",
       "deposit": "Depósito",
       "transfer": "Transferencia",
-      "reminder": "Recordatorio"
+      "reminder": "Recordatorio",
+      "unknown": "Desconocido"
     }
   },
   "gettingStarted": {

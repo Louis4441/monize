@@ -68,6 +68,12 @@ interface UpcomingBill {
    * schedule is the settlement currency rather than the brokerage account's.
    */
   currencyCode: string;
+  /**
+   * The signed amount that decides direction, `null` when the server could not
+   * derive it. Carried so `occurrenceKind` reads the occurrence rather than
+   * falling back to the schedule's snapshot sign.
+   */
+  directionAmount: number | null;
   isOverdue: boolean;
 }
 
@@ -141,6 +147,7 @@ export function UpcomingBillsReport() {
           dueDate,
           amount: occurrence.amount,
           currencyCode: occurrence.currencyCode,
+          directionAmount: occurrence.directionAmount,
           isOverdue: dueDate < today,
         },
       ];

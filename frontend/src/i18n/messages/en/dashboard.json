@@ -38,7 +38,8 @@
       "bill": "Bill",
       "deposit": "Deposit",
       "transfer": "Transfer",
-      "reminder": "Reminder"
+      "reminder": "Reminder",
+      "unknown": "Unknown"
     }
   },
   "gettingStarted": {

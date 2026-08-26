@@ -144,6 +144,11 @@ export interface ScheduledTransaction {
   effectiveAmount?: number | null;
   effectiveAmountComplete?: boolean;
   effectiveCurrencyCode?: string;
+  // The signed amount that decides DIRECTION, or `null` when the direction is not
+  // derivable (an unpriceable mixed-sign split posts either way). Absent means an
+  // older backend, which is no information -- `occurrenceKind` then falls back as
+  // it always did.
+  effectiveDirectionAmount?: number | null;
   tagIds?: string[];
   splits?: ScheduledTransactionSplit[];
   overrideCount?: number;
@@ -264,6 +269,8 @@ export interface ScheduledTransactionOverride {
   // to read `amount`. Its currency is the parent's `effectiveCurrencyCode`.
   effectiveAmount?: number | null;
   effectiveAmountComplete?: boolean;
+  /** As on the schedule: `null` is "direction not derivable", absent is "not said". */
+  effectiveDirectionAmount?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -338,6 +345,13 @@ export interface ScheduledOccurrence {
   dueDate: string;
   amount: number | null;
   amountComplete: boolean;
+  /**
+   * The signed amount that decides this occurrence's direction, or `null` when it
+   * cannot be derived (an unpriceable mixed-sign split posts on either side of
+   * zero). Read it through `occurrenceKind` -- never substitute the schedule's
+   * stored amount for a `null`.
+   */
+  directionAmount: number | null;
   currencyCode: string;
   overrideId: string | null;
   /** True when an override moved this occurrence off its recurrence slot. */

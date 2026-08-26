@@ -38,7 +38,8 @@
       "bill": "請求書",
       "deposit": "入金",
       "transfer": "振替",
-      "reminder": "リマインダー"
+      "reminder": "リマインダー",
+      "unknown": "不明"
     }
   },
   "gettingStarted": {

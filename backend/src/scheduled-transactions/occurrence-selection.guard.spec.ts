@@ -196,9 +196,11 @@ describe("occurrence selection stays in one place", () => {
       // The one consumer that may: `own ? own.effective : resolved.base` is the
       // override-then-base precedence itself.
       ["scheduled-transactions/scheduled-occurrence.service.ts", 1],
-      // findAll's schedule-level read model: `effectiveAmount` on a schedule row
-      // is by definition the base, and the row carries its overrides beside it.
-      ["scheduled-transactions/scheduled-transactions.service.ts", 3],
+      // findAll's schedule-level read model: `effectiveAmount`,
+      // `effectiveAmountComplete`, `effectiveCurrencyCode` and
+      // `effectiveDirectionAmount` on a schedule row are by definition the base,
+      // and the row carries its overrides beside it.
+      ["scheduled-transactions/scheduled-transactions.service.ts", 4],
     ]);
 
     const counts = new Map<string, number>();
@@ -289,6 +291,64 @@ describe("occurrence selection stays in one place", () => {
     }
 
     expect(offenders).toEqual([]);
+  });
+
+  /**
+   * The candidate prefilter is an optimization over a semantic question, so it has
+   * to be provably complete: it may narrow on the stored sign only while keeping
+   * every shape whose sign something else can move.
+   *
+   * A base-only `st.amount < 0` gate dropped a +100 schedule whose next occurrence
+   * was overridden to -250, and later a positive one whose override carried an
+   * embedded investment split with no amount of its own. Both were invisible to a
+   * test of the resolver, because the row never reached it.
+   */
+  it("keeps every shape whose direction is not the stored sign in the candidate read", () => {
+    const source = files.find(
+      (f) =>
+        f.path === "scheduled-transactions/scheduled-occurrence.service.ts",
+    );
+    expect(source).toBeDefined();
+    const body = source!.lines.filter((l) => !isComment(l)).join("\n");
+
+    // The narrowing exists...
+    expect(body).toContain("st.amount < 0");
+    // ...and every escape from it is present: an FX-sensitive base, a base
+    // investment split, and an override that carries either an amount or a shape.
+    expect(body).toContain("st.isInvestment = true");
+    expect(body).toContain("scheduled_transaction_splits");
+    expect(body).toContain("scheduled_transaction_overrides ovr");
+    expect(body).toContain("ovr.amount IS NOT NULL OR ovr.is_split = true");
+    // And the direction itself is decided after pricing, never in the SQL.
+    expect(body).toContain(
+      "o.directionAmount === null || o.directionAmount < 0",
+    );
+  });
+
+  /**
+   * Direction has to be able to say "not derivable", or the implementation is
+   * forced to invent an answer for a mixed-sign aggregate.
+   */
+  it("keeps the occurrence direction nullable", () => {
+    const contract = files.find(
+      (f) =>
+        f.path === "scheduled-transactions/scheduled-occurrence.service.ts",
+    );
+    const arithmetic = files.find(
+      (f) =>
+        f.path ===
+        "scheduled-transactions/scheduled-effective-amount.service.ts",
+    );
+    expect(contract!.lines.join("\n")).toContain(
+      "directionAmount: number | null",
+    );
+    expect(arithmetic!.lines.join("\n")).toContain(
+      "directionAmount: number | null",
+    );
+    // The fallback is conditional on the sign being provable -- an unconditional
+    // `?? Number(row.amount)` is the shape this guards against.
+    const body = contract!.lines.filter((l) => !isComment(l)).join("\n");
+    expect(body).not.toMatch(/directionAmount:\s*\w+\.amount\s*\?\?/);
   });
 
   // The predicates themselves, pinned: a guard whose matcher quietly stopped

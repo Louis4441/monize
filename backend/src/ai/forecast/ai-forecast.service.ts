@@ -198,7 +198,16 @@ export class AiForecastService {
 
     sections.push("\n--- SCHEDULED/RECURRING FUTURE TRANSACTIONS ---");
     for (const st of aggregates.scheduledTransactions.slice(0, 20)) {
-      const type = st.isIncome ? "INCOME" : "EXPENSE";
+      // An occurrence whose direction the server could not derive is stated as
+      // such: a mixed-sign split with an unpriceable investment line posts on
+      // either side of zero, and "EXPENSE" would be a guess the model then
+      // reasons from (issue #1247 re-audit).
+      const type =
+        st.isIncome === null
+          ? "DIRECTION UNKNOWN"
+          : st.isIncome
+            ? "INCOME"
+            : "EXPENSE";
       if (!st.isTransfer) {
         // An amount the server could not resolve is stated as unknown rather
         // than quoted from the persisted snapshot, which was calculated at an

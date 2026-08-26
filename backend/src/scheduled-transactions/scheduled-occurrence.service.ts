@@ -40,25 +40,23 @@ export interface EffectiveScheduledOccurrence {
   amount: number | null;
   /**
    * The signed amount that decides this occurrence's DIRECTION -- bill or
-   * deposit, outflow or income.
+   * deposit, outflow or income -- or `null` when the direction cannot be derived.
    *
-   * `amount` when it is known, and the schedule's snapshot only when it is not.
-   * A consumer must never take the direction from `schedule.amount` itself: "an
-   * exchange rate is positive, so it cannot flip a sign" is true of one scalar
-   * times one rate, and false of a **mixed-sign split parent**, where only the
-   * investment line re-prices while its sibling stays put. A parent stored at
-   * -10 (an ordinary -100 beside a SELL line worth +90) posts +20 once that line
-   * re-prices to +120: an outflow that has become an inflow. The reverse
-   * happens too, and a filter keyed on the stored sign drops the occurrence
-   * entirely.
+   * `amount` when it is known. When it is not, the schedule's snapshot stands in
+   * only where its sign is *provable* without the missing rate: a top-level
+   * investment is one scalar times one positive rate, and a split whose lines all
+   * point the same way stays on that side of zero because an investment line's
+   * cash impact is signed by its action.
    *
-   * The fallback is the sign of the stored amount rather than zero on purpose:
-   * an FX rate cannot flip the sign of the *fallback* case either (a top-level
-   * investment schedule is one scalar times one rate), and `Number(null)` would
-   * paint an unpriceable bill as a zero-amount reminder. `frontend/src/lib/
-   * scheduled-kind.ts`'s `occurrenceKind` is the same rule on the client.
+   * `null` is the mixed-sign aggregate: a +10 parent made of a fixed +100 beside
+   * an unpriceable BUY posts -20 at one rate and +20 at another, so asserting
+   * either side is inventing an answer. A consumer reports it as unknown -- it
+   * must never fall back to `schedule.amount` itself, which is what made AI/MCP
+   * call a re-priced deposit a bill and made an outflow-only filter drop the
+   * reverse case. `frontend/src/lib/scheduled-kind.ts`'s `occurrenceKind` is the
+   * same rule on the client.
    */
-  directionAmount: number;
+  directionAmount: number | null;
   /** The currency `amount` is expressed in (the settlement currency for an investment). */
   currencyCode: string;
   /** `amount !== null`. A total containing an incomplete occurrence is incomplete. */
@@ -84,8 +82,10 @@ export interface EffectiveScheduledOccurrence {
 export interface OccurrenceCandidateFilter {
   /**
    * Only occurrences whose **resolved** direction is an outflow
-   * (`directionAmount < 0`), so a zero-amount reminder is excluded as it always
-   * was.
+   * (`directionAmount < 0`), plus those whose direction cannot be derived at all
+   * (`null`) -- their amount is unknown as well, so the consumer's total is
+   * withheld rather than quietly missing a possible outflow. A zero-amount
+   * reminder is excluded, as it always was.
    *
    * Deliberately not a pure SQL predicate: the stored sign cannot answer this
    * for an FX-sensitive schedule (see `directionAmount`). The candidate read
@@ -170,7 +170,7 @@ export class ScheduledOccurrenceService {
           originalDate: slot.originalDate,
           dueDate: slot.dueDate,
           amount: amount.amount,
-          directionAmount: amount.amount ?? Number(row.amount),
+          directionAmount: amount.directionAmount,
           currencyCode: amount.currencyCode,
           complete: amount.complete,
           overrideId: slot.override?.id ?? null,
@@ -249,9 +249,14 @@ export class ScheduledOccurrenceService {
       //    mixed-sign parent that can land on the other side of zero;
       //  - a per-occurrence override REPLACES the amount outright, sign included,
       //    so a schedule stored at +100 whose next occurrence is overridden to
-      //    -250 is a genuine outflow the snapshot cannot see. An override with no
-      //    amount of its own inherits the base and cannot flip anything, so it
-      //    does not widen the read.
+      //    -250 is a genuine outflow the snapshot cannot see. An override can
+      //    also replace the SHAPE: `is_split` with its own splits, an embedded
+      //    investment among them, and `amount` left NULL because the lines carry
+      //    it -- priced at the current rate that occurrence can be negative while
+      //    the base is positive, which is why the predicate cannot ask about the
+      //    amount alone. Only an override that carries neither an amount nor
+      //    splits inherits the base entirely, and that one does not widen the
+      //    read.
       //
       // The direction itself is decided on the resolved occurrence below.
       if (filter.outflowsOnly) {
@@ -264,7 +269,7 @@ export class ScheduledOccurrenceService {
             ) OR EXISTS (
               SELECT 1 FROM scheduled_transaction_overrides ovr
               WHERE ovr.scheduled_transaction_id = st.id
-                AND ovr.amount IS NOT NULL
+                AND (ovr.amount IS NOT NULL OR ovr.is_split = true)
             ))`,
           { investmentKind: SplitKind.INVESTMENT },
         );
@@ -292,7 +297,12 @@ export class ScheduledOccurrenceService {
       ...window,
       maxOccurrences: undefined,
     });
-    const outflows = occurrences.filter((o) => o.directionAmount < 0);
+    // An unknown direction is KEPT, not dropped: its amount is unknown too, so a
+    // consumer's total is withheld either way, and dropping it would hide a
+    // possible outflow behind a total that still looked complete.
+    const outflows = occurrences.filter(
+      (o) => o.directionAmount === null || o.directionAmount < 0,
+    );
     if (window.maxOccurrences === undefined) return outflows;
 
     const kept: ResolvedScheduledOccurrence[] = [];

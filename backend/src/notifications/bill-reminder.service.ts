@@ -288,7 +288,13 @@ export class BillReminderService {
           // question nor the same row: an override re-pricing a -200 charge into
           // a +500 refund, on a pair whose rate cannot be resolved, fell through
           // to the schedule and the email called the refund an expense.
-          isIncome: occurrence.directionAmount > 0,
+          // `null` travels: an unpriceable mixed-sign occurrence posts on either
+          // side of zero, so the row shows a neutral badge rather than asserting
+          // an expense the data cannot support (issue #1247 re-audit).
+          isIncome:
+            occurrence.directionAmount === null
+              ? null
+              : occurrence.directionAmount > 0,
         };
       });
 

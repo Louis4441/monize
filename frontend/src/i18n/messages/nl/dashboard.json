@@ -38,7 +38,8 @@
       "bill": "Factuur",
       "deposit": "Storting",
       "transfer": "Overboeking",
-      "reminder": "Herinnering"
+      "reminder": "Herinnering",
+      "unknown": "Onbekend"
     }
   },
   "gettingStarted": {

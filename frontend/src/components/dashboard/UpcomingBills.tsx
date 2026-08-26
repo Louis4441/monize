@@ -162,6 +162,11 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
         return <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-xs rounded font-medium">{t('upcomingBills.typeBadge.transfer')}</span>;
       case 'reminder':
         return <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 text-xs rounded font-medium">{t('upcomingBills.typeBadge.reminder')}</span>;
+      case 'unknown':
+        // The server could not derive which way this occurrence goes, so the
+        // badge says that rather than picking a colour: red would read as money
+        // out and green as money in (issue #1247 re-audit).
+        return <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 text-xs rounded font-medium">{t('upcomingBills.typeBadge.unknown')}</span>;
     }
   };
 

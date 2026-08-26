@@ -38,7 +38,8 @@
       "bill": "Fattura",
       "deposit": "Versamento",
       "transfer": "Trasferimento",
-      "reminder": "Promemoria"
+      "reminder": "Promemoria",
+      "unknown": "Sconosciuto"
     }
   },
   "gettingStarted": {

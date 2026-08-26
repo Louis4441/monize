@@ -67,7 +67,13 @@ export function BudgetUpcomingBills({
         // about what the payment will cost. Deposits and transfers are not
         // budgeted spending and stay out.
         const kind = occurrenceKind(getEffective(st), st);
-        if (kind !== 'bill' && kind !== 'reminder') return false;
+        // `unknown` is kept: the server could not derive the direction, so this
+        // occurrence MIGHT be a bill, and dropping it would leave the panel's
+        // total looking complete while a possible payment went uncounted. Its
+        // amount is unknown too, so the total below is withheld either way.
+        if (kind !== 'bill' && kind !== 'reminder' && kind !== 'unknown') {
+          return false;
+        }
         const dueDate = parseISO(nextOccurrenceDueDate(st));
         const daysUntil = differenceInDays(dueDate, today);
         const daysUntilEnd = differenceInDays(endDate, dueDate);

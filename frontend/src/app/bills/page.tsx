@@ -543,7 +543,12 @@ function BillsContent() {
       // neither is a bill or a deposit here.
       const kind = t.isActive ? billKind(t) : null;
 
-      if (kind === 'bill') {
+      if (kind === 'unknown') {
+        // Neither bucket can claim it, and the net cannot be complete without
+        // it: the server could not derive which side of zero this occurrence
+        // falls on (issue #1247 re-audit).
+        monthlyAmountsComplete = false;
+      } else if (kind === 'bill') {
         totalBills++;
         if (effective === null) monthlyAmountsComplete = false;
         else monthlyBills += monthlyEquivalent(Math.abs(amount), t.frequency);
