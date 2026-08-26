@@ -16,12 +16,7 @@ import {
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
-import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
-import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
-import {
-  ScheduledEffectiveAmountService,
-  overrideEffectiveKey,
-} from "../scheduled-transactions/scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { CreateBudgetDto } from "./dto/create-budget.dto";
 import { UpdateBudgetDto } from "./dto/update-budget.dto";
 import { CreateBudgetCategoryDto } from "./dto/create-budget-category.dto";
@@ -85,10 +80,11 @@ export class BudgetsService {
   constructor(
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
-    // "What does this scheduled occurrence cost today" has one server-side
-    // answer (issue #1247); the budget asks it rather than reading the persisted
-    // snapshot, so its figures cannot disagree with the cash-flow forecast.
-    private effectiveAmounts: ScheduledEffectiveAmountService,
+    // "Which occurrence is due, and what does it cost today" has one
+    // server-side answer (issue #1247); the budget asks it rather than reading
+    // the persisted snapshot or re-deciding which override applies, so its
+    // figures cannot disagree with the cash-flow forecast or the register.
+    private occurrences: ScheduledOccurrenceService,
   ) {}
 
   async create(
@@ -433,53 +429,41 @@ export class BudgetsService {
     };
   }
 
+  /**
+   * The next occurrence of every outflow schedule due between today and
+   * `periodEnd`, priced at what it would actually cost today.
+   *
+   * Both halves come from the one occurrence contract (issue #1247). The
+   * occurrence matters as much as the amount: reading the schedule template meant
+   * an occurrence the user had re-priced or moved was reported at the template's
+   * figure on the template's date, and `getVelocity` subtracts this from what is
+   * available to spend.
+   */
   async getUpcomingBills(
     userId: string,
     periodEnd: string,
   ): Promise<UpcomingBill[]> {
     const todayStr = todayYMD();
-
-    const scheduledTransactions = await withScopedDb(this.dataSource, (m) =>
-      m
-        .getRepository(ScheduledTransaction)
-        .createQueryBuilder("st")
-        // The splits decide whether a schedule's cash total is FX-sensitive
-        // (an embedded investment line re-prices at the current rate), so the
-        // effective-amount resolver cannot answer without them (issue #1247).
-        .leftJoinAndSelect("st.splits", "splits")
-        .where("st.user_id = :userId", { userId })
-        .andWhere("st.is_active = true")
-        .andWhere("st.amount < 0")
-        .andWhere("st.next_due_date >= :todayStr", { todayStr })
-        .andWhere("st.next_due_date <= :periodEnd", { periodEnd })
-        .orderBy("st.next_due_date", "ASC")
-        .getMany(),
-    );
-
-    // The stored sign selects the outflows (an FX rate is positive, so it cannot
-    // flip one), but the magnitude comes from the shared resolver -- the same one
-    // the cash-flow forecast and the posting use, so the budget cannot disagree
-    // with them about what a bill costs (issue #1247). Resolved outside the read
-    // transaction: the rate path can fetch and persist.
-    const effective = await this.effectiveAmounts.resolveMany(
-      userId,
-      scheduledTransactions,
-    );
-
-    return scheduledTransactions.map((st) => {
-      const base = effective.get(st.id)!.base;
-      return {
-        id: st.id,
-        name: st.name,
-        amount: base.amount === null ? null : Math.abs(base.amount),
-        amountComplete: base.complete,
-        dueDate:
-          typeof st.nextDueDate === "string"
-            ? st.nextDueDate
-            : formatDateYMD(st.nextDueDate as Date),
-        categoryId: st.categoryId,
-      };
+    const occurrences = await this.occurrences.findOccurrences(userId, {
+      from: todayStr,
+      through: periodEnd,
+      // One row per schedule, which is the shape this list has always had.
+      maxOccurrences: 1,
     });
+
+    // The stored sign selects the outflows. An FX rate is positive, so it cannot
+    // flip one: the sign classifies the row correctly even when its magnitude is
+    // a stale snapshot or unknown, and only the magnitude needs re-resolving.
+    return occurrences
+      .filter((occurrence) => Number(occurrence.schedule.amount) < 0)
+      .map((occurrence) => ({
+        id: occurrence.scheduledTransactionId,
+        name: occurrence.schedule.name,
+        amount: occurrence.amount === null ? null : Math.abs(occurrence.amount),
+        amountComplete: occurrence.complete,
+        dueDate: occurrence.dueDate,
+        categoryId: occurrence.schedule.categoryId,
+      }));
   }
 
   async getVelocity(
@@ -626,39 +610,33 @@ export class BudgetsService {
     today.setHours(0, 0, 0, 0);
     const todayStr = todayYMD();
 
-    // Use a 30-day DB-level cap, then filter per-bill by reminderDaysBefore
+    // Use a 30-day cap, then filter per-bill by reminderDaysBefore
     const horizon = new Date(today);
     horizon.setDate(horizon.getDate() + 30);
     const horizonStr = formatDateYMD(horizon);
 
-    const manualBills = await withScopedDb(this.dataSource, (m) =>
-      m
-        .getRepository(ScheduledTransaction)
-        .createQueryBuilder("st")
-        .leftJoinAndSelect("st.payee", "payee")
-        // See getUpcomingBills: the effective-amount resolver needs the splits to
-        // tell an FX-sensitive cash total from a fixed one (issue #1247).
-        .leftJoinAndSelect("st.splits", "splits")
-        .where("st.user_id = :userId", { userId })
-        .andWhere("st.is_active = true")
-        .andWhere("st.auto_post = false")
-        .andWhere("st.next_due_date >= :todayStr", { todayStr })
-        .andWhere("st.next_due_date <= :horizonStr", { horizonStr })
-        .orderBy("st.next_due_date", "ASC")
-        .getMany(),
-    );
+    // Occurrences, not schedules (issue #1247). The alert is about one occurrence
+    // -- what it will cost and when it falls -- and both answers come from the one
+    // occurrence contract. Keying the override lookup on `overrideDate` here (the
+    // identity is `originalDate`) meant a bill the user had MOVED silently fell
+    // back to the template's amount, on the template's date.
+    const occurrences = await this.occurrences.findOccurrences(userId, {
+      from: todayStr,
+      through: horizonStr,
+      maxOccurrences: 1,
+    });
 
-    if (manualBills.length === 0) return;
+    // Auto-posting bills need no reminder: the posting is the reminder.
+    const manualOccurrences = occurrences.filter((o) => !o.schedule.autoPost);
+    if (manualOccurrences.length === 0) return;
 
-    // Filter bills to only those within their own reminder window
-    // and not already paid ahead of time
-    const eligibleBills = manualBills.filter((bill) => {
-      const dueDate =
-        typeof bill.nextDueDate === "string"
-          ? bill.nextDueDate
-          : formatDateYMD(bill.nextDueDate as Date);
+    // Only those within their own reminder window, and not already paid ahead of
+    // time. Measured from the date the occurrence actually falls on.
+    const eligible = manualOccurrences.filter((occurrence) => {
+      const bill = occurrence.schedule;
       const daysUntilDue = Math.ceil(
-        (new Date(dueDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+        (new Date(occurrence.dueDate).getTime() - today.getTime()) /
+          (1000 * 60 * 60 * 24),
       );
       if (daysUntilDue > bill.reminderDaysBefore) return false;
 
@@ -680,7 +658,7 @@ export class BudgetsService {
       return true;
     });
 
-    if (eligibleBills.length === 0) return;
+    if (eligible.length === 0) return;
 
     // Fetch ALL existing BILL_DUE alerts (including dismissed) to prevent re-creation
     const existingAlerts = await withScopedDb(this.dataSource, (m) =>
@@ -694,65 +672,35 @@ export class BudgetsService {
         .getMany(),
     );
 
+    // An occurrence's identity is `(billId, originalDate)`, so that is what
+    // decides "already alerted". `periodStart` is the date the alert announces,
+    // which an override can move -- deduping on it alone would raise a second
+    // alert for the same occurrence every time the user re-dated it. Rows written
+    // before `originalDate` was recorded are still matched on their announced
+    // date, so an upgrade does not re-alert everything once.
     const existingBillKeys = new Set(
-      existingAlerts.map(
-        (a) => `${(a.data as Record<string, unknown>).billId}:${a.periodStart}`,
-      ),
+      existingAlerts.flatMap((a) => {
+        const data = (a.data ?? {}) as Record<string, unknown>;
+        const keys = [`${data.billId}:${a.periodStart}`];
+        if (typeof data.originalDate === "string") {
+          keys.push(`${data.billId}:${data.originalDate}`);
+        }
+        return keys;
+      }),
     );
 
-    // Batch-fetch instance overrides for eligible bills
-    const billIds = eligibleBills.map((b) => b.id);
-    const overrides = await withScopedDb(this.dataSource, (m) =>
-      m
-        .getRepository(ScheduledTransactionOverride)
-        .createQueryBuilder("o")
-        .where("o.scheduled_transaction_id IN (:...billIds)", { billIds })
-        .getMany(),
-    );
+    for (const occurrence of eligible) {
+      const bill = occurrence.schedule;
+      const dueDate = occurrence.dueDate;
 
-    const overrideMap = new Map<string, ScheduledTransactionOverride>();
-    for (const o of overrides) {
-      // Key by billId:overrideDate to match against nextDueDate
-      const overrideDate =
-        typeof o.overrideDate === "string"
-          ? o.overrideDate
-          : formatDateYMD(o.overrideDate as unknown as Date);
-      overrideMap.set(`${o.scheduledTransactionId}:${overrideDate}`, o);
-    }
-
-    // The alert says what the bill will cost, so it asks the shared resolver
-    // rather than reading the persisted snapshot (issue #1247). Hydrating each
-    // bill's matching override lets the resolver apply the same
-    // override-then-base precedence the posting does.
-    const eligibleWithOverrides = eligibleBills.map((bill) => {
-      const dueDate =
-        typeof bill.nextDueDate === "string"
-          ? bill.nextDueDate
-          : formatDateYMD(bill.nextDueDate as Date);
-      return {
-        ...bill,
-        nextOverride: overrideMap.get(`${bill.id}:${dueDate}`) ?? null,
-      };
-    });
-    const effective = await this.effectiveAmounts.resolveMany(
-      userId,
-      eligibleWithOverrides,
-    );
-
-    for (const bill of eligibleWithOverrides) {
-      const dueDate =
-        typeof bill.nextDueDate === "string"
-          ? bill.nextDueDate
-          : formatDateYMD(bill.nextDueDate as Date);
-
-      if (existingBillKeys.has(`${bill.id}:${dueDate}`)) continue;
+      if (
+        existingBillKeys.has(`${bill.id}:${occurrence.originalDate}`) ||
+        existingBillKeys.has(`${bill.id}:${dueDate}`)
+      ) {
+        continue;
+      }
 
       const payeeName = bill.payee?.name || bill.payeeName || bill.name;
-      const resolved = effective.get(bill.id)!;
-      const occurrence = bill.nextOverride
-        ? (resolved.overrides.get(overrideEffectiveKey(bill.nextOverride))
-            ?.effective ?? resolved.base)
-        : resolved.base;
       // An amount we cannot work out is stated as unavailable. Naming a stale
       // figure in an alert the user acts on is the defect; withholding the
       // alert entirely would hide a payment that is genuinely due.
@@ -770,6 +718,11 @@ export class BudgetsService {
       alert.budgetCategoryId = null;
       alert.alertType = AlertType.BILL_DUE;
       alert.severity = severity;
+      // `title`/`message` are the English fallbacks for a reader with no client
+      // to render them (the email digest, an API consumer). The UI composes both
+      // from `alertType` and `data` in the reader's own language -- a stored
+      // sentence cannot be translated after the fact, and the missing-rate case
+      // is exactly the one a non-English reader hits.
       alert.title = `${payeeName} due${daysUntilDue === 0 ? " today" : daysUntilDue === 1 ? " tomorrow" : ` in ${daysUntilDue} days`}`;
       alert.message =
         amount === null
@@ -781,6 +734,8 @@ export class BudgetsService {
         amount,
         amountComplete: amount !== null,
         dueDate,
+        originalDate: occurrence.originalDate,
+        daysUntilDue,
         currencyCode: occurrence.currencyCode,
       };
       alert.isRead = false;

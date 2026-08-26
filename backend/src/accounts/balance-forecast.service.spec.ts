@@ -6,6 +6,7 @@ import { Account } from "./entities/account.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
@@ -17,7 +18,11 @@ jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
+// Pin only the clock. Replacing the whole module would delete its other
+// exports -- `addDaysYMD` among them -- and the forecast would fail on a
+// missing function rather than on anything this suite is about.
 jest.mock("../common/date-utils", () => ({
+  ...jest.requireActual("../common/date-utils"),
   todayYMD: jest.fn(() => "2024-07-08"),
 }));
 
@@ -55,6 +60,10 @@ describe("BalanceForecastService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BalanceForecastService,
+        // Both read-side services are real, over a stubbed FX source: the dates,
+        // the amounts and the account each occurrence is charged to ARE their
+        // output, so a double would test nothing (issue #1247).
+        ScheduledOccurrenceService,
         ScheduledEffectiveAmountService,
         {
           provide: InvestmentTransactionsService,

@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { ScheduledTransactionsService } from "./scheduled-transactions.service";
 import { ScheduledEffectiveAmountService } from "./scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "./scheduled-occurrence.service";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
 import { AccountsService } from "../accounts/accounts.service";
@@ -56,6 +57,7 @@ describe("scheduled-transactions module RLS context smoke (real withScopedDb)", 
         // the #1167 FX decisions moved here (issue #1247) and the assertions below
         // are about those decisions, so a double would test nothing.
         ScheduledEffectiveAmountService,
+        ScheduledOccurrenceService,
         { provide: DataSource, useValue: dataSource },
         { provide: AccountsService, useValue: {} },
         { provide: TransactionsService, useValue: transactionsService },

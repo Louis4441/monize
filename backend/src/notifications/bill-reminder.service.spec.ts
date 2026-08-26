@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { BillReminderService } from "./bill-reminder.service";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import {
   createInvestmentFxMock,
@@ -31,6 +32,7 @@ describe("BillReminderService", () => {
   const jobClaims: JobClaimMock = createJobClaimMock();
   let service: BillReminderService;
   let scheduledTransactionsRepo: Record<string, jest.Mock>;
+  let overridesRepo: Record<string, jest.Mock>;
   let usersRepo: Record<string, jest.Mock>;
   let preferencesRepo: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
@@ -49,6 +51,13 @@ describe("BillReminderService", () => {
 
     scheduledTransactionsRepo = {
       find: jest.fn(),
+    };
+
+    // The occurrence contract loads a bill's overrides itself, keyed by schedule
+    // id -- the per-bill fixtures below still carry them on the row for the
+    // cross-user window filter, which cannot reach the database.
+    overridesRepo = {
+      find: jest.fn().mockResolvedValue([]),
     };
 
     usersRepo = {
@@ -76,6 +85,7 @@ describe("BillReminderService", () => {
 
     const { dataSource } = createScopedDbMocks([
       [ScheduledTransaction, scheduledTransactionsRepo],
+      [ScheduledTransactionOverride, overridesRepo],
       [User, usersRepo],
       [UserPreference, preferencesRepo],
     ]);
@@ -83,6 +93,9 @@ describe("BillReminderService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillReminderService,
+        // Both read-side services are real over the stubbed FX source: which
+        // occurrence is due and what it costs ARE their output (issue #1247).
+        ScheduledOccurrenceService,
         ScheduledEffectiveAmountService,
         {
           provide: InvestmentTransactionsService,
@@ -496,6 +509,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -566,6 +580,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -586,6 +601,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -606,6 +622,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -626,6 +643,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -659,6 +677,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
           investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
@@ -696,6 +715,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
           investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
@@ -722,6 +742,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -783,6 +804,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -844,6 +866,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
           emailService.sendMail.mockRejectedValue(
@@ -922,6 +945,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -991,6 +1015,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -1018,6 +1043,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -1045,6 +1071,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -1096,6 +1123,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -1122,6 +1150,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -1143,6 +1172,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -1162,6 +1192,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 
@@ -1187,6 +1218,7 @@ describe("BillReminderService", () => {
           });
 
           scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          overridesRepo.find.mockResolvedValue(bill.overrides ?? []);
           preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
           usersRepo.findOne.mockResolvedValue(mockUser1);
 

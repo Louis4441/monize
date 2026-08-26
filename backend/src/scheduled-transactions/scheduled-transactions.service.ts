@@ -42,13 +42,16 @@ import {
   AMOUNT_ONLY_ACTIONS,
 } from "./scheduled-investment-actions";
 import {
-  EffectiveScheduledAmount,
   ScheduledEffectiveAmountService,
   overrideEffectiveKey,
 } from "./scheduled-effective-amount.service";
+import {
+  ResolvedScheduledOccurrence,
+  ScheduledOccurrenceService,
+} from "./scheduled-occurrence.service";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
-import { todayInTimezone, todayYMD } from "../common/date-utils";
+import { addDaysYMD, todayInTimezone, todayYMD } from "../common/date-utils";
 import {
   calculateNextDueDate as calcNextDueDate,
   ensureYMD,
@@ -167,6 +170,34 @@ export type ScheduledTransactionReadModel = ScheduledTransaction & {
   effectiveAmountComplete: boolean;
   effectiveCurrencyCode: string;
 };
+
+/**
+ * One occurrence, as a client receives it (issue #1247, INV-OCCURRENCE-003).
+ *
+ * `amount` is already the effective amount for THIS occurrence -- the override's
+ * when one governs it, the schedule's otherwise -- so there is no base-versus-
+ * override choice left for a consumer to make, and no persisted snapshot in the
+ * payload to reach for. `null` (with `amountComplete` false) means the current
+ * amount cannot be determined: render it unavailable and withhold any total
+ * containing it.
+ *
+ * `originalDate` is the recurrence slot (the occurrence's identity, and what an
+ * override edit addresses); `dueDate` is when it actually falls.
+ */
+export interface ScheduledOccurrenceReadModel {
+  scheduledTransactionId: string;
+  originalDate: string;
+  dueDate: string;
+  amount: number | null;
+  amountComplete: boolean;
+  currencyCode: string;
+  overrideId: string | null;
+  /** True when an override moved this occurrence off its recurrence slot. */
+  moved: boolean;
+  accountId: string;
+  transferAccountId: string | null;
+  isTransfer: boolean;
+}
 
 const INVESTMENT_RELATIONS = [
   "account",
@@ -342,6 +373,11 @@ export class ScheduledTransactionsService {
     // budget and the reports consume -- comes from here, so no surface can grow
     // its own copy of the #1167 rules.
     private effectiveAmounts: ScheduledEffectiveAmountService,
+    // The single server-side answer to "which occurrence is due, and when"
+    // (issue #1247). Centralizing the arithmetic was half the fix: every surface
+    // still chose its own member of the resolver's result, so this owns the
+    // recurrence expansion and the override selection as well.
+    private occurrences: ScheduledOccurrenceService,
     private overrideService: ScheduledTransactionOverrideService,
     private loanService: ScheduledTransactionLoanService,
     private dataSource: DataSource,
@@ -1562,14 +1598,19 @@ export class ScheduledTransactionsService {
     filter: LlmUpcomingFilter = {},
   ): Promise<LlmUpcomingScheduledResult> {
     const days = filter.days ?? 30;
-    const rows = await this.findUpcoming(userId, days);
-    // The effective amount, from the one resolver the forecast and the posting
-    // use (issue #1247). Resolved outside `findUpcoming`'s transaction because
-    // the rate path can fetch and persist.
-    const effective = await this.effectiveAmounts.resolveMany(userId, rows);
     const today = todayYMD();
-    const items = rows
-      .map((r) => toLlmScheduledItem(r, today, effective.get(r.id)!.base))
+    // The *occurrence* that is next due, not the schedule's template: an
+    // occurrence the user re-priced or moved is what will actually post, so
+    // reporting the base amount here made the assistant and MCP disagree with
+    // the register about a bill the user had already changed (issue #1247).
+    // `maxOccurrences: 1` keeps this payload one row per schedule, which is the
+    // shape both tool layers publish.
+    const occurrences = await this.occurrences.findOccurrences(userId, {
+      through: addDaysYMD(today, days),
+      maxOccurrences: 1,
+    });
+    const items = occurrences
+      .map((occurrence) => toLlmScheduledItem(occurrence, today))
       .filter((item) => matchesScheduledFilter(item, filter));
 
     const bills = items.filter((i) => i.kind === "bill");
@@ -1600,6 +1641,44 @@ export class ScheduledTransactionsService {
       ...(unknownAmountItems.length > 0 ? { unknownAmountItems } : {}),
       items,
     };
+  }
+
+  /**
+   * The occurrences due through `through`, priced at what each would post today
+   * (issue #1247).
+   *
+   * This is what a client renders a bills calendar, list or export from. It
+   * exists because the browser cannot answer the question: expanding the
+   * recurrence client-side gives you dates but no per-occurrence amount, so the
+   * Upcoming Bills report applied one schedule-level figure to every projected
+   * occurrence and exported it -- wrong for every occurrence the user had
+   * re-priced, and wrong by the FX drift for an investment schedule.
+   *
+   * `accountId` / `transferAccountId` / `isTransfer` travel with each occurrence
+   * so the delegate filter and the transfer mask can do their work on this
+   * payload exactly as they do on a schedule list.
+   */
+  async findEffectiveOccurrences(
+    userId: string,
+    options: { through: string; maxPerSchedule?: number },
+  ): Promise<ScheduledOccurrenceReadModel[]> {
+    const occurrences = await this.occurrences.findOccurrences(userId, {
+      through: options.through,
+      maxOccurrences: options.maxPerSchedule ?? 100,
+    });
+    return occurrences.map((occurrence) => ({
+      scheduledTransactionId: occurrence.scheduledTransactionId,
+      originalDate: occurrence.originalDate,
+      dueDate: occurrence.dueDate,
+      amount: occurrence.amount,
+      amountComplete: occurrence.complete,
+      currencyCode: occurrence.currencyCode,
+      overrideId: occurrence.overrideId,
+      moved: occurrence.moved,
+      accountId: occurrence.schedule.accountId,
+      transferAccountId: occurrence.schedule.transferAccountId ?? null,
+      isTransfer: !!occurrence.schedule.isTransfer,
+    }));
   }
 
   async update(
@@ -3380,12 +3459,19 @@ function daysBetweenYMD(fromYMD: string, toYMD: string): number {
   return Math.round((to - from) / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * One occurrence, as the AI Assistant and MCP publish it.
+ *
+ * `nextDueDate` is the occurrence's own due date -- the moved date when an
+ * override moved it, not the recurrence slot it replaced. A schedule whose next
+ * occurrence was pushed a week out used to be announced on the original date and
+ * priced from the template, which is two wrong answers about one bill.
+ */
 function toLlmScheduledItem(
-  row: ScheduledTransaction,
+  occurrence: ResolvedScheduledOccurrence,
   todayYMDStr: string,
-  effective: EffectiveScheduledAmount,
 ): LlmScheduledItem {
-  const nextDueDate = ensureYMD(row.nextDueDate);
+  const row = occurrence.schedule;
   return {
     id: row.id,
     name: row.name,
@@ -3393,12 +3479,12 @@ function toLlmScheduledItem(
     accountName: row.account?.name ?? "",
     payeeName: row.payee?.name ?? row.payeeName ?? null,
     categoryName: row.category?.name ?? null,
-    amount: effective.amount,
-    amountComplete: effective.complete,
-    currency: effective.currencyCode,
+    amount: occurrence.amount,
+    amountComplete: occurrence.complete,
+    currency: occurrence.currencyCode,
     frequency: row.frequency,
-    nextDueDate,
-    daysUntilDue: daysBetweenYMD(todayYMDStr, nextDueDate),
+    nextDueDate: occurrence.dueDate,
+    daysUntilDue: daysBetweenYMD(todayYMDStr, occurrence.dueDate),
     isActive: row.isActive,
     autoPost: row.autoPost,
     kind: classifyScheduledKind(row),

@@ -7,6 +7,7 @@ import {
 import { DataSource } from "typeorm";
 import { ScheduledTransactionsService } from "./scheduled-transactions.service";
 import { ScheduledEffectiveAmountService } from "./scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "./scheduled-occurrence.service";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
 import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
@@ -270,6 +271,9 @@ describe("ScheduledTransactionsService", () => {
         // the #1167 FX decisions moved here (issue #1247) and the assertions below
         // are about those decisions, so a double would test nothing.
         ScheduledEffectiveAmountService,
+        // Likewise real: occurrence selection (which override governs the
+        // occurrence that is due) is what these assertions are about.
+        ScheduledOccurrenceService,
         { provide: AccountsService, useValue: accountsService },
         { provide: TransactionsService, useValue: transactionsService },
         {
@@ -1451,6 +1455,130 @@ describe("ScheduledTransactionsService", () => {
       // The deposits bucket answers for itself: nothing in it is unknown.
       expect(result.totalUpcomingDeposits).toBe(0);
       expect(result.knownUpcomingDepositsSubtotal).toBeUndefined();
+    });
+
+    // ---- Occurrence selection (issue #1247) ----
+    //
+    // The payload is about the occurrence that is next due, not the schedule's
+    // template. Reporting the base amount for an occurrence the user had
+    // re-priced or moved is the same class of defect as reporting a stale FX
+    // snapshot: the assistant answers with a figure and a date the register
+    // disagrees with.
+
+    /** The template's occurrences: due on the 15th, -1,200. */
+    const rentOnThe15th = () =>
+      makeScheduled({
+        id: "s-rent",
+        name: "Rent",
+        amount: -1200,
+        currencyCode: "USD",
+        nextDueDate: "2026-03-15",
+        account: { name: "Checking" } as any,
+      });
+
+    it("quotes the next occurrence's override amount, not the schedule's", async () => {
+      scheduledRepo.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder([rentOnThe15th()]),
+      );
+      overridesRepo.find.mockResolvedValue([
+        {
+          id: "ovr-1",
+          scheduledTransactionId: "s-rent",
+          originalDate: "2026-03-15",
+          overrideDate: "2026-03-15",
+          amount: -675,
+        },
+      ]);
+
+      const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+      expect(result.items[0].amount).toBe(-675);
+      expect(result.items[0].amount).not.toBe(-1200);
+      expect(result.totalUpcomingBills).toBe(675);
+    });
+
+    it("announces the date an override moved the occurrence to", async () => {
+      scheduledRepo.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder([rentOnThe15th()]),
+      );
+      overridesRepo.find.mockResolvedValue([
+        {
+          id: "ovr-1",
+          scheduledTransactionId: "s-rent",
+          // The identity is the slot it replaces; the occurrence itself moved.
+          originalDate: "2026-03-15",
+          overrideDate: "2026-03-28",
+          amount: -675,
+        },
+      ]);
+
+      const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+      expect(result.items[0].nextDueDate).toBe("2026-03-28");
+      expect(result.items[0].amount).toBe(-675);
+    });
+
+    it("withholds the bills total when the due occurrence's override cannot be priced", async () => {
+      // A plain bill whose next occurrence the user turned into a split that buys
+      // a security. The template is still -1,200 and perfectly knowable; the
+      // OCCURRENCE is not, because that line's settlement rate is unresolvable --
+      // so a consumer reading the base here would report a complete total for an
+      // occurrence nobody can price.
+      scheduledRepo.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder([
+          rentOnThe15th(),
+          makeScheduled({
+            id: "s-phone",
+            name: "Phone bill",
+            amount: -80,
+            currencyCode: "USD",
+            nextDueDate: "2026-03-20",
+            account: { name: "Checking" } as any,
+          }),
+        ]),
+      );
+      overridesRepo.find.mockResolvedValue([
+        {
+          id: "ovr-phone",
+          scheduledTransactionId: "s-phone",
+          originalDate: "2026-03-20",
+          overrideDate: "2026-03-20",
+          amount: null,
+          isSplit: true,
+          splits: [
+            {
+              amount: -1500,
+              splitKind: "investment",
+              investment: {
+                action: "BUY",
+                securityId: "SEC-1",
+                quantity: 10,
+                price: 100,
+                commission: 0,
+                exchangeRate: 1.5,
+                exchangeRateFromCurrency: "EUR",
+                exchangeRateToCurrency: "CAD",
+              },
+            },
+          ],
+        },
+      ]);
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+
+      const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+      const phone = result.items.find((i) => i.id === "s-phone")!;
+      expect(phone.amount).toBeNull();
+      expect(phone.amountComplete).toBe(false);
+      expect(result.totalUpcomingBills).toBeNull();
+      // The occurrence that did resolve, under its own name -- never the total's.
+      expect(result.knownUpcomingBillsSubtotal).toBe(1200);
+      expect(result.unknownAmountItems).toEqual(["Phone bill"]);
     });
   });
 

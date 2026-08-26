@@ -1,40 +1,38 @@
 import {
-  ForecastScheduleInput,
+  ForecastOccurrenceInput,
   accumulateForecastDeltas,
-  addDaysYMD,
   buildForecastSeries,
 } from "./balance-forecast.util";
 
-function schedule(
-  overrides: Partial<ForecastScheduleInput> = {},
-): ForecastScheduleInput {
+/**
+ * One occurrence as the projection receives it: already expanded, already
+ * matched against its override and already priced. Expansion and override
+ * selection are `common/scheduled-occurrences.ts`'s job and are tested there --
+ * this module is the arithmetic that follows (issue #1247).
+ */
+function occurrence(
+  overrides: Partial<ForecastOccurrenceInput> = {},
+): ForecastOccurrenceInput {
   return {
-    id: "st-1",
+    scheduledTransactionId: "st-1",
     name: "Rent",
     accountId: "acc-1",
     transferAccountId: null,
+    dueDate: "2024-07-15",
     amount: -100,
-    frequency: "MONTHLY",
-    nextDueDate: "2024-07-15",
-    endDate: null,
-    occurrencesRemaining: null,
     ...overrides,
   };
 }
 
 /** The deltas alone, for the cases that are not about gaps. */
 function deltasOf(
-  schedules: ForecastScheduleInput[],
+  occurrences: ForecastOccurrenceInput[],
   accountId: string,
-  today: string,
-  horizon: string,
   actuals?: Map<string, number>,
 ): Map<string, number> {
   const { byDate, gaps } = accumulateForecastDeltas(
-    schedules,
+    occurrences,
     accountId,
-    today,
-    horizon,
     actuals,
   );
   expect(gaps).toEqual([]);
@@ -42,20 +40,17 @@ function deltasOf(
 }
 
 describe("balance-forecast.util", () => {
-  describe("addDaysYMD", () => {
-    it("adds days across month boundaries", () => {
-      expect(addDaysYMD("2024-07-08", 90)).toBe("2024-10-06");
-      expect(addDaysYMD("2024-12-31", 1)).toBe("2025-01-01");
-    });
-  });
-
   describe("accumulateForecastDeltas", () => {
-    const today = "2024-07-08";
-    const horizon = "2024-10-08";
+    it("sums each occurrence onto the date it falls on", () => {
+      const deltas = deltasOf(
+        [
+          occurrence({ dueDate: "2024-07-15" }),
+          occurrence({ dueDate: "2024-08-15" }),
+          occurrence({ dueDate: "2024-09-15" }),
+        ],
+        "acc-1",
+      );
 
-    it("expands recurring occurrences within the horizon", () => {
-      const deltas = deltasOf([schedule()], "acc-1", today, horizon);
-      // MONTHLY from 2024-07-15: Jul 15, Aug 15, Sep 15 (Oct 15 is past horizon).
       expect([...deltas.keys()].sort()).toEqual([
         "2024-07-15",
         "2024-08-15",
@@ -64,138 +59,69 @@ describe("balance-forecast.util", () => {
       expect(deltas.get("2024-08-15")).toBe(-100);
     });
 
+    it("adds two occurrences that land on the same day", () => {
+      const deltas = deltasOf(
+        [
+          occurrence({ amount: -100 }),
+          occurrence({ scheduledTransactionId: "st-2", amount: -250 }),
+        ],
+        "acc-1",
+      );
+
+      expect(deltas.get("2024-07-15")).toBe(-350);
+    });
+
     it("treats a transfer target as an inflow", () => {
-      const s = schedule({
-        accountId: "other",
-        transferAccountId: "acc-1",
-        amount: -250,
-      });
-      const deltas = deltasOf([s], "acc-1", today, horizon);
+      const deltas = deltasOf(
+        [
+          occurrence({
+            accountId: "other",
+            transferAccountId: "acc-1",
+            amount: -250,
+          }),
+        ],
+        "acc-1",
+      );
+
       expect(deltas.get("2024-07-15")).toBe(250);
     });
 
-    it("stops a ONCE schedule after one occurrence", () => {
+    it("merges future-dated actuals", () => {
       const deltas = deltasOf(
-        [schedule({ frequency: "ONCE" })],
+        [occurrence({ dueDate: "2024-08-01" })],
         "acc-1",
-        today,
-        horizon,
+        new Map([["2024-07-20", 500]]),
       );
-      expect([...deltas.keys()]).toEqual(["2024-07-15"]);
-    });
 
-    it("respects the end date and remaining occurrences", () => {
-      const capped = deltasOf(
-        [schedule({ occurrencesRemaining: 2 })],
-        "acc-1",
-        today,
-        horizon,
-      );
-      expect([...capped.keys()].sort()).toEqual(["2024-07-15", "2024-08-15"]);
-
-      const ended = deltasOf(
-        [schedule({ endDate: "2024-08-31" })],
-        "acc-1",
-        today,
-        horizon,
-      );
-      expect([...ended.keys()].sort()).toEqual(["2024-07-15", "2024-08-15"]);
-    });
-
-    it("skips occurrences on or before today and merges with actuals", () => {
-      const actuals = new Map([["2024-07-20", 500]]);
-      const deltas = deltasOf(
-        [schedule({ nextDueDate: "2024-07-01" })], // starts in the past
-        "acc-1",
-        today,
-        horizon,
-        actuals,
-      );
-      // The 2024-07-01 occurrence is <= today, so it is not added.
-      expect(deltas.has("2024-07-01")).toBe(false);
       expect(deltas.get("2024-07-20")).toBe(500);
       expect(deltas.get("2024-08-01")).toBe(-100);
     });
 
-    // ---- Overrides and gaps (issue #1247) ----
+    it("emits no point for a day whose net effect is zero", () => {
+      // A transfer between two accounts, neither of which is this one, plus a
+      // zero-amount reminder on the charted account.
+      const deltas = deltasOf([occurrence({ amount: 0 })], "acc-1");
 
-    it("moves an overridden occurrence to its new date and amount", () => {
-      const deltas = deltasOf(
-        [
-          schedule({
-            overrides: [
-              {
-                originalDate: "2024-08-15",
-                overrideDate: "2024-08-20",
-                amount: -250,
-              },
-            ],
-          }),
-        ],
-        "acc-1",
-        today,
-        horizon,
-      );
-
-      // August lands on the 20th at the override's amount; the other
-      // occurrences are untouched.
-      expect(deltas.has("2024-08-15")).toBe(false);
-      expect(deltas.get("2024-08-20")).toBe(-250);
-      expect(deltas.get("2024-07-15")).toBe(-100);
-      expect(deltas.get("2024-09-15")).toBe(-100);
+      expect([...deltas.keys()]).toEqual([]);
     });
 
-    it("applies the transfer sign to an override too", () => {
-      const deltas = deltasOf(
-        [
-          schedule({
-            accountId: "other",
-            transferAccountId: "acc-1",
-            amount: -100,
-            overrides: [
-              {
-                originalDate: "2024-07-15",
-                overrideDate: "2024-07-15",
-                amount: -400,
-              },
-            ],
-          }),
-        ],
+    it("ignores an occurrence that does not touch this account", () => {
+      const { byDate, gaps } = accumulateForecastDeltas(
+        [occurrence({ accountId: "other", amount: null })],
         "acc-1",
-        today,
-        horizon,
-      );
-
-      expect(deltas.get("2024-07-15")).toBe(400);
-    });
-
-    it("drops an occurrence an override moved past the horizon", () => {
-      const { byDate } = accumulateForecastDeltas(
-        [
-          schedule({
-            frequency: "ONCE",
-            overrides: [
-              {
-                originalDate: "2024-07-15",
-                overrideDate: "2025-01-15",
-                amount: -100,
-              },
-            ],
-          }),
-        ],
-        "acc-1",
-        today,
-        horizon,
       );
 
       expect([...byDate.keys()]).toEqual([]);
+      expect(gaps).toEqual([]);
     });
+
+    // ---- Unknown amounts (issue #1247) ----
 
     it("reports an unpriced occurrence as a gap instead of skipping it", () => {
       const { byDate, gaps } = accumulateForecastDeltas(
         [
-          schedule({
-            id: "st-inv",
+          occurrence({
+            scheduledTransactionId: "st-inv",
             name: "Monthly ETF buy",
             amount: null,
             gapReason: "unresolvedSettlementRate",
@@ -204,8 +130,6 @@ describe("balance-forecast.util", () => {
           }),
         ],
         "acc-1",
-        today,
-        horizon,
       );
 
       // Nothing is added -- an unknown amount is not a zero.
@@ -223,70 +147,71 @@ describe("balance-forecast.util", () => {
 
     it("reports one gap per schedule, not one per occurrence", () => {
       const { gaps } = accumulateForecastDeltas(
-        [schedule({ amount: null })],
+        [
+          occurrence({ amount: null, dueDate: "2024-07-15" }),
+          occurrence({ amount: null, dueDate: "2024-08-15" }),
+          occurrence({ amount: null, dueDate: "2024-09-15" }),
+        ],
         "acc-1",
-        today,
-        horizon,
       );
 
-      // Three occurrences fall in the window; the reader needs the schedule once.
+      // The reader needs the schedule named once, not three times.
       expect(gaps).toHaveLength(1);
     });
 
-    it("does not report a schedule whose unpriced occurrences all fall outside the horizon", () => {
-      // Completeness is a question about THIS window: a schedule nobody can
-      // price but which posts nothing before the horizon does not make this
-      // projection unknown.
-      const { byDate, gaps } = accumulateForecastDeltas(
-        [
-          schedule({
-            amount: null,
-            frequency: "ONCE",
-            nextDueDate: "2025-06-01",
-          }),
-        ],
-        "acc-1",
-        today,
-        horizon,
-      );
-
-      expect(gaps).toEqual([]);
-      expect([...byDate.keys()]).toEqual([]);
-    });
-
-    it("does not report a schedule that does not touch this account", () => {
+    it("defaults the reason when the caller named none", () => {
       const { gaps } = accumulateForecastDeltas(
-        [schedule({ accountId: "other", amount: null })],
+        [occurrence({ amount: null })],
         "acc-1",
-        today,
-        horizon,
       );
 
-      expect(gaps).toEqual([]);
+      expect(gaps[0]).toEqual({
+        scheduledTransactionId: "st-1",
+        name: "Rent",
+        reason: "unresolvedSettlementRate",
+        fromCurrency: null,
+        toCurrency: null,
+      });
     });
 
-    it("reports an unpriced override even when the base amount is known", () => {
+    it("carries a cross-currency transfer's own reason", () => {
       const { byDate, gaps } = accumulateForecastDeltas(
         [
-          schedule({
-            overrides: [
-              {
-                originalDate: "2024-08-15",
-                overrideDate: "2024-08-15",
-                amount: null,
-              },
-            ],
+          occurrence({
+            accountId: "other",
+            transferAccountId: "acc-1",
+            amount: null,
+            gapReason: "crossCurrencyTransfer",
+            gapFromCurrency: "EUR",
+            gapToCurrency: "CAD",
           }),
         ],
         "acc-1",
-        today,
-        horizon,
       );
 
-      expect(gaps).toHaveLength(1);
-      // The occurrence contributes nothing rather than falling back to the base.
-      expect(byDate.has("2024-08-15")).toBe(false);
+      expect([...byDate.keys()]).toEqual([]);
+      expect(gaps[0]).toMatchObject({
+        reason: "crossCurrencyTransfer",
+        fromCurrency: "EUR",
+        toCurrency: "CAD",
+      });
+    });
+
+    it("keeps the known occurrences of a schedule whose other occurrence is a gap", () => {
+      // One unknown occurrence makes the SERIES unusable -- that decision is the
+      // caller's. This function still reports the deltas it could compute, so
+      // the caller can say which day the gap starts at.
+      const { byDate, gaps } = accumulateForecastDeltas(
+        [
+          occurrence({ dueDate: "2024-07-15", amount: -100 }),
+          occurrence({ dueDate: "2024-08-15", amount: null }),
+        ],
+        "acc-1",
+      );
+
       expect(byDate.get("2024-07-15")).toBe(-100);
+      expect(byDate.has("2024-08-15")).toBe(false);
+      expect(gaps).toHaveLength(1);
     });
   });
 

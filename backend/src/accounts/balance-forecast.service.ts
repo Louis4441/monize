@@ -4,26 +4,22 @@ import {
   forwardRef,
   Inject,
 } from "@nestjs/common";
-import { DataSource, In } from "typeorm";
+import { DataSource } from "typeorm";
 import { Account } from "./entities/account.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
-import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import {
-  ScheduledEffectiveAmountService,
-  overrideEffectiveKey,
-} from "../scheduled-transactions/scheduled-effective-amount.service";
+  ResolvedScheduledOccurrence,
+  ScheduledOccurrenceService,
+} from "../scheduled-transactions/scheduled-occurrence.service";
 import {
   BalanceForecastGap,
-  ForecastOverrideInput,
+  ForecastOccurrenceInput,
   ForecastPoint,
-  ForecastScheduleInput,
   accumulateForecastDeltas,
-  addDaysYMD,
   buildForecastSeries,
 } from "./balance-forecast.util";
 import { roundMoney } from "../common/round.util";
-import { todayYMD } from "../common/date-utils";
-import { ensureYMD } from "../common/recurrence";
+import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { tr } from "../i18n/translate";
 import { withScopedDb } from "../common/db/scoped-db";
 
@@ -52,12 +48,14 @@ export interface BalanceForecastResult {
 export class BalanceForecastService {
   constructor(
     private readonly dataSource: DataSource,
-    // What each occurrence would post today, and which account pays for it, from
-    // the one server-side resolver (issue #1247). Both halves matter here: a
-    // scheduled investment's `accountId` is the brokerage while its cash settles
-    // elsewhere, so a projection keyed on that column charged the wrong account.
-    @Inject(forwardRef(() => ScheduledEffectiveAmountService))
-    private readonly effectiveAmounts: ScheduledEffectiveAmountService,
+    // Which occurrences fall inside the horizon, what each would post today, and
+    // which account pays for it -- all from the one server-side occurrence
+    // contract (issue #1247). Every half matters here: a scheduled investment's
+    // `accountId` is the brokerage while its cash settles elsewhere, so a
+    // projection keyed on that column charged the wrong account, and an
+    // occurrence the user re-priced or moved is not the template's.
+    @Inject(forwardRef(() => ScheduledOccurrenceService))
+    private readonly occurrences: ScheduledOccurrenceService,
   ) {}
 
   async getBalanceForecast(
@@ -147,85 +145,43 @@ export class BalanceForecastService {
       }),
     );
 
-    // Per-occurrence overrides move a date and replace an amount, and the
-    // cash-flow forecast already honours them -- an account chart that ignored
-    // them disagreed with the forecast for every overridden occurrence.
-    const candidateIds = candidates.map((c) => c.id);
-    const overrides = candidateIds.length
-      ? await withScopedDb(this.dataSource, (m) =>
-          m.getRepository(ScheduledTransactionOverride).find({
-            where: { scheduledTransactionId: In(candidateIds) },
-          }),
-        )
-      : [];
-    const overridesBySchedule = new Map<
-      string,
-      ScheduledTransactionOverride[]
-    >();
-    for (const o of overrides) {
-      const list = overridesBySchedule.get(o.scheduledTransactionId) ?? [];
-      list.push(o);
-      overridesBySchedule.set(o.scheduledTransactionId, list);
-    }
-    const hydrated = candidates.map((c) => ({
-      ...c,
-      futureOverrides: overridesBySchedule.get(c.id) ?? [],
-    }));
+    // Occurrences, not schedules: the expansion, the override selection and the
+    // pricing all come from the one occurrence contract, so this chart cannot
+    // disagree with the cash-flow forecast, the budget or the register about
+    // which occurrence falls when and what it costs (issue #1247).
+    const occurrences = await this.occurrences.expand(userId, candidates, {
+      // Strictly after today: today's balance is already a fact, and the anchor
+      // point carries it.
+      from: addDaysYMD(today, 1),
+      through: horizon,
+    });
 
-    // Resolved outside every read transaction: the rate path can fetch and
-    // persist.
-    const effective = await this.effectiveAmounts.resolveMany(userId, hydrated);
-
-    const inputs: ForecastScheduleInput[] = [];
-    for (const row of hydrated) {
-      const resolved = effective.get(row.id)!;
+    const inputs: ForecastOccurrenceInput[] = [];
+    for (const occurrence of occurrences) {
+      const row = occurrence.schedule;
       // Charge the occurrence to the account that actually moves the cash.
-      const settlementAccountId = resolved.settlementAccountId;
       const isTransferTarget = row.transferAccountId === accountId;
-      if (settlementAccountId !== accountId && !isTransferTarget) continue;
+      if (occurrence.settlementAccountId !== accountId && !isTransferTarget) {
+        continue;
+      }
 
-      const gap = this.gapFor(row, resolved, account, isTransferTarget);
-      const overrideInputs: ForecastOverrideInput[] = (
-        row.futureOverrides ?? []
-      ).map((o) => {
-        // `?.amount ?? base` would be wrong here: an override the resolver
-        // priced as UNKNOWN reads as null, which `??` cannot tell from "no
-        // entry" -- and falling through to the base amount is exactly the
-        // substitution issue #1247 forbids. Branch on the entry, not the value.
-        const own = resolved.overrides.get(overrideEffectiveKey(o));
-        return {
-          originalDate: ensureYMD(o.originalDate as unknown as string),
-          overrideDate: ensureYMD(o.overrideDate as unknown as string),
-          amount: gap
-            ? null
-            : own
-              ? own.effective.amount
-              : resolved.base.amount,
-        };
-      });
-
+      const gap = this.gapFor(occurrence, account, isTransferTarget);
       inputs.push({
-        id: row.id,
+        scheduledTransactionId: occurrence.scheduledTransactionId,
         name: row.name,
-        accountId: settlementAccountId,
+        accountId: occurrence.settlementAccountId,
         transferAccountId: row.transferAccountId,
-        amount: gap ? null : resolved.base.amount,
+        dueDate: occurrence.dueDate,
+        amount: gap ? null : occurrence.amount,
         gapReason: gap?.reason,
         gapFromCurrency: gap?.from ?? null,
         gapToCurrency: gap?.to ?? null,
-        frequency: row.frequency,
-        nextDueDate: ensureYMD(row.nextDueDate),
-        endDate: row.endDate ? ensureYMD(row.endDate) : null,
-        occurrencesRemaining: row.occurrencesRemaining,
-        overrides: overrideInputs,
       });
     }
 
     const { byDate, gaps } = accumulateForecastDeltas(
       inputs,
       accountId,
-      today,
-      horizon,
       actualByDate,
     );
     const complete = gaps.length === 0;
@@ -244,13 +200,13 @@ export class BalanceForecastService {
   }
 
   /**
-   * Whether this schedule can be projected onto `account` at all, and why not.
+   * Whether this occurrence can be projected onto `account` at all, and why not.
    *
    * Two ways it cannot, and neither may be papered over with the persisted
    * amount or an unconverted one (issue #1247):
    *
-   *  - the resolver could not price the occurrence (an investment-carrying
-   *    schedule whose current settlement rate is unknown);
+   *  - the occurrence could not be priced (an investment-carrying schedule whose
+   *    current settlement rate is unknown, or an override in the same state);
    *  - the schedule is a transfer *into* this account from an account in another
    *    currency. Its `amount` is the source's, the arriving amount is resolved
    *    when it posts, and this endpoint applies no rate -- so adding the source
@@ -258,16 +214,13 @@ export class BalanceForecastService {
    *    defect from the stale snapshot and is reported under its own reason.
    *
    * The currency check on the priced case is deliberately a comparison rather
-   * than an assumption: `base.currencyCode` is the settlement account's currency
-   * by construction, so it should always equal this account's -- and if that ever
-   * stops being true, the honest answer is a gap, not a silent addition.
+   * than an assumption: the occurrence's `currencyCode` is the settlement
+   * account's currency by construction, so it should always equal this account's
+   * -- and if that ever stops being true, the honest answer is a gap, not a
+   * silent addition.
    */
   private gapFor(
-    row: ScheduledTransaction,
-    resolved: {
-      base: { amount: number | null; currencyCode: string };
-      settlementPair: { from: string; to: string } | null;
-    },
+    occurrence: ResolvedScheduledOccurrence,
     account: Account,
     isTransferTarget: boolean,
   ): {
@@ -275,6 +228,7 @@ export class BalanceForecastService {
     from: string | null;
     to: string | null;
   } | null {
+    const row = occurrence.schedule;
     if (isTransferTarget && row.currencyCode !== account.currencyCode) {
       return {
         reason: "crossCurrencyTransfer",
@@ -282,24 +236,21 @@ export class BalanceForecastService {
         to: account.currencyCode,
       };
     }
-    if (resolved.base.amount === null) {
+    if (occurrence.amount === null) {
       // Name the pair when there is one: "no rate from USD to CAD" is something
       // the reader can go and fix. A split parent's lines each settle their own
       // security's currency, so there is no single pair and the message says the
       // rate is unavailable without naming one.
       return {
         reason: "unresolvedSettlementRate",
-        from: resolved.settlementPair?.from ?? null,
-        to: resolved.settlementPair?.to ?? resolved.base.currencyCode,
+        from: occurrence.settlementPair?.from ?? null,
+        to: occurrence.settlementPair?.to ?? occurrence.currencyCode,
       };
     }
-    if (
-      !isTransferTarget &&
-      resolved.base.currencyCode !== account.currencyCode
-    ) {
+    if (!isTransferTarget && occurrence.currencyCode !== account.currencyCode) {
       return {
         reason: "unresolvedSettlementRate",
-        from: resolved.base.currencyCode,
+        from: occurrence.currencyCode,
         to: account.currencyCode,
       };
     }

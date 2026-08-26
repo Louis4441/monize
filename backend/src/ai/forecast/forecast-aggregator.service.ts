@@ -7,7 +7,8 @@ import {
 } from "../../common/investment-filter.util";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
-import { ScheduledEffectiveAmountService } from "../../scheduled-transactions/scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "../../scheduled-transactions/scheduled-occurrence.service";
+import { addDaysYMD, todayYMD } from "../../common/date-utils";
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
 import { RecurringCharge } from "../../transactions/recurring-charges.util";
@@ -82,6 +83,16 @@ export { RecurringCharge };
  */
 const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
 
+/**
+ * How far ahead the forecast summary looks for each schedule's next occurrence.
+ *
+ * Not a product window: the summary describes every active schedule, and each
+ * contributes exactly one occurrence. Ten years is long enough that only a
+ * schedule which has genuinely run out of occurrences yields none, and short
+ * enough that the expansion of a daily schedule stays bounded.
+ */
+const FORECAST_OCCURRENCE_HORIZON_DAYS = 3650;
+
 @Injectable()
 export class ForecastAggregatorService {
   private readonly logger = new Logger(ForecastAggregatorService.name);
@@ -91,10 +102,10 @@ export class ForecastAggregatorService {
     @Inject(forwardRef(() => AccountsService))
     private readonly accountsService: AccountsService,
     private readonly transactionAnalytics: TransactionAnalyticsService,
-    // The amount a forecast prompt quotes is the amount the occurrence would
-    // post, from the one shared resolver (issue #1247).
-    @Inject(forwardRef(() => ScheduledEffectiveAmountService))
-    private readonly effectiveAmounts: ScheduledEffectiveAmountService,
+    // The date and the amount a forecast prompt quotes are the occurrence's own,
+    // from the one server-side occurrence contract (issue #1247).
+    @Inject(forwardRef(() => ScheduledOccurrenceService))
+    private readonly occurrences: ScheduledOccurrenceService,
   ) {}
 
   async computeAggregates(
@@ -250,27 +261,30 @@ export class ForecastAggregatorService {
         order: { nextDueDate: "ASC" },
       }),
     );
-    const effective = await this.effectiveAmounts.resolveMany(
-      userId,
-      scheduled,
-    );
+    // The NEXT occurrence of each schedule, with the date and amount it will
+    // actually post -- an occurrence the user re-priced or moved is what the
+    // model should be forecasting from, not the template it came from.
+    // The horizon is wide rather than a product window: every active schedule
+    // belongs in this summary, so the bound exists only to stop the expansion
+    // running away on a schedule with no end.
+    const occurrences = await this.occurrences.expand(userId, scheduled, {
+      through: addDaysYMD(todayYMD(), FORECAST_OCCURRENCE_HORIZON_DAYS),
+      maxOccurrences: 1,
+    });
 
-    return scheduled.map((st) => {
+    return occurrences.map((occurrence) => {
+      const st = occurrence.schedule;
       // The direction still comes from the stored sign (an FX rate is positive,
-      // so it cannot flip one); the magnitude comes from the resolver, and is
+      // so it cannot flip one); the magnitude comes from the occurrence, and is
       // null when the current rate for it cannot be determined.
-      const amount = Number(st.amount);
-      const isIncome = st.category?.isIncome === true || amount > 0;
-      const effectiveAmount = effective.get(st.id)!.base.amount;
+      const isIncome = st.category?.isIncome === true || Number(st.amount) > 0;
 
       return {
         name: st.name,
-        amount: effectiveAmount === null ? null : Math.abs(effectiveAmount),
-        amountComplete: effectiveAmount !== null,
+        amount: occurrence.amount === null ? null : Math.abs(occurrence.amount),
+        amountComplete: occurrence.amount !== null,
         frequency: st.frequency,
-        nextDueDate: st.nextDueDate
-          ? new Date(st.nextDueDate).toISOString().substring(0, 10)
-          : "",
+        nextDueDate: occurrence.dueDate,
         categoryName: st.category?.name || null,
         isIncome,
         isTransfer: st.isTransfer,

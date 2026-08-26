@@ -7,6 +7,7 @@ import { Account } from "../accounts/entities/account.entity";
 import { Tag } from "../tags/entities/tag.entity";
 import { ScheduledTransactionsService } from "./scheduled-transactions.service";
 import { ScheduledEffectiveAmountService } from "./scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "./scheduled-occurrence.service";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ScheduledTransactionsController } from "./scheduled-transactions.controller";
@@ -36,13 +37,19 @@ import { DelegationModule } from "../delegation/delegation.module";
   providers: [
     ScheduledTransactionsService,
     ScheduledEffectiveAmountService,
+    ScheduledOccurrenceService,
     ScheduledTransactionOverrideService,
     ScheduledTransactionLoanService,
   ],
   controllers: [ScheduledTransactionsController],
-  // The effective-amount resolver is exported so a consumer that reads schedule
-  // rows for itself (BudgetsService) asks it rather than re-deriving the #1167
-  // FX rules (issue #1247).
-  exports: [ScheduledTransactionsService, ScheduledEffectiveAmountService],
+  // Both read-side services are exported so a consumer that holds schedule rows
+  // of its own (BudgetsService, the account balance forecast) asks them rather
+  // than re-deriving the #1167 FX rules or re-implementing occurrence selection
+  // (issue #1247).
+  exports: [
+    ScheduledTransactionsService,
+    ScheduledEffectiveAmountService,
+    ScheduledOccurrenceService,
+  ],
 })
 export class ScheduledTransactionsModule {}

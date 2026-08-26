@@ -4,10 +4,9 @@ import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
-import {
-  ScheduledEffectiveAmountService,
-  overrideEffectiveKey,
-} from "../scheduled-transactions/scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
+import { expandOccurrenceSlots } from "../common/scheduled-occurrences";
+import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { User } from "../users/entities/user.entity";
 import { EmailService } from "./email.service";
@@ -47,10 +46,11 @@ export class BillReminderService {
     private configService: ConfigService,
     private readonly i18n: I18nService,
     private readonly jobClaims: JobClaimService,
-    // The amount a reminder quotes is the amount the posting will use, from the
-    // one shared resolver rather than the persisted snapshot (issue #1247).
-    @Inject(forwardRef(() => ScheduledEffectiveAmountService))
-    private readonly effectiveAmounts: ScheduledEffectiveAmountService,
+    // Which occurrence is due, when it falls and what it will cost -- all from
+    // the one server-side occurrence contract rather than the persisted snapshot
+    // or a private copy of the override rules (issue #1247).
+    @Inject(forwardRef(() => ScheduledOccurrenceService))
+    private readonly occurrences: ScheduledOccurrenceService,
   ) {}
 
   /**
@@ -108,22 +108,19 @@ export class BillReminderService {
     // Group bills by userId where due date is within reminderDaysBefore window
     const billsByUser = new Map<string, ScheduledTransaction[]>();
 
+    const todayStr = todayYMD();
     for (const bill of manualBills) {
-      // Check for an override matching the next due date (user may have changed the date)
-      const nextDueDateStr = String(bill.nextDueDate).split("T")[0];
-      const override = bill.overrides?.find(
-        (o) => String(o.originalDate).split("T")[0] === nextDueDateStr,
-      );
-      const effectiveDueDate = override
-        ? new Date(override.overrideDate)
-        : new Date(bill.nextDueDate);
-      effectiveDueDate.setHours(0, 0, 0, 0);
-
-      const daysUntilDue = Math.ceil(
-        (effectiveDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      if (daysUntilDue >= 0 && daysUntilDue <= bill.reminderDaysBefore) {
+      // "Is this bill due inside its own reminder window" is a question about an
+      // OCCURRENCE, so it is asked through the one expander: the override that
+      // matters is the one on the recurrence slot, and it may have moved the
+      // occurrence's date (issue #1247). This half runs cross-user, so it cannot
+      // price anything -- `deliverForUser` does that under the owner's identity.
+      const due = expandOccurrenceSlots(bill, bill.overrides ?? [], {
+        from: todayStr,
+        through: addDaysYMD(todayStr, bill.reminderDaysBefore),
+        maxOccurrences: 1,
+      });
+      if (due.length > 0) {
         const existing = billsByUser.get(bill.userId) || [];
         existing.push(bill);
         billsByUser.set(bill.userId, existing);
@@ -244,33 +241,33 @@ export class BillReminderService {
         return false;
       }
 
-      // What each occurrence would actually post, from the one server-side
-      // resolver the forecast and the posting use (issue #1247). The persisted
-      // `amount` is a snapshot at whatever rate was current when it was written,
-      // so a reminder built from it can name a figure the posting will not use.
+      // What each occurrence would actually post, and when, from the one
+      // server-side occurrence contract (issue #1247). The persisted `amount` is
+      // a snapshot at whatever rate was current when it was written, so a
+      // reminder built from it can name a figure the posting will not use -- and
+      // the occurrence the user re-dated is not the one the template describes.
       // The direction (income vs expense) still comes from the stored sign: an
       // FX rate is positive, so it cannot flip one, and the sign is known even
       // when the magnitude is not.
-      const effective = await this.effectiveAmounts.resolveMany(userId, [
-        ...bills,
-      ]);
-      const billData = bills.map((b) => {
-        const dueDateStr = String(b.nextDueDate).split("T")[0];
-        const ov = b.overrides?.find(
-          (o) => String(o.originalDate).split("T")[0] === dueDateStr,
-        );
-        const resolved = effective.get(b.id)!;
-        const occurrence = ov
-          ? (resolved.overrides.get(overrideEffectiveKey(ov))?.effective ??
-            resolved.base)
-          : resolved.base;
+      const todayStr = todayYMD();
+      const longestWindow = Math.max(
+        ...bills.map((b) => b.reminderDaysBefore ?? 0),
+        0,
+      );
+      const occurrences = await this.occurrences.expand(userId, [...bills], {
+        from: todayStr,
+        through: addDaysYMD(todayStr, longestWindow),
+        maxOccurrences: 1,
+      });
+      const billData = occurrences.map((occurrence) => {
+        const b = occurrence.schedule;
         return {
           payee: b.payee?.name || b.payeeName || b.name,
           amount:
             occurrence.amount === null ? null : Math.abs(occurrence.amount),
-          dueDate: ov ? String(ov.overrideDate).split("T")[0] : dueDateStr,
+          dueDate: occurrence.dueDate,
           currencyCode: occurrence.currencyCode,
-          isIncome: Number(ov?.amount ?? b.amount) > 0,
+          isIncome: (occurrence.amount ?? Number(b.amount)) > 0,
         };
       });
 

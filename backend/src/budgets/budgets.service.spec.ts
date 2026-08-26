@@ -4,6 +4,7 @@ import { DataSource } from "typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { BudgetsService } from "./budgets.service";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
+import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import {
   createInvestmentFxMock,
@@ -25,6 +26,7 @@ import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { addDaysYMD, todayYMD } from "../common/date-utils";
 import {
   createScopedDbMocks,
   DataSourceMock,
@@ -199,6 +201,9 @@ describe("BudgetsService", () => {
     };
 
     overridesRepository = {
+      // The occurrence contract loads a schedule's overrides with `find`, keyed
+      // by schedule id, and matches them on `originalDate` itself.
+      find: jest.fn().mockResolvedValue([]),
       createQueryBuilder: jest.fn(() => createMockQueryBuilder()),
     };
 
@@ -235,6 +240,7 @@ describe("BudgetsService", () => {
         // pair is same-currency, so a plain schedule's effective amount equals
         // its stored one and every pre-existing expectation still holds.
         ScheduledEffectiveAmountService,
+        ScheduledOccurrenceService,
         {
           provide: InvestmentTransactionsService,
           useValue: investmentTransactionsService,
@@ -910,14 +916,22 @@ describe("BudgetsService", () => {
       );
     };
 
-    /** The issue's schedule: 10 x 100, pinned at 1.50 while priced in EUR. */
+    /**
+     * The issue's schedule: 10 x 100, pinned at 1.50 while priced in EUR.
+     *
+     * Due today, because the period `getVelocity` reports on is the CURRENT
+     * month and the occurrence window is now filtered in code rather than by a
+     * mocked SQL predicate -- a fixture dated outside the window is simply not
+     * an upcoming bill.
+     */
     const staleInvestmentBill = () => ({
       id: "st-inv",
       userId: "user-1",
       name: "Monthly ETF buy",
       amount: -1000,
       currencyCode: "CAD",
-      nextDueDate: "2026-02-20",
+      frequency: "MONTHLY",
+      nextDueDate: todayYMD(),
       categoryId: null,
       isActive: true,
       isSplit: false,
@@ -963,7 +977,8 @@ describe("BudgetsService", () => {
           name: "Rent",
           amount: -1200,
           currencyCode: "CAD",
-          nextDueDate: "2026-02-25",
+          frequency: "MONTHLY",
+          nextDueDate: todayYMD(),
           categoryId: "cat-1",
           isActive: true,
           isSplit: false,
@@ -989,6 +1004,120 @@ describe("BudgetsService", () => {
       // Both derived figures are unknown, not larger.
       expect(result.trulyAvailable).toBeNull();
       expect(result.safeDailySpend).toBeNull();
+    });
+
+    // ---- Occurrence selection (issue #1247) ----
+
+    it("counts the occurrence's override amount, not the schedule's", async () => {
+      stubVelocityBudget([
+        {
+          id: "st-rent",
+          userId: "user-1",
+          name: "Rent",
+          amount: -1350,
+          currencyCode: "USD",
+          frequency: "MONTHLY",
+          nextDueDate: todayYMD(),
+          categoryId: "cat-1",
+          isActive: true,
+          isSplit: false,
+          isInvestment: false,
+          splits: [],
+        },
+      ]);
+      overridesRepository.find.mockResolvedValue([
+        {
+          id: "ovr-1",
+          scheduledTransactionId: "st-rent",
+          originalDate: todayYMD(),
+          overrideDate: todayYMD(),
+          amount: -675,
+        },
+      ]);
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.upcomingBills[0].amount).toBe(675);
+      expect(result.totalUpcomingBills).toBe(675);
+      // 600 budgeted - 200 spent - 675 upcoming.
+      expect(result.trulyAvailable).toBe(-275);
+    });
+
+    /**
+     * The override's identity is `originalDate`. Keying the lookup on
+     * `overrideDate` -- which is what the alert path did -- silently returns the
+     * template's amount for every occurrence the user MOVED, and the two dates
+     * are equal in the ordinary case, so nothing notices.
+     */
+    it("honours an override that also moved the occurrence, and reports the moved date", async () => {
+      const slot = todayYMD();
+      const movedTo = addDaysYMD(slot, 3);
+      stubVelocityBudget([
+        {
+          id: "st-rent",
+          userId: "user-1",
+          name: "Rent",
+          amount: -1350,
+          currencyCode: "USD",
+          frequency: "MONTHLY",
+          nextDueDate: slot,
+          categoryId: "cat-1",
+          isActive: true,
+          isSplit: false,
+          isInvestment: false,
+          splits: [],
+        },
+      ]);
+      overridesRepository.find.mockResolvedValue([
+        {
+          id: "ovr-1",
+          scheduledTransactionId: "st-rent",
+          originalDate: slot,
+          overrideDate: movedTo,
+          amount: -675,
+        },
+      ]);
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.upcomingBills[0].amount).toBe(675);
+      expect(result.upcomingBills[0].dueDate).toBe(movedTo);
+      expect(result.totalUpcomingBills).toBe(675);
+    });
+
+    it("drops an occurrence an override moved past the end of the period", async () => {
+      const slot = todayYMD();
+      stubVelocityBudget([
+        {
+          id: "st-rent",
+          userId: "user-1",
+          name: "Rent",
+          amount: -1350,
+          currencyCode: "USD",
+          frequency: "ONCE",
+          nextDueDate: slot,
+          categoryId: "cat-1",
+          isActive: true,
+          isSplit: false,
+          isInvestment: false,
+          splits: [],
+        },
+      ]);
+      overridesRepository.find.mockResolvedValue([
+        {
+          id: "ovr-1",
+          scheduledTransactionId: "st-rent",
+          originalDate: slot,
+          // Pushed into next year: it is not this period's bill any more.
+          overrideDate: addDaysYMD(slot, 400),
+          amount: -675,
+        },
+      ]);
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.upcomingBills).toEqual([]);
+      expect(result.totalUpcomingBills).toBe(0);
     });
   });
 
@@ -1071,9 +1200,7 @@ describe("BudgetsService", () => {
         getMany: jest.fn().mockResolvedValue([]),
       });
       budgetAlertsRepository.createQueryBuilder.mockReturnValue(alertQb);
-      overridesRepository.createQueryBuilder.mockReturnValue(
-        createMockQueryBuilder({ getMany: jest.fn().mockResolvedValue([]) }),
-      );
+      overridesRepository.find.mockResolvedValue([]);
       budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
         ...data,
         id: "new-alert-1",
@@ -1123,22 +1250,18 @@ describe("BudgetsService", () => {
         getMany: jest.fn().mockResolvedValue([]),
       });
       budgetAlertsRepository.createQueryBuilder.mockReturnValue(alertQb);
-      overridesRepository.createQueryBuilder.mockReturnValue(
-        createMockQueryBuilder({
-          getMany: jest.fn().mockResolvedValue([
-            {
-              // A stored override always carries an id and the original date it
-              // replaces (the `(scheduled_transaction_id, original_date)` unique
-              // index), and the effective-amount resolver files it under them.
-              id: "ovr-1",
-              scheduledTransactionId: "st-1",
-              originalDate: tomorrowStr,
-              overrideDate: tomorrowStr,
-              amount: -312.65,
-            },
-          ]),
-        }),
-      );
+      overridesRepository.find.mockResolvedValue([
+        {
+          // A stored override always carries an id and the original date it
+          // replaces (the `(scheduled_transaction_id, original_date)` unique
+          // index), and the occurrence contract matches on that date.
+          id: "ovr-1",
+          scheduledTransactionId: "st-1",
+          originalDate: tomorrowStr,
+          overrideDate: tomorrowStr,
+          amount: -312.65,
+        },
+      ]);
       budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
         ...data,
         id: "new-alert-1",
@@ -1194,9 +1317,7 @@ describe("BudgetsService", () => {
       budgetAlertsRepository.createQueryBuilder.mockReturnValue(
         createMockQueryBuilder({ getMany: jest.fn().mockResolvedValue([]) }),
       );
-      overridesRepository.createQueryBuilder.mockReturnValue(
-        createMockQueryBuilder({ getMany: jest.fn().mockResolvedValue([]) }),
-      );
+      overridesRepository.find.mockResolvedValue([]);
       budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
         ...data,
         id: "new-alert-1",
@@ -1221,6 +1342,123 @@ describe("BudgetsService", () => {
       expect((saved.data as Record<string, unknown>).amountComplete).toBe(
         false,
       );
+    });
+
+    /**
+     * The regression the audit of the first pass found: the override lookup was
+     * keyed on `overrideDate` while the occurrence's identity is `originalDate`,
+     * so a bill the user had MOVED fell back to the template's amount -- and the
+     * alert announced the template's date. The previous test cannot see it,
+     * because there the two dates are equal.
+     */
+    it("prices a moved occurrence from its override and announces the moved date", async () => {
+      const slot = addDaysYMD(todayYMD(), 1);
+      const movedTo = addDaysYMD(todayYMD(), 2);
+
+      scheduledTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({
+          getMany: jest.fn().mockResolvedValue([
+            {
+              id: "st-1",
+              userId: "user-1",
+              name: "Electric",
+              payee: { name: "Power Co" },
+              payeeName: null,
+              amount: -250.0,
+              currencyCode: "USD",
+              frequency: "MONTHLY",
+              nextDueDate: slot,
+              isActive: true,
+              autoPost: false,
+              reminderDaysBefore: 3,
+            },
+          ]),
+          leftJoinAndSelect: jest.fn().mockReturnThis(),
+        }),
+      );
+      budgetAlertsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({ getMany: jest.fn().mockResolvedValue([]) }),
+      );
+      overridesRepository.find.mockResolvedValue([
+        {
+          id: "ovr-1",
+          scheduledTransactionId: "st-1",
+          originalDate: slot,
+          overrideDate: movedTo,
+          amount: -312.65,
+        },
+      ]);
+      budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
+        ...data,
+        id: "new-alert-1",
+      }));
+      budgetAlertsRepository.find.mockResolvedValue([]);
+
+      await service.getAlerts("user-1");
+
+      const saved = budgetAlertsRepository.save.mock.calls[0][0] as BudgetAlert;
+      expect(saved.message).toContain("312.65");
+      expect(saved.message).not.toContain("250");
+      const data = saved.data as Record<string, unknown>;
+      expect(data.amount).toBe(312.65);
+      expect(data.dueDate).toBe(movedTo);
+      // The occurrence's identity travels with the alert, so re-dating it again
+      // cannot raise a second alert for the same occurrence.
+      expect(data.originalDate).toBe(slot);
+      expect(saved.periodStart).toBe(movedTo);
+    });
+
+    it("does not re-alert an occurrence whose alert was filed under an earlier date", async () => {
+      const slot = addDaysYMD(todayYMD(), 1);
+
+      scheduledTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({
+          getMany: jest.fn().mockResolvedValue([
+            {
+              id: "st-1",
+              userId: "user-1",
+              name: "Electric",
+              payee: { name: "Power Co" },
+              payeeName: null,
+              amount: -250.0,
+              currencyCode: "USD",
+              frequency: "MONTHLY",
+              nextDueDate: slot,
+              isActive: true,
+              autoPost: false,
+              reminderDaysBefore: 3,
+            },
+          ]),
+          leftJoinAndSelect: jest.fn().mockReturnThis(),
+        }),
+      );
+      // The stored alert announced the original date; the user has since moved
+      // the occurrence, so `periodStart` no longer matches -- the identity does.
+      budgetAlertsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({
+          getMany: jest.fn().mockResolvedValue([
+            {
+              id: "alert-1",
+              periodStart: "1999-01-01",
+              data: { billId: "st-1", originalDate: slot },
+            },
+          ]),
+        }),
+      );
+      overridesRepository.find.mockResolvedValue([
+        {
+          id: "ovr-1",
+          scheduledTransactionId: "st-1",
+          originalDate: slot,
+          overrideDate: addDaysYMD(todayYMD(), 2),
+          amount: -312.65,
+        },
+      ]);
+      budgetAlertsRepository.find.mockResolvedValue([]);
+
+      await service.getAlerts("user-1");
+
+      expect(budgetAlertsRepository.save).not.toHaveBeenCalled();
     });
 
     it("skips bills outside their reminder window", async () => {
@@ -1862,9 +2100,7 @@ describe("BudgetsService", () => {
 
   describe("upcoming bills awareness", () => {
     it("getUpcomingBills returns scheduled transactions due in the period", async () => {
-      const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrow = addDaysYMD(todayYMD(), 1);
 
       const stQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([
@@ -1872,21 +2108,26 @@ describe("BudgetsService", () => {
             id: "st-1",
             name: "Netflix",
             amount: -15.99,
-            nextDueDate: tomorrow.toISOString().split("T")[0],
+            frequency: "MONTHLY",
+            nextDueDate: tomorrow,
             categoryId: "cat-ent",
           },
           {
             id: "st-2",
             name: "Internet",
             amount: -79.99,
-            nextDueDate: tomorrow.toISOString().split("T")[0],
+            frequency: "MONTHLY",
+            nextDueDate: tomorrow,
             categoryId: "cat-util",
           },
         ]),
       });
       scheduledTransactionsRepository.createQueryBuilder.mockReturnValue(stQb);
 
-      const result = await service.getUpcomingBills("user-1", "2026-02-28");
+      const result = await service.getUpcomingBills(
+        "user-1",
+        addDaysYMD(todayYMD(), 7),
+      );
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe("Netflix");
@@ -1901,7 +2142,10 @@ describe("BudgetsService", () => {
       });
       scheduledTransactionsRepository.createQueryBuilder.mockReturnValue(stQb);
 
-      const result = await service.getUpcomingBills("user-1", "2026-02-28");
+      const result = await service.getUpcomingBills(
+        "user-1",
+        addDaysYMD(todayYMD(), 7),
+      );
 
       expect(result).toHaveLength(0);
     });
@@ -1933,15 +2177,14 @@ describe("BudgetsService", () => {
       transactionsRepository.createQueryBuilder.mockReturnValue(directQb);
       splitsRepository.createQueryBuilder.mockReturnValue(splitQb);
 
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
       const stQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([
           {
             id: "st-1",
             name: "Rent",
             amount: -200,
-            nextDueDate: tomorrow.toISOString().split("T")[0],
+            frequency: "MONTHLY",
+            nextDueDate: todayYMD(),
             categoryId: "cat-rent",
           },
         ]),
@@ -1987,15 +2230,14 @@ describe("BudgetsService", () => {
       transactionsRepository.createQueryBuilder.mockReturnValue(directQb);
       splitsRepository.createQueryBuilder.mockReturnValue(splitQb);
 
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
       const stQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([
           {
             id: "st-1",
             name: "Large Bill",
             amount: -200,
-            nextDueDate: tomorrow.toISOString().split("T")[0],
+            frequency: "MONTHLY",
+            nextDueDate: todayYMD(),
             categoryId: null,
           },
         ]),
