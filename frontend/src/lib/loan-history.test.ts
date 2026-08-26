@@ -4,6 +4,7 @@ import {
   deriveCurrentInstallment,
   deriveLoanPaymentHistory,
   resolveCurrentInstallment,
+  resolveCurrentLoanTerms,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
 } from './loan-history';
@@ -790,6 +791,23 @@ describe('buildLoanProjectionInput rate authority', () => {
     expect(resolveCurrentInstallment(acct, history)).toBe(
       buildLoanProjectionInput(acct, history)!.paymentAmount,
     );
+  });
+
+  it('reports an absent rate as unknown, not as 0%', () => {
+    // Number(null) is 0, and 0 is a rate: the summary card, the detail view and
+    // the PDF all print `${rate}%`, so a loan with no rate anywhere rendered a
+    // measured "0%" where it had always said "Not set".
+    const acct = makeAccount({ interestRate: null as unknown as number });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 300 }),
+    ]);
+    expect(resolveCurrentLoanTerms(acct, history).annualRate).toBeNull();
+    // A recorded rate still answers for such a loan.
+    expect(
+      resolveCurrentLoanTerms(acct, history, [
+        { effectiveDate: '2024-01-01', annualRate: 7 },
+      ]).annualRate,
+    ).toBe(7);
   });
 
   it('falls back to the account scalar when no timeline row applies', () => {

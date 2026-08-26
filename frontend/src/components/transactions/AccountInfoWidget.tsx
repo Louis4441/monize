@@ -128,8 +128,13 @@ export function AccountInfoWidget({
   // a payoff computed from another. Falls back to the scalar while the
   // projection is loading, for a failed load, and for every non-loan account
   // (which have no rate history at all).
-  const displayedRate = loan.currentAnnualRate ?? Number(account.interestRate);
-  if (account.interestRate != null && displayedRate !== 0) {
+  // Gated on the RESOLVED rate, not on the scalar: a loan whose rate lives only
+  // in its rate history has a null scalar, and gating on that hid the row
+  // entirely while the payoff beside it was projected at that very rate.
+  const displayedRate =
+    loan.currentAnnualRate ??
+    (account.interestRate != null ? Number(account.interestRate) : null);
+  if (displayedRate != null && displayedRate !== 0) {
     details.push({
       label: t('accountWidget.interestRate'),
       value: `${displayedRate}%`,

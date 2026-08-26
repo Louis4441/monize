@@ -301,6 +301,14 @@ describe('AccountDetailPage', () => {
 
     expect(screen.getByText(/Couldn't load the rate history/)).toBeInTheDocument();
     expect(screen.queryByText('Loan Schedule')).not.toBeInTheDocument();
+
+    // "Retryable" has to mean there is a retry: the only control used to be
+    // Back to Accounts, which is leaving the page, not trying again.
+    mockGetAllRateChanges.mockResolvedValue([]);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Try again'));
+    });
+    expect(screen.getByText('Loan Schedule')).toBeInTheDocument();
   });
 
   it('projects future payments from the account terms', async () => {

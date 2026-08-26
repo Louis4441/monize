@@ -92,6 +92,7 @@ export function DebtPayoffTimelineReport() {
   // (API limit is 200 per page).
   const {
     data: transactionsData,
+    dataKey: transactionsKey,
     isLoading: transactionsLoading,
     error: transactionsError,
     reload: reloadTransactions,
@@ -101,9 +102,18 @@ export function DebtPayoffTimelineReport() {
       return fetchAllAccountTransactions(selectedAccountId);
     },
     [selectedAccountId],
+    { requestKey: selectedAccountId },
   );
 
-  const transactions = useMemo<Transaction[]>(() => transactionsData ?? [], [transactionsData]);
+  // Each payload carries the account it answers for. Without that, the one
+  // render between a selection change and the effect that refetches draws the
+  // previous loan's rows -- and for the rate history that means projecting one
+  // loan's rate onto another. The sibling LoanAmortizationReport guards the same
+  // way.
+  const transactions = useMemo<Transaction[]>(
+    () => (transactionsKey === selectedAccountId ? (transactionsData ?? []) : []),
+    [transactionsData, transactionsKey, selectedAccountId],
+  );
 
   // The loan's separately-booked interest expenses, so derived interest matches
   // the loan detail page (see #893). Folded into the combined isLoading/error/
@@ -113,6 +123,7 @@ export function DebtPayoffTimelineReport() {
   // failed fetch must reach the error state rather than settle at that zero.
   const {
     data: interestData,
+    dataKey: interestKey,
     isLoading: interestLoading,
     error: interestError,
     reload: reloadInterest,
@@ -123,8 +134,12 @@ export function DebtPayoffTimelineReport() {
       return fetchLoanInterestTransactions(account);
     },
     [selectedAccountId, accounts],
+    { requestKey: selectedAccountId },
   );
-  const interestTransactions = useMemo<Transaction[]>(() => interestData ?? [], [interestData]);
+  const interestTransactions = useMemo<Transaction[]>(
+    () => (interestKey === selectedAccountId ? (interestData ?? []) : []),
+    [interestData, interestKey, selectedAccountId],
+  );
 
   // The recorded rate history. Load-bearing for the projection, not decoration:
   // recording a rate change never writes the account's own interestRate, so
@@ -134,6 +149,7 @@ export function DebtPayoffTimelineReport() {
   // same reason as the interest list: [] is a claim, not a neutral default.
   const {
     data: rateChangeData,
+    dataKey: rateChangesKey,
     isLoading: rateChangesLoading,
     error: rateChangesError,
     reload: reloadRateChanges,
@@ -148,8 +164,12 @@ export function DebtPayoffTimelineReport() {
       return loanRateChangesApi.getAll(selectedAccountId);
     },
     [selectedAccountId, accounts],
+    { requestKey: selectedAccountId },
   );
-  const rateChanges = useMemo<LoanRateChange[]>(() => rateChangeData ?? [], [rateChangeData]);
+  const rateChanges = useMemo<LoanRateChange[]>(
+    () => (rateChangesKey === selectedAccountId ? (rateChangeData ?? []) : []),
+    [rateChangeData, rateChangesKey, selectedAccountId],
+  );
 
   const isLoading =
     accountsLoading || transactionsLoading || interestLoading || rateChangesLoading;

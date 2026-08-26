@@ -71,6 +71,7 @@ export default function AccountDetailPage() {
 
 function AccountDetailContent() {
   const t = useTranslations('accounts');
+  const tc = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const accountId = params.id as string;
@@ -248,9 +249,22 @@ function AccountDetailContent() {
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
               {error || t('loanDetail.notFound')}
             </h3>
-            <Button onClick={() => router.push('/accounts')}>
-              {t('loanDetail.backToAccounts')}
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {/*
+                A failed load is retryable, so the screen has to offer the retry
+                -- both for the initial load and for a rate-history reload after
+                a successful mutation, where the alternative was leaving the old
+                payoff live over terms the user had just replaced. Without this
+                the only way out was leaving the page, which is not a retry.
+              */}
+              {error && <Button onClick={loadData}>{tc('errorPage.tryAgain')}</Button>}
+              <Button
+                variant={error ? 'secondary' : 'primary'}
+                onClick={() => router.push('/accounts')}
+              >
+                {t('loanDetail.backToAccounts')}
+              </Button>
+            </div>
           </div>
         </main>
       </PageLayout>

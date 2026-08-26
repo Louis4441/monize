@@ -188,14 +188,15 @@ export interface RateTimelineRow {
  * row's rate is the origination rate, which is a fact about the loan.
  */
 export interface EffectiveLoanTerms {
-  annualRate: number;
+  /** Null only when no row applies and the account carries no rate either. */
+  annualRate: number | null;
   paymentAmount: number | null;
 }
 
 export function resolveEffectiveLoanTerms(
   rows: RateTimelineRow[],
   asOfIso: string,
-  fallbackAnnualRate: number,
+  fallbackAnnualRate: number | null,
 ): EffectiveLoanTerms {
   const applied = rows
     .filter((row) => row.effectiveDate <= asOfIso)
@@ -205,7 +206,7 @@ export function resolveEffectiveLoanTerms(
     .reverse()
     .find((row) => row.newPaymentAmount != null && row.source !== 'initial');
   return {
-    annualRate: latest?.annualRate ?? fallbackAnnualRate,
+    annualRate: latest?.annualRate ?? fallbackAnnualRate ?? null,
     paymentAmount: statedPayment?.newPaymentAmount ?? null,
   };
 }

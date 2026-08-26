@@ -392,7 +392,7 @@ export function resolveCurrentLoanTerms(
 ): CurrentLoanTerms {
   const seed = resolveSeedPayment(account, history, rateChanges);
   return {
-    annualRate: Number.isFinite(seed.annualRate) ? seed.annualRate : null,
+    annualRate: seed.annualRate,
     payment: seed.payment != null && seed.payment > 0 ? seed.payment : null,
   };
 }
@@ -400,7 +400,8 @@ export function resolveCurrentLoanTerms(
 /** The resolved projection seed: the terms in effect plus the payment to use. */
 interface SeedPayment {
   payment: number | null;
-  annualRate: number;
+  /** Null when the loan has no rate recorded anywhere -- see resolveCurrentLoanTerms. */
+  annualRate: number | null;
   /** The rate row 1 of the schedule will actually run at -- see below. */
   firstRowAnnualRate: number;
   firstPaymentDate: Date;
@@ -453,10 +454,12 @@ function resolveSeedPayment(
   const isCanadian = account.isCanadianMortgage || false;
   const isVariableRate = account.isVariableRate || false;
   const today = new Date().toISOString().slice(0, 10);
+  // `Number(null)` is 0, and 0 is a rate. Pass the absence through so a loan
+  // with no rate anywhere reads as "Not set" rather than as a measured 0%.
   const effective = resolveEffectiveLoanTerms(
     rateChanges,
     today,
-    Number(account.interestRate),
+    account.interestRate != null ? Number(account.interestRate) : null,
   );
 
   // The amortization guard has to test the rate the schedule will actually use
@@ -467,11 +470,12 @@ function resolveSeedPayment(
   // next line then refuses -- the "a preview computes what the commit will do,
   // through the same code" rule, applied to the guard.
   const firstPaymentDate = advanceDate(new Date(), frequency);
-  const firstRowAnnualRate = resolveEffectiveLoanTerms(
-    rateChanges,
-    firstPaymentDate.toISOString().slice(0, 10),
-    effective.annualRate,
-  ).annualRate;
+  const firstRowAnnualRate =
+    resolveEffectiveLoanTerms(
+      rateChanges,
+      firstPaymentDate.toISOString().slice(0, 10),
+      effective.annualRate,
+    ).annualRate ?? 0;
 
   const observed = observedInstallment(history);
   const contractual = account.paymentAmount ?? 0;
@@ -546,7 +550,9 @@ export function buildLoanProjectionInput(
   if (!canProject) return null;
 
   const seed = resolveSeedPayment(account, history, rateChanges);
-  if (seed.payment == null) return null;
+  // canProject already required a rate, so this is a type narrowing rather than
+  // a new refusal.
+  if (seed.payment == null || seed.annualRate == null) return null;
 
   // Only the future-dated steps are taken from here; the current terms are the
   // seed's. `buildRateTimeline`'s own "starting" fields are deliberately unused
