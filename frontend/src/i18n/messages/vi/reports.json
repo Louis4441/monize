@@ -1549,6 +1549,7 @@
     "csvColBillName": "Tên hóa đơn",
     "csvColDueDate": "Ngày đến hạn",
     "csvColAmount": "Số tiền",
+    "csvColCurrency": "Tiền tệ",
     "csvColFrequency": "Tần suất",
     "csvColAccount": "Tài khoản",
     "csvColStatus": "Trạng thái",

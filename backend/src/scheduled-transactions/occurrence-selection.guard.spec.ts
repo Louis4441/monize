@@ -220,6 +220,39 @@ describe("occurrence selection stays in one place", () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * Direction is a question about the occurrence, so the sign comes from
+   * `directionAmount` -- never from a schedule row's stored amount compared
+   * against zero.
+   *
+   * "An exchange rate is positive, so it cannot flip a sign" was written in three
+   * places and is false for a mixed-sign split parent, where only the investment
+   * line re-prices: a parent stored at -200 posts +150 once that line moves, so
+   * AI/MCP called a deposit a bill, the forecast called an inflow an expense, and
+   * a budget filter keyed on the snapshot dropped the reverse case outright.
+   */
+  it("decides an occurrence's direction from the occurrence", () => {
+    // The one place the fallback lives: `directionAmount` is defined as the
+    // occurrence's amount when known and the snapshot's sign when not.
+    const DECIDERS = ["scheduled-transactions/scheduled-occurrence.service.ts"];
+    // A signed comparison against zero on a *schedule-shaped* variable. `bill`
+    // and `occurrence` are deliberately absent: an `UpcomingBill` and a resolved
+    // occurrence both carry the occurrence's own figure.
+    const STORED_SIGN =
+      /Number\(\s*(st|row|schedule|scheduled|template)\??\.amount\s*\)\s*[<>]/;
+
+    const offenders: string[] = [];
+    for (const file of files) {
+      if (DECIDERS.includes(file.path)) continue;
+      file.lines.forEach((line, i) => {
+        if (isComment(line)) return;
+        if (STORED_SIGN.test(line)) offenders.push(`${file.path}:${i + 1}`);
+      });
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   // The predicates themselves, pinned: a guard whose matcher quietly stopped
   // matching would report a clean tree for ever.
   describe("its own matchers", () => {
@@ -244,6 +277,19 @@ describe("occurrence selection stays in one place", () => {
           "await this.effectiveAmounts.resolveMany(userId, rows)",
         ),
       ).toBe(true);
+      const STORED_SIGN =
+        /Number\(\s*(st|row|schedule|scheduled|template)\??\.amount\s*\)\s*[<>]/;
+      // The three shapes this actually caught.
+      expect(
+        STORED_SIGN.test('return Number(row.amount) < 0 ? "bill" : "d"'),
+      ).toBe(true);
+      expect(STORED_SIGN.test("const isIncome = Number(st.amount) > 0")).toBe(
+        true,
+      );
+      expect(STORED_SIGN.test("Number(schedule?.amount) < 0")).toBe(true);
+      // And the shapes that are the correct answer, so it does not ban them.
+      expect(STORED_SIGN.test("occurrence.directionAmount < 0")).toBe(false);
+      expect(STORED_SIGN.test("roundMoney(Number(row.amount))")).toBe(false);
     });
 
     it("does not fire on the prose that describes them", () => {

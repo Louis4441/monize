@@ -1549,6 +1549,7 @@
     "csvColBillName": "बिल नाम",
     "csvColDueDate": "देय तिथि",
     "csvColAmount": "राशि",
+    "csvColCurrency": "मुद्रा",
     "csvColFrequency": "आवृत्ति",
     "csvColAccount": "खाता",
     "csvColStatus": "स्थिति",

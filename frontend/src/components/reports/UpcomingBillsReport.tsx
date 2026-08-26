@@ -29,10 +29,21 @@ import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
-import { sumEffectiveAmounts } from '@/lib/scheduled-effective-amount';
+import { sumEffectiveOccurrences } from '@/lib/scheduled-effective-amount';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { isComplete, type ConvertedTotal } from '@/lib/currency-total';
 
 /** How far ahead the report projects, matching the three months it always has. */
 const HORIZON_MONTHS = 3;
+
+/**
+ * Why a withheld total is withheld, which decides where the reader goes to fix
+ * it: a named currency is a display rate to refresh on the Currencies page, an
+ * unnamed shortfall is one occurrence's own settlement rate.
+ */
+function unknownReason(total: ConvertedTotal): 'displayFx' | 'scheduledFx' {
+  return total.missingCurrencies.length > 0 ? 'displayFx' : 'scheduledFx';
+}
 
 interface CalendarDay {
   date: Date;
@@ -64,6 +75,9 @@ export function UpcomingBillsReport() {
   const t = useTranslations('reports');
   const router = useRouter();
   const { formatCurrencyCompact: formatCurrency } = useNumberFormat();
+  // Every occurrence is priced in its own currency, so a single total needs a
+  // conversion rather than an addition (issue #1247).
+  const { convertToDefault, defaultCurrency } = useExchangeRates();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewType, setViewType] = useState<'calendar' | 'list'>('calendar');
 
@@ -169,13 +183,14 @@ export function UpcomingBillsReport() {
     // (issue #1247); the known part is kept separately and never shown under
     // the total's own caption.
     const totalOf = (bills: UpcomingBill[]) =>
-      sumEffectiveAmounts(
+      sumEffectiveOccurrences(
         bills.filter((b) => !b.scheduledTransaction.isTransfer),
         (b) => ({
           amount: b.amount,
           currencyCode: b.currencyCode,
           complete: b.amount !== null,
         }),
+        convertToDefault,
         Math.abs,
       );
 
@@ -185,7 +200,7 @@ export function UpcomingBillsReport() {
       thisMonthCount: thisMonth.length,
       thisMonthTotal: totalOf(thisMonth),
     };
-  }, [upcomingBills, currentMonth]);
+  }, [upcomingBills, currentMonth, convertToDefault]);
 
   const handleBillClick = (_st: ScheduledTransaction) => {
     router.push('/bills');
@@ -196,6 +211,11 @@ export function UpcomingBillsReport() {
       t('upcomingBills.csvColBillName'),
       t('upcomingBills.csvColDueDate'),
       t('upcomingBills.csvColAmount'),
+      // The amount column holds the occurrence's own figure, so the currency is
+      // its own column rather than a fact the reader has to assume. A
+      // spreadsheet that sums a CAD row into a USD column is the export's
+      // version of the defect the totals above fix (issue #1247).
+      t('upcomingBills.csvColCurrency'),
       t('upcomingBills.csvColFrequency'),
       t('upcomingBills.csvColAccount'),
       t('upcomingBills.csvColStatus'),
@@ -207,6 +227,7 @@ export function UpcomingBillsReport() {
       // an empty cell (indistinguishable from zero once a spreadsheet totals the
       // column) and not as the stale stored figure (issue #1247).
       bill.amount ?? t('upcomingBills.csvAmountUnavailable'),
+      bill.currencyCode,
       bill.scheduledTransaction.frequency,
       bill.scheduledTransaction.account?.name || '',
       bill.isOverdue ? t('upcomingBills.csvStatusOverdue') : bill.scheduledTransaction.autoPost ? t('upcomingBills.csvStatusAuto') : t('upcomingBills.csvStatusManual'),
@@ -227,13 +248,14 @@ export function UpcomingBillsReport() {
       ...(summary.overdueCount > 0 ? [{ label: t('upcomingBills.pdfOverdue'), value: String(summary.overdueCount), color: '#dc2626' }] : []),
       {
         label: t('upcomingBills.pdfThisMonth'),
-        // The total is withheld when any occurrence in it is unknown -- a PDF is
-        // a record, so a figure in it must not be a partial sum wearing a
-        // total's caption (issue #1247).
-        value:
-          summary.thisMonthTotal.total === null
-            ? `${summary.thisMonthCount} (${t('upcomingBills.amountUnavailable')})`
-            : `${summary.thisMonthCount} (${formatCurrency(summary.thisMonthTotal.total)})`,
+        // The total is withheld when any occurrence in it is unknown or could
+        // not be converted into the reporting currency -- a PDF is a record, so
+        // a figure in it must not be a partial sum wearing a total's caption
+        // (issue #1247). `isComplete` covers both causes; a figure printed here
+        // is complete in `defaultCurrency` and says so.
+        value: !isComplete(summary.thisMonthTotal)
+          ? `${summary.thisMonthCount} (${t('upcomingBills.amountUnavailable')})`
+          : `${summary.thisMonthCount} (${formatCurrency(summary.thisMonthTotal.value, defaultCurrency)})`,
         color: '#2563eb',
       },
     ];
@@ -278,10 +300,10 @@ export function UpcomingBillsReport() {
               {summary.overdueCount}
             </div>
             <div className="text-sm text-red-600 dark:text-red-400">
-              {summary.overdueTotal.total === null ? (
-                <UnknownAmount />
+              {isComplete(summary.overdueTotal) ? (
+                formatCurrency(summary.overdueTotal.value, defaultCurrency)
               ) : (
-                formatCurrency(summary.overdueTotal.total)
+                <UnknownAmount reason={unknownReason(summary.overdueTotal)} />
               )}
             </div>
           </div>
@@ -292,10 +314,10 @@ export function UpcomingBillsReport() {
             {summary.thisMonthCount}
           </div>
           <div className="text-sm text-blue-600 dark:text-blue-400">
-            {summary.thisMonthTotal.total === null ? (
-              <UnknownAmount />
+            {isComplete(summary.thisMonthTotal) ? (
+              formatCurrency(summary.thisMonthTotal.value, defaultCurrency)
             ) : (
-              formatCurrency(summary.thisMonthTotal.total)
+              <UnknownAmount reason={unknownReason(summary.thisMonthTotal)} />
             )}
           </div>
         </div>
@@ -479,7 +501,11 @@ export function UpcomingBillsReport() {
                     {bill.amount === null ? (
                       <UnknownAmount />
                     ) : (
-                      formatCurrency(Math.abs(bill.amount))
+                      // In the occurrence's OWN currency: the settlement one for
+                      // an investment, which need not be the reader's default.
+                      // Omitting the code formatted a CAD figure with a USD
+                      // symbol (issue #1247).
+                      formatCurrency(Math.abs(bill.amount), bill.currencyCode)
                     )}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">

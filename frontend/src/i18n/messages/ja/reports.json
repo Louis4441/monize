@@ -1549,6 +1549,7 @@
     "csvColBillName": "請求書名",
     "csvColDueDate": "支払期日",
     "csvColAmount": "金額",
+    "csvColCurrency": "通貨",
     "csvColFrequency": "頻度",
     "csvColAccount": "口座",
     "csvColStatus": "ステータス",

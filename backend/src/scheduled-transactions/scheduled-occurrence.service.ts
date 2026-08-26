@@ -10,6 +10,7 @@ import {
   OccurrenceWindow,
   expandOccurrenceSlots,
 } from "../common/scheduled-occurrences";
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 import { withScopedDb } from "../common/db/scoped-db";
 
 /**
@@ -37,6 +38,27 @@ export interface EffectiveScheduledOccurrence {
   dueDate: string;
   /** What this occurrence would post today, or `null` when that is unknown. */
   amount: number | null;
+  /**
+   * The signed amount that decides this occurrence's DIRECTION -- bill or
+   * deposit, outflow or income.
+   *
+   * `amount` when it is known, and the schedule's snapshot only when it is not.
+   * A consumer must never take the direction from `schedule.amount` itself: "an
+   * exchange rate is positive, so it cannot flip a sign" is true of one scalar
+   * times one rate, and false of a **mixed-sign split parent**, where only the
+   * investment line re-prices while its sibling stays put. A parent stored at
+   * -10 (an ordinary -100 beside a SELL line worth +90) posts +20 once that line
+   * re-prices to +120: an outflow that has become an inflow. The reverse
+   * happens too, and a filter keyed on the stored sign drops the occurrence
+   * entirely.
+   *
+   * The fallback is the sign of the stored amount rather than zero on purpose:
+   * an FX rate cannot flip the sign of the *fallback* case either (a top-level
+   * investment schedule is one scalar times one rate), and `Number(null)` would
+   * paint an unpriceable bill as a zero-amount reminder. `frontend/src/lib/
+   * scheduled-kind.ts`'s `occurrenceKind` is the same rule on the client.
+   */
+  directionAmount: number;
   /** The currency `amount` is expressed in (the settlement currency for an investment). */
   currencyCode: string;
   /** `amount !== null`. A total containing an incomplete occurrence is incomplete. */
@@ -60,7 +82,17 @@ export interface EffectiveScheduledOccurrence {
  * occurrence applies belongs to this service, not to its callers.
  */
 export interface OccurrenceCandidateFilter {
-  /** Only schedules whose stored amount is negative. */
+  /**
+   * Only occurrences whose **resolved** direction is an outflow
+   * (`directionAmount < 0`), so a zero-amount reminder is excluded as it always
+   * was.
+   *
+   * Deliberately not a pure SQL predicate: the stored sign cannot answer this
+   * for an FX-sensitive schedule (see `directionAmount`). The candidate read
+   * narrows on the stored sign only for the shapes whose sign no rate can move,
+   * keeps every FX-sensitive row, and the direction is applied to the resolved
+   * occurrence afterwards.
+   */
   outflowsOnly?: boolean;
   /** Only schedules the user has to post themselves. */
   manualOnly?: boolean;
@@ -138,6 +170,7 @@ export class ScheduledOccurrenceService {
           originalDate: slot.originalDate,
           dueDate: slot.dueDate,
           amount: amount.amount,
+          directionAmount: amount.amount ?? Number(row.amount),
           currencyCode: amount.currencyCode,
           complete: amount.complete,
           overrideId: slot.override?.id ?? null,
@@ -203,9 +236,28 @@ export class ScheduledOccurrenceService {
         )
         .orderBy("st.nextDueDate", "ASC");
 
-      // The stored sign selects the outflows: an exchange rate is positive, so it
-      // cannot flip one, and only the magnitude needs re-resolving.
-      if (filter.outflowsOnly) qb.andWhere("st.amount < 0");
+      // The stored sign selects the outflows only where no rate can move it.
+      //
+      // For a plain, transfer or ordinary-split schedule the effective amount is
+      // the stored one, so `st.amount < 0` is exactly the set of outflows and
+      // narrowing here saves resolving every positive schedule. An FX-sensitive
+      // schedule -- a top-level investment, or a split parent carrying an
+      // investment line -- is a different matter: its effective amount is
+      // recomputed, and for a mixed-sign parent that can land on the other side
+      // of zero (see `directionAmount`). Those rows stay in the candidate set
+      // whatever their stored sign, and the direction is decided on the resolved
+      // occurrence below.
+      if (filter.outflowsOnly) {
+        qb.andWhere(
+          `(st.amount < 0 OR st.isInvestment = true OR EXISTS (
+              SELECT 1 FROM scheduled_transaction_splits s
+              WHERE s.scheduled_transaction_id = st.id
+                AND s.kind = :investmentKind
+                AND s.investment_action IS NOT NULL
+            ))`,
+          { investmentKind: SplitKind.INVESTMENT },
+        );
+      }
       // An auto-posted schedule needs no reminder -- the posting is the reminder.
       if (filter.manualOnly) {
         qb.andWhere("st.autoPost = :autoPost", { autoPost: false });
@@ -213,7 +265,12 @@ export class ScheduledOccurrenceService {
       return qb.getMany();
     });
 
-    return this.expand(userId, rows, window);
+    const occurrences = await this.expand(userId, rows, window);
+    // The direction is a question about the occurrence, so it is asked after it
+    // has been priced -- never in the SQL above, which only saw the snapshot.
+    return filter.outflowsOnly
+      ? occurrences.filter((o) => o.directionAmount < 0)
+      : occurrences;
   }
 
   private async loadOverrides(

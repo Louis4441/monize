@@ -71,7 +71,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -85,7 +86,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -104,7 +106,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -126,7 +129,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -145,7 +149,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -164,7 +169,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -184,7 +190,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -207,7 +214,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -229,7 +237,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -250,7 +259,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -274,7 +284,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={1000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -293,7 +304,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -318,7 +330,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -350,7 +363,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -375,7 +389,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -400,7 +415,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -431,7 +447,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={0}
         totalBudgeted={2000}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -471,7 +488,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={0}
         totalBudgeted={2000}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -503,7 +521,8 @@ describe('BudgetUpcomingBills', () => {
         currentSpent={3000}
         totalBudgeted={5200}
         periodEnd="2026-02-28"
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 

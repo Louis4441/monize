@@ -240,7 +240,8 @@
   "unknownAmount": {
     "marker": "—",
     "srLabel": "Montant non disponible",
-    "scheduledFx": "Le montant actuel ne peut pas être déterminé : aucun taux de change n'est disponible pour la paire de devises de règlement de cet élément planifié. Le montant enregistré a été calculé à un taux antérieur, il n'est donc pas affiché."
+    "scheduledFx": "Le montant actuel ne peut pas être déterminé : aucun taux de change n'est disponible pour la paire de devises de règlement de cet élément planifié. Le montant enregistré a été calculé à un taux antérieur, il n'est donc pas affiché.",
+    "displayFx": "Ce montant ne peut pas être affiché ici : la valeur est connue, mais aucun taux de change n'est disponible pour la convertir dans la devise de ce total. Actualisez les taux sur la page Devises."
   },
   "density": {
     "title": "Changer la densité des lignes",

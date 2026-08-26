@@ -104,6 +104,7 @@ const mockVelocity: BudgetVelocity = {
   totalUpcomingBills: 0,
   knownUpcomingBillsSubtotal: 0,
   upcomingBillsComplete: true,
+  upcomingBillsMissingRates: [],
   trulyAvailable: 0,
 };
 
@@ -129,7 +130,8 @@ describe('BudgetDashboard', () => {
         dailySpending={[]}
         trendData={[]}
         healthScore={85}
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -152,7 +154,8 @@ describe('BudgetDashboard', () => {
         dailySpending={[]}
         trendData={[]}
         healthScore={85}
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -168,7 +171,8 @@ describe('BudgetDashboard', () => {
         dailySpending={[]}
         trendData={[]}
         healthScore={92}
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 
@@ -186,7 +190,8 @@ describe('BudgetDashboard', () => {
         dailySpending={[]}
         trendData={[]}
         healthScore={85}
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
         onCategoryClick={mockOnCategoryClick}
       />,
     );
@@ -203,7 +208,8 @@ describe('BudgetDashboard', () => {
         dailySpending={[]}
         trendData={[]}
         healthScore={85}
-        formatCurrency={mockFormat}
+        displayCurrency="USD"
+      formatCurrency={mockFormat}
       />,
     );
 

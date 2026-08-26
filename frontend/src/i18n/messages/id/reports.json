@@ -1549,6 +1549,7 @@
     "csvColBillName": "Nama Tagihan",
     "csvColDueDate": "Tanggal Jatuh Tempo",
     "csvColAmount": "Jumlah",
+    "csvColCurrency": "Mata Uang",
     "csvColFrequency": "Frekuensi",
     "csvColAccount": "Akun",
     "csvColStatus": "Status",

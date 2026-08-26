@@ -3429,10 +3429,21 @@ export class ScheduledTransactionsService {
  * scalar's sign classifies the row correctly even when its magnitude is a stale
  * snapshot or unknown (issue #1247). Only the magnitude needs re-resolving.
  */
-function classifyScheduledKind(row: ScheduledTransaction): LlmScheduledKind {
+/**
+ * What ONE occurrence is, for a model reading the list.
+ *
+ * The direction comes from the occurrence (`directionAmount`), never from the
+ * schedule's stored amount: a mixed-sign split parent's effective amount can sit
+ * on the other side of zero from its snapshot, and reading the snapshot reported
+ * a re-priced inflow as a bill (see `ScheduledOccurrenceService`).
+ */
+function classifyScheduledKind(
+  occurrence: ResolvedScheduledOccurrence,
+): LlmScheduledKind {
+  const row = occurrence.schedule;
   if (row.isTransfer) return "transfer";
   if (row.isInvestment) return "investment";
-  return Number(row.amount) < 0 ? "bill" : "deposit";
+  return occurrence.directionAmount < 0 ? "bill" : "deposit";
 }
 
 /**
@@ -3487,7 +3498,7 @@ function toLlmScheduledItem(
     daysUntilDue: daysBetweenYMD(todayYMDStr, occurrence.dueDate),
     isActive: row.isActive,
     autoPost: row.autoPost,
-    kind: classifyScheduledKind(row),
+    kind: classifyScheduledKind(occurrence),
     description: row.description ?? null,
   };
 }

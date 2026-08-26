@@ -240,7 +240,8 @@
   "unknownAmount": {
     "marker": "—",
     "srLabel": "Valor não disponível",
-    "scheduledFx": "Não é possível determinar o valor atual: não há taxa de câmbio disponível para o par de moedas de liquidação deste item agendado. O valor salvo foi calculado com uma taxa anterior, por isso não é exibido."
+    "scheduledFx": "Não é possível determinar o valor atual: não há taxa de câmbio disponível para o par de moedas de liquidação deste item agendado. O valor salvo foi calculado com uma taxa anterior, por isso não é exibido.",
+    "displayFx": "Este valor não pode ser exibido aqui: o montante é conhecido, mas não há taxa de câmbio disponível para convertê-lo na moeda deste total. Atualize as taxas na página Moedas."
   },
   "density": {
     "title": "Alternar densidade das linhas",

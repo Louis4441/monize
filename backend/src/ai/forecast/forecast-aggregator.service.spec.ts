@@ -4,7 +4,10 @@ import { ForecastAggregatorService } from "./forecast-aggregator.service";
 import { ScheduledEffectiveAmountService } from "../../scheduled-transactions/scheduled-effective-amount.service";
 import { ScheduledOccurrenceService } from "../../scheduled-transactions/scheduled-occurrence.service";
 import { ScheduledTransactionOverride } from "../../scheduled-transactions/entities/scheduled-transaction-override.entity";
-import { createInvestmentFxMock } from "../../test-helpers/investment-fx-testing";
+import {
+  createInvestmentFxMock,
+  InvestmentFxMock,
+} from "../../test-helpers/investment-fx-testing";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
@@ -25,6 +28,7 @@ describe("ForecastAggregatorService", () => {
   let mockOverridesRepo: Record<string, jest.Mock>;
   let mockAccountsService: Record<string, jest.Mock>;
   let mockTransactionAnalytics: Record<string, jest.Mock>;
+  let fx: InvestmentFxMock;
 
   const userId = "user-1";
 
@@ -81,6 +85,8 @@ describe("ForecastAggregatorService", () => {
       getRecurringCharges: jest.fn().mockResolvedValue([]),
     };
 
+    fx = createInvestmentFxMock();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ForecastAggregatorService,
@@ -106,7 +112,7 @@ describe("ForecastAggregatorService", () => {
         ScheduledEffectiveAmountService,
         {
           provide: InvestmentTransactionsService,
-          useValue: createInvestmentFxMock(),
+          useValue: fx,
         },
       ],
     }).compile();
@@ -251,6 +257,53 @@ describe("ForecastAggregatorService", () => {
 
       expect(result.scheduledTransactions[0].amount).toBe(1650);
       expect(result.scheduledTransactions[0].nextDueDate).toBe("2026-09-05");
+    });
+
+    it("takes the direction from the occurrence, not the stored parent sign", async () => {
+      // A mixed-sign split parent with no category of its own: an ordinary -1200
+      // line beside an embedded SELL of 10 x 100. The SELL's stored pair is stale,
+      // so the line re-prices at the current 1.35 to +1350 and the occurrence is
+      // an inflow of 150 -- while the stored parent still says -200.
+      fx.resolveSettlementCurrencyPair.mockResolvedValue({
+        from: "EUR",
+        to: "USD",
+      });
+      fx.resolveCashExchangeRateOrNull.mockResolvedValue(1.35);
+      mockScheduledTransactionRepo.find.mockResolvedValue([
+        {
+          id: "st-split",
+          name: "Sell 10 shares, pay the fee",
+          amount: -200,
+          currencyCode: "USD",
+          frequency: "MONTHLY",
+          nextDueDate: new Date("2026-09-01"),
+          category: null,
+          isTransfer: false,
+          isSplit: true,
+          splits: [
+            { id: "sp-1", kind: "category", amount: -1200 },
+            {
+              id: "sp-2",
+              kind: "investment",
+              amount: 1000,
+              investmentAction: "SELL",
+              investmentSecurityId: "SEC-1",
+              investmentQuantity: 10,
+              investmentPrice: 100,
+              investmentCommission: 0,
+              investmentExchangeRate: 1,
+              investmentExchangeRateFromCurrency: "CAD",
+              investmentExchangeRateToCurrency: "USD",
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.computeAggregates(userId, "USD");
+
+      expect(result.scheduledTransactions[0].amount).toBe(150);
+      // The stored -200 would have made this an expense in the model's summary.
+      expect(result.scheduledTransactions[0].isIncome).toBe(true);
     });
 
     it("computes income patterns and variability", async () => {

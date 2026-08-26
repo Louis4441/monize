@@ -213,7 +213,14 @@ export function RecurringChargesPanel({ accountId, currencyCode }: RecurringChar
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {tf(`frequency.${s.frequency}` as 'frequency.MONTHLY')}
                           {' · '}
-                          {t('recurring.nextDue', { date: formatDate(s.nextDueDate) })}
+                          {/* The date the occurrence actually falls on, which is
+                              what the list is already sorted by. `nextDueDate` is
+                              the recurrence slot, so printing it announced a
+                              payment on a day the user had moved -- beside the
+                              re-priced amount, on the same line (issue #1247). */}
+                          {t('recurring.nextDue', {
+                            date: formatDate(nextOccurrenceDueDate(s)),
+                          })}
                         </div>
                       </div>
                       <div

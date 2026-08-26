@@ -6,7 +6,11 @@ import { I18nService } from "nestjs-i18n";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { expandOccurrenceSlots } from "../common/scheduled-occurrences";
-import { addDaysYMD, todayYMD } from "../common/date-utils";
+import { todayYMD } from "../common/date-utils";
+import {
+  MAX_REMINDER_DAYS_BEFORE,
+  reminderWindowThrough,
+} from "../scheduled-transactions/reminder-window";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { User } from "../users/entities/user.entity";
 import { EmailService } from "./email.service";
@@ -115,13 +119,13 @@ export class BillReminderService {
       // matters is the one on the recurrence slot, and it may have moved the
       // occurrence's date (issue #1247). This half runs cross-user, so it cannot
       // price anything -- `deliverForUser` does that under the owner's identity.
-      // `reminder_days_before` is nullable in the schema, and `addDaysYMD` would
-      // turn a null into an invalid date string that silently matches nothing --
-      // dropping the bill. Zero is the same window the previous comparison
-      // (`daysUntilDue <= null`) allowed: due today only.
+      // The window bound goes through `reminderWindowThrough`, which owns the
+      // nullable column (null is "due today only") and the ceiling. A raw
+      // `addDaysYMD` on an unbounded value produced "NaN-NaN-NaN", and the
+      // expander's text comparison read that as "every bill is due today".
       const due = expandOccurrenceSlots(bill, bill.overrides ?? [], {
         from: todayStr,
-        through: addDaysYMD(todayStr, bill.reminderDaysBefore ?? 0),
+        through: reminderWindowThrough(todayStr, bill.reminderDaysBefore),
         maxOccurrences: 1,
       });
       if (due.length > 0) {
@@ -254,13 +258,20 @@ export class BillReminderService {
       // FX rate is positive, so it cannot flip one, and the sign is known even
       // when the magnitude is not.
       const todayStr = todayYMD();
-      const longestWindow = Math.max(
-        ...bills.map((b) => b.reminderDaysBefore ?? 0),
+      // Reduced rather than spread: `Math.max(...xs)` over a per-user array is a
+      // stack-depth limit disguised as an aggregate, and this array is as long as
+      // the user's manual-bill list.
+      const longestWindow = bills.reduce(
+        (widest, b) =>
+          Math.max(
+            widest,
+            Math.min(b.reminderDaysBefore ?? 0, MAX_REMINDER_DAYS_BEFORE),
+          ),
         0,
       );
       const occurrences = await this.occurrences.expand(userId, [...bills], {
         from: todayStr,
-        through: addDaysYMD(todayStr, longestWindow),
+        through: reminderWindowThrough(todayStr, longestWindow),
         maxOccurrences: 1,
       });
       const billData = occurrences.map((occurrence) => {

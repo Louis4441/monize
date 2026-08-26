@@ -20,6 +20,7 @@ const baseVelocity: BudgetVelocity = {
   totalUpcomingBills: 0,
   knownUpcomingBillsSubtotal: 0,
   upcomingBillsComplete: true,
+  upcomingBillsMissingRates: [],
   trulyAvailable: 3185,
 };
 
@@ -107,11 +108,12 @@ describe('BudgetVelocityWidget', () => {
     const velocityWithBills: BudgetVelocity = {
       ...baseVelocity,
       upcomingBills: [
-        { id: 'st-1', name: 'Rent', amount: 1200, amountComplete: true, dueDate: '2026-02-25', categoryId: null },
+        { id: 'st-1', name: 'Rent', amount: 1200, currencyCode: 'USD', amountComplete: true, dueDate: '2026-02-25', categoryId: null },
       ],
       totalUpcomingBills: 1200,
       knownUpcomingBillsSubtotal: 1200,
       upcomingBillsComplete: true,
+      upcomingBillsMissingRates: [],
       trulyAvailable: 1985,
     };
 
@@ -144,6 +146,7 @@ describe('BudgetVelocityWidget', () => {
           id: 'st-inv',
           name: 'Monthly ETF buy',
           amount: null,
+          currencyCode: 'USD',
           amountComplete: false,
           dueDate: '2026-02-25',
           categoryId: null,
@@ -152,6 +155,7 @@ describe('BudgetVelocityWidget', () => {
           id: 'st-rent',
           name: 'Rent',
           amount: 1200,
+          currencyCode: 'USD',
           amountComplete: true,
           dueDate: '2026-02-26',
           categoryId: null,
@@ -160,6 +164,7 @@ describe('BudgetVelocityWidget', () => {
       totalUpcomingBills: null,
       knownUpcomingBillsSubtotal: 1200,
       upcomingBillsComplete: false,
+      upcomingBillsMissingRates: [],
       trulyAvailable: null,
       safeDailySpend: null,
     };
@@ -183,11 +188,12 @@ describe('BudgetVelocityWidget', () => {
     const velocityOverBudget: BudgetVelocity = {
       ...baseVelocity,
       upcomingBills: [
-        { id: 'st-1', name: 'Big Bill', amount: 5000, amountComplete: true, dueDate: '2026-02-25', categoryId: null },
+        { id: 'st-1', name: 'Big Bill', amount: 5000, currencyCode: 'USD', amountComplete: true, dueDate: '2026-02-25', categoryId: null },
       ],
       totalUpcomingBills: 5000,
       knownUpcomingBillsSubtotal: 5000,
       upcomingBillsComplete: true,
+      upcomingBillsMissingRates: [],
       trulyAvailable: -1815,
     };
 

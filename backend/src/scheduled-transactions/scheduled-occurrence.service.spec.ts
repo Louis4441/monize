@@ -249,8 +249,17 @@ describe("ScheduledOccurrenceService", () => {
     );
 
     const predicates = qb.andWhere.mock.calls.map((c) => String(c[0]));
-    expect(predicates).toContain("st.amount < 0");
     expect(predicates).toContain("st.autoPost = :autoPost");
+    // The outflow narrowing keeps every FX-sensitive row whatever its stored
+    // sign: a bare `st.amount < 0` drops a mixed-sign split parent whose
+    // effective amount has crossed zero (the behaviour tests below).
+    const outflowPredicate = predicates.find((p) =>
+      p.includes("st.amount < 0"),
+    );
+    expect(outflowPredicate).toBeDefined();
+    expect(outflowPredicate).toContain("st.isInvestment = true");
+    expect(outflowPredicate).toContain("scheduled_transaction_splits");
+    expect(predicates).not.toContain("st.amount < 0");
   });
 
   it("leaves the candidate read wide when no filter is asked for", async () => {
@@ -292,5 +301,121 @@ describe("ScheduledOccurrenceService", () => {
     expect(
       predicates.some((p) => p.includes("override_date <= :through")),
     ).toBe(true);
+  });
+
+  /**
+   * A mixed-sign split parent is the case the stored sign cannot answer.
+   *
+   * Only the investment line re-prices; its ordinary sibling stays put, so the
+   * parent's effective total can cross zero. "An exchange rate is positive, so
+   * it cannot flip a sign" is true of one scalar times one rate and false here,
+   * and `outflowsOnly` used to be a bare `st.amount < 0` on the snapshot -- which
+   * counted a re-priced inflow as a bill in one direction and dropped a real
+   * outflow in the other.
+   */
+  describe("mixed-sign split parent direction", () => {
+    /**
+     * An ordinary child beside an embedded SELL of 10 x 100. The SELL's stored
+     * pair is EUR -> CAD, which is no longer the settlement pair, so the resolver
+     * re-prices it at the current USD -> CAD rate instead of reusing 1.5.
+     */
+    const mixedSignSplit = (
+      parentAmount: number,
+      ordinaryChild: number,
+    ): ScheduledTransaction =>
+      investmentSchedule({
+        id: "st-split",
+        name: "Sell 10 shares, pay the fee",
+        amount: parentAmount,
+        isInvestment: false,
+        investmentAction: null,
+        investmentSecurityId: null,
+        isSplit: true,
+        splits: [
+          { id: "sp-1", kind: "category", amount: ordinaryChild },
+          {
+            id: "sp-2",
+            kind: "investment",
+            amount: parentAmount - ordinaryChild,
+            investmentAction: "SELL",
+            investmentSecurityId: "SEC-1",
+            investmentQuantity: 10,
+            investmentPrice: 100,
+            investmentCommission: 0,
+            investmentExchangeRate: 1.5,
+            investmentExchangeRateFromCurrency: "EUR",
+            investmentExchangeRateToCurrency: "CAD",
+          },
+        ],
+      } as unknown as Partial<ScheduledTransaction>);
+
+    const candidateRead = (rows: ScheduledTransaction[]) => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+    };
+
+    it("reports the effective sign, not the stored one", async () => {
+      // Stored -200 (ordinary -1200 + SELL +1000); the SELL re-prices to +1350.
+      const occurrences = await service.expand(
+        userId,
+        [mixedSignSplit(-200, -1200)],
+        { through: "2026-03-31" },
+      );
+
+      expect(occurrences[0].amount).toBe(150);
+      expect(occurrences[0].directionAmount).toBe(150);
+    });
+
+    it("drops a stored outflow whose occurrence has become an inflow", async () => {
+      candidateRead([mixedSignSplit(-200, -1200)]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      // The old predicate kept this row and a budget counted abs(+150) as a bill.
+      expect(occurrences).toEqual([]);
+    });
+
+    it("keeps a stored inflow whose occurrence has become an outflow", async () => {
+      // The security's currency moved the other way: 10 x 100 x 0.5 = +500.
+      fx.resolveCashExchangeRateOrNull.mockResolvedValue(0.5);
+      candidateRead([mixedSignSplit(300, -1200)]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      expect(occurrences).toHaveLength(1);
+      expect(occurrences[0].amount).toBe(-700);
+      expect(occurrences[0].directionAmount).toBe(-700);
+    });
+
+    it("falls back to the stored sign when the occurrence cannot be priced", async () => {
+      // An unpriceable bill is still a bill: `Number(null)` would make it a
+      // zero-amount reminder and drop it from an outflow-only surface.
+      fx.resolveCashExchangeRateOrNull.mockResolvedValue(null);
+      candidateRead([mixedSignSplit(-200, -1200)]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      expect(occurrences).toHaveLength(1);
+      expect(occurrences[0].amount).toBeNull();
+      expect(occurrences[0].directionAmount).toBe(-200);
+    });
   });
 });

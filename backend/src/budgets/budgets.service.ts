@@ -34,6 +34,8 @@ import {
 import { formatDateYMD, todayYMD } from "../common/date-utils";
 import { formatCurrency } from "../common/format-currency.util";
 import { roundMoney, sumMoney } from "../common/round.util";
+import { FxAggregate } from "../common/fx-aggregate";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 
 export interface UpcomingBill {
@@ -47,6 +49,17 @@ export interface UpcomingBill {
    * quietly counts a stale figure understates or overstates what is available.
    */
   amount: number | null;
+  /**
+   * The currency `amount` is expressed in -- the occurrence's own, which for an
+   * investment schedule is the settlement currency rather than the brokerage
+   * account's, and which need not be the budget's.
+   *
+   * It travels with the amount because it is half of what the amount means: the
+   * two were separated here and `getVelocity` subtracted a 1,350 CAD bill from a
+   * USD budget as though it were 1,350 USD -- a 35% overstatement of that bill,
+   * presented as a real figure in the reader's own currency.
+   */
+  currencyCode: string;
   /** `amount !== null`. */
   amountComplete: boolean;
   dueDate: string;
@@ -85,6 +98,10 @@ export class BudgetsService {
     // the persisted snapshot or re-deciding which override applies, so its
     // figures cannot disagree with the cash-flow forecast or the register.
     private occurrences: ScheduledOccurrenceService,
+    // An occurrence's amount is meaningful only in its own currency, and a
+    // budget's figures are in the budget's: the two are reconciled here rather
+    // than by dropping the currency and hoping they match (issue #1247).
+    private exchangeRates: ExchangeRateService,
   ) {}
 
   async create(
@@ -459,6 +476,7 @@ export class BudgetsService {
       id: occurrence.scheduledTransactionId,
       name: occurrence.schedule.name,
       amount: occurrence.amount === null ? null : Math.abs(occurrence.amount),
+      currencyCode: occurrence.currencyCode,
       amountComplete: occurrence.complete,
       dueDate: occurrence.dueDate,
       categoryId: occurrence.schedule.categoryId,
@@ -489,6 +507,13 @@ export class BudgetsService {
     totalUpcomingBills: number | null;
     knownUpcomingBillsSubtotal: number;
     upcomingBillsComplete: boolean;
+    /**
+     * The currency pairs a bill could not be converted through, so a withheld
+     * total says why. Empty when every component converted -- including when the
+     * shortfall was an occurrence with no resolvable amount at all, which has no
+     * pair to name.
+     */
+    upcomingBillsMissingRates: string[];
     /** `null` when the upcoming-bills total is unknown. */
     trulyAvailable: number | null;
   }> {
@@ -522,20 +547,46 @@ export class BudgetsService {
     const budgetTotal = sumMoney(expenseCategories.map((c) => c.budgeted));
 
     const upcomingBills = await this.getUpcomingBills(userId, periodEnd);
-    // One unknown bill makes "what is truly available" unknowable, not smaller:
-    // the partial sum is kept beside the total under its own name and never
-    // stands in for it (issue #1247, `docs/financial-semantics.md`).
-    const knownUpcomingBills = upcomingBills.filter(
-      (b): b is UpcomingBill & { amount: number } => b.amount !== null,
-    );
-    const upcomingBillsComplete =
-      knownUpcomingBills.length === upcomingBills.length;
-    const knownUpcomingBillsSubtotal = sumMoney(
-      knownUpcomingBills.map((b) => b.amount),
-    );
-    const totalUpcomingBills = upcomingBillsComplete
-      ? knownUpcomingBillsSubtotal
-      : null;
+    // Today on the caller's own clock, so the rate is the one the bills list is
+    // showing rather than one from the container's timezone.
+    const todayStr = todayYMD();
+    // Every bill converted into the budget's own currency before it joins the
+    // total, because that is the currency `remaining` is in.
+    //
+    // Two separate ways a component goes missing, and both make the total
+    // unknowable rather than smaller (issue #1247, `docs/financial-semantics.md`):
+    // an occurrence whose current amount could not be resolved at all, and one
+    // whose amount is known in a currency with no rate to the budget's. The
+    // partial sum travels beside the total under its own name and never stands in
+    // for it, and `upcomingBillsMissingRates` names the pairs so a withheld
+    // figure comes with the reason (an unexplained blank is a dead end).
+    const upcomingBillsAgg = new FxAggregate();
+    for (const bill of upcomingBills) {
+      if (bill.amount === null) {
+        // No currency to blame: the settlement rate behind the occurrence itself
+        // is what is missing, and the occurrence already reported that.
+        upcomingBillsAgg.addUnknown();
+        continue;
+      }
+      if (bill.currencyCode === budget.currencyCode) {
+        upcomingBillsAgg.addConverted(bill.amount);
+        continue;
+      }
+      const rate = await this.exchangeRates.getRateForDate(
+        bill.currencyCode,
+        budget.currencyCode,
+        todayStr,
+      );
+      upcomingBillsAgg.add(
+        rate === null ? null : roundMoney(bill.amount * rate),
+        bill.currencyCode,
+        budget.currencyCode,
+      );
+    }
+    const upcomingBillsComplete = upcomingBillsAgg.isComplete;
+    const knownUpcomingBillsSubtotal = upcomingBillsAgg.knownSubtotal;
+    const totalUpcomingBills = upcomingBillsAgg.total;
+    const upcomingBillsMissingRates = upcomingBillsAgg.missingPairs;
 
     const dailyBurnRate = currentSpent / daysElapsed;
     const projectedTotal = dailyBurnRate * totalDays;
@@ -578,6 +629,7 @@ export class BudgetsService {
       totalUpcomingBills,
       knownUpcomingBillsSubtotal,
       upcomingBillsComplete,
+      upcomingBillsMissingRates,
       trulyAvailable,
     };
   }

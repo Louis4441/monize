@@ -69,7 +69,7 @@ implied.
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
-| INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount, on the date it falls | enforced |
+| INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
 | INV-AUTH-001 | A refresh token rotates once, or the family is revoked | enforced |
 | INV-AUTH-002 | A failed-login counter records every failure | enforced |
@@ -696,8 +696,11 @@ Enforcement         Server: every occurrence-aware surface consumes the occurren
                     occurrence-selection.guard.spec.ts is the scan: a second
                     recurrence loop, a second overrideEffectiveKey lookup, a
                     `.base.amount` read outside the two places where the base is
-                    the question, or a new resolveMany call site each fail with the
-                    file and line.
+                    the question, a new resolveMany call site, or a direction read
+                    of a schedule's stored amount (`Number(st.amount) < 0`) each
+                    fail with the file and line. The base-read and resolver-call
+                    allowances are COUNTS per file rather than exemptions, so a
+                    new occurrence-aware method inside an allowed file still fails.
                     Client: lib/scheduled-effective-amount.ts is the only reader
                     of those fields (nextOccurrenceEffectiveAmount for a
                     schedule-level surface, nextOccurrenceDueDate for the date it
@@ -716,6 +719,31 @@ Enforcement         Server: every occurrence-aware surface consumes the occurren
 Aggregation rule    A total is null when any component is unknown; the partial sum
                     travels in a separately named field (knownUpcoming*Subtotal,
                     knownSubtotal) and never under the total's caption.
+                    A total also spans one currency or it spans none: each
+                    occurrence is converted into the reporting currency before it
+                    joins a sum, and a pair with no rate withholds the total and
+                    is NAMED (getVelocity's upcomingBillsMissingRates,
+                    ConvertedTotal.missingCurrencies) so the reader knows which
+                    rate to fix. Backend aggregation goes through FxAggregate,
+                    client aggregation through sumConverted /
+                    sumEffectiveOccurrences; a currency-blind adder is the defect
+                    (the report summed 1,350 CAD beside 500 USD and printed 1,850
+                    in the reader's default currency).
+Direction           Bill or deposit, outflow or income, is decided from
+                    EffectiveScheduledOccurrence.directionAmount -- the
+                    occurrence's own amount when known, the snapshot's sign only
+                    when it is not. "An exchange rate is positive, so it cannot
+                    flip a sign" holds for one scalar times one rate and fails for
+                    a mixed-sign split parent, where only the investment line
+                    re-prices: a parent stored at -200 posts +150 once that line
+                    moves. Reading the snapshot reported a re-priced deposit as a
+                    bill (AI/MCP, the forecast) and a SQL prefilter on
+                    `st.amount < 0` dropped the reverse case from the budget
+                    entirely. The candidate read therefore narrows on the stored
+                    sign only for shapes no rate can move and keeps every
+                    FX-sensitive row; the direction is applied after pricing.
+                    The client's equivalent is occurrenceKind, which already read
+                    the occurrence first.
 Concurrency scope   per occurrence; the resolver's FX caches are per read
 Failure response    the occurrence renders as unavailable (UnknownAmount, or the
                     localized budgets.alerts.billDue.amountUnavailable copy) and
@@ -760,7 +788,19 @@ Required tests      Occurrence identity and window: scheduled-occurrences.spec.t
                     the unavailable-amount case), UpcomingBills.test.tsx and
                     BudgetUpcomingBills.test.tsx (moved next occurrence),
                     plus scheduled-utils, BudgetVelocityWidget,
-                    RecurringChargesPanel and ScheduledTransactionList.
+                    RecurringChargesPanel (including the date an override moved
+                    the occurrence to, which the panel sorted by and printed the
+                    slot for) and ScheduledTransactionList.
+                    Direction and currency: scheduled-occurrence.service.spec.ts
+                    (a mixed-sign split parent whose effective sign flips, both
+                    ways, plus the unpriceable fallback),
+                    scheduled-transactions.service.spec.ts (the AI/MCP kind),
+                    forecast-aggregator.service.spec.ts (isIncome),
+                    budgets.service.spec.ts (a CAD occurrence converted into a USD
+                    budget, and a missing display rate withholding the total),
+                    scheduled-effective-amount.test.ts (conversion before summing)
+                    and UpcomingBillsReport.test.tsx (a mixed-currency total and
+                    the CSV currency column).
                     Each mutant these exist for was confirmed to fail them: base
                     instead of override, and keying the override on override_date.
 Settlement account  An occurrence is charged to the account that actually moves

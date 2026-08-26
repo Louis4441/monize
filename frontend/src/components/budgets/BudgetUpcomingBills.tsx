@@ -12,16 +12,28 @@ import type { ScheduledTransaction } from '@/types/scheduled-transaction';
 import {
   nextOccurrenceDueDate,
   nextOccurrenceEffectiveAmount,
-  sumEffectiveAmounts,
+  sumEffectiveOccurrences,
 } from '@/lib/scheduled-effective-amount';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import { isComplete } from '@/lib/currency-total';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 
 interface BudgetUpcomingBillsProps {
   scheduledTransactions: ScheduledTransaction[];
   currentSpent: number;
   totalBudgeted: number;
   periodEnd: string;
-  formatCurrency: (amount: number) => string;
+  /**
+   * The currency this panel's own figures are reported in -- the budget's, which
+   * is what `currentSpent` and `totalBudgeted` are in. Each occurrence is
+   * converted into it before joining a total.
+   */
+  displayCurrency: string;
+  /**
+   * `currencyCode` omitted means "the budget's own currency". A row shows the
+   * occurrence's currency, because that is the currency its amount is in.
+   */
+  formatCurrency: (amount: number, currencyCode?: string) => string;
 }
 
 export function BudgetUpcomingBills({
@@ -29,10 +41,12 @@ export function BudgetUpcomingBills({
   currentSpent,
   totalBudgeted,
   periodEnd,
+  displayCurrency,
   formatCurrency,
 }: BudgetUpcomingBillsProps) {
   const today = startOfDay(new Date());
   const endDate = parseISO(periodEnd);
+  const { convert } = useExchangeRates();
 
   // What this occurrence would cost TODAY, from the server's effective-amount
   // contract (issue #1247). Never `nextOverride?.amount ?? amount`: that scalar
@@ -71,15 +85,27 @@ export function BudgetUpcomingBills({
   // separately and shown as a subtotal through `PartialTotal`, which is also what
   // tells the reader a figure is missing rather than zero.
   const upcomingTotal = useMemo(
-    () => sumEffectiveAmounts(upcomingBills, getEffective, Math.abs),
-    [upcomingBills],
+    () =>
+      sumEffectiveOccurrences(
+        upcomingBills,
+        getEffective,
+        (amount, from) => convert(amount, from, displayCurrency),
+        Math.abs,
+      ),
+    [upcomingBills, convert, displayCurrency],
   );
 
   const t = useTranslations('budgets');
-  const trulyAvailable =
-    upcomingTotal.total === null
-      ? null
-      : totalBudgeted - currentSpent - upcomingTotal.total;
+  // A named currency pair is a display rate to refresh; an unnamed shortfall is
+  // the occurrence's own settlement rate. Different screens fix them.
+  const unknownReason =
+    upcomingTotal.missingCurrencies.length > 0 ? 'displayFx' : 'scheduledFx';
+  // Incomplete for either reason -- an occurrence nobody can price, or one in a
+  // currency with no rate into the budget's -- leaves this unknown rather than
+  // larger. `isComplete` is the one definition of "nothing left out".
+  const trulyAvailable = isComplete(upcomingTotal)
+    ? totalBudgeted - currentSpent - upcomingTotal.value
+    : null;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 sm:p-6">
@@ -115,7 +141,10 @@ export function BudgetUpcomingBills({
                 {getEffective(bill).amount === null ? (
                   <UnknownAmount />
                 ) : (
-                  formatCurrency(Math.abs(getEffective(bill).amount!))
+                  formatCurrency(
+                    Math.abs(getEffective(bill).amount!),
+                    getEffective(bill).currencyCode,
+                  )
                 )}
               </span>
             </div>
@@ -133,12 +162,12 @@ export function BudgetUpcomingBills({
           {/* A total is only a total when every component is known. One bill
               whose current amount could not be resolved makes this unknowable,
               and the per-bill rows above already mark which one (issue #1247). */}
-          {upcomingTotal.total === null ? (
-            <UnknownAmount />
-          ) : (
+          {isComplete(upcomingTotal) ? (
             <span className="font-semibold text-red-600 dark:text-red-400">
-              {formatCurrency(upcomingTotal.total)}
+              {formatCurrency(upcomingTotal.value)}
             </span>
+          ) : (
+            <UnknownAmount reason={unknownReason} />
           )}
         </div>
         <div className="flex items-center justify-between text-sm">
@@ -147,7 +176,7 @@ export function BudgetUpcomingBills({
               Showing a number here would be the whole defect: a budget that
               silently counted a stale bill (issue #1247). */}
           {trulyAvailable === null ? (
-            <UnknownAmount />
+            <UnknownAmount reason={unknownReason} />
           ) : (
             <span className={`font-semibold ${gainLossColor(trulyAvailable)}`}>
               {formatCurrency(Math.abs(trulyAvailable))}

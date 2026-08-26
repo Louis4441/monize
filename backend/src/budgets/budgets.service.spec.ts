@@ -26,6 +26,7 @@ import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { addDaysYMD, todayYMD } from "../common/date-utils";
 import {
   createScopedDbMocks,
@@ -50,6 +51,9 @@ describe("BudgetsService", () => {
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let overridesRepository: Record<string, jest.Mock>;
   let investmentTransactionsService: InvestmentFxMock;
+  let exchangeRateService: jest.Mocked<
+    Pick<ExchangeRateService, "getRateForDate">
+  >;
 
   const mockBudget: Budget = {
     id: "budget-1",
@@ -230,6 +234,12 @@ describe("BudgetsService", () => {
     // Same-currency by default, so a plain schedule's effective amount equals its
     // stored one; the stale/unknown-rate cases override these per test.
     investmentTransactionsService = createInvestmentFxMock();
+    // The display conversion into the budget's currency. A rate of 1 by default,
+    // which is only ever asked for when the two currencies differ -- a
+    // same-currency bill never reaches it.
+    exchangeRateService = {
+      getRateForDate: jest.fn().mockResolvedValue(1),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -279,6 +289,10 @@ describe("BudgetsService", () => {
           provide: ActionHistoryService,
           useValue: mockActionHistoryService,
         },
+        // An occurrence's amount is in the occurrence's own currency; the budget
+        // converts it into the budget's before totalling (issue #1247). Typed,
+        // so a return shape the real service cannot produce is a compile error.
+        { provide: ExchangeRateService, useValue: exchangeRateService },
       ],
     }).compile();
 
@@ -957,15 +971,56 @@ describe("BudgetsService", () => {
         1.35,
       );
 
+      // The budget reports in USD (`mockBudget`) and this occurrence settles in
+      // CAD, so the total needs the display conversion as well as the settlement
+      // one: 1,350 CAD is 999 USD at 0.74.
+      exchangeRateService.getRateForDate.mockResolvedValue(0.74);
+
       const result = await service.getVelocity("user-1", "budget-1");
 
       expect(result.upcomingBills[0].amount).toBe(1350);
       // What the persisted 1.50 rate would have given.
       expect(result.upcomingBills[0].amount).not.toBe(1500);
-      expect(result.totalUpcomingBills).toBe(1350);
+      // The amount is meaningless without this, and the budget is not in it.
+      expect(result.upcomingBills[0].currencyCode).toBe("CAD");
+      expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
+        "CAD",
+        "USD",
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
+      expect(result.totalUpcomingBills).toBe(999);
+      // The CAD figure wearing the budget's USD label -- 35% over.
+      expect(result.totalUpcomingBills).not.toBe(1350);
       expect(result.upcomingBillsComplete).toBe(true);
-      // 600 budgeted - 200 spent - 1350 upcoming.
-      expect(result.trulyAvailable).toBe(-950);
+      expect(result.upcomingBillsMissingRates).toEqual([]);
+      // 600 budgeted - 200 spent - 999 upcoming, all in USD.
+      expect(result.trulyAvailable).toBe(-599);
+    });
+
+    it("withholds the total when a bill cannot be converted into the budget's currency", async () => {
+      stubVelocityBudget([staleInvestmentBill()]);
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+      // The occurrence's own amount is known; what is missing is the rate from
+      // its currency to the budget's. A figure nobody can convert is not a
+      // smaller figure, and 1,350 is not 1,350 USD.
+      exchangeRateService.getRateForDate.mockResolvedValue(null);
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.upcomingBills[0].amount).toBe(1350);
+      expect(result.upcomingBills[0].amountComplete).toBe(true);
+      expect(result.totalUpcomingBills).toBeNull();
+      expect(result.knownUpcomingBillsSubtotal).toBe(0);
+      expect(result.upcomingBillsComplete).toBe(false);
+      // The reader is told which pair to fix, not just that something is missing.
+      expect(result.upcomingBillsMissingRates).toEqual(["CAD->USD"]);
+      expect(result.trulyAvailable).toBeNull();
+      expect(result.safeDailySpend).toBeNull();
     });
 
     it("withholds the upcoming total and truly-available when a bill's rate is unknown", async () => {

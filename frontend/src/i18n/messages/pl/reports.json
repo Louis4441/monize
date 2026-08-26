@@ -1549,6 +1549,7 @@
     "csvColBillName": "Nazwa rachunku",
     "csvColDueDate": "Termin płatności",
     "csvColAmount": "Kwota",
+    "csvColCurrency": "Waluta",
     "csvColFrequency": "Częstotliwość",
     "csvColAccount": "Konto",
     "csvColStatus": "Status",

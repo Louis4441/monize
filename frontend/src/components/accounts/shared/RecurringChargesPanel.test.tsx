@@ -152,6 +152,32 @@ describe('RecurringChargesPanel', () => {
     expect(screen.queryByText('-$1500.00')).not.toBeInTheDocument();
   });
 
+  it('prints the date the occurrence actually falls on, not the recurrence slot', async () => {
+    // An override addressed to the slot moved this occurrence, and the panel is
+    // already sorted by the moved date -- printing `nextDueDate` beside the
+    // re-priced amount announced a payment on a day the user had changed
+    // (issue #1247).
+    mockGetScheduled.mockResolvedValue([
+      schedule({
+        nextDueDate: '2026-07-01',
+        nextOverride: {
+          id: 'ovr-1',
+          originalDate: '2026-07-01',
+          overrideDate: '2026-07-10',
+          amount: -1250,
+          effectiveAmount: -1250,
+        },
+      }),
+    ]);
+    await renderPanel();
+    await waitFor(() => expect(screen.getByText('Landlord')).toBeInTheDocument());
+
+    expect(screen.getByText(/Next due 2026-07-10/)).toBeInTheDocument();
+    expect(screen.queryByText(/Next due 2026-07-01/)).not.toBeInTheDocument();
+    // The amount on that line is the occurrence's own too.
+    expect(screen.getByText('-$1250.00')).toBeInTheDocument();
+  });
+
   it('marks an unresolvable occurrence unavailable, not stale', async () => {
     mockGetScheduled.mockResolvedValue([
       schedule({

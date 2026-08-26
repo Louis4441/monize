@@ -3,8 +3,9 @@ import {
   nextOccurrenceEffectiveAmount,
   overrideEffectiveAmount,
   scheduleEffectiveAmount,
-  sumEffectiveAmounts,
+  sumEffectiveOccurrences,
 } from './scheduled-effective-amount';
+import { isComplete } from './currency-total';
 import type {
   ScheduledTransaction,
   ScheduledTransactionOverride,
@@ -201,49 +202,95 @@ describe('scheduled effective amounts', () => {
     });
   });
 
-  describe('sumEffectiveAmounts', () => {
-    const known = (amount: number) => ({
+  describe('sumEffectiveOccurrences', () => {
+    const at = (amount: number, currencyCode = 'CAD') => ({
       amount,
-      currencyCode: 'CAD',
+      currencyCode,
       complete: true,
     });
     const unknown = { amount: null, currencyCode: 'CAD', complete: false };
+    /** A converter that knows exactly one pair, so a second currency is a gap. */
+    const cadOnly = (amount: number, from: string) =>
+      from === 'CAD' ? amount : null;
+    const identity = (amount: number) => amount;
 
-    it('totals a complete set', () => {
-      expect(
-        sumEffectiveAmounts([known(-1200), known(-1350)], (x) => x, Math.abs),
-      ).toEqual({ total: 2550, knownSubtotal: 2550, unknownCount: 0 });
-    });
-
-    it('withholds the total when any component is unknown, keeping the subtotal', () => {
-      const result = sumEffectiveAmounts(
-        [known(-1200), unknown],
+    it('totals a complete single-currency set', () => {
+      const result = sumEffectiveOccurrences(
+        [at(-1200), at(-1350)],
         (x) => x,
+        cadOnly,
         Math.abs,
       );
 
-      expect(result.total).toBeNull();
-      expect(result.knownSubtotal).toBe(1200);
-      expect(result.unknownCount).toBe(1);
+      expect(result.value).toBe(2550);
+      expect(isComplete(result)).toBe(true);
+    });
+
+    it('converts before summing, so currencies cannot be added as numbers', () => {
+      // 1,350 CAD at 0.74 is 999 USD; beside a 500 USD bill the answer is 1,499
+      // USD, not the 1,850 an adder that ignored the currency produced.
+      const toUsd = (amount: number, from: string) =>
+        from === 'USD' ? amount : amount * 0.74;
+      const result = sumEffectiveOccurrences(
+        [at(-1350, 'CAD'), at(-500, 'USD')],
+        (x) => x,
+        toUsd,
+        Math.abs,
+      );
+
+      expect(result.value).toBe(1499);
+      expect(result.value).not.toBe(1850);
+      expect(isComplete(result)).toBe(true);
+    });
+
+    it('withholds the total when a rate is missing, and names the currency', () => {
+      const result = sumEffectiveOccurrences(
+        [at(-1200, 'CAD'), at(-500, 'USD')],
+        (x) => x,
+        cadOnly,
+        Math.abs,
+      );
+
+      expect(isComplete(result)).toBe(false);
+      expect(result.value).toBe(1200);
+      expect(result.missingCurrencies).toEqual(['USD']);
+      expect(result.excludedCount).toBe(1);
+    });
+
+    it('excludes an unpriceable occurrence by count, with no currency to blame', () => {
+      // Its own settlement rate is what is missing, so it is unknown in every
+      // currency -- naming CAD would send the reader to fix the wrong rate.
+      const result = sumEffectiveOccurrences(
+        [at(-1200), unknown],
+        (x) => x,
+        cadOnly,
+        Math.abs,
+      );
+
+      expect(isComplete(result)).toBe(false);
+      expect(result.value).toBe(1200);
+      expect(result.missingCurrencies).toEqual([]);
+      expect(result.excludedCount).toBe(1);
     });
 
     it('totals an empty set as a known zero, not as unknown', () => {
       // Nothing upcoming is a settled answer; reporting it as unknown would take
       // a question the user can act on away from them.
-      expect(sumEffectiveAmounts([], (x: never) => x)).toEqual({
-        total: 0,
-        knownSubtotal: 0,
-        unknownCount: 0,
-      });
+      const result = sumEffectiveOccurrences([], (x: never) => x, cadOnly);
+
+      expect(result.value).toBe(0);
+      expect(isComplete(result)).toBe(true);
     });
 
     it('accumulates in integer ten-thousandths, so cents do not drift', () => {
-      const result = sumEffectiveAmounts(
-        [known(0.1), known(0.2)],
+      const result = sumEffectiveOccurrences(
+        [at(0.1), at(0.2)],
         (x) => x,
+        cadOnly,
+        identity,
       );
 
-      expect(result.total).toBe(0.3);
+      expect(result.value).toBe(0.3);
     });
   });
 });

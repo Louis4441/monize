@@ -1549,6 +1549,7 @@
     "csvColBillName": "帳單名稱",
     "csvColDueDate": "到期日",
     "csvColAmount": "金額",
+    "csvColCurrency": "貨幣",
     "csvColFrequency": "頻率",
     "csvColAccount": "科目",
     "csvColStatus": "狀態",

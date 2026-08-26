@@ -2,6 +2,7 @@ import type {
   ScheduledTransaction,
   ScheduledTransactionOverride,
 } from '@/types/scheduled-transaction';
+import { sumConverted, type ConvertedTotal } from '@/lib/currency-total';
 
 /**
  * The cash amount one scheduled occurrence would post today, and whether that is
@@ -130,30 +131,36 @@ export function nextOccurrenceDueDate(st: ScheduledTransaction): string {
 }
 
 /**
- * A total over effective amounts, or `null` when any component is unknown, with
- * the partial sum kept separately: a subtotal is not a total
- * (`docs/financial-semantics.md`). `map` reads the value each item contributes in
- * the bucket's own convention -- bills as positive magnitudes, say.
+ * Convert and total a bucket of effective occurrence amounts into one currency.
+ *
+ * This exists instead of a currency-blind adder. The predecessor took the same
+ * `EffectiveScheduledAmount` accessor and read only its `amount`, so it summed a
+ * 1,350 CAD occurrence beside a 500 USD one and handed back 1,850 for a caller
+ * to format in the reader's default currency -- a 23% overstatement presented as
+ * a real figure. Passing the right `currencyCode` into it fixed nothing, because
+ * it never looked. `sumConverted` cannot be called without saying how to convert.
+ *
+ * `convert` returns `null` for a pair with no rate, which keeps the total
+ * withheld and names the currency; an occurrence whose own amount is unknown
+ * arrives as `NaN` and is excluded by count, because it is unknown in every
+ * currency and has no pair to blame. `map` applies the bucket's convention
+ * (bills as positive magnitudes) *after* conversion. Check `isComplete` before
+ * displaying the value: a caller either withholds an incomplete total or marks
+ * it with `PartialTotal`, and never prints it under a total's own caption.
  */
-export function sumEffectiveAmounts<T>(
-  items: T[],
+export function sumEffectiveOccurrences<T>(
+  items: readonly T[],
   effective: (item: T) => EffectiveScheduledAmount,
+  convert: (amount: number, fromCurrency: string) => number | null,
   map: (amount: number) => number = amount => amount,
-): { total: number | null; knownSubtotal: number; unknownCount: number } {
-  let knownMinorUnits = 0;
-  let unknownCount = 0;
-  for (const item of items) {
-    const { amount } = effective(item);
-    if (amount === null) {
-      unknownCount += 1;
-      continue;
-    }
-    knownMinorUnits += Math.round(map(amount) * 10000);
-  }
-  const knownSubtotal = knownMinorUnits / 10000;
-  return {
-    total: unknownCount === 0 ? knownSubtotal : null,
-    knownSubtotal,
-    unknownCount,
-  };
+): ConvertedTotal {
+  return sumConverted(
+    items,
+    item => effective(item).amount ?? NaN,
+    item => effective(item).currencyCode,
+    (amount, currency) => {
+      const converted = convert(amount, currency);
+      return converted === null ? null : map(converted);
+    },
+  );
 }

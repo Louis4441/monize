@@ -274,10 +274,14 @@ export class ForecastAggregatorService {
 
     return occurrences.map((occurrence) => {
       const st = occurrence.schedule;
-      // The direction still comes from the stored sign (an FX rate is positive,
-      // so it cannot flip one); the magnitude comes from the occurrence, and is
-      // null when the current rate for it cannot be determined.
-      const isIncome = st.category?.isIncome === true || Number(st.amount) > 0;
+      // Both halves come from the occurrence. The category is an independent
+      // semantic and still wins where it is set; the sign is the occurrence's
+      // (`directionAmount`), because a mixed-sign split parent's effective
+      // amount can land on the other side of zero from its stored snapshot --
+      // "an FX rate is positive, so it cannot flip a sign" holds for one scalar
+      // times one rate, not for a parent whose investment line alone re-prices.
+      const isIncome =
+        st.category?.isIncome === true || occurrence.directionAmount > 0;
 
       return {
         name: st.name,

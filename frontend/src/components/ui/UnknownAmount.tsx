@@ -8,8 +8,13 @@ interface UnknownAmountProps {
    * Why this figure is unknown, as a catalog key under `common.unknownAmount`.
    * Defaults to the scheduled-occurrence case (issue #1247): the server could
    * not resolve the current settlement exchange rate.
+   *
+   * `displayFx` is the other half of the same story and a different fix: the
+   * component's own amount is known, in a currency with no rate into the one this
+   * figure is reported in. Telling the reader to check the security's currency
+   * when what is missing is a display rate sends them to the wrong screen.
    */
-  reason?: 'scheduledFx';
+  reason?: 'scheduledFx' | 'displayFx';
   /** Extra classes for the wrapper, so a table cell can keep its alignment. */
   className?: string;
 }

@@ -1549,6 +1549,7 @@
     "csvColBillName": "Nom de la facture",
     "csvColDueDate": "Date d'échéance",
     "csvColAmount": "Montant",
+    "csvColCurrency": "Devise",
     "csvColFrequency": "Fréquence",
     "csvColAccount": "Compte",
     "csvColStatus": "Statut",

@@ -280,6 +280,12 @@ export interface UpcomingBill {
    * never the persisted snapshot (issue #1247).
    */
   amount: number | null;
+  /**
+   * The currency `amount` is in -- the occurrence's own settlement currency,
+   * which need not be the budget's. Half of what the amount means: formatting a
+   * figure without it prints a CAD bill under a USD symbol.
+   */
+  currencyCode: string;
   amountComplete: boolean;
   dueDate: string;
   categoryId: string | null;
@@ -307,6 +313,12 @@ export interface BudgetVelocity {
   totalUpcomingBills: number | null;
   knownUpcomingBillsSubtotal: number;
   upcomingBillsComplete: boolean;
+  /**
+   * The currency pairs a bill could not be converted through, so a withheld
+   * total can say why. Empty when the shortfall was an occurrence with no
+   * resolvable amount at all -- that one has no pair to name.
+   */
+  upcomingBillsMissingRates: string[];
   /** `null` when the upcoming-bills total is unknown. */
   trulyAvailable: number | null;
 }

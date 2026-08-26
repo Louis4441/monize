@@ -240,7 +240,8 @@
   "unknownAmount": {
     "marker": "—",
     "srLabel": "Kwota niedostępna",
-    "scheduledFx": "Nie można ustalić aktualnej kwoty: brak kursu wymiany dla pary walutowej rozliczenia tej zaplanowanej pozycji. Zapisana kwota została obliczona po starszym kursie, więc nie jest wyświetlana."
+    "scheduledFx": "Nie można ustalić aktualnej kwoty: brak kursu wymiany dla pary walutowej rozliczenia tej zaplanowanej pozycji. Zapisana kwota została obliczona po starszym kursie, więc nie jest wyświetlana.",
+    "displayFx": "Tej kwoty nie można tu pokazać: sama kwota jest znana, ale brakuje kursu wymiany, aby przeliczyć ją na walutę tej sumy. Odśwież kursy na stronie Waluty."
   },
   "density": {
     "title": "Przełącz gęstość wierszy",

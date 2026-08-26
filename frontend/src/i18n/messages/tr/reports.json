@@ -1549,6 +1549,7 @@
     "csvColBillName": "Fatura Adı",
     "csvColDueDate": "Vade Tarihi",
     "csvColAmount": "Miktar",
+    "csvColCurrency": "Para Birimi",
     "csvColFrequency": "Sıklık",
     "csvColAccount": "Hesap",
     "csvColStatus": "Durum",

@@ -1549,6 +1549,7 @@
     "csvColBillName": "청구서 이름",
     "csvColDueDate": "만기일",
     "csvColAmount": "금액",
+    "csvColCurrency": "통화",
     "csvColFrequency": "빈도",
     "csvColAccount": "계정",
     "csvColStatus": "상태",

@@ -39,6 +39,14 @@ export function BudgetVelocityWidget({
   const t = useTranslations('budgets');
   const paceColor = getPaceColor(velocity.paceStatus);
   const paceBgColor = getPaceBgColor(velocity.paceStatus);
+  // Why the figure is missing decides which screen fixes it: a named pair is a
+  // display rate to refresh on Currencies, an unnamed shortfall is the
+  // occurrence's own settlement rate. Read defensively -- an older backend
+  // mid-deploy sends no field at all, which is "no information", not "no pairs".
+  const unknownReason =
+    (velocity.upcomingBillsMissingRates?.length ?? 0) > 0
+      ? 'displayFx'
+      : 'scheduledFx';
   const paceLabel = t(`velocity.paceStatus.${velocity.paceStatus}`);
 
   return (
@@ -108,7 +116,7 @@ export function BudgetVelocityWidget({
               {t('velocity.billsComing')}
             </div>
             {velocity.totalUpcomingBills === null ? (
-              <UnknownAmount />
+              <UnknownAmount reason={unknownReason} />
             ) : (
               <div className="text-lg font-semibold text-red-600 dark:text-red-400">
                 {formatCurrency(velocity.totalUpcomingBills)}
@@ -120,7 +128,7 @@ export function BudgetVelocityWidget({
               {t('velocity.trulyAvailable')}
             </div>
             {velocity.trulyAvailable === null ? (
-              <UnknownAmount />
+              <UnknownAmount reason={unknownReason} />
             ) : (
               <div className={`text-lg font-semibold ${
                 gainLossColor(velocity.trulyAvailable)

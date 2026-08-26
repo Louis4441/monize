@@ -1549,6 +1549,7 @@
     "csvColBillName": "Rechnungsname",
     "csvColDueDate": "Fälligkeitsdatum",
     "csvColAmount": "Betrag",
+    "csvColCurrency": "Währung",
     "csvColFrequency": "Häufigkeit",
     "csvColAccount": "Konto",
     "csvColStatus": "Status",

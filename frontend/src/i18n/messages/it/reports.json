@@ -1549,6 +1549,7 @@
     "csvColBillName": "Nome fattura",
     "csvColDueDate": "Data scadenza",
     "csvColAmount": "Importo",
+    "csvColCurrency": "Valuta",
     "csvColFrequency": "Frequenza",
     "csvColAccount": "Conto",
     "csvColStatus": "Stato",

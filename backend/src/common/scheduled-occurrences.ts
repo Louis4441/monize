@@ -8,6 +8,17 @@ import { FrequencyType, calculateNextDueDate, ensureYMD } from "./recurrence";
  */
 export const OCCURRENCE_WALK_GUARD = 2000;
 
+/** A window bound is a calendar date, because that is what it is compared as. */
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+function assertWindowDate(value: string, field: "from" | "through"): void {
+  if (!YMD.test(value)) {
+    throw new RangeError(
+      `expandOccurrenceSlots: window.${field} must be a YYYY-MM-DD date, got ${JSON.stringify(value)}`,
+    );
+  }
+}
+
 /**
  * The half of a per-occurrence override that decides WHICH occurrence it is and
  * WHEN that occurrence falls. Deliberately not the amount: this module answers
@@ -89,6 +100,17 @@ export function expandOccurrenceSlots<O extends OccurrenceOverrideInput>(
   overrides: readonly O[],
   window: OccurrenceWindow,
 ): ExpandedOccurrence<O>[] {
+  // The window is compared as text, so a bound that is not a date fails OPEN
+  // rather than closed: `"2026-08-26" <= "NaN-NaN-NaN"` is true (digits sort
+  // before letters), so every slot passed both the walk condition and the
+  // filter, and the caller got "due today" for a bill years away. That is how an
+  // unbounded `reminderDaysBefore` overflowing `addDaysYMD` turned into a daily
+  // reminder for every one of a user's manual bills. Refuse the input instead:
+  // no caller has a meaning for a non-date window, and a silent all-match is the
+  // worst of the three possible answers.
+  assertWindowDate(window.through, "through");
+  if (window.from !== undefined) assertWindowDate(window.from, "from");
+
   const byOriginal = new Map<string, O>();
   for (const override of overrides) {
     const key = ensureYMD(override.originalDate as string);

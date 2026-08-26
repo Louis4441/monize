@@ -1549,6 +1549,7 @@
     "csvColBillName": "Назва рахунку",
     "csvColDueDate": "Термін оплати",
     "csvColAmount": "Сума",
+    "csvColCurrency": "Валюта",
     "csvColFrequency": "Частота",
     "csvColAccount": "Рахунок",
     "csvColStatus": "Статус",

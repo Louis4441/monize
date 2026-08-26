@@ -1549,6 +1549,7 @@
     "csvColBillName": "账单名称",
     "csvColDueDate": "到期日",
     "csvColAmount": "金额",
+    "csvColCurrency": "货币",
     "csvColFrequency": "频率",
     "csvColAccount": "账户",
     "csvColStatus": "状态",

@@ -1549,6 +1549,7 @@
     "csvColBillName": "Название счёта",
     "csvColDueDate": "Дата платежа",
     "csvColAmount": "Сумма",
+    "csvColCurrency": "Валюта",
     "csvColFrequency": "Частота",
     "csvColAccount": "Счёт",
     "csvColStatus": "Статус",

@@ -1549,6 +1549,7 @@
     "csvColBillName": "Rekeningnaam",
     "csvColDueDate": "Vervaldatum",
     "csvColAmount": "Bedrag",
+    "csvColCurrency": "Valuta",
     "csvColFrequency": "Frequentie",
     "csvColAccount": "Rekening",
     "csvColStatus": "Status",

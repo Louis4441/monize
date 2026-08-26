@@ -1272,6 +1272,51 @@ describe("ScheduledTransactionsService", () => {
       expect(result.totalUpcomingDeposits).toBe(3000);
     });
 
+    it("classifies an item from its occurrence, not the stored parent sign", async () => {
+      // A mixed-sign split parent: an ordinary -1200 line beside an embedded
+      // SELL of 10 x 100 whose stored pair is stale. The line re-prices at 1.35
+      // to +1350, so the occurrence is a 150 deposit while the parent still
+      // reads -200 -- and only one of those two answers is what will post.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "EUR", to: "USD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+      const rows = [
+        makeScheduled({
+          id: "s-split",
+          name: "Sell 10 shares, pay the fee",
+          amount: -200,
+          isSplit: true,
+          splits: [
+            { id: "sp-1", kind: "category", amount: -1200 },
+            {
+              id: "sp-2",
+              kind: "investment",
+              amount: 1000,
+              investmentAction: "SELL",
+              investmentSecurityId: "SEC-1",
+              investmentQuantity: 10,
+              investmentPrice: 100,
+              investmentCommission: 0,
+              investmentExchangeRate: 1,
+              investmentExchangeRateFromCurrency: "CAD",
+              investmentExchangeRateToCurrency: "USD",
+            },
+          ] as never,
+        }),
+      ];
+      scheduledRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder(rows));
+
+      const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+      expect(result.items[0].amount).toBe(150);
+      expect(result.items[0].kind).toBe("deposit");
+      expect(result.totalUpcomingDeposits).toBe(150);
+      expect(result.totalUpcomingBills).toBe(0);
+    });
+
     it("filters by kind", async () => {
       const rows = [
         makeScheduled({ id: "s1", amount: -100 }),

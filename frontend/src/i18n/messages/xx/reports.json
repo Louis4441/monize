@@ -1549,6 +1549,7 @@
     "csvColBillName": "[XX-Bill Name-XX]",
     "csvColDueDate": "[XX-Due Date-XX]",
     "csvColAmount": "[XX-Amount-XX]",
+    "csvColCurrency": "[XX-Currency-XX]",
     "csvColFrequency": "[XX-Frequency-XX]",
     "csvColAccount": "[XX-Account-XX]",
     "csvColStatus": "[XX-Status-XX]",
