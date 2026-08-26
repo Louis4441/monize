@@ -75,6 +75,13 @@ test.describe('Mobile reconcile', () => {
     // device width the moment the table mounted.
     expect(await page.evaluate(() => window.innerWidth)).toBe(390);
 
+    // The table card bleeds to the screen edge on phones, so the table gets
+    // the full device width -- and not a pixel more.
+    const tableBox = (await page.locator('table').boundingBox())!;
+    expect(tableBox.width).toBeGreaterThanOrEqual(389);
+    expect(tableBox.width).toBeLessThanOrEqual(390);
+    expect(tableBox.x).toBeGreaterThanOrEqual(0);
+
     // Actions live in the long-press / right-click sheet, not in a column:
     // open it on the row and pick Edit to reach the transaction form.
     await page.getByTestId(/^reconcile-row-/).first().click({ button: 'right' });

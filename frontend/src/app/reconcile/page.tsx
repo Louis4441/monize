@@ -475,7 +475,10 @@ function ReconcileContent() {
     const totalCount = reconciliationData.transactions.length;
 
     return (
-      <div className="px-4 sm:px-6 lg:px-12">
+      // No horizontal inset of its own below `sm`: the <main> wrapper already
+      // carries px-4 there, and stacking the two halved the table's width on a
+      // phone. From `sm` up the doubled inset is the intended, roomier look.
+      <div className="sm:px-6 lg:px-12">
         {/* Summary Bar */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -512,8 +515,11 @@ function ReconcileContent() {
           </div>
         </div>
 
-        {/* Transaction List */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        {/* Transaction List. On phones the card bleeds to the screen edge
+            (cancelling <main>'s px-4) so the table gets the full device width;
+            the corners square off there because a rounded card flush with the
+            viewport reads as a clipping fault. */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg max-sm:-mx-4 max-sm:rounded-none shadow overflow-hidden">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap justify-between items-center gap-3">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {t('list.heading', { count: totalCount })}
