@@ -232,6 +232,44 @@ describe("ScheduledOccurrenceService", () => {
     expect(overridesRepo.find).not.toHaveBeenCalled();
   });
 
+  it("narrows the candidate read on the schedule attributes a caller asks for", async () => {
+    const qb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+    scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findOccurrences(
+      userId,
+      { through: "2026-04-30" },
+      { outflowsOnly: true, manualOnly: true },
+    );
+
+    const predicates = qb.andWhere.mock.calls.map((c) => String(c[0]));
+    expect(predicates).toContain("st.amount < 0");
+    expect(predicates).toContain("st.autoPost = :autoPost");
+  });
+
+  it("leaves the candidate read wide when no filter is asked for", async () => {
+    const qb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+    scheduledRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findOccurrences(userId, { through: "2026-04-30" });
+
+    const predicates = qb.andWhere.mock.calls.map((c) => String(c[0]));
+    expect(predicates).not.toContain("st.amount < 0");
+    expect(predicates).not.toContain("st.autoPost = :autoPost");
+  });
+
   it("loads candidates whose occurrence an override moved into the window", async () => {
     const qb = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),

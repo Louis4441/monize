@@ -444,26 +444,25 @@ export class BudgetsService {
     periodEnd: string,
   ): Promise<UpcomingBill[]> {
     const todayStr = todayYMD();
-    const occurrences = await this.occurrences.findOccurrences(userId, {
-      from: todayStr,
-      through: periodEnd,
-      // One row per schedule, which is the shape this list has always had.
-      maxOccurrences: 1,
-    });
+    const occurrences = await this.occurrences.findOccurrences(
+      userId,
+      {
+        from: todayStr,
+        through: periodEnd,
+        // One row per schedule, which is the shape this list has always had.
+        maxOccurrences: 1,
+      },
+      { outflowsOnly: true },
+    );
 
-    // The stored sign selects the outflows. An FX rate is positive, so it cannot
-    // flip one: the sign classifies the row correctly even when its magnitude is
-    // a stale snapshot or unknown, and only the magnitude needs re-resolving.
-    return occurrences
-      .filter((occurrence) => Number(occurrence.schedule.amount) < 0)
-      .map((occurrence) => ({
-        id: occurrence.scheduledTransactionId,
-        name: occurrence.schedule.name,
-        amount: occurrence.amount === null ? null : Math.abs(occurrence.amount),
-        amountComplete: occurrence.complete,
-        dueDate: occurrence.dueDate,
-        categoryId: occurrence.schedule.categoryId,
-      }));
+    return occurrences.map((occurrence) => ({
+      id: occurrence.scheduledTransactionId,
+      name: occurrence.schedule.name,
+      amount: occurrence.amount === null ? null : Math.abs(occurrence.amount),
+      amountComplete: occurrence.complete,
+      dueDate: occurrence.dueDate,
+      categoryId: occurrence.schedule.categoryId,
+    }));
   }
 
   async getVelocity(
@@ -620,14 +619,11 @@ export class BudgetsService {
     // occurrence contract. Keying the override lookup on `overrideDate` here (the
     // identity is `originalDate`) meant a bill the user had MOVED silently fell
     // back to the template's amount, on the template's date.
-    const occurrences = await this.occurrences.findOccurrences(userId, {
-      from: todayStr,
-      through: horizonStr,
-      maxOccurrences: 1,
-    });
-
-    // Auto-posting bills need no reminder: the posting is the reminder.
-    const manualOccurrences = occurrences.filter((o) => !o.schedule.autoPost);
+    const manualOccurrences = await this.occurrences.findOccurrences(
+      userId,
+      { from: todayStr, through: horizonStr, maxOccurrences: 1 },
+      { manualOnly: true },
+    );
     if (manualOccurrences.length === 0) return;
 
     // Only those within their own reminder window, and not already paid ahead of

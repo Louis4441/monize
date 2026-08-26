@@ -54,6 +54,18 @@ export interface EffectiveScheduledOccurrence {
   settlementPair: { from: string; to: string } | null;
 }
 
+/**
+ * Narrowing on *schedule* attributes, for a surface that genuinely wants fewer
+ * rows. Deliberately not a general `where`: anything that decides which
+ * occurrence applies belongs to this service, not to its callers.
+ */
+export interface OccurrenceCandidateFilter {
+  /** Only schedules whose stored amount is negative. */
+  outflowsOnly?: boolean;
+  /** Only schedules the user has to post themselves. */
+  manualOnly?: boolean;
+}
+
 /** An occurrence plus the row it came from, for a server-side consumer. */
 export interface ResolvedScheduledOccurrence extends EffectiveScheduledOccurrence {
   schedule: ScheduledTransaction;
@@ -151,13 +163,19 @@ export class ScheduledOccurrenceService {
    * schedule-shaped one: a schedule whose next recurrence slot sits beyond the
    * window still has an occurrence inside it when an override moved one back, so
    * `next_due_date <= through` alone loses it.
+   *
+   * `filter` narrows on stable *schedule* attributes only -- never on anything
+   * that decides which occurrence applies. A surface that wants fewer rows says
+   * so here rather than writing its own candidate query, which is how the
+   * override rules got copied in the first place.
    */
   async findOccurrences(
     userId: string,
     window: OccurrenceWindow,
+    filter: OccurrenceCandidateFilter = {},
   ): Promise<ResolvedScheduledOccurrence[]> {
-    const rows = await withScopedDb(this.dataSource, (m) =>
-      m
+    const rows = await withScopedDb(this.dataSource, (m) => {
+      const qb = m
         .getRepository(ScheduledTransaction)
         .createQueryBuilder("st")
         .leftJoinAndSelect("st.account", "account")
@@ -183,9 +201,17 @@ export class ScheduledOccurrenceService {
             ))`,
           { through: window.through },
         )
-        .orderBy("st.nextDueDate", "ASC")
-        .getMany(),
-    );
+        .orderBy("st.nextDueDate", "ASC");
+
+      // The stored sign selects the outflows: an exchange rate is positive, so it
+      // cannot flip one, and only the magnitude needs re-resolving.
+      if (filter.outflowsOnly) qb.andWhere("st.amount < 0");
+      // An auto-posted schedule needs no reminder -- the posting is the reminder.
+      if (filter.manualOnly) {
+        qb.andWhere("st.autoPost = :autoPost", { autoPost: false });
+      }
+      return qb.getMany();
+    });
 
     return this.expand(userId, rows, window);
   }
