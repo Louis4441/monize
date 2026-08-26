@@ -1317,6 +1317,56 @@ describe("ScheduledTransactionsService", () => {
       expect(result.totalUpcomingBills).toBe(0);
     });
 
+    it("keeps an unknown-direction occurrence in the rollups even under a kind filter", async () => {
+      // A mixed-sign split whose investment line cannot be priced. Asked for
+      // bills, the caller must not be handed a complete-looking bills total: the
+      // item could be one, and the tool description promises exactly this.
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "EUR", to: "USD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        null,
+      );
+      const rows = [
+        makeScheduled({ id: "s-bill", name: "Rent", amount: -1200 }),
+        makeScheduled({
+          id: "s-split",
+          name: "Sell shares, pay the fee",
+          amount: 10,
+          isSplit: true,
+          splits: [
+            { id: "sp-1", kind: "category", amount: -1200 },
+            {
+              id: "sp-2",
+              kind: "investment",
+              amount: 1210,
+              investmentAction: "SELL",
+              investmentSecurityId: "SEC-1",
+              investmentQuantity: 10,
+              investmentPrice: 121,
+              investmentCommission: 0,
+              investmentExchangeRate: 1,
+              investmentExchangeRateFromCurrency: "CAD",
+              investmentExchangeRateToCurrency: "USD",
+            },
+          ] as never,
+        }),
+      ];
+      scheduledRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder(rows));
+
+      const result = await service.getLlmUpcomingBillsAndDeposits(userId, {
+        kind: "bill",
+      });
+
+      // The list honours the filter...
+      expect(result.items.map((i) => i.name)).toEqual(["Rent"]);
+      // ...and the rollups still know about the item it removed.
+      expect(result.totalUpcomingBills).toBeNull();
+      expect(result.knownUpcomingBillsSubtotal).toBe(1200);
+      expect(result.amountsComplete).toBe(false);
+      expect(result.unknownAmountItems).toEqual(["Sell shares, pay the fee"]);
+    });
+
     it("filters by kind", async () => {
       const rows = [
         makeScheduled({ id: "s1", amount: -100 }),

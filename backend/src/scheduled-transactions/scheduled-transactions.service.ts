@@ -1634,9 +1634,21 @@ export class ScheduledTransactionsService {
       through: addDaysYMD(today, days),
       maxOccurrences: 1,
     });
-    const items = occurrences
+    // Everything the window holds that the caller's OTHER filters accept. The
+    // rollups are built from this rather than from the kind-filtered list,
+    // because an occurrence whose direction is not derivable is exactly what a
+    // `kind: "bill"` filter must not be allowed to hide: dropping it first
+    // returned a complete-looking `totalUpcomingBills` with
+    // `amountsComplete: true`, which is what the tool descriptions promise never
+    // happens (issue #1247 re-audit).
+    const rollupBase = occurrences
       .map((occurrence) => toLlmScheduledItem(occurrence, today))
-      .filter((item) => matchesScheduledFilter(item, filter));
+      .filter((item) =>
+        matchesScheduledFilter(item, { ...filter, kind: undefined }),
+      );
+    const items = rollupBase.filter((item) =>
+      matchesScheduledFilter(item, filter),
+    );
 
     const bills = items.filter((i) => i.kind === "bill");
     const deposits = items.filter((i) => i.kind === "deposit");
@@ -1646,7 +1658,7 @@ export class ScheduledTransactionsService {
     // on. It stays out of the two item lists, because a list of bills that
     // includes something that might be a deposit is a worse answer than a named
     // unknown (issue #1247 re-audit).
-    const unclassified = items.filter((i) => i.kind === "unknown");
+    const unclassified = rollupBase.filter((i) => i.kind === "unknown");
     // A bucket's total exists only when every item in it resolved; the partial
     // sum travels in its own explicitly-named field so nothing reads it as a
     // total. Each bucket otherwise answers for itself -- an unknown deposit does
@@ -1658,9 +1670,16 @@ export class ScheduledTransactionsService {
       [...deposits, ...unclassified],
       (a) => a,
     );
-    const unknownAmountItems = items
-      .filter((i) => !i.amountComplete)
-      .map((i) => i.name);
+    // Named from the rollup base for the same reason: an unknown the kind filter
+    // removed from the list still makes the totals incomplete, so the caller has
+    // to be told which item it was.
+    const unknownAmountItems = [
+      ...new Set(
+        [...items, ...unclassified]
+          .filter((i) => !i.amountComplete)
+          .map((i) => i.name),
+      ),
+    ];
 
     return {
       daysWindow: days,

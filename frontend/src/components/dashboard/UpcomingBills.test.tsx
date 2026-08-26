@@ -107,6 +107,33 @@ describe('UpcomingBills', () => {
     expect(screen.getByText('Total due')).toBeInTheDocument();
   });
 
+  it('withholds both totals for an occurrence whose direction is unknown', () => {
+    // A mixed-sign split whose investment line cannot be priced could be either,
+    // so it withholds BOTH figures. Filtering it out of the two buckets left them
+    // rendering as complete totals beside a row saying its own amount is unknown
+    // (issue #1247 re-audit).
+    const dateStr = futureDateStr(1);
+    const transactions = [
+      { id: '1', name: 'Netflix', amount: -15.99, currencyCode: 'CAD', nextDueDate: dateStr, isActive: true, autoPost: true },
+      { id: '2', name: 'Payroll', amount: 3000, currencyCode: 'CAD', nextDueDate: dateStr, isActive: true, autoPost: true },
+      {
+        id: '3', name: 'Sell shares, pay the fee', amount: 10, currencyCode: 'CAD',
+        nextDueDate: dateStr, isActive: true, autoPost: true, isSplit: true,
+        effectiveAmount: null, effectiveAmountComplete: false,
+        effectiveDirectionAmount: null,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.getByText('Total due')).toBeInTheDocument();
+    expect(screen.getByText('Total incoming')).toBeInTheDocument();
+    // Both figures are marked partial rather than printed as settled sums.
+    expect(screen.getAllByTestId('partial-total').length).toBe(2);
+    // And the row itself is neither red nor green.
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+  });
+
   it('shows total incoming for deposits', () => {
     const dateStr = futureDateStr(1);
     const transactions = [

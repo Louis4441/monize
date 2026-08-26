@@ -229,8 +229,19 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   // failure with no currency to blame, which is exactly what an unresolvable
   // settlement rate is; the missing-rate branch below still names a currency
   // when it is the *display* conversion that has no rate.
+  // An occurrence whose direction the server could not derive belongs to EITHER
+  // bucket, so it withholds BOTH totals rather than being quietly left out of
+  // both: filtering it away left "Total due" and "Total incoming" rendering as
+  // complete figures beside a row that says its own amount is unknown. Its amount
+  // is null, which is what `sumConverted`'s non-finite branch withholds on.
+  const unclassified = upcomingItems.filter(
+    (item) => getItemType(item) === 'unknown',
+  );
   const totalDue = sumConverted(
-    upcomingItems.filter((item) => getItemType(item) === 'bill'),
+    [
+      ...upcomingItems.filter((item) => getItemType(item) === 'bill'),
+      ...unclassified,
+    ],
     (item) => getEffective(item).amount ?? NaN,
     (item) => getEffective(item).currencyCode,
     (amount, currency) => {
@@ -239,7 +250,10 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
     },
   );
   const totalIncoming = sumConverted(
-    upcomingItems.filter((item) => getItemType(item) === 'deposit'),
+    [
+      ...upcomingItems.filter((item) => getItemType(item) === 'deposit'),
+      ...unclassified,
+    ],
     (item) => getEffective(item).amount ?? NaN,
     (item) => getEffective(item).currencyCode,
     convertToDefault,
