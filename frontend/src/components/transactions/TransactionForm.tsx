@@ -573,15 +573,21 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   // status to UNRECONCILED, otherwise mirrors duplicateFrom behaviour. When
   // the source is a split, the form switches into split mode and the splits
   // state is restored so the user gets back the same split breakdown.
+  //
+  // The account is deliberately NOT copied: the recents list is global, so a
+  // chosen row often belongs to a different account than the one the user
+  // opened the form on, and silently moving the entry there is never what
+  // they asked for. The currency follows from that account (see the
+  // currencyCode effect above), so it is not copied either - taking the
+  // source's code would denominate the amount in a currency the account does
+  // not hold.
   const handleQuickFill = (source: Transaction) => {
     const amount = Math.round(Number(source.amount) * 100) / 100;
-    setValue('accountId', source.accountId, { shouldDirty: true, shouldValidate: true });
     setValue('transactionDate', getLocalDateString(), { shouldDirty: true, shouldValidate: true });
     setValue('payeeId', source.payeeId || undefined, { shouldDirty: true });
     setValue('payeeName', source.payeeName || '', { shouldDirty: true });
     setValue('categoryId', source.categoryId || '', { shouldDirty: true });
     setValue('amount', amount, { shouldDirty: true, shouldValidate: true });
-    setValue('currencyCode', source.currencyCode, { shouldDirty: true });
     setValue('description', source.description || '', { shouldDirty: true });
     setValue('referenceNumber', '', { shouldDirty: true });
     setValue('status', TransactionStatus.UNRECONCILED, { shouldDirty: true });

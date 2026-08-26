@@ -3296,6 +3296,114 @@ describe('TransactionForm', () => {
       });
       expect(mockGetRecent).not.toHaveBeenCalled();
     });
+
+    // The recents list is global (deduped across accounts), so a chosen row
+    // routinely belongs to a different account than the one the form was
+    // opened on. Quick-fill copies the payee/category/amount and must leave
+    // the account - and the currency derived from it - exactly as they were.
+    async function openRecentsAndPick(recent: ReturnType<typeof createExistingTransaction>) {
+      mockGetRecent.mockResolvedValue([recent]);
+
+      await waitFor(() => {
+        expect(
+          screen.getByLabelText('Show recent transactions'),
+        ).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Show recent transactions'));
+      });
+
+      const row = await screen.findByRole('button', {
+        name: new RegExp(recent.payeeName as string),
+      });
+      await act(async () => {
+        fireEvent.click(row);
+      });
+    }
+
+    it('leaves the account untouched when quick-filling from a row in another account', async () => {
+      const recent = createExistingTransaction({
+        id: 'rec-1',
+        accountId: 'acc-2',
+        amount: -25.5,
+        payeeName: 'Grocery Store',
+      });
+
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+        />
+      );
+
+      await openRecentsAndPick(recent);
+
+      // Quick-fill happened...
+      await waitFor(() => {
+        expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe(
+          '-25.50',
+        );
+      });
+      // ...but the account the user opened the form on is still selected.
+      expect((screen.getByLabelText('Account') as HTMLSelectElement).value).toBe(
+        'acc-1',
+      );
+    });
+
+    it('keeps the selected account currency when the recent row is in a foreign-currency account', async () => {
+      const recent = createExistingTransaction({
+        id: 'rec-2',
+        accountId: 'acc-3',
+        currencyCode: 'USD',
+        amount: -30,
+        payeeName: 'Grocery Store',
+      });
+
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+          // Same category the recent row carries, so quick-fill leaves
+          // selectedCategoryId untouched and the account-currency effect does
+          // not re-run: a copied currency code would survive to submit rather
+          // than being incidentally corrected.
+          defaultCategoryId="cat-1"
+        />
+      );
+
+      await openRecentsAndPick(recent);
+
+      await waitFor(() => {
+        expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe(
+          '-30.00',
+        );
+      });
+      expect((screen.getByLabelText('Account') as HTMLSelectElement).value).toBe(
+        'acc-1',
+      );
+
+      // The currency is the CAD account's, never the USD source row's: it is
+      // derived from the account, and the account did not change.
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: /Create Transaction/i }),
+        );
+      });
+      await waitFor(() => {
+        expect(mockCreate).toHaveBeenCalled();
+      });
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({
+        accountId: 'acc-1',
+        currencyCode: 'CAD',
+      });
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({
+        accountId: 'acc-1',
+        currencyCode: 'CAD',
+      });
+    });
   });
 
   // =========================================================================
