@@ -1,6 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { fork } from "child_process";
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import {
   existsSync,
   mkdtempSync,
@@ -77,7 +77,21 @@ const logger = new Logger("RestorePeakRss");
 const gunzipAsync = promisify(gunzip);
 
 const MIB = 1024 * 1024;
-const HARNESS_PASSWORD = "peak-rss-harness-password";
+/**
+ * The password the harness encrypts its own synthetic artifacts under, minted
+ * fresh for each run and handed to the measuring children through the
+ * environment.
+ *
+ * It was a string literal, which is the shape of a credential even when it is
+ * not one -- a scanner reads it as a hard-coded secret (CWE-798) and it is right
+ * to: the way to tell a real secret from a placeholder is not the value. This
+ * protects nothing (the artifacts are generated, measured and deleted inside one
+ * run), and a random value per run says so in a way nobody has to take on trust.
+ */
+const newHarnessPassword = (): string => randomBytes(24).toString("base64url");
+
+/** Where the parent hands its per-run password to the children it forks. */
+const PASSWORD_ENV = "MONIZE_PEAK_RSS_PASSWORD";
 
 /** What a case's rows look like, which is what decides its compression ratio. */
 type Profile = "repetitive" | "mixed" | "attachments";
@@ -280,6 +294,7 @@ async function measureCase(
   spec: HarnessCase,
   artifactPath: string,
   expandedLimitBytes: number,
+  password: string,
 ): Promise<CaseResult> {
   // Two independent readings, because the first version of this harness trusted
   // one and was wrong twice over. `ru_maxrss` is a high-water mark that a process
@@ -297,9 +312,7 @@ async function measureCase(
 
   const wire = readFileSync(artifactPath);
   sink.push(wire);
-  const gzipped = spec.encrypted
-    ? await decryptBackup(wire, HARNESS_PASSWORD)
-    : wire;
+  const gzipped = spec.encrypted ? await decryptBackup(wire, password) : wire;
   sink.push(gzipped);
   const decompressed = await gunzipAsync(gzipped, {
     maxOutputLength: expandedLimitBytes,
@@ -407,12 +420,20 @@ async function runChild(options: Options): Promise<void> {
   if (!spec || !artifactPath) {
     throw new Error(`Unknown case "${options.caseId}" or missing artifact`);
   }
+  // Required rather than regenerated: a child that minted its own password would
+  // fail to decrypt the artifact the parent encrypted, and report it as a case
+  // that could not be measured.
+  const password = process.env[PASSWORD_ENV];
+  if (spec.encrypted && !password) {
+    throw new Error(`${PASSWORD_ENV} was not passed to the measuring child`);
+  }
   // Twice the target, so the ceiling never decides the measurement.
   try {
     const result = await measureCase(
       spec,
       artifactPath,
       options.targetBytes * 2,
+      password ?? "",
     );
     process.send?.(result);
   } catch (error) {
@@ -472,6 +493,7 @@ function measureInChild(
   artifactPath: string,
   options: Options,
   heapMib: number | null,
+  password: string,
 ): Promise<CaseResult> {
   const entry = childEntry();
   const execArgv =
@@ -483,7 +505,11 @@ function measureInChild(
       entry.path,
       [`--case=${spec.id}`, `--target-mib=${options.targetBytes / MIB}`],
       {
-        env: { ...process.env, MONIZE_PEAK_RSS_ARTIFACT: artifactPath },
+        env: {
+          ...process.env,
+          MONIZE_PEAK_RSS_ARTIFACT: artifactPath,
+          [PASSWORD_ENV]: password,
+        },
         execArgv,
         // V8's own out-of-memory report goes to the child's stderr; the parent
         // does not relay it, because the outcome is what matters and a stack
@@ -528,6 +554,10 @@ const mib = (bytes: number) => `${(bytes / MIB).toFixed(1)}MiB`;
 /** The parent half: build each artifact, measure it, print and record. */
 async function runParent(options: Options): Promise<void> {
   const workDir = mkdtempSync(join(tmpdir(), "monize-peak-rss-"));
+  // One password for this run's artifacts, minted here and passed to each child.
+  // It never leaves the process tree and nothing outlives the run: the artifacts
+  // are deleted in the `finally` below.
+  const password = newHarnessPassword();
   const cgroupLimit = detectProcessMemoryLimitBytes();
   logger.log(
     `Target expanded sizes ${options.targetBytesList.map(mib).join(", ")}, ${options.repeat} run(s) per case, ` +
@@ -568,7 +598,7 @@ async function runParent(options: Options): Promise<void> {
         const plain = buildArtifact(spec.profile, targetBytes);
         const gzipped = gzipSync(plain);
         const wire = spec.encrypted
-          ? await encryptBackup(gzipped, HARNESS_PASSWORD)
+          ? await encryptBackup(gzipped, password)
           : gzipped;
         const artifactPath = join(workDir, `${spec.id}-${targetBytes}.bin`);
         writeFileSync(artifactPath, wire);
@@ -592,6 +622,7 @@ async function runParent(options: Options): Promise<void> {
                 artifactPath,
                 { ...options, targetBytes },
                 heapMib,
+                password,
               ),
             );
           }
