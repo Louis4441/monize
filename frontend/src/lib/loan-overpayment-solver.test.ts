@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { LoanScheduleInput, generateLoanSchedule } from './loan-schedule';
+import {
+  LoanScheduleInput,
+  calculateMortgagePaymentAmount,
+  generateLoanSchedule,
+} from './loan-schedule';
 import {
   solveRecurringForInterestSavings,
   solveRecurringForPayoffMonth,
@@ -95,5 +99,109 @@ describe('solveRecurringForPayoffMonth', () => {
     const solved = solveRecurringForPayoffMonth(baseInput(), '2024-12');
     expect(solved.status).toBe('unreachable');
     expect(solved.amount).toBeNull();
+  });
+});
+
+describe('goal-seek under non-monthly loan frequencies', () => {
+  // A biweekly loan asked for a monthly overpayment: the cadence ratio does not
+  // divide, so the solver and the replay must agree on how many occurrences a
+  // year the plan really pays. Under the old rounded interval they did not --
+  // the solve assumed 13 hits a year and returned an amount too low for the 12
+  // the plan describes.
+  const biweekly = (): LoanScheduleInput => ({
+    startingBalance: 300000,
+    annualRate: 5,
+    paymentAmount: calculateMortgagePaymentAmount(
+      300000,
+      5,
+      300,
+      'BIWEEKLY',
+      false,
+      false,
+    ),
+    frequency: 'BIWEEKLY',
+    firstPaymentDate: new Date(2026, 0, 1),
+  });
+
+  /** Replay the solved amount through the same cadence the plan carries. */
+  const replay = (amount: number) =>
+    generateLoanSchedule({
+      ...biweekly(),
+      overpayments: {
+        recurringExtra: { amount, frequency: 'MONTHLY', mode: 'SHORTEN_TERM' },
+      },
+    });
+
+  it('returns a payoff-month amount that still reaches the target on replay', () => {
+    const target = '2042-06';
+    const solved = solveRecurringForPayoffMonth(
+      biweekly(),
+      `${target}-01`,
+      'SHORTEN_TERM',
+      1,
+      { frequency: 'MONTHLY' },
+    );
+    expect(solved.status).toBe('ok');
+    const replayed = replay(solved.amount!);
+    expect(replayed.paidOff).toBe(true);
+    expect(replayed.payoffDate!.slice(0, 7) <= target).toBe(true);
+  });
+
+  it('returns an interest-savings amount that still saves that much on replay', () => {
+    const savings = 50000;
+    const solved = solveRecurringForInterestSavings(
+      biweekly(),
+      savings,
+      'SHORTEN_TERM',
+      1,
+      { frequency: 'MONTHLY' },
+    );
+    expect(solved.status).toBe('ok');
+    const baselineBiweekly = generateLoanSchedule(biweekly());
+    const replayed = replay(solved.amount!);
+    expect(replayed.paidOff).toBe(true);
+    expect(baselineBiweekly.totalInterest - replayed.totalInterest).toBeGreaterThanOrEqual(
+      savings,
+    );
+  });
+});
+
+describe('a target cannot be met by a truncated schedule', () => {
+  // 500k at 6% paying 2510/month never clears inside the 50-year horizon.
+  const nonAmortizing = (): LoanScheduleInput => ({
+    startingBalance: 500000,
+    annualRate: 6,
+    paymentAmount: 2510,
+    frequency: 'MONTHLY',
+    firstPaymentDate: new Date(2026, 0, 15),
+  });
+
+  it('reports baseline-incomplete rather than a saving against a subtotal', () => {
+    const incomplete = generateLoanSchedule(nonAmortizing());
+    expect(incomplete.paidOff).toBe(false);
+
+    const savings = solveRecurringForInterestSavings(nonAmortizing(), 10000);
+    expect(savings.status).toBe('baseline-incomplete');
+    expect(savings.amount).toBeNull();
+    expect(savings.interestSaved).toBeNull();
+
+    // Same for an absolute target: "already met" would be a claim about the
+    // horizon's interest, which is smaller than the loan's.
+    const target = solveRecurringForTargetInterest(
+      nonAmortizing(),
+      incomplete.totalInterest + 1,
+    );
+    expect(target.status).toBe('baseline-incomplete');
+  });
+
+  it('never counts a truncated candidate as meeting an interest target', () => {
+    // maxPayments caps every candidate schedule, so no amount can prove a
+    // lifetime interest below the target -- the answer is unreachable, not a
+    // small amount whose truncated interest happens to look low enough.
+    const solved = solveRecurringForTargetInterest(
+      { ...nonAmortizing(), maxPayments: 12 },
+      1,
+    );
+    expect(solved.status).toBe('baseline-incomplete');
   });
 });

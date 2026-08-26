@@ -12,7 +12,7 @@ import { loanScenariosApi, planToScenarioData, scenarioToPlan } from '@/lib/loan
 import {
   BaselineOutcome,
   ScenarioComparisonChart,
-  ScenarioOutcome,
+  ScenarioChartOutcome,
 } from '@/components/accounts/loan-detail/ScenarioComparisonChart';
 import { LoanScenario } from '@/types/loan-scenario';
 import { getErrorMessage } from '@/lib/errors';
@@ -31,7 +31,7 @@ interface SavedScenariosPanelProps {
   activePlan: OverpaymentPlan | null;
   /** Outcomes for the comparison chart; the chart toggle only shows when
    *  there are at least two (comparing one scenario has nothing to say). */
-  chartOutcomes?: ScenarioOutcome[];
+  chartOutcomes?: ScenarioChartOutcome[];
   /** No-overpayment baseline for the comparison chart's context marker */
   chartBaseline?: BaselineOutcome | null;
   onLoad: (plan: OverpaymentPlan | null, scenario: LoanScenario) => void;

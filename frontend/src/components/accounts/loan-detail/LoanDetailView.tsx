@@ -15,7 +15,11 @@ import { PayoffComparisonChart } from '@/components/accounts/loan-detail/PayoffC
 import { RateHistorySidebar } from '@/components/accounts/loan-detail/RateHistorySidebar';
 import { ComparisonSummaryCards } from '@/components/accounts/loan-detail/ComparisonSummaryCards';
 import { SavedScenariosPanel } from '@/components/accounts/loan-detail/SavedScenariosPanel';
-import type { ScenarioOutcome } from '@/components/accounts/loan-detail/ScenarioComparisonChart';
+import {
+  hasKnownInterestSaved,
+  type ScenarioChartOutcome,
+  type ScenarioOutcome,
+} from '@/components/accounts/loan-detail/ScenarioComparisonChart';
 import { createScenarioLabels } from '@/components/accounts/loan-detail/loan-scenario-labels';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { sanitizeFilename } from '@/lib/export-filename';
@@ -172,10 +176,13 @@ export function LoanDetailView({
 
   // The comparison chart is only meaningful with more than one saved scenario;
   // the no-overpayment baseline renders as a context line, not a bar.
-  const scenarioChartOutcomes = useMemo<ScenarioOutcome[]>(
-    () => (scenarioOutcomes.length < 2 || !baseline ? [] : scenarioOutcomes),
-    [scenarioOutcomes, baseline],
-  );
+  const scenarioChartOutcomes = useMemo<ScenarioChartOutcome[]>(() => {
+    // Only scenarios with a known interest saving can be drawn (the arc's height
+    // is that saving), so the "more than one scenario" test counts drawable ones.
+    if (!baseline) return [];
+    const drawable = scenarioOutcomes.filter(hasKnownInterestSaved);
+    return drawable.length < 2 ? [] : drawable;
+  }, [scenarioOutcomes, baseline]);
 
   // Past impact of overpayments. It reuses the baseline (no-overpayment)
   // projection as the current projection -- computed once here, not twice --

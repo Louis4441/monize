@@ -33,7 +33,14 @@ export interface PastImpactResult {
   /** Projected payoff, or the final actual payment when already paid off */
   currentPayoffDate: string | null;
   monthsAlreadySaved: number;
-  interestAlreadySaved: number;
+  /**
+   * Interest the overpayments have already saved against the original
+   * contractual schedule, or `null` when either schedule stopped at its
+   * projection horizon instead of paying off. Both sides are lifetime figures,
+   * so a horizon subtotal on either side makes the difference unknown rather
+   * than small.
+   */
+  interestAlreadySaved: number | null;
   /**
    * Total extra principal already paid: the principal from payments recognized
    * as overpayments (by the loan's overpayment category or memo). Matches the
@@ -43,8 +50,10 @@ export interface PastImpactResult {
   extraPrincipalPaid: number;
 }
 
-/** Original schedules can be longer than the reports' 600-payment cap
- * (e.g. a 25-year weekly mortgage), so give them room to complete. */
+/** An original schedule runs from origination rather than from today's balance,
+ * so it needs room beyond even the engine's default horizon (a 30-year weekly
+ * mortgage already carries 1560 payments before any historical rate step
+ * stretches it). This is the engine's hard maximum. */
 const ORIGINAL_SCHEDULE_MAX_PAYMENTS = 10000;
 
 /**
@@ -224,14 +233,26 @@ export function computePastImpact(
     ? lastActualPaymentDate
     : (currentProjection?.payoffDate ?? null);
 
-  const projectedRemainingInterest = currentProjection?.totalInterest ?? 0;
-  const interestAlreadySaved = Math.max(
-    0,
-    round2(
-      originalSchedule.totalInterest -
-        (history.cumulativeInterest + projectedRemainingInterest),
-    ),
-  );
+  // Both sides of the comparison are lifetime interest, so both have to be
+  // known: `totalInterest` on a schedule that stopped at its projection horizon
+  // is the interest over that horizon, and subtracting it would report a saving
+  // the loan has not made. A loan already paid off contributes a known zero of
+  // remaining interest rather than an unknown (there is nothing left to
+  // project), which is why the settled case is not gated on a projection.
+  const remainingInterestKnown = isPaidOff || currentProjection?.paidOff === true;
+  const projectedRemainingInterest = isPaidOff
+    ? 0
+    : (currentProjection?.totalInterest ?? 0);
+  const interestAlreadySaved =
+    originalSchedule.paidOff && remainingInterestKnown
+      ? Math.max(
+          0,
+          round2(
+            originalSchedule.totalInterest -
+              (history.cumulativeInterest + projectedRemainingInterest),
+          ),
+        )
+      : null;
 
   // Extra principal already paid = the principal from payments recognized as
   // overpayments (by the loan's overpayment category or memo). This is the sum

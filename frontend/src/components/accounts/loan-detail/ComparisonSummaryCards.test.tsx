@@ -35,7 +35,7 @@ describe('ComparisonSummaryCards', () => {
     expect(screen.getByText(`${comparison.monthsSaved} months`)).toBeInTheDocument();
     expect(screen.getByText('Interest Saved')).toBeInTheDocument();
     expect(
-      screen.getByText(`$${comparison.interestSaved.toFixed(2)}`),
+      screen.getByText(`$${comparison.interestSaved!.toFixed(2)}`),
     ).toBeInTheDocument();
     expect(screen.getByText('Total Extra Contributed')).toBeInTheDocument();
     expect(

@@ -308,6 +308,7 @@
     "previewFirstInterest": "Interés del Primer Pago:",
     "previewTotalPayments": "Total de Pagos:",
     "previewTotalInterest": "Total de Interés:",
+    "previewFinalPayment": "Pago final:",
     "previewPayoffDate": "Fecha Est. de Liquidación:",
     "previewNA": "N/A",
     "calculatingPreview": "Calculando vista previa...",
@@ -436,7 +437,8 @@
         "effect": "→ ahorra {interest}, liquidación {date}",
         "alreadyMet": "Ya se cumple sin ningún pago extra.",
         "unreachableInterest": "Inalcanzable: ni siquiera un pago extra muy grande puede ahorrar tantos intereses.",
-        "unreachableDate": "Inalcanzable: ese mes es anterior a la liquidación más temprana posible."
+        "unreachableDate": "Inalcanzable: ese mes es anterior a la liquidación más temprana posible.",
+        "baselineIncomplete": "Este préstamo no se liquida dentro del periodo proyectado, por lo que no hay un total de intereses del que partir."
       },
       "simulationTypeLabel": "Tipo de simulación",
       "overpaymentAmount": "Importe de amortización",
@@ -463,6 +465,7 @@
       "interestSaved": "Intereses ahorrados",
       "totalExtraContributed": "Total adicional aportado",
       "beyondProjection": "Más allá de la proyección",
+      "unknown": "Desconocido",
       "newInstallment": "Nueva cuota",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "Cuota mensual",

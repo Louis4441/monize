@@ -488,6 +488,11 @@ export function OverpaymentSimulator({
           )}
         </p>
       )}
+      {goalStatus === 'baseline-incomplete' && (
+        <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">
+          {t('loanDetail.simulator.goalSeek.baselineIncomplete')}
+        </p>
+      )}
       {goalStatus === 'already-met' && (
         <p className="mt-2 text-sm text-green-700 dark:text-green-400">
           {t('loanDetail.simulator.goalSeek.alreadyMet')}

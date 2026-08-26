@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/utils';
 
 /**
  * Shared loan/mortgage schedule engine.
@@ -10,9 +11,12 @@ import { format } from 'date-fns';
  *
  * The rate math mirrors backend/src/accounts/mortgage-amortization.util.ts
  * (including Canadian fixed-rate semi-annual compounding); parity is pinned by
- * fixtures in loan-schedule.test.ts. When no overpayments are supplied the
- * loop reproduces the reports' historical projection behaviour exactly:
- * unrounded internal accumulation, per-row values rounded to 2 decimals.
+ * fixtures in loan-schedule.test.ts. Backend/frontend agreement is drift
+ * detection, not evidence for the convention itself -- that is named in
+ * docs/financial-semantics.md section 9 and held by independently derived
+ * fixtures on both sides. When no overpayments are supplied the loop reproduces
+ * the reports' historical projection behaviour exactly: unrounded internal
+ * accumulation, per-row values rounded to 2 decimals.
  */
 
 export type ScheduleFrequency =
@@ -38,10 +42,16 @@ export interface LumpSum {
 
 /**
  * How often a recurring overpayment is made. ONE_OFF is a single dated payment
- * (modelled as a lump sum, not a RecurringExtra); the rest recur. When an
- * overpayment cadence differs from the loan's own payment cadence, the extra is
- * approximated as an equivalent amount spread across every loan payment (e.g. a
- * weekly extra on a monthly loan is applied as extra * 52/12 each month).
+ * (modelled as a lump sum, not a RecurringExtra); the rest recur.
+ *
+ * A cadence is a *calendar*, independent of the loan's own payment frequency:
+ * occurrences fall on the anchor date and every cadence step after it, and each
+ * is applied at the first loan payment on or after its due date
+ * (`recurringOccurrencesDue`). So MONTHLY contributes exactly 12 occurrences per
+ * calendar year on a weekly, biweekly or monthly loan, and the borrower's
+ * nominal annual cash is what they typed. Deriving a payment interval instead
+ * (`round(periodsPerYear / overpaymentsPerYear)`) paid a monthly extra 13 times
+ * a year on a biweekly loan.
  */
 export type OverpaymentFrequency =
   | 'ONE_OFF'
@@ -70,9 +80,14 @@ export function overpaymentsPerYear(frequency: OverpaymentFrequency): number {
 }
 
 /**
- * The equivalent extra applied on every loan payment for a recurring
- * overpayment made `amount` per `frequency` (approximate model: the cadence is
- * levelled across the loan's payment periods).
+ * The *average* extra per loan payment for a recurring overpayment of `amount`
+ * per `frequency`: the nominal annual cash spread over the loan's periods.
+ *
+ * Display only -- it is what the "resulting monthly payment" card adds to the
+ * installment when the cadence is at least as frequent as the loan's payments.
+ * The schedule engine does NOT apply this figure; it dates each occurrence and
+ * applies the full amount (see `recurringOccurrencesDue`), so a balance must
+ * never be computed from this average.
  */
 export function perPaymentExtraAmount(
   amount: number,
@@ -85,7 +100,7 @@ export function perPaymentExtraAmount(
 }
 
 export interface RecurringExtra {
-  /** Amount per `frequency` (levelled across loan payments during projection). */
+  /** Amount paid per occurrence of `frequency` (not per loan payment). */
   amount: number;
   /** ISO date (yyyy-MM-dd); applies from the first payment when omitted */
   startDate?: string;
@@ -93,9 +108,9 @@ export interface RecurringExtra {
   endDate?: string;
   /**
    * Cadence of the overpayment. Omitted means the amount is applied on every
-   * loan payment as-is (legacy "extra per payment"); a set frequency levels the
-   * amount across payments (e.g. QUARTERLY spreads a quarterly amount over the
-   * quarter's payments).
+   * loan payment as-is (legacy "extra per payment"); a set frequency dates the
+   * occurrences on the calendar and applies the full amount at the first loan
+   * payment on or after each due date.
    */
   frequency?: OverpaymentFrequency;
   /**
@@ -183,7 +198,11 @@ export interface LoanScheduleInput {
   overpayments?: OverpaymentPlan;
   /** Known rate steps; each applies from the first payment on/after its date */
   rateChanges?: RateChange[];
-  /** Maximum projected payments; defaults to 600, clamped to 10000 */
+  /**
+   * Maximum projected payments. Defaults to `DEFAULT_MAX_PROJECTION_YEARS`
+   * worth of this frequency's payments (`maxPaymentsForHorizon`), clamped to
+   * `HARD_MAX_PAYMENTS`.
+   */
   maxPayments?: number;
   /**
    * Amortize to zero over exactly this many payments, re-levelling the payment
@@ -233,6 +252,14 @@ export interface LoanScheduleResult {
   rows: ScheduleRow[];
   /** Date of the final payment, or null when not paid off within maxPayments */
   payoffDate: string | null;
+  /**
+   * Interest over the rows actually projected. This is the loan's **lifetime**
+   * interest only when `paidOff` is true; when the schedule stopped at the
+   * projection horizon it is the interest over that horizon -- a subtotal, per
+   * `docs/financial-calculation-contract.md` section 1. Every consumer that
+   * presents a lifetime figure, or a saving derived from one, gates on `paidOff`
+   * first (`deriveLoanFigures` and `compareSchedules` are the two that do).
+   */
   totalInterest: number;
   /** Regular payments + extra principal contributed across the schedule */
   totalPaid: number;
@@ -252,7 +279,13 @@ export interface ScenarioComparison {
   scenario: LoanScheduleResult;
   paymentsSaved: number;
   monthsSaved: number;
-  interestSaved: number;
+  /**
+   * Interest the scenario saves against the baseline, or `null` when either
+   * schedule stopped at the projection horizon instead of paying off. The
+   * difference of two horizons is not a saving, and presenting one as though it
+   * were is how a truncated baseline contaminated every scenario's headline.
+   */
+  interestSaved: number | null;
   /**
    * How much lower the scenario's ending installment is than the baseline's.
    * Zero for SHORTEN_TERM (the installment is unchanged); positive for
@@ -261,10 +294,35 @@ export interface ScenarioComparison {
   installmentReduction: number;
 }
 
-const DEFAULT_MAX_PAYMENTS = 600;
+/**
+ * Default projection horizon, in years. The bound on a schedule is a span of
+ * time, not a row count: a flat 600-payment default was 50 years of a monthly
+ * loan but only 11 years of a weekly one, so ordinary 25- and 30-year weekly and
+ * biweekly mortgages (1300 and 780 payments) stopped mid-term and reported no
+ * payoff date and a fraction of their lifetime interest.
+ *
+ * 50 years is past the longest amortization any supported term expresses, so a
+ * schedule that still has not cleared is genuinely not amortizing rather than
+ * merely long.
+ */
+export const DEFAULT_MAX_PROJECTION_YEARS = 50;
 const HARD_MAX_PAYMENTS = 10000;
 /** Balances at or below this are considered paid off (matches the reports) */
 const PAYOFF_EPSILON = 0.01;
+
+/**
+ * Payments in `years` of `frequency`, clamped to `HARD_MAX_PAYMENTS` -- the
+ * default projection bound, and the one place the horizon becomes a row count.
+ */
+export function maxPaymentsForHorizon(
+  frequency: ScheduleFrequency,
+  years: number = DEFAULT_MAX_PROJECTION_YEARS,
+): number {
+  return Math.min(
+    Math.max(1, Math.round(getPeriodsPerYear(frequency) * years)),
+    HARD_MAX_PAYMENTS,
+  );
+}
 
 export function getPeriodsPerYear(frequency: ScheduleFrequency): number {
   switch (frequency) {
@@ -286,6 +344,17 @@ export function getPeriodsPerYear(frequency: ScheduleFrequency): number {
   }
 }
 
+/**
+ * Periodic rate, on the convention named in docs/financial-semantics.md
+ * section 9: the quoted rate is a nominal annual rate compounded at the payment
+ * frequency, so the periodic rate is `annualRate / periodsPerYear` -- NOT
+ * monthly compounding converted to the period. Canadian fixed-rate mortgages
+ * are the one exception (semi-annual compounding, required by law).
+ *
+ * Mirrors `getPeriodicRate` in
+ * backend/src/accounts/mortgage-amortization.util.ts, which carries the full
+ * reasoning. The mirroring detects drift; it is not evidence for the convention.
+ */
 export function getPeriodicRate(
   annualRate: number,
   periodsPerYear: number,
@@ -351,6 +420,95 @@ export function advanceDate(date: Date, frequency: ScheduleFrequency): Date {
       break;
   }
   return next;
+}
+
+/** Cadence step of each recurring overpayment frequency, as a date advance. */
+const OVERPAYMENT_CADENCE: Record<
+  Exclude<OverpaymentFrequency, 'ONE_OFF'>,
+  ScheduleFrequency
+> = {
+  WEEKLY: 'WEEKLY',
+  BIWEEKLY: 'BIWEEKLY',
+  MONTHLY: 'MONTHLY',
+  QUARTERLY: 'QUARTERLY',
+  ANNUALLY: 'YEARLY',
+};
+
+/** Counts the overpayment occurrences a given loan payment has to carry. */
+export interface RecurringOccurrenceCounter {
+  /**
+   * Occurrences due on or before `rowDate` that no earlier payment has taken.
+   * Stateful: call once per schedule row, in date order.
+   */
+  dueBy(rowDate: string): number;
+}
+
+/**
+ * The one place a recurring overpayment's cadence becomes schedule rows.
+ *
+ * A declared frequency is a **calendar**: occurrences fall on the anchor date
+ * and every cadence step after it, and each is applied at the first loan payment
+ * on or after its due date. That makes the annual count exact in both
+ * directions -- 12 monthly occurrences a year on a weekly, biweekly or monthly
+ * loan; 52 weekly occurrences a year on a monthly loan, arriving four or five at
+ * a time -- so the borrower's nominal annual cash is what they typed.
+ *
+ * The interval this replaced was `round(periodsPerYear / overpaymentsPerYear)`,
+ * which is only exact when the ratio divides: `26 / 12` rounded to 2, so a
+ * "monthly" 100 landed every second biweekly payment, 13 times a year.
+ *
+ * Two window rules, both deliberate:
+ * - The anchor never precedes the first projected payment. A start date already
+ *   in the past means "from now", not a backlog of missed occurrences dumped
+ *   onto row 1.
+ * - The end date is tested against an occurrence's **due** date, not against
+ *   the payment that carries it: cash committed inside the window is still
+ *   paid, even when the next payment date falls past the end.
+ *
+ * An omitted frequency keeps the legacy meaning -- the amount on every payment
+ * inside the window, so every payment is exactly one occurrence.
+ */
+export function recurringOccurrencesDue(
+  extra: RecurringExtra,
+  firstPaymentDate: Date,
+): RecurringOccurrenceCounter {
+  const cadence =
+    extra.frequency && extra.frequency !== 'ONE_OFF'
+      ? OVERPAYMENT_CADENCE[extra.frequency]
+      : null;
+
+  if (!cadence) {
+    return {
+      dueBy: (rowDate) =>
+        (!extra.startDate || extra.startDate <= rowDate) &&
+        (!extra.endDate || rowDate <= extra.endDate)
+          ? 1
+          : 0,
+    };
+  }
+
+  const firstPaymentIso = format(firstPaymentDate, 'yyyy-MM-dd');
+  let due =
+    extra.startDate && extra.startDate > firstPaymentIso
+      ? parseLocalDate(extra.startDate)
+      : new Date(firstPaymentDate);
+
+  return {
+    dueBy: (rowDate) => {
+      let count = 0;
+      for (;;) {
+        const dueIso = format(due, 'yyyy-MM-dd');
+        // Not yet due: it stays pending for a later payment.
+        if (dueIso > rowDate) break;
+        // Past the window: nothing further is ever due, and the cursor stays
+        // parked so subsequent rows count nothing.
+        if (extra.endDate && dueIso > extra.endDate) break;
+        count++;
+        due = advanceDate(due, cadence);
+      }
+      return count;
+    },
+  };
 }
 
 /**
@@ -449,7 +607,7 @@ export function generateBudgetSchedule(
   } = input;
 
   const periodsPerYear = getPeriodsPerYear(frequency);
-  const cap = Math.min(maxPayments ?? DEFAULT_MAX_PAYMENTS, HARD_MAX_PAYMENTS);
+  const cap = Math.min(maxPayments ?? maxPaymentsForHorizon(frequency), HARD_MAX_PAYMENTS);
 
   // LOWER_INSTALLMENT re-amortizes the installment over the remaining
   // contractual term (it steps down as the balance falls); SHORTEN_TERM keeps
@@ -613,7 +771,7 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
   } = input;
 
   const maxPayments = Math.min(
-    Math.max(1, input.maxPayments ?? DEFAULT_MAX_PAYMENTS),
+    Math.max(1, input.maxPayments ?? maxPaymentsForHorizon(frequency)),
     HARD_MAX_PAYMENTS,
   );
 
@@ -662,28 +820,14 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
   let rateChangeIndex = 0;
 
   const recurringExtra = overpayments?.recurringExtra;
-  // How the recurring extra lands on the schedule:
-  // - no frequency (legacy): the amount on every payment.
-  // - frequency at least as frequent as the loan's payments (e.g. weekly on a
-  //   monthly loan): levelled to an equivalent amount on every payment.
-  // - frequency sparser than the loan's payments (e.g. quarterly on a monthly
-  //   loan): the full amount as a real overpayment every Nth payment, so a
-  //   sparse cadence genuinely pays down less than the same total spread out.
-  const overPerYear = recurringExtra?.frequency
-    ? overpaymentsPerYear(recurringExtra.frequency)
-    : 0;
-  const recurringIsSparse = overPerYear > 0 && overPerYear < periodsPerYear;
-  const recurringInterval = recurringIsSparse
-    ? Math.max(1, Math.round(periodsPerYear / overPerYear))
-    : 1;
-  const recurringPerHit = recurringExtra
-    ? recurringIsSparse
-      ? recurringExtra.amount
-      : recurringExtra.frequency
-        ? perPaymentExtraAmount(recurringExtra.amount, recurringExtra.frequency, frequency)
-        : recurringExtra.amount
-    : 0;
-  let recurringHits = 0;
+  // The recurring extra lands on dated calendar occurrences, each applied at the
+  // first loan payment on or after its due date -- so the nominal annual cash is
+  // exact for every combination of cadence and loan frequency. See
+  // recurringOccurrencesDue.
+  const recurringOccurrences =
+    recurringExtra && recurringExtra.amount > 0
+      ? recurringOccurrencesDue(recurringExtra, firstPaymentDate)
+      : null;
   const lumpSums = [...(overpayments?.lumpSums ?? [])].sort((a, b) =>
     a.date.localeCompare(b.date),
   );
@@ -761,19 +905,15 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
     // Whether a LOWER_INSTALLMENT-mode overpayment landed this period, so the
     // installment is re-levelled below (SHORTEN_TERM ones leave it unchanged).
     let lowerApplied = false;
-    if (
-      recurringExtra &&
-      recurringPerHit > 0 &&
-      (!recurringExtra.startDate || recurringExtra.startDate <= rowDate) &&
-      (!recurringExtra.endDate || rowDate <= recurringExtra.endDate)
-    ) {
-      // Dense/levelled cadences hit every in-window payment (interval 1); a
-      // sparse cadence lands on the first in-window payment and every Nth after.
-      if (recurringHits % recurringInterval === 0) {
-        extraPrincipal += recurringPerHit;
+    if (recurringOccurrences && recurringExtra) {
+      // Every occurrence whose due date has arrived is paid in full, so a
+      // cadence denser than the loan's payments contributes several at once and
+      // a sparser one contributes none on most payments.
+      const occurrences = recurringOccurrences.dueBy(rowDate);
+      if (occurrences > 0) {
+        extraPrincipal += recurringExtra.amount * occurrences;
         if (modeOf(recurringExtra.mode) === 'LOWER_INSTALLMENT') lowerApplied = true;
       }
-      recurringHits++;
     }
     // Lump sums land on the first payment on or after their date (sums dated
     // before the first payment attach to row 1)
@@ -919,12 +1059,20 @@ export function compareSchedules(
   baseline: LoanScheduleResult,
   scenario: LoanScheduleResult,
 ): ScenarioComparison {
+  // A saving is a difference of two lifetime totals, so both sides must have
+  // paid off within the horizon. `totalInterest` on a truncated schedule is the
+  // interest over the horizon, and subtracting one horizon from another says
+  // nothing about the loan (a truncated baseline made every scenario look
+  // better than it is).
+  const lifetimeInterestKnown = baseline.paidOff && scenario.paidOff;
   return {
     baseline,
     scenario,
     paymentsSaved: baseline.numPayments - scenario.numPayments,
     monthsSaved: monthsBetween(scenario.payoffDate, baseline.payoffDate),
-    interestSaved: round2(baseline.totalInterest - scenario.totalInterest),
+    interestSaved: lifetimeInterestKnown
+      ? round2(baseline.totalInterest - scenario.totalInterest)
+      : null,
     installmentReduction: round2(
       baseline.finalPaymentAmount - scenario.finalPaymentAmount,
     ),

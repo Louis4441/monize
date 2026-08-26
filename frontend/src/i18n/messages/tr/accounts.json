@@ -308,6 +308,7 @@
     "previewFirstInterest": "İlk Ödeme Faizi:",
     "previewTotalPayments": "Toplam Ödemeler:",
     "previewTotalInterest": "Toplam Faiz:",
+    "previewFinalPayment": "Son ödeme:",
     "previewPayoffDate": "Tahmini Kapanış Tarihi:",
     "previewNA": "Yok",
     "calculatingPreview": "Önizleme hesaplanıyor...",
@@ -436,7 +437,8 @@
         "effect": "→ {interest} tasarruf, kapanış {date}",
         "alreadyMet": "Hiç ek ödeme yapmadan zaten karşılanıyor.",
         "unreachableInterest": "Ulaşılamaz — çok büyük bir ek ödeme bile o kadar faiz tasarrufu sağlayamaz.",
-        "unreachableDate": "Ulaşılamaz — bu ay, mümkün olan en erken kapanıştan daha önce."
+        "unreachableDate": "Ulaşılamaz — bu ay, mümkün olan en erken kapanıştan daha önce.",
+        "baselineIncomplete": "Bu kredi öngörülen dönem içinde kapanmıyor, dolayısıyla geriye doğru hesaplanacak bir toplam faiz yok."
       },
       "simulationTypeLabel": "Simülasyon türü",
       "overpaymentAmount": "Ek ödeme tutarı",
@@ -463,6 +465,7 @@
       "interestSaved": "Tasarruf Edilen Faiz",
       "totalExtraContributed": "Toplam Ek Ödeme",
       "beyondProjection": "Öngörünün ötesinde",
+      "unknown": "Bilinmiyor",
       "newInstallment": "Yeni Taksit",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "Aylık ödeme",

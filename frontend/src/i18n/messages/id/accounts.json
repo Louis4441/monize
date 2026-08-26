@@ -308,6 +308,7 @@
     "previewFirstInterest": "Bunga Pembayaran Pertama:",
     "previewTotalPayments": "Total Pembayaran:",
     "previewTotalInterest": "Total Bunga:",
+    "previewFinalPayment": "Pembayaran terakhir:",
     "previewPayoffDate": "Est. Tanggal Pelunasan:",
     "previewNA": "T/A",
     "calculatingPreview": "Menghitung pratinjau...",
@@ -436,7 +437,8 @@
         "effect": "→ menghemat {interest}, pelunasan {date}",
         "alreadyMet": "Sudah tercapai tanpa pembayaran ekstra.",
         "unreachableInterest": "Tidak terjangkau — pembayaran ekstra yang sangat besar pun tidak dapat menghemat bunga sebanyak itu.",
-        "unreachableDate": "Tidak terjangkau — bulan itu lebih awal dari pelunasan tercepat yang mungkin."
+        "unreachableDate": "Tidak terjangkau — bulan itu lebih awal dari pelunasan tercepat yang mungkin.",
+        "baselineIncomplete": "Pinjaman ini tidak lunas dalam periode proyeksi, jadi tidak ada total bunga sebagai titik awal perhitungan."
       },
       "simulationTypeLabel": "Jenis simulasi",
       "overpaymentAmount": "Jumlah pembayaran ekstra",
@@ -463,6 +465,7 @@
       "interestSaved": "Bunga yang Dihemat",
       "totalExtraContributed": "Total Pembayaran Tambahan",
       "beyondProjection": "Di luar proyeksi",
+      "unknown": "Tidak diketahui",
       "newInstallment": "Angsuran Baru",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "Pembayaran bulanan",

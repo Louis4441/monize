@@ -308,6 +308,7 @@
     "previewFirstInterest": "पहला भुगतान ब्याज:",
     "previewTotalPayments": "कुल भुगतान:",
     "previewTotalInterest": "कुल ब्याज:",
+    "previewFinalPayment": "अंतिम भुगतान:",
     "previewPayoffDate": "अनुमानित भुगतान तिथि:",
     "previewNA": "लागू नहीं",
     "calculatingPreview": "पूर्वावलोकन गणना हो रही है...",
@@ -436,7 +437,8 @@
         "effect": "→ {interest} की बचत, चुकौती {date}",
         "alreadyMet": "बिना किसी अतिरिक्त भुगतान के ही लक्ष्य पूरा है।",
         "unreachableInterest": "पहुँच से बाहर — बहुत बड़ा अतिरिक्त भुगतान भी इतना ब्याज नहीं बचा सकता।",
-        "unreachableDate": "पहुँच से बाहर — यह माह जल्द से जल्द संभव चुकौती से पहले है।"
+        "unreachableDate": "पहुँच से बाहर — यह माह जल्द से जल्द संभव चुकौती से पहले है।",
+        "baselineIncomplete": "यह ऋण अनुमानित अवधि के भीतर नहीं चुकता है, इसलिए पीछे की ओर गणना करने के लिए कोई कुल ब्याज नहीं है।"
       },
       "simulationTypeLabel": "सिमुलेशन प्रकार",
       "overpaymentAmount": "अतिरिक्त भुगतान राशि",
@@ -463,6 +465,7 @@
       "interestSaved": "बचा हुआ ब्याज",
       "totalExtraContributed": "कुल अतिरिक्त योगदान",
       "beyondProjection": "अनुमान से परे",
+      "unknown": "अज्ञात",
       "newInstallment": "नई किस्त",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "मासिक भुगतान",

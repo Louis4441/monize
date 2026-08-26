@@ -308,6 +308,7 @@
     "previewFirstInterest": "Odsetki pierwszej płatności:",
     "previewTotalPayments": "Łączna liczba płatności:",
     "previewTotalInterest": "Łączne odsetki:",
+    "previewFinalPayment": "Ostatnia rata:",
     "previewPayoffDate": "Szac. data spłaty:",
     "previewNA": "Brak",
     "calculatingPreview": "Obliczanie podglądu...",
@@ -436,7 +437,8 @@
         "effect": "→ oszczędza {interest}, spłata {date}",
         "alreadyMet": "Cel osiągnięty już bez nadpłat.",
         "unreachableInterest": "Poza zasięgiem — nawet bardzo duża nadpłata nie da tak dużej oszczędności na odsetkach.",
-        "unreachableDate": "Poza zasięgiem — ten miesiąc jest wcześniejszy niż najwcześniejsza możliwa spłata."
+        "unreachableDate": "Poza zasięgiem — ten miesiąc jest wcześniejszy niż najwcześniejsza możliwa spłata.",
+        "baselineIncomplete": "Ten kredyt nie zostaje spłacony w prognozowanym okresie, więc nie ma całkowitych odsetek, od których można liczyć wstecz."
       },
       "simulationTypeLabel": "Typ symulacji",
       "overpaymentAmount": "Kwota nadpłaty",
@@ -463,6 +465,7 @@
       "interestSaved": "Zaoszczędzone odsetki",
       "totalExtraContributed": "Łączna kwota nadpłat",
       "beyondProjection": "Poza prognozą",
+      "unknown": "Nieznane",
       "newInstallment": "Nowa rata",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "Miesięczna płatność",

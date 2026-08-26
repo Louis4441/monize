@@ -308,6 +308,7 @@
     "previewFirstInterest": "初回支払い利息：",
     "previewTotalPayments": "総支払い回数：",
     "previewTotalInterest": "総利息：",
+    "previewFinalPayment": "最終返済額:",
     "previewPayoffDate": "完済予定日：",
     "previewNA": "N/A",
     "calculatingPreview": "プレビューを計算中...",
@@ -436,7 +437,8 @@
         "effect": "→ {interest} 節約、完済 {date}",
         "alreadyMet": "追加返済なしで既に達成しています。",
         "unreachableInterest": "達成不可 — どれほど大きな追加返済でもそこまで利息を節約できません。",
-        "unreachableDate": "達成不可 — その月は最短の完済時期より前です。"
+        "unreachableDate": "達成不可 — その月は最短の完済時期より前です。",
+        "baselineIncomplete": "このローンは予測期間内に完済しないため、逆算のもとになる利息総額がありません。"
       },
       "simulationTypeLabel": "シミュレーションの種類",
       "overpaymentAmount": "繰上返済額",
@@ -463,6 +465,7 @@
       "interestSaved": "節約できる利息",
       "totalExtraContributed": "追加返済の合計",
       "beyondProjection": "予測範囲外",
+      "unknown": "不明",
       "newInstallment": "新しい返済額",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "毎月の返済額",

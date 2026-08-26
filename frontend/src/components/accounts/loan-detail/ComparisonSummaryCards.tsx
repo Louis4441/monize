@@ -51,9 +51,13 @@ export function ComparisonSummaryCards({
 
   const opAmount = recurringOverpayment?.amount ?? 0;
   const opFrequency = recurringOverpayment?.frequency;
-  // A cadence sparser than the loan's payments (e.g. quarterly on a monthly
-  // loan) does not fall on every payment, so it is not part of the regular
-  // monthly payment -- it shows only as the periodic overpayment note below.
+  // Presentation only. A cadence sparser than the loan's payments (e.g.
+  // quarterly on a monthly loan) does not fall on every payment, so folding it
+  // into "monthly payment" would misstate the regular outlay -- it shows as the
+  // periodic overpayment note below instead. A denser or equal cadence is added
+  // in as its per-payment AVERAGE (`perPaymentExtraAmount`); the schedule itself
+  // applies each dated occurrence in full, so an individual row can carry more
+  // or less than this figure.
   const isSparse =
     !!opFrequency &&
     !!loanFrequency &&
@@ -113,7 +117,13 @@ export function ComparisonSummaryCards({
       )}
       <Card
         label={t('loanDetail.comparison.interestSaved')}
-        value={formatCurrency(Math.max(comparison.interestSaved, 0), currencyCode)}
+        // A saving is unknown when either schedule ran past the projection
+        // horizon, and unknown is not zero -- say so rather than print 0.00.
+        value={
+          comparison.interestSaved == null
+            ? t('loanDetail.comparison.unknown')
+            : formatCurrency(Math.max(comparison.interestSaved, 0), currencyCode)
+        }
         valueClass="text-green-600 dark:text-green-400"
       />
       <Card

@@ -318,6 +318,7 @@
     "previewFirstInterest": "[XX-First Payment Interest:-XX]",
     "previewTotalPayments": "[XX-Total Payments:-XX]",
     "previewTotalInterest": "[XX-Total Interest:-XX]",
+    "previewFinalPayment": "[XX-Final Payment:-XX]",
     "previewPayoffDate": "[XX-Est. Payoff Date:-XX]",
     "previewNA": "[XX-N/A-XX]",
     "calculatingPreview": "[XX-Calculating preview...-XX]",
@@ -520,7 +521,8 @@
         "effect": "[XX-→ saves {interest}, payoff {date}-XX]",
         "alreadyMet": "[XX-Already met without any overpayment.-XX]",
         "unreachableInterest": "[XX-Out of reach — even a very large overpayment cannot save that much interest.-XX]",
-        "unreachableDate": "[XX-Out of reach — that month is earlier than the soonest possible payoff.-XX]"
+        "unreachableDate": "[XX-Out of reach — that month is earlier than the soonest possible payoff.-XX]",
+        "baselineIncomplete": "[XX-This loan does not pay off within the projected period, so there is no total interest to work back from.-XX]"
       }
     },
     "scenarioChart": {
@@ -546,6 +548,7 @@
       "installmentDrop": "[XX-{payment} (−{reduction})-XX]",
       "totalExtraContributed": "[XX-Total Extra Contributed-XX]",
       "beyondProjection": "[XX-Beyond projection-XX]",
+      "unknown": "[XX-Unknown-XX]",
       "overpaymentAtFrequency": "[XX-{frequency}: +{amount}-XX]"
     },
     "chart": {

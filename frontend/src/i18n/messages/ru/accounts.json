@@ -308,6 +308,7 @@
     "previewFirstInterest": "Проценты первого платежа:",
     "previewTotalPayments": "Итого платежей:",
     "previewTotalInterest": "Итого процентов:",
+    "previewFinalPayment": "Последний платёж:",
     "previewPayoffDate": "Ожидаемая дата погашения:",
     "previewNA": "Н/Д",
     "calculatingPreview": "Расчёт предпросмотра...",
@@ -436,7 +437,8 @@
         "effect": "→ экономит {interest}, погашение {date}",
         "alreadyMet": "Цель уже достигнута без досрочных платежей.",
         "unreachableInterest": "Недостижимо — даже очень большая доплата не даст такой экономии на процентах.",
-        "unreachableDate": "Недостижимо — этот месяц раньше самого раннего возможного погашения."
+        "unreachableDate": "Недостижимо — этот месяц раньше самого раннего возможного погашения.",
+        "baselineIncomplete": "Этот кредит не погашается в течение прогнозируемого периода, поэтому нет общей суммы процентов, от которой можно считать."
       },
       "simulationTypeLabel": "Тип симуляции",
       "overpaymentAmount": "Сумма досрочного платежа",
@@ -463,6 +465,7 @@
       "interestSaved": "Сэкономленные проценты",
       "totalExtraContributed": "Всего внесено дополнительно",
       "beyondProjection": "За пределами прогноза",
+      "unknown": "Неизвестно",
       "newInstallment": "Новый платёж",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "Ежемесячный платёж",

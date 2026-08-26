@@ -13,23 +13,41 @@ import {
  * extra per period means less total interest and an earlier payoff -- so a
  * binary search converges reliably.
  *
+ * A target is only "met" by a schedule that actually paid off inside the
+ * projection horizon: a truncated schedule has accumulated less interest than
+ * the loan really costs, so it satisfies any interest target by being
+ * incomplete. `meetsInterestTarget` is that predicate, and a baseline that did
+ * not pay off yields `baseline-incomplete` rather than a saving measured against
+ * a subtotal.
+ *
  * The recurring amount is the knob because it is the natural "how much should I
  * overpay every month" answer. The mode is SHORTEN_TERM: paying off sooner (and
  * paying less interest) is only meaningful when the extra shortens the term;
  * LOWER_INSTALLMENT keeps the end date, so it cannot hit a payoff-date target.
  */
 
-export type SolveStatus = 'ok' | 'already-met' | 'unreachable';
+/**
+ * `baseline-incomplete` is distinct from `unreachable`: it means the
+ * no-overpayment schedule itself did not pay off inside the projection horizon,
+ * so its lifetime interest is unknown and no interest target derived from it can
+ * be honoured -- not that a large enough overpayment could not reach a target.
+ */
+export type SolveStatus =
+  | 'ok'
+  | 'already-met'
+  | 'unreachable'
+  | 'baseline-incomplete';
 
 export interface SolveResult {
   status: SolveStatus;
   /** Required recurring extra per period (rounded up to `step`); null unless ok */
   amount: number | null;
   /** Schedule produced by `amount`; for already-met it is the no-overpayment
-   *  baseline, and it is null when unreachable */
+   *  baseline, and it is null for unreachable and baseline-incomplete */
   result: LoanScheduleResult | null;
-  /** Interest saved vs the no-overpayment baseline by `result`; null when
-   *  unreachable */
+  /** Interest saved vs the no-overpayment baseline by `result`; null whenever
+   *  either side's lifetime interest is unknown -- unreachable,
+   *  baseline-incomplete, or a payoff-month solve whose baseline never paid off */
   interestSaved: number | null;
 }
 
@@ -43,6 +61,21 @@ export interface SolveWindow {
   startDate?: string;
   endDate?: string;
   frequency?: OverpaymentFrequency;
+}
+
+/**
+ * Whether a schedule provably costs no more than `targetInterest` over its life.
+ *
+ * `paidOff` is half the predicate: a schedule that stopped at the projection
+ * horizon has accumulated only the horizon's interest, which is smaller than the
+ * lifetime figure and would satisfy any target by being incomplete. An unknown
+ * total does not meet a target.
+ */
+function meetsInterestTarget(
+  result: LoanScheduleResult,
+  targetInterest: number,
+): boolean {
+  return result.paidOff && result.totalInterest <= targetInterest;
 }
 
 function scheduleWith(
@@ -79,6 +112,8 @@ function roundUpTo(amount: number, step: number): number {
  * - `already-met`: the loan already costs that little (or less) with no extra.
  * - `unreachable`: even the maximum extra cannot get interest that low (the
  *   target is below the interest of a near-immediate payoff).
+ * - `baseline-incomplete`: the loan does not pay off inside the projection
+ *   horizon, so what it costs over its life is unknown.
  */
 export function solveRecurringForTargetInterest(
   base: LoanScheduleInput,
@@ -107,18 +142,29 @@ function solveTargetInterestWithBaseline(
   step: number,
   window: SolveWindow = {},
 ): SolveResult {
+  if (!baseline.paidOff) {
+    // The baseline hit the projection horizon, so its lifetime interest is
+    // unknown; "already met" and any saving measured against it would both be
+    // claims about a subtotal.
+    return {
+      status: 'baseline-incomplete',
+      amount: null,
+      result: null,
+      interestSaved: null,
+    };
+  }
   if (baseline.totalInterest <= targetInterest) {
     return { status: 'already-met', amount: 0, result: baseline, interestSaved: 0 };
   }
   const hi0 = upperBound(base);
-  if (scheduleWith(base, hi0, mode, window).totalInterest > targetInterest) {
+  if (!meetsInterestTarget(scheduleWith(base, hi0, mode, window), targetInterest)) {
     return { status: 'unreachable', amount: null, result: null, interestSaved: null };
   }
   let lo = 0;
   let hi = hi0;
   for (let i = 0; i < ITERATIONS; i++) {
     const mid = (lo + hi) / 2;
-    if (scheduleWith(base, mid, mode, window).totalInterest <= targetInterest) hi = mid;
+    if (meetsInterestTarget(scheduleWith(base, mid, mode, window), targetInterest)) hi = mid;
     else lo = mid;
   }
   const amount = roundUpTo(hi, step);
@@ -139,6 +185,8 @@ function solveTargetInterestWithBaseline(
  * - `already-met`: the target is zero or negative, so no extra is needed.
  * - `unreachable`: even the maximum extra cannot save that much (the savings
  *   asked for exceed what a near-immediate payoff would save).
+ * - `baseline-incomplete`: the baseline never pays off, so there is no lifetime
+ *   interest to save against.
  */
 export function solveRecurringForInterestSavings(
   base: LoanScheduleInput,
@@ -201,6 +249,10 @@ export function solveRecurringForPayoffMonth(
     status: 'ok',
     amount,
     result,
-    interestSaved: round2(baseline.totalInterest - result.totalInterest),
+    // The date target is met either way, but the saving is only a number when
+    // the baseline paid off too -- otherwise it is a horizon minus a lifetime.
+    interestSaved: baseline.paidOff
+      ? round2(baseline.totalInterest - result.totalInterest)
+      : null,
   };
 }

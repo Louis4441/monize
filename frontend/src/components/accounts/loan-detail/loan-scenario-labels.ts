@@ -99,8 +99,10 @@ export function createScenarioLabels({
         });
   };
 
+  // No comparison at all and an unknown saving read the same to a user: the
+  // number cannot be shown. Both render the em dash rather than a zero.
   const interestSavedLabel = (comparison: ScenarioComparison | null): string =>
-    comparison
+    comparison && comparison.interestSaved != null
       ? formatCurrency(Math.max(0, comparison.interestSaved), currencyCode)
       : '—';
 

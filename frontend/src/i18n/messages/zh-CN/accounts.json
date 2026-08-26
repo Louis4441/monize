@@ -308,6 +308,7 @@
     "previewFirstInterest": "首期利息：",
     "previewTotalPayments": "还款总次数：",
     "previewTotalInterest": "利息总额：",
+    "previewFinalPayment": "最后一期还款：",
     "previewPayoffDate": "预计还清日期：",
     "previewNA": "不适用",
     "calculatingPreview": "正在计算预览...",
@@ -436,7 +437,8 @@
         "effect": "→ 节省 {interest},还清 {date}",
         "alreadyMet": "无需任何额外还款即已达成。",
         "unreachableInterest": "无法达成——即使非常大的额外还款也无法节省这么多利息。",
-        "unreachableDate": "无法达成——该月份早于最早可能的还清时间。"
+        "unreachableDate": "无法达成——该月份早于最早可能的还清时间。",
+        "baselineIncomplete": "该贷款在预测期内无法还清，因此没有可用于反推的利息总额。"
       },
       "simulationTypeLabel": "模拟类型",
       "overpaymentAmount": "额外还款金额",
@@ -463,6 +465,7 @@
       "interestSaved": "节省的利息",
       "totalExtraContributed": "额外还款总额",
       "beyondProjection": "超出预测范围",
+      "unknown": "未知",
       "newInstallment": "新还款额",
       "installmentDrop": "{payment} (−{reduction})",
       "monthlyPayment": "每月还款",

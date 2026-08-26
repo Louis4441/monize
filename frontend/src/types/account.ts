@@ -235,6 +235,14 @@ export interface MortgageAmortizationPreview {
   principalPayment: number;
   interestPayment: number;
   totalPayments: number;
+  /**
+   * The last payment: the residual payoff, not another full installment. Only an
+   * accelerated schedule (or a rounding remainder) makes it differ from
+   * `paymentAmount`, so the preview shows it only when it does. -1 when the
+   * payment never amortizes. Absent during a rolling deploy of an older API.
+   */
+  finalPaymentAmount?: number;
+  /** Date of the final payment (the first payment date is payment 1) */
   endDate: string;
   totalInterest: number;
   effectiveAnnualRate: number;
