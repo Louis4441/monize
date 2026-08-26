@@ -611,6 +611,44 @@ describe('LoanAmortizationReport', () => {
     expect(screen.queryByText(/payments made/)).not.toBeInTheDocument();
   });
 
+  it('recovers the schedule when the retry succeeds', async () => {
+    // The whole point of surfacing the failure is that the user can ask again,
+    // so Try again has to re-issue both fetches -- a retry that only re-renders
+    // is the swallowed error with an extra button.
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loan-1', name: 'Mortgage', accountType: 'MORTGAGE',
+        currentBalance: -100000, openingBalance: -120000, interestRate: 5.0,
+        paymentAmount: 800, paymentFrequency: 'MONTHLY',
+        interestCategoryId: 'cat-int', sourceAccountId: 'src-1',
+        isCanadianMortgage: false, isVariableRate: false, isClosed: false,
+      },
+    ]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [{ id: 'p1', transactionDate: '2024-06-01', amount: 500, linkedTransaction: null }],
+      pagination: { hasMore: false },
+    });
+    mockGetAllPages.mockRejectedValueOnce(new Error('timeout')).mockResolvedValue([
+      { id: 'i1', transactionDate: '2024-06-01', amount: -300, categoryId: 'cat-int', isTransfer: false },
+    ]);
+
+    render(<LoanAmortizationReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Try again')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Try again'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 payments made/)).toBeInTheDocument();
+    });
+    // The booked $300 is on screen because the retry actually re-fetched it,
+    // not because the report settled for an empty interest list.
+    expect(screen.getByText('$300.00')).toBeInTheDocument();
+  });
+
   it('exports CSV and PDF', async () => {
     const { exportToCsv } = await import('@/lib/csv-export');
     const { exportToPdf } = await import('@/lib/pdf-export');
