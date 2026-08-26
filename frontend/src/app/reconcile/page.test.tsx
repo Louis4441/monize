@@ -413,12 +413,12 @@ describe('ReconcilePage', () => {
       return screen.getByTestId(`reconcile-row-${id}`);
     }
 
-    // The row actions live in the long-press / right-click sheet now, not in a
-    // column, so a test reaches Edit or Delete the way a user does: open the
-    // sheet on the row, then pick the action.
+    // The inline actions column carries Edit and Delete from `sm` up; the
+    // long-press / right-click sheet offers the same handlers and is covered
+    // by ReconcileTable's own tests, so the page wiring is exercised once,
+    // through the inline path.
     function openRowAction(id: string, label: 'Edit' | 'Delete') {
-      fireEvent.contextMenu(rowFor(id));
-      fireEvent.click(screen.getByRole('button', { name: label }));
+      fireEvent.click(within(rowFor(id)).getByLabelText(label));
     }
 
     it('opens a blank form filed against the account being reconciled', async () => {

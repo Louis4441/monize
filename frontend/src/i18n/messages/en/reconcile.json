@@ -29,6 +29,7 @@
     "colAmount": "Amount",
     "colStatus": "Status",
     "finish": "Finish Reconciliation",
+    "colActions": "Actions",
     "selectRow": "Select the transaction for {payee}",
     "groupByFlow": "Group by money in and out",
     "groupCredits": "Money in ({count})",

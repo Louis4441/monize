@@ -29,6 +29,7 @@
     "colAmount": "금액",
     "colStatus": "상태",
     "finish": "조정 완료",
+    "colActions": "작업",
     "selectRow": "{payee} 거래 선택",
     "groupByFlow": "입금과 출금으로 그룹화",
     "groupCredits": "입금 ({count})",

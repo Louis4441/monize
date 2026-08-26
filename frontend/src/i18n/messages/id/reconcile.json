@@ -29,6 +29,7 @@
     "colAmount": "Jumlah",
     "colStatus": "Status",
     "finish": "Selesaikan Rekonsiliasi",
+    "colActions": "Tindakan",
     "selectRow": "Pilih transaksi untuk {payee}",
     "groupByFlow": "Kelompokkan berdasarkan uang masuk dan keluar",
     "groupCredits": "Uang masuk ({count})",

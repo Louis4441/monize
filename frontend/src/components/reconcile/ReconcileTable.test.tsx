@@ -134,10 +134,45 @@ describe('ReconcileTable', () => {
   describe('row actions (long-press / right-click sheet)', () => {
     const sheet = () => screen.getByRole('dialog');
 
-    it('renders no actions column -- the row itself is the whole surface', () => {
+    it('offers edit and delete inline from sm up, without toggling the row', () => {
       renderTable();
+      const rowEl = screen.getByTestId('reconcile-row-tx-a');
+      fireEvent.click(within(rowEl).getByLabelText('Edit'));
+      expect(defaults.onEdit).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tx-a' }),
+      );
+      fireEvent.click(within(rowEl).getByLabelText('Delete'));
+      expect(defaults.onDelete).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tx-a' }),
+      );
+      expect(defaults.onToggle).not.toHaveBeenCalled();
+    });
+
+    it('collapses the actions column below sm -- phones use the sheet instead', () => {
+      renderTable();
+      const cell = within(screen.getByTestId('reconcile-row-tx-a'))
+        .getByLabelText('Edit')
+        .closest('td')!;
+      expect(cell.className.split(/\s+/)).toEqual(
+        expect.arrayContaining(['hidden', 'sm:table-cell']),
+      );
+    });
+
+    it('withholds the inline actions on a reconciled row while the lock is on', () => {
+      renderTable({
+        transactions: [row({ id: 'tx-r', status: TransactionStatus.RECONCILED })],
+        reconciledLocked: true,
+      });
       expect(screen.queryByLabelText('Edit')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Delete')).not.toBeInTheDocument();
+      expect(screen.getByText('Locked')).toBeInTheDocument();
+    });
+
+    it('keeps the inline actions on an unreconciled row while the lock is on', () => {
+      // The lock is about reconciled rows. Hiding every action would make the
+      // setting unusable for the screen it matters most on.
+      renderTable({ reconciledLocked: true });
+      expect(screen.getAllByLabelText('Edit').length).toBe(3);
     });
 
     it('opens the sheet from a right-click and edits from it', () => {
@@ -265,11 +300,11 @@ describe('ReconcileTable', () => {
       return classes.includes('hidden') && classes.includes('sm:table-cell');
     };
 
-    it('collapses the Category and Status columns below sm, and only those', () => {
+    it('collapses the Category, Status and Actions columns below sm, and only those', () => {
       renderTable();
       const [headerRow] = screen.getAllByRole('row');
       const headerCells = within(headerRow).getAllByRole('columnheader');
-      expect(headerCells).toHaveLength(6);
+      expect(headerCells).toHaveLength(7);
       expect(headerCells.map(collapsedAt)).toEqual([
         false, // select
         false, // date
@@ -277,11 +312,12 @@ describe('ReconcileTable', () => {
         true, // category
         false, // amount
         true, // status
+        true, // actions
       ]);
 
       const rowEl = screen.getByTestId('reconcile-row-tx-a');
       const cells = within(rowEl).getAllByRole('cell');
-      expect(cells).toHaveLength(6);
+      expect(cells).toHaveLength(7);
       expect(cells.map(collapsedAt)).toEqual([
         false, // select
         false, // date
@@ -289,6 +325,7 @@ describe('ReconcileTable', () => {
         true, // category
         false, // amount
         true, // status
+        true, // actions
       ]);
     });
 
@@ -318,8 +355,8 @@ describe('ReconcileTable', () => {
       const label = within(groupRow).getByRole('columnheader');
       expect(label).toHaveAttribute('colspan', '3');
       const cells = within(groupRow).getAllByRole('cell');
-      expect(cells).toHaveLength(3);
-      expect(cells.filter(collapsedAt)).toHaveLength(2);
+      expect(cells).toHaveLength(4);
+      expect(cells.filter(collapsedAt)).toHaveLength(3);
     });
   });
 

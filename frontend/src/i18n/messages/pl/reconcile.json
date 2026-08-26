@@ -29,6 +29,7 @@
     "colAmount": "Kwota",
     "colStatus": "Status",
     "finish": "Zakończ uzgadnianie",
+    "colActions": "Akcje",
     "selectRow": "Zaznacz transakcję dla {payee}",
     "groupByFlow": "Grupuj według wpływów i wydatków",
     "groupCredits": "Wpływy ({count})",

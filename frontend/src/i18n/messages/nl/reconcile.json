@@ -29,6 +29,7 @@
     "colAmount": "Bedrag",
     "colStatus": "Status",
     "finish": "Afstemming voltooien",
+    "colActions": "Acties",
     "selectRow": "Transactie voor {payee} selecteren",
     "groupByFlow": "Groeperen op inkomend en uitgaand",
     "groupCredits": "Inkomend ({count})",

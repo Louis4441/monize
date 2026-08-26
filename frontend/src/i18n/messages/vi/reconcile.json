@@ -29,6 +29,7 @@
     "colAmount": "Số tiền",
     "colStatus": "Trạng thái",
     "finish": "Hoàn Tất Đối Soát",
+    "colActions": "Thao tác",
     "selectRow": "Chọn giao dịch của {payee}",
     "groupByFlow": "Nhóm theo tiền vào và tiền ra",
     "groupCredits": "Tiền vào ({count})",

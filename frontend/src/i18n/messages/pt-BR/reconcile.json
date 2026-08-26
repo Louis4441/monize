@@ -29,6 +29,7 @@
     "colAmount": "Valor",
     "colStatus": "Status",
     "finish": "Concluir reconciliação",
+    "colActions": "Ações",
     "selectRow": "Selecionar a transação de {payee}",
     "groupByFlow": "Agrupar por entradas e saídas",
     "groupCredits": "Entradas ({count})",

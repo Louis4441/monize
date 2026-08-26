@@ -29,6 +29,7 @@
     "colAmount": "राशि",
     "colStatus": "स्थिति",
     "finish": "समाधान पूर्ण करें",
+    "colActions": "कार्रवाइयाँ",
     "selectRow": "{payee} का लेनदेन चुनें",
     "groupByFlow": "आय और व्यय के अनुसार समूहित करें",
     "groupCredits": "आय ({count})",

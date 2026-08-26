@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { StatusCellButton } from '@/components/transactions/StatusCellButton';
+import { RowActions } from '@/components/ui/row-actions/RowActions';
 import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 import { registerDateColumnPadding } from '@/components/transactions/register-date-columns';
@@ -50,9 +51,10 @@ const STALE_ROW_CLASS =
  * they are on, and each row carries the same edit/delete actions the register
  * does -- reconciling is where a missing or wrong transaction is discovered, so
  * making the user leave the screen to fix one is the thing this replaces. The
- * actions live in the shared `RowActionSheet`, opened by a long-press or a
- * right-click on the row (`useLongPress`), rather than in a column of their
- * own; a plain click keeps toggling the row's selection.
+ * actions column is drawn from `sm` up; on any width a long-press or a
+ * right-click on the row (`useLongPress`) opens the same actions in the shared
+ * `RowActionSheet` -- the only path on phones, where the column collapses. A
+ * plain click keeps toggling the row's selection.
  *
  * Rows the account should already have reconciled are highlighted through the
  * shared `classifyStaleRow`, against the dates the server supplied, so the
@@ -230,6 +232,9 @@ export function ReconcileTable({
             >
               {t('list.colStatus')}
             </SortableHeader>
+            <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <span className="sr-only">{t('list.colActions')}</span>
+            </th>
           </tr>
         </thead>
         {groups.map((group) => (
@@ -257,6 +262,7 @@ export function ReconcileTable({
                     amount: formatCurrency(group.subtotal),
                   })}
                 </td>
+                <td className="hidden sm:table-cell" />
                 <td className="hidden sm:table-cell" />
               </tr>
             )}
@@ -348,6 +354,22 @@ export function ReconcileTable({
                       dense
                       onCycle={() => onCycleStatus(transaction)}
                     />
+                  </td>
+                  <td
+                    className="hidden sm:table-cell px-2 sm:px-4 py-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {transaction.status === TransactionStatus.RECONCILED &&
+                    reconciledLocked ? (
+                      <span className="block text-right text-xs text-gray-400 dark:text-gray-500">
+                        {t('list.lockedRow')}
+                      </span>
+                    ) : (
+                      <RowActions
+                        actions={buildActions(transaction)}
+                        density="compact"
+                      />
+                    )}
                   </td>
                 </tr>
               );

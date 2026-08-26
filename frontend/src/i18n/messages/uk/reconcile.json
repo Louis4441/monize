@@ -29,6 +29,7 @@
     "colAmount": "Сума",
     "colStatus": "Статус",
     "finish": "Завершити звірку",
+    "colActions": "Дії",
     "selectRow": "Вибрати транзакцію для {payee}",
     "groupByFlow": "Групувати за надходженнями та витратами",
     "groupCredits": "Надходження ({count})",
