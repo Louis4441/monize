@@ -67,6 +67,11 @@ implied.
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
+| INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
+| INV-LOAN-002 | A schedule truncated by the projection horizon yields no lifetime total | enforced |
+| INV-LOAN-003 | One named compounding convention, from preview to projection to displayed EAR | enforced |
+| INV-LOAN-004 | The final payment is the residual payoff, not another installment | enforced |
+| INV-LOAN-005 | The first payment date is payment number 1 | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
@@ -601,6 +606,155 @@ The parent-only half was found by a second audit, of the fix itself
 was hiding too much exposes every row it was also hiding *correctly*. The
 account-type predicate had been doing two jobs, and only one of them was wrong.
 Five of the cases above fail on the first fix and pass on the second.
+
+### INV-LOAN-001 -- a recurring overpayment's cadence is a calendar
+
+```text
+Statement           A recurring overpayment declared MONTHLY contributes exactly
+                    12 occurrences per calendar year (QUARTERLY 4, ANNUALLY 1)
+                    whatever the loan's own payment frequency is, and WEEKLY /
+                    BIWEEKLY contribute one every 7 / 14 days. The borrower's
+                    nominal annual cash may not change because the loan happens
+                    to be paid biweekly.
+Source of truth     The overpayment's frequency plus its window, on the plan.
+Enforcement         recurringOccurrencesDue (frontend/src/lib/loan-schedule.ts)
+                    is the single place a cadence becomes schedule rows: dated
+                    occurrences, each applied at the first loan payment on or
+                    after its due date. The interval it replaced,
+                    round(periodsPerYear / overpaymentsPerYear), rounded 26/12 to
+                    2 and paid a monthly extra 13 times a year on a biweekly
+                    loan -- 8.3% more cash than the plan describes, with the
+                    interest saving overstated to match.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     -- (projection only; nothing is persisted)
+Failure response    --
+Required tests      Present: the recurringOccurrencesDue block and the
+                    "recurring overpayment cadence in a schedule" block in
+                    frontend/src/lib/loan-schedule.test.ts assert the per-year
+                    counts across weekly, biweekly and monthly loans, the
+                    cumulative "every occurrence paid exactly once" invariant,
+                    and the window rules. The goal-seek replay cases in
+                    loan-overpayment-solver.test.ts assert a solved amount still
+                    reaches its target when replayed through the same cadence.
+Status              enforced
+```
+
+`perPaymentExtraAmount` survives as a display average for the "resulting monthly
+payment" card. It is not what the engine applies, and a balance must never be
+computed from it.
+
+### INV-LOAN-002 -- a truncated schedule yields no lifetime total
+
+```text
+Statement           A projection that stopped at its horizon rather than paying
+                    off has accumulated the horizon's interest, not the loan's.
+                    No lifetime figure, and no saving derived from one, may be
+                    presented from it.
+Source of truth     LoanScheduleResult.paidOff.
+Enforcement         The horizon itself is derived from the frequency
+                    (maxPaymentsForHorizon: DEFAULT_MAX_PROJECTION_YEARS of this
+                    frequency's payments), so an ordinary 25- or 30-year weekly
+                    or biweekly mortgage completes -- a flat 600-payment default
+                    cut those short, omitting 44% of a 30-year weekly
+                    mortgage's lifetime interest and reporting no payoff date. Where truncation is still possible,
+                    consumers gate on paidOff: compareSchedules().interestSaved
+                    and PastImpactResult.interestAlreadySaved are null,
+                    deriveLoanFigures withholds the payoff date and remaining
+                    interest, ScenarioComparisonChart draws only outcomes passing
+                    hasKnownInterestSaved, and the goal-seek solver returns
+                    baseline-incomplete rather than a saving against a subtotal
+                    (meetsInterestTarget requires paidOff).
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     -- (projection only)
+Failure response    null, plus an explicit unknown in the UI -- never 0.00.
+Required tests      Present: "projection horizon" and "a truncated schedule is
+                    not a lifetime total" in loan-schedule.test.ts (the four
+                    ordinary long terms, and interestSaved null when either side
+                    truncates); "a target cannot be met by a truncated schedule"
+                    in loan-overpayment-solver.test.ts; the two unknown-saving
+                    cases in loan-past-impact.test.ts.
+Status              enforced
+```
+
+### INV-LOAN-003 -- one compounding convention, named
+
+```text
+Statement           The mortgage creation preview, the persisted paymentAmount,
+                    the scheduled principal/interest split, the frontend
+                    projection and the displayed effective annual rate all use
+                    one explicitly chosen compounding convention.
+Source of truth     docs/financial-semantics.md section 9.
+Enforcement         The convention is the nominal annual rate divided by the
+                    payments per year (calculateStandardPeriodicRate), with
+                    Canadian fixed-rate semi-annual compounding as the one legal
+                    exception (calculateCanadianPeriodicRate); the frontend
+                    getPeriodicRate mirrors it. calculateEffectiveAnnualRate now
+                    takes periodsPerYear and compounds at the payment frequency,
+                    so the displayed EAR describes the rate the schedule charges
+                    rather than a monthly one nothing used.
+Concurrency scope   --
+Failure response    --
+Required tests      Present: the "periodic-rate convention" block in
+                    backend/src/accounts/mortgage-amortization.util.spec.ts and
+                    "is the nominal convention, not monthly compounding
+                    converted" in frontend/src/lib/loan-schedule.test.ts. Both
+                    spell out the REJECTED contract and assert the implementation
+                    differs from it -- backend/frontend parity mirrors one
+                    formula, so it can only detect drift, never validate the
+                    choice.
+Status              enforced
+```
+
+### INV-LOAN-004 -- the final payment is the residual payoff
+
+```text
+Statement           Lifetime interest reflects cash actually paid. The payment
+                    that clears the balance is the remaining balance plus that
+                    period's interest, not another full installment.
+Source of truth     The period-by-period amortization of the same schedule.
+Enforcement         calculateResidualPayoff
+                    (backend/src/accounts/mortgage-amortization.util.ts) computes
+                    the balance after n-1 installments and closes it out, and
+                    calculateMortgageAmortization derives totalInterest and
+                    finalPaymentAmount from it. paymentAmount * totalPayments -
+                    principal overstated a 25-year accelerated-biweekly
+                    mortgage's lifetime interest by 569, because Math.ceil had
+                    rounded a fractional payoff count up. The frontend schedule
+                    already capped its final principal at the balance, so the two
+                    surfaces disagreed.
+Concurrency scope   --
+Failure response    -1 for both figures when the payment never amortizes.
+Required tests      Present: "final payment and lifetime interest" in
+                    mortgage-amortization.util.spec.ts, whose expectations come
+                    from an independent period-by-period simulation in the spec
+                    rather than from the implementation.
+Status              enforced
+```
+
+### INV-LOAN-005 -- the first payment date is payment number 1
+
+```text
+Statement           accounts.payment_start_date is the date of the first payment,
+                    so a schedule of N payments advances N-1 intervals to reach
+                    its last one.
+Source of truth     accounts.payment_start_date.
+Enforcement         calculateEndDate (loan-amortization.util.ts) and
+                    calculateMortgageEndDate (mortgage-amortization.util.ts)
+                    advance totalPayments - 1, with the zero- and
+                    infinite-payment sentinels kept explicit. Advancing N dated
+                    every displayed payoff -- and the linked scheduled
+                    transaction's endDate, derived from the same value -- one
+                    full payment period late.
+Concurrency scope   --
+Failure response    The start date itself for a zero- or one-payment schedule.
+Required tests      Present: the calculateEndDate and calculateMortgageEndDate
+                    blocks in both specs assert exact calendar dates (12 monthly
+                    payments from 2026-01-01 end on 2026-12-01), including the
+                    one-payment and zero-payment cases.
+Status              enforced
+```
 
 ## Scheduled occurrences
 

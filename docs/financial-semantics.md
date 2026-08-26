@@ -284,7 +284,113 @@ The rule that follows is about which of the two a new field is:
 and a settled zero must not be reported as unknown applies in both directions
 here. Decide which the source column actually means before choosing a default.
 
-## 9. Gap register
+## 9. Loan and mortgage interest
+
+### The periodic rate is the nominal annual rate divided by the payments per year
+
+Outside one legal exception, a loan or mortgage rate is quoted as a **nominal
+annual rate compounded at the payment frequency**, so the rate charged per
+period is `annualRate / periodsPerYear` -- `0.06 / 26` for a biweekly mortgage,
+not `(1 + 0.06/12)^(12/26) - 1`.
+
+The exception is Canadian **fixed-rate** mortgages, which must compound
+semi-annually by law: `(1 + r/2)^(2/n) - 1`. Canadian variable-rate mortgages
+and every non-Canadian mortgage use the nominal convention.
+
+Both conventions are defensible and they disagree -- on 300k at 6% over 25
+biweekly-paid years the difference is 0.68 on the installment and about 443 in
+lifetime interest -- so the choice is a named contract, not a formula detail:
+
+| Where | What implements it |
+| --- | --- |
+| Backend rate | `calculateStandardPeriodicRate` / `calculateCanadianPeriodicRate` in `backend/src/accounts/mortgage-amortization.util.ts` |
+| Backend generic loan | `calculatePaymentSplit` / `calculateTotalPayments` in `backend/src/accounts/loan-amortization.util.ts` |
+| Frontend projections | `getPeriodicRate` in `frontend/src/lib/loan-schedule.ts` |
+| Displayed EAR | `calculateEffectiveAnnualRate`, compounding at the **payment** frequency |
+
+The displayed effective annual rate has to describe the rate the schedule
+actually charges. Compounding at 12 regardless of the payment frequency named a
+rate nothing in the app used: a biweekly mortgage charges `r/26` twenty-six
+times, so its EAR is `(1 + r/26)^26 - 1`. Canadian fixed keeps `(1 + r/2)^2 - 1`
+whatever its payment frequency, because that is the rate the law defines.
+
+Backend and frontend agreeing is **not** evidence for either convention -- they
+deliberately mirror one formula, so parity can only detect drift, never a wrong
+shared choice. The fixtures that hold this rule are derived independently of
+both (`backend/src/accounts/mortgage-amortization.util.spec.ts`, "periodic-rate
+convention"; `frontend/src/lib/loan-schedule.test.ts`).
+
+### The first payment date is payment number 1
+
+`accounts.payment_start_date` is the date of the **first** payment (the loan and
+mortgage forms label it "First Payment Date"), so a schedule of N payments
+advances only N - 1 intervals to reach its last one: 12 monthly payments from
+2026-01-01 finish on 2026-12-01. `calculateEndDate` and
+`calculateMortgageEndDate` own this, and the linked scheduled transaction's
+`endDate` is derived from their answer -- so an off-by-one there dates every
+displayed payoff, and the scheduler's own end, one full period late.
+
+### The last payment is a residual, not another installment
+
+A whole payment count is a ceiling: the payment that clears the balance is the
+remaining balance plus that period's interest, and it is normally smaller than
+the installment. Lifetime interest therefore comes from
+`calculateResidualPayoff`, never from `paymentAmount * totalPayments -
+principal` -- that arithmetic bills a full installment for a partial period
+(569 too much on a 25-year accelerated-biweekly mortgage) and disagrees with the
+period-by-period schedule the same app shows afterwards.
+
+### A projection horizon is derived from the frequency, and a truncated total is unknown
+
+`frontend/src/lib/loan-schedule.ts` projects at most
+`DEFAULT_MAX_PROJECTION_YEARS` (50) years of payments, which is `periodsPerYear
+* 50` rows -- 600 monthly, 1300 biweekly, 2600 weekly. A flat 600-payment cap
+was not a horizon but a monthly-only one, and it cut ordinary 25- and 30-year
+weekly and biweekly mortgages short. A 30-year weekly mortgage of 300k at 5%
+runs 1560 payments and costs 279,367.53 in interest; stopped at 600 it reported
+no payoff date, 232,723.84 still outstanding, and 155,557.54 of interest --
+omitting 44% of the lifetime figure under a total's label.
+
+When a schedule stops because it hit the horizon (`paidOff === false`), its
+accumulated interest is the interest over that horizon, not the loan's lifetime
+interest. Per `docs/financial-calculation-contract.md` section 1 that is a
+subtotal: `LoanScheduleResult.totalInterest` carries it, and every consumer that
+presents a lifetime figure or a saving derived from one gates on `paidOff`
+first -- `compareSchedules().interestSaved` and
+`PastImpactResult.interestAlreadySaved` are `null` rather than a difference of
+horizons, and the goal-seek solver refuses a target it cannot prove was met.
+
+### A recurring overpayment cadence is a calendar, not a payment interval
+
+A monthly overpayment happens twelve times a year on any loan. Deriving a fixed
+payment interval instead (`Math.round(periodsPerYear / overpaymentsPerYear)`)
+made "100 monthly" land every second biweekly payment -- thirteen times a year,
+8.3% more cash than the borrower said they would pay, and interest savings
+overstated to match.
+
+So occurrences are dated: they fall on the cadence anchor (the overpayment's
+start date, never before the first projected payment) and every cadence step
+after it, and each one is applied at the first loan payment on or after its due
+date. `recurringOccurrencesDue` in `frontend/src/lib/loan-schedule.ts` is the
+only place that decision is made, and it makes the cadence exact in both
+directions: `MONTHLY`, `QUARTERLY` and `ANNUALLY` are calendar cadences, so they
+contribute exactly 12, 4 and 1 occurrences per calendar year on a weekly,
+biweekly or monthly loan; `WEEKLY` and `BIWEEKLY` are day cadences, so they
+contribute one every 7 or 14 days -- 52 or 53 a year, exactly as a weekly
+standing order does, rather than a levelled 52/12 per month that falls on no
+payment date at all.
+
+An occurrence is carried by the first loan payment on or after its due date, so
+a cadence denser than the loan's payments arrives in batches (four or five
+weekly occurrences on each monthly payment) and one due in late December is paid
+by the January installment. That lag is the honest direction: interest is
+charged for the days the money had not yet arrived.
+
+`perPaymentExtraAmount` survives as a **display** average for the "resulting
+monthly payment" card. It is not what the engine applies, and it must not be
+used to compute a balance.
+
+## 10. Gap register
 
 Places where two paths currently answer the same question differently. Each was
 confirmed by reading `main`; each is a divergence, not a style difference.

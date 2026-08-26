@@ -78,6 +78,11 @@ adds value but proves nothing on its own. `--` means not applicable.
 | INV-RECONCILE-001 reconciled lock | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |
 | INV-REPORT-001 report account scope | supporting | **required** | **required** | -- | -- | -- | -- | optional |
+| INV-LOAN-001 overpayment cadence | **required** | -- | -- | -- | -- | -- | -- | optional |
+| INV-LOAN-002 no truncated total | **required** | -- | -- | -- | -- | -- | -- | optional |
+| INV-LOAN-003 compounding convention | **required** | -- | -- | -- | -- | -- | -- | -- |
+| INV-LOAN-004 residual final payment | **required** | -- | -- | -- | -- | -- | -- | -- |
+| INV-LOAN-005 first payment is payment 1 | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |
 | INV-OCCURRENCE-002 override price | required | -- | -- | -- | -- | -- | -- | required |
 | INV-CLAIM-001 single-use claim | supporting | -- | required | **required** | optional | optional | -- | required |
