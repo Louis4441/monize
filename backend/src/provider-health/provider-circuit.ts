@@ -230,10 +230,19 @@ export class ProviderCircuit {
     this.lastFailureAt = now;
     this.lastFailureReason = reason;
 
-    if (wasProbe) {
-      // A failed probe re-opens the same episode with a longer window. Not a
-      // new "opened" transition: the provider never came back, and reporting
-      // one per probe would be the log flood again, one window apart.
+    // A failed probe -- or a failure recorded after the window elapsed without
+    // one, which is the same evidence from a caller that reached the provider
+    // by another door -- re-opens the same episode with a longer window.
+    //
+    // The second half is load-bearing: without it a post-window failure left
+    // `retryAt` in the past, so every later gate check saw an elapsed window
+    // and admitted the call. The breaker protected for exactly one minute and
+    // was then a permanent no-op, which is the defect it exists to prevent.
+    const windowElapsed =
+      this.state === "open" && this.retryAt !== null && now >= this.retryAt;
+    if (wasProbe || windowElapsed) {
+      // Not a new "opened" transition: the provider never came back, and
+      // reporting one per probe would be the log flood again, one window apart.
       this.openWindowMs = Math.min(this.openWindowMs * 2, MAX_OPEN_WINDOW_MS);
       this.state = "open";
       this.retryAt = now + this.openWindowMs;

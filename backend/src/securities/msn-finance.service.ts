@@ -325,7 +325,7 @@ export class MsnFinanceService implements QuoteProvider {
     // host is unreachable, a refusal is instant and silent rather than one
     // 10-second timeout and one log line per symbol (issue #1265's shape, with
     // this provider's endpoints in place of Yahoo's).
-    if (!this.health.isAvailable(HEALTH_PROVIDER_ID)) return null;
+    if (!this.health.tryRequest(HEALTH_PROVIDER_ID)) return null;
     try {
       const response = await fetch(url, {
         headers: {
@@ -1155,7 +1155,7 @@ export class MsnFinanceService implements QuoteProvider {
     // surface for sector data is limited and may not be available for all
     // security types.
     const url = `${STOCK_DETAILS_PAGE}/fi-${encodeURIComponent(instrumentId)}`;
-    if (!this.health.isAvailable(HEALTH_PROVIDER_ID)) return null;
+    if (!this.health.tryRequest(HEALTH_PROVIDER_ID)) return null;
     try {
       const response = await fetch(url, {
         headers: {

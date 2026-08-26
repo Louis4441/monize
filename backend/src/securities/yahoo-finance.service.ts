@@ -318,8 +318,9 @@ export class YahooFinanceService implements QuoteProvider {
     // not cached -- so while Yahoo is unreachable every v10 caller used to pay
     // two cookie timeouts plus a getcrumb timeout before failing. Refuse it
     // with the same breaker the rest of the client uses.
-    if (!this.health.isAvailable(HEALTH_PROVIDER_ID)) return false;
+    if (!this.health.tryRequest(HEALTH_PROVIDER_ID)) return false;
     let lastStatus: number | string = "no cookies";
+    let lastError: unknown = null;
     for (const source of YahooFinanceService.COOKIE_SOURCES) {
       try {
         const cookieStr = await this.fetchYahooCookie(source);
@@ -358,11 +359,19 @@ export class YahooFinanceService implements QuoteProvider {
       } catch (error) {
         this.health.recordFailure(HEALTH_PROVIDER_ID, error);
         lastStatus = describeFetchFailure(error);
+        lastError = error;
       }
     }
 
-    this.logger.warn(
-      `Yahoo Finance: could not obtain a crumb (last: ${lastStatus})`,
+    // Through the rate-limited door like every other provider failure: the
+    // handshake is attempted per v10 caller, so a bare warn here is one line
+    // per symbol -- the flood, one layer down. A status-only failure carries no
+    // error to describe, so it is given one.
+    this.health.logFailure(
+      this.logger,
+      HEALTH_PROVIDER_ID,
+      "crumb handshake",
+      lastError ?? new Error(`could not obtain a crumb (last: ${lastStatus})`),
     );
     return false;
   }

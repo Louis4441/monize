@@ -72,7 +72,7 @@ describe("outbound provider calls are answerable to the breaker", () => {
       expect(source).toContain(
         'from "../provider-health/provider-health.service"',
       );
-      expect(source).toMatch(/this\.health\.(isAvailable|assertAvailable)\(/);
+      expect(source).toMatch(/this\.health\.(tryRequest|assertAvailable)\(/);
       expect(source).toContain("this.health.recordSuccess(");
     },
   );

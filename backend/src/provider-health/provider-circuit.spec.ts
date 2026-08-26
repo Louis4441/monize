@@ -129,6 +129,34 @@ describe("ProviderCircuit", () => {
     }
   });
 
+  it("re-arms the window when a failure lands after it elapsed", () => {
+    // A caller can reach the provider without taking the probe slot (a gate
+    // that only read the state used to allow exactly that). Its failure is the
+    // same evidence a probe's is, and leaving `retryAt` in the past made every
+    // later check see an elapsed window -- a breaker that protected for one
+    // minute and then never again.
+    const { circuit, advance } = circuitAt();
+    open(circuit);
+    advance(OPEN_WINDOW_MS + 1);
+
+    circuit.recordTransportFailure("still down");
+
+    const decision = circuit.beforeRequest();
+    expect(decision.allowed).toBe(false);
+    expect(decision.retryAfterMs).toBe(OPEN_WINDOW_MS * 2);
+  });
+
+  it("does not escalate on failures that were already in flight", () => {
+    // Requests admitted just before the breaker opened land afterwards. They
+    // are not new evidence, and doubling the window per straggler would push a
+    // brief outage to the cap.
+    const { circuit, advance } = circuitAt();
+    open(circuit);
+    advance(5_000);
+    for (let i = 0; i < 10; i++) circuit.recordTransportFailure("in flight");
+    expect(circuit.beforeRequest().retryAfterMs).toBe(OPEN_WINDOW_MS - 5_000);
+  });
+
   it("caps the window so a day-long outage still gets probed", () => {
     const { circuit, advance } = circuitAt();
     open(circuit);

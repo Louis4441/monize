@@ -25,12 +25,21 @@ import {
   MarketIndexDefinition,
   marketIndexByCode,
 } from "./market-indexes";
-import { describeFetchFailure } from "../common/http/fetch-failure.util";
+import {
+  describeFetchFailure,
+  isTransportFailure,
+} from "../common/http/fetch-failure.util";
 import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { isProviderUnavailable } from "../provider-health/provider-unavailable.error";
 import { TrackedProviderId } from "../provider-health/providers";
 
 /** The provider the index closes come from, for availability reporting. */
 const HEALTH_PROVIDER_ID: TrackedProviderId = "yahoo_finance";
+
+/** True when the failure is the provider's, rather than this service's own. */
+function isProviderFailure(error: unknown): boolean {
+  return isProviderUnavailable(error) || isTransportFailure(error);
+}
 
 /** Where an index's stored history begins and ends, and how dense it is. */
 export interface MarketIndexCoverage {
@@ -518,13 +527,22 @@ export class MarketIndexService implements OnApplicationBootstrap {
       // email quotes.
       const message = describeFetchFailure(error);
       await this.recordFailure(index.code, message);
-      // Rate-limited per provider, and silent for a call the breaker refused:
-      // 24 indexes failing the same way is one fact, not 24 log lines.
-      this.health.logFailure(
-        this.logger,
-        HEALTH_PROVIDER_ID,
-        `market index refresh for ${index.code}`,
-        error,
+      if (isProviderFailure(error)) {
+        // Rate-limited per provider, and silent for a call the breaker refused:
+        // 24 indexes failing the same way is one fact, not 24 log lines.
+        this.health.logFailure(
+          this.logger,
+          HEALTH_PROVIDER_ID,
+          `market index refresh for ${index.code}`,
+          error,
+        );
+        return;
+      }
+      // Not the provider's fault -- a failed upsert, a database that went away.
+      // It gets its own line rather than being rate-limited behind an unrelated
+      // network failure, or demoted to debug by it.
+      this.logger.error(
+        `Market index refresh for ${index.code} failed: ${message}`,
       );
     }
   }

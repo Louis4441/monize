@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import {
   runOutsideActiveScopedManager,
@@ -71,14 +71,31 @@ export class ProviderHealthService {
   private readonly circuits = new Map<string, ProviderCircuit>();
   private readonly logStates = new Map<string, LogState>();
   private readonly lastPersistedAt = new Map<string, number>();
+  /**
+   * Providers this process has already recorded a success for.
+   *
+   * A fresh process starts with a closed breaker, so a success after a restart
+   * is not a *transition* and used to write nothing -- leaving a row that says
+   * `down` from before the restart, for a provider that is plainly answering.
+   * That row is not merely stale: `notifyRecovery` needs `state = 'up'`, so no
+   * all-clear could ever be sent, and the outage claim needs
+   * `outage_notified_at IS NULL`, so every later outage of that provider would
+   * be silently suppressed. One extra write per provider per process closes it.
+   */
+  private readonly successPersisted = new Set<string>();
 
   /**
    * @param now injected clock: the windows are the behaviour under test, and a
-   *   test that waits out a real minute is a test nobody runs.
+   *   test that waits out a real minute is a test nobody runs. `@Optional()` is
+   *   load-bearing, not decoration: TypeScript emits `Function` as this
+   *   parameter's `design:paramtypes` entry, which is not a provider token, so
+   *   without it Nest refuses to construct the service and the container never
+   *   boots -- while every spec, which uses `new`, stays green.
+   *   `provider-health.module.spec.ts` is the regression test.
    */
   constructor(
     private readonly dataSource: DataSource,
-    private readonly now: () => number = Date.now,
+    @Optional() private readonly now: () => number = Date.now,
   ) {}
 
   private circuit(provider: string): ProviderCircuit {
@@ -95,7 +112,7 @@ export class ProviderHealthService {
   }
 
   /**
-   * Take the request slot, or refuse it.
+   * Take the request slot, or refuse it by throwing.
    *
    * Called *before* any queue or semaphore the caller has: the point of a
    * refusal is that it costs nothing, and a refusal that first waits behind
@@ -112,25 +129,42 @@ export class ProviderHealthService {
     );
   }
 
-  /** True when a call would be allowed, without consuming the probe slot. */
-  isAvailable(provider: string): boolean {
-    const snapshot = this.circuit(provider).snapshot();
-    if (snapshot.state === "closed") return true;
-    return snapshot.retryAt !== null && this.now() >= snapshot.retryAt;
+  /**
+   * `assertAvailable` for a caller whose contract is a null, not a throw.
+   *
+   * It **takes the slot**, exactly like `assertAvailable`: this is "may I make
+   * one request now", not "is the provider up". A read-only variant would let
+   * every caller past the moment an open window elapsed, and the whole point of
+   * half-open is that a still-dead provider costs one socket per window. Use
+   * `snapshot()` when you genuinely only want to look.
+   */
+  tryRequest(provider: string): boolean {
+    return this.circuit(provider).beforeRequest().allowed;
   }
 
   /** The provider answered. Closes the breaker and clears the failure run. */
   recordSuccess(provider: string): void {
     const outcome = this.circuit(provider).recordSuccess();
-    if (outcome.transition !== "recovered") return;
-    this.logger.log(
-      `${providerLabel(provider)} is answering again` +
-        (outcome.suppressedCalls > 0
-          ? `; ${outcome.suppressedCalls} call(s) were refused while it was down`
-          : ""),
-    );
-    this.resetLogState(provider);
-    this.persist(provider, outcome.snapshot, "up");
+    const firstOfProcess = !this.successPersisted.has(provider);
+    this.successPersisted.add(provider);
+
+    if (outcome.transition === "recovered") {
+      this.logger.log(
+        `${providerLabel(provider)} is answering again` +
+          (outcome.suppressedCalls > 0
+            ? `; ${outcome.suppressedCalls} call(s) were refused while it was down`
+            : ""),
+      );
+      this.resetLogState(provider);
+    }
+
+    // Written on a recovery, and on this process's first success for the
+    // provider whatever the breaker did -- see `successPersisted`. Every later
+    // success is silent: a row per priced symbol would be the flood in another
+    // form.
+    if (outcome.transition === "recovered" || firstOfProcess) {
+      this.persist(provider, outcome.snapshot, "up");
+    }
   }
 
   /**

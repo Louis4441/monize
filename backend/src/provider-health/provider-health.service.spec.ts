@@ -230,13 +230,17 @@ describe("ProviderHealthService", () => {
       expect(params[1]).toBe("up");
     });
 
-    it("is silent for a success that follows a success", () => {
+    it("says nothing in the log for a success that follows a success", () => {
+      service.recordSuccess(PROVIDER);
       service.recordSuccess(PROVIDER);
       service.recordSuccess(PROVIDER);
       expect(serviceLogger.log).not.toHaveBeenCalled();
+      // One write, from the first success of the process, which is what
+      // corrects a row a dead process left saying `down`. Not one per priced
+      // symbol.
       expect(
         statements().filter((sql) => sql.includes("provider_health")),
-      ).toHaveLength(0);
+      ).toHaveLength(1);
     });
   });
 
@@ -310,19 +314,87 @@ describe("ProviderHealthService", () => {
     });
   });
 
-  describe("isAvailable", () => {
-    it("does not consume the probe slot", () => {
-      driveOpen();
-      advance(OPEN_WINDOW_MS + 1);
-      expect(service.isAvailable(PROVIDER)).toBe(true);
-      expect(service.isAvailable(PROVIDER)).toBe(true);
-      // The probe is still there for the caller that actually makes a request.
-      expect(() => service.assertAvailable(PROVIDER)).not.toThrow();
+  describe("tryRequest", () => {
+    it("is true while the provider answers", () => {
+      expect(service.tryRequest(PROVIDER)).toBe(true);
     });
 
     it("is false while the window has not elapsed", () => {
       driveOpen();
-      expect(service.isAvailable(PROVIDER)).toBe(false);
+      expect(service.tryRequest(PROVIDER)).toBe(false);
+    });
+
+    it("takes the probe slot, so a dead provider costs one call per window", () => {
+      // A read-only "is it up" gate let every caller past the instant the
+      // window elapsed, which is the herd half-open exists to prevent -- and
+      // the callers that use this door (MSN, the Yahoo crumb handshake) are
+      // exactly the ones with no throw in their contract.
+      driveOpen();
+      advance(OPEN_WINDOW_MS + 1);
+      expect(service.tryRequest(PROVIDER)).toBe(true);
+      expect(service.tryRequest(PROVIDER)).toBe(false);
+      expect(service.tryRequest(PROVIDER)).toBe(false);
+    });
+
+    it("keeps refusing after a post-window failure, not forever admitting", () => {
+      driveOpen();
+      advance(OPEN_WINDOW_MS + 1);
+      expect(service.tryRequest(PROVIDER)).toBe(true);
+      service.recordFailure(PROVIDER, transportError());
+
+      // The bug this pins: the failure left retryAt in the past, so every later
+      // check saw an elapsed window and let the call out. The breaker protected
+      // for one minute and was then a permanent no-op.
+      for (let i = 0; i < 20; i++) {
+        advance(1_000);
+        expect(service.tryRequest(PROVIDER)).toBe(false);
+      }
+    });
+  });
+
+  describe("after a restart inside an outage", () => {
+    /** A process that starts with a closed breaker, as every restart does. */
+    const restarted = () => {
+      const fresh = new ProviderHealthService(dataSource as never, () => now);
+      (fresh as unknown as { logger: unknown }).logger = fakeLogger();
+      return fresh;
+    };
+
+    it("records the provider as up on its first success, transition or not", () => {
+      // The row was left saying `down` by the process that died. Nothing else
+      // will ever correct it: a success in a fresh process is not a transition,
+      // notifyRecovery needs state='up', and the outage claim needs
+      // outage_notified_at IS NULL -- so both the all-clear and every future
+      // outage alert for this provider would be lost.
+      const fresh = restarted();
+      fresh.recordSuccess(PROVIDER);
+
+      const writes = manager.query.mock.calls.filter((call) =>
+        String(call[0]).includes("INSERT INTO provider_health"),
+      );
+      expect(writes).toHaveLength(1);
+      expect((writes[0][1] as unknown[])[1]).toBe("up");
+    });
+
+    it("is silent for every success after the first", () => {
+      const fresh = restarted();
+      for (let i = 0; i < 500; i++) fresh.recordSuccess(PROVIDER);
+      expect(
+        manager.query.mock.calls.filter((call) =>
+          String(call[0]).includes("INSERT INTO provider_health"),
+        ),
+      ).toHaveLength(1);
+    });
+
+    it("leaves the stored episode start alone, so the alert clock survives", () => {
+      const fresh = restarted();
+      fresh.recordSuccess(PROVIDER);
+      const insert = String(
+        manager.query.mock.calls.find((call) =>
+          String(call[0]).includes("INSERT INTO provider_health"),
+        )?.[0],
+      );
+      expect(insert).toContain("THEN provider_health.outage_started_at");
     });
   });
 });
