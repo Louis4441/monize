@@ -539,12 +539,18 @@ function ReconcileContent() {
                   {t('list.groupByFlow')}
                 </span>
               </div>
-              <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                {t('list.selectAll')}
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSelectNone}>
-                {t('list.selectNone')}
-              </Button>
+              {/* One non-wrapping group: the toolbar wraps on phones, and the
+                  two selection buttons are halves of one control -- letting the
+                  wrap split them put Select All and Select None on different
+                  rows. */}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleSelectAll}>
+                  {t('list.selectAll')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleSelectNone}>
+                  {t('list.selectNone')}
+                </Button>
+              </div>
               <Button size="sm" onClick={transactionModal.openCreate}>
                 {t('list.addTransaction')}
               </Button>

@@ -314,6 +314,19 @@ describe('ReconcilePage', () => {
       await waitFor(() => expect(screen.getByText('Statement Balance')).toBeInTheDocument(), { timeout: 3000 });
     }
 
+    it('keeps Select All and Select None in one non-wrapping group', async () => {
+      // The header toolbar wraps on phones; the two selection buttons are
+      // halves of one control, so they share a flex group the wrap cannot
+      // split -- and Add Transaction is deliberately outside it, free to wrap.
+      await advanceToReconcileStep();
+      const selectAll = screen.getByText('Select All');
+      const selectNone = screen.getByText('Select None');
+      expect(selectAll.parentElement).toBe(selectNone.parentElement);
+      expect(selectAll.parentElement).not.toContainElement(
+        screen.getByText('Add Transaction'),
+      );
+    });
+
     it('loads reconciliation data and shows summary bar', async () => {
       await advanceToReconcileStep();
       expect(screen.getByText('Statement Balance')).toBeInTheDocument();
