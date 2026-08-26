@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterAll, afterEach, vi } from 'vitest';
+
+import { failOnActWarnings, isActWarning, recordActWarning } from './act-guard';
 
 afterEach(async () => {
   cleanup();
@@ -21,7 +23,14 @@ afterEach(async () => {
   // assertion read the mock. The two would never see each other's writes.
   const { useDensityStore } = await import('@/store/densityStore');
   useDensityStore.setState({ densities: {} });
+  // Last, so an update React commits during `cleanup()` is counted against the
+  // test that mounted the tree rather than the next one.
+  failOnActWarnings();
 });
+
+// `cleanup()` for the file's final test runs inside that test's own afterEach
+// above, but a warning React logs after the last hook has nowhere else to go.
+afterAll(failOnActWarnings);
 
 // Suppress known-harmless jsdom warnings for SVG elements used by Recharts.
 // Also suppress tagged output from the project's `createLogger` (e.g.
@@ -32,6 +41,13 @@ const LOGGER_TAG_RE = /^\[[A-Za-z][\w-]*\]$/;
 const originalConsoleError = console.error;
 console.error = (...args: unknown[]) => {
   const msg = typeof args[0] === 'string' ? args[0] : '';
+  // Recorded rather than printed: the failure raised in `afterEach` names the
+  // test, which one line on stderr in a 14,000-test run does not. See
+  // `act-guard.ts` for why these are failures and not noise.
+  if (isActWarning(args)) {
+    recordActWarning(args);
+    return;
+  }
   if (
     msg.includes('is unrecognized in this browser') ||
     msg.includes('is using incorrect casing') ||
