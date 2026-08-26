@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import {
   ALERT_QUIET_PERIOD_MS,
   MIN_OUTAGE_MS,
@@ -190,7 +191,10 @@ describe("ProviderOutageAlertService", () => {
       expect(emailService.sendMail).not.toHaveBeenCalled();
     });
 
-    it("tells nobody, loudly, when no administrator accepts email", async () => {
+    it("does not spend the episode's only notice when nobody can be told", async () => {
+      // The claim is consumed once and never retried, so claiming before
+      // knowing there is a recipient destroys the alert silently. The state has
+      // to survive until somebody can receive it.
       route({
         pending: [healthRow()],
         outageClaim: [healthRow()],
@@ -198,6 +202,19 @@ describe("ProviderOutageAlertService", () => {
       });
       await service.sweepProviderHealth();
       expect(emailService.sendMail).not.toHaveBeenCalled();
+      expect(
+        statements().filter((sql) => sql.includes("SET outage_notified_at")),
+      ).toHaveLength(0);
+    });
+
+    it("does not query recipients for a row that is plainly not due", async () => {
+      route({
+        pending: [healthRow({ outage_started_at: new Date() })],
+      });
+      await service.sweepProviderHealth();
+      expect(
+        statements().filter((sql) => sql.includes("FROM users u")),
+      ).toHaveLength(0);
     });
 
     it("emails every administrator, and one bad address costs only itself", async () => {
@@ -304,6 +321,35 @@ describe("ProviderOutageAlertService", () => {
       await service.sweepProviderHealth();
       expect(emailService.sendMail).not.toHaveBeenCalled();
     });
+
+    it("keeps the episode marker when there is nobody to send it to", async () => {
+      // Clearing it with no recipient destroyed both the all-clear and the
+      // record that one was owed -- and, unlike the outage path, said nothing.
+      route({ pending: [recovered], recoveryClaim: [recovered], admins: [] });
+      await service.sweepProviderHealth();
+      expect(emailService.sendMail).not.toHaveBeenCalled();
+      expect(
+        statements().filter((sql) => sql.includes("SET outage_notified_at")),
+      ).toHaveLength(0);
+    });
+  });
+
+  it("says once, not every ten minutes, that there is nobody to tell", async () => {
+    // 144 warnings a day about a misconfigured recipient list is the noise this
+    // change exists to remove.
+    route({ pending: [healthRow()], admins: [] });
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+    try {
+      for (let i = 0; i < 5; i++) await service.sweepProviderHealth();
+      const lines = warn.mock.calls
+        .map((call) => String(call[0]))
+        .filter((text) => text.includes("nobody was told"));
+      expect(lines).toHaveLength(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("keeps sweeping after one provider's alert throws", async () => {

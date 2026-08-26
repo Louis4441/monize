@@ -2305,6 +2305,70 @@ describe("YahooFinanceService", () => {
       }
     });
 
+    it("does not leave the probe slot held by a successful crumb handshake", async () => {
+      // The crumb handshake takes the exclusive half-open probe slot. Reporting
+      // no outcome on success held it for two minutes, during which every
+      // Yahoo call in the process was refused -- with the provider healthy.
+      let clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+
+      mockFetchError(dnsFailure());
+      for (let i = 0; i < 5; i++) {
+        await timedService.fetchHistorical("^RUT", null, "1y");
+      }
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("open");
+
+      clock += OPEN_WINDOW_MS + 1;
+      // The handshake is the probe: cookies from https.get, crumb over fetch.
+      (
+        timedService as unknown as { fetchYahooCookie: () => Promise<string> }
+      ).fetchYahooCookie = jest.fn().mockResolvedValue("A1=cookie");
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve("abc123"),
+      });
+
+      const gotCrumb = await (
+        timedService as unknown as { fetchCrumb: () => Promise<boolean> }
+      ).fetchCrumb();
+
+      expect(gotCrumb).toBe(true);
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("closed");
+      // And the next ordinary request is allowed, rather than refused for the
+      // probe timeout.
+      expect(() => timedHealth.assertAvailable("yahoo_finance")).not.toThrow();
+    });
+
+    it("frees the probe slot even when the handshake is refused a crumb", async () => {
+      // A 401 or a cookie-less response still proves the host answered.
+      let clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+
+      mockFetchError(dnsFailure());
+      for (let i = 0; i < 5; i++) {
+        await timedService.fetchHistorical("^RUT", null, "1y");
+      }
+      clock += OPEN_WINDOW_MS + 1;
+      (
+        timedService as unknown as { fetchYahooCookie: () => Promise<string> }
+      ).fetchYahooCookie = jest.fn().mockResolvedValue("A1=cookie");
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve(""),
+      });
+
+      expect(
+        await (
+          timedService as unknown as { fetchCrumb: () => Promise<boolean> }
+        ).fetchCrumb(),
+      ).toBe(false);
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("closed");
+    });
+
     it("resumes once the provider answers again", async () => {
       let clock = 1_700_000_000_000;
       const timedHealth = createTestProviderHealth(() => clock);

@@ -324,6 +324,12 @@ export class YahooFinanceService implements QuoteProvider {
     for (const source of YahooFinanceService.COOKIE_SOURCES) {
       try {
         const cookieStr = await this.fetchYahooCookie(source);
+        // A response arrived, cookies or not: the host is reachable. Recording
+        // it is not optional bookkeeping -- `tryRequest` above took the
+        // exclusive half-open probe slot, and a probe that reports no outcome
+        // holds it for PROBE_TIMEOUT_MS, during which every Yahoo call in the
+        // process is refused with the provider healthy.
+        this.health.recordSuccess(HEALTH_PROVIDER_ID);
         if (!cookieStr) {
           lastStatus = "no cookies";
           continue;
@@ -340,6 +346,8 @@ export class YahooFinanceService implements QuoteProvider {
           },
         );
 
+        // Answered, whatever it thinks of the request.
+        this.health.recordSuccess(HEALTH_PROVIDER_ID);
         if (!crumbResp.ok) {
           lastStatus = crumbResp.status;
           await crumbResp.text().catch(() => undefined);

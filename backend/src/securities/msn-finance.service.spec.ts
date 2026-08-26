@@ -6,6 +6,7 @@ import { createTestProviderHealth } from "../test-helpers/provider-health-testin
 
 describe("MsnFinanceService", () => {
   let service: MsnFinanceService;
+  let module: TestingModule;
   let originalFetch: typeof global.fetch;
 
   const createResponse = (body: unknown, ok = true, status = 200) =>
@@ -18,7 +19,7 @@ describe("MsnFinanceService", () => {
 
   beforeEach(async () => {
     originalFetch = global.fetch;
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         MsnFinanceService,
         {
@@ -122,6 +123,48 @@ describe("MsnFinanceService", () => {
       const second = await service.resolveInstrumentId("AAPL", "NASDAQ");
       expect(second).toBe("a1u3p2");
       expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
+    });
+
+    it("does not cache a null the breaker produced", async () => {
+      // A refusal and an empty answer are the same `null` from httpGetJson, and
+      // this cache holds for 24 hours: caching a refusal would let one price
+      // sweep during a two-minute outage poison every symbol for a day. Before
+      // the breaker each poisoning at least cost a real 10-second timeout, so
+      // it could not fan out.
+      const dnsFailure = () => {
+        const error = new TypeError("fetch failed");
+        Object.assign(error, {
+          cause: Object.assign(new Error("getaddrinfo EAI_AGAIN"), {
+            code: "EAI_AGAIN",
+          }),
+        });
+        return error;
+      };
+      global.fetch = jest.fn().mockRejectedValue(dnsFailure());
+
+      // Drive the breaker open through this client's own door.
+      for (let i = 0; i < 6; i++) {
+        expect(
+          await service.resolveInstrumentId(`SYM${i}`, "NASDAQ"),
+        ).toBeNull();
+      }
+      expect(await service.resolveInstrumentId("AAPL", "NASDAQ")).toBeNull();
+
+      // The provider comes back; the symbol must be resolvable again, not
+      // remembered as absent.
+      global.fetch = jest.fn().mockReturnValue(
+        createResponse({
+          data: {
+            stocks: [{ Symbol: "AAPL", SecId: "a1u3p2", Exchange: "XNAS" }],
+          },
+        }),
+      );
+      const health = module.get(ProviderHealthService);
+      health.recordSuccess("msn_finance");
+
+      expect(await service.resolveInstrumentId("AAPL", "NASDAQ")).toBe(
+        "a1u3p2",
+      );
     });
 
     it("prefers the exchange match when multiple candidates are returned", async () => {

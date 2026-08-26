@@ -578,6 +578,49 @@ describe("MarketIndexService", () => {
     });
   });
 
+  // --- what an operator reads when an index has no history -----------------
+
+  describe("recorded failure reason", () => {
+    /** The reason string the service stored, from the recordFailure call. */
+    const storedReason = (): string | undefined => {
+      const call = manager.query.mock.calls.find((entry) =>
+        String(entry[0]).includes("last_error = $2"),
+      );
+      return call ? String((call[1] as unknown[])[1]) : undefined;
+    };
+
+    it("says the provider had nothing when the provider answered", async () => {
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue([]);
+
+      await service.refreshAll();
+
+      expect(storedReason()).toContain("no history returned");
+    });
+
+    it("says the provider was not called when the breaker is open", async () => {
+      // The client turns a transport failure into null, which is
+      // indistinguishable here from "this symbol has no history" -- and
+      // "nothing came back" sends whoever reads market_index_sync.last_error
+      // looking for a symbol problem that does not exist.
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockResolvedValue(null);
+      const failure = Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error("getaddrinfo EAI_AGAIN"), {
+          code: "EAI_AGAIN",
+        }),
+      });
+      for (let i = 0; i < 5; i++)
+        health.recordFailure("yahoo_finance", failure);
+
+      await service.refreshAll();
+
+      expect(storedReason()).toContain("not fetched");
+      expect(storedReason()).toContain("unavailable");
+      expect(storedReason()).toContain("EAI_AGAIN");
+    });
+  });
+
   // --- start-up ------------------------------------------------------------
 
   describe("onApplicationBootstrap", () => {

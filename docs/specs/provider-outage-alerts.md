@@ -94,9 +94,11 @@ The same shape applies to the other outbound callers -- `CurrenciesService` (FX)
 the AI providers, `UpdatesService`, `favicon.service`, `password-breach.service`.
 They are not wired to the breaker in this change, and
 `provider-call.guard.spec.ts` scopes its scan to `src/securities/` for that
-reason. Adopting one is: pick an id in `TRACKED_PROVIDERS`, call
-`assertAvailable`/`isAvailable` before the request, `recordSuccess` on any
-response, `recordFailure` on a rejection, and `logFailure` in the catch.
+reason. Adopting one is: pick an id in `TRACKED_PROVIDERS`, call `assertAvailable` (or
+`tryRequest`, where the caller's contract is a `null` rather than a throw)
+before the request, `recordSuccess` on any response, `recordFailure` on a
+rejection, and `logFailure` in the catch. Both gates take the exclusive
+half-open probe slot, so every taker owes an outcome.
 
 ## Verification
 

@@ -111,6 +111,16 @@ export function formatOutageDuration(ms: number, t: EmailT): string {
 export class ProviderOutageAlertService {
   private readonly logger = new Logger(ProviderOutageAlertService.name);
 
+  /**
+   * Providers already reported as having nobody to notify.
+   *
+   * The sweep runs every ten minutes; an install whose administrators have all
+   * disabled email would otherwise log the same warning 144 times a day, which
+   * is the noise this whole change exists to remove. Cleared as soon as a
+   * recipient reappears, so the next occasion is reported again.
+   */
+  private readonly noRecipientsReported = new Set<string>();
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly emailService: EmailService,
@@ -177,6 +187,18 @@ export class ProviderOutageAlertService {
    * (`docs/external-side-effects.md`).
    */
   private async notifyOutage(row: HealthRow): Promise<void> {
+    // Recipients first, and the claim only if there are any: the claim is
+    // consumed once and never retried, so taking it before knowing anybody can
+    // be told would destroy the episode's only notice. The `WHERE` below is
+    // still the authority on whether the notice is owed -- this is a local
+    // pre-filter, so a row that is merely already-notified costs no query.
+    if (!this.outageMightBeDue(row)) return;
+    const recipients = await this.administrators();
+    if (recipients.length === 0) {
+      this.reportNoRecipients(row.provider, "is down");
+      return;
+    }
+
     const claimed: HealthRow[] = await withScopedDb(
       this.dataSource,
       (manager) =>
@@ -198,15 +220,6 @@ export class ProviderOutageAlertService {
     );
     const won = claimed[0];
     if (!won) return;
-
-    const recipients = await this.administrators();
-    if (recipients.length === 0) {
-      this.logger.warn(
-        `${providerLabel(won.provider)} is down and no administrator has ` +
-          "email notifications enabled; nobody was told",
-      );
-      return;
-    }
 
     const startedAt = won.outage_started_at
       ? new Date(won.outage_started_at)
@@ -247,6 +260,15 @@ export class ProviderOutageAlertService {
 
   /** Clear the episode's notice and send the all-clear that pairs with it. */
   private async notifyRecovery(row: HealthRow): Promise<void> {
+    // Same reason as the outage path, and it bit harder here: clearing
+    // `outage_notified_at` with nobody to email destroyed the all-clear *and*
+    // the record that an outage notice was owed one, silently.
+    const recipients = await this.administrators();
+    if (recipients.length === 0) {
+      this.reportNoRecipients(row.provider, "is answering again");
+      return;
+    }
+
     const claimed: HealthRow[] = await withScopedDb(
       this.dataSource,
       (manager) =>
@@ -264,9 +286,6 @@ export class ProviderOutageAlertService {
     );
     const won = claimed[0];
     if (!won) return;
-
-    const recipients = await this.administrators();
-    if (recipients.length === 0) return;
 
     const restoredAt = won.last_success_at
       ? new Date(won.last_success_at)
@@ -303,6 +322,33 @@ export class ProviderOutageAlertService {
   }
 
   /**
+   * Whether this row could possibly owe an outage notice, from what was read.
+   *
+   * A cheap local mirror of the claim's `WHERE`, and deliberately generous: it
+   * exists only to avoid a recipient query for a row that is plainly not due,
+   * and the claim -- which is atomic and re-reads the row -- decides.
+   */
+  private outageMightBeDue(row: HealthRow): boolean {
+    if (row.state !== "down") return false;
+    if (row.outage_notified_at !== null) return false;
+    if (row.outage_started_at === null) return false;
+    return (
+      Date.now() - new Date(row.outage_started_at).getTime() >= MIN_OUTAGE_MS
+    );
+  }
+
+  /** Say once, per provider, that there is nobody to tell. */
+  private reportNoRecipients(provider: string, what: string): void {
+    if (this.noRecipientsReported.has(provider)) return;
+    this.noRecipientsReported.add(provider);
+    this.logger.warn(
+      `${providerLabel(provider)} ${what}, and no administrator has an email ` +
+        "address with email notifications enabled; nobody was told. The alert " +
+        "stays owed, so it is sent once a recipient exists.",
+    );
+  }
+
+  /**
    * The administrators who accept email.
    *
    * A provider outage is a deployment-wide operational fact, not one user's
@@ -330,6 +376,7 @@ export class ProviderOutageAlertService {
             ORDER BY u.created_at`,
       ),
     );
+    if (rows.length > 0) this.noRecipientsReported.clear();
     return rows.map((row) => ({
       userId: row.id,
       email: row.email,

@@ -381,7 +381,15 @@ export class MsnFinanceService implements QuoteProvider {
       }
     }
 
-    this.setCached(key, null);
+    // A null the breaker produced means "we did not ask", not "MSN has no such
+    // instrument" -- and this cache holds for 24 hours, so caching it during an
+    // outage poisons every symbol for a day. (Before the breaker, each
+    // poisoning at least cost a real 10-second timeout, so it could not fan out
+    // across a whole price sweep.) The breaker is asked rather than the
+    // response, because a refusal and an empty answer are the same `null` here.
+    if (this.health.snapshot(HEALTH_PROVIDER_ID).state === "closed") {
+      this.setCached(key, null);
+    }
     return null;
   }
 

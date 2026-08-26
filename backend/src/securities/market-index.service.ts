@@ -473,10 +473,12 @@ export class MarketIndexService implements OnApplicationBootstrap {
       }
 
       if (prices.length === 0) {
-        await this.recordFailure(
-          index.code,
-          `no history returned for ${index.yahooSymbol}`,
-        );
+        // "Nothing came back" has two causes and an operator reads this string:
+        // the provider answered with an empty series, or it was never called
+        // because the breaker is open. Saying the first when it was the second
+        // sends whoever reads `market_index_sync.last_error` looking for a
+        // symbol problem that does not exist.
+        await this.recordFailure(index.code, this.emptyFetchReason(index));
         return;
       }
 
@@ -528,8 +530,12 @@ export class MarketIndexService implements OnApplicationBootstrap {
       const message = describeFetchFailure(error);
       await this.recordFailure(index.code, message);
       if (isProviderFailure(error)) {
-        // Rate-limited per provider, and silent for a call the breaker refused:
-        // 24 indexes failing the same way is one fact, not 24 log lines.
+        // Belt, not the main path: the provider client catches its own
+        // transport failures and returns null (which lands in the empty-series
+        // branch above), so what usually reaches here is *this* service's
+        // problem. If a provider error ever does escape, it goes through the
+        // rate-limited door -- 24 indexes failing the same way is one fact, not
+        // 24 log lines.
         this.health.logFailure(
           this.logger,
           HEALTH_PROVIDER_ID,
@@ -538,13 +544,34 @@ export class MarketIndexService implements OnApplicationBootstrap {
         );
         return;
       }
-      // Not the provider's fault -- a failed upsert, a database that went away.
-      // It gets its own line rather than being rate-limited behind an unrelated
-      // network failure, or demoted to debug by it.
+      // A failed upsert, a database that went away: not the provider's fault,
+      // so it gets its own line rather than being rate-limited behind an
+      // unrelated network failure -- or demoted to debug by one.
       this.logger.error(
         `Market index refresh for ${index.code} failed: ${message}`,
       );
     }
+  }
+
+  /**
+   * Why a fetch came back with no usable bars, in the words an operator needs.
+   *
+   * The provider client turns a transport failure into `null`, which is
+   * indistinguishable here from "this symbol has no history in that window", so
+   * the breaker is asked instead of the response.
+   */
+  private emptyFetchReason(index: MarketIndexDefinition): string {
+    const health = this.health.snapshot(HEALTH_PROVIDER_ID);
+    if (health.state === "closed") {
+      return `no history returned for ${index.yahooSymbol}`;
+    }
+    return (
+      `${index.yahooSymbol} was not fetched: the provider is currently ` +
+      `unavailable` +
+      (health.lastFailureReason
+        ? ` (last failure: ${health.lastFailureReason})`
+        : "")
+    );
   }
 
   /** Where each index's stored history begins and ends. */
