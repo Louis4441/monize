@@ -16,6 +16,7 @@
       "info": "情報"
     },
     "billDue": {
+      "titleOverdue": "{payee} は支払期日超過",
       "titleToday": "{payee} は今日が支払期日",
       "titleTomorrow": "{payee} は明日が支払期日",
       "titleInDays": "{payee} は{days}日後が支払期日",

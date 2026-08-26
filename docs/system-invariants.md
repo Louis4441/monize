@@ -702,7 +702,10 @@ Enforcement         Server: every occurrence-aware surface consumes the occurren
                     of those fields (nextOccurrenceEffectiveAmount for a
                     schedule-level surface, nextOccurrenceDueDate for the date it
                     falls on); lib/scheduled-kind.ts occurrenceKind is the only
-                    place an occurrence's kind is decided.
+                    place an occurrence's kind is decided, and the guard scans for
+                    the composed `scheduledKind({ amount: x ?? y })` shape it
+                    replaced -- `Number(null)` is 0, which paints an unpriceable
+                    bill as a grey reminder.
                     lib/scheduled-effective-amount.guard.test.ts scans src/ for
                     the `override.amount ?? …amount` fingerprint, for a client
                     -side recurrence expansion outside its four named exemptions,
@@ -718,6 +721,17 @@ Failure response    the occurrence renders as unavailable (UnknownAmount, or the
                     localized budgets.alerts.billDue.amountUnavailable copy) and
                     every total containing it is withheld -- never the stale
                     figure, never a measured zero.
+Persisted alerts    A BILL_DUE row carries structured data (payeeName, amount,
+                    amountComplete, dueDate, originalDate, currencyCode) and the
+                    client composes both lines from it, counting the days from
+                    `dueDate` against its own clock: the row outlives the day it
+                    was written, so a stored "due in 3 days" would go on saying
+                    three days. `title`/`message` remain as the English fallback
+                    for a consumer with no catalog. `originalDate` is also what
+                    decides "already alerted" and what the weekly digest compares
+                    `nextDueDate` against -- an override can move an occurrence
+                    EARLIER than its slot, and comparing the announced date then
+                    reads an unposted bill as paid and drops it from the digest.
 Required tests      Occurrence identity and window: scheduled-occurrences.spec.ts
                     (slot-versus-override-date matching, an occurrence moved out
                     of the window, an occurrence moved INTO it from beyond the

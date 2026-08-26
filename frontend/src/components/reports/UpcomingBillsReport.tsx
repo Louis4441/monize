@@ -52,6 +52,11 @@ interface UpcomingBill {
    * had re-priced was listed, totalled and exported at the template's amount.
    */
   amount: number | null;
+  /**
+   * The currency `amount` is in -- the occurrence's own, which for an investment
+   * schedule is the settlement currency rather than the brokerage account's.
+   */
+  currencyCode: string;
   isOverdue: boolean;
 }
 
@@ -109,6 +114,7 @@ export function UpcomingBillsReport() {
           scheduledTransaction,
           dueDate,
           amount: occurrence.amount,
+          currencyCode: occurrence.currencyCode,
           isOverdue: dueDate < today,
         },
       ];
@@ -167,7 +173,7 @@ export function UpcomingBillsReport() {
         bills.filter((b) => !b.scheduledTransaction.isTransfer),
         (b) => ({
           amount: b.amount,
-          currencyCode: b.scheduledTransaction.currencyCode,
+          currencyCode: b.currencyCode,
           complete: b.amount !== null,
         }),
         Math.abs,

@@ -16,6 +16,7 @@
       "info": "Info"
     },
     "billDue": {
+      "titleOverdue": "{payee} terlambat",
       "titleToday": "{payee} jatuh tempo hari ini",
       "titleTomorrow": "{payee} jatuh tempo besok",
       "titleInDays": "{payee} jatuh tempo dalam {days} hari",

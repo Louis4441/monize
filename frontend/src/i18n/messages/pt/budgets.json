@@ -16,6 +16,7 @@
       "info": "Informação"
     },
     "billDue": {
+      "titleOverdue": "{payee} em atraso",
       "titleToday": "{payee} vence hoje",
       "titleTomorrow": "{payee} vence amanhã",
       "titleInDays": "{payee} vence em {days} dias",

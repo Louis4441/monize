@@ -115,9 +115,13 @@ export class BillReminderService {
       // matters is the one on the recurrence slot, and it may have moved the
       // occurrence's date (issue #1247). This half runs cross-user, so it cannot
       // price anything -- `deliverForUser` does that under the owner's identity.
+      // `reminder_days_before` is nullable in the schema, and `addDaysYMD` would
+      // turn a null into an invalid date string that silently matches nothing --
+      // dropping the bill. Zero is the same window the previous comparison
+      // (`daysUntilDue <= null`) allowed: due today only.
       const due = expandOccurrenceSlots(bill, bill.overrides ?? [], {
         from: todayStr,
-        through: addDaysYMD(todayStr, bill.reminderDaysBefore),
+        through: addDaysYMD(todayStr, bill.reminderDaysBefore ?? 0),
         maxOccurrences: 1,
       });
       if (due.length > 0) {
@@ -317,12 +321,17 @@ export class BillReminderService {
 
 /**
  * The delivery key for one user's bill reminder: today's date plus a digest of
- * exactly what the email will say.
+ * WHICH bills it covers.
  *
  * The date alone would suppress a legitimate second reminder when another bill
  * falls due later the same day. The digest alone would let the same set be
  * re-sent tomorrow. Together they mean "this reminder, today", which is what the
  * claim is asserting.
+ *
+ * Deliberately fingerprinted on the stored scalars rather than on the effective
+ * amounts the email quotes: the claim answers "have we already reminded this
+ * user about these bills today", and a mid-day exchange-rate move is not a
+ * second reminder to send (issue #1247).
  */
 export function buildReminderClaimKey(
   bills: readonly ScheduledTransaction[],

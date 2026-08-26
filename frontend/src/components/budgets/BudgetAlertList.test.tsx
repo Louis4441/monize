@@ -25,6 +25,15 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
+/** A `YYYY-MM-DD` date `offset` days from today, on the local clock. */
+const daysFromToday = (offset: number): string => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + offset);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
 const makeAlert = (overrides: Partial<BudgetAlert> = {}): BudgetAlert => ({
   id: 'alert-1',
   userId: 'user-1',
@@ -287,8 +296,7 @@ describe('BudgetAlertList', () => {
             payeeName: 'Power Co',
             amount: 312.65,
             amountComplete: true,
-            dueDate: '2026-03-05',
-            daysUntilDue: 3,
+            dueDate: daysFromToday(3),
             currencyCode: 'USD',
           }),
         ]}
@@ -296,7 +304,9 @@ describe('BudgetAlertList', () => {
     );
 
     expect(screen.getByText('Power Co due in 3 days')).toBeInTheDocument();
-    expect(screen.getByText(/312\.65 due on 2026-03-05/)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`312\\.65 due on ${daysFromToday(3)}`)),
+    ).toBeInTheDocument();
     expect(screen.queryByText('STORED ENGLISH TITLE')).not.toBeInTheDocument();
     expect(screen.queryByText('STORED ENGLISH MESSAGE')).not.toBeInTheDocument();
   });
@@ -311,8 +321,7 @@ describe('BudgetAlertList', () => {
             payeeName: 'Monthly ETF buy',
             amount: null,
             amountComplete: false,
-            dueDate: '2026-03-05',
-            daysUntilDue: 0,
+            dueDate: daysFromToday(0),
             currencyCode: 'CAD',
           }),
         ]}
@@ -322,7 +331,7 @@ describe('BudgetAlertList', () => {
     expect(screen.getByText('Monthly ETF buy due today')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Amount unavailable (no current exchange rate), due on 2026-03-05',
+        `Amount unavailable (no current exchange rate), due on ${daysFromToday(0)}`,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText('STORED ENGLISH MESSAGE')).not.toBeInTheDocument();
@@ -337,8 +346,7 @@ describe('BudgetAlertList', () => {
             payeeName: 'Netflix',
             amount: 15.99,
             amountComplete: true,
-            dueDate: '2026-03-02',
-            daysUntilDue: 1,
+            dueDate: daysFromToday(1),
             currencyCode: 'USD',
           }),
         ]}
@@ -346,6 +354,30 @@ describe('BudgetAlertList', () => {
     );
 
     expect(screen.getByText('Netflix due tomorrow')).toBeInTheDocument();
+  });
+
+  /**
+   * The row lives until it is dismissed, so the copy is counted from `dueDate`
+   * against the reader's clock -- a stored "in 3 days" would still say three days
+   * a week later.
+   */
+  it('says overdue once the due date has passed', () => {
+    render(
+      <BudgetAlertList
+        {...defaultProps}
+        alerts={[
+          billDueAlert({
+            payeeName: 'Power Co',
+            amount: 312.65,
+            amountComplete: true,
+            dueDate: daysFromToday(-2),
+            currencyCode: 'USD',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Power Co overdue')).toBeInTheDocument();
   });
 
   it('falls back to the stored copy for a row written before the data existed', () => {

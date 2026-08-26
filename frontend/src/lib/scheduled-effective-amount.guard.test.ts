@@ -129,6 +129,46 @@ describe('scheduled occurrence expansion guard', () => {
   });
 
   /**
+   * An occurrence's kind is `occurrenceKind`, not a `scheduledKind({ amount: x ??
+   * y })` composed at the call site. Two surfaces had written that expression out
+   * with identical comments, and the shape hides a real trap: `Number(null)` is
+   * 0, so an unpriceable bill classifies as a grey reminder.
+   */
+  it('composes an occurrence kind in exactly one place', () => {
+    const KIND_COMPOSERS = new Set(['/src/lib/scheduled-kind.ts']);
+    const offenders: string[] = [];
+
+    for (const [path, contents] of productionSources()) {
+      if (KIND_COMPOSERS.has(path)) continue;
+      const lines = contents.split('\n');
+      lines.forEach((line, index) => {
+        if (isComment(line)) return;
+        if (!/scheduledKind\s*\(\s*\{/.test(line)) return;
+        // The amount argument may be on the following lines.
+        const argument = lines.slice(index, index + 4).join(' ');
+        if (/amount:[^,}]*\?\?/.test(argument)) {
+          offenders.push(`${path}:${index + 1}`);
+        }
+      });
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('bans the composed-kind shape, and nothing correct', () => {
+    const composed = [
+      'const kind = scheduledKind({',
+      '  amount: getEffective(st).amount ?? Number(st.amount),',
+      '  isTransfer: st.isTransfer,',
+      '});',
+    ].join(' ');
+    const correct = 'const kind = scheduledKind({ amount: Number(st.amount) });';
+    expect(/scheduledKind\s*\(\s*\{/.test(composed)).toBe(true);
+    expect(/amount:[^,}]*\?\?/.test(composed)).toBe(true);
+    expect(/amount:[^,}]*\?\?/.test(correct)).toBe(false);
+  });
+
+  /**
    * Import presence is not proof: the report imported the effective-amount helper
    * throughout the period it was applying one amount to every occurrence. What
    * makes it correct is that its dates AND amounts come from the same server

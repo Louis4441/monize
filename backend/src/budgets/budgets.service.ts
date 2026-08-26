@@ -724,6 +724,11 @@ export class BudgetsService {
         amount === null
           ? `Amount unavailable (no current exchange rate), due on ${dueDate}`
           : `${formatCurrency(amount, occurrence.currencyCode)} due on ${dueDate}`;
+      // Structured, so the UI can compose the copy in the reader's language --
+      // and deliberately without `daysUntilDue`: "due in 3 days" was true when
+      // this row was written and stops being true the next morning, while the
+      // row lives until it is dismissed. The client counts from `dueDate`
+      // against its own clock.
       alert.data = {
         billId: bill.id,
         payeeName,
@@ -731,7 +736,6 @@ export class BudgetsService {
         amountComplete: amount !== null,
         dueDate,
         originalDate: occurrence.originalDate,
-        daysUntilDue,
         currencyCode: occurrence.currencyCode,
       };
       alert.isRead = false;

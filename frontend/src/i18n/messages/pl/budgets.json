@@ -16,6 +16,7 @@
       "info": "Informacja"
     },
     "billDue": {
+      "titleOverdue": "{payee} – termin minął",
       "titleToday": "{payee} – termin dzisiaj",
       "titleTomorrow": "{payee} – termin jutro",
       "titleInDays": "{payee} – termin za {days} dni",

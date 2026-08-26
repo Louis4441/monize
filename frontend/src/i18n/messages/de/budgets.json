@@ -16,6 +16,7 @@
       "info": "Info"
     },
     "billDue": {
+      "titleOverdue": "{payee} überfällig",
       "titleToday": "{payee} heute fällig",
       "titleTomorrow": "{payee} morgen fällig",
       "titleInDays": "{payee} fällig in {days} Tagen",

@@ -16,6 +16,7 @@
       "info": "정보"
     },
     "billDue": {
+      "titleOverdue": "{payee} 결제 기한 초과",
       "titleToday": "{payee} 오늘 결제 예정",
       "titleTomorrow": "{payee} 내일 결제 예정",
       "titleInDays": "{payee} {days}일 후 결제 예정",

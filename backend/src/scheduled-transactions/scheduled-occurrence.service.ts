@@ -121,8 +121,8 @@ export class ScheduledOccurrenceService {
 
     const occurrences: ResolvedScheduledOccurrence[] = [];
     for (const row of rows) {
-      const resolved = effective.get(row.id);
-      if (!resolved) continue;
+      // `resolveMany` answers for every row it was given, so this is total.
+      const resolved = effective.get(row.id)!;
       const overrides = overridesBySchedule.get(row.id) ?? [];
       for (const slot of expandOccurrenceSlots(row, overrides, window)) {
         // Branch on the ENTRY, never on its amount: an override priced as unknown

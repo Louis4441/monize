@@ -16,6 +16,7 @@
       "info": "Інформація"
     },
     "billDue": {
+      "titleOverdue": "{payee}: термін минув",
       "titleToday": "{payee}: сплатити сьогодні",
       "titleTomorrow": "{payee}: сплатити завтра",
       "titleInDays": "{payee}: сплатити через {days} дн.",

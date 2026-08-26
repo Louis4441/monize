@@ -16,6 +16,7 @@
       "info": "Info"
     },
     "billDue": {
+      "titleOverdue": "{payee} achterstallig",
       "titleToday": "{payee} vandaag verschuldigd",
       "titleTomorrow": "{payee} morgen verschuldigd",
       "titleInDays": "{payee} over {days} dagen verschuldigd",

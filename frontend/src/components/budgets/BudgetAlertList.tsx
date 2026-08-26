@@ -20,7 +20,6 @@ interface BillDueAlertData {
   amount?: number | null;
   amountComplete?: boolean;
   dueDate?: string;
-  daysUntilDue?: number;
   currencyCode?: string;
 }
 
@@ -96,8 +95,21 @@ function billDueData(alert: BudgetAlert): BillDueAlertData | null {
   if (alert.alertType !== 'BILL_DUE') return null;
   const data = alert.data as BillDueAlertData | undefined;
   if (!data || typeof data.dueDate !== 'string') return null;
-  if (typeof data.daysUntilDue !== 'number') return null;
   return data;
+}
+
+/**
+ * Whole days from today to `dueDate`, on the reader's own clock.
+ *
+ * Counted at render time rather than read from the row: an alert lives until it
+ * is dismissed, so a stored "in 3 days" goes on saying three days for as long
+ * as the alert is on screen.
+ */
+function daysUntil(dueDate: string): number {
+  const due = new Date(`${dueDate}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due.getTime() - today.getTime()) / 86_400_000);
 }
 
 function timeAgo(dateStr: string): string {
@@ -146,14 +158,11 @@ export function BudgetAlertList({
     const data = billDueData(alert);
     if (!data) return null;
     const payee = data.payeeName ?? '';
-    if (data.daysUntilDue! <= 0) return t('alerts.billDue.titleToday', { payee });
-    if (data.daysUntilDue === 1) {
-      return t('alerts.billDue.titleTomorrow', { payee });
-    }
-    return t('alerts.billDue.titleInDays', {
-      payee,
-      days: data.daysUntilDue!,
-    });
+    const days = daysUntil(data.dueDate!);
+    if (days < 0) return t('alerts.billDue.titleOverdue', { payee });
+    if (days === 0) return t('alerts.billDue.titleToday', { payee });
+    if (days === 1) return t('alerts.billDue.titleTomorrow', { payee });
+    return t('alerts.billDue.titleInDays', { payee, days });
   };
 
   /**

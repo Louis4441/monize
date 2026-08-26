@@ -16,6 +16,7 @@
       "info": "資訊"
     },
     "billDue": {
+      "titleOverdue": "{payee} 已逾期",
       "titleToday": "{payee} 今天到期",
       "titleTomorrow": "{payee} 明天到期",
       "titleInDays": "{payee} 將在 {days} 天後到期",

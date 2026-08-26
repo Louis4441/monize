@@ -16,6 +16,7 @@
       "info": "Bilgi"
     },
     "billDue": {
+      "titleOverdue": "{payee} gecikmiş",
       "titleToday": "{payee} bugün ödenecek",
       "titleTomorrow": "{payee} yarın ödenecek",
       "titleInDays": "{payee} {days} gün içinde ödenecek",

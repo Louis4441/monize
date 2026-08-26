@@ -16,6 +16,7 @@
       "info": "जानकारी"
     },
     "billDue": {
+      "titleOverdue": "{payee} अतिदेय",
       "titleToday": "{payee} आज देय",
       "titleTomorrow": "{payee} कल देय",
       "titleInDays": "{payee} {days} दिनों में देय",

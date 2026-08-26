@@ -16,6 +16,7 @@
       "info": "[XX-Info-XX]"
     },
     "billDue": {
+      "titleOverdue": "[XX-{payee} overdue-XX]",
       "titleToday": "[XX-{payee} due today-XX]",
       "titleTomorrow": "[XX-{payee} due tomorrow-XX]",
       "titleInDays": "[XX-{payee} due in {days} days-XX]",

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SCHEDULED_KIND_AMOUNT_CLASSES,
+  occurrenceKind,
   SCHEDULED_KIND_CHIP_CLASSES,
   scheduledKind,
 } from './scheduled-kind';
@@ -30,6 +31,41 @@ describe('scheduledKind', () => {
 
   it('treats an unparseable amount as a reminder rather than a deposit', () => {
     expect(scheduledKind({ amount: 'n/a' })).toBe('reminder');
+  });
+
+  describe('occurrenceKind', () => {
+    it('classifies from the occurrence\'s own amount when it is known', () => {
+      // The template is an outflow; this occurrence was overridden to a credit.
+      expect(occurrenceKind({ amount: 50 }, { amount: -100 })).toBe('deposit');
+      expect(occurrenceKind({ amount: -50 }, { amount: 100 })).toBe('bill');
+    });
+
+    /**
+     * The trap the helper exists for: `Number(null)` is 0, which classifies an
+     * unpriceable bill as a grey reminder. An exchange rate is positive, so the
+     * schedule's sign is still the right answer for direction (issue #1247).
+     */
+    it('falls back to the schedule\'s sign when the occurrence is unpriceable', () => {
+      expect(occurrenceKind({ amount: null }, { amount: -1000 })).toBe('bill');
+      expect(occurrenceKind({ amount: null }, { amount: 3000 })).toBe('deposit');
+      expect(occurrenceKind({ amount: null }, { amount: '-1000.0000' })).toBe(
+        'bill',
+      );
+    });
+
+    it('keeps a transfer a transfer, priced or not', () => {
+      expect(
+        occurrenceKind({ amount: null }, { amount: -100, isTransfer: true }),
+      ).toBe('transfer');
+      expect(
+        occurrenceKind({ amount: -100 }, { amount: -100, isTransfer: true }),
+      ).toBe('transfer');
+    });
+
+    it('keeps a zero-amount reminder a reminder', () => {
+      expect(occurrenceKind({ amount: 0 }, { amount: 0 })).toBe('reminder');
+      expect(occurrenceKind({ amount: null }, { amount: 0 })).toBe('reminder');
+    });
   });
 
   it('gives every kind its own chip and amount styling', () => {
