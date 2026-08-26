@@ -4,7 +4,7 @@ import { useState, useMemo, Fragment } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { format, parseISO } from 'date-fns';
 import { accountsApi } from '@/lib/accounts';
-import { loanRateChangesApi } from '@/lib/loan-rate-changes';
+import { loanRateChangesApi, supportsRateChanges } from '@/lib/loan-rate-changes';
 import type { LoanRateChange } from '@/types/loan-rate-change';
 import { Transaction } from '@/types/transaction';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
@@ -127,7 +127,12 @@ export function LoanAmortizationReport() {
         account
           ? fetchLoanInterestTransactions(account)
           : Promise.resolve([] as Transaction[]),
-        loanRateChangesApi.getAll(selectedAccountId),
+        // A line of credit is in this report's account list and the endpoint
+        // answers 400 for one, which would replace the report with its error
+        // state -- persisted, so it would stay broken across reloads.
+        supportsRateChanges(account)
+          ? loanRateChangesApi.getAll(selectedAccountId)
+          : Promise.resolve([] as LoanRateChange[]),
       ]);
       return { transactions: txns, interestTransactions: interest, rateChanges: rates };
     },

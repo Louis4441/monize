@@ -55,7 +55,10 @@ vi.mock('@/lib/accounts', () => ({
 }));
 
 const mockGetRateChanges = vi.fn();
-vi.mock('@/lib/loan-rate-changes', () => ({
+// Only the API is mocked; supportsRateChanges is the predicate under test here,
+// so it stays real rather than being restated in the mock.
+vi.mock('@/lib/loan-rate-changes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/loan-rate-changes')>()),
   loanRateChangesApi: {
     getAll: (...args: any[]) => mockGetRateChanges(...args),
   },
@@ -138,6 +141,36 @@ describe('DebtPayoffTimelineReport', () => {
         accountIds: ['src-1'],
       }),
     );
+  });
+
+  it('does not ask for a line of credit\'s rate history, which the API rejects', async () => {
+    // /accounts/:id/rate-changes answers 400 for a LINE_OF_CREDIT
+    // (LoanRateChangesService.verifyLoanAccount), and this report lists LOCs. A
+    // rejection here lands in the shared error state and replaces the whole
+    // report -- selector included -- and because the selection is persisted it
+    // stays broken across reloads. The mocks resolving [] for every account type
+    // is why this went unnoticed: a fixture the API cannot produce.
+    mockGetRateChanges.mockRejectedValue(new Error('400 not a loan account'));
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loc-1', name: 'LOC', accountType: 'LINE_OF_CREDIT',
+        currentBalance: -3000, openingBalance: -5000, interestRate: 8,
+        paymentAmount: 200, paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false, isVariableRate: false, isClosed: false,
+      },
+    ]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [{ id: 'tx-1', transactionDate: '2024-01-15', amount: 200, linkedTransaction: null }],
+      pagination: { hasMore: false },
+    });
+
+    render(<DebtPayoffTimelineReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Select Account')).toBeInTheDocument();
+    });
+    expect(mockGetRateChanges).not.toHaveBeenCalled();
+    expect(screen.queryByText('Try again')).not.toBeInTheDocument();
   });
 
   it('loads the loan rate history for the selected account', async () => {

@@ -144,7 +144,11 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
       data.rateChanges,
       data.interestTransactions,
     );
-    const currentInstallment = resolveCurrentInstallment(history, account.paymentAmount);
+    const currentInstallment = resolveCurrentInstallment(
+      account,
+      history,
+      data.rateChanges,
+    );
     const projectionInput = buildLoanProjectionInput(account, history, data.rateChanges);
     const baseline = projectionInput ? generateLoanSchedule(projectionInput) : null;
 

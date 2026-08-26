@@ -111,10 +111,12 @@ export function LoanDetailView({
   // The borrower's real current installment (principal + interest) from the
   // payment history, shown on the summary card and used to seed the projection.
   // The stored paymentAmount is often principal-only for separately-booked
-  // interest, so it is only a fallback when there is no usable history yet.
+  // interest, so it is only a fallback when there is no usable history yet --
+  // and the same resolution the projection is seeded with, so the card and the
+  // payoff beside it cannot describe two different installments.
   const currentInstallment = useMemo(
-    () => resolveCurrentInstallment(history, account.paymentAmount),
-    [history, account.paymentAmount],
+    () => resolveCurrentInstallment(account, history, rateChanges),
+    [account, history, rateChanges],
   );
 
   const projectionInput = useMemo(

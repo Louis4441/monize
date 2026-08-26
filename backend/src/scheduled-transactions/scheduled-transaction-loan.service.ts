@@ -114,12 +114,26 @@ export class ScheduledTransactionLoanService {
       const categoryLines = splits.filter(
         (s) => s.categoryId && !s.transferAccountId,
       );
-      const interestSplit =
-        (loanAccount.interestCategoryId
-          ? categoryLines.find(
-              (s) => s.categoryId === loanAccount.interestCategoryId,
-            )
-          : undefined) ?? (categoryLines.length === 1 ? categoryLines[0] : undefined);
+      // There must always be a line to write. This method rewrites the parent
+      // amount to principal + interest + extra whether or not it found one, and
+      // the posting path's split validator requires exact 4dp equality between
+      // parent and children -- so resolving to `undefined` would freeze the
+      // interest line at last period's figure while the parent moved, and the
+      // occurrence would silently stop posting. Ambiguity is reported, not
+      // answered with nothing.
+      const configuredLine = loanAccount.interestCategoryId
+        ? categoryLines.find(
+            (s) => s.categoryId === loanAccount.interestCategoryId,
+          )
+        : undefined;
+      if (!configuredLine && categoryLines.length > 1) {
+        this.logger.warn(
+          `Scheduled transaction ${scheduledTransactionId} has ${categoryLines.length} categorized lines and loan account ` +
+            `${loanAccountId} has no interest category configured; recalculating the first line as interest. ` +
+            `Set the loan's interest category to make this unambiguous.`,
+        );
+      }
+      const interestSplit = configuredLine ?? categoryLines[0];
 
       // What the template holds is what was just posted -- including any clamp
       // a previous pass wrote for that one installment (a final payment, an

@@ -16,7 +16,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { accountsApi } from '@/lib/accounts';
-import { loanRateChangesApi } from '@/lib/loan-rate-changes';
+import { loanRateChangesApi, supportsRateChanges } from '@/lib/loan-rate-changes';
 import type { LoanRateChange } from '@/types/loan-rate-change';
 import { Transaction } from '@/types/transaction';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
@@ -139,10 +139,15 @@ export function DebtPayoffTimelineReport() {
     reload: reloadRateChanges,
   } = useReportData(
     async () => {
-      if (!selectedAccountId) return [] as LoanRateChange[];
+      // A line of credit has no rate history and the endpoint answers 400 for
+      // one, which would replace this whole report with its error state.
+      const account = accounts.find((a) => a.id === selectedAccountId);
+      if (!selectedAccountId || !supportsRateChanges(account)) {
+        return [] as LoanRateChange[];
+      }
       return loanRateChangesApi.getAll(selectedAccountId);
     },
-    [selectedAccountId],
+    [selectedAccountId, accounts],
   );
   const rateChanges = useMemo<LoanRateChange[]>(() => rateChangeData ?? [], [rateChangeData]);
 

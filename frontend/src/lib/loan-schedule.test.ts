@@ -3,6 +3,7 @@ import {
   ScheduleFrequency,
   advanceDate,
   buildRateTimeline,
+  resolveEffectiveLoanTerms,
   calculateMortgagePaymentAmount,
   calculatePaymentForTerm,
   compareSchedules,
@@ -469,6 +470,78 @@ describe('generateLoanSchedule rescueEndPeriod', () => {
       }),
     );
     expect(forced.numPayments).toBeGreaterThan(300);
+  });
+});
+
+describe('resolveEffectiveLoanTerms', () => {
+  const rows = [
+    { effectiveDate: '2022-01-01', annualRate: 5.5, newPaymentAmount: 2500, source: 'manual' as const },
+    { effectiveDate: '2023-06-01', annualRate: 6.2, newPaymentAmount: null, source: 'manual' as const },
+  ];
+
+  it('takes the latest row at or before the date', () => {
+    expect(resolveEffectiveLoanTerms(rows, '2024-01-01', 4)).toEqual({
+      annualRate: 6.2,
+      paymentAmount: 2500,
+    });
+  });
+
+  it('falls back to the account scalar before the earliest row, unlike buildRateTimeline', () => {
+    // This is the whole reason it exists. buildRateTimeline deliberately applies
+    // the EARLIEST row when the schedule starts before it -- right for a
+    // schedule anchored at origination (loan-past-impact), wrong for one
+    // anchored today, where it would make a change dated next year today's rate
+    // AND emit it again as a future step.
+    expect(resolveEffectiveLoanTerms(rows, '2021-01-01', 4)).toEqual({
+      annualRate: 4,
+      paymentAmount: null,
+    });
+    expect(buildRateTimeline(rows, '2021-01-01', 4).startingAnnualRate).toBe(5.5);
+  });
+
+  it('ignores an initial row for the payment but not for the rate', () => {
+    // An initial row's newPaymentAmount is a verbatim copy of
+    // account.paymentAmount, so it states nothing the caller does not already
+    // hold -- and goes stale the moment the user edits that field. Its RATE is
+    // the origination rate, which is a fact about the loan.
+    const initialOnly = [
+      { effectiveDate: '2022-01-01', annualRate: 3.9, newPaymentAmount: 450, source: 'initial' as const },
+    ];
+    expect(resolveEffectiveLoanTerms(initialOnly, '2024-01-01', 4)).toEqual({
+      annualRate: 3.9,
+      paymentAmount: null,
+    });
+  });
+
+  it('takes the latest stating row when a later one leaves the payment unchanged', () => {
+    const withInitial = [
+      { effectiveDate: '2021-01-01', annualRate: 3, newPaymentAmount: 100, source: 'initial' as const },
+      { effectiveDate: '2022-01-01', annualRate: 5, newPaymentAmount: 2500, source: 'manual' as const },
+      { effectiveDate: '2023-01-01', annualRate: 6, newPaymentAmount: null, source: 'inferred' as const },
+    ];
+    expect(resolveEffectiveLoanTerms(withInitial, '2024-01-01', 4)).toEqual({
+      annualRate: 6,
+      paymentAmount: 2500,
+    });
+  });
+
+  it('treats a row with no source as stating its payment', () => {
+    // The field is optional so existing callers and fixtures keep working; only
+    // an explicit 'initial' is demoted.
+    expect(
+      resolveEffectiveLoanTerms(
+        [{ effectiveDate: '2022-01-01', annualRate: 5, newPaymentAmount: 800 }],
+        '2024-01-01',
+        4,
+      ).paymentAmount,
+    ).toBe(800);
+  });
+
+  it('returns the fallback for an empty timeline', () => {
+    expect(resolveEffectiveLoanTerms([], '2024-01-01', 4.25)).toEqual({
+      annualRate: 4.25,
+      paymentAmount: null,
+    });
   });
 });
 

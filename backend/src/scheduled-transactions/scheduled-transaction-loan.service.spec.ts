@@ -179,6 +179,50 @@ describe("ScheduledTransactionLoanService", () => {
       expect(saved.some((s: any) => s.id === "split-escrow")).toBe(false);
     });
 
+    it("still writes an interest line when the loan has no interest category to disambiguate", async () => {
+      // The parent is rewritten to principal + interest + extra regardless, and
+      // the posting path requires parent and children to sum to exact 4dp
+      // equality -- so resolving the interest line to nothing would freeze it at
+      // last period's figure and the occurrence would stop posting silently.
+      // Ambiguity falls back to the first line and logs, rather than writing
+      // nothing.
+      const loanAccount = makeLoanAccount({ currentBalance: -20000 });
+      accountsRepository.findOne.mockResolvedValue(loanAccount);
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction({
+          amount: -700,
+          splits: [
+            {
+              id: "split-principal",
+              transferAccountId: loanAccountId,
+              categoryId: null,
+              amount: -390,
+              memo: "Principal",
+            },
+            {
+              id: "split-interest",
+              transferAccountId: null,
+              categoryId: "cat-interest",
+              amount: -110,
+              memo: "Interest",
+            },
+            {
+              id: "split-escrow",
+              transferAccountId: null,
+              categoryId: "cat-escrow",
+              amount: -200,
+              memo: "Property tax",
+            },
+          ],
+        } as unknown as Partial<ScheduledTransaction>),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      const saved = splitsRepository.save.mock.calls.map((call: any) => call[0]);
+      expect(saved.some((s: any) => s.id === "split-interest")).toBe(true);
+    });
+
     describe("final installment (P5-008)", () => {
       it("reduces the parent amount with the principal when the balance is below one payment", async () => {
         // The audit's worked example: 50 outstanding at 0%, regular payment 100.

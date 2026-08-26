@@ -3,6 +3,7 @@ import {
   buildLoanProjectionInput,
   deriveCurrentInstallment,
   deriveLoanPaymentHistory,
+  resolveCurrentInstallment,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
 } from './loan-history';
@@ -697,6 +698,100 @@ describe('buildLoanProjectionInput rate authority', () => {
     expect(input!.paymentAmount).toBe(1500); // contractual, the only amortizing candidate
   });
 
+  it('does not treat an initial row\'s payment as authoritative', () => {
+    // insertInitialRowIfFirst writes newPaymentAmount as a verbatim copy of
+    // account.paymentAmount, so an 'initial' row is rank 3 wearing rank 1's
+    // clothes. Seeding it unconditionally pinned the projection to a snapshot of
+    // the very field the user would edit to fix it: a principal-only 300 copied
+    // into the row, and correcting the account to 1500 changed nothing.
+    const acct = divergent({ paymentAmount: 1500 });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 300 }),
+    ]);
+    const input = buildLoanProjectionInput(acct, history, [
+      {
+        effectiveDate: '2024-01-04',
+        annualRate: 5,
+        newPaymentAmount: 300,
+        source: 'initial',
+      },
+    ]);
+    // 100000 at 5% costs 416.67, which the 300 snapshot cannot cover, so the
+    // corrected contractual 1500 is used instead of pinning to the stale copy.
+    expect(input!.paymentAmount).toBe(1500);
+  });
+
+  it('keeps a manual row\'s payment authoritative even when it cannot amortize', () => {
+    const acct = divergent({ paymentAmount: 1500 });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 450 }),
+    ]);
+    const input = buildLoanProjectionInput(acct, history, [
+      {
+        effectiveDate: '2024-01-05',
+        annualRate: 12,
+        newPaymentAmount: 900,
+        source: 'manual',
+      },
+    ]);
+    expect(input!.paymentAmount).toBe(900);
+    expect(generateLoanSchedule(input!).rows).toHaveLength(0);
+  });
+
+  it('tests the guard against the rate row 1 will actually run at', () => {
+    // firstPaymentDate is one period ahead and generateLoanSchedule applies every
+    // step dated on or before a row's date to that row, so a step recorded for
+    // next week lands on row 1. Guarding at today's rate would pass a candidate
+    // the very next line then refuses, and the projection would silently vanish
+    // instead of using a payment that does amortize.
+    const acct = divergent({ paymentAmount: 1500, interestRate: 5 });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 600 }),
+    ]);
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const input = buildLoanProjectionInput(acct, history, [
+      { effectiveDate: nextWeek.toISOString().slice(0, 10), annualRate: 12 },
+    ]);
+
+    // Row 1 runs at 12% (1000 of interest), so the 600 derived from history is
+    // rejected and the 1500 contractual is seeded -- and the schedule amortizes.
+    expect(input!.paymentAmount).toBe(1500);
+    expect(generateLoanSchedule(input!).rows.length).toBeGreaterThan(0);
+  });
+
+  it('keeps a complete observed installment even when it no longer amortizes', () => {
+    // 250000 at 5% costs 1041.67. The last payment recorded 600 principal and
+    // 400 interest, so 1000 is a COMPLETE statement of what is being paid -- a
+    // real state (a rate rise the installment has not caught up with). Falling
+    // back to the contractual 1800 would report a payoff from a payment nobody
+    // makes; the fallback is only for an INCOMPLETE `principal + 0`.
+    const acct = divergent({ currentBalance: -250000, paymentAmount: 1800 });
+    const history = deriveLoanPaymentHistory(acct, [
+      withInterestSplit(
+        makeTransaction({ transactionDate: '2024-01-05', amount: 600 }),
+        'parent-1',
+        400,
+      ),
+    ]);
+    expect(resolveCurrentInstallment(acct, history)).toBe(1000);
+    const input = buildLoanProjectionInput(acct, history);
+    expect(input!.paymentAmount).toBe(1000);
+    expect(generateLoanSchedule(input!).rows).toHaveLength(0);
+  });
+
+  it('shows the same installment the projection is seeded with', () => {
+    // The card and the schedule used to resolve separately: "Current Payment
+    // $450" beside a payoff computed from the contractual $950.
+    const acct = divergent({ currentBalance: -100000, paymentAmount: 1500 });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 450 }),
+    ]);
+    expect(resolveCurrentInstallment(acct, history)).toBe(
+      buildLoanProjectionInput(acct, history)!.paymentAmount,
+    );
+  });
+
   it('falls back to the account scalar when no timeline row applies', () => {
     // Negative control: with no timeline, startingAnnualRate IS the scalar, so
     // this change is inert for every loan without a rate history.
@@ -806,7 +901,61 @@ describe('readRecordedInterest provenance', () => {
     expect(history.events[0].interest).toBe(300);
   });
 
-  it('records no interest for a transfer-only split parent', () => {
+  it('ignores an uncategorized line when a categorized interest line is present', () => {
+    // "A categorized line" has to mean the same thing here as in the backend's
+    // ScheduledTransactionLoanService, which recalculates these templates:
+    // categoryId && !transferAccountId. The two differed by that one clause, so
+    // [principal, categorized interest, uncategorized fee] was one candidate to
+    // the writer and two to this reader -- ambiguous, and reported as no
+    // interest at all while the recorded 300 sat in the split.
+    const history = deriveLoanPaymentHistory(makeAccount(), [
+      splitPayment([
+        LOAN_LINE,
+        INTEREST_LINE,
+        { transferAccountId: null, amount: -25, memo: 'Fee' } as unknown as TransactionSplit,
+      ]),
+    ]);
+    expect(history.events[0].interest).toBe(300);
+  });
+
+  it('rounds a multi-line interest sum to cents like every sibling path', () => {
+    // takeSeparateInterest and the orphan rows both round; an unrounded sum let
+    // float drift into event.interest and the cumulative accumulator.
+    const history = deriveLoanPaymentHistory(withInterestCategory, [
+      splitPayment([
+        LOAN_LINE,
+        { transferAccountId: null, categoryId: 'cat-interest', amount: -0.1 } as unknown as TransactionSplit,
+        { transferAccountId: null, categoryId: 'cat-interest', amount: -0.2 } as unknown as TransactionSplit,
+      ]),
+    ]);
+    expect(history.events[0].interest).toBe(0.3);
+  });
+
+  it('lets a paired separate expense answer for a transfer-only split parent', () => {
+    // Regular principal + extra principal, both transfers to the loan, with the
+    // interest booked as its own expense that day. Answering a hard 0 here made
+    // the caller treat the parent as final and drop the real expense.
+    const history = deriveLoanPaymentHistory(
+      makeAccount(),
+      [
+        splitPayment([
+          LOAN_LINE,
+          { transferAccountId: LOAN_ID, amount: -200 } as TransactionSplit,
+        ]),
+      ],
+      [],
+      [
+        {
+          transactionDate: '2026-01-15',
+          amount: -300,
+          isTransfer: false,
+        } as Transaction,
+      ],
+    );
+    expect(history.events[0].interest).toBe(300);
+  });
+
+  it('records no interest for a transfer-only split parent with nothing paired', () => {
     const history = deriveLoanPaymentHistory(withInterestCategory, [
       splitPayment([
         LOAN_LINE,
@@ -1035,7 +1184,7 @@ describe('deriveLoanPaymentHistory reconstructed rate (no rate history)', () => 
         recordedInterest,
       ),
     ]);
-    expect(events[0].interest).toBeCloseTo(recordedInterest, 6);
+    expect(events[0].interest).toBeCloseTo(recordedInterest, 2);
     expect(events[0].annualRate).toBeCloseTo(5.5, 1);
   });
 
@@ -1057,7 +1206,7 @@ describe('deriveLoanPaymentHistory reconstructed rate (no rate history)', () => 
         recordedInterest,
       ),
     ]);
-    expect(events[0].interest).toBeCloseTo(recordedInterest, 6);
+    expect(events[0].interest).toBeCloseTo(recordedInterest, 2);
     expect(events[0].annualRate).toBeCloseTo(6, 1);
   });
 });

@@ -156,6 +156,58 @@ export interface RateTimelineRow {
   effectiveDate: string;
   annualRate: number;
   newPaymentAmount?: number | null;
+  /**
+   * How the row was created. Load-bearing for the payment, not the rate: an
+   * `initial` row's `newPaymentAmount` is a verbatim copy of
+   * `account.paymentAmount` taken when the first rate change was recorded
+   * (`LoanRateChangesService.insertInitialRowIfFirst`), so it is a snapshot of
+   * that field rather than an independent statement about what is being paid --
+   * and a stale one once the user edits the account. `manual` (typed by the
+   * user) and `inferred` (observed from payment history, and deliberately null
+   * when interest is booked separately) do state the payment.
+   */
+  source?: 'manual' | 'inferred' | 'initial';
+}
+
+/**
+ * The loan's terms in effect on `asOfIso`, resolved from the persisted rate
+ * history: the latest row dated at or before that day.
+ *
+ * Deliberately NOT `buildRateTimeline`'s `startingAnnualRate` /
+ * `startingPaymentAmount`. Those carry a "before the earliest row, the earliest
+ * row applies" fallback, which is right for a schedule anchored at
+ * **origination** (`loan-past-impact.ts` builds the contractual schedule that
+ * way, and needs the origination terms) and wrong for one anchored at a date
+ * the history already covers: under it a change dated next year would become
+ * today's terms *and* be applied again as a future step. A row dated ahead is a
+ * step, never the current state.
+ *
+ * `paymentAmount` is null when no applicable row states one -- which includes a
+ * loan whose only row is `initial`, since that payment is a copy of the account
+ * field the caller already has. The rate has no such distinction: an `initial`
+ * row's rate is the origination rate, which is a fact about the loan.
+ */
+export interface EffectiveLoanTerms {
+  annualRate: number;
+  paymentAmount: number | null;
+}
+
+export function resolveEffectiveLoanTerms(
+  rows: RateTimelineRow[],
+  asOfIso: string,
+  fallbackAnnualRate: number,
+): EffectiveLoanTerms {
+  const applied = rows
+    .filter((row) => row.effectiveDate <= asOfIso)
+    .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
+  const latest = applied[applied.length - 1];
+  const statedPayment = [...applied]
+    .reverse()
+    .find((row) => row.newPaymentAmount != null && row.source !== 'initial');
+  return {
+    annualRate: latest?.annualRate ?? fallbackAnnualRate,
+    paymentAmount: statedPayment?.newPaymentAmount ?? null,
+  };
 }
 
 export interface RateTimeline {
