@@ -279,6 +279,25 @@ describe('ReconcilePage', () => {
       const button = startButtons.find(el => el.tagName === 'BUTTON');
       expect(button).toBeDisabled();
     });
+
+    it('stores a typed "-0" as plain zero, never negative zero', async () => {
+      // Number("-0") is negative zero, and Intl formats -0 with a leading
+      // minus -- so an unnormalized entry would print "-$0.00" across the
+      // reconcile step and go into the request as -0.
+      render(<ReconcilePage />);
+      await waitFor(() => expect(screen.getByText(/Visa/)).toBeInTheDocument());
+      fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'acc-2' } });
+      fireEvent.change(screen.getByLabelText('Statement Ending Balance'), {
+        target: { value: '-0' },
+      });
+      fireEvent.click(
+        screen.getAllByText('Start Reconciliation').find((el) => el.tagName === 'BUTTON')!,
+      );
+      await waitFor(() => expect(mockGetReconciliationData).toHaveBeenCalled());
+      const balanceArg = mockGetReconciliationData.mock.calls[0][2];
+      expect(balanceArg).toBe(0);
+      expect(Object.is(balanceArg, -0)).toBe(false);
+    });
   });
 
   describe('Reconcile Step', () => {
@@ -627,20 +646,18 @@ describe('ReconcilePage', () => {
       expect(Number(input.value)).toBe(-750);
     });
 
-    it('uses a negative placeholder for liability accounts', async () => {
-      render(<ReconcilePage />);
-      await waitFor(() => expect(screen.getByText(/Visa/)).toBeInTheDocument());
-      fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'acc-2' } });
-      const input = screen.getByLabelText('Statement Ending Balance') as HTMLInputElement;
-      expect(input.placeholder).toBe('-0.00');
-    });
-
-    it('uses a standard placeholder for non-liability accounts', async () => {
+    it('passes no account-specific placeholder -- the field keeps its neutral default', async () => {
+      // The liability "-0.00" placeholder read as a broken value, and the
+      // auto-negation above already owns the sign, so no account type gets a
+      // placeholder of its own (CurrencyInput's built-in "0.00" applies).
       render(<ReconcilePage />);
       await waitFor(() => expect(screen.getByText(/Checking/)).toBeInTheDocument());
-      fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'acc-1' } });
-      const input = screen.getByLabelText('Statement Ending Balance') as HTMLInputElement;
-      expect(input.placeholder).toBe('0.00');
+      for (const accountId of ['acc-1', 'acc-2']) {
+        fireEvent.change(screen.getByLabelText('Account'), { target: { value: accountId } });
+        expect(screen.getByLabelText('Statement Ending Balance')).not.toHaveAttribute(
+          'placeholder',
+        );
+      }
     });
   });
 

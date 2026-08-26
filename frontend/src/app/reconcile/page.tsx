@@ -158,7 +158,9 @@ function ReconcileContent() {
   // sign-handling pattern in TransactionForm.
   const handleStatementBalanceChange = (value: number | undefined) => {
     if (value === undefined || value === 0 || !isLiability) {
-      setStatementBalance(value);
+      // A typed "-0" parses to negative zero, and Intl formats -0 with a
+      // leading minus -- an entered zero is stored as plain 0 either way.
+      setStatementBalance(value === 0 ? 0 : value);
       return;
     }
 
@@ -439,10 +441,12 @@ function ReconcileContent() {
             onChange={() => {}}
           />
 
+          {/* No liability-specific "-0.00" placeholder: the handler above
+              already negates a positive entry for a liability account, and a
+              minus-signed placeholder read as a broken value, not a hint. */}
           <CurrencyInput
             label={t('setup.statementBalanceLabel')}
             prefix={getCurrencySymbol(selectedAccount?.currencyCode || defaultCurrency)}
-            placeholder={isLiability ? '-0.00' : '0.00'}
             value={statementBalance}
             onChange={handleStatementBalanceChange}
           />
