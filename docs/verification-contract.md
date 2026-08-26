@@ -77,6 +77,7 @@ adds value but proves nothing on its own. `--` means not applicable.
 | INV-REDEEM-001 accrued interest | required | **required** | required | -- | -- | -- | -- | optional |
 | INV-RECONCILE-001 reconciled lock | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |
+| INV-REPORT-001 report account scope | supporting | **required** | **required** | -- | -- | -- | -- | optional |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |
 | INV-OCCURRENCE-002 override price | required | -- | -- | -- | -- | -- | -- | required |
 | INV-CLAIM-001 single-use claim | supporting | -- | required | **required** | optional | optional | -- | required |

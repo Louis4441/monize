@@ -66,6 +66,7 @@ implied.
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
+| INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
@@ -429,6 +430,177 @@ Status              enforced
 At a real rate of 1.3500, a false 100.00 CAD would understate a 135.00 CAD
 position by 35.00 and report it as measured -- which is what the null return and
 the scan now prevent.
+
+### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
+
+```text
+Statement           A report over the transaction ledger includes an ordinary
+                    categorized cash row whatever account it sits in, and
+                    excludes a row that is an investment movement. Membership is
+                    decided by what the row IS -- the cash leg of an investment
+                    transaction, or a row in a securities sleeve -- never by the
+                    account's type. An INVESTMENT account is a pair, and its
+                    INVESTMENT_CASH sleeve is ordinary money: salary, interest,
+                    fees, transfers in and out; a standalone INVESTMENT account
+                    (account_type INVESTMENT with a NULL sub-type, which the
+                    ordinary account-create path produces and which net_worth and
+                    the monthly comparison already branch on) IS its own cash
+                    side.
+                    The claim is symmetric, and the account type fails in both
+                    directions: an investment action with an explicit
+                    fundingAccountId posts its generated cash into an ORDINARY
+                    account, where an account-type predicate cannot see it at
+                    all.
+Source of truth     investment_transactions.transaction_id /
+                    .transaction_split_id for the linkage; accounts.
+                    account_sub_type for the sleeve. Not accounts.account_type,
+                    which is the same value for both halves of the pair.
+Enforcement         One predicate, in backend/src/common/investment-filter.util.ts:
+                    investmentExclusionSql for raw-SQL report queries,
+                    applyInvestmentTransactionFilters for QueryBuilder callers,
+                    both built from the same fragments so the two dialects
+                    cannot drift. An embedded investment split is excluded by
+                    both of its representations -- the split's declared kind and
+                    an investment_transactions row pointing at that split -- and
+                    at SPLIT-ROW granularity, so an ordinary sibling line on the
+                    same split parent survives (excluding the parent would lose
+                    it; keying only on transaction_id would miss the embedded
+                    line entirely, since its transaction_id is null).
+                    A report that reads only the parent row cannot classify a
+                    line at all -- t.amount there is the sum of every child --
+                    so it derives its figure through
+                    reportableTransactionAmountSql: the sum of the children that
+                    are neither transfer nor investment, NULL when the row
+                    represents no ordinary cash. Spending by Payee, Recurring
+                    Expenses, Bill Payment History and the Uncategorized list
+                    and summary read that instead of t.amount. Duplicate
+                    Transactions is the one declared exception, marked in its SQL
+                    as a PARENT-IDENTITY REPORT: its subject is the stored row,
+                    so a split parent entered twice is a duplicate at its stored
+                    amount and the remedy is deleting one whole transaction.
+                    Applied by all fifteen ledger queries under
+                    backend/src/built-in-reports/ and by the "Uncategorized"
+                    filters on the register (transactions.service.ts), the
+                    register summary (transaction-analytics.service.ts) and the
+                    bulk-update filter (transaction-bulk-update.service.ts) --
+                    the last one a write path, where the old predicate let a
+                    "select all uncategorized" sweep reach the cash legs a trade
+                    owns. Two scans in
+                    backend/src/common/investment-filter.guard.spec.ts: no
+                    account-type exclusion anywhere in src/, and every
+                    built-in-report query that is not transfer-only carries the
+                    exclusion IN THE REPRESENTATION ITS SHAPE NEEDS -- a query
+                    joining transaction_splits must use the split-aware
+                    conjunction, and a parent-only query must derive its amount,
+                    since accepting the bare substring passed exactly the defect
+                    the branch audit found (F-RPT-001). Both exemptions are
+                    derived from the query rather than kept as a list of file
+                    names: transfer-only (an investment cash leg is never a
+                    transfer) and the declared PARENT-IDENTITY marker. The
+                    classifier carries its own negative controls, so the scan is
+                    known to fire rather than merely known to pass.
+Concurrency scope   -- (read path)
+Retry semantics     -- (read path)
+Crash semantics     -- (read path)
+Failure response    -- a report answers; it does not refuse.
+Required tests      Present: the two source scans above, and
+                    backend/test/integration/report-investment-cash.integration
+                    .spec.ts, which reproduces issue #1257 against a real
+                    database using the real writer
+                    (InvestmentTransactionsService.create posts the cash leg)
+                    and asserts both directions -- $1,000 of sleeve income
+                    reaching Cash Flow and Income by Source, the generated leg
+                    staying out of spending, payees, Uncategorized and
+                    duplicates, the parent-only consumers reporting a mixed
+                    split at its ordinary 60 rather than the parent's 560 or
+                    nothing at all (by payee, as recurring spending, and in the
+                    Uncategorized list and summary), a pure embedded-investment
+                    passthrough being absent from Uncategorized and never
+                    learned as a recurring expense, the custom report engine
+                    answering the same 60 through five groupings and agreeing
+                    with the built-in report over one fixture, a brokerage-sleeve
+                    row
+                    staying out, generated
+                    cash staying out of an ORDINARY funding account's report
+                    (BUY debit and DIVIDEND credit), a SELL credit staying out
+                    of income, ordinary cash on a standalone INVESTMENT account
+                    counting, the VOID and transfer-split exclusions still
+                    holding, an embedded investment split not becoming an
+                    Uncategorized bucket while its ordinary sibling still
+                    counts, the three Cash Flow queries reconciling with each
+                    other, and the catalogue-wide claim that adding a trade
+                    changes no report's answer. Unit specs mock manager.query and can only
+                    assert the text of the SQL, which is why the behavioural
+                    proof is the integration suite.
+Also covered        backend/src/reports/ -- the USER-DEFINED custom report
+                    engine. It reads the same ledger through hydrated TypeORM
+                    entities and aggregates in TypeScript, so no SQL fragment
+                    reaches it; it gets the same rule in the other dialect
+                    (isEmbeddedInvestmentSplit / ordinarySplitLines /
+                    reportableTransactionAmount, beside the SQL in
+                    investment-filter.util.ts). Its selector always excludes the
+                    generated cash leg (investmentLinkedTransactionExclusion) and
+                    excludes the securities sleeve
+                    (brokerageExclusionForEntity) only from a report that did not
+                    NAME an account -- built-in reports have no account picker,
+                    this one does, and answering an explicitly scoped report with
+                    nothing is worse than showing the rows that were asked for.
+                    It hydrates splits.investmentTransaction; its six aggregators
+                    iterate
+                    ordinary lines and ask for the reportable amount rather than
+                    reading a parent's own. Until this was done a generated BUY
+                    leg was reported as `Uncategorized` spending and the
+                    canonical -560 parent reported 560 rather than 60 (re-audit
+                    F-CUSTOM-001) -- existing debt rather than a regression: that
+                    engine is byte-identical at the merge base. The two dialects
+                    differ by exactly one clause, deliberately: the SQL form
+                    drops transfer children because no built-in report using it
+                    includes transfers, while this one says nothing about
+                    transfers at all. Direction (Income/Expenses only) is
+                    applied to the split LINES in that engine, never to the
+                    parent's own amount: a -60 expense beside a +500 embedded
+                    SELL is a +440 parent, and rejecting that row on its sum
+                    discarded the expense before provenance could run (audit
+                    F-CUSTOM-DIR-001). The securities-sleeve exception is per
+                    ROW, keyed on the accounts the report explicitly names,
+                    because conditions inside a filter group are OR'd and a
+                    whole-report boolean cannot tell `account = Brokerage OR
+                    category = Salary` from `account = Chequing OR payee = Acme`
+                    (F-CUSTOM-OR-001).
+                    Transfer SPLIT LINES are the report's own decision, not this
+                    invariant's: `includeTransfers` is applied per LINE in that
+                    engine (`narrowSplitLines`), because a split parent carrying
+                    a transfer line is not itself a transfer -- so a -260 parent
+                    of -60 groceries and a -200 transfer reported 260 until it
+                    was. Investment provenance is a property of the data; which
+                    transfers to count is a property of the report.
+                    The AI forecast baseline
+                    (ai/forecast/forecast-aggregator.service.ts) reads one row
+                    per payment with no split join, so it derives the reportable
+                    amount too: it had been training on a -560 parent as 560 of
+                    household spending.
+                    The category-keyed aggregates (ai/insights,
+                    budgets/budget-generator, the payee totals) are structurally
+                    unable to admit either row and are deliberately not listed as
+                    mechanism: each INNER JOINs a category, and a generated cash
+                    leg has none while a split parent's own category_id is NULL.
+                    If one of those joins is ever loosened to a LEFT JOIN it
+                    needs this predicate in the same change.
+Status              enforced
+```
+
+The defect this records was not a subtle one: with `AND a.account_type !=
+'INVESTMENT'` in place, sixteen of the twenty-three integration cases above
+fail, and the rest pass only because every report was uniformly empty for that
+account. The focused audit of issue #1257 recorded the same root as
+`F-1257-001` (MEDIUM, derived reporting only -- no stored balance is wrong) and
+the naive-repair trap as `DR-1257-001`.
+
+The parent-only half was found by a second audit, of the fix itself
+(`F-RPT-001`), and is worth recording as its own lesson: removing a filter that
+was hiding too much exposes every row it was also hiding *correctly*. The
+account-type predicate had been doing two jobs, and only one of them was wrong.
+Five of the cases above fail on the first fix and pass on the second.
 
 ## Scheduled occurrences
 
