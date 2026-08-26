@@ -67,6 +67,7 @@ implied.
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
+| INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
@@ -601,6 +602,78 @@ The parent-only half was found by a second audit, of the fix itself
 was hiding too much exposes every row it was also hiding *correctly*. The
 account-type predicate had been doing two jobs, and only one of them was wrong.
 Five of the cases above fail on the first fix and pass on the second.
+
+### INV-LOAN-HISTORY-001 -- historical loan interest counted as paid is ledger-backed
+
+```text
+Statement           Interest attributed to a historical loan payment is a
+                    recorded interest split of that payment, or the separate
+                    interest expense paired to its date. Absent both, after a
+                    SUCCESSFUL read, the interest is a measured zero -- never a
+                    figure derived from the balance and the account's rate. A
+                    FAILED read is unknown, not zero, and must not be rendered
+                    as a schedule.
+                    The rate is a separate fact from the interest and does not
+                    fall with it: a fixed-rate loan with no recorded rate
+                    history keeps its configured rate on a zero-interest row,
+                    while a variable-rate loan's rate for that date stays null
+                    rather than inheriting today's scalar.
+                    A forward PROJECTION may estimate -- that is its job, and
+                    its rows are labelled projected. The prohibition is on a
+                    historical row.
+Source of truth     transaction_splits (the payment's recorded interest leg) and
+                    the interest-category expenses on the loan's configured
+                    source account. Not accounts.interest_rate, which describes
+                    the loan and not what any payment settled.
+Enforcement         One producer: frontend/src/lib/loan-history.ts
+                    deriveLoanPaymentHistory / classifyPayment, which takes
+                    neither the running balance nor the rate timeline as an
+                    argument, so there is nothing for an estimate to be computed
+                    from. analyticInterest is deleted. The backend computes only
+                    forward schedules (accounts/mortgage-amortization.util.ts,
+                    for previews and scheduled-payment setup), so no second
+                    producer of the historical figure exists.
+                    frontend/src/lib/loan-history.guard.test.ts scans the module
+                    for any catch, since a swallowed lookup failure resolves to
+                    [] and [] is read as "no interest was booked".
+Concurrency scope   -- (read path)
+Failure response    The rejection propagates to the caller's error-and-retry
+                    state: useReportData in the three loan reports, the
+                    failedAccountId branch of hooks/useLoanProjection.ts, the
+                    page error on the account detail route. A success retires
+                    the same account's earlier failure, or the figures stay
+                    unavailable after recovery.
+Required tests      Present: the principal-only matrix in
+                    frontend/src/lib/loan-history.test.ts (every account type x
+                    Canadian/variable flag x frequency x rate-timeline
+                    presence -- each was a separate door into the estimate), the
+                    fixed-rate and variable-rate Rate-column cases, the
+                    reconstruction paths re-pinned against RECORDED interest so
+                    the Canadian semi-annual and day-count annualizations stay
+                    covered, the rejection test, the source scan above, the
+                    report's error-and-retry test in
+                    frontend/src/components/reports/LoanAmortizationReport.test.tsx,
+                    and the failure-then-refresh-then-success recovery test in
+                    frontend/src/hooks/useLoanProjection.test.tsx.
+Status              enforced
+```
+
+Issue #1255: a $450 principal-only transfer on a $10,000 loan at 6% rendered as
+Payment $500 / Principal $450 / Interest $50. The $50 was never paid, and it
+reached Interest Paid, every cumulative total, the CSV and PDF exports, and the
+installment the forward projection was seeded with.
+
+Two things the estimate was quietly holding up, and both are the interesting
+half of the fix. The Rate column was reconstructed *from* the interest charged,
+so removing the interest removed the rate as well -- for a fixed-rate loan that
+is a known fact being discarded, not an unknown being reported. And
+`deriveCurrentInstallment` returns `principal + interest`, which for a loan
+booking its interest outside the app is now under one period's interest, so
+`generateLoanSchedule` refuses the seed: `buildLoanProjectionInput` falls back
+to the stored contractual payment, and where the rate timeline records the
+payment in effect that value is authoritative even when it does not amortize
+(`INV-LOAN-HISTORY-001` covers the interest; the payment's authority ordering is
+documented in `frontend/CLAUDE.md`).
 
 ## Scheduled occurrences
 

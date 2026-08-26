@@ -527,11 +527,13 @@ describe('deriveCurrentInstallment', () => {
   });
 
   it('uses principal + interest for separately-booked interest', () => {
-    // Interest booked as a separate transaction leaves regular rows with interest
-    // derived from the rate timeline; principal + interest is then the real
-    // installment and always covers the period interest (the principal portion is
-    // positive), so it is used directly rather than the possibly principal-only
-    // stored payment.
+    // Interest booked as a separate transaction is paired to the payment's date
+    // from the ledger -- the rate timeline describes the rate, it never
+    // manufactures historical interest. Principal + that recorded interest is
+    // the real installment, so it is used directly rather than the possibly
+    // principal-only stored payment. (Whether it covers the period's interest is
+    // buildLoanProjectionInput's decision, not this function's -- a row whose
+    // interest the ledger never recorded contributes principal + 0.)
     const result = deriveCurrentInstallment(
       history([
         { principal: 300, interest: 300, type: 'REGULAR' },
@@ -596,6 +598,38 @@ describe('buildLoanProjectionInput seed payment', () => {
       { effectiveDate: '2022-04-05', annualRate: 5.5, newPaymentAmount: 1310 },
     ]);
     expect(input!.paymentAmount).toBe(1310);
+  });
+
+  it('keeps a timeline payment that no longer covers the interest, rather than substituting the account scalar', () => {
+    // 100000 at 12% costs 1000 a month. The timeline says 900 is being paid --
+    // a rate rise the installment has not caught up with -- while the
+    // user-owned account scalar still holds a stale 1500. The backend keeps
+    // those two independent (`resolveCurrentTimeline` never writes the scalar),
+    // and it never infers a principal-only payment onto a timeline row
+    // (`persistSegments` writes newPaymentAmount: null when interest is booked
+    // separately), so 900 is a full installment and the authoritative one.
+    // Seeding 1500 would report a payoff computed from a payment nobody makes.
+    const acct = makeAccount({
+      accountType: 'MORTGAGE',
+      openingBalance: -100000,
+      currentBalance: -100000,
+      interestRate: 12,
+      paymentAmount: 1500,
+      paymentFrequency: 'MONTHLY',
+    });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 600 }),
+    ]);
+    const input = buildLoanProjectionInput(acct, history, [
+      { effectiveDate: '2024-01-05', annualRate: 12, newPaymentAmount: 900 },
+    ]);
+
+    expect(input!.paymentAmount).toBe(900);
+    // 900 against 1000 of interest: the loan does not amortize, so there is no
+    // payoff to show -- not a payoff derived from the stale 1500.
+    const schedule = generateLoanSchedule(input!);
+    expect(schedule.rows).toHaveLength(0);
+    expect(schedule.paidOff).toBe(false);
   });
 
   it('projects nothing when no candidate covers a period of interest', () => {

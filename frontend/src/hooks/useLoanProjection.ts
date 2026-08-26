@@ -66,6 +66,10 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
   // left over from the previously selected account reads as "still loading"
   // rather than as this account's answer. Nothing is cleared on switching --
   // the key comparison below is what decides, not the order of two setStates.
+  // Switching is not the only way a failure stops being true, though: a later
+  // load of the *same* account succeeding retires it (see the load below), or
+  // one transient outage would leave the figures unavailable for the rest of the
+  // page's life.
   const [data, setData] = useState<LoanSourceData | null>(null);
   const [failedAccountId, setFailedAccountId] = useState<string | null>(null);
 
@@ -83,6 +87,14 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
         ]);
         if (cancelled) return;
         setData({ accountId, transactions, interestTransactions, rateChanges });
+        // A success retires this account's earlier failure, and only this
+        // account's: the failure describes a request that has now been answered,
+        // so leaving it set outranks fresh data with a stale error and no
+        // in-page refresh can recover the figures. Compared inside the updater
+        // rather than against the render's `failedAccountId`, so a failure
+        // recorded for a *different* account while this load was in flight
+        // survives.
+        setFailedAccountId((failed) => (failed === accountId ? null : failed));
       } catch (error) {
         if (cancelled) return;
         // A rate-history or payment-history failure changes what the projection

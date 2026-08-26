@@ -146,6 +146,66 @@ describe('useLoanProjection', () => {
     expect(result.current.remainingInterest).toBeNull();
   });
 
+  it('recovers when a refresh succeeds after a transient interest failure', async () => {
+    // The whole reason fetchLoanInterestTransactions rejects rather than
+    // returning [] is so a caller can retry. A failure identity that outlives
+    // the successful retry defeats that: one timeout would leave Current
+    // Payment, Est. Payoff and Est. Remaining Interest unavailable for the rest
+    // of the page's life, through every later reload.
+    const loan = makeAccount({
+      interestCategoryId: 'cat-int',
+      sourceAccountId: 'src-1',
+      currentBalance: -250000,
+    });
+    getAll.mockResolvedValue(pageOf([payment('t1', '2026-06-15', 600)]));
+    getAllPages.mockRejectedValueOnce(new Error('timeout'));
+
+    const { result, rerender } = renderHook(
+      ({ refreshKey }: { refreshKey: number }) =>
+        useLoanProjection(loan, refreshKey),
+      { initialProps: { refreshKey: 0 } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.currentPayment).toBeNull();
+
+    // The separately booked $400 interest beside the $600 principal makes the
+    // real installment $1,000 -- knowable, and known, once this read lands.
+    getAllPages.mockResolvedValue([
+      {
+        id: 'i1',
+        transactionDate: '2026-06-15',
+        amount: -400,
+        categoryId: 'cat-int',
+        isTransfer: false,
+      } as unknown as Transaction,
+    ]);
+    rerender({ refreshKey: 1 });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.currentPayment).toBe(1000);
+  });
+
+  it('keeps a failure recorded for another account while this one succeeds', async () => {
+    // The clear is keyed on the account that succeeded, so recovering one loan
+    // must not silently mark a different, still-broken loan as fine.
+    getAll.mockRejectedValueOnce(new Error('network'));
+    const { result, rerender } = renderHook(
+      ({ account }: { account: Account }) => useLoanProjection(account),
+      { initialProps: { account: makeAccount({ id: 'mtg-broken' }) } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('error'));
+
+    getAll.mockResolvedValue(pageOf([payment('t1', '2026-06-15', 1800)]));
+    rerender({ account: makeAccount({ id: 'mtg-fine' }) });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    // Back to the loan whose load failed: still an error, because nothing has
+    // answered its request since.
+    getAll.mockReturnValue(new Promise(() => {}));
+    rerender({ account: makeAccount({ id: 'mtg-broken' }) });
+    expect(result.current.status).toBe('error');
+  });
+
   it('refetches when the refresh key is bumped', async () => {
     const { result, rerender } = renderHook(
       ({ refreshKey }: { refreshKey: number }) =>

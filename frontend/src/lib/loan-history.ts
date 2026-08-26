@@ -336,24 +336,24 @@ export function resolveCurrentInstallment(
  * current installment. Returns null when the account cannot be projected (no
  * remaining balance, rate, payment, or frequency).
  *
- * The seed payment is the installment actually in effect, preferred in this
- * order, and each candidate is used only if it covers the first period's
- * interest -- a payment that does not can never amortize, and seeding one makes
- * `generateLoanSchedule` return no rows at all:
+ * The seed payment comes from the most authoritative source that has one, and
+ * only the last two are tested against the first period's interest:
  *
- *   1. the latest recorded payment change from the rate timeline;
- *   2. the installment derived from history (`principal + interest` of the last
- *      regular payment) -- the borrower's real one where the ledger recorded
- *      that payment's interest;
- *   3. the stored contractual `paymentAmount`.
+ *   1. the payment in effect from the rate timeline, used unconditionally --
+ *      it is the recorded answer to "what is being paid now", so a payment that
+ *      no longer covers the interest is a fact about the loan and the schedule
+ *      must be allowed to refuse rather than be handed a different number;
+ *   2. otherwise the installment derived from history (`principal + interest` of
+ *      the last regular payment), if it covers one period's interest;
+ *   3. otherwise the stored contractual `paymentAmount`, if it does.
  *
- * The contractual figure is last because it is often stale or principal-only,
- * but it is a real stored fact and it is what a loan booking its interest
- * outside the app has left: history alone then yields `principal + 0`, under one
- * period's interest, and the estimate that used to top it up was the defect in
- * issue #1255. When nothing on the list amortizes there is no projection --
- * `generateLoanSchedule` refuses, and the payoff and remaining interest read as
- * unknown rather than as a figure built on an invented installment.
+ * The contractual figure is last because it is often stale, but it is a real
+ * stored fact and it is what a loan booking its interest outside the app has
+ * left: history alone then yields `principal + 0`, under one period's interest,
+ * and the estimate that used to top it up was the defect in issue #1255. When
+ * neither amortizes there is no projection -- `generateLoanSchedule` refuses,
+ * and the payoff and remaining interest read as unknown rather than as a figure
+ * built on an installment nobody is paying.
  *
  * Future-dated rate steps bend the projection ahead; passing no `rateChanges`
  * simply omits them.
@@ -387,17 +387,27 @@ export function buildLoanProjectionInput(
     isVariableRate,
   );
   const amortizes = (payment: number) => payment > periodInterest;
-  const candidates = [
-    futureTimeline.startingPaymentAmount ?? installment,
-    installment,
-    account.paymentAmount!,
-  ];
-  // With no amortizing candidate the derived installment is passed through, so
+  // A timeline payment is used whether or not it amortizes. It is the payment in
+  // effect (`LoanRateChangesService.resolveCurrentTimeline`), and it cannot be a
+  // principal-only figure: detection writes `newPaymentAmount: null` outright
+  // when interest is booked separately, exactly so a principal-only observation
+  // never becomes a row's payment. So a non-null one is a full installment, and
+  // one that no longer covers the interest is a fact about the loan -- a rate
+  // rise the payment has not caught up with. Substituting the account scalar
+  // there would report a payoff computed from a payment the timeline says is not
+  // in effect.
+  const timelinePayment = futureTimeline.startingPaymentAmount;
+  // Without a timeline the ledger is all there is, and a principal-only history
+  // yields `principal + 0`. The stored contractual payment is the fallback --
+  // stale, but real, and the only complete payment fact such a loan has. When
+  // nothing amortizes the derived installment is passed through so
   // `generateLoanSchedule` refuses exactly as it does for a genuinely
-  // underfunded loan -- there is nothing left to seed a projection with, and
-  // picking the largest figure available would only make the refusal look like
-  // a decision about the loan.
-  const currentPayment = candidates.find(amortizes) ?? installment;
+  // underfunded loan: picking the largest figure available would only make the
+  // refusal look like a decision about the loan.
+  const currentPayment =
+    timelinePayment ??
+    [installment, account.paymentAmount!].find(amortizes) ??
+    installment;
 
   return {
     startingBalance: history.currentBalance,
