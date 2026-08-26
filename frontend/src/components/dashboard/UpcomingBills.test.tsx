@@ -96,7 +96,9 @@ describe('UpcomingBills', () => {
     expect(screen.getByText('5 days')).toBeInTheDocument();
   });
 
-  it('shows total due amount for bills', () => {
+  // The widget lists what is due; the summed "Total due" row was removed
+  // deliberately, so bills contribute no total line of their own.
+  it('shows no total row for bills', () => {
     const dateStr = futureDateStr(1);
     const transactions = [
       { id: '1', name: 'Netflix', amount: -15.99, currencyCode: 'CAD', nextDueDate: dateStr, isActive: true, autoPost: true },
@@ -104,7 +106,11 @@ describe('UpcomingBills', () => {
     ] as any[];
 
     render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
-    expect(screen.getByText('Total due')).toBeInTheDocument();
+    expect(screen.getByText('Netflix')).toBeInTheDocument();
+    expect(screen.queryByText(/Total due/i)).not.toBeInTheDocument();
+    // The per-item amounts stay; only the summary line goes.
+    expect(screen.getByText('-$15.99')).toBeInTheDocument();
+    expect(screen.queryByText('-$25.98')).not.toBeInTheDocument();
   });
 
   it('shows total incoming for deposits', () => {
