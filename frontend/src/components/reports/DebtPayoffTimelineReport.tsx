@@ -25,6 +25,7 @@ import {
   deriveLoanPaymentHistory,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
+  resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
@@ -287,6 +288,18 @@ export function DebtPayoffTimelineReport() {
     return { payoffSchedule: monthlySchedule, projectionStartLabel: startLabel };
   }, [selectedAccount, transactions, interestTransactions, rateChanges, formatChartDate]);
 
+  // The terms in effect, from the same resolution the curve is projected from.
+  const currentTerms = useMemo(() => {
+    if (!selectedAccount) return { annualRate: null, payment: null };
+    const history = deriveLoanPaymentHistory(
+      selectedAccount,
+      transactions,
+      rateChanges,
+      interestTransactions,
+    );
+    return resolveCurrentLoanTerms(selectedAccount, history, rateChanges);
+  }, [selectedAccount, transactions, rateChanges, interestTransactions]);
+
   const summary = useMemo(() => {
     if (payoffSchedule.length === 0 || !selectedAccount) return null;
     const lastItem = payoffSchedule[payoffSchedule.length - 1];
@@ -369,8 +382,8 @@ export function DebtPayoffTimelineReport() {
         ? t('accountBalances.accountTypes.LINE_OF_CREDIT' as Parameters<typeof t>[0])
         : selectedAccount.accountType.charAt(0) + selectedAccount.accountType.slice(1).toLowerCase(),
       formatCurrency(Math.abs(selectedAccount.currentBalance)),
-      selectedAccount.interestRate ? `${selectedAccount.interestRate}%` : t('debtPayoff.notSet'),
-      selectedAccount.paymentAmount ? formatCurrency(selectedAccount.paymentAmount) : t('debtPayoff.notSet'),
+      currentTerms.annualRate ? `${currentTerms.annualRate}%` : t('debtPayoff.notSet'),
+      currentTerms.payment ? formatCurrency(currentTerms.payment) : t('debtPayoff.notSet'),
     ]] : [];
     await exportToPdf({
       title: t('page.names.debt-payoff-timeline' as Parameters<typeof t>[0]),
@@ -727,7 +740,7 @@ export function DebtPayoffTimelineReport() {
             <div>
               <span className="text-gray-500 dark:text-gray-400">{t('debtPayoff.colInterestRate')}</span>
               <p className="font-medium text-gray-900 dark:text-gray-100">
-                {selectedAccount.interestRate ? `${selectedAccount.interestRate}%` : t('debtPayoff.notSet')}
+                {currentTerms.annualRate ? `${currentTerms.annualRate}%` : t('debtPayoff.notSet')}
               </p>
             </div>
             <div>

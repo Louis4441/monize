@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildLoanProjectionInput,
-  deriveCurrentInstallment,
   deriveLoanPaymentHistory,
-  resolveCurrentInstallment,
+  observedInstallment,
   resolveCurrentLoanTerms,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
@@ -469,7 +468,7 @@ describe('deriveLoanPaymentHistory', () => {
   });
 });
 
-describe('deriveCurrentInstallment', () => {
+describe('observedInstallment', () => {
   const history = (
     events: Array<{
       principal: number;
@@ -492,40 +491,46 @@ describe('deriveCurrentInstallment', () => {
     cumulativeInterest: 0,
   });
 
-  it('uses the last regular installment when it is lower than contractual', () => {
-    const result = deriveCurrentInstallment(
+  it('takes the last regular installment, principal + interest', () => {
+    const result = observedInstallment(
       history([
         { principal: 800, interest: 200, type: 'REGULAR' },
         { principal: 765, interest: 153, type: 'REGULAR' },
       ]),
-      1279,
     );
-    expect(result).toBe(918);
+    expect(result).toEqual({ amount: 918, complete: true });
   });
 
-  it('uses the last regular installment even when it exceeds the stored payment', () => {
-    // The stored contractual payment can be stale or principal-only, so the most
-    // recent real installment (principal + interest) is preferred.
-    const result = deriveCurrentInstallment(
+  it('reports what was observed, whatever the stored payment says', () => {
+    // The stored contractual payment can be stale or principal-only; ranking the
+    // two is resolveSeedPayment's job, not this function's.
+    const result = observedInstallment(
       history([{ principal: 765, interest: 700, type: 'REGULAR' }]),
-      1279,
     );
-    expect(result).toBe(1465);
+    expect(result).toEqual({ amount: 1465, complete: true });
   });
 
   it('skips overpayment rows when finding the last regular installment', () => {
-    const result = deriveCurrentInstallment(
+    const result = observedInstallment(
       history([
         { principal: 765, interest: 153, type: 'REGULAR' },
         { principal: 5000, interest: 0, type: 'OVERPAYMENT' },
       ]),
-      1279,
     );
-    expect(result).toBe(918);
+    expect(result).toEqual({ amount: 918, complete: true });
   });
 
-  it('falls back to the contractual payment with no regular history', () => {
-    expect(deriveCurrentInstallment(history([]), 1279)).toBe(1279);
+  it('reports nothing observed with no regular history', () => {
+    // Null is what sends resolveSeedPayment to the stored contractual payment.
+    expect(observedInstallment(history([]))).toBeNull();
+  });
+
+  it('marks a principal-only row incomplete rather than smaller', () => {
+    // The distinction the contractual fallback keys off: principal + 0 is a
+    // partial installment, not a lower one.
+    expect(
+      observedInstallment(history([{ principal: 450, interest: 0, type: 'REGULAR' }])),
+    ).toEqual({ amount: 450, complete: false });
   });
 
   it('uses principal + interest for separately-booked interest', () => {
@@ -536,14 +541,13 @@ describe('deriveCurrentInstallment', () => {
     // principal-only stored payment. (Whether it covers the period's interest is
     // buildLoanProjectionInput's decision, not this function's -- a row whose
     // interest the ledger never recorded contributes principal + 0.)
-    const result = deriveCurrentInstallment(
+    const result = observedInstallment(
       history([
         { principal: 300, interest: 300, type: 'REGULAR' },
         { principal: 300, interest: 300, type: 'REGULAR' },
       ]),
-      1279,
     );
-    expect(result).toBe(600);
+    expect(result).toEqual({ amount: 600, complete: true });
   });
 });
 
@@ -722,6 +726,26 @@ describe('buildLoanProjectionInput rate authority', () => {
     expect(input!.paymentAmount).toBe(1500);
   });
 
+  it('uses an initial row\'s payment when it is a real observed installment', () => {
+    // The other writer of `initial`: detection records the modal observed
+    // payment. Discarding it because of the source threw away a real
+    // observation, so it is ranked and tested -- and here it amortizes, so it
+    // wins over the contractual figure.
+    const acct = divergent({ paymentAmount: 1500 });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 300 }),
+    ]);
+    const input = buildLoanProjectionInput(acct, history, [
+      {
+        effectiveDate: '2024-01-04',
+        annualRate: 5,
+        newPaymentAmount: 1150,
+        source: 'initial',
+      },
+    ]);
+    expect(input!.paymentAmount).toBe(1150);
+  });
+
   it('keeps a manual row\'s payment authoritative even when it cannot amortize', () => {
     const acct = divergent({ paymentAmount: 1500 });
     const history = deriveLoanPaymentHistory(acct, [
@@ -775,7 +799,7 @@ describe('buildLoanProjectionInput rate authority', () => {
         400,
       ),
     ]);
-    expect(resolveCurrentInstallment(acct, history)).toBe(1000);
+    expect(resolveCurrentLoanTerms(acct, history).payment).toBe(1000);
     const input = buildLoanProjectionInput(acct, history);
     expect(input!.paymentAmount).toBe(1000);
     expect(generateLoanSchedule(input!).rows).toHaveLength(0);
@@ -788,9 +812,55 @@ describe('buildLoanProjectionInput rate authority', () => {
     const history = deriveLoanPaymentHistory(acct, [
       makeTransaction({ transactionDate: '2024-01-05', amount: 450 }),
     ]);
-    expect(resolveCurrentInstallment(acct, history)).toBe(
+    expect(resolveCurrentLoanTerms(acct, history).payment).toBe(
       buildLoanProjectionInput(acct, history)!.paymentAmount,
     );
+  });
+
+  it('projects a loan configured only through its rate history', () => {
+    // canProject used to gate on account.interestRate / paymentAmount -- the
+    // very scalars this function demotes -- so a loan whose terms live only in
+    // loan_rate_changes was refused while the cards, reading the same
+    // resolution, displayed its real rate and payment beside "Est. Payoff N/A".
+    const acct = makeAccount({
+      accountType: 'MORTGAGE',
+      openingBalance: -100000,
+      currentBalance: -100000,
+      interestRate: null as unknown as number,
+      paymentAmount: null as unknown as number,
+      paymentFrequency: 'MONTHLY',
+    });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 600 }),
+    ]);
+    const rows = [
+      {
+        effectiveDate: '2024-01-01',
+        annualRate: 6,
+        newPaymentAmount: 1200,
+        source: 'manual' as const,
+      },
+    ];
+
+    const terms = resolveCurrentLoanTerms(acct, history, rows);
+    const input = buildLoanProjectionInput(acct, history, rows);
+    expect(terms.annualRate).toBe(6);
+    expect(terms.payment).toBe(1200);
+    // The cards and the projection now agree, and the payoff exists.
+    expect(input).not.toBeNull();
+    expect(input!.annualRate).toBe(6);
+    expect(input!.paymentAmount).toBe(1200);
+    expect(generateLoanSchedule(input!).paidOff).toBe(true);
+  });
+
+  it('still refuses a loan with no terms anywhere', () => {
+    const acct = makeAccount({
+      currentBalance: -10000,
+      interestRate: null as unknown as number,
+      paymentAmount: null as unknown as number,
+    });
+    const history = deriveLoanPaymentHistory(acct, []);
+    expect(buildLoanProjectionInput(acct, history)).toBeNull();
   });
 
   it('reports an absent rate as unknown, not as 0%', () => {

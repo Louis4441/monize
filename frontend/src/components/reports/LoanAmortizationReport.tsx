@@ -13,6 +13,7 @@ import {
   deriveLoanPaymentHistory,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
+  resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { exportToCsv } from '@/lib/csv-export';
@@ -208,6 +209,21 @@ export function LoanAmortizationReport() {
     return payments;
   }, [selectedAccount, transactions, interestTransactions, rateChanges]);
 
+  // The terms in effect, from the same resolution the schedule below is built
+  // from. `selectedAccount.interestRate` / `.paymentAmount` are the scalars a
+  // rate-change mutation deliberately never writes, so printing them put "5% /
+  // $500" directly above a projection withheld because the real rate is 12%.
+  const currentTerms = useMemo(() => {
+    if (!selectedAccount) return { annualRate: null, payment: null };
+    const history = deriveLoanPaymentHistory(
+      selectedAccount,
+      transactions,
+      rateChanges,
+      interestTransactions,
+    );
+    return resolveCurrentLoanTerms(selectedAccount, history, rateChanges);
+  }, [selectedAccount, transactions, rateChanges, interestTransactions]);
+
   const historicalCount = useMemo(() => paymentHistory.filter((r) => !r.isProjected).length, [paymentHistory]);
   const hasProjection = useMemo(() => paymentHistory.some((r) => r.isProjected), [paymentHistory]);
 
@@ -264,7 +280,7 @@ export function LoanAmortizationReport() {
       cards.push(
         { label: t('loanAmortization.currentBalance'), value: formatCurrency(Math.abs(selectedAccount.currentBalance), currency), color: '#dc2626' },
         { label: t('loanAmortization.originalAmount'), value: formatCurrency(summary?.originalBalance || Math.abs(selectedAccount.openingBalance), currency), color: '#111827' },
-        { label: t('loanAmortization.interestRate'), value: selectedAccount.interestRate ? `${selectedAccount.interestRate}%` : t('loanAmortization.notSet'), color: '#111827' },
+        { label: t('loanAmortization.interestRate'), value: currentTerms.annualRate ? `${currentTerms.annualRate}%` : t('loanAmortization.notSet'), color: '#111827' },
         { label: summary?.hasProjection ? t('loanAmortization.estTotalInterest') : t('loanAmortization.totalInterestPaid'), value: formatCurrency(summary?.totalInterest || 0, currency), color: '#ea580c' },
         { label: t('loanAmortization.paymentsMade'), value: String(historicalCount), color: '#16a34a' },
       );
@@ -387,7 +403,7 @@ export function LoanAmortizationReport() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('loanAmortization.interestRate')}</div>
             <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              {selectedAccount.interestRate ? `${selectedAccount.interestRate}%` : t('loanAmortization.notSet')}
+              {currentTerms.annualRate ? `${currentTerms.annualRate}%` : t('loanAmortization.notSet')}
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
@@ -436,7 +452,7 @@ export function LoanAmortizationReport() {
             <div>
               <span className="text-gray-500 dark:text-gray-400">{t('loanAmortization.paymentAmount')}</span>
               <p className="font-medium text-gray-900 dark:text-gray-100">
-                {selectedAccount.paymentAmount ? formatCurrency(selectedAccount.paymentAmount) : t('loanAmortization.notSet')}
+                {currentTerms.payment ? formatCurrency(currentTerms.payment) : t('loanAmortization.notSet')}
               </p>
             </div>
             <div>

@@ -719,7 +719,7 @@ Two things the estimate was quietly holding up, and both are the interesting
 half of the fix. The Rate column was reconstructed *from* the interest charged,
 so removing the interest removed the rate as well -- for a fixed-rate loan that
 is a known fact being discarded, not an unknown being reported. And
-`deriveCurrentInstallment` returns `principal + interest`, which for a loan
+`observedInstallment` returns `principal + interest`, which for a loan
 booking its interest outside the app is now under one period's interest, so
 `generateLoanSchedule` refuses the seed: `buildLoanProjectionInput` falls back
 to the stored contractual payment, and where the rate timeline records the

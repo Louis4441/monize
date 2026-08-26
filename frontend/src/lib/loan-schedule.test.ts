@@ -483,6 +483,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms(rows, '2024-01-01', 4)).toEqual({
       annualRate: 6.2,
       paymentAmount: 2500,
+      snapshotPaymentAmount: null,
     });
   });
 
@@ -495,21 +496,24 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms(rows, '2021-01-01', 4)).toEqual({
       annualRate: 4,
       paymentAmount: null,
+      snapshotPaymentAmount: null,
     });
     expect(buildRateTimeline(rows, '2021-01-01', 4).startingAnnualRate).toBe(5.5);
   });
 
-  it('ignores an initial row for the payment but not for the rate', () => {
-    // An initial row's newPaymentAmount is a verbatim copy of
-    // account.paymentAmount, so it states nothing the caller does not already
-    // hold -- and goes stale the moment the user edits that field. Its RATE is
-    // the origination rate, which is a fact about the loan.
+  it('reports an initial row\'s payment separately, not as the stated one', () => {
+    // `initial` is written both by detection (a real observed installment) and
+    // by the first-rate-change hook (a verbatim copy of account.paymentAmount),
+    // with nothing on the row to tell them apart -- so it is neither
+    // authoritative nor worthless, and the caller ranks it. Its RATE is the
+    // origination rate either way, which is a fact about the loan.
     const initialOnly = [
       { effectiveDate: '2022-01-01', annualRate: 3.9, newPaymentAmount: 450, source: 'initial' as const },
     ];
     expect(resolveEffectiveLoanTerms(initialOnly, '2024-01-01', 4)).toEqual({
       annualRate: 3.9,
       paymentAmount: null,
+      snapshotPaymentAmount: 450,
     });
   });
 
@@ -522,6 +526,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms(withInitial, '2024-01-01', 4)).toEqual({
       annualRate: 6,
       paymentAmount: 2500,
+      snapshotPaymentAmount: 100,
     });
   });
 
@@ -541,6 +546,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms([], '2024-01-01', 4.25)).toEqual({
       annualRate: 4.25,
       paymentAmount: null,
+      snapshotPaymentAmount: null,
     });
   });
 });

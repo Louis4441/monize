@@ -157,14 +157,18 @@ export interface RateTimelineRow {
   annualRate: number;
   newPaymentAmount?: number | null;
   /**
-   * How the row was created. Load-bearing for the payment, not the rate: an
-   * `initial` row's `newPaymentAmount` is a verbatim copy of
-   * `account.paymentAmount` taken when the first rate change was recorded
-   * (`LoanRateChangesService.insertInitialRowIfFirst`), so it is a snapshot of
-   * that field rather than an independent statement about what is being paid --
-   * and a stale one once the user edits the account. `manual` (typed by the
-   * user) and `inferred` (observed from payment history, and deliberately null
-   * when interest is booked separately) do state the payment.
+   * How the row was created. Load-bearing for the payment, not the rate.
+   *
+   * `manual` (typed by the user) and `inferred` (the modal observed payment from
+   * detection, and deliberately null when interest is booked separately) STATE
+   * the payment: they are answers to "what is being paid".
+   *
+   * `initial` is written by two things and means different things in each, with
+   * no way to tell them apart from the row: `insertInitialRowIfFirst` copies
+   * `account.paymentAmount` verbatim (a snapshot of a field the user may since
+   * have corrected), while detection's first segment carries a real observed
+   * payment. So it is neither authoritative nor worthless -- it comes back as
+   * `snapshotPaymentAmount`, a candidate its caller tests before using.
    */
   source?: 'manual' | 'inferred' | 'initial';
 }
@@ -190,7 +194,14 @@ export interface RateTimelineRow {
 export interface EffectiveLoanTerms {
   /** Null only when no row applies and the account carries no rate either. */
   annualRate: number | null;
+  /** Stated by an applicable `manual` or `inferred` row; authoritative. */
   paymentAmount: number | null;
+  /**
+   * From an applicable `initial` row. Either a real observed installment or a
+   * stale copy of `account.paymentAmount` -- see `source` -- so a caller ranks
+   * it with the account's own scalar rather than above it.
+   */
+  snapshotPaymentAmount: number | null;
 }
 
 export function resolveEffectiveLoanTerms(
@@ -202,12 +213,17 @@ export function resolveEffectiveLoanTerms(
     .filter((row) => row.effectiveDate <= asOfIso)
     .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
   const latest = applied[applied.length - 1];
-  const statedPayment = [...applied]
-    .reverse()
-    .find((row) => row.newPaymentAmount != null && row.source !== 'initial');
+  const byLatest = [...applied].reverse();
+  const statedPayment = byLatest.find(
+    (row) => row.newPaymentAmount != null && row.source !== 'initial',
+  );
+  const snapshotPayment = byLatest.find(
+    (row) => row.newPaymentAmount != null && row.source === 'initial',
+  );
   return {
     annualRate: latest?.annualRate ?? fallbackAnnualRate ?? null,
     paymentAmount: statedPayment?.newPaymentAmount ?? null,
+    snapshotPaymentAmount: snapshotPayment?.newPaymentAmount ?? null,
   };
 }
 

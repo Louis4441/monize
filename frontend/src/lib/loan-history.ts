@@ -285,26 +285,8 @@ function debtMagnitude(signedBalance: number): number {
   return Math.max(0, -signedBalance);
 }
 
-/**
- * The installment to seed a forward projection with, given the payment history:
- * the most recent regular payment's full amount, `principal + interest`. Where
- * that payment's interest was recorded (a split, or a paired separate expense)
- * this is the borrower's real current installment. Falls back to the stored
- * contractual payment only when there is no usable regular payment yet (e.g. an
- * interest-only grace period). The stored payment is not preferred even when it
- * is lower: for loans whose interest is booked separately it often holds only
- * the principal part and would seed a non-amortizing payment.
- *
- * **It does not always amortize.** A row whose interest the ledger never
- * recorded contributes `principal + 0`, which for a loan booking interest
- * outside the app can be well under one period's interest. It used to be topped
- * up by an estimate (issue #1255) -- so the figure looked like an installment
- * and was partly invented. `buildLoanProjectionInput` now checks it against the
- * first period's interest and looks elsewhere when it falls short, rather than
- * this function guessing the missing part.
- */
 /** The last regular installment actually observed, and whether it is complete. */
-interface ObservedInstallment {
+export interface ObservedInstallment {
   amount: number;
   /**
    * True when the row's interest was recorded (a split, or a paired separate
@@ -314,7 +296,22 @@ interface ObservedInstallment {
   complete: boolean;
 }
 
-function observedInstallment(history: LoanHistoryResult): ObservedInstallment | null {
+/**
+ * The most recent REGULAR installment in the history, `principal + interest`,
+ * and whether the ledger recorded that interest. Overpayments are skipped: an
+ * ad-hoc extra payment is not the installment. Null when there is no usable
+ * regular row yet (an interest-only grace period, or no history at all), which
+ * is what sends `resolveSeedPayment` to the stored contractual payment.
+ *
+ * The only derivation of this figure. It replaced an exported
+ * `deriveCurrentInstallment`/`resolveCurrentInstallment` pair that had no
+ * production caller left but still carried the pre-change semantics -- a live
+ * trap, since calling either bypassed the rate-timeline resolution every
+ * surface now shares.
+ */
+export function observedInstallment(
+  history: LoanHistoryResult,
+): ObservedInstallment | null {
   const lastRegular = [...history.events]
     .reverse()
     .find((event) => event.type === 'REGULAR');
@@ -323,43 +320,6 @@ function observedInstallment(history: LoanHistoryResult): ObservedInstallment | 
     Math.round((lastRegular.principal + lastRegular.interest) * 100) / 100;
   if (amount <= 0) return null;
   return { amount, complete: lastRegular.interest > 0 };
-}
-
-export function deriveCurrentInstallment(
-  history: LoanHistoryResult,
-  contractualPayment: number,
-): number {
-  const lastRegular = [...history.events]
-    .reverse()
-    .find((event) => event.type === 'REGULAR');
-  if (!lastRegular) return contractualPayment;
-  const observed =
-    Math.round((lastRegular.principal + lastRegular.interest) * 100) / 100;
-  return observed > 0 ? observed : contractualPayment;
-}
-
-/**
- * The installment in effect: what "Current Payment" shows AND what the
- * projection is seeded with. One function, because they were two and disagreed.
- *
- * For a loan booking its interest outside the app the history yields
- * `principal + 0` -- $450 of a $950 installment -- and this used to publish that
- * as Current Payment while `buildLoanProjectionInput` separately fell back to the
- * contractual $950 to build the schedule. The card then read "$450" beside a
- * payoff date and remaining interest computed from $950: issue #1255 inverted,
- * with the payment understated by its whole interest portion instead of the
- * interest being invented. The analytic estimate used to hide it by making the
- * two agree.
- *
- * Returns null when nothing usable is known. Shared by the loan detail view, the
- * transactions Details sidebar and the projection, so all three name one figure.
- */
-export function resolveCurrentInstallment(
-  account: Account,
-  history: LoanHistoryResult,
-  rateChanges: RateTimelineRow[] = [],
-): number | null {
-  return resolveCurrentLoanTerms(account, history, rateChanges).payment;
 }
 
 /** The loan's rate and payment in effect: one answer for every surface. */
@@ -431,10 +391,12 @@ interface SeedPayment {
  *      the last regular payment), if it covers one period's interest;
  *   3. otherwise the stored contractual `paymentAmount`, if it does.
  *
- * An `initial` row is excluded from rank 1 by `resolveEffectiveLoanTerms`: its
- * payment is a verbatim copy of `account.paymentAmount`, so it is rank 3 wearing
- * rank 1's clothes -- and seeding it unconditionally pinned the projection to a
- * snapshot of the very field the user would edit to fix it.
+ * An `initial` row's payment is not rank 1: it is a real observed installment
+ * when detection wrote it and a verbatim copy of `account.paymentAmount` when
+ * the first-rate-change hook did, and nothing on the row distinguishes them.
+ * Seeding it unconditionally pinned the projection to a snapshot of the very
+ * field the user would edit to fix it; discarding it threw away a real
+ * observation. It joins rank 3 instead, ahead of the scalar and tested like it.
  *
  * The contractual figure is last because it is often stale, but it is a real
  * stored fact and it is what a loan booking its interest outside the app has
@@ -510,9 +472,17 @@ function resolveSeedPayment(
   } else if (observed?.complete) {
     payment = observed.amount;
   } else {
-    const candidates = [observed?.amount, contractual].filter(
-      (value): value is number => value != null && value > 0,
-    );
+    // The `initial` row's payment sits here rather than at rank 1: it is a real
+    // observed installment when detection wrote it and a stale copy of
+    // `account.paymentAmount` when the first-rate-change hook did, and the row
+    // does not say which. Tested like the contractual figure, both readings come
+    // out right -- an observation that amortizes is used, a stale copy that no
+    // longer covers the interest falls through to the corrected scalar.
+    const candidates = [
+      observed?.amount,
+      effective.snapshotPaymentAmount,
+      contractual,
+    ].filter((value): value is number => value != null && value > 0);
     payment = candidates.find(amortizes) ?? candidates[0] ?? null;
   }
 
@@ -541,18 +511,21 @@ export function buildLoanProjectionInput(
   history: LoanHistoryResult,
   rateChanges: RateTimelineRow[] = [],
 ): LoanScheduleInput | null {
-  const canProject =
-    history.currentBalance > 0.01 &&
-    account.interestRate != null &&
-    !!account.paymentAmount &&
-    account.paymentAmount > 0 &&
-    !!account.paymentFrequency;
-  if (!canProject) return null;
+  // Gated on the RESOLVED terms, not on the account's scalars. Gating on the
+  // scalars asked the wrong question: this function goes on to resolve both the
+  // rate and the payment from the rate history precisely because the scalars can
+  // be stale or absent relative to it -- so a loan configured only through the
+  // rate-history UI (`interestRate` null, or a payment that lives only in a
+  // rate-change row) was refused outright while the summary cards, now reading
+  // the same resolution, displayed its real 6% and $1,200 beside "Est. Payoff
+  // N/A". That is the disagreement this work exists to remove, with the halves
+  // swapped.
+  if (history.currentBalance <= 0.01 || !account.paymentFrequency) return null;
 
   const seed = resolveSeedPayment(account, history, rateChanges);
-  // canProject already required a rate, so this is a type narrowing rather than
-  // a new refusal.
-  if (seed.payment == null || seed.annualRate == null) return null;
+  if (seed.payment == null || seed.payment <= 0 || seed.annualRate == null) {
+    return null;
+  }
 
   // Only the future-dated steps are taken from here; the current terms are the
   // seed's. `buildRateTimeline`'s own "starting" fields are deliberately unused

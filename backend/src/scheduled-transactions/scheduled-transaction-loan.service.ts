@@ -108,32 +108,54 @@ export class ScheduledTransactionLoanService {
       // transfer, not that it is interest -- so on a template a user has added
       // an escrow or insurance line to it recalculates whichever line happens to
       // be listed first. The configured category is the explicit statement, and
-      // it is order-independent. Falls back to the old predicate when the loan
-      // has no interest category configured, which is the canonical shape this
-      // service itself writes (one principal transfer, one interest line).
+      // it is order-independent.
       const categoryLines = splits.filter(
         (s) => s.categoryId && !s.transferAccountId,
       );
-      // There must always be a line to write. This method rewrites the parent
-      // amount to principal + interest + extra whether or not it found one, and
-      // the posting path's split validator requires exact 4dp equality between
-      // parent and children -- so resolving to `undefined` would freeze the
-      // interest line at last period's figure while the parent moved, and the
-      // occurrence would silently stop posting. Ambiguity is reported, not
-      // answered with nothing.
-      const configuredLine = loanAccount.interestCategoryId
+      const interestSplit = loanAccount.interestCategoryId
         ? categoryLines.find(
             (s) => s.categoryId === loanAccount.interestCategoryId,
           )
-        : undefined;
-      if (!configuredLine && categoryLines.length > 1) {
+        : categoryLines.length === 1
+          ? categoryLines[0]
+          : undefined;
+
+      // This method understands exactly one template shape: a principal
+      // transfer, one interest line, and optionally an extra-principal transfer.
+      // It rewrites the parent to principal + interest + extra, which is the
+      // whole template only for that shape -- so a template carrying an escrow,
+      // insurance or tax line ends up with a parent that no longer equals the
+      // sum of its children, and the posting path's exact-4dp split validator
+      // then refuses every occurrence. The schedule stops posting silently, with
+      // the amount it would have charged nowhere on screen.
+      //
+      // So it declines rather than rewriting what it cannot account for. The
+      // cost is a P/I split that stays at last period's figures; the alternative
+      // cost is a bill that never posts again. Declining also removes the last
+      // place a line was chosen by position: with several categorized lines and
+      // no configured category, there is nothing here that identifies interest,
+      // and guessing is what put an amortization figure onto a property-tax line.
+      const unmanagedLines = splits.filter(
+        (s) =>
+          s !== interestSplit &&
+          s !== principalSplit &&
+          s !== extraPrincipalSplit,
+      );
+      if (!interestSplit || unmanagedLines.length > 0) {
         this.logger.warn(
-          `Scheduled transaction ${scheduledTransactionId} has ${categoryLines.length} categorized lines and loan account ` +
-            `${loanAccountId} has no interest category configured; recalculating the first line as interest. ` +
-            `Set the loan's interest category to make this unambiguous.`,
+          `Skipping loan recalculation for scheduled transaction ${scheduledTransactionId}: ` +
+            `${
+              interestSplit
+                ? `${unmanagedLines.length} line(s) beyond principal/interest/extra`
+                : loanAccount.interestCategoryId
+                  ? "no line carries the loan's configured interest category"
+                  : `${categoryLines.length} categorized lines and no interest category configured on account ${loanAccountId}`
+            }. ` +
+            `Rewriting the parent would leave it unequal to the sum of its children and the occurrence would stop posting. ` +
+            `Set the loan's interest category, or keep the template to principal + interest (+ extra principal).`,
         );
+        return;
       }
-      const interestSplit = configuredLine ?? categoryLines[0];
 
       // What the template holds is what was just posted -- including any clamp
       // a previous pass wrote for that one installment (a final payment, an
