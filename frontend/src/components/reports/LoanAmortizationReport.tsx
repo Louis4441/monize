@@ -4,6 +4,8 @@ import { useState, useMemo, Fragment } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { format, parseISO } from 'date-fns';
 import { accountsApi } from '@/lib/accounts';
+import { loanRateChangesApi } from '@/lib/loan-rate-changes';
+import type { LoanRateChange } from '@/types/loan-rate-change';
 import { Transaction } from '@/types/transaction';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
 import {
@@ -38,6 +40,7 @@ const ACCOUNT_STORAGE_KEY = 'monize-reports-loan-amortization-account';
 
 /** Stable empty list, so "nothing loaded yet" is not a new dependency each render. */
 const NO_TRANSACTIONS: Transaction[] = [];
+const NO_RATE_CHANGES: LoanRateChange[] = [];
 
 export function LoanAmortizationReport() {
   const t = useTranslations('reports');
@@ -108,16 +111,25 @@ export function LoanAmortizationReport() {
   } = useReportData(
     async () => {
       if (!selectedAccountId) {
-        return { transactions: [] as Transaction[], interestTransactions: [] as Transaction[] };
+        return {
+          transactions: [] as Transaction[],
+          interestTransactions: [] as Transaction[],
+          rateChanges: [] as LoanRateChange[],
+        };
       }
       const account = accounts.find((a) => a.id === selectedAccountId);
-      const [txns, interest] = await Promise.all([
+      // The rate history rides in the same request key as the rest: recording a
+      // rate change never writes the account's own interestRate, so projecting
+      // without these rows uses a stale scalar and disagrees with the loan
+      // detail page about the same loan's payoff date.
+      const [txns, interest, rates] = await Promise.all([
         fetchAllAccountTransactions(selectedAccountId),
         account
           ? fetchLoanInterestTransactions(account)
           : Promise.resolve([] as Transaction[]),
+        loanRateChangesApi.getAll(selectedAccountId),
       ]);
-      return { transactions: txns, interestTransactions: interest };
+      return { transactions: txns, interestTransactions: interest, rateChanges: rates };
     },
     [selectedAccountId, accounts],
     { requestKey: selectedAccountId },
@@ -137,6 +149,10 @@ export function LoanAmortizationReport() {
     () => loanDataForSelection?.interestTransactions ?? NO_TRANSACTIONS,
     [loanDataForSelection],
   );
+  const rateChanges = useMemo(
+    () => loanDataForSelection?.rateChanges ?? NO_RATE_CHANGES,
+    [loanDataForSelection],
+  );
 
   const isLoading = accountsLoading || loanDataLoading;
   const error = accountsError || loanDataError;
@@ -150,7 +166,12 @@ export function LoanAmortizationReport() {
     if (!selectedAccount) return [];
 
     // --- Historical payments from actual transactions ---
-    const history = deriveLoanPaymentHistory(selectedAccount, transactions, [], interestTransactions);
+    const history = deriveLoanPaymentHistory(
+      selectedAccount,
+      transactions,
+      rateChanges,
+      interestTransactions,
+    );
     const payments: PaymentRow[] = history.events.map((event, index) => ({
       paymentNumber: index + 1,
       date: event.date,
@@ -162,7 +183,7 @@ export function LoanAmortizationReport() {
     }));
 
     // --- Project future payments ---
-    const projectionInput = buildLoanProjectionInput(selectedAccount, history);
+    const projectionInput = buildLoanProjectionInput(selectedAccount, history, rateChanges);
     if (projectionInput) {
       const projection = generateLoanSchedule(projectionInput);
 
@@ -180,7 +201,7 @@ export function LoanAmortizationReport() {
     }
 
     return payments;
-  }, [selectedAccount, transactions, interestTransactions]);
+  }, [selectedAccount, transactions, interestTransactions, rateChanges]);
 
   const historicalCount = useMemo(() => paymentHistory.filter((r) => !r.isProjected).length, [paymentHistory]);
   const hasProjection = useMemo(() => paymentHistory.some((r) => r.isProjected), [paymentHistory]);

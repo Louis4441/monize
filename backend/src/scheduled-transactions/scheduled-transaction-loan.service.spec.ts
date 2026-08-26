@@ -132,6 +132,53 @@ describe("ScheduledTransactionLoanService", () => {
       expect(interestSave[0].amount).toBeLessThan(0);
     });
 
+    it("recalculates the configured interest category, not whichever line is first", async () => {
+      // A user adds an escrow line to the template. "The first categorized
+      // split" then recalculates ESCROW as the interest portion -- rewriting a
+      // property-tax line with an amortization figure, and leaving the real
+      // interest line untouched. The loan names its interest category, so use it.
+      const loanAccount = makeLoanAccount({
+        currentBalance: -20000,
+        interestCategoryId: "cat-interest",
+      });
+      accountsRepository.findOne.mockResolvedValue(loanAccount);
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction({
+          amount: -700,
+          splits: [
+            {
+              id: "split-principal",
+              transferAccountId: loanAccountId,
+              categoryId: null,
+              amount: -390,
+              memo: "Principal",
+            },
+            {
+              id: "split-escrow",
+              transferAccountId: null,
+              categoryId: "cat-escrow",
+              amount: -200,
+              memo: "Property tax",
+            },
+            {
+              id: "split-interest",
+              transferAccountId: null,
+              categoryId: "cat-interest",
+              amount: -110,
+              memo: "Interest",
+            },
+          ],
+        } as unknown as Partial<ScheduledTransaction>),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      const saved = splitsRepository.save.mock.calls.map((call: any) => call[0]);
+      // The interest line was recalculated; the escrow line was left alone.
+      expect(saved.some((s: any) => s.id === "split-interest")).toBe(true);
+      expect(saved.some((s: any) => s.id === "split-escrow")).toBe(false);
+    });
+
     describe("final installment (P5-008)", () => {
       it("reduces the parent amount with the principal when the balance is below one payment", async () => {
         // The audit's worked example: 50 outstanding at 0%, regular payment 100.

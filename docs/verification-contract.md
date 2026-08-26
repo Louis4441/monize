@@ -78,6 +78,7 @@ adds value but proves nothing on its own. `--` means not applicable.
 | INV-RECONCILE-001 reconciled lock | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |
 | INV-REPORT-001 report account scope | supporting | **required** | **required** | -- | -- | -- | -- | optional |
+| INV-LOAN-HISTORY-001 ledger-backed loan interest | **required** | required | -- | -- | -- | -- | -- | optional |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |
 | INV-OCCURRENCE-002 override price | required | -- | -- | -- | -- | -- | -- | required |
 | INV-CLAIM-001 single-use claim | supporting | -- | required | **required** | optional | optional | -- | required |
@@ -109,6 +110,22 @@ kind, not any one service test. `INV-REDEEM-001` too: proceeds and accrued
 interest are added in exactly one place, and `accrued-interest.guard.spec.ts`
 failing a hand-rolled addition anywhere else is what keeps the cash from being
 moved twice.
+
+`INV-LOAN-HISTORY-001` is the opposite arrangement, and worth stating because it
+is the exception the previous paragraph would lead you to guess wrong. Its
+load-bearing kind is the **unit** test, not the scan: there is exactly one
+producer of historical loan interest (`deriveLoanPaymentHistory`, in the
+frontend), so the defect cannot arrive from a second call site, and what has
+actually gone wrong every time is the *arithmetic decision* inside it -- an
+estimate substituted for an absent ledger fact, then a rate dropped along with
+the interest, then escrow read as interest because it was listed first. Those are
+caught by a case, not by a pattern. The scan
+(`loan-history.guard.test.ts`) is `required` rather than load-bearing because it
+proves a narrower thing: that no `catch` reappears in the module, since a
+swallowed lookup resolves to `[]` and `[]` is read as "no interest was booked".
+The unit matrix is what has to be exhaustive -- every account type, compounding
+flag, frequency and timeline combination was a separate door into the estimate,
+and a single-fixture test closed only one of them.
 
 `INV-IMPORT-002`'s load-bearing kind is a **failpoint**, and it is worth
 understanding why the other columns cannot substitute. The MNY import has real

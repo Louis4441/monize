@@ -11,7 +11,11 @@ import {
 
 const cachePrefix = (accountId: string) => `loan-rate-changes:${accountId}`;
 
-/** Mutations can move the account's current rate/payment, so both caches go */
+/**
+ * Both caches go: a mutation leaves the account's own rate/payment untouched
+ * (they are user-owned) but can realign its linked scheduled payment, and every
+ * loan projection resolves its current rate from these rows.
+ */
 function invalidateAfterMutation(accountId: string): void {
   invalidateCache(cachePrefix(accountId));
   invalidateCache('accounts:');

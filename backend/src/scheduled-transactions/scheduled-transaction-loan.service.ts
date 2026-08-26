@@ -103,9 +103,23 @@ export class ScheduledTransactionLoanService {
         (s) =>
           s.transferAccountId === loanAccountId && s !== extraPrincipalSplit,
       );
-      const interestSplit = splits.find(
+      // Prefer the loan's configured interest category. "The first categorized
+      // line" is an absence predicate -- it says the line is not the principal
+      // transfer, not that it is interest -- so on a template a user has added
+      // an escrow or insurance line to it recalculates whichever line happens to
+      // be listed first. The configured category is the explicit statement, and
+      // it is order-independent. Falls back to the old predicate when the loan
+      // has no interest category configured, which is the canonical shape this
+      // service itself writes (one principal transfer, one interest line).
+      const categoryLines = splits.filter(
         (s) => s.categoryId && !s.transferAccountId,
       );
+      const interestSplit =
+        (loanAccount.interestCategoryId
+          ? categoryLines.find(
+              (s) => s.categoryId === loanAccount.interestCategoryId,
+            )
+          : undefined) ?? (categoryLines.length === 1 ? categoryLines[0] : undefined);
 
       // What the template holds is what was just posted -- including any clamp
       // a previous pass wrote for that one installment (a final payment, an

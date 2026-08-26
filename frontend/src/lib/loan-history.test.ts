@@ -646,6 +646,189 @@ describe('buildLoanProjectionInput seed payment', () => {
   });
 });
 
+describe('buildLoanProjectionInput rate authority', () => {
+  // Recording a rate change never writes account.interestRate -- the backend
+  // keeps it user-owned and says so -- so a loan whose rate rose through the
+  // rate-history UI has a stale scalar and a current timeline. The projection
+  // must take both its rate and its payment from the timeline.
+  const divergent = (overrides: Partial<Account> = {}) =>
+    makeAccount({
+      accountType: 'MORTGAGE',
+      openingBalance: -100000,
+      currentBalance: -100000,
+      interestRate: 5, // stale scalar
+      paymentAmount: 1500, // stale scalar
+      paymentFrequency: 'MONTHLY',
+      ...overrides,
+    });
+
+  it('projects at the timeline rate, not the stale account scalar', () => {
+    const acct = divergent();
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 600 }),
+    ]);
+    const input = buildLoanProjectionInput(acct, history, [
+      { effectiveDate: '2024-01-05', annualRate: 12, newPaymentAmount: 900 },
+    ]);
+
+    expect(input!.annualRate).toBe(12);
+    expect(input!.paymentAmount).toBe(900);
+    // At the real 12%, 100000 costs 1000 a month and 900 does not amortize, so
+    // there is no payoff. At the stale 5% it costs 416.67 and the same 900 looks
+    // comfortably amortizing -- a ~150-month payoff and ~34.5k of projected
+    // interest for a loan that is going backwards.
+    const schedule = generateLoanSchedule(input!);
+    expect(schedule.rows).toHaveLength(0);
+    expect(schedule.paidOff).toBe(false);
+  });
+
+  it('takes the timeline rate even when the timeline records no payment', () => {
+    // A rate change entered without a new payment: the rate is still the
+    // timeline's, and the payment falls back down the documented order.
+    const acct = divergent();
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 600 }),
+    ]);
+    const input = buildLoanProjectionInput(acct, history, [
+      { effectiveDate: '2024-01-05', annualRate: 12 },
+    ]);
+
+    expect(input!.annualRate).toBe(12);
+    expect(input!.paymentAmount).toBe(1500); // contractual, the only amortizing candidate
+  });
+
+  it('falls back to the account scalar when no timeline row applies', () => {
+    // Negative control: with no timeline, startingAnnualRate IS the scalar, so
+    // this change is inert for every loan without a rate history.
+    const acct = divergent();
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 600 }),
+    ]);
+    expect(buildLoanProjectionInput(acct, history)!.annualRate).toBe(5);
+    // A future-dated row does not describe today either -- neither its rate nor
+    // its payment. It is a step, and applying it as the current state as well
+    // would apply the same change twice.
+    const future = buildLoanProjectionInput(acct, history, [
+      { effectiveDate: '2099-01-01', annualRate: 12, newPaymentAmount: 2000 },
+    ]);
+    expect(future!.annualRate).toBe(5);
+    // At 5% the 600 derived from history already amortizes, so it wins -- the
+    // point is that the 2000 named by the future row is not adopted as today's.
+    expect(future!.paymentAmount).not.toBe(2000);
+    expect(future!.paymentAmount).toBe(600);
+    expect(future!.rateChanges).toHaveLength(1); // still bends the projection ahead
+  });
+});
+
+describe('readRecordedInterest provenance', () => {
+  const LOAN_LINE = { transferAccountId: LOAN_ID, amount: -1000 } as TransactionSplit;
+  const ESCROW_LINE = {
+    transferAccountId: null,
+    categoryId: 'cat-escrow',
+    amount: -500,
+  } as unknown as TransactionSplit;
+  const INTEREST_LINE = {
+    transferAccountId: null,
+    categoryId: 'cat-interest',
+    amount: -300,
+  } as unknown as TransactionSplit;
+
+  /** A mortgage payment split into principal, escrow and interest. */
+  const splitPayment = (splits: TransactionSplit[]): Transaction =>
+    ({
+      ...makeTransaction({ transactionDate: '2026-01-15', amount: 1000 }),
+      linkedTransaction: { id: 'parent-1', splits } as Transaction,
+    }) as Transaction;
+
+  const withInterestCategory = makeAccount({ interestCategoryId: 'cat-interest' });
+
+  it('reads the configured interest category, whatever order the lines are in', () => {
+    // The defect: `the first split that is not the principal transfer` made the
+    // ESCROW line interest whenever it happened to come first, reporting $500 of
+    // property tax as $500 of interest paid on a payment whose interest was $300.
+    const escrowFirst = deriveLoanPaymentHistory(withInterestCategory, [
+      splitPayment([LOAN_LINE, ESCROW_LINE, INTEREST_LINE]),
+    ]);
+    const interestFirst = deriveLoanPaymentHistory(withInterestCategory, [
+      splitPayment([LOAN_LINE, INTEREST_LINE, ESCROW_LINE]),
+    ]);
+
+    expect(escrowFirst.events[0].interest).toBe(300);
+    expect(interestFirst.events[0].interest).toBe(300);
+    // Order changes nothing -- that is the whole property.
+    expect(escrowFirst.events[0].interest).toBe(interestFirst.events[0].interest);
+  });
+
+  it('sums interest split across two lines of the configured category', () => {
+    const history = deriveLoanPaymentHistory(withInterestCategory, [
+      splitPayment([
+        LOAN_LINE,
+        INTEREST_LINE,
+        { transferAccountId: null, categoryId: 'cat-interest', amount: -20 } as unknown as TransactionSplit,
+      ]),
+    ]);
+    expect(history.events[0].interest).toBe(320);
+  });
+
+  it('refuses to guess between two category lines with no configured category', () => {
+    // No interestCategoryId, escrow and interest indistinguishable: reporting
+    // either would be picking a number because it was listed first.
+    const history = deriveLoanPaymentHistory(makeAccount(), [
+      splitPayment([LOAN_LINE, ESCROW_LINE, INTEREST_LINE]),
+    ]);
+    expect(history.events[0].interest).toBe(0);
+  });
+
+  it('still reads a single category line with no configured category', () => {
+    // The canonical shape ScheduledTransactionLoanService builds, and what every
+    // loan without a configured interest category has always relied on.
+    const history = deriveLoanPaymentHistory(makeAccount(), [
+      splitPayment([LOAN_LINE, INTEREST_LINE]),
+    ]);
+    expect(history.events[0].interest).toBe(300);
+  });
+
+  it('lets a paired separate expense answer when the split carries no interest line', () => {
+    // Configured category, but this parent is principal + escrow only and the
+    // interest is booked as its own expense. Reporting 0 here would drop it.
+    const history = deriveLoanPaymentHistory(
+      withInterestCategory,
+      [splitPayment([LOAN_LINE, ESCROW_LINE])],
+      [],
+      [
+        {
+          transactionDate: '2026-01-15',
+          amount: -300,
+          isTransfer: false,
+        } as Transaction,
+      ],
+    );
+    expect(history.events[0].interest).toBe(300);
+  });
+
+  it('records no interest for a transfer-only split parent', () => {
+    const history = deriveLoanPaymentHistory(withInterestCategory, [
+      splitPayment([
+        LOAN_LINE,
+        { transferAccountId: LOAN_ID, amount: -200 } as TransactionSplit,
+      ]),
+    ]);
+    expect(history.events[0].interest).toBe(0);
+  });
+
+  it('never treats a transfer to a third account as interest', () => {
+    // The old predicate was `transferAccountId !== loanAccountId`, so a leg
+    // moving money to some other account of the user's read as interest.
+    const history = deriveLoanPaymentHistory(makeAccount(), [
+      splitPayment([
+        LOAN_LINE,
+        { transferAccountId: 'savings-1', amount: -250 } as TransactionSplit,
+      ]),
+    ]);
+    expect(history.events[0].interest).toBe(0);
+  });
+});
+
 describe('fetchAllAccountTransactions', () => {
   it('paginates until hasMore is false', async () => {
     const pageOne = Array.from({ length: 200 }, (_, i) => ({ id: `tx-${i}` }));

@@ -121,9 +121,21 @@ function AccountDetailContent() {
         setRateChanges([]);
         return;
       }
-      // Scenario/rate-history failures keep the page usable but must not be
-      // silent: an empty panel reads as "my saved scenarios are gone" while
-      // the rows still exist (a retried save then hits the duplicate-name 409).
+      // A scenario failure keeps the page usable but must not be silent: an
+      // empty panel reads as "my saved scenarios are gone" while the rows still
+      // exist (a retried save then hits the duplicate-name 409). Scenarios feed
+      // no headline figure, so degrading to [] costs nothing but the panel.
+      //
+      // The rate history is NOT in that category any more. Recording a rate
+      // change deliberately leaves `account.interestRate` alone, so these rows
+      // are where the loan's CURRENT rate lives -- `buildLoanProjectionInput`
+      // resolves both the projection's rate and its payment from them. An empty
+      // list is therefore a claim ("no rate change was ever recorded"), and
+      // substituting it for a failed read projects the payoff and remaining
+      // interest at a stale scalar rate: at 5% against a real 12% a payment
+      // short of the interest looks comfortably amortizing. So it fails with the
+      // page, where the error is retryable, rather than answering with a number
+      // nobody can tell is wrong.
       const [transactionsData, interestData, scenariosData, rateChangesData] =
         await Promise.all([
           fetchAllAccountTransactions(accountId),
@@ -132,10 +144,7 @@ function AccountDetailContent() {
             toast.error(t('loanDetail.scenarios.loadFailed'));
             return [] as LoanScenario[];
           }),
-          loanRateChangesApi.getAll(accountId).catch(() => {
-            toast.error(t('loanDetail.rateHistory.loadFailed'));
-            return [] as LoanRateChange[];
-          }),
+          loanRateChangesApi.getAll(accountId),
         ]);
       setAccount(accountData);
       setTransactions(transactionsData);
@@ -184,8 +193,12 @@ function AccountDetailContent() {
     }
   }, [accountId, t]);
 
-  // Rate-change mutations can move the account's current rate/payment, so the
-  // account reloads together with the timeline.
+  // A rate-change mutation never writes the account's own interestRate /
+  // paymentAmount -- those stay user-owned, set only by the edit form -- but it
+  // can realign the linked scheduled bill, and the account row is what carries
+  // that. So the account reloads together with the timeline. (Which of the two
+  // is the loan's CURRENT rate is a separate question, answered by the timeline:
+  // see buildLoanProjectionInput.)
   const reloadRateChanges = useCallback(async () => {
     try {
       const [accountData, rateChangesData] = await Promise.all([

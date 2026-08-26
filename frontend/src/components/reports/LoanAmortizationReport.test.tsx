@@ -28,6 +28,13 @@ vi.mock('@/lib/accounts', () => ({
   },
 }));
 
+const mockGetRateChanges = vi.fn();
+vi.mock('@/lib/loan-rate-changes', () => ({
+  loanRateChangesApi: {
+    getAll: (...args: any[]) => mockGetRateChanges(...args),
+  },
+}));
+
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getAll: (...args: any[]) => mockGetAllTransactions(...args),
@@ -47,6 +54,8 @@ vi.mock('@/lib/logger', () => ({
 describe('LoanAmortizationReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Most cases have no recorded rate history; the ones that do override it.
+    mockGetRateChanges.mockResolvedValue([]);
   });
 
   it('shows loading state initially', () => {
@@ -647,6 +656,57 @@ describe('LoanAmortizationReport', () => {
     // The booked $300 is on screen because the retry actually re-fetched it,
     // not because the report settled for an empty interest list.
     expect(screen.getByText('$300.00')).toBeInTheDocument();
+  });
+
+  // The report used to pass [] as the rate history, so its projection ran at
+  // whatever stale scalar the account still held while the loan detail page ran
+  // at the real timeline rate -- the same loan, two payoff dates. These two
+  // cases differ ONLY in the recorded rate history.
+  const divergentRateAccount = [
+    {
+      id: 'loan-1', name: 'Mortgage', accountType: 'MORTGAGE',
+      currentBalance: -100000, openingBalance: -100000, interestRate: 5,
+      paymentAmount: 500, paymentFrequency: 'MONTHLY',
+      isCanadianMortgage: false, isVariableRate: false, isClosed: false,
+    },
+  ];
+  const onePayment = {
+    data: [{ id: 'tx-1', transactionDate: '2024-01-15', amount: 500, linkedTransaction: null }],
+    pagination: { hasMore: false },
+  };
+
+  it('loads the loan rate history for the selected account', async () => {
+    mockGetAllAccounts.mockResolvedValue(divergentRateAccount);
+    mockGetAllTransactions.mockResolvedValue(onePayment);
+    render(<LoanAmortizationReport />);
+    await waitFor(() => expect(mockGetRateChanges).toHaveBeenCalledWith('loan-1'));
+  });
+
+  it('projects at the scalar rate when no rate change has been recorded', async () => {
+    // 100000 at 5% costs 416.67 a month, so the 500 payment amortizes.
+    mockGetAllAccounts.mockResolvedValue(divergentRateAccount);
+    mockGetAllTransactions.mockResolvedValue(onePayment);
+    mockGetRateChanges.mockResolvedValue([]);
+    render(<LoanAmortizationReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Projected Future Payments')).toBeInTheDocument();
+    });
+  });
+
+  it('withholds the projection when the recorded rate makes the payment non-amortizing', async () => {
+    // Same fixture, but a recorded rate change to 12%: 100000 now costs 1000 a
+    // month and the 500 payment does not amortize, so there is no payoff to
+    // show. Reading the stale 5% scalar instead would print a plausible one.
+    mockGetAllAccounts.mockResolvedValue(divergentRateAccount);
+    mockGetAllTransactions.mockResolvedValue(onePayment);
+    mockGetRateChanges.mockResolvedValue([
+      { id: 'r1', effectiveDate: '2024-02-01', annualRate: 12, newPaymentAmount: null },
+    ]);
+    render(<LoanAmortizationReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Select Loan')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Projected Future Payments')).not.toBeInTheDocument();
   });
 
   it('exports CSV and PDF', async () => {

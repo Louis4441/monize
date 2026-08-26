@@ -336,6 +336,11 @@ export function resolveCurrentInstallment(
  * current installment. Returns null when the account cannot be projected (no
  * remaining balance, rate, payment, or frequency).
  *
+ * The rate and the payment are resolved from ONE effective state, the rate
+ * timeline's (`startingAnnualRate`, which falls back to the account's scalar
+ * when no row applies). Recording a rate change never writes the account's
+ * scalar, so mixing the two reports a payoff at a rate that is not in effect.
+ *
  * The seed payment comes from the most authoritative source that has one, and
  * only the last two are tested against the first period's interest:
  *
@@ -374,14 +379,37 @@ export function buildLoanProjectionInput(
   const frequency = account.paymentFrequency as ScheduleFrequency;
   const isCanadian = account.isCanadianMortgage || false;
   const isVariableRate = account.isVariableRate || false;
-  // The account's scalar rate is already current; only future-dated steps from
-  // the rate history bend the projection ahead.
   const today = new Date().toISOString().slice(0, 10);
   const futureTimeline = buildRateTimeline(rateChanges, today, account.interestRate!);
+  // The rate and the payment come from ONE effective state, resolved here from
+  // the rows that have actually taken effect.
+  //
+  // Recording a rate change deliberately does not touch `account.interestRate`
+  // -- it stays user-owned, set only by the account edit form -- so after any
+  // rate change entered through the rate-history UI the scalar is the OLD rate
+  // while the timeline holds the current one. Reading the payment from the
+  // timeline and the rate from the scalar mixes two states: at a stale 5%
+  // against a real 12% a payment $100 short of the interest looks comfortably
+  // amortizing, and the projection reports a payoff for a loan going backwards.
+  // A past step is invisible in `futureTimeline.rateChanges`, which carries only
+  // future-dated ones, so it has to be read here.
+  //
+  // Deliberately NOT `buildRateTimeline`'s `startingAnnualRate` /
+  // `startingPaymentAmount`: those carry a "before the earliest row, the
+  // earliest row applies" fallback, which is right for a schedule anchored at
+  // ORIGINATION (loan-past-impact builds the contractual schedule that way) and
+  // wrong for one anchored today. Under it a rate change dated next year would
+  // set today's rate *and* be applied again as a future step -- the same change
+  // twice. Rows dated ahead are steps, never the current state.
+  const appliedByToday = [...rateChanges]
+    .filter((row) => row.effectiveDate <= today)
+    .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
+  const currentRow = appliedByToday[appliedByToday.length - 1];
+  const currentAnnualRate = currentRow?.annualRate ?? Number(account.interestRate);
   const installment = deriveCurrentInstallment(history, account.paymentAmount!);
   const periodInterest = firstPeriodInterest(
     history.currentBalance,
-    account.interestRate!,
+    currentAnnualRate,
     frequency,
     isCanadian,
     isVariableRate,
@@ -396,7 +424,11 @@ export function buildLoanProjectionInput(
   // rise the payment has not caught up with. Substituting the account scalar
   // there would report a payoff computed from a payment the timeline says is not
   // in effect.
-  const timelinePayment = futureTimeline.startingPaymentAmount;
+  // Same at-or-before-today rule as the rate: the latest row that has actually
+  // taken effect and names a payment.
+  const timelinePayment =
+    [...appliedByToday].reverse().find((row) => row.newPaymentAmount != null)
+      ?.newPaymentAmount ?? null;
   // Without a timeline the ledger is all there is, and a principal-only history
   // yields `principal + 0`. The stored contractual payment is the fallback --
   // stale, but real, and the only complete payment fact such a loan has. When
@@ -411,7 +443,7 @@ export function buildLoanProjectionInput(
 
   return {
     startingBalance: history.currentBalance,
-    annualRate: account.interestRate!,
+    annualRate: currentAnnualRate,
     paymentAmount: currentPayment,
     frequency,
     isCanadian,
@@ -466,6 +498,7 @@ function classifyPayment(
   const recorded = readRecordedInterest(
     transaction,
     loanAccountId,
+    account.interestCategoryId,
     processedParentIds,
   );
   if (recorded !== null) {
@@ -605,23 +638,70 @@ function matchesOverpaymentMemo(
 }
 
 /**
- * The recorded interest of a payment lives on the linked source-account
- * transaction as the split that does not transfer back to the loan. Returns
- * null when there is no recorded interest split (so the caller falls back to a
- * paired separate expense, then to zero); a single source payment covering
- * several loan transfers is counted only once.
+ * The recorded interest of a payment, from the splits of the linked
+ * source-account transaction. A single source payment covering several loan
+ * transfers is counted only once.
+ *
+ * Interest is identified by **provenance, not by absence**. "The split that is
+ * not the principal transfer" says what a line is *not*, and a real mortgage
+ * payment has more than two lines: principal to the loan, escrow or property
+ * tax, insurance, a fee, and the interest. Under that predicate whichever
+ * non-principal line came first became "Interest Paid", so the figure depended
+ * on split order -- $500 of escrow reported as interest on a payment whose
+ * interest was $300, and into every cumulative total, export and projection
+ * seed downstream. The loan already names its interest category, so use it.
+ *
+ * Three outcomes, and the difference between the last two matters:
+ *   - a number: interest this parent records;
+ *   - `0`: the parent was read and records no interest -- every line is a
+ *     transfer, so the payment moved principal only;
+ *   - `null`: nothing here identifies interest, so the caller falls through to a
+ *     separate interest expense paired to the date, and then to zero. Returned
+ *     for a parent with no splits; for an *ambiguous* one (two or more category
+ *     lines and no configured interest category to pick between them -- guessing
+ *     one is what this function used to do); and for a configured category with
+ *     no matching line, since such a loan usually books its interest as the
+ *     separate expense the caller is about to look for.
  */
 function readRecordedInterest(
   transaction: Transaction,
   loanAccountId: string,
+  interestCategoryId: string | null | undefined,
   processedParentIds: Set<string>,
 ): number | null {
   const linkedTx = transaction.linkedTransaction;
   if (!linkedTx?.splits || linkedTx.splits.length === 0) return null;
   if (processedParentIds.has(linkedTx.id)) return 0;
   processedParentIds.add(linkedTx.id);
-  const interestSplit = linkedTx.splits.find((s) => s.transferAccountId !== loanAccountId);
-  return interestSplit ? Math.abs(interestSplit.amount) : 0;
+
+  // A category line, never a transfer: interest is paid to the lender, so it is
+  // an expense. A transfer leg moves money between the user's own accounts --
+  // the principal leg is one, and a leg to some third account is not interest
+  // either, though the old `!== loanAccountId` predicate accepted it.
+  const categoryLines = linkedTx.splits.filter((s) => !s.transferAccountId);
+
+  if (interestCategoryId) {
+    // The explicit statement of which line is interest. Summed rather than
+    // picked so a payment splitting interest across two lines is not truncated,
+    // and order-independent by construction.
+    const matching = categoryLines.filter((s) => s.categoryId === interestCategoryId);
+    if (matching.length > 0) {
+      return matching.reduce((total, s) => total + Math.abs(Number(s.amount)), 0);
+    }
+    // Configured but no matching line: this parent does not record the interest,
+    // and a loan with an interest category configured is usually one that books
+    // interest as a separate expense -- so fall through and let the expense
+    // paired to this date answer. Returning 0 here would drop a real interest
+    // charge for a payment split across principal and escrow.
+    return null;
+  }
+
+  // No configured category. One category line is unambiguous -- the canonical
+  // shape ScheduledTransactionLoanService builds, and what every loan without a
+  // configured interest category has always relied on.
+  if (categoryLines.length === 1) return Math.abs(Number(categoryLines[0].amount));
+  if (categoryLines.length === 0) return 0;
+  return null;
 }
 
 /**

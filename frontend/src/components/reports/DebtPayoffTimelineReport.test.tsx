@@ -54,6 +54,13 @@ vi.mock('@/lib/accounts', () => ({
   },
 }));
 
+const mockGetRateChanges = vi.fn();
+vi.mock('@/lib/loan-rate-changes', () => ({
+  loanRateChangesApi: {
+    getAll: (...args: any[]) => mockGetRateChanges(...args),
+  },
+}));
+
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getAll: (...args: any[]) => mockGetAllTransactions(...args),
@@ -77,6 +84,8 @@ vi.mock('@/lib/logger', () => ({
 describe('DebtPayoffTimelineReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Most cases have no recorded rate history; the ones that do override it.
+    mockGetRateChanges.mockResolvedValue([]);
     // Default to a single-page result so the report's pagination loop
     // terminates. Individual tests override data/pagination as needed.
     mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
@@ -129,6 +138,26 @@ describe('DebtPayoffTimelineReport', () => {
         accountIds: ['src-1'],
       }),
     );
+  });
+
+  it('loads the loan rate history for the selected account', async () => {
+    // The report used to pass [] as the rate history, so its projection ran at
+    // the account's possibly stale scalar rate while the loan detail page ran at
+    // the recorded one -- the same loan with two payoff dates.
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loan-1', name: 'Mortgage', accountType: 'MORTGAGE',
+        currentBalance: -100000, openingBalance: -100000, interestRate: 5,
+        paymentAmount: 500, paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false, isVariableRate: false, isClosed: false,
+      },
+    ]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [{ id: 'tx-1', transactionDate: '2024-01-15', amount: 500, linkedTransaction: null }],
+      pagination: { hasMore: false },
+    });
+    render(<DebtPayoffTimelineReport />);
+    await waitFor(() => expect(mockGetRateChanges).toHaveBeenCalledWith('loan-1'));
   });
 
   it('stays in the loading state until the interest fetch resolves (no zero-interest flicker)', async () => {

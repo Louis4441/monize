@@ -16,6 +16,8 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { accountsApi } from '@/lib/accounts';
+import { loanRateChangesApi } from '@/lib/loan-rate-changes';
+import type { LoanRateChange } from '@/types/loan-rate-change';
 import { Transaction } from '@/types/transaction';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
 import {
@@ -124,12 +126,34 @@ export function DebtPayoffTimelineReport() {
   );
   const interestTransactions = useMemo<Transaction[]>(() => interestData ?? [], [interestData]);
 
-  const isLoading = accountsLoading || transactionsLoading || interestLoading;
-  const error = accountsError || transactionsError || interestError;
+  // The recorded rate history. Load-bearing for the projection, not decoration:
+  // recording a rate change never writes the account's own interestRate, so
+  // without these rows this report projects at whatever stale scalar the account
+  // still holds while the loan detail page projects at the real one -- the same
+  // loan, two payoff dates. Folded into the shared error/retry state for the
+  // same reason as the interest list: [] is a claim, not a neutral default.
+  const {
+    data: rateChangeData,
+    isLoading: rateChangesLoading,
+    error: rateChangesError,
+    reload: reloadRateChanges,
+  } = useReportData(
+    async () => {
+      if (!selectedAccountId) return [] as LoanRateChange[];
+      return loanRateChangesApi.getAll(selectedAccountId);
+    },
+    [selectedAccountId],
+  );
+  const rateChanges = useMemo<LoanRateChange[]>(() => rateChangeData ?? [], [rateChangeData]);
+
+  const isLoading =
+    accountsLoading || transactionsLoading || interestLoading || rateChangesLoading;
+  const error = accountsError || transactionsError || interestError || rateChangesError;
   const reload = () => {
     reloadAccounts();
     reloadTransactions();
     reloadInterest();
+    reloadRateChanges();
   };
 
   // Build payment timeline from actual transactions + projected future payments
@@ -140,7 +164,12 @@ export function DebtPayoffTimelineReport() {
     if (!selectedAccount) return { payoffSchedule: [], projectionStartLabel: null };
 
     // --- Historical payments from actual transactions ---
-    const history = deriveLoanPaymentHistory(selectedAccount, transactions, [], interestTransactions);
+    const history = deriveLoanPaymentHistory(
+      selectedAccount,
+      transactions,
+      rateChanges,
+      interestTransactions,
+    );
     const schedule: PayoffScheduleItem[] = history.events.map((event) => ({
       date: event.date,
       label: formatChartDate(event.date, 'MMM yyyy'),
@@ -153,7 +182,7 @@ export function DebtPayoffTimelineReport() {
     }));
 
     // --- Project future payments ---
-    const projectionInput = buildLoanProjectionInput(selectedAccount, history);
+    const projectionInput = buildLoanProjectionInput(selectedAccount, history, rateChanges);
     if (projectionInput) {
       const projection = generateLoanSchedule({
         ...projectionInput,
@@ -231,7 +260,7 @@ export function DebtPayoffTimelineReport() {
     }
 
     return { payoffSchedule: monthlySchedule, projectionStartLabel: startLabel };
-  }, [selectedAccount, transactions, interestTransactions, formatChartDate]);
+  }, [selectedAccount, transactions, interestTransactions, rateChanges, formatChartDate]);
 
   const summary = useMemo(() => {
     if (payoffSchedule.length === 0 || !selectedAccount) return null;

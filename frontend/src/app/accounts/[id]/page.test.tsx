@@ -238,10 +238,11 @@ describe('AccountDetailPage', () => {
     expect(section).toHaveAttribute('data-account-id', 'loan-1');
   });
 
-  it('surfaces a scenarios/rate-history load failure instead of a silent empty list (issue: saved scenario "gone" but re-save hits 409)', async () => {
+  it('surfaces a scenarios load failure instead of a silent empty list (issue: saved scenario "gone" but re-save hits 409)', async () => {
+    // Scenarios feed no headline figure, so the page degrades to an empty panel
+    // and says so. The rate history is a different case -- see below.
     mockGetById.mockResolvedValue(makeAccount());
     mockGetAllScenarios.mockRejectedValue(new Error('throttled'));
-    mockGetAllRateChanges.mockRejectedValue(new Error('throttled'));
 
     await renderPage();
 
@@ -249,12 +250,25 @@ describe('AccountDetailPage', () => {
     expect(toast.error).toHaveBeenCalledWith(
       expect.stringContaining("Couldn't load the saved scenarios"),
     );
-    expect(toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("Couldn't load the rate history"),
-    );
     // The page itself stays usable
     expect(screen.getByText('Car Loan')).toBeInTheDocument();
     expect(screen.getByText('Loan Schedule')).toBeInTheDocument();
+  });
+
+  it('refuses to project after a failed rate-history load rather than using the stale scalar', async () => {
+    // The rate history holds the loan's CURRENT rate: recording a rate change
+    // deliberately leaves account.interestRate alone, and the projection
+    // resolves both its rate and its payment from those rows. Substituting []
+    // for a failed read prices the payoff at a stale scalar -- at 5% against a
+    // real 12% a payment short of the interest looks comfortably amortizing --
+    // so the failure has to reach the page's retryable error state instead.
+    mockGetById.mockResolvedValue(makeAccount());
+    mockGetAllRateChanges.mockRejectedValue(new Error('throttled'));
+
+    await renderPage();
+
+    expect(screen.getByText('Failed to load account details')).toBeInTheDocument();
+    expect(screen.queryByText('Loan Schedule')).not.toBeInTheDocument();
   });
 
   it('projects future payments from the account terms', async () => {

@@ -613,6 +613,13 @@ Statement           Interest attributed to a historical loan payment is a
                     figure derived from the balance and the account's rate. A
                     FAILED read is unknown, not zero, and must not be rendered
                     as a schedule.
+                    "Ledger-backed" is not enough on its own: the row has to be
+                    an INTEREST row. Escrow, property tax, insurance and fees are
+                    all ledger-backed and none of them is interest, so the line
+                    is identified by provenance -- the loan's configured interest
+                    category -- and never by "the split that is not the principal
+                    transfer". Changing the order of a payment's split lines must
+                    not change Interest Paid.
                     The rate is a separate fact from the interest and does not
                     fall with it: a fixed-rate loan with no recorded rate
                     history keeps its configured rate on a zero-interest row,
@@ -621,10 +628,14 @@ Statement           Interest attributed to a historical loan payment is a
                     A forward PROJECTION may estimate -- that is its job, and
                     its rows are labelled projected. The prohibition is on a
                     historical row.
-Source of truth     transaction_splits (the payment's recorded interest leg) and
-                    the interest-category expenses on the loan's configured
-                    source account. Not accounts.interest_rate, which describes
-                    the loan and not what any payment settled.
+Source of truth     transaction_splits (the payment's recorded interest leg,
+                    identified by accounts.interest_category_id) and the
+                    interest-category expenses on the loan's configured source
+                    account. Not accounts.interest_rate, which describes the loan
+                    and not what any payment settled -- and, for the projection
+                    that reads this history, not accounts.interest_rate as the
+                    CURRENT rate either: recording a rate change never writes it,
+                    so loan_rate_changes at or before today is the current rate.
 Enforcement         One producer: frontend/src/lib/loan-history.ts
                     deriveLoanPaymentHistory / classifyPayment, which takes
                     neither the running balance nor the rate timeline as an
@@ -650,10 +661,18 @@ Required tests      Present: the principal-only matrix in
                     fixed-rate and variable-rate Rate-column cases, the
                     reconstruction paths re-pinned against RECORDED interest so
                     the Canadian semi-annual and day-count annualizations stay
-                    covered, the rejection test, the source scan above, the
-                    report's error-and-retry test in
+                    covered, the split-provenance group (escrow before interest
+                    and interest before escrow yielding the same figure, the
+                    refusal to guess between two uncategorized lines, a transfer
+                    leg never counting), the rate-authority group (a stale scalar
+                    losing to the timeline, a future-dated row being a step and
+                    not the current state), the rejection test, the source scan
+                    above, the report's error-and-retry and rate-history-wiring
+                    tests in
                     frontend/src/components/reports/LoanAmortizationReport.test.tsx,
-                    and the failure-then-refresh-then-success recovery test in
+                    the failed-rate-history refusal in
+                    frontend/src/app/accounts/[id]/page.test.tsx, and the
+                    failure-then-refresh-then-success recovery test in
                     frontend/src/hooks/useLoanProjection.test.tsx.
 Status              enforced
 ```
