@@ -131,7 +131,7 @@ describe('DebtPayoffTimelineReport', () => {
     );
   });
 
-  it('stays in the loading state until the interest fetch resolves (no analytic-estimate flicker)', async () => {
+  it('stays in the loading state until the interest fetch resolves (no zero-interest flicker)', async () => {
     mockGetAllAccounts.mockResolvedValue([
       {
         id: 'loan-1',
@@ -163,8 +163,10 @@ describe('DebtPayoffTimelineReport', () => {
     render(<DebtPayoffTimelineReport />);
 
     // Accounts and transactions have resolved, but the separate-interest fetch
-    // is still in flight: the report must keep the skeleton instead of painting
-    // the schedule with the analytic interest estimate.
+    // is still in flight. An interest list that has not arrived looks exactly
+    // like one that is genuinely empty, so the report must keep the skeleton
+    // rather than paint a schedule of zero interest and then snap to the booked
+    // figures.
     await act(async () => {});
     await act(async () => {});
     expect(document.querySelector('.animate-pulse')).toBeTruthy();

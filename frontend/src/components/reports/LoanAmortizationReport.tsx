@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { format, parseISO } from 'date-fns';
 import { accountsApi } from '@/lib/accounts';
@@ -20,10 +20,7 @@ import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountId } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
-import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
-
-const logger = createLogger('LoanAmortizationReport');
 
 type AmortizationSortField = 'paymentNumber' | 'date' | 'payment' | 'principal' | 'interest' | 'balance';
 
@@ -39,6 +36,9 @@ interface PaymentRow {
 
 const ACCOUNT_STORAGE_KEY = 'monize-reports-loan-amortization-account';
 
+/** Stable empty list, so "nothing loaded yet" is not a new dependency each render. */
+const NO_TRANSACTIONS: Transaction[] = [];
+
 export function LoanAmortizationReport() {
   const t = useTranslations('reports');
   const { formatCurrency } = useNumberFormat();
@@ -51,8 +51,6 @@ export function LoanAmortizationReport() {
       default: return type.charAt(0) + type.slice(1).toLowerCase();
     }
   };
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [interestTransactions, setInterestTransactions] = useState<Transaction[]>([]);
   const [showAllRows, setShowAllRows] = useState(false);
   const { sortField, sortDirection, handleSort } = useSortableTable<AmortizationSortField>(
     'reports.loan-amortization.sort',
@@ -60,10 +58,12 @@ export function LoanAmortizationReport() {
   );
 
   // Load all accounts and filter for loans.
-  const { data: fetchedAccounts, isLoading, error, reload } = useReportData(
-    () => accountsApi.getAll(true),
-    [],
-  );
+  const {
+    data: fetchedAccounts,
+    isLoading: accountsLoading,
+    error: accountsError,
+    reload: reloadAccounts,
+  } = useReportData(() => accountsApi.getAll(true), []);
 
   const accounts = useMemo(
     () =>
@@ -92,31 +92,58 @@ export function LoanAmortizationReport() {
 
   // Load the loan account's transactions plus its separately-booked interest
   // expenses, so the derived interest matches the loan detail page (see #893).
-  useEffect(() => {
-    const loadTransactions = async () => {
+  //
+  // Folded into the report's shared error + retry state rather than caught and
+  // replaced with empty lists: an empty interest list is what tells the
+  // derivation that these payments booked no interest, so a failed load
+  // rendered a schedule of zero interest that looks exactly like a real one
+  // (audit of PR #1258). A failure the user can retry is the only honest
+  // rendering of "we do not know what this loan paid".
+  const {
+    data: loanData,
+    dataKey: loanDataKey,
+    isLoading: loanDataLoading,
+    error: loanDataError,
+    reload: reloadLoanData,
+  } = useReportData(
+    async () => {
       if (!selectedAccountId) {
-        setTransactions([]);
-        setInterestTransactions([]);
-        return;
+        return { transactions: [] as Transaction[], interestTransactions: [] as Transaction[] };
       }
-
       const account = accounts.find((a) => a.id === selectedAccountId);
-      try {
-        const [txns, interest] = await Promise.all([
-          fetchAllAccountTransactions(selectedAccountId),
-          account ? fetchLoanInterestTransactions(account) : Promise.resolve([]),
-        ]);
-        setTransactions(txns);
-        setInterestTransactions(interest);
-      } catch (error) {
-        logger.error('Failed to load transactions:', error);
-        setTransactions([]);
-        setInterestTransactions([]);
-      }
-    };
+      const [txns, interest] = await Promise.all([
+        fetchAllAccountTransactions(selectedAccountId),
+        account
+          ? fetchLoanInterestTransactions(account)
+          : Promise.resolve([] as Transaction[]),
+      ]);
+      return { transactions: txns, interestTransactions: interest };
+    },
+    [selectedAccountId, accounts],
+    { requestKey: selectedAccountId },
+  );
 
-    loadTransactions();
-  }, [selectedAccountId, accounts]);
+  // The payload and the request it answers travel together: until the held data
+  // belongs to the loan on screen, there is nothing to draw for this selection.
+  const loanDataForSelection = useMemo(
+    () => (loanDataKey === selectedAccountId ? loanData : null),
+    [loanData, loanDataKey, selectedAccountId],
+  );
+  const transactions = useMemo(
+    () => loanDataForSelection?.transactions ?? NO_TRANSACTIONS,
+    [loanDataForSelection],
+  );
+  const interestTransactions = useMemo(
+    () => loanDataForSelection?.interestTransactions ?? NO_TRANSACTIONS,
+    [loanDataForSelection],
+  );
+
+  const isLoading = accountsLoading || loanDataLoading;
+  const error = accountsError || loanDataError;
+  const reload = () => {
+    reloadAccounts();
+    reloadLoanData();
+  };
 
   // Build payment history from actual transactions + projected future payments
   const paymentHistory = useMemo((): PaymentRow[] => {

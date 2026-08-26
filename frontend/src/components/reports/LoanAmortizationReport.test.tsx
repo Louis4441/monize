@@ -83,6 +83,7 @@ describe('LoanAmortizationReport', () => {
     ]);
     mockGetAllTransactions.mockResolvedValue({
       data: [{ id: 'p1', transactionDate: '2024-06-01', amount: 500, linkedTransaction: null }],
+      pagination: { hasMore: false },
     });
     mockGetAllPages.mockResolvedValue([
       { id: 'i1', transactionDate: '2024-06-01', amount: -300, categoryId: 'cat-int', isTransfer: false },
@@ -90,9 +91,9 @@ describe('LoanAmortizationReport', () => {
 
     render(<LoanAmortizationReport />);
 
-    // The report now pulls the loan's interest expenses, scoped to its
-    // configured interest category + source account, so its interest matches
-    // the loan detail page instead of an analytic estimate.
+    // The report pulls the loan's interest expenses, scoped to its configured
+    // interest category + source account, so its interest matches the loan
+    // detail page.
     await waitFor(() =>
       expect(mockGetAllPages).toHaveBeenCalledWith({
         categoryIds: ['cat-int'],
@@ -121,6 +122,7 @@ describe('LoanAmortizationReport', () => {
       data: [
         { id: 'tx-1', transactionDate: '2024-06-01', amount: 350, linkedTransaction: null },
       ],
+      pagination: { hasMore: false },
     });
     render(<LoanAmortizationReport />);
     await waitFor(() => {
@@ -152,6 +154,7 @@ describe('LoanAmortizationReport', () => {
         { id: 'tx-1', transactionDate: '2024-03-01', amount: 180, linkedTransaction: null },
         { id: 'tx-2', transactionDate: '2024-04-01', amount: 180, linkedTransaction: null },
       ],
+      pagination: { hasMore: false },
     });
     render(<LoanAmortizationReport />);
     await waitFor(() => {
@@ -560,7 +563,7 @@ describe('LoanAmortizationReport', () => {
     });
   });
 
-  it('handles loadTransactions error gracefully', async () => {
+  it('shows a retryable error when loading the loan transactions fails', async () => {
     mockGetAllAccounts.mockResolvedValue([
       {
         id: 'loan-1', name: 'Loan', accountType: 'LOAN',
@@ -572,8 +575,40 @@ describe('LoanAmortizationReport', () => {
     mockGetAllTransactions.mockRejectedValue(new Error('boom'));
     render(<LoanAmortizationReport />);
     await waitFor(() => {
-      expect(screen.getByText('Select Loan')).toBeInTheDocument();
+      expect(screen.getByText('Try again')).toBeInTheDocument();
     });
+    // The schedule must not be drawn from a history that failed to load: an
+    // empty one projects a plausible payoff from no payments at all.
+    expect(screen.queryByText('Select Loan')).not.toBeInTheDocument();
+  });
+
+  it('shows a retryable error when the interest lookup fails, not a zero-interest schedule', async () => {
+    // The loan books interest as separate expenses. The payments load, the
+    // interest lookup does not -- and an empty interest list is exactly what
+    // tells the derivation that these payments carried no interest. Rendering
+    // Interest $0.00 here is a plausible, wrong figure the user cannot tell from
+    // a real one (audit of PR #1258).
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loan-1', name: 'Mortgage', accountType: 'MORTGAGE',
+        currentBalance: -100000, openingBalance: -120000, interestRate: 5.0,
+        paymentAmount: 800, paymentFrequency: 'MONTHLY',
+        interestCategoryId: 'cat-int', sourceAccountId: 'src-1',
+        isCanadianMortgage: false, isVariableRate: false, isClosed: false,
+      },
+    ]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [{ id: 'p1', transactionDate: '2024-06-01', amount: 500, linkedTransaction: null }],
+      pagination: { hasMore: false },
+    });
+    mockGetAllPages.mockRejectedValue(new Error('timeout'));
+
+    render(<LoanAmortizationReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Try again')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/payments made/)).not.toBeInTheDocument();
   });
 
   it('exports CSV and PDF', async () => {
@@ -790,7 +825,7 @@ describe('LoanAmortizationReport', () => {
         isClosed: false,
       },
     ]);
-    mockGetAllTransactions.mockResolvedValue({ data: [] });
+    mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
     mockGetAllPages.mockResolvedValue([]);
     render(<LoanAmortizationReport />);
     await waitFor(() => {
@@ -816,7 +851,7 @@ describe('LoanAmortizationReport', () => {
         isVariableRate: false,
         isClosed: false,
       }]);
-    mockGetAllTransactions.mockResolvedValue({ data: [] });
+    mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
     mockGetAllPages.mockResolvedValue([]);
     render(<LoanAmortizationReport />);
     await waitFor(() => {

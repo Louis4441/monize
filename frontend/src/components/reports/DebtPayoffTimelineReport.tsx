@@ -105,8 +105,10 @@ export function DebtPayoffTimelineReport() {
 
   // The loan's separately-booked interest expenses, so derived interest matches
   // the loan detail page (see #893). Folded into the combined isLoading/error/
-  // reload below like the other loaders, so the schedule never paints with the
-  // analytic interest estimate and then snaps to the booked interest.
+  // reload below like the other loaders: an interest list that has not arrived
+  // is indistinguishable from one that is genuinely empty, so the schedule must
+  // not paint at zero interest and then snap to the booked figures -- and a
+  // failed fetch must reach the error state rather than settle at that zero.
   const {
     data: interestData,
     isLoading: interestLoading,

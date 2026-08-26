@@ -26,17 +26,20 @@ import {
  *   2. otherwise, if the linked source-account transaction carries an interest
  *      split (the shape ScheduledTransactionLoanService builds), that recorded
  *      interest is used -- exact even on variable-rate loans;
- *   3. otherwise, for a loan with no separately-booked interest at all, the
- *      interest is derived analytically from the running balance at the rate in
- *      effect on that date (`balance * periodicRate`, using the rate timeline
- *      when supplied), so a plain principal-only transfer shows a realistic
- *      interest that tracks the bank rather than 100% principal. When the loan
- *      DOES book interest as separate expenses, a payment with no paired expense
- *      carried no interest of its own (it is already represented by the booked
- *      expenses), so it is left at 0 rather than given an analytic estimate.
+ *   3. otherwise the payment recorded no interest, so it is 100% principal and
+ *      its interest is a known **zero** -- never an estimate derived from the
+ *      balance and the account's rate. Historical rows report the ledger: a
+ *      figure the borrower never paid inflates "Interest Paid", every cumulative
+ *      total built on it, the CSV/PDF exports, and the installment the forward
+ *      projection is seeded with (issue #1255).
  *
  * The balance walk is unchanged -- it always tracks the actual ledger amount,
  * so the projected balance still ends at the account's current balance.
+ *
+ * Zero here is a *measured* zero, which is why it is a number and not null: the
+ * ledger was read and it recorded no interest. A ledger that could not be read
+ * is a different state, and `fetchLoanInterestTransactions` rejects rather than
+ * returning an empty list so its callers can tell the two apart.
  */
 
 export type LoanPaymentType = 'REGULAR' | 'OVERPAYMENT';
@@ -55,11 +58,14 @@ export interface LoanPaymentEvent {
   /**
    * The annual interest rate (percentage) for this installment. When the loan
    * has a recorded rate history it is the exact rate in effect on this row's
-   * date (the clean, discrete history); with no rate history it falls back to
-   * the rate reconstructed from the interest charged (`interest /
-   * balanceBefore x periodsPerYear`). Null for overpayments. Always populated
-   * by `deriveLoanPaymentHistory`; optional only so test fixtures that build
-   * events by hand need not supply it.
+   * date (the clean, discrete history); with no rate history it is
+   * reconstructed from the interest charged (`interest / balanceBefore x
+   * periodsPerYear`), and where the row charged no interest a *fixed*-rate
+   * loan still shows its configured rate -- the rate is a known fact about the
+   * loan whether or not this payment settled any interest. Null for
+   * overpayments, and for a variable-rate loan whose history says nothing.
+   * Always populated by `deriveLoanPaymentHistory`; optional only so test
+   * fixtures that build events by hand need not supply it.
    */
   annualRate?: number | null;
 }
@@ -82,7 +88,8 @@ export function deriveLoanPaymentHistory(
   // actual expense paired to its date -- exact, matching the lender -- and
   // overpayments show the interest charged alongside them. Excludes transfers
   // (a principal transfer that happens to share the interest category is not
-  // interest). Falls back to the split/analytic paths when none is paired.
+  // interest). Falls back to a recorded split, then to zero, when none is
+  // paired.
   interestTransactions: Transaction[] = [],
 ): LoanHistoryResult {
   const loanAccountId = account.id;
@@ -147,15 +154,6 @@ export function deriveLoanPaymentHistory(
       scopedInterestTransactions,
       repayments.map((t) => t.transactionDate.split('T')[0]),
     );
-  // Whether this loan books interest as separate expenses. When it does, a
-  // payment with no paired interest carried none of its own (the interest for
-  // its date is already represented by the booked expenses), so it must not
-  // receive an analytic estimate -- see classifyPayment. Derived from the
-  // pairing output (not the raw list) so all-transfer / zero-amount inputs,
-  // which pairSeparateInterestByDate discards, don't falsely disable the
-  // analytic fallback.
-  const hasSeparateInterest =
-    separateInterestByDate.size > 0 || orphanInterest.length > 0;
   const usedInterestDates = new Set<string>();
   const events: LoanPaymentEvent[] = [];
 
@@ -173,14 +171,11 @@ export function deriveLoanPaymentHistory(
       const principal = Math.abs(Number(transaction.amount));
       const { interest, type } = classifyPayment(
         transaction,
-        runningBalance,
         account,
         loanAccountId,
         processedParentIds,
-        rateChanges,
         separateInterestByDate,
         usedInterestDates,
-        hasSeparateInterest,
       );
       runningBalance = Math.max(0, runningBalance - principal);
       cumulativePrincipal += principal;
@@ -201,20 +196,16 @@ export function deriveLoanPaymentHistory(
     // magnitude at that point.
     let runningSigned = openingSigned;
     for (const transaction of sortedTransactions) {
-      const balanceBefore = debtMagnitude(runningSigned);
       runningSigned += Number(transaction.amount);
       if (Number(transaction.amount) <= 0) continue; // draws move the balance, no row
       const principal = Math.abs(Number(transaction.amount));
       const { interest, type } = classifyPayment(
         transaction,
-        balanceBefore,
         account,
         loanAccountId,
         processedParentIds,
-        rateChanges,
         separateInterestByDate,
         usedInterestDates,
-        hasSeparateInterest,
       );
       cumulativePrincipal += principal;
       cumulativeInterest += interest;
@@ -295,15 +286,21 @@ function debtMagnitude(signedBalance: number): number {
 
 /**
  * The installment to seed a forward projection with, given the payment history:
- * the most recent regular payment's full amount, `principal + interest`. With
- * interest now taken from the rate timeline (or a recorded split), this is the
- * borrower's real current installment -- and it always covers the period's
- * interest, since the principal portion is positive, so the projection
- * amortizes. Falls back to the stored contractual payment only when there is no
- * usable regular payment yet (e.g. an interest-only grace period). The stored
- * payment is not preferred even when it is lower: for loans whose interest is
- * booked separately it often holds only the principal part and would seed a
- * non-amortizing payment.
+ * the most recent regular payment's full amount, `principal + interest`. Where
+ * that payment's interest was recorded (a split, or a paired separate expense)
+ * this is the borrower's real current installment. Falls back to the stored
+ * contractual payment only when there is no usable regular payment yet (e.g. an
+ * interest-only grace period). The stored payment is not preferred even when it
+ * is lower: for loans whose interest is booked separately it often holds only
+ * the principal part and would seed a non-amortizing payment.
+ *
+ * **It does not always amortize.** A row whose interest the ledger never
+ * recorded contributes `principal + 0`, which for a loan booking interest
+ * outside the app can be well under one period's interest. It used to be topped
+ * up by an estimate (issue #1255) -- so the figure looked like an installment
+ * and was partly invented. `buildLoanProjectionInput` now checks it against the
+ * first period's interest and looks elsewhere when it falls short, rather than
+ * this function guessing the missing part.
  */
 export function deriveCurrentInstallment(
   history: LoanHistoryResult,
@@ -339,14 +336,27 @@ export function resolveCurrentInstallment(
  * current installment. Returns null when the account cannot be projected (no
  * remaining balance, rate, payment, or frequency).
  *
- * The seed payment is the installment actually in effect -- the latest recorded
- * payment change from the rate timeline, else the real installment derived from
- * history (principal + interest of the last regular payment) -- never the stored
- * contractual `paymentAmount`, which is often stale or principal-only. When that
- * seed cannot cover the first period's interest (a principal-only figure for
- * separately-booked interest), it falls back to the derived installment, which
- * always amortizes. Future-dated rate steps bend the projection ahead; passing
- * no `rateChanges` simply omits them.
+ * The seed payment is the installment actually in effect, preferred in this
+ * order, and each candidate is used only if it covers the first period's
+ * interest -- a payment that does not can never amortize, and seeding one makes
+ * `generateLoanSchedule` return no rows at all:
+ *
+ *   1. the latest recorded payment change from the rate timeline;
+ *   2. the installment derived from history (`principal + interest` of the last
+ *      regular payment) -- the borrower's real one where the ledger recorded
+ *      that payment's interest;
+ *   3. the stored contractual `paymentAmount`.
+ *
+ * The contractual figure is last because it is often stale or principal-only,
+ * but it is a real stored fact and it is what a loan booking its interest
+ * outside the app has left: history alone then yields `principal + 0`, under one
+ * period's interest, and the estimate that used to top it up was the defect in
+ * issue #1255. When nothing on the list amortizes there is no projection --
+ * `generateLoanSchedule` refuses, and the payoff and remaining interest read as
+ * unknown rather than as a figure built on an invented installment.
+ *
+ * Future-dated rate steps bend the projection ahead; passing no `rateChanges`
+ * simply omits them.
  */
 export function buildLoanProjectionInput(
   account: Account,
@@ -369,12 +379,25 @@ export function buildLoanProjectionInput(
   const today = new Date().toISOString().slice(0, 10);
   const futureTimeline = buildRateTimeline(rateChanges, today, account.interestRate!);
   const installment = deriveCurrentInstallment(history, account.paymentAmount!);
-  const seededPayment = futureTimeline.startingPaymentAmount ?? installment;
-  const currentPayment =
-    seededPayment >
-    firstPeriodInterest(history.currentBalance, account.interestRate!, frequency, isCanadian, isVariableRate)
-      ? seededPayment
-      : installment;
+  const periodInterest = firstPeriodInterest(
+    history.currentBalance,
+    account.interestRate!,
+    frequency,
+    isCanadian,
+    isVariableRate,
+  );
+  const amortizes = (payment: number) => payment > periodInterest;
+  const candidates = [
+    futureTimeline.startingPaymentAmount ?? installment,
+    installment,
+    account.paymentAmount!,
+  ];
+  // With no amortizing candidate the derived installment is passed through, so
+  // `generateLoanSchedule` refuses exactly as it does for a genuinely
+  // underfunded loan -- there is nothing left to seed a projection with, and
+  // picking the largest figure available would only make the refusal look like
+  // a decision about the loan.
+  const currentPayment = candidates.find(amortizes) ?? installment;
 
   return {
     startingBalance: history.currentBalance,
@@ -392,21 +415,21 @@ export function buildLoanProjectionInput(
  * Classify a positive loan-account transaction into its interest portion and
  * row type. Interest is resolved in order: a recorded interest split of the
  * payment; else the actual separate interest expense paired to this date; else
- * an analytic estimate from the running balance and rate. An overpayment
- * (recognized by the loan's overpayment category / memo / payee) is extra
- * principal, but still shows any real interest charged alongside it (paired) --
- * never an analytic estimate.
+ * zero -- the payment recorded no interest, so it was all principal. An
+ * overpayment (recognized by the loan's overpayment category / memo / payee) is
+ * extra principal, but still shows any real interest charged alongside it
+ * (paired).
+ *
+ * Nothing here consults the balance or the rate: a historical row states what
+ * the ledger holds. `account` is read only for the overpayment markers.
  */
 function classifyPayment(
   transaction: Transaction,
-  balanceBefore: number,
   account: Account,
   loanAccountId: string,
   processedParentIds: Set<string>,
-  rateChanges: RateTimelineRow[],
   separateInterestByDate: Map<string, number>,
   usedInterestDates: Set<string>,
-  hasSeparateInterest: boolean,
 ): { interest: number; type: LoanPaymentType } {
   const dateKey = transaction.transactionDate.split('T')[0];
   // The actual interest expense paired to this date, consumed once.
@@ -442,20 +465,12 @@ function classifyPayment(
   if (paired != null) {
     return { interest: paired, type: 'REGULAR' };
   }
-  // A loan that books interest as separate expenses has this payment's interest
-  // (if any) already captured by those expenses. When none is paired to this
-  // payment -- e.g. a principal-only leg sharing a date with another payment
-  // that already consumed the date's interest, like an overpayment and a
-  // regular installment on the same day -- it genuinely carried no interest.
-  // Only fall back to an analytic estimate for loans with no separate interest
-  // booking at all, where the interest is not recorded anywhere else.
-  if (hasSeparateInterest) {
-    return { interest: 0, type: 'REGULAR' };
-  }
-  return {
-    interest: analyticInterest(balanceBefore, account, transaction, rateChanges),
-    type: 'REGULAR',
-  };
+  // Neither a recorded split nor a paired separate expense: the ledger records
+  // no interest against this payment, so it moved principal only. That is a
+  // measured zero, not an unknown -- the alternative, estimating it from the
+  // balance and the account's rate, reported interest the borrower never paid
+  // (issue #1255).
+  return { interest: 0, type: 'REGULAR' };
 }
 
 /**
@@ -582,9 +597,9 @@ function matchesOverpaymentMemo(
 /**
  * The recorded interest of a payment lives on the linked source-account
  * transaction as the split that does not transfer back to the loan. Returns
- * null when there is no recorded interest split (so the caller falls back to
- * the analytic derivation); a single source payment covering several loan
- * transfers is counted only once.
+ * null when there is no recorded interest split (so the caller falls back to a
+ * paired separate expense, then to zero); a single source payment covering
+ * several loan transfers is counted only once.
  */
 function readRecordedInterest(
   transaction: Transaction,
@@ -597,43 +612,6 @@ function readRecordedInterest(
   processedParentIds.add(linkedTx.id);
   const interestSplit = linkedTx.splits.find((s) => s.transferAccountId !== loanAccountId);
   return interestSplit ? Math.abs(interestSplit.amount) : 0;
-}
-
-/**
- * Interest a regular payment accrued over the period, `balance * periodicRate`,
- * for amortizing debt with a positive rate. Only loans and mortgages get an
- * analytic estimate (revolving credit has no fixed installment schedule). The
- * rate is the one in effect on the payment date from the rate timeline (falling
- * back to the account's rate), so a variable-rate loan reprices each month and
- * the figure tracks the bank's amortization. Not capped at the loan-side
- * transaction amount: that amount is principal-only when interest is booked as
- * a separate transaction, and capping there collapses interest to the principal
- * (the artifact this replaces). Floored at zero.
- */
-function analyticInterest(
-  balanceBefore: number,
-  account: Account,
-  transaction: Transaction,
-  rateChanges: RateTimelineRow[],
-): number {
-  if (account.accountType !== 'LOAN' && account.accountType !== 'MORTGAGE') {
-    return 0;
-  }
-  const annualRate = effectiveAnnualRateOn(
-    rateChanges,
-    transaction.transactionDate,
-    Number(account.interestRate),
-  );
-  if (!annualRate || annualRate <= 0 || balanceBefore <= 0) return 0;
-  const frequency = (account.paymentFrequency as ScheduleFrequency) || 'MONTHLY';
-  const periodicRate = getPeriodicRate(
-    annualRate,
-    getPeriodsPerYear(frequency),
-    account.isCanadianMortgage || false,
-    account.isVariableRate || false,
-  );
-  const interest = balanceBefore * periodicRate;
-  return Math.round(Math.max(0, interest) * 100) / 100;
 }
 
 /**
@@ -742,6 +720,14 @@ const FULL_PERIOD_INTEREST_RATIO = 0.5;
  * full-period installment keeps its observed rate, which tracks the real
  * variable rate month to month. Falls back to the plain observed rate when no
  * timeline rate is available to compare against.
+ *
+ * A regular row that charged no interest has nothing to reconstruct from, and
+ * for a **fixed**-rate loan that is not the same as an unknown rate: the
+ * configured `interestRate` was in effect on that date regardless of what the
+ * payment settled, so the row keeps showing it. A variable-rate loan with no
+ * recorded history genuinely does not know its rate on that date, and stays
+ * null. Historical *interest* is the ledger's to state (issue #1255); the
+ * historical *rate* is the loan's, and one must not be dropped with the other.
  */
 function assignObservedRates(
   events: LoanPaymentEvent[],
@@ -771,6 +757,11 @@ function assignObservedRates(
   const periodDays = 365 / periodsPerYear;
   const isCanadian = account.isCanadianMortgage || false;
   const isVariable = account.isVariableRate || false;
+  // No rate history here (this branch only runs when rateChanges is empty), so
+  // the account's scalar rate is the only reference available -- both to
+  // sanity-check a reconstructed figure against and, for a fixed-rate loan, as
+  // the rate of a row that charged no interest to reconstruct from.
+  const configuredRate = Number(account.interestRate);
   let lastInterestDateKey: string | null = null;
   for (const event of events) {
     const balanceBefore = event.balance + event.principal;
@@ -803,18 +794,21 @@ function assignObservedRates(
           ? periodicRate * periodsPerYear * 100
           : (Math.pow(1 + periodicRate, periodsPerYear / 2) - 1) * 2 * 100
         : periodicRate * (365 / days) * 100;
-      // No rate history here (this branch only runs when rateChanges is empty),
-      // so the account's scalar rate is the only reference to sanity-check the
-      // observed figure against.
-      const fallbackRate = Number(account.interestRate);
       const expectedFullPeriodInterest =
-        fallbackRate > 0
-          ? balanceBefore * getPeriodicRate(fallbackRate, periodsPerYear, isCanadian, isVariable)
+        configuredRate > 0
+          ? balanceBefore * getPeriodicRate(configuredRate, periodsPerYear, isCanadian, isVariable)
           : 0;
       const isFullPeriod =
         expectedFullPeriodInterest <= 0 ||
         event.interest >= expectedFullPeriodInterest * FULL_PERIOD_INTEREST_RATIO;
-      event.annualRate = isFullPeriod ? observed : fallbackRate;
+      event.annualRate = isFullPeriod ? observed : configuredRate;
+    } else if (event.type === 'REGULAR' && !isVariable && configuredRate > 0) {
+      // Nothing to reconstruct from (a principal-only payment, or a row against
+      // no balance), but a fixed loan's configured rate was still the rate in
+      // effect on this date -- so the Rate column keeps it rather than dropping
+      // to "--" alongside the interest. Deliberately not extended to variable
+      // rates: there the scalar rate is only today's, and this row's is unknown.
+      event.annualRate = configuredRate;
     } else {
       event.annualRate = null;
     }
@@ -853,9 +847,17 @@ export async function fetchAllAccountTransactions(accountId: string): Promise<Tr
 /**
  * Fetch the loan's separate interest expenses: transactions in the loan's
  * interest category on its payment source account. Pass the result to
- * `deriveLoanPaymentHistory` so each row shows the actual interest booked
- * (rather than an analytic estimate) and overpayments show their interest too.
- * Returns [] when the loan has no interest category or source account set.
+ * `deriveLoanPaymentHistory` so each row shows the actual interest booked and
+ * overpayments show their interest too. Returns [] when the loan has no
+ * interest category or source account set.
+ *
+ * **Rejects on a failed lookup rather than returning [].** An empty list is a
+ * claim about the ledger -- `deriveLoanPaymentHistory` reads it as "no interest
+ * was booked against these payments, so their interest is zero" -- and a
+ * timeout, a 500 or a proxy error is not that claim. Swallowing the failure
+ * here rendered a plausible, wrong Interest Paid of 0.00 with no way for the
+ * user to tell it from a real one. Every caller routes the rejection into its
+ * own error-and-retry state.
  *
  * Only genuinely standalone interest expenses are returned. The category filter
  * also matches interest booked as a *split leg* of a payment (the backend
@@ -876,15 +878,11 @@ export async function fetchLoanInterestTransactions(
   account: Account,
 ): Promise<Transaction[]> {
   if (!account.interestCategoryId || !account.sourceAccountId) return [];
-  try {
-    const results = await transactionsApi.getAllPages({
-      categoryIds: [account.interestCategoryId],
-      accountIds: [account.sourceAccountId],
-    });
-    return results.filter(
-      (tx) => tx.categoryId === account.interestCategoryId && !tx.isTransfer,
-    );
-  } catch {
-    return [];
-  }
+  const results = await transactionsApi.getAllPages({
+    categoryIds: [account.interestCategoryId],
+    accountIds: [account.sourceAccountId],
+  });
+  return results.filter(
+    (tx) => tx.categoryId === account.interestCategoryId && !tx.isTransfer,
+  );
 }
