@@ -3352,6 +3352,63 @@ describe('TransactionForm', () => {
       );
     });
 
+    it('leaves the date the user entered alone when quick-filling', async () => {
+      const recent = createExistingTransaction({
+        id: 'rec-3',
+        transactionDate: '2024-01-15',
+        payeeName: 'Grocery Store',
+      });
+
+      render(
+        <TransactionForm
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+          defaultAccountId="acc-1"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Date')).toBeInTheDocument();
+      });
+      // The user is back-dating a batch of receipts.
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Date'), {
+          target: { value: '2026-08-19' },
+        });
+      });
+
+      await openRecentsAndPick(recent);
+
+      await waitFor(() => {
+        expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe(
+          '-50.00',
+        );
+      });
+      // The date box still shows what the user typed...
+      expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe(
+        '2026-08-19',
+      );
+
+      // ...and so does the saved row. This is the assertion that matters:
+      // DateInput renders its own internal state, so the old
+      // setValue('transactionDate', today) never showed up in the box - it
+      // only changed the value that got submitted, leaving the screen and the
+      // stored date disagreeing. Neither today nor the source row's own date.
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: /Create Transaction/i }),
+        );
+      });
+      await waitFor(() => {
+        expect(mockCreate).toHaveBeenCalled();
+      });
+      expect(mockCreate.mock.calls[0][0].transactionDate).toBe('2026-08-19');
+      expect(mockCreate.mock.calls[0][0].transactionDate).not.toBe(
+        getLocalDateString(),
+      );
+      expect(mockCreate.mock.calls[0][0].transactionDate).not.toBe('2024-01-15');
+    });
+
     it('keeps the selected account currency when the recent row is in a foreign-currency account', async () => {
       const recent = createExistingTransaction({
         id: 'rec-2',
