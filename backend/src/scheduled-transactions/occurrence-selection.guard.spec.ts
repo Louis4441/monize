@@ -155,24 +155,31 @@ describe("occurrence selection stays in one place", () => {
    * changed.
    */
   it("reads the resolver's base amount only where the base is the question", () => {
-    const BASE_READERS = [
-      "scheduled-transactions/scheduled-effective-amount.service.ts",
-      "scheduled-transactions/scheduled-occurrence.service.ts",
+    // Counts, not a blanket exemption: `scheduled-transactions.service.ts` is
+    // 4000 lines, and a file-level allowance would let a NEW occurrence-aware
+    // method in it read the base freely. Shrink-only -- a lower number is a
+    // migration, a higher one needs its own argument here.
+    const ALLOWED_BASE_READS = new Map([
+      ["scheduled-transactions/scheduled-effective-amount.service.ts", 8],
+      ["scheduled-transactions/scheduled-occurrence.service.ts", 1],
       // findAll's schedule-level read model: `effectiveAmount` on a schedule row
       // is by definition the base, and the row carries its overrides beside it.
-      "scheduled-transactions/scheduled-transactions.service.ts",
-    ];
+      ["scheduled-transactions/scheduled-transactions.service.ts", 3],
+    ]);
 
-    const offenders: string[] = [];
+    const counts = new Map<string, number>();
     for (const file of files) {
-      if (BASE_READERS.includes(file.path)) continue;
-      file.lines.forEach((line, i) => {
+      file.lines.forEach((line) => {
         if (isComment(line)) return;
         if (/\.base\.(amount|complete|currencyCode)\b/.test(line)) {
-          offenders.push(`${file.path}:${i + 1}`);
+          counts.set(file.path, (counts.get(file.path) ?? 0) + 1);
         }
       });
     }
+
+    const offenders = [...counts.entries()]
+      .filter(([path, count]) => count > (ALLOWED_BASE_READS.get(path) ?? 0))
+      .map(([path, count]) => `${path}: ${count} base reads`);
 
     expect(offenders).toEqual([]);
   });
@@ -184,25 +191,31 @@ describe("occurrence selection stays in one place", () => {
    * argued for here.
    */
   it("calls the effective-amount resolver only from declared places", () => {
-    const RESOLVER_CALLERS = [
+    // Also counted, for the same reason as the base reads above.
+    const ALLOWED_RESOLVER_CALLS = new Map([
       // `resolveOne` delegates to `resolveMany`.
-      "scheduled-transactions/scheduled-effective-amount.service.ts",
+      ["scheduled-transactions/scheduled-effective-amount.service.ts", 1],
       // The one consumer: prices the occurrences it has expanded.
-      "scheduled-transactions/scheduled-occurrence.service.ts",
+      ["scheduled-transactions/scheduled-occurrence.service.ts", 1],
       // The schedule-level list read model (see above).
-      "scheduled-transactions/scheduled-transactions.service.ts",
-    ];
+      ["scheduled-transactions/scheduled-transactions.service.ts", 1],
+    ]);
 
-    const offenders: string[] = [];
+    const counts = new Map<string, number>();
     for (const file of files) {
-      if (RESOLVER_CALLERS.includes(file.path)) continue;
-      file.lines.forEach((line, i) => {
+      file.lines.forEach((line) => {
         if (isComment(line)) return;
         if (/\.(resolveMany|resolveOne)\s*\(/.test(line)) {
-          offenders.push(`${file.path}:${i + 1}`);
+          counts.set(file.path, (counts.get(file.path) ?? 0) + 1);
         }
       });
     }
+
+    const offenders = [...counts.entries()]
+      .filter(
+        ([path, count]) => count > (ALLOWED_RESOLVER_CALLS.get(path) ?? 0),
+      )
+      .map(([path, count]) => `${path}: ${count} resolver calls`);
 
     expect(offenders).toEqual([]);
   });
