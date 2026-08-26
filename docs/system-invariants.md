@@ -892,8 +892,9 @@ Required tests      A workflow self-test asserting the bump commit's parent is t
 Status              partial
 ```
 
-`docs/release-integrity.md` has the full rules and gap register, including the
-unconditional `--passWithNoTests` on the integration suite.
+`docs/release-integrity.md` has the full rules and gap register, including
+REL-001's blanket pass-with-no-tests rule and what still remains unenforced
+under REL-002.
 
 ## Candidates not yet admitted
 
