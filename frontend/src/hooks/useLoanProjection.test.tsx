@@ -206,6 +206,45 @@ describe('useLoanProjection', () => {
     expect(result.current.status).toBe('error');
   });
 
+  it('reports the rate in effect, not the account scalar the payoff ignores', async () => {
+    // The card, the sidebar and the PDF all used to print account.interestRate
+    // while the payoff was projected from the timeline. A user troubleshooting an
+    // unavailable payoff was shown "5%" -- terms under which the loan amortizes
+    // comfortably -- by the very screen refusing to project it at the real 12%.
+    getAll.mockResolvedValue(pageOf([payment('t1', '2026-06-15', 600)]));
+    getRateChanges.mockResolvedValue([
+      {
+        id: 'r1',
+        effectiveDate: '2026-01-01',
+        annualRate: 12,
+        newPaymentAmount: 900,
+        source: 'manual',
+      },
+    ]);
+
+    const { result } = renderHook(() =>
+      useLoanProjection(makeAccount({ currentBalance: -100000, interestRate: 5 })),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.currentAnnualRate).toBe(12);
+    expect(result.current.currentPayment).toBe(900);
+    // 100000 at 12% costs 1000 a month, so 900 does not amortize and there is no
+    // payoff -- which is exactly why the displayed rate must be the 12%.
+    expect(result.current.payoffDate).toBeNull();
+    expect(result.current.remainingInterest).toBeNull();
+  });
+
+  it('leaves the rate unknown while loading and on failure', async () => {
+    // A consumer keeps its own fallback for those states rather than being
+    // handed a number that is not yet, or never was, resolved.
+    getAll.mockRejectedValue(new Error('network'));
+    const { result } = renderHook(() => useLoanProjection(makeAccount()));
+    expect(result.current.currentAnnualRate).toBeNull();
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.currentAnnualRate).toBeNull();
+  });
+
   it('refetches when the refresh key is bumped', async () => {
     const { result, rerender } = renderHook(
       ({ refreshKey }: { refreshKey: number }) =>

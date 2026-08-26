@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act } from '@/test/render';
+import { render, screen, act, fireEvent } from '@/test/render';
 import AccountDetailPage from './page';
 import { Account } from '@/types/account';
 
@@ -268,6 +268,38 @@ describe('AccountDetailPage', () => {
     await renderPage();
 
     expect(screen.getByText('Failed to load account details')).toBeInTheDocument();
+    expect(screen.queryByText('Loan Schedule')).not.toBeInTheDocument();
+  });
+
+  it('refuses to keep the old payoff live after a rate mutation whose reload fails', async () => {
+    // The mutation SUCCEEDED, so the rows on screen are known-stale -- and the
+    // projection resolves its rate and payment from them, so the payoff, the
+    // scenarios and the PDF export would all stay live over terms the user has
+    // just replaced. A toast disappears; the page's retryable error state does
+    // not, and it is the same treatment a failed initial load gets because it is
+    // the same prerequisite.
+    const { loanRateChangesApi } = await import('@/lib/loan-rate-changes');
+    (loanRateChangesApi.detect as ReturnType<typeof vi.fn>).mockResolvedValue({
+      created: [],
+      warnings: [],
+    });
+    mockGetById.mockResolvedValue(makeAccount());
+    await renderPage();
+    expect(screen.getByText('Loan Schedule')).toBeInTheDocument();
+
+    // Detection succeeds, the follow-up authoritative reload does not.
+    mockGetAllRateChanges.mockRejectedValue(new Error('throttled'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Detect from history'));
+    });
+    // The confirm dialog reuses the trigger's label, so there are two; the
+    // dialog's is the later one.
+    const confirms = screen.getAllByText('Detect from history');
+    await act(async () => {
+      fireEvent.click(confirms[confirms.length - 1]);
+    });
+
+    expect(screen.getByText(/Couldn't load the rate history/)).toBeInTheDocument();
     expect(screen.queryByText('Loan Schedule')).not.toBeInTheDocument();
   });
 

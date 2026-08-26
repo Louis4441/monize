@@ -22,6 +22,15 @@ interface LoanSummaryCardsProps {
    * loans that book interest separately holds only the principal part.
    */
   currentInstallment: number | null;
+  /**
+   * The rate in effect, resolved from the rate history the projection also uses
+   * (`resolveCurrentLoanTerms`) -- NOT `account.interestRate`, which recording a
+   * rate change deliberately never writes and which is therefore the OLD rate on
+   * any loan whose rate was changed through the rate-history UI. Showing the
+   * scalar here put "5%" on the card beside a payoff the projection had refused
+   * at the real 12%.
+   */
+  currentAnnualRate: number | null;
   /** Projection from the current balance; null when the loan can't project */
   baseline: LoanScheduleResult | null;
 }
@@ -34,6 +43,7 @@ export function LoanSummaryCards({
   account,
   startingBalance,
   currentInstallment,
+  currentAnnualRate,
   baseline,
 }: LoanSummaryCardsProps) {
   const t = useTranslations('accounts');
@@ -43,8 +53,8 @@ export function LoanSummaryCards({
 
   const isCanadianFixed = account.isCanadianMortgage && !account.isVariableRate;
   const effectiveRate =
-    isCanadianFixed && account.interestRate
-      ? (Math.pow(1 + account.interestRate / 100 / 2, 2) - 1) * 100
+    isCanadianFixed && currentAnnualRate
+      ? (Math.pow(1 + currentAnnualRate / 100 / 2, 2) - 1) * 100
       : null;
 
   const frequencyLabel = account.paymentFrequency
@@ -77,7 +87,10 @@ export function LoanSummaryCards({
     },
     {
       label: t('loanDetail.summary.interestRate'),
-      value: account.interestRate != null ? `${account.interestRate}%` : t('loanDetail.summary.notSet'),
+      value:
+        currentAnnualRate != null
+          ? `${currentAnnualRate}%`
+          : t('loanDetail.summary.notSet'),
       note:
         effectiveRate != null
           ? t('loanDetail.summary.effectiveRate', { rate: effectiveRate.toFixed(3) })

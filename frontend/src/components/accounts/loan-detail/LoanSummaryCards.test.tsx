@@ -38,12 +38,32 @@ function makeBaseline() {
 }
 
 describe('LoanSummaryCards', () => {
+  it('shows the rate in effect, not the account scalar', () => {
+    // The scalar is the OLD rate on any loan whose rate was changed through the
+    // rate-history UI (recording a change deliberately never writes it), so the
+    // card used to print 5% beside a payoff the projection had refused at 12%.
+    // Every other fixture here passes a rate equal to the account's, which is
+    // why reverting this to account.interestRate left them all green.
+    render(
+      <LoanSummaryCards
+        account={makeAccount({ interestRate: 5 })}
+        startingBalance={10000}
+        currentInstallment={500}
+        currentAnnualRate={12}
+        baseline={null}
+      />,
+    );
+    expect(screen.getByText('12%')).toBeInTheDocument();
+    expect(screen.queryByText('5%')).not.toBeInTheDocument();
+  });
+
   it('renders balance, original amount, rate, and payment figures', () => {
     render(
       <LoanSummaryCards
         account={makeAccount()}
         startingBalance={10000}
         currentInstallment={500}
+        currentAnnualRate={6}
         baseline={makeBaseline()}
       />,
     );
@@ -64,6 +84,7 @@ describe('LoanSummaryCards', () => {
         account={makeAccount()}
         startingBalance={10000}
         currentInstallment={500}
+        currentAnnualRate={6}
         baseline={baseline}
       />,
     );
@@ -80,6 +101,7 @@ describe('LoanSummaryCards', () => {
         account={makeAccount({ accountType: 'MORTGAGE', isCanadianMortgage: true, interestRate: 5 })}
         startingBalance={10000}
         currentInstallment={500}
+        currentAnnualRate={5}
         baseline={null}
       />,
     );
@@ -94,6 +116,7 @@ describe('LoanSummaryCards', () => {
         account={makeAccount({ isCanadianMortgage: true, isVariableRate: true, interestRate: 5 })}
         startingBalance={10000}
         currentInstallment={500}
+        currentAnnualRate={5}
         baseline={null}
       />,
     );
@@ -107,6 +130,7 @@ describe('LoanSummaryCards', () => {
         account={makeAccount({ interestRate: null, paymentAmount: null, paymentFrequency: null })}
         startingBalance={10000}
         currentInstallment={null}
+        currentAnnualRate={null}
         baseline={null}
       />,
     );
@@ -121,6 +145,7 @@ describe('LoanSummaryCards', () => {
         account={makeAccount({ currentBalance: 0 })}
         startingBalance={10000}
         currentInstallment={500}
+        currentAnnualRate={6}
         baseline={null}
       />,
     );
@@ -144,6 +169,7 @@ describe('LoanSummaryCards', () => {
         account={makeAccount({ currentBalance: 42 })}
         startingBalance={10000}
         currentInstallment={500}
+        currentAnnualRate={6}
         baseline={null}
       />,
     );
@@ -169,6 +195,7 @@ describe('LoanSummaryCards', () => {
         account={makeAccount()}
         startingBalance={10000}
         currentInstallment={50}
+        currentAnnualRate={6}
         baseline={baseline}
       />,
     );

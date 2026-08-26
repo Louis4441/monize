@@ -6,7 +6,7 @@ import {
   deriveLoanPaymentHistory,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
-  resolveCurrentInstallment,
+  resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { loanRateChangesApi } from '@/lib/loan-rate-changes';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
@@ -35,6 +35,13 @@ export type LoanProjectionStatus =
 
 export interface LoanProjectionResult extends LoanFigures {
   status: LoanProjectionStatus;
+  /**
+   * The annual rate in effect, from the same resolution the payoff is projected
+   * at -- `account.interestRate` is the OLD rate on any loan whose rate was
+   * changed through the rate-history UI. Null while loading or unknown, so a
+   * consumer keeps its own fallback for those states.
+   */
+  currentAnnualRate: number | null;
 }
 
 /** The raw history one account's projection is derived from, with its own key. */
@@ -122,12 +129,13 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
       payoffDate: null,
       remainingInterest: null,
     };
-    if (!isAmortizingDebt) return { status: 'idle', ...unknown };
+    if (!isAmortizingDebt) return { status: 'idle', currentAnnualRate: null, ...unknown };
     if (failedAccountId === accountId) {
       // The balance is the account's own, so a settled debt still reads as
       // settled even when its history could not be loaded.
       return {
         status: 'error',
+        currentAnnualRate: null,
         ...unknown,
         ...deriveLoanFigures({
           currentBalance: account.currentBalance,
@@ -136,7 +144,8 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
         }),
       };
     }
-    if (!data || data.accountId !== accountId) return { status: 'loading', ...unknown };
+    if (!data || data.accountId !== accountId)
+      return { status: 'loading', currentAnnualRate: null, ...unknown };
 
     const history = deriveLoanPaymentHistory(
       account,
@@ -144,19 +153,16 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
       data.rateChanges,
       data.interestTransactions,
     );
-    const currentInstallment = resolveCurrentInstallment(
-      account,
-      history,
-      data.rateChanges,
-    );
+    const currentTerms = resolveCurrentLoanTerms(account, history, data.rateChanges);
     const projectionInput = buildLoanProjectionInput(account, history, data.rateChanges);
     const baseline = projectionInput ? generateLoanSchedule(projectionInput) : null;
 
     return {
       status: 'ready',
+      currentAnnualRate: currentTerms.annualRate,
       ...deriveLoanFigures({
         currentBalance: account.currentBalance,
-        currentInstallment,
+        currentInstallment: currentTerms.payment,
         baseline,
       }),
     };

@@ -359,8 +359,42 @@ export function resolveCurrentInstallment(
   history: LoanHistoryResult,
   rateChanges: RateTimelineRow[] = [],
 ): number | null {
+  return resolveCurrentLoanTerms(account, history, rateChanges).payment;
+}
+
+/** The loan's rate and payment in effect: one answer for every surface. */
+export interface CurrentLoanTerms {
+  /** Null only when the account has no rate at all. */
+  annualRate: number | null;
+  payment: number | null;
+}
+
+/**
+ * The terms to DISPLAY, which are the terms the projection runs at.
+ *
+ * Every "current" figure on a loan surface comes from here: the summary card's
+ * Interest Rate and Payment, the PDF export's, the transactions sidebar's, and
+ * the payoff/remaining-interest projection. They used to be resolved
+ * separately, so a loan whose rate had been recorded through the rate-history
+ * UI showed "Interest Rate 5%" and "Payment $1,500" beside "Est. Payoff N/A" --
+ * the projection correctly refusing at the real 12% and $900 while the cards
+ * described terms under which the loan would amortize comfortably. A user
+ * troubleshooting the missing payoff was reading numbers that disagreed with the
+ * calculation refusing it.
+ *
+ * The rate is null only for an account with none recorded anywhere; a loan with
+ * no rate history simply falls back to the account's own scalar.
+ */
+export function resolveCurrentLoanTerms(
+  account: Account,
+  history: LoanHistoryResult,
+  rateChanges: RateTimelineRow[] = [],
+): CurrentLoanTerms {
   const seed = resolveSeedPayment(account, history, rateChanges);
-  return seed.payment != null && seed.payment > 0 ? seed.payment : null;
+  return {
+    annualRate: Number.isFinite(seed.annualRate) ? seed.annualRate : null,
+    payment: seed.payment != null && seed.payment > 0 ? seed.payment : null,
+  };
 }
 
 /** The resolved projection seed: the terms in effect plus the payment to use. */

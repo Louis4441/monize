@@ -207,9 +207,18 @@ function AccountDetailContent() {
       ]);
       setAccount(accountData);
       setRateChanges(rateChangesData);
-    } catch {
-      // The list stays as-is (stale after the mutation), so say so.
-      toast.error(t('loanDetail.rateHistory.loadFailed'));
+    } catch (err) {
+      // Keeping the old timeline here would be worse than it looks. The
+      // mutation SUCCEEDED, so the rows on screen are known-stale -- and since
+      // the projection resolves its rate and payment from them, every figure
+      // derived from them is now describing terms the user has just replaced. A
+      // toast is not enough for that: it disappears, and the payoff, the
+      // scenarios and the PDF export all stay live over the old rate. The
+      // page's own retryable error state is the honest presentation, and the
+      // same one a failed initial load gets, since it is the same prerequisite.
+      const message = getErrorMessage(err, t('loanDetail.rateHistory.loadFailed'));
+      setError(message);
+      toast.error(message);
     }
   }, [accountId, t]);
 

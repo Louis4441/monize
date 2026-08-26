@@ -67,7 +67,7 @@ implied.
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
-| INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | enforced |
+| INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
@@ -674,7 +674,40 @@ Required tests      Present: the principal-only matrix in
                     frontend/src/app/accounts/[id]/page.test.tsx, and the
                     failure-then-refresh-then-success recovery test in
                     frontend/src/hooks/useLoanProjection.test.tsx.
-Status              enforced
+Known gap           **Standalone interest is attributed by `(interest category,
+                    source account)`, which is not per-loan.** A loan's separate
+                    interest expenses are fetched with exactly that pair
+                    (`fetchLoanInterestTransactions`) and nothing on those rows
+                    names the loan they belong to. Two loans paid from one
+                    account and sharing one interest category therefore merge:
+                    each one's history absorbs the other's interest, and
+                    `pairSeparateInterestByDate` sums both onto whichever
+                    payment date matches. The source comment has always said to
+                    give each loan its own category; what makes the state normal
+                    rather than exceptional is the DEFAULT --
+                    `LoanPaymentSetupService` falls back to
+                    `CategoriesService.findLoanCategories`, which resolves one
+                    user-level `Loan -> Loan Interest` category for every loan.
+                    Worked example: Loan A pays 800 principal + 200 interest and
+                    Loan B pays 500 + 100 on the same date from the same
+                    chequing account; A's history reports 300 of interest and an
+                    1,100 installment instead of 200 and 1,000.
+                    Closing it needs a durable provenance link (the loan account
+                    id, or the principal payment / scheduled occurrence, recorded
+                    on the interest transaction) plus a decision about existing
+                    data and about the setup default. Both are schema/product
+                    decisions, so the status is `partial` and says so rather than
+                    the catalogue claiming a guarantee the code does not give.
+                    A second, smaller gap: `accounts.interest_booking_mode`
+                    (`AUTO | SPLIT | SEPARATE`) is persisted, offered in the
+                    account form and written by the MNY importer, but no reader
+                    branches on it -- so it constrains nothing here, and a
+                    `SPLIT` loan can still consume a standalone expense. Its
+                    cross-layer meaning is undefined and needs a truth table
+                    before any reader starts honouring it.
+Status              partial -- the estimate is gone and the provenance of a
+                    SPLIT-recorded interest line is enforced; the provenance of
+                    a STANDALONE interest expense is not.
 ```
 
 Issue #1255: a $450 principal-only transfer on a $10,000 loan at 6% rendered as
