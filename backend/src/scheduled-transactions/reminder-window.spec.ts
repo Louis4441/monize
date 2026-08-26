@@ -1,10 +1,17 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
+import { findRepoRoot, requireRepoRoot } from "../common/repo-tree.util";
 import {
   MAX_REMINDER_DAYS_BEFORE,
   reminderWindowThrough,
 } from "./reminder-window";
 import { CreateScheduledTransactionDto } from "./dto/create-scheduled-transaction.dto";
+import {
+  OCCURRENCE_HORIZON_MAX_DAYS,
+  ScheduledOccurrencesQueryDto,
+} from "./dto/scheduled-occurrences-query.dto";
 import { expandOccurrenceSlots } from "../common/scheduled-occurrences";
 
 /**
@@ -82,6 +89,83 @@ describe("reminder window", () => {
 
     it("rejects a negative notice period", async () => {
       expect(await errorsFor(-1)).not.toHaveLength(0);
+    });
+  });
+
+  describe("the column", () => {
+    const schema = readFileSync(
+      join(requireRepoRoot(findRepoRoot(__dirname)), "database/schema.sql"),
+      "utf8",
+    );
+
+    it("carries the same ceiling as the code, in both directions", () => {
+      // The DTO is the API's door and the CHECK is the column's; a bound written
+      // twice drifts, so the number is asserted against the schema rather than
+      // trusted. `database/migrations/165_clamp_reminder_days_before.sql` adds the
+      // same constraint to an existing database and normalizes the rows written
+      // before it -- without that, a legacy row above the ceiling made every later
+      // save of that schedule fail validation.
+      const check = schema.match(
+        /CONSTRAINT chk_scheduled_reminder_days_before CHECK \(\s*reminder_days_before IS NULL OR \(reminder_days_before BETWEEN 0 AND (\d+)\)\s*\)/,
+      );
+      expect(check).not.toBeNull();
+      expect(Number(check![1])).toBe(MAX_REMINDER_DAYS_BEFORE);
+    });
+
+    it("has a migration that normalizes the rows written before the bound", () => {
+      const migration = readFileSync(
+        join(
+          requireRepoRoot(findRepoRoot(__dirname)),
+          "database/migrations/165_clamp_reminder_days_before.sql",
+        ),
+        "utf8",
+      );
+      expect(migration).toContain(
+        `SET reminder_days_before = ${MAX_REMINDER_DAYS_BEFORE}`,
+      );
+      expect(migration).toContain(
+        `WHERE reminder_days_before > ${MAX_REMINDER_DAYS_BEFORE}`,
+      );
+    });
+  });
+
+  describe("the occurrences query bound", () => {
+    const queryFor = (through: string) =>
+      plainToInstance(ScheduledOccurrencesQueryDto, { through });
+
+    const errorsFor = async (through: string) =>
+      (await validate(queryFor(through))).filter(
+        (e) => e.property === "through",
+      );
+
+    const ymdFromNow = (days: number) => {
+      const d = new Date();
+      d.setUTCHours(0, 0, 0, 0);
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+
+    it("accepts a real date inside the horizon", async () => {
+      expect(await errorsFor(ymdFromNow(90))).toHaveLength(0);
+      expect(await errorsFor(ymdFromNow(-30))).toHaveLength(0);
+    });
+
+    it("rejects a calendar-impossible date the shape check allowed", async () => {
+      // `@Matches(/^\d{4}-\d{2}-\d{2}$/)` passed these, and Postgres then raised
+      // "date/time field value out of range" -- a 500 for a client error.
+      expect(await errorsFor("9999-99-99")).not.toHaveLength(0);
+      expect(await errorsFor("2026-02-30")).not.toHaveLength(0);
+      expect(await errorsFor("2026-13-01")).not.toHaveLength(0);
+    });
+
+    it("rejects a horizon that turns a cheap request into a full walk", async () => {
+      expect(await errorsFor("9999-12-31")).not.toHaveLength(0);
+      expect(
+        await errorsFor(ymdFromNow(OCCURRENCE_HORIZON_MAX_DAYS + 1)),
+      ).not.toHaveLength(0);
+      expect(
+        await errorsFor(ymdFromNow(OCCURRENCE_HORIZON_MAX_DAYS - 1)),
+      ).toHaveLength(0);
     });
   });
 

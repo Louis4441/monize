@@ -624,6 +624,11 @@ CREATE TABLE scheduled_transactions (
     total_occurrences INTEGER, -- original total if using occurrence limit
     is_active BOOLEAN DEFAULT true,
     auto_post BOOLEAN DEFAULT false, -- automatically create transaction when due
+    -- Bounded (issue #1247 review): this reaches a date computation, and a value
+    -- past JavaScript's Date range serialized the reminder window's upper bound
+    -- as "NaN-NaN-NaN", which the text-comparing occurrence expander read as an
+    -- unlimited window. See MAX_REMINDER_DAYS_BEFORE in
+    -- backend/src/scheduled-transactions/reminder-window.ts.
     reminder_days_before INTEGER DEFAULT 3,
     last_posted_date DATE, -- when the transaction was last posted
     is_split BOOLEAN DEFAULT false, -- indicates amounts are split across categories
@@ -648,6 +653,9 @@ CREATE TABLE scheduled_transactions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_scheduled_transactions_kind_exclusive CHECK (
         NOT (is_transfer = TRUE AND is_investment = TRUE)
+    ),
+    CONSTRAINT chk_scheduled_reminder_days_before CHECK (
+        reminder_days_before IS NULL OR (reminder_days_before BETWEEN 0 AND 366)
     )
 );
 

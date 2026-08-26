@@ -45,7 +45,7 @@ import {
   deriveAccountsFromScheduledTransactions,
 } from '@/lib/bills-filters';
 import { parseLocalDate } from '@/lib/utils';
-import { SCHEDULED_KIND_CHIP_CLASSES, scheduledKind } from '@/lib/scheduled-kind';
+import { SCHEDULED_KIND_CHIP_CLASSES, occurrenceKind } from '@/lib/scheduled-kind';
 import { scheduleEffectiveAmount } from '@/lib/scheduled-effective-amount';
 import { advanceByFrequency, isOneTime, monthlyEquivalent } from '@/lib/frequency';
 import type { FutureTransaction } from '@/lib/forecast';
@@ -70,6 +70,20 @@ interface OverrideEditorState {
   existingOverride: ScheduledTransactionOverride | null;
   // When set (post-reconciliation flow), seeds the Amount field with this value.
   prefillAmount: number | null;
+}
+
+/**
+ * What a schedule's next occurrence IS, for every surface on this page: the
+ * filter, the tab counts, the calendar chip and the monthly summary.
+ *
+ * One function, because these all sit beside a magnitude that comes from the
+ * occurrence: classifying from the stored sign put a re-priced inflow in the
+ * bills bucket and painted its chip red beside a green number. `occurrenceKind`
+ * falls back to the schedule's sign when the occurrence cannot be priced, so an
+ * unpriceable bill stays a bill rather than becoming a zero-amount reminder.
+ */
+function billKind(st: ScheduledTransaction) {
+  return occurrenceKind(scheduleEffectiveAmount(st), st);
 }
 
 export default function BillsPage() {
@@ -483,8 +497,8 @@ function BillsContent() {
   // effective date (considering overrides)
   const filteredTransactions = useMemo(() => {
     const byType = scheduledTransactions.filter((t) => {
-      if (filterType === 'bills') return scheduledKind(t) === 'bill';
-      if (filterType === 'deposits') return scheduledKind(t) === 'deposit';
+      if (filterType === 'bills') return billKind(t) === 'bill';
+      if (filterType === 'deposits') return billKind(t) === 'deposit';
       return true;
     });
 
@@ -515,13 +529,19 @@ function BillsContent() {
     for (const t of scheduledTransactions) {
       // The amount this schedule would post today, not the persisted snapshot:
       // for an FX-sensitive schedule that scalar was calculated at an older rate.
-      // The KIND still comes from the stored sign -- an exchange rate is
-      // positive, so it cannot turn a bill into a deposit.
-      const effective = scheduleEffectiveAmount(t).amount;
+      const effectiveAmount = scheduleEffectiveAmount(t);
+      const effective = effectiveAmount.amount;
       const amount = effective ?? Number(t.amount);
-      // Transfers move money between the user's own accounts and a zero-amount
-      // reminder states no amount, so neither is a bill or a deposit here.
-      const kind = t.isActive ? scheduledKind(t) : null;
+      // The kind comes from the SAME occurrence the magnitude does. Reading the
+      // stored sign here put a re-priced inflow of 20 into `monthlyBills` and
+      // left the header's net 40 out: "an exchange rate cannot turn a bill into a
+      // deposit" is true of one scalar times one rate and false of a mixed-sign
+      // split parent, where only the investment line re-prices. `occurrenceKind`
+      // falls back to the schedule's sign when the occurrence cannot be priced,
+      // so an unpriceable bill is still a bill. Transfers move money between the
+      // user's own accounts and a zero-amount reminder states no amount, so
+      // neither is a bill or a deposit here.
+      const kind = t.isActive ? billKind(t) : null;
 
       if (kind === 'bill') {
         totalBills++;
@@ -757,8 +777,8 @@ function BillsContent() {
                       }`}
                     >
                       {type === 'all' ? t('viewTabs.filterAll', { count: scheduledTransactions.length }) :
-                       type === 'bills' ? t('viewTabs.filterBills', { count: scheduledTransactions.filter((st) => scheduledKind(st) === 'bill').length }) :
-                       t('viewTabs.filterDeposits', { count: scheduledTransactions.filter((st) => scheduledKind(st) === 'deposit').length })}
+                       type === 'bills' ? t('viewTabs.filterBills', { count: scheduledTransactions.filter((st) => billKind(st) === 'bill').length }) :
+                       t('viewTabs.filterDeposits', { count: scheduledTransactions.filter((st) => billKind(st) === 'deposit').length })}
                     </button>
                   ))}
                 </div>
@@ -861,7 +881,7 @@ function BillsContent() {
                         key={billIndex}
                         onClick={() => handleEdit(bill)}
                         className={`px-1 py-0.5 text-xs rounded truncate cursor-pointer ${
-                          SCHEDULED_KIND_CHIP_CLASSES[scheduledKind(bill)]
+                          SCHEDULED_KIND_CHIP_CLASSES[billKind(bill)]
                         } hover:opacity-80`}
                       >
                         {bill.name}

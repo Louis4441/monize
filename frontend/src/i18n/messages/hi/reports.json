@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "स्वतः",
     "csvStatusManual": "मैन्युअल",
     "amountUnavailable": "उपलब्ध नहीं",
+    "occurrencesUnavailable": "अनुमानित घटनाएं लोड नहीं हो सकीं, इसलिए नीचे कैलेंडर और राशियां उपलब्ध नहीं हैं। आपके बिल स्वयं प्रभावित नहीं हुए हैं।",
     "csvAmountUnavailable": "उपलब्ध नहीं (कोई वर्तमान विनिमय दर नहीं)",
     "pdfTitle": "आगामी बिल रिपोर्ट",
     "pdfSubtitle": "{month} | {count} सक्रिय बिल",

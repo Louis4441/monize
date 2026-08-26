@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Ręczne",
     "amountUnavailable": "Niedostępna",
+    "occurrencesUnavailable": "Nie udało się wczytać prognozowanych wystąpień, więc kalendarz i kwoty poniżej są niedostępne. Same rachunki pozostają bez zmian.",
     "csvAmountUnavailable": "Niedostępna (brak aktualnego kursu wymiany)",
     "pdfTitle": "Raport nadchodzących rachunków",
     "pdfSubtitle": "{month} | {count} aktywnych rachunków",

@@ -36,6 +36,7 @@ import { formatCurrency } from "../common/format-currency.util";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { FxAggregate } from "../common/fx-aggregate";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { ActionHistoryService } from "../action-history/action-history.service";
 
 export interface UpcomingBill {
@@ -561,6 +562,28 @@ export class BudgetsService {
     // for it, and `upcomingBillsMissingRates` names the pairs so a withheld
     // figure comes with the reason (an unexplained blank is a dead end).
     const upcomingBillsAgg = new FxAggregate();
+    // One lookup per PAIR, not per bill. Twelve CAD bills in a USD budget asked
+    // the identical question twelve times, in series, and on a cold pair the
+    // first fetches a provider window while the other eleven wait for it. The
+    // rate is a property of the pair, and `todayStr` is fixed across this read --
+    // the same shape `ScheduledEffectiveAmountService` uses for its own pairs.
+    const rateCache = new Map<string, Promise<number | null>>();
+    const rateFor = (from: string): Promise<number | null> => {
+      let pending = rateCache.get(from);
+      if (!pending) {
+        // Through `resolveFxRateOrNull`, never the raw service call: a stored
+        // rate of 0 or a negative one is ABSENT, not applicable, and multiplying
+        // by it would convert a 1,350 bill to zero and report the total complete.
+        pending = resolveFxRateOrNull(
+          this.exchangeRates,
+          from,
+          budget.currencyCode,
+          todayStr,
+        );
+        rateCache.set(from, pending);
+      }
+      return pending;
+    };
     for (const bill of upcomingBills) {
       if (bill.amount === null) {
         // No currency to blame: the settlement rate behind the occurrence itself
@@ -572,11 +595,7 @@ export class BudgetsService {
         upcomingBillsAgg.addConverted(bill.amount);
         continue;
       }
-      const rate = await this.exchangeRates.getRateForDate(
-        bill.currencyCode,
-        budget.currencyCode,
-        todayStr,
-      );
+      const rate = await rateFor(bill.currencyCode);
       upcomingBillsAgg.add(
         rate === null ? null : roundMoney(bill.amount * rate),
         bill.currencyCode,

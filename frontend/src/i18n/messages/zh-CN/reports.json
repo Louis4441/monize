@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "自动",
     "csvStatusManual": "手动",
     "amountUnavailable": "不可用",
+    "occurrencesUnavailable": "无法加载预计的发生记录，因此下方的日历和金额不可用。您的账单本身未受影响。",
     "csvAmountUnavailable": "不可用（无当前汇率）",
     "pdfTitle": "即将到期账单报告",
     "pdfSubtitle": "{month} | {count} 个活跃账单",

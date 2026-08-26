@@ -401,6 +401,88 @@ describe("ScheduledOccurrenceService", () => {
       expect(occurrences[0].directionAmount).toBe(-700);
     });
 
+    it("keeps a stored INFLOW whose override made the occurrence an outflow", async () => {
+      // An override replaces the amount outright, sign included, so a schedule
+      // stored at +100 with a -250 override on its next slot is a real outflow the
+      // snapshot cannot see. The candidate read used to narrow to `st.amount < 0`
+      // plus the FX-sensitive shapes, so this row never reached the pricing.
+      const deposit = investmentSchedule({
+        id: "st-plain",
+        name: "Quarterly rebate",
+        amount: 100,
+        isInvestment: false,
+        investmentAction: null,
+        investmentSecurityId: null,
+        nextDueDate: "2026-03-15",
+      } as unknown as Partial<ScheduledTransaction>);
+      overridesRepo.find.mockResolvedValue([
+        {
+          id: "ovr-charge",
+          scheduledTransactionId: "st-plain",
+          originalDate: "2026-03-15",
+          overrideDate: "2026-03-15",
+          amount: -250,
+        } as unknown as ScheduledTransactionOverride,
+      ]);
+      candidateRead([deposit]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { from: "2026-03-01", through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      expect(occurrences).toHaveLength(1);
+      expect(occurrences[0].amount).toBe(-250);
+      // And the read that fetched it says why it was not pre-filtered away.
+      const predicates = (
+        scheduledRepo.createQueryBuilder.mock.results[0].value.andWhere.mock
+          .calls as unknown[][]
+      ).map((c) => String(c[0]));
+      expect(
+        predicates.some((p) =>
+          p.includes("scheduled_transaction_overrides ovr"),
+        ),
+      ).toBe(true);
+    });
+
+    it("caps after the direction filter, so a credited occurrence cannot hide a real one", async () => {
+      // Rent stored at -1,500 with the NEAREST occurrence overridden into a +200
+      // credit, and an ordinary -1,500 occurrence later the same month. Capping
+      // inside the expander kept only the credit, which the direction filter then
+      // dropped -- so the budget reported no upcoming rent at all.
+      const rent = investmentSchedule({
+        id: "st-rent",
+        name: "Rent",
+        amount: -1500,
+        isInvestment: false,
+        investmentAction: null,
+        investmentSecurityId: null,
+        frequency: "WEEKLY",
+        nextDueDate: "2026-03-02",
+      } as unknown as Partial<ScheduledTransaction>);
+      overridesRepo.find.mockResolvedValue([
+        {
+          id: "ovr-credit",
+          scheduledTransactionId: "st-rent",
+          originalDate: "2026-03-02",
+          overrideDate: "2026-03-02",
+          amount: 200,
+        } as unknown as ScheduledTransactionOverride,
+      ]);
+      candidateRead([rent]);
+
+      const occurrences = await service.findOccurrences(
+        userId,
+        { from: "2026-03-01", through: "2026-03-31", maxOccurrences: 1 },
+        { outflowsOnly: true },
+      );
+
+      expect(occurrences).toHaveLength(1);
+      expect(occurrences[0].dueDate).toBe("2026-03-09");
+      expect(occurrences[0].amount).toBe(-1500);
+    });
+
     it("falls back to the stored sign when the occurrence cannot be priced", async () => {
       // An unpriceable bill is still a bill: `Number(null)` would make it a
       // zero-amount reminder and drop it from an outflow-only surface.

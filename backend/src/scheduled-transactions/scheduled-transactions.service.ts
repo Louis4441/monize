@@ -3424,12 +3424,6 @@ export class ScheduledTransactionsService {
 }
 
 /**
- * Bill or deposit is a question about the *direction* of the movement, and an FX
- * rate is positive, so `sign(amount x rate) === sign(amount)`: the stored
- * scalar's sign classifies the row correctly even when its magnitude is a stale
- * snapshot or unknown (issue #1247). Only the magnitude needs re-resolving.
- */
-/**
  * What ONE occurrence is, for a model reading the list.
  *
  * The direction comes from the occurrence (`directionAmount`), never from the

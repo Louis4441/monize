@@ -949,6 +949,38 @@ describe('BillsPage', () => {
       });
     });
 
+    it('buckets a re-priced occurrence by its own sign, not the stored one', async () => {
+      // A mixed-sign split parent stored at -10 (an ordinary -100 line beside a
+      // SELL line worth +90) whose investment line re-priced to +120: the
+      // occurrence is a +20 inflow. Classified from the stored sign it went into
+      // monthly BILLS as 20, so the net was out by 40 in the wrong direction.
+      mockGetAll.mockResolvedValue([
+        {
+          id: 'st-split',
+          name: 'Share sale, net of fee',
+          amount: -10,
+          frequency: 'MONTHLY',
+          nextDueDate: '2026-03-01',
+          isActive: true,
+          isTransfer: false,
+          isSplit: true,
+          splits: [
+            { id: 'sp-1', kind: 'category', amount: -100 },
+            { id: 'sp-2', kind: 'investment', amount: 90, investmentAction: 'SELL' },
+          ],
+          effectiveAmount: 20,
+          effectiveAmountComplete: true,
+        },
+      ]);
+      render(<BillsPage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-Monthly Net')).toHaveTextContent('$20.00');
+      });
+      // And it is counted as a deposit, not a bill.
+      expect(screen.getByTestId('summary-Active Deposits')).toHaveTextContent('1');
+      expect(screen.getByTestId('summary-Active Bills')).toHaveTextContent('0');
+    });
+
     it('normalizes WEEKLY frequency to monthly', async () => {
       mockGetAll.mockResolvedValue([
         { id: 'st-a', name: 'Weekly Bill', amount: -100, frequency: 'WEEKLY', nextDueDate: '2026-03-01', isActive: true, isTransfer: false },

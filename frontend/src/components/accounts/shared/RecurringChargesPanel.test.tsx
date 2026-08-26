@@ -152,6 +152,63 @@ describe('RecurringChargesPanel', () => {
     expect(screen.queryByText('-$1500.00')).not.toBeInTheDocument();
   });
 
+  it('signs and colours the row by the occurrence, not the stored amount', async () => {
+    // A mixed-sign split parent stored at -10 (an ordinary -100 line beside a
+    // SELL line worth +90) whose investment line re-priced to +120: the occurrence
+    // is an inflow of 20. Keyed off the stored sign, the row rendered '-$20.00'
+    // in red -- the sign, the colour and the number describing two events.
+    mockGetScheduled.mockResolvedValue([
+      schedule({
+        id: 'st-split',
+        payeeName: 'Share sale, net of fee',
+        payeeId: null,
+        amount: -10,
+        isSplit: true,
+        splits: [
+          { id: 'sp-1', kind: 'category', amount: -100 },
+          { id: 'sp-2', kind: 'investment', amount: 90, investmentAction: 'SELL' },
+        ],
+        effectiveAmount: 20,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+      }),
+    ]);
+    await renderPanel();
+    await waitFor(() =>
+      expect(screen.getByText('Share sale, net of fee')).toBeInTheDocument(),
+    );
+
+    const amount = screen.getByText('+$20.00');
+    expect(amount).toBeInTheDocument();
+    expect(amount.className).toContain('text-green-600');
+    expect(screen.queryByText('-$20.00')).not.toBeInTheDocument();
+  });
+
+  it('keeps an unpriceable bill a bill rather than a grey reminder', async () => {
+    // `Number(null)` is 0, which `occurrenceKind` must not reach: the fallback is
+    // the schedule's own sign, so the row stays red and marked unavailable.
+    mockGetScheduled.mockResolvedValue([
+      schedule({
+        id: 'st-inv',
+        payeeName: 'Monthly ETF buy',
+        payeeId: null,
+        amount: -1000,
+        isInvestment: true,
+        effectiveAmount: null,
+        effectiveAmountComplete: false,
+        effectiveCurrencyCode: 'CAD',
+      }),
+    ]);
+    await renderPanel();
+    await waitFor(() =>
+      expect(screen.getByText('Monthly ETF buy')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+    const row = screen.getByText('Monthly ETF buy').closest('li')!;
+    expect(row.innerHTML).toContain('text-red-600');
+  });
+
   it('prints the date the occurrence actually falls on, not the recurrence slot', async () => {
     // An override addressed to the slot moved this occurrence, and the panel is
     // already sorted by the moved date -- printing `nextDueDate` beside the

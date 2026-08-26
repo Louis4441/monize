@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manual",
     "amountUnavailable": "No disponible",
+    "occurrencesUnavailable": "No se pudieron cargar las ocurrencias previstas, por lo que el calendario y los importes siguientes no están disponibles. Sus facturas no se ven afectadas.",
     "csvAmountUnavailable": "No disponible (sin tipo de cambio actual)",
     "pdfTitle": "Informe de facturas próximas",
     "pdfSubtitle": "{month} | {count} facturas activas",

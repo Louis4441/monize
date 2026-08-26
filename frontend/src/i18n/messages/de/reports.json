@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manuell",
     "amountUnavailable": "Nicht verfügbar",
+    "occurrencesUnavailable": "Die geplanten Vorkommen konnten nicht geladen werden, daher sind der Kalender und die Beträge unten nicht verfügbar. Ihre Rechnungen selbst sind davon nicht betroffen.",
     "csvAmountUnavailable": "Nicht verfügbar (kein aktueller Wechselkurs)",
     "pdfTitle": "Bevorstehende Rechnungen",
     "pdfSubtitle": "{month} | {count} aktive Rechnungen",

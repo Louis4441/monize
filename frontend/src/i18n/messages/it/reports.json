@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manuale",
     "amountUnavailable": "Non disponibile",
+    "occurrencesUnavailable": "Non è stato possibile caricare le occorrenze previste, quindi il calendario e gli importi seguenti non sono disponibili. Le tue scadenze non sono state modificate.",
     "csvAmountUnavailable": "Non disponibile (nessun tasso di cambio attuale)",
     "pdfTitle": "Report fatture in scadenza",
     "pdfSubtitle": "{month} | {count} fatture attive",

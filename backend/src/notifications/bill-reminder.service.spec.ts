@@ -954,6 +954,45 @@ describe("BillReminderService", () => {
           expect(emailService.sendMail).toHaveBeenCalledTimes(1);
         });
 
+        /**
+         * The two halves of the cron ask their own question, against their own
+         * "today". They can disagree -- the run crosses midnight, an override
+         * moves in between -- and an email with an empty table plus a
+         * `delivered_at` record is the worst possible outcome: the subject claims
+         * a bill, the body shows none, and the delivery record makes the genuine
+         * reminder unsendable for the rest of the day.
+         */
+        it("sends nothing and records nothing when no occurrence survives the owner's own window", async () => {
+          const bill = makeBill({
+            userId: userId1,
+            nextDueDate: daysFromNow(0),
+            reminderDaysBefore: 3,
+          });
+          scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+          preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
+          usersRepo.findOne.mockResolvedValue(mockUser1);
+          // The divergence is real and in the code: the cross-user pass reads the
+          // overrides hydrated on the row, while `expand` re-reads them from the
+          // database. An override written between the two moves this occurrence
+          // out of the window, so the second pass has nothing to say.
+          overridesRepo.find.mockResolvedValue([
+            {
+              id: "ovr-moved",
+              scheduledTransactionId: bill.id,
+              originalDate: String(bill.nextDueDate).split("T")[0],
+              overrideDate: daysFromNow(90),
+              amount: null,
+            },
+          ]);
+
+          await service.sendBillReminders();
+
+          expect(emailService.sendMail).not.toHaveBeenCalled();
+          expect(jobClaims.markDelivered).not.toHaveBeenCalled();
+          // The lease goes back, so the next run can try again.
+          expect(jobClaims.releaseLease).toHaveBeenCalled();
+        });
+
         it("groups multiple bills for the same user into one email", async () => {
           const bill1 = makeBill({
             id: "bill-1",

@@ -106,10 +106,11 @@ export class BillReminderService {
       return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Group bills by userId where due date is within reminderDaysBefore window
+    // Group bills by userId where an occurrence falls inside the bill's own
+    // reminder window. One "today", as a YYYY-MM-DD string: the local-midnight
+    // `Date` this used to keep beside it fed the old day-count comparison and was
+    // left behind when the expander replaced it -- two "today"s that are not
+    // interchangeable is how the wrong one gets picked up.
     const billsByUser = new Map<string, ScheduledTransaction[]>();
 
     const todayStr = todayYMD();
@@ -254,9 +255,9 @@ export class BillReminderService {
       // a snapshot at whatever rate was current when it was written, so a
       // reminder built from it can name a figure the posting will not use -- and
       // the occurrence the user re-dated is not the one the template describes.
-      // The direction (income vs expense) still comes from the stored sign: an
-      // FX rate is positive, so it cannot flip one, and the sign is known even
-      // when the magnitude is not.
+      // The direction comes from the occurrence too (`directionAmount`), which is
+      // the occurrence's own amount when known and the snapshot's sign only when
+      // it is not.
       const todayStr = todayYMD();
       // Reduced rather than spread: `Math.max(...xs)` over a per-user array is a
       // stack-depth limit disguised as an aggregate, and this array is as long as
@@ -275,16 +276,43 @@ export class BillReminderService {
         maxOccurrences: 1,
       });
       const billData = occurrences.map((occurrence) => {
-        const b = occurrence.schedule;
+        const schedule = occurrence.schedule;
         return {
-          payee: b.payee?.name || b.payeeName || b.name,
+          payee: schedule.payee?.name || schedule.payeeName || schedule.name,
           amount:
             occurrence.amount === null ? null : Math.abs(occurrence.amount),
           dueDate: occurrence.dueDate,
           currencyCode: occurrence.currencyCode,
-          isIncome: (occurrence.amount ?? Number(b.amount)) > 0,
+          // The occurrence's own direction. This read the occurrence's amount
+          // with the SCHEDULE's as its fallback, which is neither the same
+          // question nor the same row: an override re-pricing a -200 charge into
+          // a +500 refund, on a pair whose rate cannot be resolved, fell through
+          // to the schedule and the email called the refund an expense.
+          isIncome: occurrence.directionAmount > 0,
         };
       });
+
+      // Nothing to say means nothing to send, and nothing to record.
+      //
+      // The two halves of this cron each ask their own question: the cross-user
+      // pass selects bills against one `todayStr`, and this pass re-expands them
+      // under the owner's identity against its own. They can disagree -- the run
+      // crosses midnight, an override moves in between, a long-overdue daily
+      // schedule truncates at the walk guard -- and the old code then sent an
+      // email with an empty table under a subject counted from the pre-expansion
+      // list ("1 upcoming bill needs attention"), and wrote `delivered_at` for a
+      // claim key fingerprinted on those same bills. That record is what makes
+      // the reminder single-shot, so the genuine one could never be sent again
+      // that day. Hand the lease back instead and let the next run decide.
+      if (billData.length === 0) {
+        this.logger.warn(
+          `Bill reminder for user ${userId} matched ${bills.length} bill(s) in the ` +
+            `cross-user pass but no occurrence under the owner's own window; ` +
+            `nothing sent, claim released`,
+        );
+        await this.releaseClaim(userId, claimKey, leaseToken);
+        return false;
+      }
 
       const lang = prefs?.language || DEFAULT_LOCALE;
       const t = emailTranslator(this.i18n, lang);
@@ -294,16 +322,18 @@ export class BillReminderService {
         appUrl,
         t,
       );
+      // Counted from what the email actually lists, not from what phase one
+      // selected: the two can differ, and the subject is a claim about the body.
       const subject =
-        bills.length === 1
+        billData.length === 1
           ? t(
               "emails.billReminder.subjectOne",
               "Monize: 1 upcoming bill needs attention",
             )
           : t(
               "emails.billReminder.subjectMany",
-              `Monize: ${bills.length} upcoming bills need attention`,
-              { count: bills.length },
+              `Monize: ${billData.length} upcoming bills need attention`,
+              { count: billData.length },
             );
 
       await this.emailService.sendMail(user.email, subject, html);

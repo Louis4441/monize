@@ -236,17 +236,24 @@ export class ScheduledOccurrenceService {
         )
         .orderBy("st.nextDueDate", "ASC");
 
-      // The stored sign selects the outflows only where no rate can move it.
+      // The stored sign selects the outflows only where nothing can move it.
       //
-      // For a plain, transfer or ordinary-split schedule the effective amount is
-      // the stored one, so `st.amount < 0` is exactly the set of outflows and
-      // narrowing here saves resolving every positive schedule. An FX-sensitive
-      // schedule -- a top-level investment, or a split parent carrying an
-      // investment line -- is a different matter: its effective amount is
-      // recomputed, and for a mixed-sign parent that can land on the other side
-      // of zero (see `directionAmount`). Those rows stay in the candidate set
-      // whatever their stored sign, and the direction is decided on the resolved
-      // occurrence below.
+      // For a plain or ordinary-split schedule with no override the effective
+      // amount IS the stored one, so `st.amount < 0` is exactly the set of
+      // outflows and narrowing here saves resolving every positive schedule.
+      // Two things can move that sign, and both keep their rows in the candidate
+      // set whatever the snapshot says:
+      //
+      //  - an FX-sensitive schedule (a top-level investment, or a split parent
+      //    carrying an investment line) has its cash total recomputed, and for a
+      //    mixed-sign parent that can land on the other side of zero;
+      //  - a per-occurrence override REPLACES the amount outright, sign included,
+      //    so a schedule stored at +100 whose next occurrence is overridden to
+      //    -250 is a genuine outflow the snapshot cannot see. An override with no
+      //    amount of its own inherits the base and cannot flip anything, so it
+      //    does not widen the read.
+      //
+      // The direction itself is decided on the resolved occurrence below.
       if (filter.outflowsOnly) {
         qb.andWhere(
           `(st.amount < 0 OR st.isInvestment = true OR EXISTS (
@@ -254,6 +261,10 @@ export class ScheduledOccurrenceService {
               WHERE s.scheduled_transaction_id = st.id
                 AND s.kind = :investmentKind
                 AND s.investment_action IS NOT NULL
+            ) OR EXISTS (
+              SELECT 1 FROM scheduled_transaction_overrides ovr
+              WHERE ovr.scheduled_transaction_id = st.id
+                AND ovr.amount IS NOT NULL
             ))`,
           { investmentKind: SplitKind.INVESTMENT },
         );
@@ -265,12 +276,36 @@ export class ScheduledOccurrenceService {
       return qb.getMany();
     });
 
-    const occurrences = await this.expand(userId, rows, window);
-    // The direction is a question about the occurrence, so it is asked after it
-    // has been priced -- never in the SQL above, which only saw the snapshot.
-    return filter.outflowsOnly
-      ? occurrences.filter((o) => o.directionAmount < 0)
-      : occurrences;
+    if (!filter.outflowsOnly) return this.expand(userId, rows, window);
+
+    // A cap is applied to what the caller ASKED for, so it has to come after the
+    // direction filter, not before it.
+    //
+    // `maxOccurrences` is applied inside the expander, by due date. Expanding with
+    // the cap and filtering afterwards silently answered "no upcoming rent" for a
+    // schedule whose nearest occurrence had been overridden into a credit: the cap
+    // kept that one occurrence, the direction filter then dropped it, and the real
+    // -1,500 outflow later in the same period never reached the budget. So the
+    // expansion runs uncapped, the direction decides, and the cap is applied per
+    // schedule at the end -- the order the caller means.
+    const occurrences = await this.expand(userId, rows, {
+      ...window,
+      maxOccurrences: undefined,
+    });
+    const outflows = occurrences.filter((o) => o.directionAmount < 0);
+    if (window.maxOccurrences === undefined) return outflows;
+
+    const kept: ResolvedScheduledOccurrence[] = [];
+    const perSchedule = new Map<string, number>();
+    // `expand` returns due-date order, so taking the first N per schedule keeps
+    // each schedule's own earliest occurrences.
+    for (const occurrence of outflows) {
+      const seen = perSchedule.get(occurrence.scheduledTransactionId) ?? 0;
+      if (seen >= window.maxOccurrences) continue;
+      perSchedule.set(occurrence.scheduledTransactionId, seen + 1);
+      kept.push(occurrence);
+    }
+    return kept;
   }
 
   private async loadOverrides(

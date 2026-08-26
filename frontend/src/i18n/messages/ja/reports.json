@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "自動",
     "csvStatusManual": "手動",
     "amountUnavailable": "取得できません",
+    "occurrencesUnavailable": "予定されている発生分を読み込めなかったため、以下のカレンダーと金額は利用できません。登録済みの請求そのものには影響ありません。",
     "csvAmountUnavailable": "取得できません（現在の為替レートなし）",
     "pdfTitle": "支払い予定レポート",
     "pdfSubtitle": "{month} | {count} 件の有効な請求書",

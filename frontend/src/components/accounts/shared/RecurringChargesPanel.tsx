@@ -14,6 +14,10 @@ import { createLogger } from '@/lib/logger';
 import type { RecurringChargeInfo, Transaction } from '@/types/transaction';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
 import {
+  SCHEDULED_KIND_AMOUNT_CLASSES,
+  occurrenceKind,
+} from '@/lib/scheduled-kind';
+import {
   nextOccurrenceDueDate,
   nextOccurrenceEffectiveAmount,
 } from '@/lib/scheduled-effective-amount';
@@ -45,24 +49,29 @@ function normaliseName(value: string | null | undefined): string {
 }
 
 /**
- * Colour a scheduled bill's amount by kind, matching the app convention:
- * transfers blue, income (positive) green, expense (negative) red.
+ * Colour and sign a scheduled bill's amount by the kind of the OCCURRENCE whose
+ * magnitude is printed beside them: transfers blue, income green, expense red.
  *
- * Keyed off the stored sign rather than the effective amount deliberately: an
- * exchange rate is positive, so it cannot flip the direction, and the direction
- * is known even when the magnitude is not (issue #1247).
+ * Both used to key off the stored sign, on the argument that "an exchange rate is
+ * positive, so it cannot flip the direction". That is true of one scalar times one
+ * rate and false of a mixed-sign split parent, where only the investment line
+ * re-prices -- so a parent stored at -10 that now posts +20 rendered as
+ * "-$20.00" in red: the sign, the colour and the number describing two different
+ * events. `occurrenceKind` is the one place this decision is made, and it already
+ * falls back to the schedule's sign when the occurrence cannot be priced (issue
+ * #1247).
  */
 function scheduledAmountClass(s: ScheduledTransaction): string {
-  if (s.isTransfer) return 'text-blue-600 dark:text-blue-400';
-  return Number(s.amount) < 0
-    ? 'text-red-600 dark:text-red-400'
-    : 'text-green-600 dark:text-green-400';
+  return SCHEDULED_KIND_AMOUNT_CLASSES[
+    occurrenceKind(nextOccurrenceEffectiveAmount(s), s)
+  ];
 }
 
 /** Signed prefix for a scheduled bill amount; transfers carry no +/-. */
 function scheduledAmountSign(s: ScheduledTransaction): string {
-  if (s.isTransfer) return '';
-  return Number(s.amount) < 0 ? '-' : '+';
+  const kind = occurrenceKind(nextOccurrenceEffectiveAmount(s), s);
+  if (kind === 'transfer' || kind === 'reminder') return '';
+  return kind === 'bill' ? '-' : '+';
 }
 
 /**

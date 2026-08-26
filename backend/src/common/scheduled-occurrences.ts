@@ -127,6 +127,20 @@ export function expandOccurrenceSlots<O extends OccurrenceOverrideInput>(
     }
   }
 
+  // Every override, by slot, so the walk can ask what the slots it has NOT
+  // reached could still produce. `suffixMinDueDate[i]` is the earliest date any
+  // override from `sortedSlots[i]` onwards moves its occurrence to.
+  const sortedSlots = [...byOriginal.keys()].sort();
+  const suffixMinDueDate: string[] = new Array(sortedSlots.length);
+  for (let i = sortedSlots.length - 1; i >= 0; i -= 1) {
+    const own = ensureYMD(
+      byOriginal.get(sortedSlots[i])!.overrideDate as string,
+    );
+    const later = suffixMinDueDate[i + 1];
+    suffixMinDueDate[i] = later !== undefined && later < own ? later : own;
+  }
+  let slotCursor = 0;
+
   const found: ExpandedOccurrence<O>[] = [];
   const endDate = schedule.endDate ? ensureYMD(schedule.endDate) : null;
   let remaining = schedule.occurrencesRemaining ?? Number.POSITIVE_INFINITY;
@@ -161,6 +175,36 @@ export function expandOccurrenceSlots<O extends OccurrenceOverrideInput>(
     // keeps a malformed frequency from silently emitting the same date 2000 times.
     if (next <= slot) break;
     slot = next;
+
+    // Stop once no unwalked slot can enter the answer.
+    //
+    // `maxOccurrences` is applied after ordering by due date, so the walk used to
+    // run to the end of the window and throw most of its work away: the AI
+    // forecast asks for one occurrence over a ten-year horizon, which is 3,650
+    // steps for a daily schedule -- past `OCCURRENCE_WALK_GUARD`, so the "bounded
+    // horizon" was really the runaway backstop doing the bounding, silently.
+    //
+    // An unwalked slot's occurrence falls on the slot itself or on the date an
+    // override moved it to, so the earliest it can be is
+    // `min(next slot, earliest override date at or after that slot)`. Once
+    // `maxOccurrences` occurrences already fall on or before that floor, nothing
+    // further can displace them, and an override reaching back into the window
+    // from beyond the horizon is exactly what the floor accounts for.
+    if (window.maxOccurrences !== undefined) {
+      while (
+        slotCursor < sortedSlots.length &&
+        sortedSlots[slotCursor] < slot
+      ) {
+        slotCursor += 1;
+      }
+      const pendingOverride = suffixMinDueDate[slotCursor];
+      const floor =
+        pendingOverride !== undefined && pendingOverride < slot
+          ? pendingOverride
+          : slot;
+      const settled = found.filter((o) => o.dueDate <= floor).length;
+      if (settled >= window.maxOccurrences) break;
+    }
   }
 
   const ordered = found.sort((a, b) =>

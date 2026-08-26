@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Otomatik",
     "csvStatusManual": "Manuel",
     "amountUnavailable": "Kullanılamıyor",
+    "occurrencesUnavailable": "Öngörülen ödeme tarihleri yüklenemedi, bu nedenle aşağıdaki takvim ve tutarlar kullanılamıyor. Faturalarınızın kendisi etkilenmedi.",
     "csvAmountUnavailable": "Kullanılamıyor (geçerli döviz kuru yok)",
     "pdfTitle": "Yaklaşan Faturalar Raporu",
     "pdfSubtitle": "{month} | {count} aktif fatura",

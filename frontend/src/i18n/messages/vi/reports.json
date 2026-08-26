@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Tự động",
     "csvStatusManual": "Thủ công",
     "amountUnavailable": "Không có",
+    "occurrencesUnavailable": "Không thể tải các lần phát sinh dự kiến, vì vậy lịch và số tiền bên dưới không khả dụng. Các hóa đơn của bạn không bị ảnh hưởng.",
     "csvAmountUnavailable": "Không có (không có tỷ giá hiện tại)",
     "pdfTitle": "Báo cáo hóa đơn sắp tới",
     "pdfSubtitle": "{month} | {count} hóa đơn đang hoạt động",

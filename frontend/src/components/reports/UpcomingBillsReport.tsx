@@ -96,12 +96,24 @@ export function UpcomingBillsReport() {
     async () => {
       const [schedules, occurrences] = await Promise.all([
         scheduledTransactionsApi.getAll(),
-        scheduledTransactionsApi.getOccurrences({ through }),
+        // A failed occurrences read is "no information", not a failed report.
+        // This endpoint is newer than the page, so during a rolling deploy the new
+        // client can be served while a pod still runs the previous backend: a
+        // rejected leg inside `Promise.all` took the whole report down, retry
+        // button and all, for something the schedules leg could still describe.
+        // `null` is distinguishable from `[]` -- an empty array means "no
+        // occurrences", which is a real answer and must keep rendering as one.
+        scheduledTransactionsApi
+          .getOccurrences({ through })
+          .catch(() => null),
       ]);
       return { schedules, occurrences };
     },
     [through],
   );
+
+  /** The projection could not be loaded -- not the same as having none. */
+  const occurrencesUnavailable = response != null && response.occurrences === null;
 
   // Every active schedule is reported, whatever its kind: a transfer between the
   // user's own accounts and a zero-amount reminder both have due dates, and
@@ -182,17 +194,22 @@ export function UpcomingBillsReport() {
     // current amount is unknown makes the total unknown rather than smaller
     // (issue #1247); the known part is kept separately and never shown under
     // the total's own caption.
-    const totalOf = (bills: UpcomingBill[]) =>
-      sumEffectiveOccurrences(
-        bills.filter((b) => !b.scheduledTransaction.isTransfer),
-        (b) => ({
-          amount: b.amount,
-          currencyCode: b.currencyCode,
-          complete: b.amount !== null,
-        }),
-        convertToDefault,
-        Math.abs,
-      );
+    // With no projection, a total of zero would be a measured zero for a state
+    // nobody measured. One excluded component makes `isComplete` false, so every
+    // figure below renders as unavailable and the notice above says why.
+    const totalOf = (bills: UpcomingBill[]): ConvertedTotal =>
+      occurrencesUnavailable
+        ? { value: 0, missingCurrencies: [], excludedCount: 1 }
+        : sumEffectiveOccurrences(
+            bills.filter((b) => !b.scheduledTransaction.isTransfer),
+            (b) => ({
+              amount: b.amount,
+              currencyCode: b.currencyCode,
+              complete: b.amount !== null,
+            }),
+            convertToDefault,
+            Math.abs,
+          );
 
     return {
       overdueCount: overdue.length,
@@ -200,7 +217,7 @@ export function UpcomingBillsReport() {
       thisMonthCount: thisMonth.length,
       thisMonthTotal: totalOf(thisMonth),
     };
-  }, [upcomingBills, currentMonth, convertToDefault]);
+  }, [upcomingBills, currentMonth, convertToDefault, occurrencesUnavailable]);
 
   const handleBillClick = (_st: ScheduledTransaction) => {
     router.push('/bills');
@@ -285,6 +302,24 @@ export function UpcomingBillsReport() {
 
   return (
     <div className="space-y-6">
+      {occurrencesUnavailable && (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
+          data-testid="occurrences-unavailable"
+          role="status"
+        >
+          <p>{t('upcomingBills.occurrencesUnavailable')}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className="mt-2 inline-flex items-center rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            data-testid="occurrences-retry"
+          >
+            {t('error.retry')}
+          </button>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">

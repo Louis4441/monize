@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "自動",
     "csvStatusManual": "手動",
     "amountUnavailable": "不可用",
+    "occurrencesUnavailable": "無法載入預計的發生紀錄，因此下方的日曆與金額不可用。您的帳單本身未受影響。",
     "csvAmountUnavailable": "不可用（無目前匯率）",
     "pdfTitle": "即將到期帳單報表",
     "pdfSubtitle": "{month} | {count} 個有效帳單",

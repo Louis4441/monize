@@ -693,14 +693,19 @@ Enforcement         Server: every occurrence-aware surface consumes the occurren
                     effectiveCurrencyCode per schedule and per override, which is
                     a SCHEDULE-level read model: it says what the base occurrence
                     costs and carries the overrides beside it.
-                    occurrence-selection.guard.spec.ts is the scan: a second
-                    recurrence loop, a second overrideEffectiveKey lookup, a
-                    `.base.amount` read outside the two places where the base is
-                    the question, a new resolveMany call site, or a direction read
-                    of a schedule's stored amount (`Number(st.amount) < 0`) each
-                    fail with the file and line. The base-read and resolver-call
-                    allowances are COUNTS per file rather than exemptions, so a
-                    new occurrence-aware method inside an allowed file still fails.
+                    occurrence-selection.guard.spec.ts is the scan, over the files
+                    that import the resolver or the occurrence service: a second
+                    recurrence loop, a second overrideEffectiveKey lookup, a read
+                    of the resolver's `base` outside the two places where the base
+                    is the question, a new resolveMany call site, or a direction
+                    read of a schedule's stored amount each fail with the file and
+                    line. Both matchers are shape-based rather than name-based --
+                    `const b = resolved.base` and
+                    `Number(b.amount) > 0` inside a `??` expression are the two
+                    aliases that slipped past their first versions -- and the
+                    base-read and resolver-call allowances are COUNTS per file,
+                    asserted to be exactly right so a dead allowance cannot hide a
+                    matcher that stopped matching.
                     Client: lib/scheduled-effective-amount.ts is the only reader
                     of those fields (nextOccurrenceEffectiveAmount for a
                     schedule-level surface, nextOccurrenceDueDate for the date it

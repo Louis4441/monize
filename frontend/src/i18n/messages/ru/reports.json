@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Авто",
     "csvStatusManual": "Ручной",
     "amountUnavailable": "Недоступно",
+    "occurrencesUnavailable": "Не удалось загрузить прогнозируемые события, поэтому календарь и суммы ниже недоступны. Сами платежи при этом не изменились.",
     "csvAmountUnavailable": "Недоступно (нет текущего курса обмена)",
     "pdfTitle": "Отчёт о предстоящих платежах",
     "pdfSubtitle": "{month} | {count} активных счетов",

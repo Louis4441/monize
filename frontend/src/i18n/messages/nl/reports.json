@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Handmatig",
     "amountUnavailable": "Niet beschikbaar",
+    "occurrencesUnavailable": "De geprojecteerde termijnen konden niet worden geladen, dus de agenda en de bedragen hieronder zijn niet beschikbaar. Je rekeningen zelf zijn niet gewijzigd.",
     "csvAmountUnavailable": "Niet beschikbaar (geen actuele wisselkoers)",
     "pdfTitle": "Rapport aankomende rekeningen",
     "pdfSubtitle": "{month} | {count} actieve rekeningen",

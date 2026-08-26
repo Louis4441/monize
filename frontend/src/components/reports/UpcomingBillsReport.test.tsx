@@ -851,6 +851,43 @@ describe('UpcomingBillsReport', () => {
       expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThan(0);
     });
 
+    it('degrades instead of failing when the occurrences endpoint is unavailable', async () => {
+      // The endpoint is newer than the page, so during a rolling deploy the new
+      // client can be served while a pod still runs the previous backend. A
+      // rejected leg inside `Promise.all` took the whole report down.
+      mockGetAll.mockResolvedValue([makeTransaction({ nextDueDate: '2026-02-19' })]);
+      mockGetOccurrences.mockRejectedValue(new Error('404 Not Found'));
+      render(<UpcomingBillsReport />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('occurrences-unavailable')).toBeInTheDocument();
+      });
+      // The page is up: the schedule count still renders from the other leg.
+      expect(screen.getByText('Active Bills')).toBeInTheDocument();
+      // And the money is unknown, not a measured zero for a state nobody measured.
+      const thisMonthCard = screen.getByText('This Month').parentElement!;
+      expect(thisMonthCard).not.toHaveTextContent('$0');
+      expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThan(0);
+    });
+
+    it('keeps rendering a genuinely empty projection as empty', async () => {
+      // `[]` is a real answer -- "nothing scheduled in the window" -- and must not
+      // be shown as unavailable.
+      mockGetAll.mockResolvedValue([makeTransaction({ nextDueDate: '2026-02-19' })]);
+      mockGetOccurrences.mockResolvedValue([]);
+      render(<UpcomingBillsReport />);
+
+      await waitFor(() => {
+        expect(screen.getByText('This Month')).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByTestId('occurrences-unavailable'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('This Month').parentElement!).toHaveTextContent(
+        '$0',
+      );
+    });
+
     it('converts each occurrence before totalling, instead of adding currencies', async () => {
       mockGetAll.mockResolvedValue([
         makeTransaction({ id: 'st-usd', name: 'US subscription', frequency: 'ONCE', nextDueDate: '2026-02-19' }),

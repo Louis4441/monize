@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "[XX-Auto-XX]",
     "csvStatusManual": "[XX-Manual-XX]",
     "amountUnavailable": "[XX-Not available-XX]",
+    "occurrencesUnavailable": "[XX-The projected occurrences could not be loaded, so the calendar and the amounts below are unavailable. Your bills themselves are unaffected.-XX]",
     "csvAmountUnavailable": "[XX-Not available (no current exchange rate)-XX]",
     "pdfTitle": "[XX-Upcoming Bills Report-XX]",
     "pdfSubtitle": "[XX-{month} | {count} active bills-XX]",

@@ -52,7 +52,7 @@ describe("BudgetsService", () => {
   let overridesRepository: Record<string, jest.Mock>;
   let investmentTransactionsService: InvestmentFxMock;
   let exchangeRateService: jest.Mocked<
-    Pick<ExchangeRateService, "getRateForDate">
+    Pick<ExchangeRateService, "getRateForDate" | "getLatestRate">
   >;
 
   const mockBudget: Budget = {
@@ -239,6 +239,7 @@ describe("BudgetsService", () => {
     // same-currency bill never reaches it.
     exchangeRateService = {
       getRateForDate: jest.fn().mockResolvedValue(1),
+      getLatestRate: jest.fn().mockResolvedValue(1),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -995,6 +996,50 @@ describe("BudgetsService", () => {
       expect(result.upcomingBillsMissingRates).toEqual([]);
       // 600 budgeted - 200 spent - 999 upcoming, all in USD.
       expect(result.trulyAvailable).toBe(-599);
+    });
+
+    it("treats a zero or negative stored rate as no rate at all", async () => {
+      stubVelocityBudget([staleInvestmentBill()]);
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+      // A bad provider bar or a truncated import. Multiplying by it converted the
+      // whole bill to zero and reported the total COMPLETE -- understating what is
+      // owed and overstating what is available, both as settled figures.
+      exchangeRateService.getRateForDate.mockResolvedValue(0);
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.totalUpcomingBills).toBeNull();
+      expect(result.totalUpcomingBills).not.toBe(0);
+      expect(result.upcomingBillsComplete).toBe(false);
+      expect(result.upcomingBillsMissingRates).toEqual(["CAD->USD"]);
+      expect(result.trulyAvailable).toBeNull();
+    });
+
+    it("asks for each currency pair once, however many bills share it", async () => {
+      stubVelocityBudget([
+        staleInvestmentBill(),
+        { ...staleInvestmentBill(), id: "st-inv-2", name: "Second ETF buy" },
+        { ...staleInvestmentBill(), id: "st-inv-3", name: "Third ETF buy" },
+      ]);
+      investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+        { from: "USD", to: "CAD" },
+      );
+      investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+        1.35,
+      );
+      exchangeRateService.getRateForDate.mockResolvedValue(0.74);
+
+      const result = await service.getVelocity("user-1", "budget-1");
+
+      expect(result.upcomingBills).toHaveLength(3);
+      // Three CAD bills, one CAD->USD question: the rate belongs to the pair.
+      expect(exchangeRateService.getRateForDate).toHaveBeenCalledTimes(1);
+      expect(result.totalUpcomingBills).toBe(2997);
     });
 
     it("withholds the total when a bill cannot be converted into the budget's currency", async () => {

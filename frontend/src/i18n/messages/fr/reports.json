@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manuel",
     "amountUnavailable": "Non disponible",
+    "occurrencesUnavailable": "Les échéances prévues n'ont pas pu être chargées : le calendrier et les montants ci-dessous ne sont donc pas disponibles. Vos factures elles-mêmes ne sont pas affectées.",
     "csvAmountUnavailable": "Non disponible (aucun taux de change actuel)",
     "pdfTitle": "Rapport des factures à venir",
     "pdfSubtitle": "{month} | {count} factures actives",

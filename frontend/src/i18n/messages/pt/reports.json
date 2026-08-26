@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Auto",
     "csvStatusManual": "Manual",
     "amountUnavailable": "Não disponível",
+    "occurrencesUnavailable": "Não foi possível carregar as ocorrências previstas, pelo que o calendário e os valores abaixo não estão disponíveis. As suas contas em si não foram afetadas.",
     "csvAmountUnavailable": "Não disponível (sem taxa de câmbio atual)",
     "pdfTitle": "Relatório de Faturas Futuras",
     "pdfSubtitle": "{month} | {count} faturas ativas",

@@ -88,8 +88,13 @@ const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
  *
  * Not a product window: the summary describes every active schedule, and each
  * contributes exactly one occurrence. Ten years is long enough that only a
- * schedule which has genuinely run out of occurrences yields none, and short
- * enough that the expansion of a daily schedule stays bounded.
+ * schedule which has genuinely run out of occurrences yields none.
+ *
+ * It is emphatically NOT what bounds the walk -- 3,650 daily steps is past
+ * `OCCURRENCE_WALK_GUARD`, so for a while the runaway backstop was quietly doing
+ * the bounding here. The expander stops as soon as no unwalked slot can change
+ * the answer, which for `maxOccurrences: 1` is one step past the first
+ * occurrence.
  */
 const FORECAST_OCCURRENCE_HORIZON_DAYS = 3650;
 
@@ -265,8 +270,8 @@ export class ForecastAggregatorService {
     // actually post -- an occurrence the user re-priced or moved is what the
     // model should be forecasting from, not the template it came from.
     // The horizon is wide rather than a product window: every active schedule
-    // belongs in this summary, so the bound exists only to stop the expansion
-    // running away on a schedule with no end.
+    // belongs in this summary, and asking for one occurrence costs one step past
+    // it (see FORECAST_OCCURRENCE_HORIZON_DAYS).
     const occurrences = await this.occurrences.expand(userId, scheduled, {
       through: addDaysYMD(todayYMD(), FORECAST_OCCURRENCE_HORIZON_DAYS),
       maxOccurrences: 1,

@@ -1557,6 +1557,7 @@
     "csvStatusAuto": "Авто",
     "csvStatusManual": "Вручну",
     "amountUnavailable": "Недоступно",
+    "occurrencesUnavailable": "Не вдалося завантажити прогнозовані події, тому календар і суми нижче недоступні. Самі рахунки при цьому не змінилися.",
     "csvAmountUnavailable": "Недоступно (немає поточного курсу обміну)",
     "pdfTitle": "Звіт про майбутні рахунки",
     "pdfSubtitle": "{month} | {count} активних рахунків",

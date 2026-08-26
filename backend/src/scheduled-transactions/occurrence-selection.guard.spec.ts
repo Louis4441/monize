@@ -61,6 +61,39 @@ function isComment(line: string): boolean {
   );
 }
 
+/**
+ * A read of the resolver's `base` member -- `resolved.base`, `r.base.amount`, or
+ * an aliased `const b = resolved.base`.
+ *
+ * The lookbehind excludes a spread (`{ ...base }`), which is an unrelated local.
+ * The previous matcher required `.base.amount` on ONE expression, so it could not
+ * see `const amount = own ? own.effective : resolved.base` -- the only real base
+ * read in the tree -- and every allowance it granted was dead.
+ */
+const BASE_READ = /(?<!\.)\.base\b/;
+
+/**
+ * A direction decision taken from a schedule's stored amount.
+ *
+ * Any identifier, not a fixed list of variable names: the alias is the whole
+ * problem (`isIncome: (occurrence.amount ?? Number(b.amount)) > 0` slipped past a
+ * matcher that alternated over `st|row|schedule`, and the closing paren of the
+ * `??` expression slipped past the comparison half). Scoped to the resolver's
+ * consumers, because a posted transfer leg's own `Number(tx.amount) < 0` is a
+ * legitimate question about a row that has already happened.
+ */
+const STORED_SIGN = /Number\(\s*\w+\??\.amount\s*\)[\s)]*[<>]/;
+
+/**
+ * The files that hold a resolved occurrence or the resolver's own result -- the
+ * only ones these two scans are about. Scoping by import is what lets the
+ * matchers be shape-based rather than name-based.
+ */
+function resolverConsumers(all: SourceFile[]): SourceFile[] {
+  const IMPORTS_RESOLVER = /scheduled-(effective-amount|occurrence)\.service/;
+  return all.filter((file) => file.lines.some((l) => IMPORTS_RESOLVER.test(l)));
+}
+
 /** Whether a loop opens within `window` lines above `index`. */
 function insideLoop(lines: string[], index: number, window = 12): boolean {
   for (let i = Math.max(0, index - window); i < index; i += 1) {
@@ -160,7 +193,8 @@ describe("occurrence selection stays in one place", () => {
     // method in it read the base freely. Shrink-only -- a lower number is a
     // migration, a higher one needs its own argument here.
     const ALLOWED_BASE_READS = new Map([
-      ["scheduled-transactions/scheduled-effective-amount.service.ts", 8],
+      // The one consumer that may: `own ? own.effective : resolved.base` is the
+      // override-then-base precedence itself.
       ["scheduled-transactions/scheduled-occurrence.service.ts", 1],
       // findAll's schedule-level read model: `effectiveAmount` on a schedule row
       // is by definition the base, and the row carries its overrides beside it.
@@ -168,10 +202,10 @@ describe("occurrence selection stays in one place", () => {
     ]);
 
     const counts = new Map<string, number>();
-    for (const file of files) {
+    for (const file of resolverConsumers(files)) {
       file.lines.forEach((line) => {
         if (isComment(line)) return;
-        if (/\.base\.(amount|complete|currencyCode)\b/.test(line)) {
+        if (BASE_READ.test(line)) {
           counts.set(file.path, (counts.get(file.path) ?? 0) + 1);
         }
       });
@@ -182,6 +216,15 @@ describe("occurrence selection stays in one place", () => {
       .map(([path, count]) => `${path}: ${count} base reads`);
 
     expect(offenders).toEqual([]);
+    // Every allowance is live: a dead one is a guard that would not notice being
+    // shrunk to zero, which is how `.base.amount` came to match nothing at all
+    // while claiming to police the only real base read in the tree.
+    for (const [path, allowed] of ALLOWED_BASE_READS) {
+      expect({ path, reads: counts.get(path) ?? 0 }).toEqual({
+        path,
+        reads: allowed,
+      });
+    }
   });
 
   /**
@@ -202,7 +245,7 @@ describe("occurrence selection stays in one place", () => {
     ]);
 
     const counts = new Map<string, number>();
-    for (const file of files) {
+    for (const file of resolverConsumers(files)) {
       file.lines.forEach((line) => {
         if (isComment(line)) return;
         if (/\.(resolveMany|resolveOne)\s*\(/.test(line)) {
@@ -235,14 +278,9 @@ describe("occurrence selection stays in one place", () => {
     // The one place the fallback lives: `directionAmount` is defined as the
     // occurrence's amount when known and the snapshot's sign when not.
     const DECIDERS = ["scheduled-transactions/scheduled-occurrence.service.ts"];
-    // A signed comparison against zero on a *schedule-shaped* variable. `bill`
-    // and `occurrence` are deliberately absent: an `UpcomingBill` and a resolved
-    // occurrence both carry the occurrence's own figure.
-    const STORED_SIGN =
-      /Number\(\s*(st|row|schedule|scheduled|template)\??\.amount\s*\)\s*[<>]/;
 
     const offenders: string[] = [];
-    for (const file of files) {
+    for (const file of resolverConsumers(files)) {
       if (DECIDERS.includes(file.path)) continue;
       file.lines.forEach((line, i) => {
         if (isComment(line)) return;
@@ -277,16 +315,32 @@ describe("occurrence selection stays in one place", () => {
           "await this.effectiveAmounts.resolveMany(userId, rows)",
         ),
       ).toBe(true);
-      const STORED_SIGN =
-        /Number\(\s*(st|row|schedule|scheduled|template)\??\.amount\s*\)\s*[<>]/;
-      // The three shapes this actually caught.
+      // The three shapes it actually caught, including the ALIASED one that the
+      // old name-alternating matcher let through.
+      expect(
+        BASE_READ.test("const amount = own ? own.effective : resolved.base"),
+      ).toBe(true);
+      expect(BASE_READ.test("effectiveAmount: resolved.base.amount")).toBe(
+        true,
+      );
+      expect(BASE_READ.test("const b = resolved.base; return b.amount")).toBe(
+        true,
+      );
+      // A spread of an unrelated local is not a base read.
+      expect(
+        BASE_READ.test("previewRows.push({ ...base, error: reason })"),
+      ).toBe(false);
       expect(
         STORED_SIGN.test('return Number(row.amount) < 0 ? "bill" : "d"'),
       ).toBe(true);
       expect(STORED_SIGN.test("const isIncome = Number(st.amount) > 0")).toBe(
         true,
       );
-      expect(STORED_SIGN.test("Number(schedule?.amount) < 0")).toBe(true);
+      expect(
+        STORED_SIGN.test(
+          "isIncome: (occurrence.amount ?? Number(b.amount)) > 0",
+        ),
+      ).toBe(true);
       // And the shapes that are the correct answer, so it does not ban them.
       expect(STORED_SIGN.test("occurrence.directionAmount < 0")).toBe(false);
       expect(STORED_SIGN.test("roundMoney(Number(row.amount))")).toBe(false);
