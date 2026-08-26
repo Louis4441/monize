@@ -19,10 +19,24 @@ import { parseLocalDate } from '@/lib/utils';
  * accumulation, per-row values rounded to 2 decimals.
  */
 
+/**
+ * Payment frequencies a schedule can be projected at.
+ *
+ * Semi-monthly appears twice on purpose: `accounts.payment_frequency` holds
+ * whichever spelling wrote it. The mortgage path stores the mortgage enum's
+ * `SEMI_MONTHLY`; the loan-payment setup dialog stores the scheduled-transaction
+ * recurrence's `SEMIMONTHLY`. Accepting only the first made
+ * `buildLoanProjectionInput`'s cast fall through `getPeriodsPerYear` to its
+ * monthly default, so a semi-monthly loan was projected at 12 periods a year
+ * instead of 24 -- roughly double the remaining interest and a payoff date twice
+ * as far out, on every surface that reads a projection.
+ * `frontend/src/lib/loan-frequency.guard.test.ts` holds both spellings.
+ */
 export type ScheduleFrequency =
   | 'WEEKLY'
   | 'BIWEEKLY'
   | 'SEMI_MONTHLY'
+  | 'SEMIMONTHLY'
   | 'MONTHLY'
   | 'QUARTERLY'
   | 'YEARLY'
@@ -344,7 +358,13 @@ export interface ScenarioComparison {
  * merely long.
  */
 export const DEFAULT_MAX_PROJECTION_YEARS = 50;
-const HARD_MAX_PAYMENTS = 10000;
+
+/**
+ * Absolute ceiling on projected rows, whatever a caller asks for. Exported
+ * because `loan-past-impact.ts` deliberately projects to it, and a literal copy
+ * there would silently disagree the moment this moves.
+ */
+export const HARD_MAX_PAYMENTS = 10000;
 /** Balances at or below this are considered paid off (matches the reports) */
 const PAYOFF_EPSILON = 0.01;
 
@@ -390,6 +410,7 @@ export function getPeriodsPerYear(frequency: ScheduleFrequency): number {
     case 'ACCELERATED_BIWEEKLY':
       return 26;
     case 'SEMI_MONTHLY':
+    case 'SEMIMONTHLY':
       return 24;
     case 'QUARTERLY':
       return 4;
@@ -487,11 +508,20 @@ export function advanceDate(date: Date, frequency: ScheduleFrequency): Date {
       next.setDate(next.getDate() + 14);
       break;
     case 'SEMI_MONTHLY':
-      if (next.getDate() < 15) {
-        next.setDate(15);
+    case 'SEMIMONTHLY':
+      // The 15th and the last day of the month, alternating -- the convention
+      // `advanceByFrequency` in @/lib/frequency uses, because that is the
+      // engine that will actually post these payments. Projecting the 1st and
+      // the 15th instead showed a semi-monthly borrower dates their register
+      // never has. Spelled out rather than imported: importing the recurrence
+      // module would put this file in the scheduled-transaction domain of
+      // `frequency.guard.test.ts`, whose whole point is that loan cadences are
+      // a different domain. `loan-frequency.guard.test.ts` asserts the two
+      // steppings agree, so the duplication is proven rather than trusted.
+      if (next.getDate() <= 15) {
+        next.setMonth(next.getMonth() + 1, 0); // day 0 of next month = last of this
       } else {
-        next.setMonth(next.getMonth() + 1);
-        next.setDate(1);
+        next.setMonth(next.getMonth() + 1, 15);
       }
       break;
     case 'QUARTERLY':
@@ -598,9 +628,29 @@ export function recurringOccurrencesDue(
   extra: RecurringExtra,
   firstPaymentDate: Date,
 ): RecurringOccurrenceCounter {
-  // ONE_OFF cannot reach here: RecurringExtra.frequency excludes it by type.
-  const cadence = extra.frequency ? OVERPAYMENT_CADENCE[extra.frequency] : null;
+  // Three cases, not two. No frequency declared is the legacy "amount on every
+  // payment"; a recognized cadence is dated below; a frequency declared but
+  // unrecognized is neither.
+  //
+  // The third is reachable even though `RecurringExtra.frequency` excludes
+  // ONE_OFF by type: `loan_scenarios.recurring_extra_frequency` is an
+  // unconstrained VARCHAR whose only enforcement is `@IsIn` at write time, so a
+  // legacy row or a restored backup can carry anything. An undefined lookup
+  // landing in the legacy branch applied the FULL amount on every payment --
+  // the densest possible reading of an unknown value, turning a declared 5000
+  // annual overpayment into 5000 a month with a payoff and a saving to match.
+  // Contributing nothing is the direction that cannot invent a saving.
+  const declaredCadence = extra.frequency
+    ? (OVERPAYMENT_CADENCE[extra.frequency] as
+        | { days?: number; months?: number }
+        | undefined)
+    : null;
 
+  if (declaredCadence === undefined) {
+    return { dueBy: () => 0 };
+  }
+
+  const cadence = declaredCadence;
   if (!cadence) {
     return {
       dueBy: (rowDate) =>

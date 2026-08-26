@@ -27,6 +27,7 @@
     "loanRequiresInstitution": "Кредитные счета требуют название учреждения",
     "mortgageRequiredFields": "Ипотечные счета требуют: mortgagePaymentFrequency, paymentStartDate, sourceAccountId и amortizationMonths",
     "mortgageRequiresInterestRate": "Ипотечные счета требуют процентную ставку",
+    "mortgageFrequencyUnsupported": "Канадскую ипотеку нельзя запланировать с периодичностью платежей {frequency}",
     "mortgageRequiresInstitution": "Ипотечные счета требуют название учреждения",
     "onlyMortgageAccounts": "Эта операция действительна только для ипотечных счетов",
     "updateRateClosed": "Невозможно обновить ставку закрытого счёта",

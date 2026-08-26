@@ -168,9 +168,29 @@ describe("Loan Amortization Utility", () => {
       expect(endDate.getFullYear()).toBeGreaterThanOrEqual(2126);
     });
 
-    it("returns far future for very large number of payments", () => {
-      const endDate = calculateEndDate(startDate, "MONTHLY", 1500);
+    it("returns far future for the unknown-schedule sentinel", () => {
+      const endDate = calculateEndDate(startDate, "MONTHLY", -1);
       expect(endDate.getFullYear()).toBeGreaterThanOrEqual(2126);
+    });
+
+    it("returns far future above the dateable ceiling", () => {
+      // The ceiling is 10000, matching calculateMortgageEndDate and
+      // createLoanAccount's own guard. It used to be 2500, which sent an
+      // ordinary 2600-payment weekly loan to the year-2126 sentinel while the
+      // same result reported 2600 payments.
+      const endDate = calculateEndDate(startDate, "MONTHLY", 20000);
+      expect(endDate.getFullYear()).toBeGreaterThanOrEqual(2126);
+    });
+
+    it("dates a long weekly schedule instead of giving up on it", () => {
+      // 2600 weekly payments is 50 years -- inside the projection horizon the
+      // frontend engine now derives, and well inside the caller's own guard.
+      const endDate = calculateEndDate(startDate, "WEEKLY", 2600);
+      const days = Math.round(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      expect(days).toBe(2599 * 7);
+      expect(endDate.getFullYear()).toBeLessThan(2126);
     });
   });
 

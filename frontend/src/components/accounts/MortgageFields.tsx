@@ -171,7 +171,20 @@ export function MortgageFields({
   };
 
   const calculateMortgagePreview = useCallback(async () => {
-    if (isEditing || !openingBalance || !interestRate || !amortizationMonths || !mortgagePaymentFrequency || !paymentStartDate) {
+    // `interestRate == null`, not `!interestRate`: 0% is a real mortgage rate
+    // (the DTO validates `@Min(0)`, and an interest-free loan or a promotional
+    // 0% deal is an ordinary thing to record), so a falsy check read a KNOWN
+    // zero as "not set yet" and showed no preview at all. The other three are
+    // falsy-checked deliberately: a zero principal, a zero-month amortization
+    // or an empty date genuinely mean "not filled in".
+    if (
+      isEditing ||
+      !openingBalance ||
+      interestRate == null ||
+      !amortizationMonths ||
+      !mortgagePaymentFrequency ||
+      !paymentStartDate
+    ) {
       setMortgagePreview(null);
       return;
     }
@@ -396,7 +409,13 @@ export function MortgageFields({
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">{t('mortgageFields.previewTotalInterest')}</span>{' '}
                   <span className="font-medium">
-                    {mortgagePreview.totalInterest > 0 ? formatCurrency(mortgagePreview.totalInterest, watchedCurrency) : t('mortgageFields.previewNA')}
+                    {/* -1 is the "could not be worked out" sentinel; 0 is a
+                        known zero (a 0% mortgage costs no interest), and
+                        collapsing the two reported it as N/A. Matches the
+                        `>= 0` test on the residual payoff below. */}
+                    {mortgagePreview.totalInterest >= 0
+                      ? formatCurrency(mortgagePreview.totalInterest, watchedCurrency)
+                      : t('mortgageFields.previewNA')}
                   </span>
                 </div>
                 {/* The final payment is the residual payoff. It is shown only

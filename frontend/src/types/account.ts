@@ -33,15 +33,45 @@ export function isLiabilityAccountType(type: AccountType | undefined | null): bo
 export type InterestBookingMode = 'AUTO' | 'SPLIT' | 'SEPARATE';
 export const INTEREST_BOOKING_MODES: InterestBookingMode[] = ['AUTO', 'SPLIT', 'SEPARATE'];
 
-export type PaymentFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+/**
+ * Payment frequencies a loan account can carry, mirroring the backend's
+ * `PAYMENT_FREQUENCIES`.
+ *
+ * `SEMIMONTHLY` (no underscore) is here because the loan-payment setup dialog
+ * offers it and the backend writes it to `accounts.payment_frequency` -- the
+ * mortgage enum's `SEMI_MONTHLY` is the other spelling of the same cadence, and
+ * both reach this field.
+ *
+ * Declared as a runtime list with the type derived from it, so `AccountForm`'s
+ * Zod enum can be built from the same values instead of a third copy. That
+ * matters more than tidiness here: `optionalEnum` maps an unlisted value to
+ * `undefined`, so a list missing SEMIMONTHLY would silently ERASE the frequency
+ * of any loan the setup dialog created, the first time somebody edited it.
+ * `frontend/src/lib/loan-frequency.guard.test.ts` holds the lists against the
+ * label catalog.
+ */
+export const PAYMENT_FREQUENCIES = [
+  'WEEKLY',
+  'BIWEEKLY',
+  'SEMIMONTHLY',
+  'MONTHLY',
+  'QUARTERLY',
+  'YEARLY',
+] as const;
+
+export type PaymentFrequency = (typeof PAYMENT_FREQUENCIES)[number];
+
+export const MORTGAGE_PAYMENT_FREQUENCIES = [
+  'MONTHLY',
+  'SEMI_MONTHLY',
+  'BIWEEKLY',
+  'ACCELERATED_BIWEEKLY',
+  'WEEKLY',
+  'ACCELERATED_WEEKLY',
+] as const;
 
 export type MortgagePaymentFrequency =
-  | 'MONTHLY'
-  | 'SEMI_MONTHLY'
-  | 'BIWEEKLY'
-  | 'ACCELERATED_BIWEEKLY'
-  | 'WEEKLY'
-  | 'ACCELERATED_WEEKLY';
+  (typeof MORTGAGE_PAYMENT_FREQUENCIES)[number];
 
 export interface Account {
   id: string;

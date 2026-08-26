@@ -27,6 +27,7 @@
     "loanRequiresInstitution": "Las cuentas de préstamo requieren un nombre de institución",
     "mortgageRequiredFields": "Las cuentas de hipoteca requieren mortgagePaymentFrequency, paymentStartDate, sourceAccountId y amortizationMonths",
     "mortgageRequiresInterestRate": "Las cuentas de hipoteca requieren una tasa de interés",
+    "mortgageFrequencyUnsupported": "Las hipotecas canadienses no se pueden programar con una frecuencia de pago {frequency}",
     "mortgageRequiresInstitution": "Las cuentas de hipoteca requieren un nombre de institución",
     "onlyMortgageAccounts": "Esta operación solo es válida para cuentas de hipoteca",
     "updateRateClosed": "No se puede actualizar la tasa en una cuenta cerrada",

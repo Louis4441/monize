@@ -56,7 +56,10 @@ export function LoanSummaryCards({
   // argument if this card ever shows a non-Canadian mortgage.
   const isCanadianFixed = account.isCanadianMortgage && !account.isVariableRate;
   const effectiveRate =
-    isCanadianFixed && account.interestRate
+    // `!= null`, not truthiness: the card above prints `0%` from
+    // `account.interestRate != null`, so suppressing the effective-rate note for
+    // a 0% mortgage treated a known 0.000% as "could not be worked out".
+    isCanadianFixed && account.interestRate != null
       ? effectiveAnnualRate(
           account.interestRate,
           getPeriodsPerYear((account.paymentFrequency ?? 'MONTHLY') as ScheduleFrequency),

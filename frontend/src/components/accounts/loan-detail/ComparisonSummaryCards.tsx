@@ -2,7 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import {
-  OverpaymentFrequency,
+  OverpaymentMode,
+  RecurringOverpaymentFrequency,
   ScenarioComparison,
   ScheduleFrequency,
   getPeriodsPerYear,
@@ -17,7 +18,18 @@ interface ComparisonSummaryCardsProps {
   comparison: ScenarioComparison;
   currencyCode: string;
   /** The scenario's recurring overpayment (amount at its cadence), when any. */
-  recurringOverpayment?: { amount: number; frequency?: OverpaymentFrequency };
+  recurringOverpayment?: {
+    amount: number;
+    frequency?: RecurringOverpaymentFrequency;
+    /**
+     * What the bank holds fixed. Supplied rather than inferred, because the
+     * inference (`installmentReduction > 0`) is unavailable exactly when a
+     * schedule was truncated -- and a LOWER_INSTALLMENT scenario read as
+     * SHORTEN_TERM adds the overpayment on top of an already-reduced
+     * installment and offers "time saved" for a plan that saves none.
+     */
+    mode?: OverpaymentMode;
+  };
   /** The loan's own payment cadence, needed to place a recurring overpayment. */
   loanFrequency?: ScheduleFrequency;
   /** A fixed total monthly spend (budget mode): shown as the monthly payment. */
@@ -46,10 +58,15 @@ export function ComparisonSummaryCards({
     : t('loanDetail.comparison.beyondProjection');
 
   // Lower-installment scenarios keep the end date (no time saved); their headline
-  // outcome is the smaller installment instead. Null means the schedules cannot
-  // be compared at all (one stopped at the projection horizon), so there is no
-  // installment drop to headline -- the time-saved card renders Unknown instead.
-  const isLowerInstallment = (comparison.installmentReduction ?? 0) > 0.005;
+  // outcome is the smaller installment instead. The plan's own mode decides that
+  // where it is known; the installment-drop heuristic is the fallback for the
+  // saved-scenarios table, which compares without a live plan. Reading the mode
+  // off `installmentReduction` alone was wrong precisely when that value is null
+  // -- a truncated schedule -- flipping the payment card to the wrong formula.
+  const isLowerInstallment =
+    recurringOverpayment?.mode != null
+      ? recurringOverpayment.mode === 'LOWER_INSTALLMENT'
+      : (comparison.installmentReduction ?? 0) > 0.005;
 
   const opAmount = recurringOverpayment?.amount ?? 0;
   const opFrequency = recurringOverpayment?.frequency;
@@ -75,12 +92,22 @@ export function ComparisonSummaryCards({
   // The resulting monthly outlay: a fixed budget shows that budget as-is;
   // for lower-installment the recomputed smaller installment; otherwise the
   // unchanged installment plus any per-payment extra.
+  // `finalPaymentAmount` is the installment at the last row PROJECTED, which is
+  // the last payment only when the schedule paid off. On a truncated schedule it
+  // is a mid-schedule figure, so the resulting-payment card is unknown too --
+  // otherwise it printed a confident number beside an "Unknown" installment drop
+  // for the same underlying quantity. A fixed budget is the borrower's own input
+  // and stays known either way.
   const monthlyPayment =
     fixedMonthlyPayment != null
       ? fixedMonthlyPayment
-      : isLowerInstallment
-        ? scenario.finalPaymentAmount
-        : Math.round((scenario.finalPaymentAmount + perPaymentExtra) * 100) / 100;
+      : !scenario.paidOff
+        ? null
+        : isLowerInstallment
+          ? // The overpayment IS the reduction here; adding it on top would count
+            // the same money twice.
+            scenario.finalPaymentAmount
+          : Math.round((scenario.finalPaymentAmount + perPaymentExtra) * 100) / 100;
 
   const overpaymentNote =
     fixedMonthlyPayment == null && !isLowerInstallment && opAmount > 0
@@ -100,10 +127,17 @@ export function ComparisonSummaryCards({
       {isLowerInstallment ? (
         <Card
           label={t('loanDetail.comparison.newInstallment')}
-          value={t('loanDetail.comparison.installmentDrop', {
-            payment: formatCurrency(scenario.finalPaymentAmount, currencyCode),
-            reduction: formatCurrency(comparison.installmentReduction ?? 0, currencyCode),
-          })}
+          // The drop is unknown when either schedule stopped at the horizon (the
+          // scenario's "final" installment is then a mid-schedule one), so the
+          // card says so rather than claiming a reduction of 0.00.
+          value={
+            comparison.installmentReduction == null
+              ? t('loanDetail.comparison.unknown')
+              : t('loanDetail.comparison.installmentDrop', {
+                  payment: formatCurrency(scenario.finalPaymentAmount, currencyCode),
+                  reduction: formatCurrency(comparison.installmentReduction, currencyCode),
+                })
+          }
           valueClass="text-green-600 dark:text-green-400"
         />
       ) : (
@@ -137,7 +171,11 @@ export function ComparisonSummaryCards({
       />
       <Card
         label={t('loanDetail.comparison.monthlyPayment')}
-        value={formatCurrency(monthlyPayment, currencyCode)}
+        value={
+          monthlyPayment == null
+            ? t('loanDetail.comparison.unknown')
+            : formatCurrency(monthlyPayment, currencyCode)
+        }
         valueClass="text-gray-900 dark:text-gray-100"
         subvalue={overpaymentNote}
       />

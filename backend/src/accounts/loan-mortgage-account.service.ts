@@ -11,8 +11,11 @@ import { Institution } from "../institutions/entities/institution.entity";
 import { CreateAccountDto } from "./dto/create-account.dto";
 import { CategoriesService } from "../categories/categories.service";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
+import { FrequencyType as FrequencyTypeDto } from "../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import {
   calculateAmortization,
+  LOAN_FREQUENCY_TO_RECURRENCE,
+  MAX_DATEABLE_PAYMENTS,
   PaymentFrequency,
   AmortizationResult,
 } from "./loan-amortization.util";
@@ -20,6 +23,7 @@ import {
   calculateMortgageAmortization,
   getMortgagePeriodsPerYear,
   getPeriodicRate,
+  MORTGAGE_FREQUENCY_TO_RECURRENCE,
   MortgagePaymentFrequency,
   MortgageAmortizationInput,
   MortgageAmortizationResult,
@@ -161,7 +165,11 @@ export class LoanMortgageAccountService {
     });
 
     const endDateStr =
-      amortization.totalPayments > 0 && amortization.totalPayments < 10000
+      // The same ceiling the end-date helpers date up to. Two literals
+      // disagreed at the boundary: the util dated exactly 10000 while this
+      // refused it, so one schedule had a payoff date and no scheduled end.
+      amortization.totalPayments > 0 &&
+      amortization.totalPayments <= MAX_DATEABLE_PAYMENTS
         ? formatDateYMD(amortization.endDate)
         : undefined;
 
@@ -173,7 +181,15 @@ export class LoanMortgageAccountService {
         payeeName: institutionName,
         amount: -paymentAmount,
         currencyCode: accountData.currencyCode,
-        frequency: paymentFrequency as any,
+        // Through the loan-to-recurrence table rather than a cast. Every loan
+        // frequency happens to share its spelling with a recurrence frequency
+        // except SEMIMONTHLY, and a cast is exactly how that kind of mismatch
+        // reaches the database unvalidated (`as any` skips class-validator: the
+        // pipe only runs on controller input, and the column has no CHECK).
+        frequency:
+          FrequencyTypeDto[
+            LOAN_FREQUENCY_TO_RECURRENCE[paymentFrequency as PaymentFrequency]
+          ],
         nextDueDate: paymentStartDate,
         startDate: paymentStartDate,
         endDate: endDateStr,
@@ -308,19 +324,23 @@ export class LoanMortgageAccountService {
       return repo.save(account);
     });
 
-    const frequencyMap: Record<string, string> = {
-      MONTHLY: "MONTHLY",
-      SEMI_MONTHLY: "SEMI_MONTHLY",
-      BIWEEKLY: "BIWEEKLY",
-      ACCELERATED_BIWEEKLY: "BIWEEKLY",
-      WEEKLY: "WEEKLY",
-      ACCELERATED_WEEKLY: "WEEKLY",
-    };
+    // The one mortgage-to-recurrence table, shared with calculateMortgageEndDate
+    // so the payoff date and the schedule that reaches it cannot disagree. It
+    // used to be a local copy that mapped SEMI_MONTHLY to itself -- a value the
+    // recurrence engine does not recognize, whose `default` returns the same
+    // date, so the occurrence was due forever and the mortgage's payment
+    // schedule never advanced. Migration 165 heals the rows that copy wrote.
     const scheduledFrequency =
-      frequencyMap[mortgagePaymentFrequency] || "MONTHLY";
+      MORTGAGE_FREQUENCY_TO_RECURRENCE[
+        mortgagePaymentFrequency as MortgagePaymentFrequency
+      ];
 
     const endDateStr =
-      amortization.totalPayments > 0 && amortization.totalPayments < 10000
+      // The same ceiling the end-date helpers date up to. Two literals
+      // disagreed at the boundary: the util dated exactly 10000 while this
+      // refused it, so one schedule had a payoff date and no scheduled end.
+      amortization.totalPayments > 0 &&
+      amortization.totalPayments <= MAX_DATEABLE_PAYMENTS
         ? formatDateYMD(amortization.endDate)
         : undefined;
 
@@ -332,7 +352,7 @@ export class LoanMortgageAccountService {
         payeeName: institutionName,
         amount: -amortization.paymentAmount,
         currencyCode: accountData.currencyCode,
-        frequency: scheduledFrequency as any,
+        frequency: FrequencyTypeDto[scheduledFrequency],
         nextDueDate: paymentStartDate,
         startDate: paymentStartDate,
         endDate: endDateStr,

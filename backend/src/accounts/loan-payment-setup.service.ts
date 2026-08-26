@@ -18,10 +18,11 @@ import { ScheduledTransactionsService } from "../scheduled-transactions/schedule
 import {
   calculatePaymentSplit,
   PaymentFrequency,
+  SCHEDULED_FREQUENCY_BY_PAYMENT_FREQUENCY,
 } from "./loan-amortization.util";
 import {
   calculateMortgagePaymentSplit,
-  MortgagePaymentFrequency,
+  toMortgagePaymentFrequency,
 } from "./mortgage-amortization.util";
 import { allocateLoanPayment } from "./loan-payment-waterfall.util";
 import { tr } from "../i18n/translate";
@@ -129,12 +130,32 @@ export class LoanPaymentSetupService {
       account.accountType === AccountType.MORTGAGE &&
       (dto.isCanadianMortgage || account.isCanadianMortgage)
     ) {
-      // Use mortgage-specific calculation for Canadian mortgages
+      // Use mortgage-specific calculation for Canadian mortgages.
+      //
+      // The DTO's frequency is a *recurrence* spelling, and casting it into
+      // MortgagePaymentFrequency handed getMortgagePeriodsPerYear a value it has
+      // no case for: SEMIMONTHLY, QUARTERLY and YEARLY all fell through to its
+      // monthly default, so a semi-monthly Canadian mortgage was split at twice
+      // the correct interest for the life of the loan. Normalize instead, and
+      // refuse a cadence these helpers cannot express rather than computing a
+      // confident wrong number for it.
+      const mortgageFrequency = toMortgagePaymentFrequency(
+        dto.paymentFrequency,
+      );
+      if (!mortgageFrequency) {
+        throw new BadRequestException(
+          tr(
+            "errors.accounts.mortgageFrequencyUnsupported",
+            "Canadian mortgages cannot be scheduled at this payment frequency",
+            { frequency: dto.paymentFrequency },
+          ),
+        );
+      }
       const split = calculateMortgagePaymentSplit(
         currentBalance,
         interestRate,
         basePaymentAmount,
-        dto.paymentFrequency as MortgagePaymentFrequency,
+        mortgageFrequency,
         dto.isCanadianMortgage ?? account.isCanadianMortgage ?? false,
         dto.isVariableRate ?? account.isVariableRate ?? false,
       );
@@ -181,20 +202,13 @@ export class LoanPaymentSetupService {
     const scheduledExtraPrincipal = allocation.extraPrincipal;
     const parentAmount = allocation.total;
 
-    // Map frequency for scheduled transactions
-    // Mortgage frequencies like ACCELERATED_BIWEEKLY map to BIWEEKLY in scheduling
-    const frequencyMap: Record<string, string> = {
-      WEEKLY: "WEEKLY",
-      BIWEEKLY: "BIWEEKLY",
-      SEMIMONTHLY: "SEMIMONTHLY",
-      MONTHLY: "MONTHLY",
-      QUARTERLY: "QUARTERLY",
-      YEARLY: "YEARLY",
-      ACCELERATED_BIWEEKLY: "BIWEEKLY",
-      ACCELERATED_WEEKLY: "WEEKLY",
-      SEMI_MONTHLY: "SEMIMONTHLY",
-    };
-    const scheduledFrequency = frequencyMap[dto.paymentFrequency] || "MONTHLY";
+    // The DTO accepts loan spellings; mortgage callers may also carry the
+    // mortgage ones, so both tables are merged rather than a third copy written.
+    // Deriving it means a new frequency in either domain is scheduled correctly
+    // here without anybody remembering this line.
+    const scheduledFrequency =
+      SCHEDULED_FREQUENCY_BY_PAYMENT_FREQUENCY[dto.paymentFrequency] ??
+      "MONTHLY";
 
     // Build scheduled transaction splits
     const splits: Array<{

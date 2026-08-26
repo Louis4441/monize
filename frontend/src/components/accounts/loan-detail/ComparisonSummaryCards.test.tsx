@@ -105,11 +105,64 @@ describe('ComparisonSummaryCards', () => {
 
     expect(screen.getByText('Interest Saved')).toBeInTheDocument();
     expect(screen.getByText('Time Saved')).toBeInTheDocument();
-    // One "Unknown" for the time saved and one for the interest saved.
-    expect(screen.getAllByText('Unknown')).toHaveLength(2);
+    // Three: the time saved, the interest saved, and the resulting monthly
+    // payment -- whose figure is the installment at the last row PROJECTED, not
+    // at the last payment, so it is unknown for the same reason.
+    expect(screen.getAllByText('Unknown')).toHaveLength(3);
     // And nothing anywhere claiming a zero saving.
     expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
     expect(screen.queryByText('0 payments')).not.toBeInTheDocument();
     expect(screen.queryByText('0 months')).not.toBeInTheDocument();
+  });
+
+  it('reads the mode from the plan, not from the installment drop', () => {
+    // A LOWER_INSTALLMENT plan on a baseline that stopped at the horizon: the
+    // drop is null, so inferring the mode from it read the scenario as
+    // SHORTEN_TERM -- which offers "time saved" for a plan that holds the end
+    // date fixed and adds the overpayment on top of an already-reduced
+    // installment, counting the same money twice.
+    const comparison = makeIncomparable();
+    render(
+      <ComparisonSummaryCards
+        comparison={comparison}
+        currencyCode="CAD"
+        recurringOverpayment={{ amount: 100, frequency: 'MONTHLY', mode: 'LOWER_INSTALLMENT' }}
+        loanFrequency="MONTHLY"
+      />,
+    );
+
+    // The installment headline, not the time-saved one.
+    expect(screen.getByText('New Installment')).toBeInTheDocument();
+    expect(screen.queryByText('Time Saved')).not.toBeInTheDocument();
+    // The drop itself is unknown rather than 0.00, and so is the resulting
+    // payment: `finalPaymentAmount` on a truncated schedule is a mid-schedule
+    // installment. What is asserted is that neither is a confident number, and
+    // in particular that the overpayment is NOT added on top of an
+    // already-reduced installment (which is what reading the mode off the null
+    // drop produced).
+    expect(comparison.installmentReduction).toBeNull();
+    expect(screen.getAllByText('Unknown').length).toBeGreaterThanOrEqual(3);
+    const wrongTotal =
+      Math.round((comparison.scenario.finalPaymentAmount + 100) * 100) / 100;
+    expect(screen.queryByText(`$${wrongTotal.toFixed(2)}`)).not.toBeInTheDocument();
+  });
+
+  it('adds the extra on top for a SHORTEN_TERM plan', () => {
+    // The other half of the same decision: a shorten-term plan keeps the
+    // installment, so the resulting outlay is installment + extra.
+    const comparison = makeComparison();
+    render(
+      <ComparisonSummaryCards
+        comparison={comparison}
+        currencyCode="CAD"
+        recurringOverpayment={{ amount: 100, frequency: 'MONTHLY', mode: 'SHORTEN_TERM' }}
+        loanFrequency="MONTHLY"
+      />,
+    );
+
+    expect(screen.getByText('Time Saved')).toBeInTheDocument();
+    expect(screen.queryByText('New Installment')).not.toBeInTheDocument();
+    const expected = Math.round((comparison.scenario.finalPaymentAmount + 100) * 100) / 100;
+    expect(screen.getByText(`$${expected.toFixed(2)}`)).toBeInTheDocument();
   });
 });

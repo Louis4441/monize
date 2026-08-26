@@ -731,8 +731,28 @@ Enforcement         The convention is the nominal annual rate divided by the
                     computed at twice the correct rate. The case exists now, and
                     loan-payment-frequency.guard.spec.ts reads the DTO's @IsIn
                     list out of the source and fails on any accepted value
-                    without its own period count, because a cast cannot be
-                    type-checked.
+                    without its own period count or that does not move
+                    calculateEndDate, because a cast cannot be type-checked. The
+                    frontend has the same hazard and the same scan: the setup
+                    dialog stores SEMIMONTHLY, ScheduleFrequency spelled only
+                    SEMI_MONTHLY, and every projection surface read 12 periods a
+                    year instead of 24. Both spellings are accepted on both
+                    layers now. The frequency tables are Records over their
+                    unions, so a future widening is a compile error rather than a
+                    silent monthly fallback, and toMortgagePaymentFrequency
+                    refuses a cadence the mortgage helpers cannot express
+                    (QUARTERLY, YEARLY) instead of casting it into their monthly
+                    default. PAYMENT_FREQUENCIES is one list per layer with the
+                    type derived from it, because AccountForm's optionalEnum maps
+                    an unlisted value to undefined -- a form list missing a stored
+                    frequency erases it on the first edit. The tables live in
+                    payment-frequency.util.ts rather than in the two amortization
+                    utils, which had to import each other to share them: under a
+                    mortgage-first load order the merged table initialised with
+                    only the loan keys, so an accelerated-biweekly mortgage's
+                    scheduled transaction was created monthly. The guard requires
+                    the modules in the hostile order in a fresh registry, because
+                    a completeness assertion cannot see a load-order defect.
 Concurrency scope   --
 Failure response    --
 Required tests      Present: the "periodic-rate convention" block in
@@ -742,9 +762,12 @@ Required tests      Present: the "periodic-rate convention" block in
                     spell out the REJECTED contract and assert the implementation
                     differs from it -- backend/frontend parity mirrors one
                     formula, so it can only detect drift, never validate the
-                    choice. Plus loan-payment-frequency.guard.spec.ts (the DTO
-                    scan) and the effectiveAnnualRate block in
-                    loan-schedule.test.ts.
+                    choice. Plus the two frequency scans --
+                    loan-payment-frequency.guard.spec.ts reads the DTO's @IsIn
+                    list and checks both getPeriodsPerYear and calculateEndDate,
+                    loan-frequency.guard.test.ts reads the setup dialog's options
+                    and checks the frontend engine -- and the effectiveAnnualRate
+                    block in loan-schedule.test.ts.
 Status              enforced
 ```
 
@@ -759,7 +782,9 @@ Enforcement         calculateResidualPayoff
                     (backend/src/accounts/mortgage-amortization.util.ts) computes
                     the balance after n-1 installments and closes it out, and
                     calculateMortgageAmortization derives totalInterest and
-                    finalPaymentAmount from it. paymentAmount * totalPayments -
+                    residualPayoffAmount from it (deliberately NOT named
+                    finalPaymentAmount, which LoanScheduleResult already uses for
+                    the ending regular installment). paymentAmount * totalPayments -
                     principal overstated a 25-year accelerated-biweekly
                     mortgage's lifetime interest by 569, because Math.ceil had
                     rounded a fractional payoff count up. The frontend schedule
@@ -797,11 +822,18 @@ Statement           accounts.payment_start_date is the date of the first payment
 Source of truth     accounts.payment_start_date.
 Enforcement         calculateEndDate (loan-amortization.util.ts) and
                     calculateMortgageEndDate (mortgage-amortization.util.ts)
-                    advance totalPayments - 1, with the zero- and
+                    advance totalPayments - 1, with the zero-, negative- and
                     infinite-payment sentinels kept explicit. Advancing N dated
                     every displayed payoff -- and the linked scheduled
                     transaction's endDate, derived from the same value -- one
                     full payment period late.
+                    The stepping itself is calculateNextDueDate, the recurrence
+                    engine that posts those payments, through advancePaymentDates:
+                    this date bounds the scheduled transaction, so it must be a
+                    date the scheduler reaches. A hand-rolled semi-monthly step
+                    (1st, 15th) against the engine's (15th, last day of month)
+                    dated payment 24 of 24 before the final installment, and the
+                    schedule posted 23.
 Concurrency scope   --
 Failure response    The start date itself for a zero- or one-payment schedule.
 Required tests      Present: the calculateEndDate and calculateMortgageEndDate

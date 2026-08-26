@@ -185,7 +185,11 @@ export function LoanDetailView({
       return { scenarioChartOutcomes: [] as ScenarioChartOutcome[], scenarioChartExcluded: 0 };
     }
     const drawable = scenarioOutcomes.filter(hasKnownInterestSaved);
-    const excluded = scenarioOutcomes.length - drawable.length;
+    // Only report an exclusion when an unknown saving is actually why the chart
+    // is short. With a single saved scenario the chart is hidden for the count,
+    // and blaming an unknown saving would be the wrong reason.
+    const excluded =
+      scenarioOutcomes.length >= 2 ? scenarioOutcomes.length - drawable.length : 0;
     return {
       scenarioChartOutcomes: drawable.length < 2 ? [] : drawable,
       scenarioChartExcluded: excluded,
@@ -323,6 +327,10 @@ export function LoanDetailView({
                             ? {
                                 amount: plan.recurringExtra.amount,
                                 frequency: plan.recurringExtra.frequency,
+                                // The mode travels with the plan rather than
+                                // being inferred from the installment drop,
+                                // which is unknown on a truncated schedule.
+                                mode: plan.recurringExtra.mode,
                               }
                             : undefined
                         }

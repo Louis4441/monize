@@ -140,9 +140,15 @@ describe('advanceDate', () => {
     expect(advanceDate(new Date(2026, 0, 1), 'BIWEEKLY')).toEqual(new Date(2026, 0, 15));
   });
 
-  it('advances semi-monthly between the 1st and 15th', () => {
-    expect(advanceDate(new Date(2026, 0, 1), 'SEMI_MONTHLY')).toEqual(new Date(2026, 0, 15));
-    expect(advanceDate(new Date(2026, 0, 15), 'SEMI_MONTHLY')).toEqual(new Date(2026, 1, 1));
+  it('advances semi-monthly between the 15th and the last day of the month', () => {
+    // The recurrence engine's convention, because it is the engine that posts
+    // these payments -- projecting the 1st and the 15th showed a semi-monthly
+    // borrower dates their register never has. Both stored spellings step alike;
+    // loan-frequency.guard.test.ts asserts the agreement over two years.
+    expect(advanceDate(new Date(2026, 0, 1), 'SEMI_MONTHLY')).toEqual(new Date(2026, 0, 31));
+    expect(advanceDate(new Date(2026, 0, 31), 'SEMI_MONTHLY')).toEqual(new Date(2026, 1, 15));
+    expect(advanceDate(new Date(2026, 1, 15), 'SEMI_MONTHLY')).toEqual(new Date(2026, 1, 28));
+    expect(advanceDate(new Date(2026, 0, 1), 'SEMIMONTHLY')).toEqual(new Date(2026, 0, 31));
   });
 
   it('advances monthly, quarterly, and yearly by calendar units', () => {
@@ -1186,6 +1192,25 @@ describe('recurringOccurrencesDue', () => {
     }
     expect(total).toBe(6);
     expect(counter.dueBy('2027-01-01')).toBe(0);
+  });
+
+  it('contributes nothing for a cadence it does not recognize', () => {
+    // `loan_scenarios.recurring_extra_frequency` is an unconstrained VARCHAR, so
+    // a legacy row or a restored backup can carry a value the map has no key
+    // for. The undefined lookup used to land in the legacy branch and apply the
+    // FULL amount on every payment -- the densest possible reading of an unknown
+    // value. Nothing is the direction that cannot invent a saving.
+    const counter = recurringOccurrencesDue(
+      { amount: 5000, frequency: 'ONE_OFF' as unknown as never },
+      new Date(2026, 0, 1),
+    );
+    expect(counter.dueBy('2026-01-01')).toBe(0);
+    expect(counter.dueBy('2027-01-01')).toBe(0);
+
+    // And an omitted frequency still means the legacy per-payment amount, which
+    // is a different thing from an unrecognized one.
+    const legacy = recurringOccurrencesDue({ amount: 5000 }, new Date(2026, 0, 1));
+    expect(legacy.dueBy('2026-01-01')).toBe(1);
   });
 
   it('treats an omitted frequency as one occurrence per in-window payment', () => {

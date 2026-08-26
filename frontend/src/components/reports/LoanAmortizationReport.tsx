@@ -240,13 +240,23 @@ export function LoanAmortizationReport() {
         { label: interestLabel(summary), value: formatCurrency(summary?.totalInterest || 0, currency), color: '#ea580c' },
         { label: t('loanAmortization.paymentsMade'), value: String(historicalCount), color: '#16a34a' },
       );
-      if (summary?.hasProjection && summary.projectedPayoffDate) {
+      if (summary?.projectedPayoffDate) {
         cards.push({ label: t('loanAmortization.estPayoff'), value: format(parseISO(summary.projectedPayoffDate), 'MMM yyyy'), color: '#9333ea' });
       }
     }
     await exportToPdf({
       title: `${t('loanAmortization.pdfTitlePrefix')}${selectedAccount?.name || t('loanAmortization.typeLoan')}`,
-      subtitle: summary ? t('loanAmortization.pdfSubtitlePaymentsSummary', { count: historicalCount, interest: formatCurrency(summary.totalInterest, currency) }) : undefined,
+      // Only a lifetime figure goes under the "total interest" wording; a
+      // projection truncated at the horizon carries the same subtotal the card
+      // beside it labels "Interest Over Projection", and the PDF is the artifact
+      // the reader keeps.
+      subtitle:
+        summary && summary.hasLifetimeTotal
+          ? t('loanAmortization.pdfSubtitlePaymentsSummary', {
+              count: historicalCount,
+              interest: formatCurrency(summary.totalInterest, currency),
+            })
+          : undefined,
       summaryCards: cards.length > 0 ? cards : undefined,
       tableData: { headers, rows },
       filename: `amortization-${accountName}`,
@@ -343,7 +353,13 @@ export function LoanAmortizationReport() {
 
       {/* Summary Cards */}
       {selectedAccount && (
-        <div className={`grid grid-cols-2 ${summary?.hasProjection ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4`}>
+        // The sixth column exists only when the sixth card does; sizing on
+        // `hasProjection` alone left a blank column for a truncated projection.
+        <div
+          className={`grid grid-cols-2 ${
+            summary?.projectedPayoffDate ? 'md:grid-cols-6' : 'md:grid-cols-5'
+          } gap-4`}
+        >
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('loanAmortization.currentBalance')}</div>
             <div className="text-lg font-bold text-red-600 dark:text-red-400">
@@ -376,7 +392,7 @@ export function LoanAmortizationReport() {
               {historicalCount}
             </div>
           </div>
-          {summary?.hasProjection && summary.projectedPayoffDate && (
+          {summary?.projectedPayoffDate && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
               <div className="text-sm text-gray-500 dark:text-gray-400">{t('loanAmortization.estPayoff')}</div>
               <div className="text-lg font-bold text-purple-600 dark:text-purple-400">

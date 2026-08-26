@@ -701,15 +701,26 @@ describe("Mortgage Amortization Utility", () => {
 
     it("handles SEMI_MONTHLY frequency", () => {
       const endDate = calculateMortgageEndDate(startDate, "SEMI_MONTHLY", 24);
-      // Payments on the 1st and 15th from Jan 1 2026: the 24th lands on
-      // Dec 15 2026, 23 advances later.
+      // Stepped by the recurrence engine that posts the payments: the 15th and
+      // the last day of the month, so from 2026-01-01 payment 24 is 2026-12-31.
+      // The old 1st/15th calendar answered 2026-12-15, which is BEFORE the final
+      // installment -- and that date bounds the linked scheduled transaction.
       expect(endDate.getFullYear()).toBe(2026);
       expect(endDate.getMonth()).toBe(11);
-      expect(endDate.getDate()).toBe(15);
+      expect(endDate.getDate()).toBe(31);
     });
 
     it("returns far future for Infinity payments", () => {
       const endDate = calculateMortgageEndDate(startDate, "MONTHLY", Infinity);
+      expect(endDate.getFullYear()).toBeGreaterThanOrEqual(2126);
+    });
+
+    it("returns far future for the unknown-schedule sentinel", () => {
+      // -1 is what calculateResidualPayoff returns for a schedule it could not
+      // work out. Read as "at most one payment" it answered with the start date,
+      // giving a precise payoff date to a response whose every other figure says
+      // unknown.
+      const endDate = calculateMortgageEndDate(startDate, "MONTHLY", -1);
       expect(endDate.getFullYear()).toBeGreaterThanOrEqual(2126);
     });
 

@@ -21,9 +21,22 @@ import {
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { IsCurrencyCode } from "../../common/validators/is-currency-code.validator";
 
+/**
+ * Payment frequencies a loan account can carry.
+ *
+ * `SEMIMONTHLY` is here because `LoanPaymentSetupService` legitimately writes it
+ * to `accounts.payment_frequency` (it is what `SetupLoanPaymentsDto` accepts and
+ * the setup dialog offers). Omitting it meant an account the app itself created
+ * could not be saved again: `UpdateAccountDto` and `LoanPreviewDto` share this
+ * list, so editing that loan, or asking for its amortization preview, answered
+ * 400. Spelled without the underscore to match the recurrence enum, as
+ * `PaymentFrequency` in loan-amortization.util.ts is -- and
+ * `loan-payment-frequency.guard.spec.ts` holds the two lists equal.
+ */
 export const PAYMENT_FREQUENCIES = [
   "WEEKLY",
   "BIWEEKLY",
+  "SEMIMONTHLY",
   "MONTHLY",
   "QUARTERLY",
   "YEARLY",

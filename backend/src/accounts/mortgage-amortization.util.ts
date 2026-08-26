@@ -15,14 +15,24 @@
 
 import { roundMoney } from "../common/round.util";
 import { paymentsToClear } from "./amortization-count.util";
+import {
+  MAX_DATEABLE_PAYMENTS,
+  MORTGAGE_FREQUENCY_TO_RECURRENCE,
+  MortgagePaymentFrequency,
+  advancePaymentDates,
+} from "./payment-frequency.util";
 
-export type MortgagePaymentFrequency =
-  | "MONTHLY"
-  | "SEMI_MONTHLY" // 24 payments/year (1st and 15th)
-  | "BIWEEKLY" // 26 payments/year
-  | "ACCELERATED_BIWEEKLY" // 26 payments/year, but each = monthly/2
-  | "WEEKLY" // 52 payments/year
-  | "ACCELERATED_WEEKLY"; // 52 payments/year, but each = monthly/4
+/**
+ * The frequency type, the recurrence table and the domain conversion live in
+ * `payment-frequency.util.ts`, shared with the loan helpers without the two
+ * utils importing each other. Re-exported because callers have always taken
+ * `MortgagePaymentFrequency` from this module.
+ */
+export type { MortgagePaymentFrequency } from "./payment-frequency.util";
+export {
+  MORTGAGE_FREQUENCY_TO_RECURRENCE,
+  toMortgagePaymentFrequency,
+} from "./payment-frequency.util";
 
 export interface MortgageAmortizationInput {
   principal: number;
@@ -293,7 +303,16 @@ export function calculateMortgageEndDate(
 ): Date {
   const date = new Date(startDate);
 
-  if (!isFinite(totalPayments) || totalPayments > 10000) {
+  // Unknown, or too long to date: the far-future sentinel. A NEGATIVE count is
+  // unknown too -- -1 is what calculateResidualPayoff returns for a schedule it
+  // could not work out, and reading it as "at most one payment" answered with the
+  // start date: a precise payoff date on a response whose every other figure says
+  // it is unknown.
+  if (
+    !isFinite(totalPayments) ||
+    totalPayments < 0 ||
+    totalPayments > MAX_DATEABLE_PAYMENTS
+  ) {
     date.setFullYear(date.getFullYear() + 100);
     return date;
   }
@@ -306,39 +325,14 @@ export function calculateMortgageEndDate(
   }
   const advances = totalPayments - 1;
 
-  // Map accelerated frequencies to their base frequency for date calculation
-  const baseFrequency =
-    frequency === "ACCELERATED_BIWEEKLY"
-      ? "BIWEEKLY"
-      : frequency === "ACCELERATED_WEEKLY"
-        ? "WEEKLY"
-        : frequency;
-
-  for (let i = 0; i < advances; i++) {
-    switch (baseFrequency) {
-      case "WEEKLY":
-        date.setDate(date.getDate() + 7);
-        break;
-      case "BIWEEKLY":
-        date.setDate(date.getDate() + 14);
-        break;
-      case "SEMI_MONTHLY":
-        // Move to next semi-monthly date (1st or 15th)
-        if (date.getDate() < 15) {
-          date.setDate(15);
-        } else {
-          date.setMonth(date.getMonth() + 1);
-          date.setDate(1);
-        }
-        break;
-      case "MONTHLY":
-      default:
-        date.setMonth(date.getMonth() + 1);
-        break;
-    }
-  }
-
-  return date;
+  // Stepped by the recurrence engine that will post these payments, through the
+  // one frequency table -- not a second calendar. See calculateEndDate for why
+  // that is a requirement rather than a preference.
+  return advancePaymentDates(
+    date,
+    MORTGAGE_FREQUENCY_TO_RECURRENCE[frequency],
+    advances,
+  );
 }
 
 /**
@@ -540,9 +534,14 @@ export function calculateMortgageAmortization(
       paymentAmount,
       totalPayments,
     );
-  const scheduledPayments = isFinite(totalPayments)
-    ? effectivePayments
-    : totalPayments;
+  // -1 means the schedule is unknowable, and Infinity is the signal
+  // calculateMortgageEndDate and createMortgageAccount's guard already
+  // understand. The date function refuses a negative count on its own too, so
+  // this is the explicit statement of intent rather than the only defence.
+  const scheduledPayments =
+    !isFinite(totalPayments) || effectivePayments < 0
+      ? Infinity
+      : effectivePayments;
 
   // Calculate end date
   const endDate = calculateMortgageEndDate(

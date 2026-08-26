@@ -10,7 +10,7 @@ boundaries; none of that is repeated here. Root `CLAUDE.md` states the
 full field table and the call sites.
 
 It exists because a semantic that lives in three places drifts in two of them.
-Every gap in section 9 is a place where two code paths currently answer the same
+Every gap in section 10 is a place where two code paths currently answer the same
 question differently, and each was found by reading the paths side by side
 rather than by either one failing a test.
 
@@ -330,7 +330,7 @@ advances only N - 1 intervals to reach its last one: 12 monthly payments from
 `endDate` is derived from their answer -- so an off-by-one there dates every
 displayed payoff, and the scheduler's own end, one full period late.
 
-### The last payment is a residual, not another installment
+### The last payment is a residual, and the count that reaches it is derived
 
 A whole payment count is a ceiling: the payment that clears the balance is the
 remaining balance plus that period's interest, and it is normally smaller than
@@ -339,6 +339,91 @@ the installment. Lifetime interest therefore comes from
 principal` -- that arithmetic bills a full installment for a partial period
 (569 too much on a 25-year accelerated-biweekly mortgage) and disagrees with the
 period-by-period schedule the same app shows afterwards.
+
+A count *supplied* by a caller is a ceiling in the same way: an installment large
+enough to clear the balance sooner makes it too high, and one that never covers
+the interest makes it meaningless. So `calculateResidualPayoff` derives the
+effective count itself with `paymentsToClear`
+(`backend/src/accounts/amortization-count.util.ts` -- one implementation of
+`n = -ln(1 - P*r/A) / ln(1+r)`, which had three) and returns it, so
+`totalPayments`, `endDate` and the totals all come from one number. A
+non-amortizing installment yields `-1` for all three, and the payoff date falls
+back to the far-future sentinel, rather than a precise figure for a schedule with
+no end.
+
+The count's own spelling has to be real, too. `accounts.payment_frequency` holds
+whichever enum wrote it -- the mortgage path's `SEMI_MONTHLY` or the loan-payment
+setup dialog's `SEMIMONTHLY` -- and a value neither `getPeriodsPerYear` nor
+`advanceDate` recognizes falls silently through to monthly: twice the interest per
+period, and rows dated a month apart. Both spellings are handled on both layers,
+and two scans hold it (`backend/src/accounts/loan-payment-frequency.guard.spec.ts`
+reads the DTO's `@IsIn` list, `frontend/src/lib/loan-frequency.guard.test.ts` reads
+the dialog's options), because each reaches its engine through a cast.
+
+Two domains, so two tables and one conversion, all declared as data and all in
+`backend/src/accounts/payment-frequency.util.ts`:
+`LOAN_FREQUENCY_TO_RECURRENCE` and `MORTGAGE_FREQUENCY_TO_RECURRENCE` are
+`Record`s over their unions (adding a frequency without deciding how it recurs is
+a compile error), `SCHEDULED_FREQUENCY_BY_PAYMENT_FREQUENCY` is their merge for
+the one service that receives both, and `toMortgagePaymentFrequency` converts a
+recurrence spelling into the mortgage domain -- returning `null` for `QUARTERLY`
+and `YEARLY`, which a mortgage in this model has no cadence for, so the caller
+refuses rather than computing a confident wrong split. A cast in place of that
+conversion split a semi-monthly Canadian mortgage at twice the correct interest
+for the life of the loan.
+
+**A module-level merge of two tables must not be able to run before both exist.**
+Those tables started out in the two amortization utils, which then had to import
+each other. Under a mortgage-first load order the spread ran while the mortgage
+module was still initialising and `SCHEDULED_FREQUENCY_BY_PAYMENT_FREQUENCY` came
+out holding only the loan keys -- so an accelerated-biweekly mortgage fell to the
+caller's `?? "MONTHLY"` and its scheduled transaction was created monthly. A
+completeness assertion cannot see that (by the time a test runs, everything is
+loaded), so the guard requires the modules in the hostile order in a fresh
+registry: `loan-payment-frequency.guard.spec.ts`, "payment-frequency module has
+no import cycle". The neutral module is the fix; the guard is what keeps it.
+
+The same list is what the account can store, so it is also what the form may
+offer: `PAYMENT_FREQUENCIES` in `frontend/src/types/account.ts` is one runtime
+list with the type derived from it, and `AccountForm`'s Zod enum is built from it.
+That is not tidiness -- `optionalEnum` maps an unlisted value to `undefined`, so a
+form list missing a frequency the backend stores would silently ERASE it the first
+time anybody edited such an account.
+
+### A payoff date is a date the scheduler reaches
+
+`endDate` on a loan or mortgage exists to bound the linked scheduled transaction,
+so it is stepped by `calculateNextDueDate` -- the recurrence engine that will post
+those payments -- and not by a calendar of its own. `calculateEndDate` and
+`calculateMortgageEndDate` convert through the frequency tables above and call
+`advancePaymentDates`.
+
+The same reasoning reaches the *projection*, for semi-monthly only: a borrower
+reads projected row dates and posted dates as one calendar, so `advanceDate` in
+`frontend/src/lib/loan-schedule.ts` steps semi-monthly the way
+`advanceByFrequency` does (the 15th and the last day of the month), not the 1st
+and the 15th. It spells the rule out rather than importing the recurrence module,
+because that import would put the file in the scheduled-transaction domain of
+`frequency.guard.test.ts` -- whose point is that loan cadences are a different
+domain -- so `loan-frequency.guard.test.ts` asserts the two steppings agree over
+two years instead. The month-end question for the *other* frequencies stays open
+(see the register in section 10): nothing posts against those row dates.
+
+A hand-rolled semi-monthly step (the 1st and the 15th) against the engine's own
+(the 15th and the last day of the month) dated payment 24 of a 24-payment
+schedule *before* the final installment, so the schedule it bounded posted 23 of
+them. It follows that month-end drift in a payoff date is whatever the
+scheduler's drift is, by construction -- which is the only answer that keeps the
+two consistent, and is deliberately narrower than the open month-end question for
+a *projection's* row dates (`advanceDate` in the frontend engine, which no
+scheduler consumes).
+
+A negative count is unknown, not "at most one payment": `-1` is the sentinel
+`calculateResidualPayoff` returns for a schedule it could not work out, and both
+date helpers answer it with the far-future sentinel rather than the start date.
+The dateable ceiling is one exported constant (`MAX_DATEABLE_PAYMENTS`) that the
+helpers and `createLoanAccount`'s own guard compare against the same way, since
+two literals disagreed at the boundary.
 
 ### A projection horizon is derived from the frequency, and a truncated total is unknown
 
@@ -369,17 +454,6 @@ Gating one of a set and leaving its siblings is the trap: `monthsSaved` came bac
 `0` from `monthsBetween(null, ...)`, which reads as "the overpayment bought no
 time" rather than "not known", and sat next to an honest "Interest Saved:
 Unknown" on the same card.
-
-### The last payment is a residual, and the count that reaches it is derived
-
-`totalPayments` from a caller is a ceiling, not a promise: an installment large
-enough to clear the balance sooner makes it too high, and one that never covers
-the interest makes it meaningless. `calculateResidualPayoff` derives the
-effective count with `paymentsToClear` (`backend/src/accounts/amortization-count.util.ts`
--- one implementation of `n = -ln(1 - P*r/A) / ln(1+r)`, which had three) and
-returns it, so `totalPayments`, `endDate` and the totals all come from one
-number. A non-amortizing installment yields `-1` for all three rather than a
-precise, enormous figure for a schedule with no end.
 
 ### A recurring overpayment cadence is a calendar, not a payment interval
 

@@ -368,6 +368,7 @@
       "WEEKLY": "[XX-Weekly-XX]",
       "BIWEEKLY": "[XX-Bi-Weekly-XX]",
       "SEMI_MONTHLY": "[XX-Semi-Monthly-XX]",
+      "SEMIMONTHLY": "[XX-Semi-Monthly-XX]",
       "MONTHLY": "[XX-Monthly-XX]",
       "QUARTERLY": "[XX-Quarterly-XX]",
       "YEARLY": "[XX-Yearly-XX]",

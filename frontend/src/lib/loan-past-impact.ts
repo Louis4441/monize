@@ -5,6 +5,7 @@ import {
   LoanScheduleResult,
   RateTimelineRow,
   ScheduleFrequency,
+  HARD_MAX_PAYMENTS,
   buildRateTimeline,
   calculateMortgagePaymentAmount,
   firstPeriodInterest,
@@ -58,8 +59,9 @@ export interface PastImpactResult {
 /** An original schedule runs from origination rather than from today's balance,
  * so it needs room beyond even the engine's default horizon (a 30-year weekly
  * mortgage already carries 1560 payments before any historical rate step
- * stretches it). This is the engine's hard maximum. */
-const ORIGINAL_SCHEDULE_MAX_PAYMENTS = 10000;
+ * stretches it). Referencing the engine's own ceiling rather than repeating the
+ * number, so the two cannot disagree. */
+const ORIGINAL_SCHEDULE_MAX_PAYMENTS = HARD_MAX_PAYMENTS;
 
 /**
  * Compute the past impact of overpayments, or null when the account lacks the

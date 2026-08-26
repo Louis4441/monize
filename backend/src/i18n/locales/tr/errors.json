@@ -27,6 +27,7 @@
     "loanRequiresInstitution": "Kredi hesapları için kurum adı gereklidir",
     "mortgageRequiredFields": "İpotek hesapları için mortgagePaymentFrequency, paymentStartDate, sourceAccountId ve amortizationMonths gereklidir",
     "mortgageRequiresInterestRate": "İpotek hesapları için faiz oranı gereklidir",
+    "mortgageFrequencyUnsupported": "Kanada ipotekleri {frequency} ödeme sıklığıyla planlanamaz",
     "mortgageRequiresInstitution": "İpotek hesapları için kurum adı gereklidir",
     "onlyMortgageAccounts": "Bu işlem yalnızca ipotek hesapları için geçerlidir",
     "updateRateClosed": "Kapalı bir hesabın faiz oranı güncellenemiyor",

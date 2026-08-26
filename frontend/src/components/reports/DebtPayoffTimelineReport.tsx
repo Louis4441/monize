@@ -452,7 +452,14 @@ export function DebtPayoffTimelineReport() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className={`grid grid-cols-2 ${summary.hasProjection ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
+        // The fifth column exists only when the fifth card does. Sizing on
+        // `hasProjection` while the card also requires a payoff date left a
+        // blank column for a projection truncated at the horizon.
+        <div
+          className={`grid grid-cols-2 ${
+            summary.projectedPayoffDate ? 'md:grid-cols-5' : 'md:grid-cols-4'
+          } gap-4`}
+        >
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('debtPayoff.currentBalance')}</div>
             <div className="text-xl font-bold text-red-600 dark:text-red-400">
@@ -479,7 +486,7 @@ export function DebtPayoffTimelineReport() {
               {summary.percentPaid.toFixed(1)}%
             </div>
           </div>
-          {summary.hasProjection && summary.projectedPayoffDate && (
+          {summary.projectedPayoffDate && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
               <div className="text-sm text-gray-500 dark:text-gray-400">{t('debtPayoff.estPayoff')}</div>
               <div className="text-xl font-bold text-purple-600 dark:text-purple-400">

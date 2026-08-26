@@ -27,6 +27,7 @@
     "loanRequiresInstitution": "대출 계정에는 기관 이름이 필요합니다",
     "mortgageRequiredFields": "모기지 계정에는 mortgagePaymentFrequency, paymentStartDate, sourceAccountId, amortizationMonths가 필요합니다",
     "mortgageRequiresInterestRate": "모기지 계정에는 이자율이 필요합니다",
+    "mortgageFrequencyUnsupported": "캐나다 모기지는 {frequency} 상환 주기로 설정할 수 없습니다",
     "mortgageRequiresInstitution": "모기지 계정에는 기관 이름이 필요합니다",
     "onlyMortgageAccounts": "이 작업은 모기지 계정에만 유효합니다",
     "updateRateClosed": "폐쇄된 계정의 이자율은 수정할 수 없습니다",

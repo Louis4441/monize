@@ -9,27 +9,26 @@
 
 import { roundMoney } from "../common/round.util";
 import { paymentsToClear } from "./amortization-count.util";
+import {
+  LOAN_FREQUENCY_TO_RECURRENCE,
+  MAX_DATEABLE_PAYMENTS,
+  PaymentFrequency,
+  advancePaymentDates,
+} from "./payment-frequency.util";
 
 /**
- * Payment frequencies the generic loan helpers understand.
- *
- * These are the *scheduled transaction* recurrence spellings, because that is
- * what reaches them: `SetupLoanPaymentsDto.paymentFrequency` is cast straight
- * into `calculatePaymentSplit`. Note `SEMIMONTHLY` has no underscore here and
- * `SEMI_MONTHLY` does in `MortgagePaymentFrequency` -- two enums, two spellings,
- * and the mismatch is why this one was missing: the DTO accepted `SEMIMONTHLY`,
- * `getPeriodsPerYear` fell through to its `default: 12`, and a semi-monthly
- * loan's interest split was computed at twice the correct rate.
- * `loan-payment-frequency.guard.spec.ts` now fails if the DTO admits a value
- * that is not a case below.
+ * Payment frequencies, the recurrence tables and the dateable ceiling live in
+ * `payment-frequency.util.ts` -- shared with the mortgage helpers without the
+ * two utils importing each other. Re-exported here because callers have always
+ * taken `PaymentFrequency` from this module.
  */
-export type PaymentFrequency =
-  | "WEEKLY"
-  | "BIWEEKLY"
-  | "SEMIMONTHLY"
-  | "MONTHLY"
-  | "QUARTERLY"
-  | "YEARLY";
+export type { PaymentFrequency } from "./payment-frequency.util";
+export {
+  LOAN_FREQUENCY_TO_RECURRENCE,
+  MAX_DATEABLE_PAYMENTS,
+  SCHEDULED_FREQUENCY_BY_PAYMENT_FREQUENCY,
+  advancePaymentDates,
+} from "./payment-frequency.util";
 
 export interface AmortizationResult {
   /** Principal portion of the current payment */
@@ -156,6 +155,15 @@ export function calculateTotalPayments(
  * 2026-12-01, not 2027-01-01. Advancing N put every displayed payoff date -- and
  * the linked scheduled transaction's `endDate` -- one full payment period late.
  *
+ * The stepping is `calculateNextDueDate`, the recurrence engine that will
+ * actually post those payments, rather than a second calendar of its own. That
+ * is not a preference: this date's whole job is to bound the linked scheduled
+ * transaction, so it has to be a date the scheduler reaches. A hand-rolled
+ * semi-monthly step (1st, 15th, 1st...) against the engine's (15th, last day of
+ * month...) put the final installment past its own `endDate`, and the schedule
+ * posted 23 of 24 payments. It follows that month-end drift here is whatever the
+ * scheduler's drift is, by construction.
+ *
  * @param startDate - Date of the first payment
  * @param frequency - Payment frequency
  * @param totalPayments - Number of payments
@@ -168,8 +176,19 @@ export function calculateEndDate(
 ): Date {
   const date = new Date(startDate);
 
-  // Handle infinite payments case
-  if (!isFinite(totalPayments) || totalPayments > 2500) {
+  // Handle infinite payments case. The ceiling matches `calculateMortgageEndDate`
+  // and `createLoanAccount`'s own `totalPayments < 10000` guard: at 2500 a
+  // perfectly ordinary 2600-payment weekly loan got a year-2126 payoff date
+  // beside a reported count of 2600, so the date and the count described
+  // different schedules.
+  // A negative count is unknown, not "at most one payment": -1 is the sentinel
+  // the amortization helpers use for a schedule they could not work out, and
+  // dating from it produced a plausible payoff on the start date.
+  if (
+    !isFinite(totalPayments) ||
+    totalPayments < 0 ||
+    totalPayments > MAX_DATEABLE_PAYMENTS
+  ) {
     // Return a far future date to indicate the loan won't be paid off
     date.setFullYear(date.getFullYear() + 100);
     return date;
@@ -182,27 +201,11 @@ export function calculateEndDate(
     return date;
   }
 
-  for (let i = 0; i < totalPayments - 1; i++) {
-    switch (frequency) {
-      case "WEEKLY":
-        date.setDate(date.getDate() + 7);
-        break;
-      case "BIWEEKLY":
-        date.setDate(date.getDate() + 14);
-        break;
-      case "MONTHLY":
-        date.setMonth(date.getMonth() + 1);
-        break;
-      case "QUARTERLY":
-        date.setMonth(date.getMonth() + 3);
-        break;
-      case "YEARLY":
-        date.setFullYear(date.getFullYear() + 1);
-        break;
-    }
-  }
-
-  return date;
+  return advancePaymentDates(
+    date,
+    LOAN_FREQUENCY_TO_RECURRENCE[frequency],
+    totalPayments - 1,
+  );
 }
 
 /**

@@ -1,5 +1,9 @@
 import type { LoanScenario } from '@/types/loan-scenario';
-import type { OverpaymentFrequency, ScenarioComparison } from '@/lib/loan-schedule';
+import type {
+  OverpaymentFrequency,
+  OverpaymentMode,
+  ScenarioComparison,
+} from '@/lib/loan-schedule';
 
 /** i18n key for each overpayment frequency's label, shared across the scenario
  *  summaries, table, chart and PDF so a saved cadence reads the same way. */
@@ -84,14 +88,26 @@ export function createScenarioLabels({
         : t('loanDetail.comparison.beyondProjection')
       : '—';
 
-  const timeSavedLabel = (comparison: ScenarioComparison | null): string => {
+  /**
+   * `mode` comes from the saved scenario when the caller has it: reading the mode
+   * off `installmentReduction` fails exactly when that value is null (a schedule
+   * truncated at the projection horizon), which would offer "time saved" for a
+   * plan that holds the end date fixed.
+   */
+  const timeSavedLabel = (
+    comparison: ScenarioComparison | null,
+    mode?: OverpaymentMode | null,
+  ): string => {
     if (!comparison) return '—';
-    // Null (either schedule truncated) falls through to the unknown branch
-    // below rather than headlining a drop measured from a mid-schedule payment.
-    if ((comparison.installmentReduction ?? 0) > 0.005) {
+    const isLowerInstallment =
+      mode != null
+        ? mode === 'LOWER_INSTALLMENT'
+        : (comparison.installmentReduction ?? 0) > 0.005;
+    if (isLowerInstallment) {
+      if (comparison.installmentReduction == null) return '—';
       return t('loanDetail.comparison.installmentDrop', {
         payment: formatCurrency(comparison.scenario.finalPaymentAmount, currencyCode),
-        reduction: formatCurrency(comparison.installmentReduction ?? 0, currencyCode),
+        reduction: formatCurrency(comparison.installmentReduction, currencyCode),
       });
     }
     // Unknown when either schedule stopped at the projection horizon; the em
@@ -134,7 +150,7 @@ export function createScenarioLabels({
         overpaymentLabel(scenario),
         describeScenario(scenario),
         payoffLabel(comparison),
-        timeSavedLabel(comparison),
+        timeSavedLabel(comparison, scenario.recurringExtraMode),
         interestSavedLabel(comparison),
       ];
     }),

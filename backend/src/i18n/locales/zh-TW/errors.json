@@ -27,6 +27,7 @@
     "loanRequiresInstitution": "貸款科目需要機構名稱",
     "mortgageRequiredFields": "抵押貸款科目需要 mortgagePaymentFrequency、paymentStartDate、sourceAccountId 和 amortizationMonths",
     "mortgageRequiresInterestRate": "抵押貸款科目需要利率",
+    "mortgageFrequencyUnsupported": "加拿大抵押貸款無法按 {frequency} 的還款頻率安排",
     "mortgageRequiresInstitution": "抵押貸款科目需要機構名稱",
     "onlyMortgageAccounts": "此操作僅適用於抵押貸款科目",
     "updateRateClosed": "無法更新已關閉科目的利率",

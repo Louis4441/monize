@@ -213,7 +213,11 @@ export function SavedScenariosPanel({
                       {payoffLabel(comparison)}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap text-green-600 dark:text-green-400">
-                      {timeSavedLabel(comparison)}
+                      {/* The mode travels with the scenario, as it does in
+                          comparisonTable's export -- inferring it from the
+                          installment drop made the visible table and its own CSV
+                          disagree for the same row. */}
+                      {timeSavedLabel(comparison, scenario.recurringExtraMode)}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap text-green-600 dark:text-green-400">
                       {interestSavedLabel(comparison)}

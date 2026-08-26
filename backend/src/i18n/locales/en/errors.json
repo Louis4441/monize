@@ -36,6 +36,7 @@
     "loanRequiresInstitution": "Loan accounts require an institution name",
     "mortgageRequiredFields": "Mortgage accounts require mortgagePaymentFrequency, paymentStartDate, sourceAccountId, and amortizationMonths",
     "mortgageRequiresInterestRate": "Mortgage accounts require an interest rate",
+    "mortgageFrequencyUnsupported": "Canadian mortgages cannot be scheduled at a {frequency} payment frequency",
     "mortgageRequiresInstitution": "Mortgage accounts require an institution name",
     "onlyMortgageAccounts": "This operation is only valid for mortgage accounts",
     "updateRateClosed": "Cannot update rate on a closed account",

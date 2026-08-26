@@ -563,6 +563,59 @@ describe('MortgageFields', () => {
     expect(screen.queryByText('$-1.00')).not.toBeInTheDocument();
   });
 
+  it('shows a known zero total interest rather than N/A', async () => {
+    // A 0% mortgage costs no interest, and the residual math makes that exactly
+    // 0. `totalInterest > 0` collapsed the known zero into the -1 "could not be
+    // worked out" sentinel and printed N/A.
+    vi.mocked(accountsApi.previewMortgageAmortization).mockResolvedValue({
+      paymentAmount: 1000, effectiveAnnualRate: 0,
+      principalPayment: 1000, interestPayment: 0,
+      totalPayments: 120, residualPayoffAmount: 1000,
+      totalInterest: 0, endDate: '2036-01-15',
+    });
+
+    render(<MortgageFields {...defaultProps}
+      openingBalance={120000} interestRate={0} amortizationMonths={120}
+      mortgagePaymentFrequency="MONTHLY" paymentStartDate="2024-02-01"
+    />);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(screen.getByText('Amortization Preview')).toBeInTheDocument();
+    });
+
+    // Scoped to the Total Interest row: "$0.00" also appears as the first
+    // payment's interest on a 0% mortgage, so a bare text match is ambiguous.
+    const totalInterestRow = screen.getByText('Total Interest:').parentElement;
+    expect(totalInterestRow).toHaveTextContent('$0.00');
+    expect(totalInterestRow).not.toHaveTextContent('N/A');
+  });
+
+  it('shows N/A for a total interest that could not be worked out', async () => {
+    vi.mocked(accountsApi.previewMortgageAmortization).mockResolvedValue({
+      paymentAmount: 100, effectiveAnnualRate: 5.12,
+      principalPayment: 0, interestPayment: 100,
+      totalPayments: -1, residualPayoffAmount: -1,
+      totalInterest: -1, endDate: '2124-01-15',
+    });
+
+    render(<MortgageFields {...defaultProps}
+      openingBalance={300000} interestRate={5} amortizationMonths={300}
+      mortgagePaymentFrequency="MONTHLY" paymentStartDate="2024-02-01"
+    />);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(screen.getByText('Amortization Preview')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('$-1.00')).not.toBeInTheDocument();
+  });
+
   it('does not allow term years above 99', () => {
     render(<MortgageFields {...defaultProps} />);
     const numberInputs = periodInputs();

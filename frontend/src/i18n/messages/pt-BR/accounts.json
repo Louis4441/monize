@@ -368,6 +368,7 @@
       "WEEKLY": "Semanal",
       "BIWEEKLY": "Quinzenal",
       "SEMI_MONTHLY": "Bimensal",
+      "SEMIMONTHLY": "Bimensal",
       "MONTHLY": "Mensal",
       "QUARTERLY": "Trimestral",
       "YEARLY": "Anual",

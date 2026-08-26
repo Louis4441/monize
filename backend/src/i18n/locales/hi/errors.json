@@ -27,6 +27,7 @@
     "loanRequiresInstitution": "ऋण खातों के लिए संस्थान का नाम आवश्यक है",
     "mortgageRequiredFields": "बंधक खातों के लिए mortgagePaymentFrequency, paymentStartDate, sourceAccountId और amortizationMonths आवश्यक हैं",
     "mortgageRequiresInterestRate": "बंधक खातों के लिए ब्याज दर आवश्यक है",
+    "mortgageFrequencyUnsupported": "कनाडाई गिरवी को {frequency} भुगतान आवृत्ति पर निर्धारित नहीं किया जा सकता",
     "mortgageRequiresInstitution": "बंधक खातों के लिए संस्थान का नाम आवश्यक है",
     "onlyMortgageAccounts": "यह ऑपरेशन केवल बंधक खातों के लिए मान्य है",
     "updateRateClosed": "बंद खाते पर दर अपडेट नहीं की जा सकती",

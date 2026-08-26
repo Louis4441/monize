@@ -77,7 +77,19 @@ export function LoanFields({
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   const calculatePreview = useCallback(async () => {
-    if (!openingBalance || !interestRate || !paymentAmount || !paymentFrequency || !paymentStartDate) {
+    // `interestRate == null`, not `!interestRate`: 0% is a real loan rate (an
+    // interest-free family loan, a promotional deal; LoanPreviewDto validates
+    // `@Min(0)`), so a falsy check read a KNOWN zero as "not filled in" and
+    // showed no preview at all. Same rule as MortgageFields. The others stay
+    // falsy-checked: a zero balance, a zero payment or an empty date genuinely
+    // mean unfilled.
+    if (
+      !openingBalance ||
+      interestRate == null ||
+      !paymentAmount ||
+      !paymentFrequency ||
+      !paymentStartDate
+    ) {
       setAmortizationPreview(null);
       return;
     }
