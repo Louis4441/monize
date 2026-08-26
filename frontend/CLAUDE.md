@@ -154,6 +154,7 @@ The header's link arrays and the per-route Heroicon map are declared side by sid
 - **On desktop it is a text box regardless of format preference** -- the pointer decides the mode, not the format (touch keeps the native picker). The native control's segment-jumping entry is issue #1201.
 - **`browser` is not a pattern, and nothing below `useDateFormat` should see it.** `datePattern` off that hook is the concrete arrangement, resolved by `resolveDateFormatPattern` (`lib/date-parse.ts`). `parseFlexibleDate` takes the pattern (7/8 is ambiguous without it); `parseDateFromFormat` stays strict for canonical values.
 - **A partial entry is completed, and an unreadable one changes nothing.** Day+month take the year from the field's current date (today when empty); a lone number is a day in the month on screen; unparseable text restores what was there -- clearing the box is the only way to mean "no date". None of this happens on the keystroke: the lenient reading waits for blur or Enter.
+- **`setValue()` moves the form, not the box.** Registered with `register('date')`, `DateInput` is uncontrolled: it renders its own `displayValue`/`isoValue` state and only reads the DOM once on mount, so a react-hook-form `setValue` on that field changes what gets *submitted* while the date on screen stays put -- the two silently disagree. To move a date the user can see, pass `value` (the sync effect runs only when `externalValue !== undefined`) or drive it through `onDateChange`. A test asserting the visible input's value cannot see the difference; assert the submitted payload.
 - **A screen hosting a date field does not answer a load with a second tree.** `if (isLoading) return <Skeleton/>` unmounts the field being typed into; render load/error states *inside* the one tree. Duplicating the controls block into the second `return` is not a fix (different child indexes still reconcile wrong -- `CashFlowReport` did this). `ui-conventions.test.ts` fails both shapes for any component pairing a date control with a `useReportData` loading flag; a one-shot prerequisite load (the report *forms*' `isLoadingData`) is deliberately not policed.
 
 ### Currency entry -- `CurrencyInput`, never a raw number input
@@ -429,6 +430,14 @@ Creation gets a blunter answer: **do not offer it.** `categoriesApi.create` writ
 `useFormModal<T>` (`hooks/useFormModal.ts`) manages create/edit modal state with browser-history integration (back button closes), unsaved-changes detection via `UnsavedChangesDialog`, and form submit exposed via ref. Returns `showForm`, `editingItem`, `openCreate()`, `openEdit(item)`, `close()`, `modalProps`, `unsavedChangesDialog`.
 
 Supporting hooks: `useFormSubmitRef` (expose submit via ref), `useFormDirtyNotify` (track dirty state). Forms use react-hook-form + Zod.
+
+**A quick-fill copies what a row says, never the context the user is entering in.** The transaction form's Recent (history) button lists recents deduped *across accounts*, so the chosen row usually belongs to somewhere other than the account the modal was opened on. `handleQuickFill` fills payee, category, amount, description, tags and split lines, and leaves three fields exactly as the form holds them:
+
+- `accountId` -- moving the entry to the source's account silently changes which ledger the user is writing to.
+- `currencyCode` -- it is derived from the selected account by the account effect in `TransactionForm.tsx`, and a copied code would denominate the amount in a currency the account does not hold (the same "currency comes from the account, not the request" rule the backend enforces with `assertTransactionCurrencyMatchesAccount`).
+- `transactionDate` -- the date on screen is the user's, typed or carried over from the remembered last entry. Resetting it to today re-dates a back-dated batch one row at a time, and the source row's own date is when *that* transaction happened, not this one.
+
+The date case is also the worked example of the `DateInput` `setValue` trap above: the old reset never moved the visible box, only the submitted value. `TransactionForm.test.tsx`'s quick-fill block pins all three, and asserts the *submitted payload* for the date and the currency.
 
 ## Internationalization (i18n)
 
