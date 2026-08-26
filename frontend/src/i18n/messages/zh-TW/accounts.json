@@ -508,7 +508,8 @@
       "colOverpayment": "額外還款",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "載入方案「{name}」",
-      "budgetSummary": "預算 {amount}/月"
+      "budgetSummary": "預算 {amount}/月",
+      "chartExcludedUnknown": "{count, plural, other {有 # 個方案未顯示：其節省的利息未知。}}"
     },
     "scenarioChart": {
       "title": "方案比較",

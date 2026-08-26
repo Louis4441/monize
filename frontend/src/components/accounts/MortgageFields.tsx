@@ -404,13 +404,13 @@ export function MortgageFields({
                     accelerated schedule, whose analytic payment count is
                     fractional), so a standard schedule does not repeat its own
                     payment amount. Read defensively: an older API omits it. */}
-                {mortgagePreview.finalPaymentAmount != null &&
-                  mortgagePreview.finalPaymentAmount >= 0 &&
-                  mortgagePreview.paymentAmount - mortgagePreview.finalPaymentAmount > 1 && (
+                {mortgagePreview.residualPayoffAmount != null &&
+                  mortgagePreview.residualPayoffAmount >= 0 &&
+                  mortgagePreview.paymentAmount - mortgagePreview.residualPayoffAmount > 1 && (
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">{t('mortgageFields.previewFinalPayment')}</span>{' '}
                       <span className="font-medium">
-                        {formatCurrency(mortgagePreview.finalPaymentAmount, watchedCurrency)}
+                        {formatCurrency(mortgagePreview.residualPayoffAmount, watchedCurrency)}
                       </span>
                     </div>
                   )}

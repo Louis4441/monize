@@ -32,7 +32,12 @@ export interface PastImpactResult {
   originalPayoffDate: string | null;
   /** Projected payoff, or the final actual payment when already paid off */
   currentPayoffDate: string | null;
-  monthsAlreadySaved: number;
+  /**
+   * Months the overpayments have already saved, or `null` when either payoff
+   * date is unknown -- `monthsBetween` returns 0 for a missing date, which reads
+   * as "the overpayments bought no time" rather than "not known".
+   */
+  monthsAlreadySaved: number | null;
   /**
    * Interest the overpayments have already saved against the original
    * contractual schedule, or `null` when either schedule stopped at its
@@ -268,10 +273,16 @@ export function computePastImpact(
     currentProjection,
     originalPayoffDate: originalSchedule.payoffDate,
     currentPayoffDate,
-    monthsAlreadySaved: Math.max(
-      0,
-      monthsBetween(currentPayoffDate, originalSchedule.payoffDate),
-    ),
+    // The sibling of interestAlreadySaved: both compare the original schedule
+    // against where the loan now ends, so both need both ends known. A schedule
+    // that stopped at its projection horizon has no payoff date at all.
+    monthsAlreadySaved:
+      currentPayoffDate != null && originalSchedule.payoffDate != null
+        ? Math.max(
+            0,
+            monthsBetween(currentPayoffDate, originalSchedule.payoffDate),
+          )
+        : null,
     interestAlreadySaved,
     extraPrincipalPaid,
   };

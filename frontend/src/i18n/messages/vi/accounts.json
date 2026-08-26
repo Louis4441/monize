@@ -508,7 +508,8 @@
       "colOverpayment": "Trả thêm",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Tải kịch bản \"{name}\"",
-      "budgetSummary": "Ngân sách {amount}/tháng"
+      "budgetSummary": "Ngân sách {amount}/tháng",
+      "chartExcludedUnknown": "{count, plural, other {# kịch bản không được hiển thị: khoản lãi tiết kiệm chưa xác định.}}"
     },
     "scenarioChart": {
       "title": "So sánh kịch bản",

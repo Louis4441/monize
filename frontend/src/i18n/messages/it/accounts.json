@@ -508,7 +508,8 @@
       "colOverpayment": "Versamento extra",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Carica lo scenario \"{name}\"",
-      "budgetSummary": "Budget {amount}/mese"
+      "budgetSummary": "Budget {amount}/mese",
+      "chartExcludedUnknown": "{count, plural, one {# scenario non è mostrato: il suo risparmio di interessi è sconosciuto.} other {# scenari non sono mostrati: il loro risparmio di interessi è sconosciuto.}}"
     },
     "scenarioChart": {
       "title": "Confronto scenari",

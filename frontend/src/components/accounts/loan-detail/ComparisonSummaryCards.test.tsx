@@ -9,6 +9,26 @@ vi.mock('@/hooks/useNumberFormat', () => ({
   }),
 }));
 
+/**
+ * A comparison whose baseline runs past the projection horizon, so no lifetime
+ * saving exists: 500k at 6% paying 2510 a month never clears inside 50 years.
+ */
+function makeIncomparable() {
+  const input = {
+    startingBalance: 500000,
+    annualRate: 6,
+    paymentAmount: 2510,
+    frequency: 'MONTHLY' as const,
+    firstPaymentDate: new Date(2026, 0, 15),
+  };
+  const baseline = generateLoanSchedule(input);
+  const scenario = generateLoanSchedule({
+    ...input,
+    overpayments: { recurringExtra: { amount: 100, frequency: 'MONTHLY' } },
+  });
+  return compareSchedules(baseline, scenario);
+}
+
 function makeComparison(paymentAmount = 500) {
   const input = {
     startingBalance: 10000,
@@ -71,5 +91,25 @@ describe('ComparisonSummaryCards', () => {
     render(<ComparisonSummaryCards comparison={comparison} currencyCode="CAD" />);
 
     expect(screen.getByText('Beyond projection')).toBeInTheDocument();
+  });
+
+  it('says Unknown rather than 0.00 when the saving cannot be worked out', () => {
+    const comparison = makeIncomparable();
+    // Both sides of the guard: the schedule really is truncated, and the cards
+    // do not print a number for either saving.
+    expect(comparison.baseline.paidOff).toBe(false);
+    expect(comparison.interestSaved).toBeNull();
+    expect(comparison.monthsSaved).toBeNull();
+
+    render(<ComparisonSummaryCards comparison={comparison} currencyCode="CAD" />);
+
+    expect(screen.getByText('Interest Saved')).toBeInTheDocument();
+    expect(screen.getByText('Time Saved')).toBeInTheDocument();
+    // One "Unknown" for the time saved and one for the interest saved.
+    expect(screen.getAllByText('Unknown')).toHaveLength(2);
+    // And nothing anywhere claiming a zero saving.
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('0 payments')).not.toBeInTheDocument();
+    expect(screen.queryByText('0 months')).not.toBeInTheDocument();
   });
 });

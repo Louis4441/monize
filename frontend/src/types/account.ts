@@ -240,8 +240,12 @@ export interface MortgageAmortizationPreview {
    * accelerated schedule (or a rounding remainder) makes it differ from
    * `paymentAmount`, so the preview shows it only when it does. -1 when the
    * payment never amortizes. Absent during a rolling deploy of an older API.
+   *
+   * Deliberately not `finalPaymentAmount`: `LoanScheduleResult` already uses
+   * that name for the ending regular *installment*, and both are loan-domain
+   * numbers of the same type reachable from the same component tree.
    */
-  finalPaymentAmount?: number;
+  residualPayoffAmount?: number;
   /** Date of the final payment (the first payment date is payment 1) */
   endDate: string;
   totalInterest: number;

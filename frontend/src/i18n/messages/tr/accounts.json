@@ -508,7 +508,8 @@
       "colOverpayment": "Ek ödeme",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "\"{name}\" senaryosunu yükle",
-      "budgetSummary": "Bütçe {amount}/ay"
+      "budgetSummary": "Bütçe {amount}/ay",
+      "chartExcludedUnknown": "{count, plural, other {# senaryo gösterilmiyor: faiz tasarrufu bilinmiyor.}}"
     },
     "scenarioChart": {
       "title": "Senaryo karşılaştırması",

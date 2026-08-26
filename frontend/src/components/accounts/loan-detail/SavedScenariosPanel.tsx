@@ -32,6 +32,11 @@ interface SavedScenariosPanelProps {
   /** Outcomes for the comparison chart; the chart toggle only shows when
    *  there are at least two (comparing one scenario has nothing to say). */
   chartOutcomes?: ScenarioChartOutcome[];
+  /** Scenarios left out of the chart because their interest saving is unknown
+   *  (a schedule that stopped at the projection horizon). The chart's arc height
+   *  IS the saving, so they cannot be drawn -- but a chart quietly missing rows,
+   *  or a toggle that disappeared since yesterday, has to say why. */
+  chartExcludedCount?: number;
   /** No-overpayment baseline for the comparison chart's context marker */
   chartBaseline?: BaselineOutcome | null;
   onLoad: (plan: OverpaymentPlan | null, scenario: LoanScenario) => void;
@@ -49,6 +54,7 @@ export function SavedScenariosPanel({
   currencyCode,
   activePlan,
   chartOutcomes = [],
+  chartExcludedCount = 0,
   chartBaseline = null,
   onLoad,
   onScenariosChanged,
@@ -252,6 +258,17 @@ export function SavedScenariosPanel({
           baseline={chartBaseline}
           currencyCode={currencyCode}
         />
+      )}
+
+      {/* Shown whether or not the chart is open: when every scenario's saving is
+          unknown the toggle is gone entirely, and that is exactly when the
+          reader needs the reason. */}
+      {chartExcludedCount > 0 && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {t('loanDetail.scenarios.chartExcludedUnknown', {
+            count: chartExcludedCount,
+          })}
+        </p>
       )}
 
       <Modal isOpen={nameModal !== null} onClose={() => setNameModal(null)} maxWidth="sm">

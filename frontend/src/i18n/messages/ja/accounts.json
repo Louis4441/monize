@@ -508,7 +508,8 @@
       "colOverpayment": "繰上返済",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "シナリオ「{name}」を読み込む",
-      "budgetSummary": "予算 {amount}/月"
+      "budgetSummary": "予算 {amount}/月",
+      "chartExcludedUnknown": "{count, plural, other {# 件のシナリオは表示されません: 利息の節約額が不明です。}}"
     },
     "scenarioChart": {
       "title": "シナリオ比較",

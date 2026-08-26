@@ -51,7 +51,30 @@ export interface SolveResult {
   interestSaved: number | null;
 }
 
-const ITERATIONS = 60;
+/**
+ * Bisection steps needed to bracket the answer inside one `step`.
+ *
+ * A flat 60 was ~3x more work than the result can use: the search halves
+ * `[0, hi0]`, so after N steps the bracket is `hi0 / 2^N`, and the answer is
+ * rounded up to `step` afterwards anyway -- for a 300k balance and a step of 1
+ * that is reached in 19. The count matters because the horizon fix made each
+ * schedule up to 4.3x longer (2600 rows on a weekly loan against 600), and
+ * `OverpaymentSimulator.apply` runs a whole solve synchronously on every
+ * keystroke in the goal fields.
+ *
+ * Four extra steps of margin, and a floor of 24, so the bracket is comfortably
+ * under a step for any realistic balance.
+ */
+function iterationsFor(upper: number, step: number): number {
+  const resolution = step > 0 ? step : 1;
+  if (!(upper > resolution)) return MIN_ITERATIONS;
+  return Math.max(
+    MIN_ITERATIONS,
+    Math.min(60, Math.ceil(Math.log2(upper / resolution)) + 4),
+  );
+}
+
+const MIN_ITERATIONS = 24;
 
 /** Optional constraints on the recurring extra being solved. A date range
  *  limits when it applies (so a short window makes tighter targets
@@ -162,7 +185,8 @@ function solveTargetInterestWithBaseline(
   }
   let lo = 0;
   let hi = hi0;
-  for (let i = 0; i < ITERATIONS; i++) {
+  const iterations = iterationsFor(hi0, step);
+  for (let i = 0; i < iterations; i++) {
     const mid = (lo + hi) / 2;
     if (meetsInterestTarget(scheduleWith(base, mid, mode, window), targetInterest)) hi = mid;
     else lo = mid;
@@ -238,7 +262,8 @@ export function solveRecurringForPayoffMonth(
   }
   let lo = 0;
   let hi = hi0;
-  for (let i = 0; i < ITERATIONS; i++) {
+  const iterations = iterationsFor(hi0, step);
+  for (let i = 0; i < iterations; i++) {
     const mid = (lo + hi) / 2;
     if (paysOffBy(scheduleWith(base, mid, mode, window))) hi = mid;
     else lo = mid;

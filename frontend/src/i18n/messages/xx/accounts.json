@@ -588,7 +588,8 @@
       "colOverpayment": "[XX-Overpayment-XX]",
       "overpaymentWithFrequency": "[XX-{amount} ({frequency})-XX]",
       "loadAria": "[XX-Load scenario \"{name}\"-XX]",
-      "budgetSummary": "[XX-Budget {amount}/month-XX]"
+      "budgetSummary": "[XX-Budget {amount}/month-XX]",
+      "chartExcludedUnknown": "[XX-{count, plural, one {# scenario is not shown: its interest saving is unknown.} other {# scenarios are not shown: their interest saving is unknown.}}-XX]"
     },
     "pastImpact": {
       "title": "[XX-Impact of Overpayments Made-XX]",

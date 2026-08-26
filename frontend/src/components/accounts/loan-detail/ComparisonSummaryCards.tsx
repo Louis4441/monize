@@ -107,10 +107,17 @@ export function ComparisonSummaryCards({
       ) : (
         <Card
           label={t('loanDetail.comparison.timeSaved')}
+          // Both figures are null when either schedule ran past the projection
+          // horizon: a horizon's length minus a lifetime's is not time saved,
+          // and "0 payments" would read as "the overpayment bought nothing".
           value={
-            comparison.monthsSaved > 0
-              ? t('loanDetail.comparison.monthsSaved', { count: comparison.monthsSaved })
-              : t('loanDetail.comparison.paymentsSaved', { count: Math.max(comparison.paymentsSaved, 0) })
+            comparison.monthsSaved == null || comparison.paymentsSaved == null
+              ? t('loanDetail.comparison.unknown')
+              : comparison.monthsSaved > 0
+                ? t('loanDetail.comparison.monthsSaved', { count: comparison.monthsSaved })
+                : t('loanDetail.comparison.paymentsSaved', {
+                    count: Math.max(comparison.paymentsSaved, 0),
+                  })
           }
           valueClass="text-green-600 dark:text-green-400"
         />

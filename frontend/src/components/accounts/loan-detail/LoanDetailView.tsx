@@ -176,12 +176,20 @@ export function LoanDetailView({
 
   // The comparison chart is only meaningful with more than one saved scenario;
   // the no-overpayment baseline renders as a context line, not a bar.
-  const scenarioChartOutcomes = useMemo<ScenarioChartOutcome[]>(() => {
-    // Only scenarios with a known interest saving can be drawn (the arc's height
-    // is that saving), so the "more than one scenario" test counts drawable ones.
-    if (!baseline) return [];
+  // Only scenarios with a known interest saving can be drawn (the arc's height
+  // IS that saving), so the "more than one scenario" test counts drawable ones --
+  // and the count left out travels to the panel, which says so rather than
+  // letting rows or the whole toggle vanish unexplained.
+  const { scenarioChartOutcomes, scenarioChartExcluded } = useMemo(() => {
+    if (!baseline) {
+      return { scenarioChartOutcomes: [] as ScenarioChartOutcome[], scenarioChartExcluded: 0 };
+    }
     const drawable = scenarioOutcomes.filter(hasKnownInterestSaved);
-    return drawable.length < 2 ? [] : drawable;
+    const excluded = scenarioOutcomes.length - drawable.length;
+    return {
+      scenarioChartOutcomes: drawable.length < 2 ? [] : drawable,
+      scenarioChartExcluded: excluded,
+    };
   }, [scenarioOutcomes, baseline]);
 
   // Past impact of overpayments. It reuses the baseline (no-overpayment)
@@ -330,6 +338,7 @@ export function LoanDetailView({
                     currencyCode={account.currencyCode}
                     activePlan={plan}
                     chartOutcomes={scenarioChartOutcomes}
+                    chartExcludedCount={scenarioChartExcluded}
                     chartBaseline={
                       baseline ? { payoffDate: baseline.payoffDate } : null
                     }

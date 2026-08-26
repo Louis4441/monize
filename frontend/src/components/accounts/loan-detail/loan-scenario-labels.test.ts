@@ -63,4 +63,39 @@ describe('createScenarioLabels', () => {
       'loanDetail.scenarios.overpaymentWithFrequency:$300.00,loanDetail.simulator.frequencyQuarterly',
     );
   });
+
+  it('renders an em dash for a saving that is unknown', () => {
+    // A schedule that stopped at the projection horizon has no lifetime figure
+    // to compare, so the table shows the same em dash as a missing comparison
+    // rather than "0 payments" or "$0.00".
+    const incomparable = {
+      scenario: { payoffDate: null, finalPaymentAmount: 500 },
+      paymentsSaved: null,
+      monthsSaved: null,
+      interestSaved: null,
+      installmentReduction: 0,
+    } as unknown as ScenarioComparison;
+
+    expect(labels.timeSavedLabel(incomparable)).toBe('\u2014');
+    expect(labels.interestSavedLabel(incomparable)).toBe('\u2014');
+    expect(labels.payoffLabel(incomparable)).toBe(
+      'loanDetail.comparison.beyondProjection',
+    );
+  });
+
+  it('still reports a lower installment when the schedules cannot be compared', () => {
+    // installmentReduction is a property of each schedule on its own, so the
+    // lower-installment headline survives a truncated comparison.
+    const lowered = {
+      scenario: { payoffDate: null, finalPaymentAmount: 400 },
+      paymentsSaved: null,
+      monthsSaved: null,
+      interestSaved: null,
+      installmentReduction: 100,
+    } as unknown as ScenarioComparison;
+
+    expect(labels.timeSavedLabel(lowered)).toBe(
+      'loanDetail.comparison.installmentDrop:$400.00,$100.00',
+    );
+  });
 });

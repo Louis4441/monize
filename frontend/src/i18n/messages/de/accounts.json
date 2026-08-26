@@ -508,7 +508,8 @@
       "colOverpayment": "Sondertilgung",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Szenario „{name}“ laden",
-      "budgetSummary": "Budget {amount}/Monat"
+      "budgetSummary": "Budget {amount}/Monat",
+      "chartExcludedUnknown": "{count, plural, one {# Szenario wird nicht angezeigt: seine Zinsersparnis ist unbekannt.} other {# Szenarien werden nicht angezeigt: ihre Zinsersparnis ist unbekannt.}}"
     },
     "scenarioChart": {
       "title": "Szenariovergleich",

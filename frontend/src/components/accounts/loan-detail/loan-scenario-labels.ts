@@ -92,6 +92,12 @@ export function createScenarioLabels({
         reduction: formatCurrency(comparison.installmentReduction, currencyCode),
       });
     }
+    // Unknown when either schedule stopped at the projection horizon; the em
+    // dash is the same rendering a missing comparison gets, since to a reader
+    // both mean "this cannot be shown".
+    if (comparison.monthsSaved == null || comparison.paymentsSaved == null) {
+      return '—';
+    }
     return comparison.monthsSaved > 0
       ? t('loanDetail.comparison.monthsSaved', { count: comparison.monthsSaved })
       : t('loanDetail.comparison.paymentsSaved', {

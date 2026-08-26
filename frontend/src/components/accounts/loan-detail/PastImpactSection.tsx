@@ -42,7 +42,14 @@ export function PastImpactSection({ account, impact }: PastImpactSectionProps) {
     },
     {
       label: t('loanDetail.pastImpact.monthsAlreadySaved'),
-      value: t('loanDetail.pastImpact.monthsValue', { count: impact.monthsAlreadySaved }),
+      // Unknown when either payoff date is: "0 months" would tell the borrower
+      // their overpayments bought no time.
+      value:
+        impact.monthsAlreadySaved == null
+          ? t('loanDetail.pastImpact.unknown')
+          : t('loanDetail.pastImpact.monthsValue', {
+              count: impact.monthsAlreadySaved,
+            }),
       valueClass: 'text-green-600 dark:text-green-400',
       note: t('loanDetail.pastImpact.payoffComparison', {
         original: formatMonth(impact.originalPayoffDate),

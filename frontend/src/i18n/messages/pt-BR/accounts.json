@@ -508,7 +508,8 @@
       "colOverpayment": "Pagamento extra",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Carregar cenário \"{name}\"",
-      "budgetSummary": "Orçamento {amount}/mês"
+      "budgetSummary": "Orçamento {amount}/mês",
+      "chartExcludedUnknown": "{count, plural, one {# cenário não é mostrado: sua economia de juros é desconhecida.} other {# cenários não são mostrados: sua economia de juros é desconhecida.}}"
     },
     "scenarioChart": {
       "title": "Comparação de cenários",

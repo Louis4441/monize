@@ -2,7 +2,12 @@
 
 import { useTranslations } from 'next-intl';
 import { Account } from '@/types/account';
-import { LoanScheduleResult } from '@/lib/loan-schedule';
+import {
+  LoanScheduleResult,
+  ScheduleFrequency,
+  effectiveAnnualRate,
+  getPeriodsPerYear,
+} from '@/lib/loan-schedule';
 import { deriveLoanFigures } from '@/lib/loan-figures';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
@@ -41,10 +46,21 @@ export function LoanSummaryCards({
   const formatChartDate = useChartDateFormat();
   const currency = account.currencyCode;
 
+  // The card is shown only for Canadian fixed-rate mortgages, where the
+  // semi-annual compounding the law requires makes the effective rate differ
+  // visibly from the quoted one. The value itself comes from the shared
+  // `effectiveAnnualRate` rather than an inline formula: this was a third copy
+  // of the compounding convention (INV-LOAN-003), so the frequency-aware fix
+  // never reached the surface an existing mortgage's owner actually reads.
   const isCanadianFixed = account.isCanadianMortgage && !account.isVariableRate;
   const effectiveRate =
     isCanadianFixed && account.interestRate
-      ? (Math.pow(1 + account.interestRate / 100 / 2, 2) - 1) * 100
+      ? effectiveAnnualRate(
+          account.interestRate,
+          getPeriodsPerYear((account.paymentFrequency ?? 'MONTHLY') as ScheduleFrequency),
+          true,
+          false,
+        )
       : null;
 
   const frequencyLabel = account.paymentFrequency

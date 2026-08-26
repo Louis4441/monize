@@ -47,8 +47,14 @@ export interface MortgageAmortizationResult {
    * period's interest), not another full installment. Equal to `paymentAmount`
    * only when the analytic payment count happens to be a whole number; -1 when
    * the payment never amortizes.
+   *
+   * Deliberately not called `finalPaymentAmount`: `LoanScheduleResult` in the
+   * frontend engine already uses that name for the ending regular *installment*
+   * (what a LOWER_INSTALLMENT overpayment reduced it to), and both are
+   * loan-domain numbers reachable from the same component tree with the same
+   * type. Two meanings under one name is a defect the compiler cannot catch.
    */
-  finalPaymentAmount: number;
+  residualPayoffAmount: number;
   /** Estimated payoff date */
   endDate: Date;
   /**
@@ -379,64 +385,119 @@ export function calculateEffectiveAnnualRate(
 }
 
 /**
- * The last payment of a schedule, and the lifetime interest that follows from it.
+ * Balance left after `payments` full installments.
+ *
+ *   B_k = P(1 + r)^k - A((1 + r)^k - 1) / r        (B_k = P - A*k when r = 0)
+ */
+function balanceAfterPayments(
+  principal: number,
+  periodicRate: number,
+  paymentAmount: number,
+  payments: number,
+): number {
+  if (periodicRate === 0) {
+    return principal - paymentAmount * payments;
+  }
+  const growth = Math.pow(1 + periodicRate, payments);
+  return principal * growth - (paymentAmount * (growth - 1)) / periodicRate;
+}
+
+/**
+ * How many payments `paymentAmount` needs to clear `principal`, as a whole
+ * number of periods. `Infinity` when the installment never covers the interest.
+ *
+ *   n = -ln(1 - P*r / A) / ln(1 + r)
+ */
+function paymentsToClear(
+  principal: number,
+  periodicRate: number,
+  paymentAmount: number,
+): number {
+  if (paymentAmount <= 0) return Infinity;
+  if (periodicRate === 0) return Math.ceil(principal / paymentAmount);
+  if (paymentAmount <= principal * periodicRate) return Infinity;
+  return Math.ceil(
+    -Math.log(1 - (principal * periodicRate) / paymentAmount) /
+      Math.log(1 + periodicRate),
+  );
+}
+
+/**
+ * The last payment of a schedule, the number of payments it really takes, and
+ * the lifetime interest that follows from both.
  *
  * `totalPayments` is a whole number of periods, but the payment that clears the
  * balance is almost never a full installment: an accelerated schedule's analytic
  * payoff count is fractional (`Math.ceil` rounds it up), and even a standard
  * schedule's installment is rounded to storage precision, so a remainder is left
  * over. `paymentAmount * totalPayments - principal` bills a whole installment for
- * that partial period -- 569.23 too much interest on a 25-year accelerated
+ * that partial period -- 569.13 too much interest on a 25-year accelerated
  * biweekly mortgage, reported as lifetime interest under a total's label.
  *
- * So the residual is computed instead: the balance left after `n - 1` full
+ * So the residual is computed instead: the balance left after n-1 full
  * installments, closed out with that period's interest.
  *
- *   B_k = P(1 + r)^k - A((1 + r)^k - 1) / r        (B_k = P - A*k when r = 0)
- *   final = B_{n-1} * (1 + r)
+ * `totalPayments` is a ceiling, not a promise. An installment large enough to
+ * clear the balance sooner makes the caller's count too high, and clamping only
+ * the final payment to zero while still billing n-1 installments charged
+ * interest for periods the schedule never reaches (1000 at 1% paying 600 over a
+ * claimed 3 periods reported 200 of interest against a true 14.10). The
+ * effective count is therefore derived here and returned, so the caller can date
+ * the payoff from the payment that actually happens.
  *
  * @param principal - Amount borrowed (positive)
  * @param periodicRate - Interest rate per payment period, as a decimal
  * @param paymentAmount - The regular installment
  * @param totalPayments - Whole number of payments, finite and at least 1
- * @returns The final payment and the sum of every period's interest
+ * @returns The final payment, the effective payment count, and the sum of every
+ *          period's interest. All three are -1 when the payment never amortizes.
  */
 export function calculateResidualPayoff(
   principal: number,
   periodicRate: number,
   paymentAmount: number,
   totalPayments: number,
-): { finalPaymentAmount: number; totalInterest: number } {
+): {
+  residualPayoffAmount: number;
+  effectivePayments: number;
+  totalInterest: number;
+} {
   // Nothing owed is a KNOWN zero, not an unknown: a mortgage already paid off
   // reaches here through recalculateMortgageAfterRateChange with a zero balance,
   // and reporting -1 ("could not be worked out") for it would be wrong.
   if (principal === 0) {
-    return { finalPaymentAmount: 0, totalInterest: 0 };
+    return { residualPayoffAmount: 0, effectivePayments: 0, totalInterest: 0 };
   }
   if (!isFinite(totalPayments) || totalPayments < 1 || principal < 0) {
-    return { finalPaymentAmount: -1, totalInterest: -1 };
+    return {
+      residualPayoffAmount: -1,
+      effectivePayments: -1,
+      totalInterest: -1,
+    };
   }
 
-  const fullPayments = totalPayments - 1;
-  const balanceBeforeFinal =
-    periodicRate === 0
-      ? principal - paymentAmount * fullPayments
-      : (() => {
-          const growth = Math.pow(1 + periodicRate, fullPayments);
-          return (
-            principal * growth - (paymentAmount * (growth - 1)) / periodicRate
-          );
-        })();
+  // The schedule ends at whichever comes first: the caller's count, or the
+  // period the installment actually clears the balance in.
+  const clearing = paymentsToClear(principal, periodicRate, paymentAmount);
+  const effectivePayments = Math.max(
+    1,
+    Math.min(totalPayments, isFinite(clearing) ? clearing : totalPayments),
+  );
 
-  // A negative remainder means the installment cleared the balance before the
-  // last period; the schedule is one payment shorter than the count says, so the
-  // final payment is nothing rather than a credit.
-  const finalPaymentAmount = roundMoney(
+  const balanceBeforeFinal = balanceAfterPayments(
+    principal,
+    periodicRate,
+    paymentAmount,
+    effectivePayments - 1,
+  );
+  const residualPayoffAmount = roundMoney(
     Math.max(0, balanceBeforeFinal * (1 + periodicRate)),
   );
-  const totalPaid = paymentAmount * fullPayments + finalPaymentAmount;
+  const totalPaid =
+    paymentAmount * (effectivePayments - 1) + residualPayoffAmount;
   return {
-    finalPaymentAmount,
+    residualPayoffAmount,
+    effectivePayments,
     totalInterest: roundMoney(totalPaid - principal),
   };
 }
@@ -491,20 +552,27 @@ export function calculateMortgageAmortization(
   const interestPayment = roundMoney(principal * periodicRate);
   const principalPayment = roundMoney(paymentAmount - interestPayment);
 
+  // Lifetime interest, with the last period charging only the residual payoff
+  // rather than another full installment. The effective count can be lower than
+  // the count above when the installment clears the balance sooner, and the
+  // payoff date is taken from it so the date and the totals describe one
+  // schedule rather than two.
+  const { residualPayoffAmount, effectivePayments, totalInterest } =
+    calculateResidualPayoff(
+      principal,
+      periodicRate,
+      paymentAmount,
+      totalPayments,
+    );
+  const scheduledPayments = isFinite(totalPayments)
+    ? effectivePayments
+    : totalPayments;
+
   // Calculate end date
   const endDate = calculateMortgageEndDate(
     startDate,
     paymentFrequency,
-    totalPayments,
-  );
-
-  // Lifetime interest, with the last period charging only the residual payoff
-  // rather than another full installment.
-  const { finalPaymentAmount, totalInterest } = calculateResidualPayoff(
-    principal,
-    periodicRate,
-    paymentAmount,
-    totalPayments,
+    scheduledPayments,
   );
 
   // Calculate effective annual rate
@@ -519,8 +587,8 @@ export function calculateMortgageAmortization(
     paymentAmount,
     principalPayment: Math.max(0, principalPayment),
     interestPayment,
-    totalPayments: isFinite(totalPayments) ? totalPayments : -1,
-    finalPaymentAmount,
+    totalPayments: isFinite(scheduledPayments) ? scheduledPayments : -1,
+    residualPayoffAmount,
     endDate,
     totalInterest: isFinite(totalInterest) ? totalInterest : -1,
     effectiveAnnualRate,

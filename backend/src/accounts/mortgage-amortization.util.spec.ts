@@ -493,19 +493,19 @@ describe("Mortgage Amortization Utility", () => {
       const expected = simulate(300000, 5 / 100 / 26, result.paymentAmount);
 
       expect(result.totalPayments).toBe(expected.payments);
-      expect(result.finalPaymentAmount).toBeCloseTo(expected.finalPayment, 2);
+      expect(result.residualPayoffAmount).toBeCloseTo(expected.finalPayment, 2);
       expect(result.totalInterest).toBeCloseTo(expected.interest, 2);
 
       // The final payment is genuinely partial, and the old
       // paymentAmount * totalPayments arithmetic overstated interest by the
       // rest of that installment.
-      expect(result.finalPaymentAmount).toBeLessThan(result.paymentAmount);
+      expect(result.residualPayoffAmount).toBeLessThan(result.paymentAmount);
       const overstatement =
         result.paymentAmount * result.totalPayments -
         300000 -
         result.totalInterest;
       expect(overstatement).toBeCloseTo(
-        result.paymentAmount - result.finalPaymentAmount,
+        result.paymentAmount - result.residualPayoffAmount,
         2,
       );
       expect(overstatement).toBeGreaterThan(500);
@@ -529,7 +529,7 @@ describe("Mortgage Amortization Utility", () => {
 
       expect(result.totalPayments).toBe(300);
       expect(result.totalInterest).toBeCloseTo(expected.interest, 2);
-      expect(result.finalPaymentAmount).toBeCloseTo(result.paymentAmount, 1);
+      expect(result.residualPayoffAmount).toBeCloseTo(result.paymentAmount, 1);
     });
 
     it("charges no interest and a plain remainder at 0%", () => {
@@ -544,12 +544,13 @@ describe("Mortgage Amortization Utility", () => {
       };
       const result = calculateMortgageAmortization(input);
       expect(result.totalInterest).toBe(0);
-      expect(result.finalPaymentAmount).toBeCloseTo(1000, 4);
+      expect(result.residualPayoffAmount).toBeCloseTo(1000, 4);
     });
 
     it("reports unknown totals when the payment never amortizes", () => {
       expect(calculateResidualPayoff(300000, 0.004, 100, Infinity)).toEqual({
-        finalPaymentAmount: -1,
+        residualPayoffAmount: -1,
+        effectivePayments: -1,
         totalInterest: -1,
       });
     });
@@ -558,21 +559,67 @@ describe("Mortgage Amortization Utility", () => {
       // A mortgage already paid off reaches this through
       // recalculateMortgageAfterRateChange; zero owed is known, not unknown.
       expect(calculateResidualPayoff(0, 0.004, 1000, 300)).toEqual({
-        finalPaymentAmount: 0,
+        residualPayoffAmount: 0,
+        effectivePayments: 0,
         totalInterest: 0,
       });
     });
 
-    it("never returns a negative final payment", () => {
-      // An installment large enough to clear the balance before the counted
-      // final period leaves nothing to pay, not a credit.
-      const { finalPaymentAmount } = calculateResidualPayoff(
-        1000,
-        0.01,
-        600,
-        3,
+    it("ends the schedule where the installment actually clears it", () => {
+      // An installment large enough to clear the balance before the caller's
+      // count is a count that is too high, so the schedule ends early: 1000 at
+      // 1% paying 600 takes two periods (interest 10 then 4.10), not three.
+      // Clamping only the final payment to zero while still billing two full
+      // installments reported 200 of interest against a true 14.10.
+      const result = calculateResidualPayoff(1000, 0.01, 600, 3);
+      expect(result.effectivePayments).toBe(2);
+      expect(result.residualPayoffAmount).toBeCloseTo(414.1, 4);
+      expect(result.totalInterest).toBeCloseTo(14.1, 4);
+      expect(result.residualPayoffAmount).toBeGreaterThan(0);
+    });
+
+    it("caps the schedule at the contractual count, absorbing the rounding", () => {
+      // The other direction: a solved installment rounded DOWN to storage
+      // precision leaves a few cents after the contractual count, so the
+      // analytic clearing count is one higher. A 300-month mortgage is still 300
+      // payments -- the last one absorbs the remainder, as a lender's does --
+      // rather than growing a 301st.
+      const result = calculateMortgageAmortization({
+        principal: 300000,
+        annualRate: 5,
+        amortizationMonths: 300,
+        paymentFrequency: "MONTHLY",
+        isCanadian: false,
+        isVariableRate: false,
+        startDate: new Date(2026, 0, 1),
+      });
+      expect(result.totalPayments).toBe(300);
+      expect(result.residualPayoffAmount).toBeGreaterThanOrEqual(
+        result.paymentAmount,
       );
-      expect(finalPaymentAmount).toBe(0);
+      // Within one storage-precision step of the installment, not a period more.
+      expect(result.residualPayoffAmount - result.paymentAmount).toBeLessThan(
+        1,
+      );
+    });
+
+    it("dates the payoff from the same count it reports", () => {
+      // totalPayments and endDate come from one number, so the date and the
+      // totals describe one schedule. startDate is payment 1 (INV-LOAN-005), so
+      // N payments advance N-1 months.
+      const startDate = new Date(2026, 0, 1);
+      const result = calculateMortgageAmortization({
+        principal: 300000,
+        annualRate: 5,
+        amortizationMonths: 300,
+        paymentFrequency: "MONTHLY",
+        isCanadian: false,
+        isVariableRate: false,
+        startDate,
+      });
+      const expectedEnd = new Date(2026, 0, 1);
+      expectedEnd.setMonth(expectedEnd.getMonth() + result.totalPayments - 1);
+      expect(result.endDate.getTime()).toBe(expectedEnd.getTime());
     });
   });
 

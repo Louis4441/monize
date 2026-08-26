@@ -508,7 +508,8 @@
       "colOverpayment": "Nadpłata",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Wczytaj scenariusz „{name}“",
-      "budgetSummary": "Budżet {amount}/mies."
+      "budgetSummary": "Budżet {amount}/mies.",
+      "chartExcludedUnknown": "{count, plural, one {# scenariusz nie jest pokazany: jego oszczędność odsetek jest nieznana.} few {# scenariusze nie są pokazane: ich oszczędność odsetek jest nieznana.} many {# scenariuszy nie jest pokazanych: ich oszczędność odsetek jest nieznana.} other {# scenariusza nie jest pokazane: ich oszczędność odsetek jest nieznana.}}"
     },
     "scenarioChart": {
       "title": "Porównanie scenariuszy",

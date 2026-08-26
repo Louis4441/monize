@@ -508,7 +508,8 @@
       "colOverpayment": "Extra aflossing",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Scenario \"{name}\" laden",
-      "budgetSummary": "Budget {amount}/maand"
+      "budgetSummary": "Budget {amount}/maand",
+      "chartExcludedUnknown": "{count, plural, one {# scenario wordt niet weergegeven: de rentebesparing is onbekend.} other {# scenario’s worden niet weergegeven: hun rentebesparing is onbekend.}}"
     },
     "scenarioChart": {
       "title": "Scenariovergelijking",

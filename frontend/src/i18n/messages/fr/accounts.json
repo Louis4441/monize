@@ -508,7 +508,8 @@
       "colOverpayment": "Remboursement",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Charger le scénario « {name} »",
-      "budgetSummary": "Budget {amount}/mois"
+      "budgetSummary": "Budget {amount}/mois",
+      "chartExcludedUnknown": "{count, plural, one {# scénario n'est pas affiché : son économie d'intérêts est inconnue.} other {# scénarios ne sont pas affichés : leur économie d'intérêts est inconnue.}}"
     },
     "scenarioChart": {
       "title": "Comparaison des scénarios",

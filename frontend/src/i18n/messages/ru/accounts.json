@@ -508,7 +508,8 @@
       "colOverpayment": "Досрочный платёж",
       "overpaymentWithFrequency": "{amount} ({frequency})",
       "loadAria": "Загрузить сценарий «{name}»",
-      "budgetSummary": "Бюджет {amount}/мес."
+      "budgetSummary": "Бюджет {amount}/мес.",
+      "chartExcludedUnknown": "{count, plural, one {# сценарий не показан: экономия на процентах неизвестна.} few {# сценария не показаны: экономия на процентах неизвестна.} many {# сценариев не показаны: экономия на процентах неизвестна.} other {# сценария не показаны: экономия на процентах неизвестна.}}"
     },
     "scenarioChart": {
       "title": "Сравнение сценариев",

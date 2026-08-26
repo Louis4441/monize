@@ -573,13 +573,20 @@ describe('compareSchedules', () => {
     expect(comparison.interestSaved).toBeGreaterThan(0);
   });
 
-  it('returns zero months saved when either schedule never pays off', () => {
+  it('reports every saving as unknown when either schedule never pays off', () => {
     const baseline = generateLoanSchedule(baseInput({ paymentAmount: 40 }));
     const scenario = generateLoanSchedule(
       baseInput({ paymentAmount: 40, overpayments: { recurringExtra: { amount: 200 } } }),
     );
     const comparison = compareSchedules(baseline, scenario);
-    expect(comparison.monthsSaved).toBe(0);
+    // Not zero: zero is a claim that the overpayment bought nothing. All three
+    // savings compare against a schedule that has no lifetime to compare with.
+    expect(comparison.monthsSaved).toBeNull();
+    expect(comparison.paymentsSaved).toBeNull();
+    expect(comparison.interestSaved).toBeNull();
+    // The ending installment is a property of each schedule alone, so it stays
+    // a number.
+    expect(comparison.installmentReduction).toBe(0);
   });
 });
 
@@ -1008,6 +1015,107 @@ describe('recurringOccurrencesDue', () => {
       expect(counter.dueBy('2026-12-31')).toBe(expected);
       expect(counter.dueBy('2027-12-31')).toBe(expected);
     }
+  });
+
+  it('keeps a month-end anchor on its day instead of drifting', () => {
+    // `advanceDate`'s MONTHLY step is `setMonth(+1)`, which overflows Jan 31 into
+    // Mar 3 and then holds every later occurrence on the 3rd -- February skipped
+    // and 11 occurrences in the first year, the same defect from the other
+    // direction. Each occurrence is derived from the anchor instead, with the day
+    // clamped to the target month's length.
+    const counter = recurringOccurrencesDue(
+      { amount: 100, frequency: 'MONTHLY' },
+      new Date(2026, 0, 31),
+    );
+    // Feb 2026 has 28 days, so the February occurrence is the 28th -- and March
+    // is back on the 31st rather than stuck on whatever February overflowed to.
+    expect(counter.dueBy('2026-01-31')).toBe(1);
+    expect(counter.dueBy('2026-02-27')).toBe(0);
+    expect(counter.dueBy('2026-02-28')).toBe(1);
+    expect(counter.dueBy('2026-03-30')).toBe(0);
+    expect(counter.dueBy('2026-03-31')).toBe(1);
+    // April has 30 days, and May is on the 31st again: no drift.
+    expect(counter.dueBy('2026-04-30')).toBe(1);
+    expect(counter.dueBy('2026-05-30')).toBe(0);
+    expect(counter.dueBy('2026-05-31')).toBe(1);
+  });
+
+  it('yields 12 monthly occurrences a year from any anchor day', () => {
+    // The invariant INV-LOAN-001 states, checked across every anchor day a month
+    // can start on -- the 29th to 31st are the ones that used to lose one.
+    for (const day of [1, 5, 15, 28, 29, 30, 31]) {
+      const counter = recurringOccurrencesDue(
+        { amount: 100, frequency: 'MONTHLY' },
+        new Date(2026, 0, day),
+      );
+      // Sweep every day of 2026 so the count cannot depend on payment dates.
+      let total = 0;
+      const cursor = new Date(2026, 0, day);
+      while (cursor.getFullYear() === 2026) {
+        total += counter.dueBy(
+          `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(
+            cursor.getDate(),
+          ).padStart(2, '0')}`,
+        );
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      expect(total).toBe(12);
+    }
+  });
+
+  it('pays a month-end monthly extra on a biweekly loan without skipping a month', () => {
+    // The reproduction: a biweekly loan whose first payment is 2026-01-31. The
+    // old accumulation put the second occurrence on Mar 3 and every later one on
+    // the 3rd, so February was skipped outright and the year paid 1100 of a
+    // declared 1200.
+    const result = generateLoanSchedule(
+      baseInput({
+        startingBalance: 400000,
+        annualRate: 6,
+        paymentAmount: calculateMortgagePaymentAmount(
+          400000,
+          6,
+          360,
+          'BIWEEKLY',
+          false,
+          false,
+        ),
+        frequency: 'BIWEEKLY',
+        firstPaymentDate: new Date(2026, 0, 31),
+        overpayments: { recurringExtra: { amount: 100, frequency: 'MONTHLY' } },
+      }),
+    );
+    const paidBy = (throughIso: string) =>
+      Math.round(
+        result.rows
+          .filter((r) => r.date <= throughIso)
+          .reduce((sum, r) => sum + r.extraPrincipal, 0) * 100,
+      ) / 100;
+
+    // February's occurrence (the 28th, clamped from the 31st) lands on the
+    // 2026-02-28 payment. The old code paid nothing at all that month.
+    const february = result.rows.find((r) => r.date === '2026-02-28');
+    expect(february?.extraPrincipal).toBeCloseTo(100, 2);
+
+    // All twelve of 2026's occurrences are paid; the last one is due 2026-12-31
+    // and the first payment on or after it is 2027-01-02, so the twelve are
+    // complete by then and no 2027 occurrence (2027-01-31) has fallen yet.
+    expect(paidBy('2027-01-02')).toBeCloseTo(1200, 2);
+    expect(paidBy('2027-01-30')).toBeCloseTo(1200, 2);
+  });
+
+  it('refuses a rowDate that goes backwards', () => {
+    // The counter consumes occurrences, so an out-of-order call would silently
+    // swallow everything between the two dates. Prose could not make that
+    // checkable; the throw can.
+    const counter = recurringOccurrencesDue(
+      { amount: 100, frequency: 'MONTHLY' },
+      new Date(2026, 0, 1),
+    );
+    expect(counter.dueBy('2026-06-01')).toBe(6);
+    expect(() => counter.dueBy('2026-03-01')).toThrow(/precedes/);
+    // Asking again for the same row is allowed (nothing new is due).
+    expect(counter.dueBy('2026-06-01')).toBe(0);
   });
 
   it('never counts an occurrence before the first projected payment', () => {

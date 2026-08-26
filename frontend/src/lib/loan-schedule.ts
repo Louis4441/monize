@@ -277,8 +277,18 @@ export interface LoanScheduleResult {
 export interface ScenarioComparison {
   baseline: LoanScheduleResult;
   scenario: LoanScheduleResult;
-  paymentsSaved: number;
-  monthsSaved: number;
+  /**
+   * Payments the scenario saves against the baseline, or `null` when either
+   * schedule stopped at the projection horizon instead of paying off -- a
+   * horizon's row count minus a lifetime's is not a number of payments saved.
+   */
+  paymentsSaved: number | null;
+  /**
+   * Months the scenario saves, or `null` on the same condition. A truncated
+   * schedule has no payoff date, and "0 months" is a claim that the overpayment
+   * bought no time rather than that the answer is unknown.
+   */
+  monthsSaved: number | null;
   /**
    * Interest the scenario saves against the baseline, or `null` when either
    * schedule stopped at the projection horizon instead of paying off. The
@@ -320,6 +330,25 @@ export function maxPaymentsForHorizon(
 ): number {
   return Math.min(
     Math.max(1, Math.round(getPeriodsPerYear(frequency) * years)),
+    HARD_MAX_PAYMENTS,
+  );
+}
+
+/**
+ * The row cap a schedule runs to: a supplied `maxPayments` or the frequency's
+ * horizon, floored at one row and clamped to the hard maximum.
+ *
+ * Written once because both entry points need it and had drifted: the budget
+ * path omitted the `Math.max(1, ...)` floor, so `maxPayments: 0` gave
+ * `generateLoanSchedule` one row and `generateBudgetSchedule` zero -- an empty,
+ * not-paid-off result for an input the other path amortized.
+ */
+function resolveMaxPayments(
+  frequency: ScheduleFrequency,
+  maxPayments: number | undefined,
+): number {
+  return Math.min(
+    Math.max(1, maxPayments ?? maxPaymentsForHorizon(frequency)),
     HARD_MAX_PAYMENTS,
   );
 }
@@ -368,6 +397,35 @@ export function getPeriodicRate(
     return Math.pow(1 + semiAnnualRate, 2 / periodsPerYear) - 1;
   }
   return annualRate / 100 / periodsPerYear;
+}
+
+/**
+ * Effective annual rate as a percentage, unrounded -- the rate the loan actually
+ * costs over a year, compounded the way its own periodic rate is derived.
+ *
+ * The one frontend implementation of the "Displayed EAR" row of
+ * docs/financial-semantics.md section 9, mirroring the backend's
+ * `calculateEffectiveAnnualRate` (which rounds to 2dp for its API contract; this
+ * returns the raw percentage so each surface chooses its own precision). The
+ * loan detail summary card previously computed the Canadian formula inline,
+ * which made it a third copy of the compounding convention that the
+ * frequency-aware fix never reached.
+ *
+ * @param periodsPerYear - Payments per year, from getPeriodsPerYear
+ */
+export function effectiveAnnualRate(
+  annualRate: number,
+  periodsPerYear: number,
+  isCanadian: boolean,
+  isVariableRate: boolean,
+): number {
+  if (isCanadian && !isVariableRate) {
+    // Semi-annual compounding, required by law and independent of how often the
+    // mortgage is paid.
+    return (Math.pow(1 + annualRate / 100 / 2, 2) - 1) * 100;
+  }
+  // Nominal rate compounded at the payment frequency.
+  return (Math.pow(1 + annualRate / 100 / periodsPerYear, periodsPerYear) - 1) * 100;
 }
 
 /**
@@ -422,17 +480,57 @@ export function advanceDate(date: Date, frequency: ScheduleFrequency): Date {
   return next;
 }
 
-/** Cadence step of each recurring overpayment frequency, as a date advance. */
+/** Cadence step of each recurring overpayment frequency: days, or months. */
 const OVERPAYMENT_CADENCE: Record<
   Exclude<OverpaymentFrequency, 'ONE_OFF'>,
-  ScheduleFrequency
+  { days?: number; months?: number }
 > = {
-  WEEKLY: 'WEEKLY',
-  BIWEEKLY: 'BIWEEKLY',
-  MONTHLY: 'MONTHLY',
-  QUARTERLY: 'QUARTERLY',
-  ANNUALLY: 'YEARLY',
+  WEEKLY: { days: 7 },
+  BIWEEKLY: { days: 14 },
+  MONTHLY: { months: 1 },
+  QUARTERLY: { months: 3 },
+  ANNUALLY: { months: 12 },
 };
+
+/**
+ * The `index`-th occurrence date of a cadence, derived from the anchor rather
+ * than accumulated from the occurrence before it.
+ *
+ * `advanceDate` is deliberately not reused for the month cadences. It steps with
+ * `Date.setMonth(+1)`, which overflows a 31st into the following month (Jan 31
+ * becomes Mar 3) and then keeps every later occurrence on the new day -- so a
+ * monthly overpayment anchored on the 29th to 31st skipped a month and paid 11
+ * times in the first year, the exact defect INV-LOAN-001 exists to prevent, from
+ * the other direction. Deriving the nth date from the anchor removes the
+ * accumulation, and clamping the day to the target month's length keeps the
+ * anchor day in every month long enough to hold it: the 31st falls on the 30th
+ * of a 30-day month and on the 28th or 29th of February, the way a standing
+ * order does.
+ *
+ * The day cadences cannot drift, but are derived the same way for one code path.
+ *
+ * This is not the month-end question `advanceDate` leaves open for loan
+ * *payments* (which follow the recorded schedule, whatever convention the lender
+ * uses): an overpayment cadence has no lender, and its count per year is an
+ * invariant, so it needs an answer here.
+ */
+function overpaymentOccurrenceDate(
+  anchor: Date,
+  step: { days?: number; months?: number },
+  index: number,
+): Date {
+  if (step.days) {
+    const date = new Date(anchor);
+    date.setDate(date.getDate() + step.days * index);
+    return date;
+  }
+  const absoluteMonth = anchor.getMonth() + (step.months ?? 1) * index;
+  const year = anchor.getFullYear() + Math.floor(absoluteMonth / 12);
+  const month = ((absoluteMonth % 12) + 12) % 12;
+  // Day 0 of the next month is the last day of this one.
+  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(anchor.getDate(), lastDayOfMonth));
+}
 
 /** Counts the overpayment occurrences a given loan payment has to carry. */
 export interface RecurringOccurrenceCounter {
@@ -488,23 +586,39 @@ export function recurringOccurrencesDue(
   }
 
   const firstPaymentIso = format(firstPaymentDate, 'yyyy-MM-dd');
-  let due =
+  const anchor =
     extra.startDate && extra.startDate > firstPaymentIso
       ? parseLocalDate(extra.startDate)
       : new Date(firstPaymentDate);
 
+  let nextIndex = 0;
+  let lastRowDate: string | null = null;
+
   return {
     dueBy: (rowDate) => {
+      // The counter consumes occurrences as it goes, so a caller that asks out
+      // of order would silently swallow every occurrence between the two dates.
+      // Refuse rather than answer wrongly -- prose could not make this checkable.
+      if (lastRowDate !== null && rowDate < lastRowDate) {
+        throw new Error(
+          `recurringOccurrencesDue: rowDate ${rowDate} precedes ${lastRowDate}; ` +
+            'occurrences are consumed in date order, one call per schedule row',
+        );
+      }
+      lastRowDate = rowDate;
       let count = 0;
       for (;;) {
-        const dueIso = format(due, 'yyyy-MM-dd');
+        const dueIso = format(
+          overpaymentOccurrenceDate(anchor, cadence, nextIndex),
+          'yyyy-MM-dd',
+        );
         // Not yet due: it stays pending for a later payment.
         if (dueIso > rowDate) break;
         // Past the window: nothing further is ever due, and the cursor stays
         // parked so subsequent rows count nothing.
         if (extra.endDate && dueIso > extra.endDate) break;
         count++;
-        due = advanceDate(due, cadence);
+        nextIndex++;
       }
       return count;
     },
@@ -607,7 +721,7 @@ export function generateBudgetSchedule(
   } = input;
 
   const periodsPerYear = getPeriodsPerYear(frequency);
-  const cap = Math.min(maxPayments ?? maxPaymentsForHorizon(frequency), HARD_MAX_PAYMENTS);
+  const cap = resolveMaxPayments(frequency, maxPayments);
 
   // LOWER_INSTALLMENT re-amortizes the installment over the remaining
   // contractual term (it steps down as the balance falls); SHORTEN_TERM keeps
@@ -770,10 +884,7 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
     initialCumulativeInterest = 0,
   } = input;
 
-  const maxPayments = Math.min(
-    Math.max(1, input.maxPayments ?? maxPaymentsForHorizon(frequency)),
-    HARD_MAX_PAYMENTS,
-  );
+  const maxPayments = resolveMaxPayments(frequency, input.maxPayments);
 
   // Each overpayment carries its own mode; SHORTEN_TERM is the default for
   // those that omit one.
@@ -1059,20 +1170,27 @@ export function compareSchedules(
   baseline: LoanScheduleResult,
   scenario: LoanScheduleResult,
 ): ScenarioComparison {
-  // A saving is a difference of two lifetime totals, so both sides must have
-  // paid off within the horizon. `totalInterest` on a truncated schedule is the
-  // interest over the horizon, and subtracting one horizon from another says
-  // nothing about the loan (a truncated baseline made every scenario look
-  // better than it is).
-  const lifetimeInterestKnown = baseline.paidOff && scenario.paidOff;
+  // Every saving is a difference of two lifetime figures, so both sides must
+  // have paid off within the horizon. A truncated schedule's `numPayments` is
+  // the horizon's row count and its `totalInterest` the interest over it, so
+  // subtracting either from a real lifetime figure says nothing about the loan
+  // (a truncated baseline made every scenario look better than it is, and could
+  // even report a negative saving). `monthsSaved` needs the same gate for a
+  // different reason: `monthsBetween` returns 0 for a missing payoff date, which
+  // reads as "the overpayment bought no time" rather than "not known".
+  const comparable = baseline.paidOff && scenario.paidOff;
   return {
     baseline,
     scenario,
-    paymentsSaved: baseline.numPayments - scenario.numPayments,
-    monthsSaved: monthsBetween(scenario.payoffDate, baseline.payoffDate),
-    interestSaved: lifetimeInterestKnown
+    paymentsSaved: comparable ? baseline.numPayments - scenario.numPayments : null,
+    monthsSaved: comparable
+      ? monthsBetween(scenario.payoffDate, baseline.payoffDate)
+      : null,
+    interestSaved: comparable
       ? round2(baseline.totalInterest - scenario.totalInterest)
       : null,
+    // The ending installment is a property of each schedule on its own, known
+    // whether or not either paid off, so the reduction stays a number.
     installmentReduction: round2(
       baseline.finalPaymentAmount - scenario.finalPaymentAmount,
     ),
