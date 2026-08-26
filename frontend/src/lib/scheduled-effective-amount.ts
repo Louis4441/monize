@@ -115,6 +115,21 @@ export function nextOccurrenceEffectiveAmount(
 }
 
 /**
+ * The date the schedule's *next* occurrence actually falls on.
+ *
+ * `nextDueDate` is the recurrence slot; an override addressed to that slot can
+ * move the occurrence, and the moved date is when the money moves. A surface
+ * that filters, sorts or prints the slot instead announces a payment on a day
+ * the user has already changed -- the same defect as reading the persisted
+ * amount, applied to the date (issue #1247).
+ */
+export function nextOccurrenceDueDate(st: ScheduledTransaction): string {
+  return st.nextOverride?.overrideDate
+    ? String(st.nextOverride.overrideDate).split('T')[0]
+    : String(st.nextDueDate).split('T')[0];
+}
+
+/**
  * A total over effective amounts, or `null` when any component is unknown, with
  * the partial sum kept separately: a subtotal is not a total
  * (`docs/financial-semantics.md`). `map` reads the value each item contributes in

@@ -261,6 +261,107 @@ describe('BudgetAlertList', () => {
     expect(mockPush).toHaveBeenCalledWith('/bills');
   });
 
+  // ---- BILL_DUE copy comes from the alert's data, in the reader's language ----
+  //
+  // The row is written by a cron under no request locale, so a stored sentence
+  // cannot be translated after the fact (issue #1247). `title`/`message` stay on
+  // the row as the fallback for a consumer with no catalog.
+
+  const billDueAlert = (data: Record<string, unknown>): BudgetAlert =>
+    makeAlert({
+      id: 'alert-bill',
+      alertType: 'BILL_DUE',
+      severity: 'info',
+      title: 'STORED ENGLISH TITLE',
+      message: 'STORED ENGLISH MESSAGE',
+      data,
+    });
+
+  it('composes a bill-due alert from its structured data', () => {
+    render(
+      <BudgetAlertList
+        {...defaultProps}
+        alerts={[
+          billDueAlert({
+            billId: 'st-1',
+            payeeName: 'Power Co',
+            amount: 312.65,
+            amountComplete: true,
+            dueDate: '2026-03-05',
+            daysUntilDue: 3,
+            currencyCode: 'USD',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Power Co due in 3 days')).toBeInTheDocument();
+    expect(screen.getByText(/312\.65 due on 2026-03-05/)).toBeInTheDocument();
+    expect(screen.queryByText('STORED ENGLISH TITLE')).not.toBeInTheDocument();
+    expect(screen.queryByText('STORED ENGLISH MESSAGE')).not.toBeInTheDocument();
+  });
+
+  it('says the amount is unavailable rather than leaving a blank or a stale figure', () => {
+    render(
+      <BudgetAlertList
+        {...defaultProps}
+        alerts={[
+          billDueAlert({
+            billId: 'st-1',
+            payeeName: 'Monthly ETF buy',
+            amount: null,
+            amountComplete: false,
+            dueDate: '2026-03-05',
+            daysUntilDue: 0,
+            currencyCode: 'CAD',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Monthly ETF buy due today')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Amount unavailable (no current exchange rate), due on 2026-03-05',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('STORED ENGLISH MESSAGE')).not.toBeInTheDocument();
+  });
+
+  it('says tomorrow rather than "in 1 days"', () => {
+    render(
+      <BudgetAlertList
+        {...defaultProps}
+        alerts={[
+          billDueAlert({
+            payeeName: 'Netflix',
+            amount: 15.99,
+            amountComplete: true,
+            dueDate: '2026-03-02',
+            daysUntilDue: 1,
+            currencyCode: 'USD',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Netflix due tomorrow')).toBeInTheDocument();
+  });
+
+  it('falls back to the stored copy for a row written before the data existed', () => {
+    // Absent is "no information", not a licence to render nothing: a row from an
+    // older release carries only its English sentence.
+    render(
+      <BudgetAlertList
+        {...defaultProps}
+        alerts={[billDueAlert({ billId: 'st-1', payeeName: 'Power Co' })]}
+      />,
+    );
+
+    expect(screen.getByText('STORED ENGLISH TITLE')).toBeInTheDocument();
+    expect(screen.getByText('STORED ENGLISH MESSAGE')).toBeInTheDocument();
+  });
+
   it('displays alert message text', () => {
     const alerts = [
       makeAlert({

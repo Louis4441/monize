@@ -69,7 +69,7 @@ implied.
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
-| INV-OCCURRENCE-003 | Every surface reports a scheduled occurrence's *current* amount | enforced |
+| INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount, on the date it falls | enforced |
 | INV-CLAIM-001 | An emergency-access claim token is consumed exactly once | enforced |
 | INV-AUTH-001 | A refresh token rotates once, or the family is revoked | enforced |
 | INV-AUTH-002 | A failed-login counter records every failure | enforced |
@@ -656,49 +656,101 @@ Required tests      Present: OverrideEditorDialog.test.tsx -- reopen with a stor
 Status              enforced
 ```
 
-### INV-OCCURRENCE-003 -- one effective amount, everywhere
+### INV-OCCURRENCE-003 -- one effective occurrence, everywhere
 
 ```text
-Statement           Every surface that presents or aggregates the cash amount of a
-                    scheduled occurrence reports the amount that occurrence would
-                    post *today*, and reports it as unavailable when that cannot
-                    be determined. The persisted amount is never substituted.
-Source of truth     ScheduledEffectiveAmountService.resolveMany (backend
-                    scheduled-transactions/scheduled-effective-amount.service.ts),
-                    which owns the #1167 stored-if-current-else-resolve decision
-                    and the combination of rate and stored scalar. It is the only
-                    place that decision is made; scheduled_transactions.amount is
-                    a snapshot at whatever rate was current when it was written.
-Enforcement         Server: findAll emits effectiveAmount /
-                    effectiveAmountComplete / effectiveCurrencyCode per schedule
-                    and per override; getLlmUpcomingBillsAndDeposits (AI + MCP),
+Statement           Every surface that presents or aggregates a scheduled
+                    occurrence reports the amount THAT occurrence would post
+                    *today*, on the date it actually falls, and reports the
+                    amount as unavailable when it cannot be determined. The
+                    persisted amount is never substituted, and the recurrence
+                    slot is never reported as the due date when an override moved
+                    the occurrence off it.
+Source of truth     Two files, and only two:
+                    common/scheduled-occurrences.ts (expandOccurrenceSlots) owns
+                    occurrence IDENTITY -- walking a recurrence over a window and
+                    matching each slot to its override. The identity is
+                    original_date (the unique index says so); override_date moves
+                    the occurrence, and filtering is on the date it falls.
+                    ScheduledOccurrenceService (backend
+                    scheduled-transactions/scheduled-occurrence.service.ts) owns
+                    PRICING: it hydrates each candidate's overrides, asks
+                    ScheduledEffectiveAmountService.resolveMany once, and returns
+                    EffectiveScheduledOccurrence {amount, currencyCode, complete,
+                    dueDate, originalDate, overrideId, settlementAccountId}.
+                    ScheduledEffectiveAmountService remains the arithmetic layer:
+                    it owns the #1167 stored-if-current-else-resolve decision and
+                    the combination of rate and stored scalar.
+                    scheduled_transactions.amount is a snapshot at whatever rate
+                    was current when it was written.
+Enforcement         Server: every occurrence-aware surface consumes the occurrence
+                    service -- getLlmUpcomingBillsAndDeposits (AI + MCP),
                     BudgetsService.getUpcomingBills / getVelocity /
                     ensureBillAlerts, BillReminderService,
-                    ForecastAggregatorService and BalanceForecastService all read
-                    the resolver.
+                    ForecastAggregatorService, BalanceForecastService, and
+                    GET /scheduled-transactions/occurrences for clients. findAll
+                    still emits effectiveAmount / effectiveAmountComplete /
+                    effectiveCurrencyCode per schedule and per override, which is
+                    a SCHEDULE-level read model: it says what the base occurrence
+                    costs and carries the overrides beside it.
+                    occurrence-selection.guard.spec.ts is the scan: a second
+                    recurrence loop, a second overrideEffectiveKey lookup, a
+                    `.base.amount` read outside the two places where the base is
+                    the question, or a new resolveMany call site each fail with the
+                    file and line.
                     Client: lib/scheduled-effective-amount.ts is the only reader
-                    of those fields, and
+                    of those fields (nextOccurrenceEffectiveAmount for a
+                    schedule-level surface, nextOccurrenceDueDate for the date it
+                    falls on); lib/scheduled-kind.ts occurrenceKind is the only
+                    place an occurrence's kind is decided.
                     lib/scheduled-effective-amount.guard.test.ts scans src/ for
-                    the `override.amount ?? …amount` fingerprint and for each
-                    migrated surface still importing the helper.
+                    the `override.amount ?? …amount` fingerprint, for a client
+                    -side recurrence expansion outside its four named exemptions,
+                    and for the Upcoming Bills report actually calling
+                    getOccurrences (import presence is not proof: the report
+                    imported the helper throughout the period it was applying one
+                    amount to every occurrence).
 Aggregation rule    A total is null when any component is unknown; the partial sum
                     travels in a separately named field (knownUpcoming*Subtotal,
                     knownSubtotal) and never under the total's caption.
 Concurrency scope   per occurrence; the resolver's FX caches are per read
-Failure response    the occurrence renders as unavailable (UnknownAmount /
-                    "Amount unavailable") and every total containing it is
-                    withheld -- never the stale figure, never a measured zero.
-Required tests      Present: scheduled-effective-amount.service.spec.ts (the
-                    issue's stale-pair and unknown-pair scenarios, split parents,
-                    overrides), findAll and getLlmUpcomingBillsAndDeposits cases
-                    in scheduled-transactions.service.spec.ts,
-                    budgets.service.spec.ts getVelocity + alert cases,
-                    bill-reminder.service.spec.ts, and the frontend suites for
-                    scheduled-utils, UpcomingBills, BudgetUpcomingBills,
-                    BudgetVelocityWidget, UpcomingBillsReport,
+Failure response    the occurrence renders as unavailable (UnknownAmount, or the
+                    localized budgets.alerts.billDue.amountUnavailable copy) and
+                    every total containing it is withheld -- never the stale
+                    figure, never a measured zero.
+Required tests      Occurrence identity and window: scheduled-occurrences.spec.ts
+                    (slot-versus-override-date matching, an occurrence moved out
+                    of the window, an occurrence moved INTO it from beyond the
+                    horizon, end date, remaining count, maxOccurrences ordering).
+                    Pricing and selection: scheduled-occurrence.service.spec.ts
+                    (override amount wins, a moved override still wins, an
+                    unpriceable override stays unknown instead of falling back to
+                    the base).
+                    Consumers, each with an override case that fails if the base
+                    is read: scheduled-transactions.service.spec.ts
+                    ("quotes the next occurrence's override amount",
+                    "announces the date an override moved the occurrence to",
+                    "withholds the bills total when the due occurrence's override
+                    cannot be priced"); budgets.service.spec.ts (getVelocity
+                    override + moved-date + moved-out-of-period, and the alert
+                    path's moved occurrence and its identity-based dedup);
+                    bill-reminder.service.spec.ts (override amount and override
+                    date in the email); forecast-aggregator.service.spec.ts;
+                    balance-forecast.service.spec.ts (settlement account, unknown
+                    rate withholding the series, per-occurrence overrides) and
+                    balance-forecast.util.spec.ts.
+                    Frontend: UpcomingBillsReport.test.tsx (per-occurrence
+                    override in the list, the calendar, the CSV and the PDF, and
+                    an unresolvable occurrence withholding the total),
+                    BudgetAlertList.test.tsx (localized bill-due copy, including
+                    the unavailable-amount case), UpcomingBills.test.tsx and
+                    BudgetUpcomingBills.test.tsx (moved next occurrence),
+                    plus scheduled-utils, BudgetVelocityWidget,
                     RecurringChargesPanel and ScheduledTransactionList.
+                    Each mutant these exist for was confirmed to fail them: base
+                    instead of override, and keying the override on override_date.
 Settlement account  An occurrence is charged to the account that actually moves
-                    the cash. `ScheduledEffectiveAmounts.settlementAccountId`
+                    the cash. `EffectiveScheduledOccurrence.settlementAccountId`
                     carries it, derived through
                     `InvestmentTransactionsService.resolveSettlementAccountId` --
                     the same decision the posting makes, and the one the currency
@@ -714,15 +766,28 @@ Cumulative series   A projected balance is cumulative, so an occurrence nobody c
                     anchor) and names the schedules in `gaps`; the client draws
                     `BalanceForecastUnavailable` instead of a stub line and reports
                     the projected-balance card as unavailable rather than falling
-                    back to today's figure. Completeness is decided while walking
-                    the horizon, so an unpriceable schedule with no occurrence
-                    inside the window does not withhold anything.
+                    back to today's figure. Completeness is decided from the
+                    occurrences that actually landed in the window, so an
+                    unpriceable schedule with no occurrence inside it does not
+                    withhold anything.
                     A `crossCurrencyTransfer` gap is a separate cause with its own
                     copy: the schedule's amount is the SOURCE account's, the
                     arriving amount is resolved at posting, and this endpoint
                     applies no rate -- so the destination's projection reports it
                     rather than adding a foreign number (INV-FX-001's rule applied
                     to a projection).
+Known scope         Two client-side expansions remain, both named in the frontend
+                    guard's exemption list with their reasons: `lib/forecast.ts`
+                    (the cash-flow forecast, which resolves each occurrence
+                    against `futureOverrides` and the effective-amount contract --
+                    it is the surface the others were wrong against) and the bills
+                    calendar in `app/bills/page.tsx` (which draws names on dates
+                    and prints no amount per occurrence). A third,
+                    `OccurrenceDatePicker`, offers dates to attach an override to.
+                    The AI forecast summary describes every active schedule, so it
+                    asks for one occurrence per schedule over a deliberately wide
+                    horizon (FORECAST_OCCURRENCE_HORIZON_DAYS) rather than a
+                    product window.
 Status              enforced
 ```
 

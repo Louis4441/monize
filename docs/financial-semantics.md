@@ -287,9 +287,17 @@ and reports `null` as unavailable. A total containing an unknown component is
 The persisted scalar is never the fallback. Substituting it turns "we do not know
 what this will cost" into a confident wrong number -- 1,500 CAD for an occurrence
 that posts 1,350 -- and it did so on five product surfaces at once while the
-cash-flow forecast beside them was right (issue #1247). INV-OCCURRENCE-003 in
-`docs/system-invariants.md` records the enforcement and the one consumer still
-outstanding.
+cash-flow forecast beside them was right (issue #1247).
+
+Nor is the recurrence slot the due date. An override is addressed to a slot
+(`original_date`, the occurrence's identity) and may move the occurrence to
+another day (`override_date`); a surface that filters, sorts or prints the slot
+announces a payment on a day the user has already changed. Both halves come from
+one place -- `expandOccurrenceSlots` decides which occurrence, and
+`ScheduledOccurrenceService` prices it -- because centralizing the arithmetic
+alone left every consumer free to pick the wrong occurrence and be confidently
+wrong about a number that was itself correct. INV-OCCURRENCE-003 in
+`docs/system-invariants.md` records the enforcement.
 
 ## 8. Import and restore: zero, null, absent
 

@@ -25,6 +25,26 @@ export function scheduledKind(st: {
 }
 
 /**
+ * The kind of ONE occurrence.
+ *
+ * Kind is a question about direction, and an exchange rate is positive, so the
+ * stored sign classifies correctly even when the occurrence's own magnitude is
+ * unknown -- which is why an unknown amount falls back to the schedule's sign
+ * rather than to `Number(null)`, whose zero would paint an unpriceable bill as a
+ * grey reminder (issue #1247). The magnitude never comes from the schedule: use
+ * the occurrence's `amount` for that, and `UnknownAmount` when it is null.
+ */
+export function occurrenceKind(
+  occurrence: { amount: number | null },
+  schedule: { amount: number | string; isTransfer?: boolean },
+): ScheduledKind {
+  return scheduledKind({
+    amount: occurrence.amount ?? Number(schedule.amount),
+    isTransfer: schedule.isTransfer,
+  });
+}
+
+/**
  * Chip styling for a calendar occurrence, so the Bills & Deposits calendar and
  * the Upcoming Bills report read the same way. Red is spending, green is money
  * arriving, blue is a transfer between the user's own accounts, and grey is a

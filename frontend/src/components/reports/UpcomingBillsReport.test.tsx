@@ -24,9 +24,47 @@ vi.mock('@/lib/utils', () => ({
 
 const mockGetAll = vi.fn();
 
+/**
+ * One occurrence per schedule, at its next due date, priced at its own amount.
+ *
+ * The report no longer expands a recurrence in the browser: the server sends
+ * occurrences, each already carrying the amount THAT occurrence would post
+ * (issue #1247). This default keeps the fixtures in the tests that are about
+ * something else -- badges, navigation, payees -- to a single schedule list, and
+ * a test that is about occurrences programs `mockGetOccurrences` itself.
+ */
+const occurrencesFrom = (schedules: any[]): any[] =>
+  schedules
+    .filter((s) => s.isActive !== false)
+    .map((s) => ({
+      scheduledTransactionId: s.id,
+      originalDate: s.nextDueDate,
+      dueDate: s.nextDueDate,
+      amount:
+        s.effectiveAmount !== undefined ? s.effectiveAmount : Number(s.amount),
+      amountComplete:
+        s.effectiveAmount !== undefined
+          ? s.effectiveAmount !== null
+          : true,
+      currencyCode: s.currencyCode ?? 'CAD',
+      overrideId: null,
+      moved: false,
+      accountId: s.accountId ?? 'acc-1',
+      transferAccountId: s.transferAccountId ?? null,
+      isTransfer: !!s.isTransfer,
+    }));
+
+const defaultOccurrences = async () =>
+  occurrencesFrom((await mockGetAll()) ?? []);
+
+const mockGetOccurrences = vi.fn<(params?: unknown) => Promise<any[]>>(
+  defaultOccurrences,
+);
+
 vi.mock('@/lib/scheduled-transactions', () => ({
   scheduledTransactionsApi: {
     getAll: (...args: any[]) => mockGetAll(...args),
+    getOccurrences: (...args: any[]) => mockGetOccurrences(...args),
   },
 }));
 
@@ -80,6 +118,10 @@ describe('UpcomingBillsReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockReset();
+    // `clearAllMocks` clears calls, not implementations: a `mockResolvedValue`
+    // from one test would otherwise answer every later one.
+    mockGetOccurrences.mockReset();
+    mockGetOccurrences.mockImplementation(defaultOccurrences);
     vi.useFakeTimers({ now, shouldAdvanceTime: true });
   });
 
@@ -438,56 +480,152 @@ describe('UpcomingBillsReport', () => {
     });
   });
 
-  describe('Frequency Types', () => {
-    const testFrequency = async (frequency: string, expectedCount: number) => {
-      mockGetAll.mockResolvedValue([
-        makeTransaction({ nextDueDate: '2026-02-15', frequency }),
+  /**
+   * Recurrence expansion is the server's answer now
+   * (`backend/src/common/scheduled-occurrences.spec.ts` proves the walk, the
+   * window and the override date move). What matters here is that the report
+   * draws exactly the occurrences it was given, and asks for the window it
+   * claims to project.
+   */
+  describe('server-expanded occurrences', () => {
+    it('asks for the three months it projects', async () => {
+      mockGetAll.mockResolvedValue([makeTransaction()]);
+      render(<UpcomingBillsReport />);
+      await waitFor(() => expect(mockGetOccurrences).toHaveBeenCalled());
+      // Fixed clock: 2026-02-14, so three months out is 2026-05-14.
+      expect(mockGetOccurrences).toHaveBeenCalledWith({ through: '2026-05-14' });
+    });
+
+    it('draws one row per occurrence the server sent', async () => {
+      const st = makeTransaction({ nextDueDate: '2026-02-15', frequency: 'MONTHLY' });
+      mockGetAll.mockResolvedValue([st]);
+      mockGetOccurrences.mockResolvedValue([
+        { ...occurrencesFrom([st])[0], dueDate: '2026-02-15', originalDate: '2026-02-15' },
+        { ...occurrencesFrom([st])[0], dueDate: '2026-03-15', originalDate: '2026-03-15' },
+        { ...occurrencesFrom([st])[0], dueDate: '2026-04-15', originalDate: '2026-04-15' },
       ]);
       render(<UpcomingBillsReport />);
       await waitFor(() => expect(screen.getByText('List')).toBeInTheDocument());
       fireEvent.click(screen.getByText('List'));
       await waitFor(() => {
-        // At least the expected count of Rent entries appears in list view
-        const rents = screen.getAllByText('Rent');
-        expect(rents.length).toBeGreaterThanOrEqual(expectedCount);
+        expect(screen.getAllByText('Rent')).toHaveLength(3);
       });
-    };
+    });
 
-    it('handles ONCE frequency (single occurrence)', async () => {
-      mockGetAll.mockResolvedValue([
-        makeTransaction({ nextDueDate: '2026-02-15', frequency: 'ONCE' }),
-      ]);
+    it('does not invent occurrences the server did not send', async () => {
+      const st = makeTransaction({ nextDueDate: '2026-02-15', frequency: 'DAILY' });
+      mockGetAll.mockResolvedValue([st]);
+      mockGetOccurrences.mockResolvedValue([occurrencesFrom([st])[0]]);
       render(<UpcomingBillsReport />);
       await waitFor(() => expect(screen.getByText('List')).toBeInTheDocument());
       fireEvent.click(screen.getByText('List'));
       await waitFor(() => {
-        const rents = screen.getAllByText('Rent');
-        expect(rents.length).toBe(1);
+        expect(screen.getAllByText('Rent')).toHaveLength(1);
       });
     });
 
-    it('handles DAILY frequency (multiple occurrences)', async () => {
-      await testFrequency('DAILY', 2);
+    /**
+     * The defect the audit of the first pass found: one schedule-level figure was
+     * applied to every projected occurrence, so an occurrence the user had
+     * re-priced was listed, totalled and exported at the template's amount.
+     */
+    it('prices each occurrence from its own override', async () => {
+      const st = makeTransaction({
+        nextDueDate: '2026-02-15',
+        frequency: 'MONTHLY',
+        amount: -1350,
+        effectiveAmount: -1350,
+      });
+      mockGetAll.mockResolvedValue([st]);
+      const base = occurrencesFrom([st])[0];
+      mockGetOccurrences.mockResolvedValue([
+        {
+          ...base,
+          dueDate: '2026-02-20',
+          originalDate: '2026-02-15',
+          amount: -675,
+          overrideId: 'ovr-1',
+          moved: true,
+        },
+        { ...base, dueDate: '2026-03-15', originalDate: '2026-03-15' },
+      ]);
+      render(<UpcomingBillsReport />);
+      await waitFor(() => expect(screen.getByText('List')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('List'));
+
+      // The list prints each occurrence's own amount; the schedule's 1350 belongs
+      // only to the March occurrence that has no override.
+      await waitFor(() => {
+        expect(screen.getAllByText('$675').length).toBeGreaterThan(0);
+      });
+      expect(screen.getByText('$1350')).toBeInTheDocument();
+      // The moved date, not the recurrence slot it replaced.
+      expect(screen.getByText('Feb 20, 2026')).toBeInTheDocument();
+      expect(screen.queryByText('Feb 15, 2026')).not.toBeInTheDocument();
+      // February's total is the overridden 675, not the template's 1350.
+      const thisMonthCard = screen.getByText('This Month').parentElement!;
+      expect(thisMonthCard).toHaveTextContent('$675');
+      expect(thisMonthCard).not.toHaveTextContent('$1350');
     });
 
-    it('handles WEEKLY frequency', async () => {
-      await testFrequency('WEEKLY', 2);
+    it('exports the overridden occurrence amount, not the schedule amount', async () => {
+      const st = makeTransaction({
+        nextDueDate: '2026-02-15',
+        frequency: 'MONTHLY',
+        amount: -1350,
+        effectiveAmount: -1350,
+      });
+      mockGetAll.mockResolvedValue([st]);
+      mockGetOccurrences.mockResolvedValue([
+        {
+          ...occurrencesFrom([st])[0],
+          dueDate: '2026-02-20',
+          originalDate: '2026-02-15',
+          amount: -675,
+          overrideId: 'ovr-1',
+          moved: true,
+        },
+      ]);
+      render(<UpcomingBillsReport />);
+      await waitFor(() => expect(screen.getByTestId('export-csv')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('export-csv'));
+
+      const rows = mockExportToCsv.mock.calls[0][2];
+      expect(rows[0][1]).toBe('2026-02-20');
+      expect(rows[0][2]).toBe(-675);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('export-pdf'));
+      });
+      const pdfRows = mockExportToPdf.mock.calls[0][0].tableData.rows;
+      expect(pdfRows[0][2]).toBe(-675);
     });
 
-    it('handles BIWEEKLY frequency', async () => {
-      await testFrequency('BIWEEKLY', 2);
-    });
+    it('marks an unresolvable overridden occurrence unavailable and withholds the total', async () => {
+      const st = makeTransaction({
+        nextDueDate: '2026-02-15',
+        frequency: 'MONTHLY',
+        amount: -1350,
+        effectiveAmount: -1350,
+        autoPost: false,
+      });
+      mockGetAll.mockResolvedValue([st]);
+      mockGetOccurrences.mockResolvedValue([
+        {
+          ...occurrencesFrom([st])[0],
+          amount: null,
+          amountComplete: false,
+          overrideId: 'ovr-1',
+        },
+      ]);
+      render(<UpcomingBillsReport />);
+      await waitFor(() => expect(screen.getByText('List')).toBeInTheDocument());
 
-    it('handles EVERY4WEEKS frequency', async () => {
-      await testFrequency('EVERY4WEEKS', 1);
-    });
-
-    it('handles QUARTERLY frequency', async () => {
-      await testFrequency('QUARTERLY', 1);
-    });
-
-    it('handles YEARLY frequency', async () => {
-      await testFrequency('YEARLY', 1);
+      // The card under "This Month" carries the marker, not a figure -- and
+      // certainly not the schedule's own 1350.
+      const thisMonthCard = screen.getByText('This Month').parentElement!;
+      expect(thisMonthCard.textContent).not.toMatch(/\$\s?[\d,]/);
+      expect(screen.queryByText('$1350')).not.toBeInTheDocument();
     });
   });
 

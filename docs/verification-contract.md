@@ -80,7 +80,7 @@ adds value but proves nothing on its own. `--` means not applicable.
 | INV-REPORT-001 report account scope | supporting | **required** | **required** | -- | -- | -- | -- | optional |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |
 | INV-OCCURRENCE-002 override price | required | -- | -- | -- | -- | -- | -- | required |
-| INV-OCCURRENCE-003 one effective amount | **required** | **required** | -- | -- | -- | -- | optional | optional |
+| INV-OCCURRENCE-003 one effective occurrence | **required** | **required** | -- | -- | -- | -- | optional | optional |
 | INV-CLAIM-001 single-use claim | supporting | -- | required | **required** | optional | optional | -- | required |
 | INV-AUTH-001 refresh rotation | supporting | -- | required | **required** | -- | -- | -- | optional |
 | INV-AUTH-002 login counter | supporting | -- | required | **required** | -- | -- | -- | -- |

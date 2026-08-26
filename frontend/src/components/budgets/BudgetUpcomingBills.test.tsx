@@ -328,6 +328,60 @@ describe('BudgetUpcomingBills', () => {
     expect(screen.queryByText('$80.00')).not.toBeInTheDocument();
   });
 
+  /**
+   * The occurrence's identity is its recurrence slot, but the date it falls on is
+   * the override's. Filtering, sorting and printing the slot announces a payment
+   * on a day the user has already changed (issue #1247).
+   */
+  it('shows the date an override moved the occurrence to', () => {
+    const bills = [
+      createBill({
+        id: 'st-1',
+        name: 'Moved Bill',
+        amount: -80,
+        nextDueDate: '2026-02-10',
+        nextOverride: { amount: -50, overrideDate: '2026-02-25' } as any,
+      }),
+    ];
+
+    render(
+      <BudgetUpcomingBills
+        scheduledTransactions={bills}
+        currentSpent={3000}
+        totalBudgeted={5200}
+        periodEnd="2026-02-28"
+        formatCurrency={mockFormat}
+      />,
+    );
+
+    expect(screen.getByText('2026-02-25')).toBeInTheDocument();
+    expect(screen.queryByText('2026-02-10')).not.toBeInTheDocument();
+  });
+
+  it('excludes a bill an override moved past the period end', () => {
+    const bills = [
+      createBill({
+        id: 'st-1',
+        name: 'Pushed Out',
+        amount: -80,
+        nextDueDate: '2026-02-20',
+        nextOverride: { amount: -50, overrideDate: '2026-03-20' } as any,
+      }),
+    ];
+
+    render(
+      <BudgetUpcomingBills
+        scheduledTransactions={bills}
+        currentSpent={3000}
+        totalBudgeted={5200}
+        periodEnd="2026-02-28"
+        formatCurrency={mockFormat}
+      />,
+    );
+
+    expect(screen.queryByText('Pushed Out')).not.toBeInTheDocument();
+  });
+
   it('calculates truly available using override amounts', () => {
     const bills = [
       createBill({

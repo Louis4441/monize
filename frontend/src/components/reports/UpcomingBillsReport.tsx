@@ -14,7 +14,6 @@ import {
   addMonths,
   subMonths,
   getDay,
-  isSameDay,
 } from 'date-fns';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
@@ -22,36 +21,35 @@ import { parseLocalDate } from '@/lib/utils';
 import {
   SCHEDULED_KIND_AMOUNT_CLASSES,
   SCHEDULED_KIND_CHIP_CLASSES,
-  scheduledKind,
+  occurrenceKind,
 } from '@/lib/scheduled-kind';
-import { advanceByFrequency, isOneTime } from '@/lib/frequency';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
-import {
-  scheduleEffectiveAmount,
-  sumEffectiveAmounts,
-} from '@/lib/scheduled-effective-amount';
+import { sumEffectiveAmounts } from '@/lib/scheduled-effective-amount';
+
+/** How far ahead the report projects, matching the three months it always has. */
+const HORIZON_MONTHS = 3;
 
 interface CalendarDay {
   date: Date;
   isCurrentMonth: boolean;
   isToday: boolean;
-  bills: ScheduledTransaction[];
+  bills: UpcomingBill[];
 }
 
 interface UpcomingBill {
   scheduledTransaction: ScheduledTransaction;
   dueDate: Date;
   /**
-   * What this occurrence would post today, from the server's effective-amount
-   * contract; `null` when it cannot be determined (issue #1247). Never the
-   * persisted `amount`, which for an FX-sensitive schedule was calculated at an
-   * older rate -- this report used to disagree with the cash-flow forecast about
-   * the same bill by the drift since.
+   * What THIS occurrence would post today, from the server's occurrence contract;
+   * `null` when it cannot be determined (issue #1247). Never the persisted
+   * `amount`, and never the schedule-level figure applied to every projected
+   * occurrence -- this report used to do the second, so an occurrence the user
+   * had re-priced was listed, totalled and exported at the template's amount.
    */
   amount: number | null;
   isOverdue: boolean;
@@ -64,9 +62,26 @@ export function UpcomingBillsReport() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewType, setViewType] = useState<'calendar' | 'list'>('calendar');
 
+  // The window is fixed for the life of the mount, so the request key is stable
+  // across re-renders (the month arrows move the calendar, not the horizon).
+  const [through] = useState(() =>
+    format(addMonths(new Date(), HORIZON_MONTHS), 'yyyy-MM-dd'),
+  );
+
+  // Schedules for their names, kinds and accounts; occurrences for the dates and
+  // the amounts. The browser cannot derive the second from the first: expanding
+  // the recurrence here gives dates with no per-occurrence amount, which is how
+  // one schedule-level figure came to be printed against every occurrence and
+  // exported (issue #1247).
   const { data: response, isLoading, error, reload } = useReportData(
-    () => scheduledTransactionsApi.getAll(),
-    [],
+    async () => {
+      const [schedules, occurrences] = await Promise.all([
+        scheduledTransactionsApi.getAll(),
+        scheduledTransactionsApi.getOccurrences({ through }),
+      ]);
+      return { schedules, occurrences };
+    },
+    [through],
   );
 
   // Every active schedule is reported, whatever its kind: a transfer between the
@@ -74,34 +89,31 @@ export function UpcomingBillsReport() {
   // leaving them out made them vanish from the calendar (issue #1124). Their
   // amounts are kept out of the money totals below -- see `summary`.
   const scheduledTransactions = useMemo(
-    () => (response ?? []).filter((st) => st.isActive),
+    () => (response?.schedules ?? []).filter((st) => st.isActive),
     [response],
   );
 
-  // Generate upcoming occurrences for each scheduled transaction
-  const getNextOccurrences = (st: ScheduledTransaction, monthsAhead: number = 3): Date[] => {
-    const occurrences: Date[] = [];
-    const startDate = new Date();
-    const endDate = addMonths(startDate, monthsAhead);
-    let nextDate = parseLocalDate(st.nextDueDate);
+  const upcomingBills = useMemo((): UpcomingBill[] => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const byId = new Map(scheduledTransactions.map((st) => [st.id, st]));
 
-    const maxOccurrences = 100;
-    let count = 0;
-
-    while (nextDate <= endDate && count < maxOccurrences) {
-      if (nextDate >= startDate || isSameDay(nextDate, startDate) || nextDate < startDate) {
-        // Include past due dates too
-        occurrences.push(new Date(nextDate));
-      }
-
-      // Calculate next occurrence based on frequency
-      if (isOneTime(st.frequency)) return occurrences;
-      nextDate = advanceByFrequency(nextDate, st.frequency);
-      count++;
-    }
-
-    return occurrences;
-  };
+    // The server orders by due date already; an occurrence whose schedule is not
+    // in the active list is skipped rather than drawn without its name.
+    return (response?.occurrences ?? []).flatMap((occurrence) => {
+      const scheduledTransaction = byId.get(occurrence.scheduledTransactionId);
+      if (!scheduledTransaction) return [];
+      const dueDate = parseLocalDate(occurrence.dueDate);
+      return [
+        {
+          scheduledTransaction,
+          dueDate,
+          amount: occurrence.amount,
+          isOverdue: dueDate < today,
+        },
+      ];
+    });
+  }, [response, scheduledTransactions]);
 
   const calendarDays = useMemo((): CalendarDay[] => {
     const monthStart = startOfMonth(currentMonth);
@@ -118,17 +130,12 @@ export function UpcomingBillsReport() {
 
     const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
-    // Build a map of bills by date
-    const billsByDate = new Map<string, ScheduledTransaction[]>();
-
-    scheduledTransactions.forEach((st) => {
-      const occurrences = getNextOccurrences(st, 3);
-      occurrences.forEach((date) => {
-        const key = format(date, 'yyyy-MM-dd');
-        const existing = billsByDate.get(key) || [];
-        existing.push(st);
-        billsByDate.set(key, existing);
-      });
+    // Build a map of occurrences by date, so the calendar and the list are the
+    // same set of occurrences rather than two expansions that can disagree.
+    const billsByDate = new Map<string, UpcomingBill[]>();
+    upcomingBills.forEach((bill) => {
+      const key = format(bill.dueDate, 'yyyy-MM-dd');
+      billsByDate.set(key, [...(billsByDate.get(key) ?? []), bill]);
     });
 
     return days.map((date) => ({
@@ -137,31 +144,7 @@ export function UpcomingBillsReport() {
       isToday: isToday(date),
       bills: billsByDate.get(format(date, 'yyyy-MM-dd')) || [],
     }));
-  }, [currentMonth, scheduledTransactions]);
-
-  const upcomingBills = useMemo((): UpcomingBill[] => {
-    const bills: UpcomingBill[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    scheduledTransactions.forEach((st) => {
-      const occurrences = getNextOccurrences(st, 3);
-      // Every projected occurrence of one schedule carries the base effective
-      // amount: this report projects the recurrence forward, and per-occurrence
-      // overrides beyond the next one are not in this payload.
-      const effective = scheduleEffectiveAmount(st).amount;
-      occurrences.forEach((dueDate) => {
-        bills.push({
-          scheduledTransaction: st,
-          dueDate,
-          amount: effective,
-          isOverdue: dueDate < today,
-        });
-      });
-    });
-
-    return bills.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-  }, [scheduledTransactions]);
+  }, [currentMonth, upcomingBills]);
 
   const summary = useMemo(() => {
     const today = new Date();
@@ -412,21 +395,22 @@ export function UpcomingBillsReport() {
                 </div>
                 <div className="space-y-0.5">
                   {day.bills.slice(0, 3).map((bill, billIndex) => {
+                    const st = bill.scheduledTransaction;
                     return (
                       <div
                         key={billIndex}
-                        onClick={() => handleBillClick(bill)}
+                        onClick={() => handleBillClick(st)}
                         className={`px-1 py-0.5 text-xs rounded truncate cursor-pointer flex items-center gap-0.5 ${
-                          SCHEDULED_KIND_CHIP_CLASSES[scheduledKind(bill)]
+                          SCHEDULED_KIND_CHIP_CLASSES[occurrenceKind(bill, st)]
                         } hover:opacity-80`}
-                        title={bill.autoPost ? t('upcomingBills.calendarAutoTitle', { name: bill.name }) : t('upcomingBills.calendarManualTitle', { name: bill.name })}
+                        title={st.autoPost ? t('upcomingBills.calendarAutoTitle', { name: st.name }) : t('upcomingBills.calendarManualTitle', { name: st.name })}
                       >
-                        {!bill.autoPost && (
+                        {!st.autoPost && (
                           <svg className="h-3 w-3 flex-shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01" />
                           </svg>
                         )}
-                        <span className="truncate">{bill.name}</span>
+                        <span className="truncate">{st.name}</span>
                       </div>
                     );
                   })}
@@ -482,7 +466,9 @@ export function UpcomingBillsReport() {
                 </div>
                 <div className="text-right">
                   <div className={`font-medium ${
-                    SCHEDULED_KIND_AMOUNT_CLASSES[scheduledKind(bill.scheduledTransaction)]
+                    SCHEDULED_KIND_AMOUNT_CLASSES[
+                      occurrenceKind(bill, bill.scheduledTransaction)
+                    ]
                   }`}>
                     {bill.amount === null ? (
                       <UnknownAmount />

@@ -12,13 +12,16 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import {
   SCHEDULED_KIND_AMOUNT_CLASSES,
-  scheduledKind,
+  occurrenceKind,
   type ScheduledKind,
 } from '@/lib/scheduled-kind';
 import { sumConverted } from '@/lib/currency-total';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
-import { nextOccurrenceEffectiveAmount } from '@/lib/scheduled-effective-amount';
+import {
+  nextOccurrenceDueDate,
+  nextOccurrenceEffectiveAmount,
+} from '@/lib/scheduled-effective-amount';
 import { WidgetHeading } from './widget-meta';
 import { CARD_CLASS } from '@/components/ui/Card';
 
@@ -43,13 +46,15 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   const upcomingItems = useMemo(() => scheduledTransactions
     .filter((st) => {
       if (!st.isActive) return false;
-      const dueDate = parseLocalDate(st.nextDueDate);
+      const dueDate = parseLocalDate(nextOccurrenceDueDate(st));
       const daysUntil = differenceInDays(dueDate, today);
       // Include overdue items (daysUntil < 0) and items within their reminder window
       return daysUntil < 0 || (daysUntil >= 0 && daysUntil <= (st.reminderDaysBefore ?? 3));
     })
     .sort((a, b) => {
-      const dateDiff = parseLocalDate(a.nextDueDate).getTime() - parseLocalDate(b.nextDueDate).getTime();
+      const dateDiff =
+        parseLocalDate(nextOccurrenceDueDate(a)).getTime() -
+        parseLocalDate(nextOccurrenceDueDate(b)).getTime();
       if (dateDiff !== 0) return dateDiff;
       // On the same day, show manual items first so they're visible before truncation
       if (!a.autoPost && b.autoPost) return -1;
@@ -144,13 +149,8 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   const getEffective = (item: ScheduledTransaction) =>
     nextOccurrenceEffectiveAmount(item);
 
-  // The kind is a question about direction, and an FX rate is positive, so the
-  // stored sign classifies the row correctly even when the magnitude is unknown.
   const getItemType = (item: ScheduledTransaction): ScheduledKind =>
-    scheduledKind({
-      amount: getEffective(item).amount ?? Number(item.amount),
-      isTransfer: item.isTransfer,
-    });
+    occurrenceKind(getEffective(item), item);
 
   const getTypeBadge = (type: ScheduledKind) => {
     switch (type) {
@@ -269,7 +269,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
               }}
               title={t('upcomingBills.postTransaction')}
               className={`flex items-center justify-between p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors hover:border-blue-400 hover:bg-gray-50 dark:hover:border-blue-500 dark:hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isOverdue(item.nextDueDate)
+                isOverdue(nextOccurrenceDueDate(item))
                   ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
                   : 'border-gray-200 dark:border-gray-700'
               }`}
@@ -277,10 +277,10 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <span
                   className={`px-2 py-1 text-xs font-medium rounded ${getDueDateColour(
-                    item.nextDueDate
+                    nextOccurrenceDueDate(item)
                   )}`}
                 >
-                  {getDueDateLabel(item.nextDueDate)}
+                  {getDueDateLabel(nextOccurrenceDueDate(item))}
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">

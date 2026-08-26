@@ -13,7 +13,10 @@ import { Modal } from '@/components/ui/Modal';
 import { createLogger } from '@/lib/logger';
 import type { RecurringChargeInfo, Transaction } from '@/types/transaction';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
-import { nextOccurrenceEffectiveAmount } from '@/lib/scheduled-effective-amount';
+import {
+  nextOccurrenceDueDate,
+  nextOccurrenceEffectiveAmount,
+} from '@/lib/scheduled-effective-amount';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 
 // The scheduled-transaction form is heavy and only needed once the user opens
@@ -152,7 +155,11 @@ export function RecurringChargesPanel({ accountId, currencyCode }: RecurringChar
     () =>
       scheduled
         .filter((s) => s.accountId === accountId && s.isActive)
-        .sort((a, b) => a.nextDueDate.localeCompare(b.nextDueDate)),
+        // Ordered by the date each occurrence actually falls on: an override can
+        // move the next one off its recurrence slot (issue #1247).
+        .sort((a, b) =>
+          nextOccurrenceDueDate(a).localeCompare(nextOccurrenceDueDate(b)),
+        ),
     [scheduled, accountId],
   );
 

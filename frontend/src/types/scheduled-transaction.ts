@@ -317,3 +317,32 @@ export interface PostScheduledTransactionData {
   investmentPrice?: number;
   investmentTotalAmount?: number;
 }
+
+/**
+ * One occurrence of one schedule, as the server sends it
+ * (`GET /scheduled-transactions/occurrences`, issue #1247).
+ *
+ * `amount` is already the effective amount for THIS occurrence -- the override's
+ * when one governs it, the schedule's otherwise -- so there is no base-versus-
+ * override choice left to make on the client, and no persisted snapshot in the
+ * payload to reach for. `null` (with `amountComplete` false) means the current
+ * amount cannot be determined: render `UnknownAmount` and withhold any total
+ * containing it.
+ *
+ * `originalDate` is the recurrence slot (the occurrence's identity, and what an
+ * override edit addresses); `dueDate` is when it actually falls.
+ */
+export interface ScheduledOccurrence {
+  scheduledTransactionId: string;
+  originalDate: string;
+  dueDate: string;
+  amount: number | null;
+  amountComplete: boolean;
+  currencyCode: string;
+  overrideId: string | null;
+  /** True when an override moved this occurrence off its recurrence slot. */
+  moved: boolean;
+  accountId: string;
+  transferAccountId: string | null;
+  isTransfer: boolean;
+}

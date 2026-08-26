@@ -73,6 +73,77 @@ const MIGRATED_SURFACES = [
   '/src/app/bills/page.tsx',
 ];
 
+/**
+ * Files allowed to expand a recurrence in the browser, each with the reason it
+ * cannot ask the server instead.
+ *
+ * Expansion belongs on the server (`GET /scheduled-transactions/occurrences`):
+ * a client can derive dates but never per-occurrence amounts, which is how the
+ * Upcoming Bills report came to print, total and export ONE schedule-level
+ * figure against every occurrence it drew (issue #1247).
+ */
+const CLIENT_EXPANDERS = new Map([
+  [
+    '/src/lib/frequency.ts',
+    'defines advanceByFrequency; steps a single date and knows nothing of occurrences',
+  ],
+  [
+    '/src/components/scheduled-transactions/OccurrenceDatePicker.tsx',
+    'offers the next N dates to attach an override to -- dates only, no amounts',
+  ],
+  [
+    '/src/lib/forecast.ts',
+    'the cash-flow forecast, which already resolves each occurrence against futureOverrides and the effective-amount contract; it is the surface the others were wrong against',
+  ],
+  [
+    '/src/app/bills/page.tsx',
+    'the bills calendar, which draws names on dates and prints no amount per occurrence',
+  ],
+]);
+
+describe('scheduled occurrence expansion guard', () => {
+  it('expands a recurrence only where a client has to', () => {
+    const offenders: string[] = [];
+
+    for (const [path, contents] of productionSources()) {
+      if (CLIENT_EXPANDERS.has(path)) continue;
+      const lines = contents.split('\n');
+      lines.forEach((line, index) => {
+        if (isComment(line)) return;
+        if (!/advanceByFrequency\s*\(/.test(line)) return;
+        const opensLoop = lines
+          .slice(Math.max(0, index - 12), index)
+          .some((prior) => /\b(while|for)\s*\(/.test(prior));
+        if (opensLoop) offenders.push(`${path}:${index + 1}`);
+      });
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('every exemption still exists, so the list cannot go stale', () => {
+    const paths = new Map(productionSources());
+    for (const path of CLIENT_EXPANDERS.keys()) {
+      expect(paths.has(path)).toBe(true);
+    }
+  });
+
+  /**
+   * Import presence is not proof: the report imported the effective-amount helper
+   * throughout the period it was applying one amount to every occurrence. What
+   * makes it correct is that its dates AND amounts come from the same server
+   * payload, so this asserts the call and the absence of a local expansion.
+   */
+  it('the Upcoming Bills report reads occurrences from the server', () => {
+    const report = new Map(productionSources()).get(
+      '/src/components/reports/UpcomingBillsReport.tsx',
+    );
+    expect(report).toBeDefined();
+    expect(report).toContain('getOccurrences');
+    expect(report).not.toContain('advanceByFrequency');
+  });
+});
+
 describe('scheduled effective amount guard', () => {
   it('has files to scan', () => {
     // A scan whose subject list is empty passes for the wrong reason.

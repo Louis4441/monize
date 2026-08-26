@@ -3,10 +3,14 @@
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { gainLossColor } from '@/lib/format';
-import { SCHEDULED_KIND_AMOUNT_CLASSES, scheduledKind } from '@/lib/scheduled-kind';
+import {
+  SCHEDULED_KIND_AMOUNT_CLASSES,
+  occurrenceKind,
+} from '@/lib/scheduled-kind';
 import { differenceInDays, startOfDay, parseISO } from 'date-fns';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
 import {
+  nextOccurrenceDueDate,
   nextOccurrenceEffectiveAmount,
   sumEffectiveAmounts,
 } from '@/lib/scheduled-effective-amount';
@@ -48,21 +52,17 @@ export function BudgetUpcomingBills({
         // contributes 0 to the total below -- the placeholder is not a claim
         // about what the payment will cost. Deposits and transfers are not
         // budgeted spending and stay out.
-        // The kind is a question about direction, and an FX rate is positive, so
-        // the stored sign classifies correctly even when the magnitude is unknown.
-        const kind = scheduledKind({
-          amount: getEffective(st).amount ?? Number(st.amount),
-          isTransfer: st.isTransfer,
-        });
+        const kind = occurrenceKind(getEffective(st), st);
         if (kind !== 'bill' && kind !== 'reminder') return false;
-        const dueDate = parseISO(st.nextDueDate);
+        const dueDate = parseISO(nextOccurrenceDueDate(st));
         const daysUntil = differenceInDays(dueDate, today);
         const daysUntilEnd = differenceInDays(endDate, dueDate);
         return daysUntil >= 0 && daysUntilEnd >= 0;
       })
       .sort(
         (a, b) =>
-          parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime(),
+          parseISO(nextOccurrenceDueDate(a)).getTime() -
+          parseISO(nextOccurrenceDueDate(b)).getTime(),
       );
   }, [scheduledTransactions, today, endDate]);
 
@@ -102,16 +102,13 @@ export function BudgetUpcomingBills({
                   {bill.name}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                  {bill.nextDueDate}
+                  {nextOccurrenceDueDate(bill)}
                 </span>
               </div>
               <span
                 className={`font-medium ml-2 whitespace-nowrap ${
                   SCHEDULED_KIND_AMOUNT_CLASSES[
-                    scheduledKind({
-                      amount: getEffective(bill).amount ?? Number(bill.amount),
-                      isTransfer: bill.isTransfer,
-                    })
+                    occurrenceKind(getEffective(bill), bill)
                   ]
                 }`}
               >

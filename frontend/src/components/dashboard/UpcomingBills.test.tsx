@@ -320,6 +320,44 @@ describe('UpcomingBills', () => {
     expect(screen.getByText('Deposit')).toBeInTheDocument();
   });
 
+  /**
+   * `nextDueDate` is the recurrence slot; an override addressed to that slot can
+   * move the occurrence. Reading the slot announces a payment on a day the user
+   * has already changed (issue #1247).
+   */
+  it('shows the date an override moved the next occurrence to', () => {
+    const slot = futureDateStr(1);
+    const movedTo = futureDateStr(4);
+    const transactions = [
+      {
+        id: '1', name: 'Moved Bill', amount: -100, currencyCode: 'CAD',
+        nextDueDate: slot, isActive: true, autoPost: true,
+        reminderDaysBefore: 7,
+        nextOverride: { amount: -75, overrideDate: movedTo },
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.getByText('4 days')).toBeInTheDocument();
+    expect(screen.queryByText('Tomorrow')).not.toBeInTheDocument();
+  });
+
+  it('drops an occurrence an override moved beyond the reminder window', () => {
+    const transactions = [
+      {
+        id: '1', name: 'Pushed Out', amount: -100, currencyCode: 'CAD',
+        nextDueDate: futureDateStr(1), isActive: true, autoPost: true,
+        reminderDaysBefore: 3,
+        nextOverride: { amount: -75, overrideDate: futureDateStr(40) },
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.queryByText('Pushed Out')).not.toBeInTheDocument();
+  });
+
   it('uses default amount when nextOverride is null', () => {
     const dateStr = futureDateStr(1);
     const transactions = [
