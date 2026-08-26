@@ -105,9 +105,10 @@ Any use of "atomic", "single-use", "exactly once", "retryable", "cannot", "alway
 CI runs in UTC with one Playwright worker; a local run does neither, and both differences produce failures that look like regressions and are not.
 
 - **`TZ=UTC npm run test:unit`** matches CI. A few tests count periods against `new Date()` and land on the wrong side of a boundary under other offsets (`backend/src/ai/insights/insights-aggregator.service.spec.ts`, `backend/src/net-worth/net-worth.service.spec.ts`).
+- **The backend's database-backed suites never run in parallel with anything, including each other.** `backend/test/integration/*` rebuilds the schema of one shared `monize_test` (`synchronize` + `dropSchema`), so a second Jest worker pulls the tables out from under a running suite. The parallel config (`backend/package.json`) is pinned to `roots: ["<rootDir>/src"]`, `test/jest-e2e.json` pins `maxWorkers: 1`, and `npm test` runs `test:unit` then `test:integration` -- so the default command covers both and needs a reachable PostgreSQL; `npm run test:unit` is the offline path, and a filtered run goes through one of those two, since `npm test` itself takes no arguments. `backend/src/common/jest-config.guard.spec.ts` fails if a spec under `test/` becomes reachable from the parallel config again. Serialization stays until each worker owns its own database or schema -- nothing short of that makes `dropSchema` suites safe to run beside each other.
 - **`--workers=1` for the whole E2E suite.** `playwright.config.ts` sets one worker only when `CI` is set, and `e2e/tests/zz-danger-zone.spec.ts` deletes the shared account -- its `zz-` ordering only means anything serially. A single spec file is safe without the flag.
 - **A test that reads the wall clock is a test about today's date** -- `TZ=UTC` pins the offset, not the day (auto-backup promotes artifacts on specific days of the month, so ten assertions failed on `main` with nothing changed). Pin the clock in the spec and derive the pinned value from the constants the behaviour branches on (`WEEKLY_DAYS`, `MONTHLY_DAY` are exported for this). `backend/src/backup/auto-backup.service.spec.ts` is the pattern: fake `Date` only (faking `nextTick`/`queueMicrotask` under real `fs.promises` deadlocks), install fake timers once, move the date through a single `withClockAt` helper, and let a source scan fail a second installation.
-- **A guard that walks the tree with `gitListFiles` cannot see an untracked file.** `doc-paths.spec.ts` and `source-comment-paths.spec.ts` list their subjects with `git ls-files` (`backend/src/common/repo-tree.util.ts`), so a brand-new file is invisible to them until staged. Green before `git add` and red in CI on the same content is not a flake -- run those guards after staging (`git add -N` is enough).
+- **A guard that walks the tree with `gitListFiles` cannot see an untracked file.** `doc-paths.spec.ts`, `source-comment-paths.spec.ts` and `jest-config.guard.spec.ts` list their subjects with `git ls-files` (`backend/src/common/repo-tree.util.ts`), so a brand-new file is invisible to them until staged. Green before `git add` and red in CI on the same content is not a flake -- run those guards after staging (`git add -N` is enough).
 - `scripts/verify-schema.sh` reproduces the "Schema vs Migrations Drift" job locally (needs only Docker). Every migration must replay as a no-op on top of `schema.sql` (`CREATE ... IF NOT EXISTS`, `DROP ... IF EXISTS` before `CREATE POLICY`/`TRIGGER`) because that is how the app boots; a migration missing its guard also aborts container start-up, and the E2E and Lighthouse jobs then report only "backend exited (1)".
 
 ### Code Intelligence
@@ -326,6 +327,58 @@ The full rules -- cost basis and tax truth table, cash, valuation, materialized-
 A refund, return, chargeback or cashback filed against an expense category is a debit that came back, so it belongs in that category's total. Every surface that reached for the gross (`WHERE amount < 0` + `SUM(ABS(...))`, `if (amount >= 0) return`, `summary.totalExpenses` alone) disagreed with the register's own balance for the same filter (issue #1125). Sum the signed amount over rows of **both** signs, per category, and decide what the row *is* from the net: `isNetSpending` and `NET_SPEND_AMOUNT` (`backend/src/built-in-reports/spending-reports.service.ts`) on the server; `netEntityTotal` (`frontend/src/components/transactions/widget-shared.ts`) for a summary scoped to one category. Never take `totalIncome` or `totalExpenses` alone as a category's headline -- those are a register's in/out split.
 
 Dropping the sign filter means income now reaches the aggregate and has to leave by a different door: a bucket whose net is not spending is not a row in a spending report -- one predicate, not a per-call-site `> 0`. Netting is **within** one category, never across two; both halves come from the same filtered aggregate. (The payee surfaces are deliberately unchanged: `PayeeInfoWidget` prints received credits as their own line beside the spend, so netting them into the headline would count them twice.)
+
+### An INVESTMENT account is a pair, so account type is never the report's filter
+
+`INVESTMENT` is the `account_type` of *both* halves of a linked pair -- the
+`INVESTMENT_CASH` sleeve holding ordinary money and the `INVESTMENT_BROKERAGE`
+sleeve holding securities -- so `AND a.account_type != 'INVESTMENT'` deleted a
+real ledger from fifteen report queries: salary paid into a brokerage's cash
+side vanished from Cash Flow, Income by Source, spending, tax and the
+Uncategorized list (issue #1257). It never described the rows it was meant to
+remove either: the cash leg a BUY/SELL/DIVIDEND posts lives in that same cash
+account, carries no category and no transfer flag -- and when the action names an
+explicit `fundingAccountId`, that leg lands in an *ordinary* account where no
+account-type predicate could ever see it, reporting an investment purchase as
+spending nobody did.
+
+What a row *is* decides it, and the predicate is written once in
+`backend/src/common/investment-filter.util.ts` -- `investmentExclusionSql` for
+raw SQL, `applyInvestmentTransactionFilters` for a QueryBuilder, both built from
+the same fragments so the two dialects cannot drift. Use those; never spell an
+account-type or sub-type exclusion by hand.
+An investment line embedded in a split is the case a transaction-level linkage
+check alone gets wrong (its `transaction_id` is null; the split carries the cash),
+so it is excluded by both of its representations -- the split's `kind` and an
+`investment_transactions` row pointing at the split -- and **at split-row
+granularity**: excluding the parent would take the ordinary sibling line with it.
+
+**A report that reads only the parent row cannot exclude a line, so it excludes
+an amount.** `t.amount` on a split parent is the sum of every child, so Spending
+by Payee, Recurring Expenses, Bill Payment History and the Uncategorized list all
+reported a `-560` parent made of `-60` groceries and a `-500` embedded BUY as
+`560` of spending. They derive their figure through
+`reportableTransactionAmountSql` -- the children that are neither transfer nor
+investment, `NULL` when the row represents no ordinary cash at all. Duplicate
+Transactions is the one exception and says so in its SQL (`PARENT-IDENTITY
+REPORT`): its subject is the stored row, not its cash meaning. The guard checks
+the *representation*, not the presence of a token, because a parent-only query
+that reached for the no-splits variant is exactly the defect.
+`backend/src/common/investment-filter.guard.spec.ts` fails on either shape and
+on a built-in-report ledger query that carries no exclusion, and
+`backend/test/integration/report-investment-cash.integration.spec.ts` holds the
+behaviour against a real database. That guard's transfer-only exemption is
+positive proof, never the presence of the token -- the monthly breakdown reads
+ordinary rows *and* categorized transfer outflows, so a substring match exempted
+a split-joining query from the whole scan. The custom report engine
+(`backend/src/reports/`) aggregates hydrated entities in TypeScript, so it uses
+the same rule's other dialect -- `ordinarySplitLines` and
+`reportableTransactionAmount`, which live beside the SQL -- and its own scans
+check the loop rather than a query string. The two dialects differ by exactly one
+clause on purpose: the SQL drops transfer children, while a custom report keeps
+its own `includeTransfers` decision. The same rule governs what "Uncategorized"
+means: an auto-generated trade leg is not a row the user forgot to file, and a
+bulk update filtered to uncategorized must not reach it.
 
 ## Environment
 
