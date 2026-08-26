@@ -1,11 +1,17 @@
+import { Logger } from "@nestjs/common";
 import { YahooFinanceService, YahooQuoteResult } from "./yahoo-finance.service";
+import { OPEN_WINDOW_MS } from "../provider-health/provider-circuit";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 
 describe("YahooFinanceService", () => {
   let service: YahooFinanceService;
+  let health: ProviderHealthService;
   let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
-    service = new YahooFinanceService();
+    health = createTestProviderHealth();
+    service = new YahooFinanceService(health);
     originalFetch = global.fetch;
   });
 
@@ -2211,6 +2217,133 @@ describe("YahooFinanceService", () => {
     it("tolerates a response with no news key", async () => {
       mockFetchResponse({ quotes: [] });
       expect(await service.fetchNews("AAPL")).toEqual([]);
+    });
+  });
+  describe("provider availability (issue #1265)", () => {
+    /** The error undici raises when the container cannot resolve the host. */
+    const dnsFailure = () => {
+      const error = new TypeError("fetch failed");
+      Object.assign(error, {
+        cause: Object.assign(
+          new Error("getaddrinfo EAI_AGAIN query1.finance.yahoo.com"),
+          {
+            code: "EAI_AGAIN",
+            syscall: "getaddrinfo",
+            hostname: "query1.finance.yahoo.com",
+          },
+        ),
+      });
+      return error;
+    };
+
+    it("stops calling an unreachable provider instead of retrying forever", async () => {
+      // The bug: every chart render, every index chunk and every quote kept
+      // calling out, so the log filled and the event loop carried hundreds of
+      // doomed sockets. Five failures is enough evidence.
+      mockFetchError(dnsFailure());
+      const fetchMock = global.fetch as jest.Mock;
+
+      for (let i = 0; i < 5; i++) {
+        expect(await service.fetchHistorical("^RUT", null, "1y")).toBeNull();
+      }
+      const callsWhenOpened = fetchMock.mock.calls.length;
+
+      for (let i = 0; i < 50; i++) {
+        expect(await service.fetchHistorical("^RUT", null, "1y")).toBeNull();
+      }
+      expect(fetchMock.mock.calls.length).toBe(callsWhenOpened);
+    });
+
+    it("refuses quotes, lookups and intraday from the same breaker", async () => {
+      mockFetchError(dnsFailure());
+      const fetchMock = global.fetch as jest.Mock;
+      for (let i = 0; i < 5; i++) {
+        await service.fetchQuote("AAPL");
+      }
+      const callsWhenOpened = fetchMock.mock.calls.length;
+
+      expect(await service.fetchQuote("MSFT")).toBeNull();
+      expect(await service.lookupSecurityMany("micro")).toEqual([]);
+      expect(
+        await service.fetchIntradaySeries("MSFT", null, {
+          interval: "5m",
+          range: "1d",
+        }),
+      ).toBeNull();
+      expect(fetchMock.mock.calls.length).toBe(callsWhenOpened);
+    });
+
+    it("logs what actually failed, not `TypeError: fetch failed`", async () => {
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      try {
+        mockFetchError(dnsFailure());
+        await service.fetchHistorical("^RUT", null, "1y");
+
+        const lines = warn.mock.calls.map((call) => String(call[0]));
+        const line = lines.find((text) => text.includes("^RUT"));
+        expect(line).toBeDefined();
+        expect(line).toContain("EAI_AGAIN");
+        expect(line).toContain("hostname=query1.finance.yahoo.com");
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("logs one line for a flood of identical failures", async () => {
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      try {
+        mockFetchError(dnsFailure());
+        for (let i = 0; i < 40; i++) {
+          await service.fetchHistorical(`SYM${i}`, null, "1y");
+        }
+        const symbolLines = warn.mock.calls
+          .map((call) => String(call[0]))
+          .filter((text) => text.includes("historical prices for"));
+        expect(symbolLines).toHaveLength(1);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("resumes once the provider answers again", async () => {
+      let clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+
+      mockFetchError(dnsFailure());
+      for (let i = 0; i < 5; i++) {
+        await timedService.fetchHistorical("^RUT", null, "1y");
+      }
+      const fetchMock = global.fetch as jest.Mock;
+      const callsWhenOpened = fetchMock.mock.calls.length;
+
+      // Inside the window: nothing leaves the process.
+      await timedService.fetchHistorical("^RUT", null, "1y");
+      expect(fetchMock.mock.calls.length).toBe(callsWhenOpened);
+
+      // Window elapsed: one probe, and a good answer re-opens the gates.
+      clock += OPEN_WINDOW_MS + 1;
+      mockFetchResponse({
+        chart: {
+          result: [
+            {
+              meta: {
+                currency: "USD",
+                exchangeTimezoneName: "America/New_York",
+              },
+              timestamp: [1700000000],
+              indicators: {
+                quote: [
+                  { close: [10], open: [9], high: [11], low: [8], volume: [1] },
+                ],
+              },
+            },
+          ],
+        },
+      });
+      const recovered = await timedService.fetchHistorical("^RUT", null, "1y");
+      expect(recovered).not.toBeNull();
+      expect(await timedService.fetchQuote("AAPL")).not.toBeNull();
     });
   });
 });

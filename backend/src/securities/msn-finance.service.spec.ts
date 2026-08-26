@@ -1,6 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { MsnFinanceService, msnInternals } from "./msn-finance.service";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 
 describe("MsnFinanceService", () => {
   let service: MsnFinanceService;
@@ -19,6 +21,12 @@ describe("MsnFinanceService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MsnFinanceService,
+        {
+          // The real breaker, so a test that drives this client to failure sees
+          // the same refusals production does.
+          provide: ProviderHealthService,
+          useValue: createTestProviderHealth(),
+        },
         {
           provide: ConfigService,
           useValue: {
@@ -898,6 +906,10 @@ describe("MsnFinanceService", () => {
         providers: [
           MsnFinanceService,
           {
+            provide: ProviderHealthService,
+            useValue: createTestProviderHealth(),
+          },
+          {
             provide: ConfigService,
             useValue: { get: () => "   " },
           },
@@ -909,7 +921,13 @@ describe("MsnFinanceService", () => {
 
     it("returns false when ConfigService not provided", async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [MsnFinanceService],
+        providers: [
+          MsnFinanceService,
+          {
+            provide: ProviderHealthService,
+            useValue: createTestProviderHealth(),
+          },
+        ],
       }).compile();
       const svc = module.get(MsnFinanceService);
       expect(svc.isApiKeyConfigured()).toBe(false);
@@ -921,6 +939,10 @@ describe("MsnFinanceService", () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           MsnFinanceService,
+          {
+            provide: ProviderHealthService,
+            useValue: createTestProviderHealth(),
+          },
           {
             provide: ConfigService,
             useValue: { get: () => undefined },

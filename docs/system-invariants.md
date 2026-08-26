@@ -81,6 +81,7 @@ implied.
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
+| INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
@@ -987,6 +988,54 @@ two replicas from producing the same effect.
 
 ## Platform
 
+### INV-PROVIDER-001 -- an unreachable provider stops being called, and is reported once
+
+```text
+Statement           A provider that stops answering stops being called: after
+                    five consecutive transport failures no request leaves the
+                    process until a single timed probe is admitted. One outage
+                    episode produces at most one alert email and one all-clear,
+                    across replicas and across restarts.
+Source of truth     The per-process ProviderCircuit decides whether to call out;
+                    provider_health decides what has been said about it.
+Enforcement         Not calling: ProviderCircuit's threshold plus an exclusive
+                    half-open probe slot (bounded by PROBE_TIMEOUT_MS so a caller
+                    that never reports cannot hold it for the life of the
+                    process); assertAvailable runs before the concurrency gate,
+                    so a refusal costs no socket. Reporting once: a single
+                    conditional UPDATE on provider_health claims the notice
+                    (state = 'down' AND outage_notified_at IS NULL AND
+                    outage_started_at <= now() - 15min AND (last_notified_at IS
+                    NULL OR last_notified_at <= now() - 6h) RETURNING), so the
+                    claim is the serialization point rather than a read followed
+                    by a write. The upsert preserves outage_started_at while the
+                    stored state is 'down', which is what makes the 15-minute
+                    gate survive the restart loop an outage provokes. Log volume:
+                    ProviderHealthService.logFailure is rate-limited per provider
+                    and silent for a refused call.
+Concurrency scope   provider key (breaker: per process; notification: global)
+Retry semantics     Refusals and successes are idempotent. A recovery clears the
+                    episode marker, and last_notified_at is never cleared, so a
+                    flapping provider cannot mail a pair per flap.
+Crash semantics     The alert is at most once: the claim commits before SMTP is
+                    called, so a process killed in between loses that notice --
+                    deliberate for a monitoring email (the duplicate is the
+                    failure mode being designed against), and the provider
+                    becomes notifiable again once the 6-hour floor elapses. The
+                    breaker's own state is process-local by design and resets on
+                    restart; the durable episode start is what stops that reset
+                    from re-arming the alert.
+Failure response    ProviderUnavailableError to the caller, which every provider
+                    client turns into its usual null/empty result -- an outage
+                    leaves data unpriced, never a failed user request.
+Required tests      Present: provider-circuit.spec.ts, provider-health.service
+                    .spec.ts, provider-outage-alert.service.spec.ts,
+                    provider-call.guard.spec.ts, and the end-to-end pair in
+                    yahoo-finance.service.spec.ts. Owed: a two-instance test that
+                    two live replicas send one email, which a mocked claim cannot
+                    prove.
+Status              enforced
+```
 ### INV-RLS-001 -- enforced mode refuses a privileged role
 
 ```text

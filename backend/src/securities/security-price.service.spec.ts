@@ -10,6 +10,7 @@ import {
 } from "./dto/price-history-query.dto";
 import { Security } from "./entities/security.entity";
 import { YahooFinanceService } from "./yahoo-finance.service";
+import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
@@ -364,7 +365,7 @@ describe("SecurityPriceService", () => {
       },
     );
 
-    yahoo = new YahooFinanceService();
+    yahoo = new YahooFinanceService(createTestProviderHealth());
     const providers = new QuoteProviderRegistry(
       yahoo,
       msnFinanceService as never,

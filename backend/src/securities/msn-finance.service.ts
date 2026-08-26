@@ -13,6 +13,11 @@ import {
   EtfSectorWeighting,
 } from "./providers/quote-provider.interface";
 import { getTradingDateFromQuote } from "./providers/trading-date.util";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { TrackedProviderId } from "../provider-health/providers";
+
+/** This client's id in `provider_health` and in the circuit breaker. */
+const HEALTH_PROVIDER_ID: TrackedProviderId = "msn_finance";
 
 // MSN / Bing Finance API endpoints. The autosuggest and Quotes endpoints are
 // the same ones MSMoneyQuotes.exe uses (reverse-engineered from the v3.0
@@ -250,7 +255,10 @@ export class MsnFinanceService implements QuoteProvider {
    */
   private readonly apiKey: string | null;
 
-  constructor(@Optional() configService?: ConfigService) {
+  constructor(
+    private readonly health: ProviderHealthService,
+    @Optional() configService?: ConfigService,
+  ) {
     const fromEnv = configService?.get<string>("MSN_API_KEY")?.trim();
     this.apiKey = fromEnv && fromEnv.length > 0 ? fromEnv : null;
     if (!this.apiKey) {
@@ -313,6 +321,11 @@ export class MsnFinanceService implements QuoteProvider {
     url: string,
     extraHeaders: Record<string, string> = {},
   ): Promise<T | null> {
+    // Every MSN JSON call comes through here, so the breaker sits here: once the
+    // host is unreachable, a refusal is instant and silent rather than one
+    // 10-second timeout and one log line per symbol (issue #1265's shape, with
+    // this provider's endpoints in place of Yahoo's).
+    if (!this.health.isAvailable(HEALTH_PROVIDER_ID)) return null;
     try {
       const response = await fetch(url, {
         headers: {
@@ -323,14 +336,20 @@ export class MsnFinanceService implements QuoteProvider {
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
+      // It answered: reachable, whatever it thinks of the request.
+      this.health.recordSuccess(HEALTH_PROVIDER_ID);
       if (!response.ok) {
         this.logger.warn(`MSN Finance GET ${url} returned ${response.status}`);
         return null;
       }
       return (await response.json()) as T;
     } catch (error) {
-      this.logger.warn(
-        `MSN Finance GET ${url} failed: ${error instanceof Error ? error.message : String(error)}`,
+      this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `GET ${url}`,
+        error,
       );
       return null;
     }
@@ -1136,6 +1155,7 @@ export class MsnFinanceService implements QuoteProvider {
     // surface for sector data is limited and may not be available for all
     // security types.
     const url = `${STOCK_DETAILS_PAGE}/fi-${encodeURIComponent(instrumentId)}`;
+    if (!this.health.isAvailable(HEALTH_PROVIDER_ID)) return null;
     try {
       const response = await fetch(url, {
         headers: {
@@ -1145,6 +1165,7 @@ export class MsnFinanceService implements QuoteProvider {
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
+      this.health.recordSuccess(HEALTH_PROVIDER_ID);
       if (!response.ok) return null;
       const html = await response.text();
       const sector = matchInText(html, /"sector"\s*:\s*"([^"]+)"/i);
@@ -1152,8 +1173,12 @@ export class MsnFinanceService implements QuoteProvider {
       if (!sector && !industry) return { sector: null, industry: null };
       return { sector, industry };
     } catch (error) {
-      this.logger.warn(
-        `MSN Finance sector fetch for ${symbol} failed: ${error instanceof Error ? error.message : String(error)}`,
+      this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `sector fetch for ${symbol}`,
+        error,
       );
       return null;
     }

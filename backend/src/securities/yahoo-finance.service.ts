@@ -16,6 +16,18 @@ import {
 } from "./providers/quote-provider.interface";
 import { getTradingDateFromQuote } from "./providers/trading-date.util";
 import { barDate } from "./providers/market-session.util";
+import { describeFetchFailure } from "../common/http/fetch-failure.util";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { TrackedProviderId } from "../provider-health/providers";
+
+/**
+ * This client's id in `provider_health` and in the circuit breaker.
+ *
+ * Distinct from `QuoteProviderName` ("yahoo"), which names the *quote provider*
+ * a security is priced by. This one names the *host we call*, is the primary key
+ * of the durable alert state, and must therefore stay stable.
+ */
+const HEALTH_PROVIDER_ID: TrackedProviderId = "yahoo_finance";
 
 // Back-compat re-exports so existing imports keep compiling during the migration.
 export type YahooQuoteResult = QuoteResult;
@@ -92,6 +104,8 @@ export class YahooFinanceService implements QuoteProvider {
 
   private readonly logger = new Logger(YahooFinanceService.name);
 
+  constructor(private readonly health: ProviderHealthService) {}
+
   private static readonly FETCH_TIMEOUT_MS = 10000;
   private static readonly USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -149,6 +163,12 @@ export class YahooFinanceService implements QuoteProvider {
    * Non-throttled HTTP errors (4xx other than 429, 5xx other than 503) are
    * returned to the caller untouched -- the helper only handles the
    * "upstream is asking us to slow down" case. Network errors propagate.
+   *
+   * It is also the single door the circuit breaker sits on: every Yahoo request
+   * except the crumb handshake goes through here, so refusing here refuses all
+   * of them. A `ProviderUnavailableError` is raised *before* the concurrency
+   * gate, because a refusal that first queues behind five in-flight 60-second
+   * timeouts costs precisely what the breaker exists to save (issue #1265).
    */
   private async throttledFetch(
     url: string,
@@ -157,14 +177,25 @@ export class YahooFinanceService implements QuoteProvider {
   ): Promise<Response> {
     const maxRetries = opts.maxRetries ?? YahooFinanceService.MAX_RETRIES;
     const timeoutMs = opts.timeoutMs ?? YahooFinanceService.FETCH_TIMEOUT_MS;
+    this.health.assertAvailable(HEALTH_PROVIDER_ID);
     await this.acquireSlot();
     try {
       let lastResponse: Response | null = null;
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        const response = await fetch(url, {
-          ...init,
-          signal: AbortSignal.timeout(timeoutMs),
-        });
+        let response: Response;
+        try {
+          response = await fetch(url, {
+            ...init,
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+        } catch (error) {
+          // No response at all: the availability signal the breaker counts.
+          this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+          throw error;
+        }
+        // It answered. Whatever the status, the provider is reachable -- a 404
+        // is this symbol's problem, not the host's.
+        this.health.recordSuccess(HEALTH_PROVIDER_ID);
         lastResponse = response;
         if (!YahooFinanceService.THROTTLED_STATUSES.has(response.status)) {
           return response;
@@ -240,7 +271,17 @@ export class YahooFinanceService implements QuoteProvider {
   private fetchYahooCookie(url: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(
-        () => reject(new Error("Cookie request timeout")),
+        () =>
+          // Carries a code, so `isTransportFailure` counts it: a timeout is the
+          // most common shape of "this host is unreachable", and an Error with
+          // only a message would have been read as a logic error and ignored by
+          // the breaker.
+          reject(
+            Object.assign(new Error("Cookie request timeout"), {
+              code: "ETIMEDOUT",
+              hostname: new URL(url).hostname,
+            }),
+          ),
         YahooFinanceService.FETCH_TIMEOUT_MS,
       );
       https
@@ -273,6 +314,11 @@ export class YahooFinanceService implements QuoteProvider {
   }
 
   private async fetchCrumb(): Promise<boolean> {
+    // The handshake does not go through throttledFetch, and a failed crumb is
+    // not cached -- so while Yahoo is unreachable every v10 caller used to pay
+    // two cookie timeouts plus a getcrumb timeout before failing. Refuse it
+    // with the same breaker the rest of the client uses.
+    if (!this.health.isAvailable(HEALTH_PROVIDER_ID)) return false;
     let lastStatus: number | string = "no cookies";
     for (const source of YahooFinanceService.COOKIE_SOURCES) {
       try {
@@ -310,8 +356,8 @@ export class YahooFinanceService implements QuoteProvider {
         this.crumbExpiresAt = Date.now() + 60 * 60 * 1000;
         return true;
       } catch (error) {
-        lastStatus =
-          error instanceof Error ? error.message : "cookie/crumb error";
+        this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+        lastStatus = describeFetchFailure(error);
       }
     }
 
@@ -338,7 +384,12 @@ export class YahooFinanceService implements QuoteProvider {
           },
         });
       } catch (err) {
-        this.logger.error(`Yahoo Finance v10 fetch error: ${err}`);
+        this.health.logFailure(
+          this.logger,
+          HEALTH_PROVIDER_ID,
+          "v10 request",
+          err,
+        );
         return null;
       }
 
@@ -440,9 +491,11 @@ export class YahooFinanceService implements QuoteProvider {
 
       return null;
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch Yahoo Finance quote for ${yahooSymbol}`,
-        error instanceof Error ? error.stack : undefined,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `quote for ${yahooSymbol}`,
+        error,
       );
       return null;
     }
@@ -599,9 +652,11 @@ export class YahooFinanceService implements QuoteProvider {
 
       return prices;
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch historical prices for ${yahooSymbol}`,
-        error instanceof Error ? error.stack : undefined,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `historical prices for ${yahooSymbol}`,
+        error,
       );
       return null;
     }
@@ -704,9 +759,11 @@ export class YahooFinanceService implements QuoteProvider {
 
       return points;
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch intraday series for ${yahooSymbol}`,
-        error instanceof Error ? error.stack : undefined,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `intraday series for ${yahooSymbol}`,
+        error,
       );
       return null;
     }
@@ -789,9 +846,11 @@ export class YahooFinanceService implements QuoteProvider {
         };
       });
     } catch (error) {
-      this.logger.error(
-        "Failed to lookup security",
-        error instanceof Error ? error.stack : undefined,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        "security lookup",
+        error,
       );
       return [];
     }
@@ -1078,9 +1137,11 @@ export class YahooFinanceService implements QuoteProvider {
         industry: match.industry || match.industryDisp || null,
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch sector info for ${yahooSymbol}`,
-        error instanceof Error ? error.stack : undefined,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `sector info for ${yahooSymbol}`,
+        error,
       );
       return null;
     }
@@ -1158,9 +1219,11 @@ export class YahooFinanceService implements QuoteProvider {
         assets: this.parseAssetPositions(topHoldings),
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch ETF breakdowns for ${yahooSymbol}`,
-        error instanceof Error ? error.stack : undefined,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `ETF breakdowns for ${yahooSymbol}`,
+        error,
       );
       return { sectors: null, assets: null };
     }
@@ -1263,9 +1326,11 @@ export class YahooFinanceService implements QuoteProvider {
 
       return { description, website: this.pickWebsite(result) };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch profile for ${yahooSymbol}`,
-        error instanceof Error ? error.stack : undefined,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `profile for ${yahooSymbol}`,
+        error,
       );
       return { description: null, website: null };
     }
@@ -1383,8 +1448,11 @@ export class YahooFinanceService implements QuoteProvider {
     } catch (error) {
       // News is decoration on a page that works without it, so a failure here
       // is logged and swallowed rather than shown as a broken page.
-      this.logger.warn(
-        `Yahoo news lookup failed for ${symbol}: ${error instanceof Error ? error.message : error}`,
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `news lookup for ${symbol}`,
+        error,
       );
       return [];
     }

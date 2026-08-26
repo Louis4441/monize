@@ -1,0 +1,268 @@
+/**
+ * One outbound provider's circuit breaker: the thing that stops a dead upstream
+ * from being asked again a thousand times a minute.
+ *
+ * Issue #1265: Yahoo became unreachable from the container, and every code path
+ * that wanted a price kept calling `fetch` anyway. A bootstrap market-index
+ * refresh alone is 24 indexes x up to 11 yearly chunks, each waiting out its
+ * own timeout and each logging a stack; the register, the dashboard and the
+ * chart endpoints added theirs on every render. The result was a log nobody
+ * could read, an event loop with hundreds of doomed sockets on it, and a
+ * container the operator restarted -- which ran the bootstrap refresh again.
+ *
+ * The breaker turns "the provider is down" from a per-call discovery into a
+ * fact the process holds:
+ *
+ * - **closed** -- normal. Consecutive transport failures are counted; the
+ *   count is reset by any success, because a breaker that counted failures
+ *   forever would open on an unrelated blip a week later.
+ * - **open** -- `FAILURE_THRESHOLD` consecutive transport failures. No request
+ *   leaves the process until the window elapses; callers get
+ *   `ProviderUnavailableError` immediately instead of a 10-60s timeout. Each
+ *   consecutive open window is twice as long as the last, capped, so an outage
+ *   that lasts an hour costs a handful of probes rather than one per minute.
+ * - **half-open** -- the window elapsed and exactly one probe is admitted. Its
+ *   outcome decides: success closes the breaker and clears the escalation,
+ *   failure re-opens it for the next (longer) window. One probe, not a
+ *   thundering herd: the whole point is that a still-dead provider costs one
+ *   socket per window.
+ *
+ * Only *transport* failures count (see `isTransportFailure`). An HTTP 404 or a
+ * body that will not parse is this request's problem; the server answered.
+ *
+ * State is per process and deliberately in memory: it describes what *this*
+ * replica just experienced with its own sockets and DNS, which is exactly the
+ * thing a shared table could not tell it. What is durable is the *notification*
+ * state (`provider_health`), so the alert survives the restart loop the outage
+ * causes.
+ */
+
+/** Consecutive transport failures that open the breaker. */
+export const FAILURE_THRESHOLD = 5;
+
+/** How long the first open window lasts. */
+export const OPEN_WINDOW_MS = 60_000;
+
+/** Ceiling for the doubling. Twenty minutes of a dead provider costs 5 probes. */
+export const MAX_OPEN_WINDOW_MS = 15 * 60_000;
+
+/**
+ * How long a half-open probe may be in flight before another is admitted.
+ *
+ * The probe slot is exclusive, so a caller that neither succeeds nor reports a
+ * failure -- one that throws between `beforeRequest` and `record*`, or awaits a
+ * promise that never settles -- would otherwise hold it for the life of the
+ * process and the provider would never be called again. Comfortably longer than
+ * the longest request timeout in the clients (60s), so a slow-but-live probe is
+ * not raced.
+ */
+export const PROBE_TIMEOUT_MS = 2 * 60_000;
+
+export type ProviderCircuitState = "closed" | "open" | "half-open";
+
+/** What the breaker did, if anything, as a result of one recorded outcome. */
+export type ProviderCircuitTransition = "opened" | "recovered" | null;
+
+export interface ProviderCircuitSnapshot {
+  readonly state: ProviderCircuitState;
+  readonly consecutiveFailures: number;
+  /** First failure of the current run of failures, null when there is none. */
+  readonly failingSince: number | null;
+  readonly lastFailureAt: number | null;
+  readonly lastFailureReason: string | null;
+  readonly lastSuccessAt: number | null;
+  /** Calls refused since the breaker last opened. */
+  readonly suppressedCalls: number;
+  /** When the current open window ends; null unless the state is `open`. */
+  readonly retryAt: number | null;
+}
+
+/** Whether a call may go out, and what to tell the caller when it may not. */
+export interface ProviderCircuitDecision {
+  readonly allowed: boolean;
+  readonly state: ProviderCircuitState;
+  /** Milliseconds until the next probe is admitted. 0 when allowed. */
+  readonly retryAfterMs: number;
+  /** Refused calls including this one; 0 when allowed. */
+  readonly suppressedCalls: number;
+  readonly lastFailureReason: string | null;
+}
+
+/** The outcome of recording a success or a failure. */
+export interface ProviderCircuitOutcome {
+  readonly transition: ProviderCircuitTransition;
+  readonly snapshot: ProviderCircuitSnapshot;
+  /**
+   * Calls the breaker refused during the window that just ended. Reported on a
+   * transition so one line can say how much noise was suppressed rather than
+   * the noise itself being the report.
+   */
+  readonly suppressedCalls: number;
+}
+
+export class ProviderCircuit {
+  private state: ProviderCircuitState = "closed";
+  private consecutiveFailures = 0;
+  private failingSince: number | null = null;
+  private lastFailureAt: number | null = null;
+  private lastFailureReason: string | null = null;
+  private lastSuccessAt: number | null = null;
+  private retryAt: number | null = null;
+  private openWindowMs = OPEN_WINDOW_MS;
+  private suppressedCalls = 0;
+  /** When the in-flight `half-open` probe was admitted; null when none is. */
+  private probeStartedAt: number | null = null;
+
+  /**
+   * @param now injected clock. Every test in this repo that reads the wall
+   *   clock is a test about today's date (root `CLAUDE.md`); a breaker whose
+   *   windows could only be tested by waiting them out would not be tested.
+   */
+  constructor(private readonly now: () => number = Date.now) {}
+
+  snapshot(): ProviderCircuitSnapshot {
+    return {
+      state: this.state,
+      consecutiveFailures: this.consecutiveFailures,
+      failingSince: this.failingSince,
+      lastFailureAt: this.lastFailureAt,
+      lastFailureReason: this.lastFailureReason,
+      lastSuccessAt: this.lastSuccessAt,
+      suppressedCalls: this.suppressedCalls,
+      retryAt: this.state === "open" ? this.retryAt : null,
+    };
+  }
+
+  /**
+   * Ask whether one request may go out, and take the probe slot if it may.
+   *
+   * Called immediately before the request. A refusal is not an error condition
+   * here -- the caller decides whether to throw, return null or skip.
+   */
+  beforeRequest(): ProviderCircuitDecision {
+    if (this.state === "closed") {
+      return {
+        allowed: true,
+        state: "closed",
+        retryAfterMs: 0,
+        suppressedCalls: 0,
+        lastFailureReason: this.lastFailureReason,
+      };
+    }
+
+    const now = this.now();
+    if (this.state === "open" && this.retryAt !== null && now >= this.retryAt) {
+      // Window elapsed: this caller becomes the probe.
+      this.state = "half-open";
+      this.probeStartedAt = now;
+      return {
+        allowed: true,
+        state: "half-open",
+        retryAfterMs: 0,
+        suppressedCalls: 0,
+        lastFailureReason: this.lastFailureReason,
+      };
+    }
+
+    if (
+      this.state === "half-open" &&
+      (this.probeStartedAt === null ||
+        now - this.probeStartedAt >= PROBE_TIMEOUT_MS)
+    ) {
+      // The probe never reported an outcome. Admit another rather than holding
+      // the exclusive slot forever, which would leave the provider uncalled for
+      // the life of the process.
+      this.probeStartedAt = now;
+      return {
+        allowed: true,
+        state: "half-open",
+        retryAfterMs: 0,
+        suppressedCalls: 0,
+        lastFailureReason: this.lastFailureReason,
+      };
+    }
+
+    this.suppressedCalls++;
+    // While a probe is in flight there is no window to wait out, so the wait is
+    // however long that probe may still hold the slot.
+    const waitUntil =
+      this.state === "half-open"
+        ? (this.probeStartedAt ?? now) + PROBE_TIMEOUT_MS
+        : this.retryAt;
+    return {
+      allowed: false,
+      state: this.state,
+      retryAfterMs: waitUntil !== null ? Math.max(0, waitUntil - now) : 0,
+      suppressedCalls: this.suppressedCalls,
+      lastFailureReason: this.lastFailureReason,
+    };
+  }
+
+  /** Record a request that got an answer. Closes the breaker if it was not. */
+  recordSuccess(): ProviderCircuitOutcome {
+    const suppressed = this.suppressedCalls;
+    const wasOpen = this.state !== "closed";
+    this.state = "closed";
+    this.probeStartedAt = null;
+    this.consecutiveFailures = 0;
+    this.failingSince = null;
+    this.lastSuccessAt = this.now();
+    this.retryAt = null;
+    this.openWindowMs = OPEN_WINDOW_MS;
+    this.suppressedCalls = 0;
+    return {
+      transition: wasOpen ? "recovered" : null,
+      snapshot: this.snapshot(),
+      suppressedCalls: suppressed,
+    };
+  }
+
+  /**
+   * Record a transport failure. Opens the breaker on the threshold, and
+   * re-opens it (for twice as long) when the probe was the one that failed.
+   */
+  recordTransportFailure(reason: string): ProviderCircuitOutcome {
+    const now = this.now();
+    const wasProbe = this.state === "half-open";
+    this.probeStartedAt = null;
+    this.consecutiveFailures++;
+    if (this.failingSince === null) this.failingSince = now;
+    this.lastFailureAt = now;
+    this.lastFailureReason = reason;
+
+    if (wasProbe) {
+      // A failed probe re-opens the same episode with a longer window. Not a
+      // new "opened" transition: the provider never came back, and reporting
+      // one per probe would be the log flood again, one window apart.
+      this.openWindowMs = Math.min(this.openWindowMs * 2, MAX_OPEN_WINDOW_MS);
+      this.state = "open";
+      this.retryAt = now + this.openWindowMs;
+      return {
+        transition: null,
+        snapshot: this.snapshot(),
+        suppressedCalls: this.suppressedCalls,
+      };
+    }
+
+    if (
+      this.state === "closed" &&
+      this.consecutiveFailures >= FAILURE_THRESHOLD
+    ) {
+      this.state = "open";
+      this.openWindowMs = OPEN_WINDOW_MS;
+      this.retryAt = now + this.openWindowMs;
+      this.suppressedCalls = 0;
+      return {
+        transition: "opened",
+        snapshot: this.snapshot(),
+        suppressedCalls: 0,
+      };
+    }
+
+    return {
+      transition: null,
+      snapshot: this.snapshot(),
+      suppressedCalls: this.suppressedCalls,
+    };
+  }
+}

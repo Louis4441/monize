@@ -1,0 +1,106 @@
+import { readdirSync, readFileSync, statSync } from "fs";
+import { join, relative } from "path";
+import { TRACKED_PROVIDERS } from "./providers";
+
+const SRC_ROOT = join(__dirname, "..");
+
+/**
+ * The market-data clients: every outbound call in here has to be answerable to
+ * a circuit breaker, because these are the ones a whole deployment's worth of
+ * requests fan out into (issue #1265).
+ *
+ * Scoped deliberately. The FX, AI, favicon, release-check and breach-check
+ * callers have the same shape and are named in
+ * `docs/specs/provider-outage-alerts.md` as the next adopters; widening this
+ * scan before they adopt would only be a failing test nobody can fix in one
+ * change.
+ */
+const GUARDED_DIRS = ["securities"];
+
+/** A bare global `fetch(` or a raw `https.get(` -- an outbound request. */
+const OUTBOUND_CALL = /(?<![.\w])fetch\(|https\.(get|request)\(/;
+
+function sourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      if (entry === "node_modules" || entry === "dist") continue;
+      out.push(...sourceFiles(full));
+      continue;
+    }
+    if (!entry.endsWith(".ts") || entry.endsWith(".spec.ts")) continue;
+    out.push(full);
+  }
+  return out;
+}
+
+function guardedFiles(): Array<{ path: string; source: string }> {
+  return GUARDED_DIRS.flatMap((dir) => sourceFiles(join(SRC_ROOT, dir))).map(
+    (path) => ({
+      path: relative(SRC_ROOT, path),
+      source: readFileSync(path, "utf8"),
+    }),
+  );
+}
+
+describe("outbound provider calls are answerable to the breaker", () => {
+  it("finds the clients it is guarding", () => {
+    // A scan that silently matches nothing is the failure mode of every guard
+    // in this repo, so it asserts its own subject exists first.
+    const callers = guardedFiles().filter((file) =>
+      OUTBOUND_CALL.test(file.source),
+    );
+    expect(callers.map((file) => file.path).sort()).toEqual([
+      "securities/msn-finance.service.ts",
+      "securities/security-news.service.ts",
+      "securities/yahoo-finance.service.ts",
+    ]);
+  });
+
+  it.each(guardedFiles().filter((file) => OUTBOUND_CALL.test(file.source)))(
+    "$path routes its availability through ProviderHealthService",
+    ({ path, source }) => {
+      // The exemption is positive and narrow: SecurityNewsService fetches
+      // thumbnail bytes for an image the page has already been given a URL for,
+      // one request per rendered image, from the URL the news payload carried --
+      // there is no symbol loop behind it and no provider host it owns.
+      if (path === "securities/security-news.service.ts") {
+        expect(source).toContain("private async fetchImage(");
+        return;
+      }
+      expect(source).toContain(
+        'from "../provider-health/provider-health.service"',
+      );
+      expect(source).toMatch(/this\.health\.(isAvailable|assertAvailable)\(/);
+      expect(source).toContain("this.health.recordSuccess(");
+    },
+  );
+
+  it.each(guardedFiles())(
+    "$path does not log a provider failure as a bare stack",
+    ({ source }) => {
+      // `TypeError: fetch failed` plus undici's own frames is what issue #1265
+      // filled the log with: true, and impossible to act on. The diagnostic
+      // goes through describeFetchFailure (usually via logFailure), which names
+      // the cause chain instead.
+      expect(source).not.toContain("error.stack");
+      expect(source).not.toContain("err.stack");
+    },
+  );
+});
+
+describe("tracked provider ids", () => {
+  it.each(Object.keys(TRACKED_PROVIDERS))(
+    "%s is the id some client actually reports under",
+    (provider) => {
+      // The id is the primary key of the durable alert state. A renamed or
+      // orphaned id would silently start a fresh outage episode, so the label
+      // table and the clients have to agree.
+      const used = GUARDED_DIRS.flatMap((dir) =>
+        sourceFiles(join(SRC_ROOT, dir)),
+      ).some((path) => readFileSync(path, "utf8").includes(`"${provider}"`));
+      expect(used).toBe(true);
+    },
+  );
+});

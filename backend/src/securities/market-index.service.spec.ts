@@ -5,6 +5,8 @@ import {
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { HistoricalPrice } from "./providers/quote-provider.interface";
 import { MARKET_INDEXES } from "./market-indexes";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 import {
   createScopedDbMocks,
   DataSourceMock,
@@ -85,6 +87,7 @@ describe("MarketIndexService", () => {
   let yahoo: jest.Mocked<
     Pick<YahooFinanceService, "fetchHistorical" | "fetchHistoricalWindow">
   >;
+  let health: ProviderHealthService;
 
   /** SQL statements the service issued, in order. */
   const statements = (): string[] =>
@@ -100,7 +103,12 @@ describe("MarketIndexService", () => {
       fetchHistorical: jest.fn().mockResolvedValue(null),
       fetchHistoricalWindow: jest.fn().mockResolvedValue(null),
     };
-    service = new MarketIndexService(dataSource as never, yahoo as never);
+    health = createTestProviderHealth();
+    service = new MarketIndexService(
+      dataSource as never,
+      yahoo as never,
+      health,
+    );
   });
 
   // --- catalog -------------------------------------------------------------
@@ -602,6 +610,46 @@ describe("MarketIndexService", () => {
         new Promise((resolve) => setImmediate(resolve)),
       ).resolves.toBeUndefined();
     });
+
+    /**
+     * Issue #1265: an unreachable provider made every restart a fresh storm of
+     * 24 indexes x up to 11 yearly chunks -- and the flood of failures was
+     * itself why the container was being restarted. A restart is not new
+     * information, so the warm-up honours the same cooldown the on-demand path
+     * does.
+     */
+    it("skips indexes attempted within the cooldown", async () => {
+      routeQueries(manager, {
+        attempts: MARKET_INDEXES.map((index) => ({
+          index_code: index.code,
+          last_attempt_at: new Date(Date.now() - 60_000),
+        })),
+      });
+
+      service.onApplicationBootstrap();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+    });
+
+    it("still warms an index whose cooldown has expired", async () => {
+      routeQueries(manager, {
+        attempts: [
+          {
+            index_code: MARKET_INDEXES[0].code,
+            last_attempt_at: new Date(
+              Date.now() - INDEX_FETCH_COOLDOWN_MS - 60_000,
+            ),
+          },
+        ],
+      });
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2001-01-03", 1400)]);
+
+      service.onApplicationBootstrap();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalled();
+    });
   });
 
   // --- scheduled refresh ---------------------------------------------------
@@ -610,6 +658,22 @@ describe("MarketIndexService", () => {
     it("seeds its own system context, since no request is behind it", async () => {
       await service.scheduledRefresh();
       expect(systemContext).toHaveBeenCalled();
+    });
+
+    it("ignores the cooldown: a daily schedule is the request", async () => {
+      // The asymmetry with the start-up warm-up is the point. A cron that
+      // skipped its own last attempt would never refresh anything.
+      routeQueries(manager, {
+        attempts: MARKET_INDEXES.map((index) => ({
+          index_code: index.code,
+          last_attempt_at: new Date(Date.now() - 60_000),
+        })),
+      });
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2026-08-25", 1400)]);
+
+      await service.scheduledRefresh();
+
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalled();
     });
 
     it("asks for a short recent window where history exists", async () => {

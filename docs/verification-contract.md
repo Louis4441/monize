@@ -92,6 +92,7 @@ adds value but proves nothing on its own. `--` means not applicable.
 | INV-ATTACHMENT-001 bytes present | supporting | -- | required | optional | -- | **required** | **required** | required |
 | INV-BACKUP-001 backup complete | supporting | -- | required | -- | optional | **required** | **required** | required |
 | INV-CRON-001 one effect per tick | supporting | -- | required | required | **required** | optional | -- | -- |
+| INV-PROVIDER-001 outage reported once | required | **required** | required | optional | required | -- | required | -- |
 | INV-RLS-001 role privilege | supporting | -- | **required** | -- | required | -- | -- | -- |
 | INV-CACHE-001 cache invalidation | required | **required** | -- | -- | -- | -- | -- | required |
 | INV-RELEASE-001 one revision | required | -- | -- | -- | -- | -- | -- | workflow self-test |
