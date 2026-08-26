@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@/test/render';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within, act, cleanup } from '@/test/render';
 import { ReconcileTable } from './ReconcileTable';
 import type { ComponentProps } from 'react';
 import { Transaction, TransactionStatus } from '@/types/transaction';
+import { useDateDisplayStore } from '@/store/dateDisplayStore';
 
 vi.mock('@/hooks/useDateFormat', () => ({
   useDateFormat: () => ({
@@ -130,25 +131,61 @@ describe('ReconcileTable', () => {
     });
   });
 
-  describe('row actions', () => {
-    it('offers edit and delete on every row', () => {
+  describe('row actions (long-press / right-click sheet)', () => {
+    const sheet = () => screen.getByRole('dialog');
+
+    it('renders no actions column -- the row itself is the whole surface', () => {
       renderTable();
-      const rowEl = screen.getByTestId('reconcile-row-tx-a');
-      fireEvent.click(within(rowEl).getByLabelText('Edit'));
+      expect(screen.queryByLabelText('Edit')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Delete')).not.toBeInTheDocument();
+    });
+
+    it('opens the sheet from a right-click and edits from it', () => {
+      renderTable();
+      fireEvent.contextMenu(screen.getByTestId('reconcile-row-tx-a'));
+      fireEvent.click(within(sheet()).getByRole('button', { name: 'Edit' }));
       expect(defaults.onEdit).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'tx-a' }),
       );
-      fireEvent.click(within(rowEl).getByLabelText('Delete'));
+      // The action closes the sheet, and the right-click did not also toggle.
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(defaults.onToggle).not.toHaveBeenCalled();
+    });
+
+    it('offers delete in the sheet', () => {
+      renderTable();
+      fireEvent.contextMenu(screen.getByTestId('reconcile-row-tx-a'));
+      fireEvent.click(within(sheet()).getByRole('button', { name: 'Delete' }));
       expect(defaults.onDelete).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'tx-a' }),
       );
     });
 
-    it('does not also toggle the row when an action is used', () => {
+    it('names the sheet after the row', () => {
       renderTable();
-      const rowEl = screen.getByTestId('reconcile-row-tx-a');
-      fireEvent.click(within(rowEl).getByLabelText('Edit'));
-      expect(defaults.onToggle).not.toHaveBeenCalled();
+      fireEvent.contextMenu(screen.getByTestId('reconcile-row-tx-a'));
+      expect(within(sheet()).getByText('Grocery')).toBeInTheDocument();
+      expect(within(sheet()).getByText('2026-02-01')).toBeInTheDocument();
+    });
+
+    it('opens the sheet from a press-and-hold, without toggling the row', () => {
+      vi.useFakeTimers();
+      try {
+        renderTable();
+        const rowEl = screen.getByTestId('reconcile-row-tx-a');
+        fireEvent.mouseDown(rowEl, { button: 0 });
+        act(() => {
+          vi.advanceTimersByTime(750);
+        });
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        // The click that trails the release is the long-press's own, not a
+        // selection toggle.
+        fireEvent.mouseUp(rowEl);
+        fireEvent.click(rowEl);
+        expect(defaults.onToggle).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('cycles the status from the shared status cell', () => {
@@ -161,21 +198,27 @@ describe('ReconcileTable', () => {
       expect(defaults.onToggle).not.toHaveBeenCalled();
     });
 
-    it('withholds the actions on a reconciled row while the lock is on', () => {
+    it('disables the sheet actions on a reconciled row while the lock is on', () => {
       renderTable({
         transactions: [row({ id: 'tx-r', status: TransactionStatus.RECONCILED })],
         reconciledLocked: true,
       });
-      expect(screen.queryByLabelText('Edit')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Delete')).not.toBeInTheDocument();
-      expect(screen.getByText('Locked')).toBeInTheDocument();
+      fireEvent.contextMenu(screen.getByTestId('reconcile-row-tx-r'));
+      const sheetEl = sheet();
+      // The lock is named, so the greyed actions read as a state, not a fault.
+      expect(within(sheetEl).getByText('Locked')).toBeInTheDocument();
+      expect(within(sheetEl).getByRole('button', { name: 'Edit' })).toBeDisabled();
+      expect(within(sheetEl).getByRole('button', { name: 'Delete' })).toBeDisabled();
+      fireEvent.click(within(sheetEl).getByRole('button', { name: 'Edit' }));
+      expect(defaults.onEdit).not.toHaveBeenCalled();
     });
 
-    it('keeps the actions on an unreconciled row while the lock is on', () => {
-      // The lock is about reconciled rows. Hiding every action would make the
-      // setting unusable for the screen it matters most on.
+    it('keeps the sheet actions live on an unreconciled row while the lock is on', () => {
+      // The lock is about reconciled rows. Disabling every action would make
+      // the setting unusable for the screen it matters most on.
       renderTable({ reconciledLocked: true });
-      expect(screen.getAllByLabelText('Edit').length).toBe(3);
+      fireEvent.contextMenu(screen.getByTestId('reconcile-row-tx-a'));
+      expect(within(sheet()).getByRole('button', { name: 'Edit' })).toBeEnabled();
     });
   });
 
@@ -226,7 +269,7 @@ describe('ReconcileTable', () => {
       renderTable();
       const [headerRow] = screen.getAllByRole('row');
       const headerCells = within(headerRow).getAllByRole('columnheader');
-      expect(headerCells).toHaveLength(7);
+      expect(headerCells).toHaveLength(6);
       expect(headerCells.map(collapsedAt)).toEqual([
         false, // select
         false, // date
@@ -234,12 +277,11 @@ describe('ReconcileTable', () => {
         true, // category
         false, // amount
         true, // status
-        false, // actions
       ]);
 
       const rowEl = screen.getByTestId('reconcile-row-tx-a');
       const cells = within(rowEl).getAllByRole('cell');
-      expect(cells).toHaveLength(7);
+      expect(cells).toHaveLength(6);
       expect(cells.map(collapsedAt)).toEqual([
         false, // select
         false, // date
@@ -247,18 +289,7 @@ describe('ReconcileTable', () => {
         true, // category
         false, // amount
         true, // status
-        false, // actions
       ]);
-    });
-
-    it('drops the year from the date below sm and keeps the full date above', () => {
-      renderTable({ transactions: [row({ id: 'tx-a', transactionDate: '2026-02-01' })] });
-      const compact = screen.getByText('02-01');
-      const full = screen.getByText('2026-02-01');
-      expect(compact.className.split(/\s+/)).toContain('sm:hidden');
-      expect(full.className.split(/\s+/)).toEqual(
-        expect.arrayContaining(['hidden', 'sm:inline']),
-      );
     });
 
     it('lets the stale chip wrap under the date instead of widening the column', () => {
@@ -286,10 +317,72 @@ describe('ReconcileTable', () => {
       const groupRow = screen.getByText('Money in (1)').closest('tr')!;
       const label = within(groupRow).getByRole('columnheader');
       expect(label).toHaveAttribute('colspan', '3');
-      const fillers = within(groupRow)
-        .getAllByRole('cell')
-        .filter((cell) => collapsedAt(cell));
-      expect(fillers).toHaveLength(2);
+      const cells = within(groupRow).getAllByRole('cell');
+      expect(cells).toHaveLength(3);
+      expect(cells.filter(collapsedAt)).toHaveLength(2);
+    });
+  });
+
+  // The register's mobile date-shortening option, shared store and all -- the
+  // toggle on either register applies to both, because whether a full date
+  // fits beside a payee is a property of the phone in the user's hand.
+  describe('compact mobile dates', () => {
+    afterEach(() => {
+      // `cleanup()` first: vitest runs after-hooks in reverse registration
+      // order, so a store write here would re-render the still-mounted tree
+      // outside act. `src/test/test-hygiene.test.ts` is the rule.
+      cleanup();
+      useDateDisplayStore.setState({ compactMobileDates: false });
+    });
+
+    it('offers the toggle in the Date column header, off by default', () => {
+      renderTable();
+      const toggle = screen.getByRole('button', { name: 'Hide the year' });
+      expect(toggle.closest('th')).toHaveTextContent('Date');
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      // Full date, single rendering -- no phone/desktop split.
+      expect(screen.getAllByText('2026-02-01')).toHaveLength(1);
+      expect(screen.queryByText('02-01')).not.toBeInTheDocument();
+    });
+
+    it('flipping the toggle does not also sort the Date column', () => {
+      renderTable();
+      fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
+      expect(defaults.onSort).not.toHaveBeenCalled();
+    });
+
+    it('drops the year for phones and keeps the full date for wider screens', () => {
+      renderTable({ transactions: [row({ id: 'tx-a', transactionDate: '2026-02-01' })] });
+      fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
+      const compact = screen.getByText('02-01');
+      const full = screen.getByText('2026-02-01');
+      expect(compact.className.split(/\s+/)).toContain('sm:hidden');
+      expect(full.className.split(/\s+/)).toEqual(
+        expect.arrayContaining(['hidden', 'sm:inline']),
+      );
+      expect(useDateDisplayStore.getState().compactMobileDates).toBe(true);
+    });
+
+    it('closes the Date/Payee gap and widens the payee cap, header and cells alike', () => {
+      renderTable();
+      const dateHeader = () =>
+        screen.getByRole('button', { name: 'Hide the year' }).closest('th')!;
+      const payeeCell = () =>
+        within(screen.getByTestId('reconcile-row-tx-a')).getAllByRole('cell')[2];
+      const dateCell = () =>
+        within(screen.getByTestId('reconcile-row-tx-a')).getAllByRole('cell')[1];
+
+      expect(dateHeader().className).not.toContain('max-sm:pr-1');
+      expect(payeeCell().className).toContain('max-w-[110px]');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
+
+      // A `th` and its `td` that disagree about padding put the label and the
+      // values it labels at different offsets, so both move together.
+      expect(dateHeader().className).toContain('max-sm:pr-1');
+      expect(dateCell().className).toContain('max-sm:pr-1');
+      expect(payeeCell().className).toContain('max-sm:pl-1');
+      expect(payeeCell().className).toContain('max-w-[160px]');
     });
   });
 });

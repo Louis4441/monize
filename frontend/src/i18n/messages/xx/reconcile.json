@@ -29,7 +29,6 @@
     "colAmount": "[XX-Amount-XX]",
     "colStatus": "[XX-Status-XX]",
     "finish": "[XX-Finish Reconciliation-XX]",
-    "colActions": "[XX-Actions-XX]",
     "selectRow": "[XX-Select the transaction for {payee}-XX]",
     "groupByFlow": "[XX-Group by money in and out-XX]",
     "groupCredits": "[XX-Money in ({count})-XX]",

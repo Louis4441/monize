@@ -29,7 +29,6 @@
     "colAmount": "Cantidad",
     "colStatus": "Estado",
     "finish": "Finalizar conciliación",
-    "colActions": "Acciones",
     "selectRow": "Seleccionar la transacción de {payee}",
     "groupByFlow": "Agrupar por entradas y salidas",
     "groupCredits": "Entradas ({count})",

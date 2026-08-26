@@ -29,7 +29,6 @@
     "colAmount": "Montant",
     "colStatus": "Statut",
     "finish": "Terminer le rapprochement",
-    "colActions": "Actions",
     "selectRow": "Sélectionner la transaction pour {payee}",
     "groupByFlow": "Grouper par entrées et sorties",
     "groupCredits": "Entrées ({count})",

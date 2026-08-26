@@ -29,7 +29,6 @@
     "colAmount": "Сумма",
     "colStatus": "Статус",
     "finish": "Завершить согласование",
-    "colActions": "Действия",
     "selectRow": "Выбрать проводку для {payee}",
     "groupByFlow": "Группировать по поступлениям и списаниям",
     "groupCredits": "Поступления ({count})",

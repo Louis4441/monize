@@ -29,7 +29,6 @@
     "colAmount": "金額",
     "colStatus": "狀態",
     "finish": "完成對帳",
-    "colActions": "操作",
     "selectRow": "選取 {payee} 的交易",
     "groupByFlow": "依收入與支出分組",
     "groupCredits": "收入 ({count})",

@@ -75,8 +75,10 @@ test.describe('Mobile reconcile', () => {
     // device width the moment the table mounted.
     expect(await page.evaluate(() => window.innerWidth)).toBe(390);
 
-    // The row keeps edit/delete on phones; open the transaction form.
-    await page.getByRole('button', { name: /^edit$/i }).first().click();
+    // Actions live in the long-press / right-click sheet, not in a column:
+    // open it on the row and pick Edit to reach the transaction form.
+    await page.getByTestId(/^reconcile-row-/).first().click({ button: 'right' });
+    await page.getByRole('dialog').getByRole('button', { name: /^edit$/i }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     // Wait for the dynamically imported form's fields before measuring.

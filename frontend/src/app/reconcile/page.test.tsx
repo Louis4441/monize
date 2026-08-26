@@ -413,6 +413,14 @@ describe('ReconcilePage', () => {
       return screen.getByTestId(`reconcile-row-${id}`);
     }
 
+    // The row actions live in the long-press / right-click sheet now, not in a
+    // column, so a test reaches Edit or Delete the way a user does: open the
+    // sheet on the row, then pick the action.
+    function openRowAction(id: string, label: 'Edit' | 'Delete') {
+      fireEvent.contextMenu(rowFor(id));
+      fireEvent.click(screen.getByRole('button', { name: label }));
+    }
+
     it('opens a blank form filed against the account being reconciled', async () => {
       await advanceToReconcileStep();
       fireEvent.click(screen.getByText('Add Transaction'));
@@ -422,7 +430,7 @@ describe('ReconcilePage', () => {
 
     it('opens the clicked row for editing', async () => {
       await advanceToReconcileStep();
-      fireEvent.click(within(rowFor('tx-2')).getByLabelText('Edit'));
+      openRowAction('tx-2', 'Edit');
       expect(screen.getByTestId('form-mode')).toHaveTextContent('tx-2');
     });
 
@@ -461,7 +469,7 @@ describe('ReconcilePage', () => {
         ...mockReconciliationData,
         transactions: mockTransactions.filter((t) => t.id !== 'tx-1'),
       });
-      fireEvent.click(within(rowFor('tx-1')).getByLabelText('Delete'));
+      openRowAction('tx-1', 'Delete');
       await act(async () => {
         fireEvent.click(screen.getByText('Delete'));
       });
@@ -470,7 +478,7 @@ describe('ReconcilePage', () => {
 
     it('deletes a plain transaction through the plain delete', async () => {
       await advanceToReconcileStep();
-      fireEvent.click(within(rowFor('tx-1')).getByLabelText('Delete'));
+      openRowAction('tx-1', 'Delete');
       await act(async () => {
         fireEvent.click(screen.getByText('Delete'));
       });
@@ -486,7 +494,7 @@ describe('ReconcilePage', () => {
         transactions: [{ ...mockTransactions[0], isTransfer: true }],
       });
       await advanceToReconcileStep();
-      fireEvent.click(within(rowFor('tx-1')).getByLabelText('Delete'));
+      openRowAction('tx-1', 'Delete');
       await act(async () => {
         fireEvent.click(screen.getByText('Delete'));
       });
@@ -496,7 +504,7 @@ describe('ReconcilePage', () => {
 
     it('asks before deleting', async () => {
       await advanceToReconcileStep();
-      fireEvent.click(within(rowFor('tx-1')).getByLabelText('Delete'));
+      openRowAction('tx-1', 'Delete');
       expect(screen.getByText('Delete Transaction')).toBeInTheDocument();
       expect(mockDelete).not.toHaveBeenCalled();
     });

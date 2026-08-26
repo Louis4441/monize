@@ -29,7 +29,6 @@
     "colAmount": "金額",
     "colStatus": "ステータス",
     "finish": "照合を完了",
-    "colActions": "操作",
     "selectRow": "{payee} の取引を選択",
     "groupByFlow": "入金と出金でグループ化",
     "groupCredits": "入金 ({count})",

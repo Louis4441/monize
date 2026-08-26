@@ -29,7 +29,6 @@
     "colAmount": "Importo",
     "colStatus": "Stato",
     "finish": "Completa riconciliazione",
-    "colActions": "Azioni",
     "selectRow": "Seleziona la transazione di {payee}",
     "groupByFlow": "Raggruppa per entrate e uscite",
     "groupCredits": "Entrate ({count})",

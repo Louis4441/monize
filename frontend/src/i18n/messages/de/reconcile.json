@@ -29,7 +29,6 @@
     "colAmount": "Betrag",
     "colStatus": "Status",
     "finish": "Abgleich abschließen",
-    "colActions": "Aktionen",
     "selectRow": "Buchung für {payee} auswählen",
     "groupByFlow": "Nach Ein- und Ausgängen gruppieren",
     "groupCredits": "Eingänge ({count})",
