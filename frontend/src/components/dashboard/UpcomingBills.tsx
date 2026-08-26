@@ -190,18 +190,9 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   }
 
   // Totals use the full list; display is capped at maxItems. An item with no
-  // rate is excluded and its currency named, so "due" is marked as a subtotal
-  // rather than quietly understating what is owed. Transfers and zero-amount
-  // reminders are classified out by scheduledKind, not summed.
-  const totalDue = sumConverted(
-    upcomingItems.filter((item) => getItemType(item) === 'bill'),
-    (item) => getEffectiveAmount(item),
-    (item) => item.currencyCode,
-    (amount, currency) => {
-      const converted = convertToDefault(amount, currency);
-      return converted === null ? null : Math.abs(converted);
-    },
-  );
+  // rate is excluded and its currency named, so the total is marked as a
+  // subtotal rather than quietly understating it. Bills, transfers and
+  // zero-amount reminders are classified out by scheduledKind, not summed.
   const totalIncoming = sumConverted(
     upcomingItems.filter((item) => getItemType(item) === 'deposit'),
     (item) => getEffectiveAmount(item),
@@ -301,16 +292,6 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
         {/* Also shown when the value is 0 but items were excluded for want of a
             rate, so the missing-currency marker still tells the user the total
             could not be worked out rather than hiding the row entirely. */}
-        {(totalDue.value > 0 || totalDue.excludedCount > 0) && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">{t('upcomingBills.totalDue')}</span>
-            <span className="font-semibold text-red-600 dark:text-red-400">
-              <PartialTotal total={totalDue} displayCurrency={defaultCurrency}>
-                {'-'}{formatCurrencyBase(totalDue.value)}
-              </PartialTotal>
-            </span>
-          </div>
-        )}
         {(totalIncoming.value > 0 || totalIncoming.excludedCount > 0) && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600 dark:text-gray-400">{t('upcomingBills.totalIncoming')}</span>
