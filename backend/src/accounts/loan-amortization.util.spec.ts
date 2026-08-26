@@ -116,33 +116,51 @@ describe("Loan Amortization Utility", () => {
   describe("calculateEndDate", () => {
     const startDate = new Date(2026, 0, 1); // Jan 1, 2026
 
-    it("adds months for MONTHLY frequency", () => {
+    // startDate is payment number 1, so N payments advance N - 1 intervals.
+    // These assertions are the calendar, counted out by hand: a 12-payment
+    // monthly schedule starting 2026-01-01 pays on the 1st of every month of
+    // 2026 and is finished, so its final payment is 2026-12-01. Advancing 12
+    // intervals named 2027-01-01, a payment date the schedule never reaches.
+    it("dates the last of 12 monthly payments in the twelfth month", () => {
       const endDate = calculateEndDate(startDate, "MONTHLY", 12);
-      expect(endDate.getFullYear()).toBe(2027);
-      expect(endDate.getMonth()).toBe(0); // January
+      expect(endDate.getFullYear()).toBe(2026);
+      expect(endDate.getMonth()).toBe(11); // December
+      expect(endDate.getDate()).toBe(1);
+    });
+
+    it("dates a single payment on the first payment date itself", () => {
+      const endDate = calculateEndDate(startDate, "MONTHLY", 1);
+      expect(endDate.getTime()).toBe(startDate.getTime());
     });
 
     it("adds weeks for WEEKLY frequency", () => {
       const endDate = calculateEndDate(startDate, "WEEKLY", 4);
-      // 4 weeks = 28 days from Jan 1
-      expect(endDate.getDate()).toBe(29); // Jan 29
+      // Payments on Jan 1, 8, 15, 22 -- three 7-day advances
+      expect(endDate.getDate()).toBe(22);
     });
 
     it("adds biweekly periods", () => {
       const endDate = calculateEndDate(startDate, "BIWEEKLY", 2);
-      // 2 * 14 = 28 days
-      expect(endDate.getDate()).toBe(29);
+      // Payments on Jan 1 and Jan 15 -- one 14-day advance
+      expect(endDate.getDate()).toBe(15);
     });
 
     it("adds quarters for QUARTERLY frequency", () => {
       const endDate = calculateEndDate(startDate, "QUARTERLY", 4);
-      // 4 quarters = 1 year
-      expect(endDate.getFullYear()).toBe(2027);
+      // Payments on Jan 1, Apr 1, Jul 1, Oct 1 of the same year
+      expect(endDate.getFullYear()).toBe(2026);
+      expect(endDate.getMonth()).toBe(9); // October
     });
 
     it("adds years for YEARLY frequency", () => {
       const endDate = calculateEndDate(startDate, "YEARLY", 5);
-      expect(endDate.getFullYear()).toBe(2031);
+      // Payments in 2026..2030
+      expect(endDate.getFullYear()).toBe(2030);
+    });
+
+    it("returns the start date when there are no payments", () => {
+      const endDate = calculateEndDate(startDate, "MONTHLY", 0);
+      expect(endDate.getTime()).toBe(startDate.getTime());
     });
 
     it("returns far future for infinite payments", () => {

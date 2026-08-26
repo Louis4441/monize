@@ -146,12 +146,18 @@ export function calculateTotalPayments(
 }
 
 /**
- * Calculate the end date of a loan based on start date, frequency, and number of payments
+ * Date of the final payment, given the date of the *first* one.
  *
- * @param startDate - Date of first payment
+ * `startDate` is payment number 1 (the loan form labels it "First Payment Date"
+ * and the account's `paymentStartDate` carries it), so a schedule of N payments
+ * advances only N - 1 intervals: 12 monthly payments from 2026-01-01 end on
+ * 2026-12-01, not 2027-01-01. Advancing N put every displayed payoff date -- and
+ * the linked scheduled transaction's `endDate` -- one full payment period late.
+ *
+ * @param startDate - Date of the first payment
  * @param frequency - Payment frequency
  * @param totalPayments - Number of payments
- * @returns Estimated end date
+ * @returns Date of the last payment
  */
 export function calculateEndDate(
   startDate: Date,
@@ -167,7 +173,14 @@ export function calculateEndDate(
     return date;
   }
 
-  for (let i = 0; i < totalPayments; i++) {
+  // No payments at all: there is no final payment to date, so the caller gets
+  // the start date back rather than a date before it. One payment lands on the
+  // start date itself.
+  if (totalPayments <= 1) {
+    return date;
+  }
+
+  for (let i = 0; i < totalPayments - 1; i++) {
     switch (frequency) {
       case "WEEKLY":
         date.setDate(date.getDate() + 7);

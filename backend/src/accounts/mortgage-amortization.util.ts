@@ -2,9 +2,13 @@
  * Mortgage Amortization Utility Functions
  *
  * Key differences from loan amortization:
- * - Canadian fixed-rate mortgages: Semi-annual compounding (required by law)
- * - Canadian variable-rate mortgages: Monthly compounding
- * - US/Other mortgages: Monthly compounding
+ * - Canadian fixed-rate mortgages: semi-annual compounding (required by law),
+ *   converted to the payment period by `calculateCanadianPeriodicRate`.
+ * - Every other mortgage (Canadian variable-rate, US/other): the quoted rate is
+ *   a *nominal annual rate compounded at the payment frequency*, so the periodic
+ *   rate is `annualRate / periodsPerYear` -- see
+ *   `calculateStandardPeriodicRate` for why that is the convention and not
+ *   monthly compounding converted to the period.
  * - Supports additional payment frequencies including accelerated options
  * - Calculates payment amount based on amortization period
  */
@@ -38,9 +42,21 @@ export interface MortgageAmortizationResult {
   interestPayment: number;
   /** Total number of payments */
   totalPayments: number;
+  /**
+   * The last payment, which is the residual payoff (remaining balance plus that
+   * period's interest), not another full installment. Equal to `paymentAmount`
+   * only when the analytic payment count happens to be a whole number; -1 when
+   * the payment never amortizes.
+   */
+  finalPaymentAmount: number;
   /** Estimated payoff date */
   endDate: Date;
-  /** Total interest over life of mortgage */
+  /**
+   * Total interest over the life of the mortgage: the sum of every period's
+   * interest, with the final period charging only the residual payoff. Never
+   * `paymentAmount * totalPayments - principal`, which bills a full installment
+   * for a partial final payment. -1 when the payment never amortizes.
+   */
   totalInterest: number;
   /** Effective annual rate after compounding */
   effectiveAnnualRate: number;
@@ -88,7 +104,22 @@ export function calculateCanadianPeriodicRate(
 }
 
 /**
- * Calculate standard periodic rate (monthly compounding)
+ * Periodic rate for the nominal-rate convention: the quoted annual rate divided
+ * by the number of payments per year.
+ *
+ * This is the convention, not an approximation of monthly compounding. A rate
+ * quoted as "6% nominal, compounded at the payment frequency" costs
+ * `6 / n` per period for any n, so a biweekly mortgage's periodic rate is
+ * `0.06 / 26`, not `(1 + 0.06/12)^(12/26) - 1`. Both are defensible contracts
+ * and they differ (the second is ~0.0000031 lower per biweekly period, about
+ * 443 over a 650-payment 300k mortgage), so the choice is named here rather
+ * than left to a formula: everything outside the Canadian fixed-rate branch
+ * uses the nominal convention, and `calculateEffectiveAnnualRate` compounds at
+ * the *payment* frequency so the displayed EAR describes this same rate.
+ *
+ * The Canadian fixed-rate exception is legal, not stylistic: those mortgages
+ * must compound semi-annually, which `calculateCanadianPeriodicRate` converts
+ * to the payment period.
  *
  * @param annualRate - Annual rate as percentage (e.g., 5.5)
  * @param periodsPerYear - Number of payment periods per year
@@ -110,8 +141,9 @@ export function getPeriodicRate(
   isCanadian: boolean,
   isVariableRate: boolean,
 ): number {
-  // Canadian fixed-rate mortgages use semi-annual compounding
-  // Variable-rate and non-Canadian use monthly compounding
+  // Canadian fixed-rate mortgages compound semi-annually (required by law);
+  // every other mortgage uses the nominal-rate convention (annual rate divided
+  // by the payment frequency) -- see calculateStandardPeriodicRate.
   if (isCanadian && !isVariableRate) {
     return calculateCanadianPeriodicRate(annualRate, periodsPerYear);
   }
@@ -253,7 +285,13 @@ function calculateAcceleratedPayments(
 }
 
 /**
- * Calculate end date based on payment frequency and count
+ * Date of the final payment, given the date of the *first* one.
+ *
+ * `startDate` is payment number 1 (the mortgage form labels it "First Payment
+ * Date" and the account's `paymentStartDate` carries it), so a schedule of N
+ * payments advances only N - 1 intervals. Advancing N put every displayed payoff
+ * date -- and the linked scheduled transaction's `endDate` -- one full payment
+ * period late.
  */
 export function calculateMortgageEndDate(
   startDate: Date,
@@ -267,6 +305,14 @@ export function calculateMortgageEndDate(
     return date;
   }
 
+  // No payments at all: there is no final payment to date, so the caller gets
+  // the start date back rather than a date before it. One payment lands on the
+  // start date itself.
+  if (totalPayments <= 1) {
+    return date;
+  }
+  const advances = totalPayments - 1;
+
   // Map accelerated frequencies to their base frequency for date calculation
   const baseFrequency =
     frequency === "ACCELERATED_BIWEEKLY"
@@ -275,7 +321,7 @@ export function calculateMortgageEndDate(
         ? "WEEKLY"
         : frequency;
 
-  for (let i = 0; i < totalPayments; i++) {
+  for (let i = 0; i < advances; i++) {
     switch (baseFrequency) {
       case "WEEKLY":
         date.setDate(date.getDate() + 7);
@@ -303,24 +349,96 @@ export function calculateMortgageEndDate(
 }
 
 /**
- * Calculate the effective annual rate for display purposes
+ * Effective annual rate for display: the rate the mortgage actually costs over
+ * a year, compounded the way its own periodic rate is derived.
  *
- * For Canadian fixed-rate: EAR = (1 + r/2)^2 - 1
- * For monthly compounding: EAR = (1 + r/12)^12 - 1
+ * For Canadian fixed-rate: EAR = (1 + r/2)^2 - 1 (semi-annual, by law).
+ * Otherwise the periodic rate is `r / periodsPerYear`
+ * (`calculateStandardPeriodicRate`), so the EAR compounds at the *payment*
+ * frequency: EAR = (1 + r/n)^n - 1. Compounding at 12 regardless of n
+ * described a rate the schedule never used -- a biweekly mortgage charges
+ * `r/26` twenty-six times, not `r/12` twelve times.
+ *
+ * @param periodsPerYear - Payments per year, from getMortgagePeriodsPerYear
  */
 export function calculateEffectiveAnnualRate(
   annualRate: number,
   isCanadian: boolean,
   isVariableRate: boolean,
+  periodsPerYear: number,
 ): number {
   if (isCanadian && !isVariableRate) {
     // Semi-annual compounding
     const ear = Math.pow(1 + annualRate / 100 / 2, 2) - 1;
     return Math.round(ear * 10000) / 100; // Return as percentage with 2 decimals
   }
-  // Monthly compounding
-  const ear = Math.pow(1 + annualRate / 100 / 12, 12) - 1;
+  // Nominal rate compounded at the payment frequency
+  const ear =
+    Math.pow(1 + annualRate / 100 / periodsPerYear, periodsPerYear) - 1;
   return Math.round(ear * 10000) / 100;
+}
+
+/**
+ * The last payment of a schedule, and the lifetime interest that follows from it.
+ *
+ * `totalPayments` is a whole number of periods, but the payment that clears the
+ * balance is almost never a full installment: an accelerated schedule's analytic
+ * payoff count is fractional (`Math.ceil` rounds it up), and even a standard
+ * schedule's installment is rounded to storage precision, so a remainder is left
+ * over. `paymentAmount * totalPayments - principal` bills a whole installment for
+ * that partial period -- 569.23 too much interest on a 25-year accelerated
+ * biweekly mortgage, reported as lifetime interest under a total's label.
+ *
+ * So the residual is computed instead: the balance left after `n - 1` full
+ * installments, closed out with that period's interest.
+ *
+ *   B_k = P(1 + r)^k - A((1 + r)^k - 1) / r        (B_k = P - A*k when r = 0)
+ *   final = B_{n-1} * (1 + r)
+ *
+ * @param principal - Amount borrowed (positive)
+ * @param periodicRate - Interest rate per payment period, as a decimal
+ * @param paymentAmount - The regular installment
+ * @param totalPayments - Whole number of payments, finite and at least 1
+ * @returns The final payment and the sum of every period's interest
+ */
+export function calculateResidualPayoff(
+  principal: number,
+  periodicRate: number,
+  paymentAmount: number,
+  totalPayments: number,
+): { finalPaymentAmount: number; totalInterest: number } {
+  // Nothing owed is a KNOWN zero, not an unknown: a mortgage already paid off
+  // reaches here through recalculateMortgageAfterRateChange with a zero balance,
+  // and reporting -1 ("could not be worked out") for it would be wrong.
+  if (principal === 0) {
+    return { finalPaymentAmount: 0, totalInterest: 0 };
+  }
+  if (!isFinite(totalPayments) || totalPayments < 1 || principal < 0) {
+    return { finalPaymentAmount: -1, totalInterest: -1 };
+  }
+
+  const fullPayments = totalPayments - 1;
+  const balanceBeforeFinal =
+    periodicRate === 0
+      ? principal - paymentAmount * fullPayments
+      : (() => {
+          const growth = Math.pow(1 + periodicRate, fullPayments);
+          return (
+            principal * growth - (paymentAmount * (growth - 1)) / periodicRate
+          );
+        })();
+
+  // A negative remainder means the installment cleared the balance before the
+  // last period; the schedule is one payment shorter than the count says, so the
+  // final payment is nothing rather than a credit.
+  const finalPaymentAmount = roundMoney(
+    Math.max(0, balanceBeforeFinal * (1 + periodicRate)),
+  );
+  const totalPaid = paymentAmount * fullPayments + finalPaymentAmount;
+  return {
+    finalPaymentAmount,
+    totalInterest: roundMoney(totalPaid - principal),
+  };
 }
 
 /**
@@ -380,15 +498,21 @@ export function calculateMortgageAmortization(
     totalPayments,
   );
 
-  // Calculate total interest
-  const totalPaid = paymentAmount * totalPayments;
-  const totalInterest = roundMoney(totalPaid - principal);
+  // Lifetime interest, with the last period charging only the residual payoff
+  // rather than another full installment.
+  const { finalPaymentAmount, totalInterest } = calculateResidualPayoff(
+    principal,
+    periodicRate,
+    paymentAmount,
+    totalPayments,
+  );
 
   // Calculate effective annual rate
   const effectiveAnnualRate = calculateEffectiveAnnualRate(
     annualRate,
     isCanadian,
     isVariableRate,
+    periodsPerYear,
   );
 
   return {
@@ -396,6 +520,7 @@ export function calculateMortgageAmortization(
     principalPayment: Math.max(0, principalPayment),
     interestPayment,
     totalPayments: isFinite(totalPayments) ? totalPayments : -1,
+    finalPaymentAmount,
     endDate,
     totalInterest: isFinite(totalInterest) ? totalInterest : -1,
     effectiveAnnualRate,
