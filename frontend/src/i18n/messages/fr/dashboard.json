@@ -37,7 +37,8 @@
       "bill": "Facture",
       "deposit": "Dépôt",
       "transfer": "Virement",
-      "reminder": "Rappel"
+      "reminder": "Rappel",
+      "unknown": "Inconnu"
     }
   },
   "gettingStarted": {

@@ -37,7 +37,8 @@
       "bill": "账单",
       "deposit": "存款",
       "transfer": "转账",
-      "reminder": "提醒"
+      "reminder": "提醒",
+      "unknown": "未知"
     }
   },
   "gettingStarted": {

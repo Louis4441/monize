@@ -910,6 +910,7 @@ describe("built-in reports and investment cash accounts (integration)", () => {
         dataSource,
         {} as never,
         {} as never,
+        {} as never,
       );
       const history = await withUserContext(userId, () =>
         (

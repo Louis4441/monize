@@ -119,3 +119,17 @@ export function formatMonthKey(year: number, month: number): string {
 export function isTransactionInFuture(transactionDate: string): boolean {
   return transactionDate > todayYMD();
 }
+
+/**
+ * Add whole days to a `YYYY-MM-DD` string, returning `YYYY-MM-DD`.
+ *
+ * Arithmetic in UTC on purpose: the input carries no time and no zone, so a
+ * local-time step would shift the day either side of a DST boundary.
+ */
+export function addDaysYMD(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getUTCFullYear()}-${p(dt.getUTCMonth() + 1)}-${p(dt.getUTCDate())}`;
+}

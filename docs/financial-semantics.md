@@ -251,8 +251,19 @@ records where it is implemented additively instead.
 ## 7. Scheduled occurrences
 
 An occurrence may carry an override. `scheduled_transaction_overrides` is unique
-on `(scheduled_transaction_id, override_date)`, so one occurrence has at most one
-override.
+on `(scheduled_transaction_id, original_date)`
+(`uq_sched_txn_overrides_occurrence`, migration 166), so one occurrence has at
+most one override.
+
+That constraint used to name `override_date`, and the sentence above was drawn
+from it as if the two were interchangeable -- they are not, and the conclusion
+was false in both directions. `original_date` is the occurrence's identity;
+`override_date` is where the override moved it. Keyed on the latter, two
+overrides could replace one slot (the reader kept whichever row came first, so
+row order chose the amount, category and date a posting used) while two genuinely
+different occurrences could not be moved onto the same day. `createOverride`'s
+SELECT-then-INSERT was the only thing between the API and the first state, and a
+SELECT is not a lock.
 
 ```text
 FIN-004
@@ -264,6 +275,40 @@ a fresh quote is an explicit action, never a side effect of opening a dialog.
 Ten shares stored at 100.00 that come back as ten at 120.00 -- with the total
 silently recomputed -- is a money field changed by nobody, and the user has no
 way to tell it happened.
+
+```text
+FIN-005
+`scheduled_transactions.amount` is a snapshot taken at whatever exchange rate was
+current when it was written, not a description of what the occurrence will post.
+For an FX-sensitive schedule -- a top-level investment, whose `amount` is the
+security-currency cash impact, or a split parent carrying an investment line --
+it stops describing the occurrence the moment a referenced security's or
+account's currency changes.
+
+The current amount is resolved, once, by
+`ScheduledEffectiveAmountService.resolveMany`: the stored rate when its recorded
+pair is still the settlement pair (because that is what posting will reuse),
+otherwise a freshly resolved rate, and `null` when a genuine cross-currency pair
+has no determinable rate. Every surface that presents or aggregates an
+occurrence's cash amount reads that answer, in the settlement currency it names,
+and reports `null` as unavailable. A total containing an unknown component is
+`null` with the partial sum in a separately named field.
+```
+
+The persisted scalar is never the fallback. Substituting it turns "we do not know
+what this will cost" into a confident wrong number -- 1,500 CAD for an occurrence
+that posts 1,350 -- and it did so on five product surfaces at once while the
+cash-flow forecast beside them was right (issue #1247).
+
+Nor is the recurrence slot the due date. An override is addressed to a slot
+(`original_date`, the occurrence's identity) and may move the occurrence to
+another day (`override_date`); a surface that filters, sorts or prints the slot
+announces a payment on a day the user has already changed. Both halves come from
+one place -- `expandOccurrenceSlots` decides which occurrence, and
+`ScheduledOccurrenceService` prices it -- because centralizing the arithmetic
+alone left every consumer free to pick the wrong occurrence and be confidently
+wrong about a number that was itself correct. INV-OCCURRENCE-003 in
+`docs/system-invariants.md` records the enforcement.
 
 ## 8. Import and restore: zero, null, absent
 
