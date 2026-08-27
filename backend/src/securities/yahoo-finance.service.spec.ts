@@ -2437,6 +2437,48 @@ describe("YahooFinanceService", () => {
       expect(timedHealth.snapshot("yahoo_finance").state).toBe("closed");
     });
 
+    it("frees the probe on a routine 404, on every path that can get one", async () => {
+      // Nine branches used to record this for themselves and two forgot, each
+      // leaving the exclusive probe slot held for two minutes against a
+      // provider that had just answered. The rule now lives in one place, so
+      // this walks the paths rather than the branches.
+      let clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+      // The crumb cache is checked against the real clock, not the breaker's.
+      const seeded = timedService as unknown as {
+        crumb: string;
+        cookie: string;
+        crumbExpiresAt: number;
+      };
+      seeded.crumb = "test-crumb";
+      seeded.cookie = "test-cookie";
+      seeded.crumbExpiresAt = Date.now() + 3_600_000;
+
+      global.fetch = jest.fn(() => Promise.reject(dnsFailure()));
+      for (let i = 0; i < 5; i++) {
+        await timedService.fetchHistorical("^RUT", null, "1y");
+      }
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("open");
+
+      clock += OPEN_WINDOW_MS + 1;
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({}),
+          text: () => Promise.resolve(""),
+        } as never),
+      );
+
+      // The probe is spent on an ETF-breakdown call, one of the two paths that
+      // used to forget.
+      await timedService.fetchEtfBreakdowns("SPY");
+
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("closed");
+      expect(timedHealth.wouldRefuse("yahoo_finance")).toBe(false);
+    });
+
     it("counts one throw once, however many layers report it", async () => {
       // The fetch helper counts what it catches and rethrows; the caller's catch
       // hands the same object to the log door. Counting it twice would open the

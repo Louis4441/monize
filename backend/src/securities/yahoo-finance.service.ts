@@ -223,14 +223,21 @@ export class YahooFinanceService implements QuoteProvider {
           }
           throw error;
         }
-        // Deliberately *not* a recorded success. Headers are not a completed
-        // request: a provider that accepts the connection and then stalls the
-        // body answers them every time, and recording that as success closed
+        // A 2xx is *not* recorded as a success here. Headers are not a
+        // completed request: a provider that accepts the connection and then
+        // stalls the body answers them every time, and recording that closed
         // the breaker on every probe -- so it flapped once a window, the
         // escalation never grew, and each fresh episode reset the alert's
-        // fifteen-minute clock so no alert was ever sent. Completion is
-        // recorded where the body is read, by `readBody` and by the branches
-        // that legitimately read none.
+        // fifteen-minute clock so no alert was ever sent. A 2xx is recorded by
+        // `readBody`, where the body actually arrives.
+        //
+        // Anything else *is* recorded, right here. A non-2xx is a complete
+        // answer with nothing left for the caller to read, and every branch
+        // that handles one used to record it for itself -- which meant nine
+        // places to remember and two that did not, each leaving the probe slot
+        // held for two minutes against a provider that had just answered a
+        // routine 404.
+        if (!response.ok) this.health.recordSuccess(HEALTH_PROVIDER_ID);
         lastResponse = response;
         if (!YahooFinanceService.THROTTLED_STATUSES.has(response.status)) {
           return response;
@@ -285,14 +292,6 @@ export class YahooFinanceService implements QuoteProvider {
       : response.text())) as T;
     this.health.recordSuccess(HEALTH_PROVIDER_ID);
     return value;
-  }
-
-  /**
-   * Record a response the client will not read a body from -- a non-2xx status,
-   * typically. The host answered in full; there is nothing left to stall on.
-   */
-  private recordAnsweredWithoutBody(): void {
-    this.health.recordSuccess(HEALTH_PROVIDER_ID);
   }
 
   private async ensureCrumb(forceRefresh = false): Promise<boolean> {
@@ -415,8 +414,10 @@ export class YahooFinanceService implements QuoteProvider {
         );
 
         if (!crumbResp.ok) {
-          // The API host answered in full; there is no body to stall on.
-          this.recordAnsweredWithoutBody();
+          // This request does not go through `throttledFetch`, so the non-2xx
+          // rule has to be applied here: the API host answered in full, and
+          // there is no body left to stall on.
+          this.health.recordSuccess(HEALTH_PROVIDER_ID);
           reported = true;
           lastStatus = crumbResp.status;
           await crumbResp.text().catch(() => undefined);
@@ -543,8 +544,6 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
-        // The host answered in full; nothing left to stall on.
-        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance API returned ${response.status} for ${yahooSymbol}`,
         );
@@ -709,10 +708,6 @@ export class YahooFinanceService implements QuoteProvider {
       );
 
       if (!response.ok) {
-        // The host answered in full; nothing left to stall on.
-        this.recordAnsweredWithoutBody();
-        // The host answered in full; nothing left to stall on.
-        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance API returned ${response.status} for historical ${yahooSymbol}`,
         );
@@ -860,8 +855,6 @@ export class YahooFinanceService implements QuoteProvider {
       );
 
       if (!response.ok) {
-        // The host answered in full; nothing left to stall on.
-        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance intraday returned ${response.status} for ${yahooSymbol} (${interval}/${range})`,
         );
@@ -939,8 +932,6 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
-        // The host answered in full; nothing left to stall on.
-        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance search API returned ${response.status} for query: ${query}`,
         );
@@ -1263,8 +1254,6 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
-        // The host answered in full; nothing left to stall on.
-        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance search returned ${response.status} for ${yahooSymbol}`,
         );
@@ -1587,8 +1576,6 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
-        // The host answered in full; nothing left to stall on.
-        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo news lookup returned ${response.status} for ${symbol}`,
         );

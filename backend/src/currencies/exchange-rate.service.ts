@@ -832,7 +832,11 @@ export class ExchangeRateService implements OnModuleInit {
       };
     }
 
-    return { stored: 0, answered: direct !== null || reverse !== null };
+    // Both directions, not either: "this pair has no rates in this window" is
+    // only known when both symbols answered. One of them answering `[]` while
+    // the other failed or was refused is exactly the half-knowledge that used
+    // to be cached for thirty minutes.
+    return { stored: 0, answered: direct !== null && reverse !== null };
   }
 
   /**

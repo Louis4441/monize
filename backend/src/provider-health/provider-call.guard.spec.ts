@@ -101,6 +101,33 @@ describe("outbound provider calls are answerable to the breaker", () => {
   );
 });
 
+describe("a response is recorded in one place per client", () => {
+  /**
+   * Nine `if (!response.ok)` branches each recorded the answer for themselves,
+   * and two forgot -- leaving the exclusive half-open probe slot held for two
+   * minutes against a provider that had just answered a routine 404. The rule
+   * moved to the places each client funnels requests through, and the count is
+   * what keeps it from drifting back out:
+   *
+   * - Yahoo: three. `throttledFetch`'s non-2xx rule, `readBody`'s
+   *   body-completion rule, and the crumb handshake, which is a raw `fetch`
+   *   outside `throttledFetch`.
+   * - MSN: four. Two request helpers, each with a non-2xx branch and a
+   *   body-completion point; it has no shared fetch helper to hang the rule on.
+   *
+   * A number going *up* means a branch started recording for itself again.
+   */
+  it.each([
+    ["securities/yahoo-finance.service.ts", 3],
+    ["securities/msn-finance.service.ts", 4],
+  ])("%s records an arrived response in at most %i places", (file, allowed) => {
+    const source = readFileSync(join(SRC_ROOT, file), "utf8");
+    const occurrences = source.split("recordSuccess(").length - 1;
+    expect(occurrences).toBeLessThanOrEqual(allowed);
+    expect(occurrences).toBeGreaterThan(0);
+  });
+});
+
 describe("tracked provider ids", () => {
   it.each(Object.keys(TRACKED_PROVIDERS))(
     "%s is the id some client actually reports under",

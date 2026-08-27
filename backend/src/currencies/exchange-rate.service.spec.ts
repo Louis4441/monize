@@ -1656,6 +1656,31 @@ describe("ExchangeRateService", () => {
       ).toBeGreaterThan(callsAfterFirst);
     });
 
+    it("does not remember a pair only one direction answered for", async () => {
+      // `USDCAD=X` answering "no bars" says nothing about `CADUSD=X`, and this
+      // memory holds for 30 minutes: half-knowledge is what used to be cached.
+      let call = 0;
+      yahooFinanceService.fetchHistoricalWindow.mockImplementation(() => {
+        call++;
+        return Promise.resolve(call === 1 ? [] : null);
+      });
+
+      await service.ensureRatesForDate(
+        [{ from: "USD", to: "CAD" }],
+        "2026-03-15",
+      );
+      const callsAfterFirst =
+        yahooFinanceService.fetchHistoricalWindow.mock.calls.length;
+
+      await service.ensureRatesForDate(
+        [{ from: "USD", to: "CAD" }],
+        "2026-03-16",
+      );
+      expect(
+        yahooFinanceService.fetchHistoricalWindow.mock.calls.length,
+      ).toBeGreaterThan(callsAfterFirst);
+    });
+
     it("still remembers a window the provider answered as empty", async () => {
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([]);
 
