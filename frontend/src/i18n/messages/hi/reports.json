@@ -438,6 +438,7 @@
     "currentBalance": "वर्तमान शेष",
     "principalPaid": "मूलधन भुगतान",
     "estTotalInterest": "अनुमानित कुल ब्याज",
+    "interestOverProjection": "अनुमानित अवधि का ब्याज",
     "interestPaid": "ब्याज भुगतान",
     "progress": "प्रगति",
     "estPayoff": "अनुमानित भुगतान",
@@ -808,6 +809,7 @@
     "originalAmount": "मूल राशि",
     "interestRate": "ब्याज दर",
     "estTotalInterest": "अनुमानित कुल ब्याज",
+    "interestOverProjection": "अनुमानित अवधि का ब्याज",
     "totalInterestPaid": "कुल ब्याज भुगतान",
     "paymentsMade": "किए गए भुगतान",
     "estPayoff": "अनुमानित भुगतान",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "ऋण-सीमा",
     "typeLoan": "ऋण",
     "typeMortgage": "बंधक",
-    "pdfSubtitlePaymentsSummary": "{count} भुगतान किए गए, {interest} कुल ब्याज"
+    "pdfSubtitlePaymentsSummary": "{count} भुगतान किए गए, {interest} कुल ब्याज",
+    "pdfSubtitlePaymentsProjection": "{count} भुगतान किए गए, प्रक्षेपण अवधि में {interest} ब्याज"
   },
   "monteCarlo": {
     "toasts": {

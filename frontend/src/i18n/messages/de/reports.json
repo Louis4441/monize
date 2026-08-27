@@ -438,6 +438,7 @@
     "currentBalance": "Aktueller Saldo",
     "principalPaid": "Getilgte Summe",
     "estTotalInterest": "Gesch. Gesamtzinsen",
+    "interestOverProjection": "Zinsen im Prognosezeitraum",
     "interestPaid": "Gezahlte Zinsen",
     "progress": "Fortschritt",
     "estPayoff": "Gesch. Tilgung",
@@ -808,6 +809,7 @@
     "originalAmount": "Ursprünglicher Betrag",
     "interestRate": "Zinssatz",
     "estTotalInterest": "Gesch. Gesamtzinsen",
+    "interestOverProjection": "Zinsen im Prognosezeitraum",
     "totalInterestPaid": "Gezahlte Zinsen gesamt",
     "paymentsMade": "Geleistete Zahlungen",
     "estPayoff": "Gesch. Tilgung",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "Kreditlinie",
     "typeLoan": "Darlehen",
     "typeMortgage": "Hypothek",
-    "pdfSubtitlePaymentsSummary": "{count} Zahlungen geleistet, {interest} Zinsen gesamt"
+    "pdfSubtitlePaymentsSummary": "{count} Zahlungen geleistet, {interest} Zinsen gesamt",
+    "pdfSubtitlePaymentsProjection": "{count} Zahlungen geleistet, {interest} Zinsen über den Projektionszeitraum"
   },
   "monteCarlo": {
     "toasts": {

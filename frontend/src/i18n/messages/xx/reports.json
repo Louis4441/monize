@@ -438,6 +438,7 @@
     "currentBalance": "[XX-Current Balance-XX]",
     "principalPaid": "[XX-Principal Paid-XX]",
     "estTotalInterest": "[XX-Est. Total Interest-XX]",
+    "interestOverProjection": "[XX-Interest Over Projection-XX]",
     "interestPaid": "[XX-Interest Paid-XX]",
     "progress": "[XX-Progress-XX]",
     "estPayoff": "[XX-Est. Payoff-XX]",
@@ -808,6 +809,7 @@
     "originalAmount": "[XX-Original Amount-XX]",
     "interestRate": "[XX-Interest Rate-XX]",
     "estTotalInterest": "[XX-Est. Total Interest-XX]",
+    "interestOverProjection": "[XX-Interest Over Projection-XX]",
     "totalInterestPaid": "[XX-Total Interest Paid-XX]",
     "paymentsMade": "[XX-Payments Made-XX]",
     "estPayoff": "[XX-Est. Payoff-XX]",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "[XX-Line of Credit-XX]",
     "typeLoan": "[XX-Loan-XX]",
     "typeMortgage": "[XX-Mortgage-XX]",
-    "pdfSubtitlePaymentsSummary": "[XX-{count} payments made, {interest} total interest-XX]"
+    "pdfSubtitlePaymentsSummary": "[XX-{count} payments made, {interest} total interest-XX]",
+    "pdfSubtitlePaymentsProjection": "[XX-{count} payments made, {interest} interest over projection-XX]"
   },
   "monteCarlo": {
     "toasts": {

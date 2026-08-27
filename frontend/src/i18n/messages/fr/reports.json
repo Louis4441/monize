@@ -438,6 +438,7 @@
     "currentBalance": "Solde actuel",
     "principalPaid": "Capital remboursé",
     "estTotalInterest": "Intérêts totaux estimés",
+    "interestOverProjection": "Intérêts sur la projection",
     "interestPaid": "Intérêts payés",
     "progress": "Progression",
     "estPayoff": "Remboursement estimé",
@@ -808,6 +809,7 @@
     "originalAmount": "Montant initial",
     "interestRate": "Taux d'intérêt",
     "estTotalInterest": "Intérêts totaux estimés",
+    "interestOverProjection": "Intérêts sur la projection",
     "totalInterestPaid": "Total des intérêts payés",
     "paymentsMade": "Paiements effectués",
     "estPayoff": "Remboursement estimé",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "Ligne de crédit",
     "typeLoan": "Prêt",
     "typeMortgage": "Hypothèque",
-    "pdfSubtitlePaymentsSummary": "{count} paiements effectués, {interest} d'intérêts au total"
+    "pdfSubtitlePaymentsSummary": "{count} paiements effectués, {interest} d'intérêts au total",
+    "pdfSubtitlePaymentsProjection": "{count} paiements effectués, {interest} d'intérêts sur la projection"
   },
   "monteCarlo": {
     "toasts": {

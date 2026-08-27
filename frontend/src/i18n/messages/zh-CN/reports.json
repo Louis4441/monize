@@ -438,6 +438,7 @@
     "currentBalance": "当前余额",
     "principalPaid": "已还本金",
     "estTotalInterest": "预计总利息",
+    "interestOverProjection": "预测期利息",
     "interestPaid": "已还利息",
     "progress": "进度",
     "estPayoff": "预计还清",
@@ -808,6 +809,7 @@
     "originalAmount": "原始金额",
     "interestRate": "利率",
     "estTotalInterest": "预计总利息",
+    "interestOverProjection": "预测期利息",
     "totalInterestPaid": "已还总利息",
     "paymentsMade": "已还款次数",
     "estPayoff": "预计还清",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "信用额度",
     "typeLoan": "贷款",
     "typeMortgage": "抵押贷款",
-    "pdfSubtitlePaymentsSummary": "已还款 {count} 次，总利息 {interest}"
+    "pdfSubtitlePaymentsSummary": "已还款 {count} 次，总利息 {interest}",
+    "pdfSubtitlePaymentsProjection": "已还款 {count} 期，预测期内利息 {interest}"
   },
   "monteCarlo": {
     "toasts": {

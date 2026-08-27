@@ -438,6 +438,7 @@
     "currentBalance": "Mevcut Bakiye",
     "principalPaid": "Ödenen Anapara",
     "estTotalInterest": "Tahmini Toplam Faiz",
+    "interestOverProjection": "Öngörü dönemi faizi",
     "interestPaid": "Ödenen Faiz",
     "progress": "İlerleme",
     "estPayoff": "Tahmini Kapanma",
@@ -808,6 +809,7 @@
     "originalAmount": "Orijinal Tutar",
     "interestRate": "Faiz Oranı",
     "estTotalInterest": "Tahmini Toplam Faiz",
+    "interestOverProjection": "Öngörü dönemi faizi",
     "totalInterestPaid": "Ödenen Toplam Faiz",
     "paymentsMade": "Yapılan Ödemeler",
     "estPayoff": "Tahmini Kapanma",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "Kredi Limiti",
     "typeLoan": "Kredi",
     "typeMortgage": "İpotek",
-    "pdfSubtitlePaymentsSummary": "{count} ödeme yapıldı, {interest} toplam faiz"
+    "pdfSubtitlePaymentsSummary": "{count} ödeme yapıldı, {interest} toplam faiz",
+    "pdfSubtitlePaymentsProjection": "{count} ödeme yapıldı, projeksiyon boyunca {interest} faiz"
   },
   "monteCarlo": {
     "toasts": {

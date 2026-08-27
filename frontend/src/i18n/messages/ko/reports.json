@@ -438,6 +438,7 @@
     "currentBalance": "현재 잔액",
     "principalPaid": "납부된 원금",
     "estTotalInterest": "예상 총 이자",
+    "interestOverProjection": "예측 기간 이자",
     "interestPaid": "납부된 이자",
     "progress": "진행률",
     "estPayoff": "예상 완납일",
@@ -808,6 +809,7 @@
     "originalAmount": "원래 금액",
     "interestRate": "이자율",
     "estTotalInterest": "예상 총 이자",
+    "interestOverProjection": "예측 기간 이자",
     "totalInterestPaid": "납부된 총 이자",
     "paymentsMade": "납부 횟수",
     "estPayoff": "예상 완납일",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "신용 한도",
     "typeLoan": "대출",
     "typeMortgage": "주택 담보 대출",
-    "pdfSubtitlePaymentsSummary": "{count}건의 납부 완료, 총 이자 {interest}"
+    "pdfSubtitlePaymentsSummary": "{count}건의 납부 완료, 총 이자 {interest}",
+    "pdfSubtitlePaymentsProjection": "{count}회 상환 완료, 예상 기간 이자 {interest}"
   },
   "monteCarlo": {
     "toasts": {

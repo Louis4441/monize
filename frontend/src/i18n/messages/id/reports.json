@@ -438,6 +438,7 @@
     "currentBalance": "Saldo Saat Ini",
     "principalPaid": "Pokok Dibayar",
     "estTotalInterest": "Perkiraan Total Bunga",
+    "interestOverProjection": "Bunga selama proyeksi",
     "interestPaid": "Bunga Dibayar",
     "progress": "Kemajuan",
     "estPayoff": "Perkiraan Pelunasan",
@@ -808,6 +809,7 @@
     "originalAmount": "Jumlah Awal",
     "interestRate": "Suku Bunga",
     "estTotalInterest": "Perkiraan Total Bunga",
+    "interestOverProjection": "Bunga selama proyeksi",
     "totalInterestPaid": "Total Bunga Dibayar",
     "paymentsMade": "Pembayaran Dilakukan",
     "estPayoff": "Perkiraan Pelunasan",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "Jalur Kredit",
     "typeLoan": "Pinjaman",
     "typeMortgage": "Hipotek",
-    "pdfSubtitlePaymentsSummary": "{count} pembayaran dilakukan, {interest} total bunga"
+    "pdfSubtitlePaymentsSummary": "{count} pembayaran dilakukan, {interest} total bunga",
+    "pdfSubtitlePaymentsProjection": "{count} pembayaran dilakukan, bunga {interest} selama proyeksi"
   },
   "monteCarlo": {
     "toasts": {

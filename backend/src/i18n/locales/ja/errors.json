@@ -27,6 +27,8 @@
     "loanRequiresInstitution": "ローン口座には金融機関名が必要です",
     "mortgageRequiredFields": "住宅ローン口座には mortgagePaymentFrequency、paymentStartDate、sourceAccountId、および amortizationMonths が必要です",
     "mortgageRequiresInterestRate": "住宅ローン口座には利率が必要です",
+    "mortgageFrequencyUnsupported": "カナダの住宅ローンは支払頻度 {frequency} では設定できません",
+    "paymentFrequencyUnsupported": "支払頻度 {frequency} は設定できません",
     "mortgageRequiresInstitution": "住宅ローン口座には金融機関名が必要です",
     "onlyMortgageAccounts": "この操作は住宅ローン口座にのみ有効です",
     "updateRateClosed": "閉鎖された口座の利率は更新できません",

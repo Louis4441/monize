@@ -27,6 +27,8 @@
     "loanRequiresInstitution": "As contas de empréstimo requerem um nome de instituição",
     "mortgageRequiredFields": "As contas de crédito habitação requerem mortgagePaymentFrequency, paymentStartDate, sourceAccountId e amortizationMonths",
     "mortgageRequiresInterestRate": "As contas de crédito habitação requerem uma taxa de juro",
+    "mortgageFrequencyUnsupported": "Os créditos habitação canadianos não podem ser agendados com a frequência de pagamento {frequency}",
+    "paymentFrequencyUnsupported": "Não é possível agendar a frequência de pagamento {frequency}",
     "mortgageRequiresInstitution": "As contas de crédito habitação requerem um nome de instituição",
     "onlyMortgageAccounts": "Esta operação só é válida para contas de crédito habitação",
     "updateRateClosed": "Não é possível atualizar a taxa de uma conta encerrada",

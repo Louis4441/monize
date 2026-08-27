@@ -438,6 +438,7 @@
     "currentBalance": "Текущий остаток",
     "principalPaid": "Основной долг уплачен",
     "estTotalInterest": "Расч. общие проценты",
+    "interestOverProjection": "Проценты за прогнозный период",
     "interestPaid": "Проценты уплачены",
     "progress": "Прогресс",
     "estPayoff": "Расч. погашение",
@@ -808,6 +809,7 @@
     "originalAmount": "Первоначальная сумма",
     "interestRate": "Процентная ставка",
     "estTotalInterest": "Расч. общие проценты",
+    "interestOverProjection": "Проценты за прогнозный период",
     "totalInterestPaid": "Всего уплачено процентов",
     "paymentsMade": "Платежей произведено",
     "estPayoff": "Расч. погашение",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "Кредитная линия",
     "typeLoan": "Займ",
     "typeMortgage": "Ипотека",
-    "pdfSubtitlePaymentsSummary": "{count} платежей произведено, {interest} общие проценты"
+    "pdfSubtitlePaymentsSummary": "{count} платежей произведено, {interest} общие проценты",
+    "pdfSubtitlePaymentsProjection": "Внесено платежей: {count}, проценты за период прогноза: {interest}"
   },
   "monteCarlo": {
     "toasts": {
