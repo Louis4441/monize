@@ -7,10 +7,7 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { expandOccurrenceSlots } from "../common/scheduled-occurrences";
 import { todayYMD } from "../common/date-utils";
-import {
-  MAX_REMINDER_DAYS_BEFORE,
-  reminderWindowThrough,
-} from "../scheduled-transactions/reminder-window";
+import { reminderWindowThrough } from "../scheduled-transactions/reminder-window";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { User } from "../users/entities/user.entity";
 import { EmailService } from "./email.service";
@@ -280,12 +277,12 @@ export class BillReminderService {
       // Reduced rather than spread: `Math.max(...xs)` over a per-user array is a
       // stack-depth limit disguised as an aggregate, and this array is as long as
       // the user's manual-bill list.
+      //
+      // No clamp here: `reminderWindowThrough` owns the ceiling, and its own doc
+      // says why it lives there rather than at a call site. A second copy of the
+      // bound is a second thing to move when the bound moves.
       const longestWindow = bills.reduce(
-        (widest, b) =>
-          Math.max(
-            widest,
-            Math.min(b.reminderDaysBefore ?? 0, MAX_REMINDER_DAYS_BEFORE),
-          ),
+        (widest, b) => Math.max(widest, b.reminderDaysBefore ?? 0),
         0,
       );
       const occurrences = await this.occurrences.expand(userId, [...bills], {

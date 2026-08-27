@@ -1669,8 +1669,18 @@ export class ScheduledTransactionsService {
       matchesScheduledFilter(item, filter),
     );
 
-    const bills = items.filter((i) => i.kind === "bill");
-    const deposits = items.filter((i) => i.kind === "deposit");
+    // From the ROLLUP BASE, not from the kind-filtered list.
+    //
+    // A rollup total is a statement about the window, and a caller narrowing the
+    // LIST to deposits has not said the bills stopped existing. Taken from
+    // `items`, `kind: "deposit"` made `bills` empty and published
+    // `totalUpcomingBills: 0` with `amountsComplete: true` -- a confident "no
+    // bills are coming" over a window holding a 1,200 bill. That is the same
+    // defect the `unclassified` line below already guards against, and the
+    // previous pass fixed only that half of it: the unknown bucket was moved off
+    // the filtered list while these two were left on it (issue #1247, round 4).
+    const bills = rollupBase.filter((i) => i.kind === "bill");
+    const deposits = rollupBase.filter((i) => i.kind === "deposit");
     // An occurrence whose direction is not derivable could belong to EITHER
     // bucket, so it withholds both totals rather than being quietly left out of
     // both -- its amount is null, which is what `totalConvertedInto` withholds
@@ -1714,14 +1724,14 @@ export class ScheduledTransactionsService {
     const missingRatePairs = [
       ...new Set([...billsTotal.missingPairs, ...depositsTotal.missingPairs]),
     ].sort();
-    // Named from the rollup base for the same reason: an unknown the kind filter
-    // removed from the list still makes the totals incomplete, so the caller has
-    // to be told which item it was.
+    // Named from the rollup base, which is what the totals now cover: an item
+    // the kind filter removed from the LIST still makes a total incomplete, so
+    // the caller has to be told which item it was. Reading `items` here named
+    // only the ones that survived the filter, so an unpriceable bill under
+    // `kind: "deposit"` went unmentioned while making the bills total unknown.
     const unknownAmountItems = [
       ...new Set(
-        [...items, ...unclassified]
-          .filter((i) => !i.amountComplete)
-          .map((i) => i.name),
+        rollupBase.filter((i) => !i.amountComplete).map((i) => i.name),
       ),
     ];
 

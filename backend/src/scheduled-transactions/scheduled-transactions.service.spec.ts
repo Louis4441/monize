@@ -1557,6 +1557,75 @@ describe("ScheduledTransactionsService", () => {
       });
     });
 
+    describe("a kind filter narrows the list, never the rollups", () => {
+      /**
+       * A rollup total is a statement about the WINDOW. A caller narrowing the
+       * list to deposits has not said the bills stopped existing, and a bucket
+       * built from the filtered list published `totalUpcomingBills: 0` with
+       * `amountsComplete: true` over a window holding a 1,200 bill -- a
+       * confident "nothing is due", which is worse than no answer.
+       *
+       * The previous pass fixed exactly half of this: it moved the unknown
+       * bucket off the filtered list and left these two on it.
+       */
+      it("still reports the other bucket's total", async () => {
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder([
+            makeScheduled({ id: "s-bill", name: "Rent", amount: -1200 }),
+            makeScheduled({ id: "s-dep", name: "Salary", amount: 3000 }),
+          ]),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId, {
+          kind: "deposit",
+        });
+
+        // The list honours the filter...
+        expect(result.items.map((i) => i.name)).toEqual(["Salary"]);
+        // ...and neither total pretends the filtered-out half is empty.
+        expect(result.totalUpcomingBills).toBe(1200);
+        expect(result.totalUpcomingDeposits).toBe(3000);
+        expect(result.amountsComplete).toBe(true);
+      });
+
+      it("names an unpriceable item the filter removed from the list", async () => {
+        // The bill cannot be priced and the caller asked for deposits, so it
+        // appears in neither `items` nor `unclassified` -- and read off the
+        // filtered list it was named nowhere while making the bills total
+        // unknown, leaving a bare `null` with no reason.
+        investmentTransactionsService.resolveSettlementCurrencyPair.mockResolvedValue(
+          { from: "EUR", to: "USD" },
+        );
+        investmentTransactionsService.resolveCashExchangeRateOrNull.mockResolvedValue(
+          null,
+        );
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder([
+            makeScheduled({
+              id: "s-inv",
+              name: "Monthly ETF buy",
+              amount: -1000,
+              isInvestment: true,
+              investmentAction: "BUY" as never,
+              investmentSecurityId: "SEC-1",
+              investmentQuantity: 10,
+              investmentPrice: 100,
+            }),
+            makeScheduled({ id: "s-bill", name: "Rent", amount: -1200 }),
+            makeScheduled({ id: "s-dep", name: "Salary", amount: 3000 }),
+          ]),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId, {
+          kind: "deposit",
+        });
+
+        expect(result.items.map((i) => i.name)).toEqual(["Salary"]);
+        expect(result.amountsComplete).toBe(false);
+        expect(result.unknownAmountItems).toContain("Monthly ETF buy");
+      });
+    });
+
     it("filters by kind", async () => {
       const rows = [
         makeScheduled({ id: "s1", amount: -100 }),
@@ -1571,7 +1640,11 @@ describe("ScheduledTransactionsService", () => {
 
       expect(result.itemCount).toBe(1);
       expect(result.items[0].kind).toBe("bill");
-      expect(result.totalUpcomingDeposits).toBe(0);
+      // The LIST is narrowed; the rollup is not. This line asserted `0` and was
+      // pinning the defect: the window holds a 200 deposit, and answering "0
+      // deposits are coming" because the caller asked about bills is a confident
+      // wrong number, not a narrower answer (issue #1247, round 4).
+      expect(result.totalUpcomingDeposits).toBe(200);
     });
 
     it("filters by accountIds", async () => {

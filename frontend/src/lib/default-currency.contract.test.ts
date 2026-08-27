@@ -68,6 +68,21 @@ describe('the reporting-currency fallback', () => {
     expect(declared![1]).toBe(FALLBACK_DEFAULT_CURRENCY);
   });
 
+  it('has no aliased second copy', () => {
+    // A constant declared elsewhere with the same value is the copy a shape scan
+    // cannot see: `locale-currency.ts` held `FALLBACK_CURRENCY = "USD"` with a
+    // comment claiming it matched the backend's default -- a claim about another
+    // file that nothing checked. Derive from this module instead.
+    const aliased = sourceFiles(frontendRoot)
+      .filter((file) =>
+        /const\s+[A-Z_]*CURRENCY[A-Z_]*(?::\s*string)?\s*=\s*['"][A-Za-z]{3}['"]/.test(
+          readFileSync(file, 'utf8'),
+        ),
+      )
+      .map((file) => file.slice(frontendRoot.length + 1));
+    expect(aliased).toEqual([]);
+  });
+
   it('reads a cleared preference as absent, not as a currency', () => {
     expect(preferredCurrency('')).toBe(FALLBACK_DEFAULT_CURRENCY);
     expect(preferredCurrency(null)).toBe(FALLBACK_DEFAULT_CURRENCY);
