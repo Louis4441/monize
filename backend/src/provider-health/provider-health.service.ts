@@ -9,7 +9,11 @@ import {
   describeFetchFailure,
   isTransportFailure,
 } from "../common/http/fetch-failure.util";
-import { ProviderCircuit, ProviderCircuitSnapshot } from "./provider-circuit";
+import {
+  FAILURE_WINDOW_MS,
+  ProviderCircuit,
+  ProviderCircuitSnapshot,
+} from "./provider-circuit";
 import {
   ProviderUnavailableError,
   isProviderUnavailable,
@@ -97,6 +101,9 @@ export class ProviderHealthService {
    * a `down` and an `up` write is not cosmetic.
    */
   private readonly writeQueues = new Map<string, Promise<void>>();
+
+  /** Errors already counted, so one throw is one failure. See `recordFailure`. */
+  private readonly countedFailures = new WeakSet<object>();
 
   /**
    * @param now injected clock: the windows are the behaviour under test, and a
@@ -278,6 +285,15 @@ export class ProviderHealthService {
   recordFailure(provider: string, error: unknown): boolean {
     if (isProviderUnavailable(error)) return false;
     if (!isTransportFailure(error)) return false;
+    // One throw is one piece of evidence, however many layers see it: the fetch
+    // helper counts what it catches and rethrows, and the caller's catch hands
+    // the same object to `logFailure`. A WeakSet keyed on the error itself is
+    // what makes the double door safe -- it holds nothing alive, and identity
+    // is exactly the question being asked.
+    if (typeof error === "object" && error !== null) {
+      if (this.countedFailures.has(error)) return true;
+      this.countedFailures.add(error);
+    }
     const reason = describeFetchFailure(error);
     const circuit = this.circuit(provider);
     const outcome = circuit.recordTransportFailure(reason);
@@ -289,7 +305,8 @@ export class ProviderHealthService {
       );
       this.logger.error(
         `${providerLabel(provider)} marked unavailable after ` +
-          `${outcome.snapshot.consecutiveFailures} consecutive transport failures; ` +
+          `${outcome.snapshot.recentFailures} transport failures in ` +
+          `${Math.round(FAILURE_WINDOW_MS / 60_000)} minutes; ` +
           `calls are refused locally for ${Math.round(retryAfterMs / 1000)}s. ` +
           `Last failure: ${reason}`,
       );
@@ -320,6 +337,16 @@ export class ProviderHealthService {
     context: string,
     error: unknown,
   ): void {
+    // Counting happens here too, and that is the point: a request can fail
+    // *after* its response headers arrived -- `response.json()` rejecting with
+    // UND_ERR_BODY_TIMEOUT is a provider that stalls mid-body -- and those
+    // never reach the fetch helper's own catch. With `recordSuccess` already
+    // fired on the headers, such an outage reset the failure run on every
+    // request and the breaker never opened. Recording is idempotent per error
+    // object, so a failure the fetch helper already counted is not counted
+    // twice on its way through here.
+    this.recordFailure(provider, error);
+
     const state = this.logStates.get(provider) ?? {
       lastLoggedAt: 0,
       suppressed: 0,
@@ -425,7 +452,7 @@ export class ProviderHealthService {
           withScopedDb(this.dataSource, (manager) =>
             manager.query(
               `INSERT INTO provider_health (
-                 provider, state, consecutive_failures, outage_started_at,
+                 provider, state, recent_failures, outage_started_at,
                  last_failure_at, last_failure_reason, last_success_at
                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
                ON CONFLICT (provider) DO UPDATE SET
@@ -448,17 +475,23 @@ export class ProviderHealthService {
                      THEN provider_health.state
                    ELSE EXCLUDED.state
                  END,
-                 consecutive_failures = EXCLUDED.consecutive_failures,
+                 recent_failures = EXCLUDED.recent_failures,
                  -- An episode already recorded as down keeps its start, so a
                  -- container restarting inside the outage does not reset the
                  -- clock the notification gate reads (issue #1265: the restart
                  -- loop was a symptom of the outage, and a reset start would
                  -- have meant the alert never became due).
+                 -- Only a write that opens an episode may set this, and only
+                 -- when one is not already recorded. An up write carries no
+                 -- start at all, and letting it through nulled the column --
+                 -- so a restart between the recovery write and the alert sweep
+                 -- left the all-clear reporting an outage that lasted 0 min.
                  outage_started_at = CASE
-                   WHEN provider_health.state = 'down'
-                        AND provider_health.outage_started_at IS NOT NULL
-                     THEN provider_health.outage_started_at
-                   ELSE EXCLUDED.outage_started_at
+                   WHEN EXCLUDED.state = 'down'
+                        AND (provider_health.state <> 'down'
+                             OR provider_health.outage_started_at IS NULL)
+                     THEN EXCLUDED.outage_started_at
+                   ELSE provider_health.outage_started_at
                  END,
                  last_failure_at = GREATEST(EXCLUDED.last_failure_at, provider_health.last_failure_at),
                  last_failure_reason = COALESCE(EXCLUDED.last_failure_reason, provider_health.last_failure_reason),
@@ -466,7 +499,7 @@ export class ProviderHealthService {
               [
                 provider,
                 state,
-                snapshot.consecutiveFailures,
+                snapshot.recentFailures,
                 outageStartedAt,
                 lastFailureAt,
                 snapshot.lastFailureReason,

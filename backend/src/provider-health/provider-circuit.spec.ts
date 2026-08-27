@@ -1,5 +1,6 @@
 import {
   FAILURE_THRESHOLD,
+  FAILURE_WINDOW_MS,
   MAX_OPEN_WINDOW_MS,
   OPEN_WINDOW_MS,
   PROBE_TIMEOUT_MS,
@@ -183,16 +184,42 @@ describe("ProviderCircuit", () => {
     expect(circuit.beforeRequest().retryAfterMs).toBe(OPEN_WINDOW_MS);
   });
 
-  it("forgets an old failure run once the provider answers", () => {
-    const { circuit } = circuitAt();
+  it("forgets a failure run the window has moved past", () => {
+    // Four failures, then quiet, then one more a week later. Counting those
+    // together would open the breaker on a provider that is working -- and a
+    // success cannot be what clears them, because the failure mode this window
+    // exists for (headers answered, body stalled) interleaves one success per
+    // failure forever.
+    const { circuit, advance } = circuitAt();
     for (let i = 0; i < FAILURE_THRESHOLD - 1; i++) {
       circuit.recordTransportFailure("blip");
     }
-    circuit.recordSuccess();
-    expect(circuit.snapshot().consecutiveFailures).toBe(0);
-    // Four old failures plus one new one must not open it a week later.
+    expect(circuit.snapshot().recentFailures).toBe(FAILURE_THRESHOLD - 1);
+
+    advance(FAILURE_WINDOW_MS + 1);
+
     expect(circuit.recordTransportFailure("blip").transition).toBeNull();
+    expect(circuit.snapshot().recentFailures).toBe(1);
     expect(circuit.beforeRequest().allowed).toBe(true);
+  });
+
+  it("opens on failures a success cannot cancel", () => {
+    // A provider that answers headers and then stalls the body: one success and
+    // one failure per request, forever. A consecutive-run breaker never reaches
+    // two, and the flood this whole change exists to stop comes straight back.
+    const { circuit, advance } = circuitAt();
+    let transitions = 0;
+    for (let i = 0; i < FAILURE_THRESHOLD; i++) {
+      circuit.recordSuccess();
+      advance(1_000);
+      if (
+        circuit.recordTransportFailure("body timeout").transition === "opened"
+      ) {
+        transitions++;
+      }
+    }
+    expect(transitions).toBe(1);
+    expect(circuit.beforeRequest().allowed).toBe(false);
   });
 
   it("keeps the first failure of the run as the outage start", () => {

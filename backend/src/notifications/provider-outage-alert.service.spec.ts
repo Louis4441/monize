@@ -25,7 +25,7 @@ function healthRow(overrides: Record<string, unknown> = {}) {
   return {
     provider: "yahoo_finance",
     state: "down",
-    consecutive_failures: 137,
+    recent_failures: 137,
     outage_started_at: new Date("2026-08-26T19:03:00Z"),
     last_failure_reason:
       "TypeError: fetch failed <- getaddrinfo EAI_AGAIN query1.finance.yahoo.com [code=EAI_AGAIN]",

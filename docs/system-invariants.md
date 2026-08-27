@@ -992,13 +992,17 @@ two replicas from producing the same effect.
 
 ```text
 Statement           A provider that stops answering stops being called: after
-                    five consecutive transport failures no request leaves the
-                    process until a single timed probe is admitted. One outage
+                    five transport failures inside a five-minute window no
+                    request leaves the process until a single timed probe is
+                    admitted. One outage
                     episode produces at most one alert email and one all-clear,
                     across replicas and across restarts.
 Source of truth     The per-process ProviderCircuit decides whether to call out;
                     provider_health decides what has been said about it.
-Enforcement         Not calling: ProviderCircuit's threshold plus an exclusive
+Enforcement         Not calling: ProviderCircuit's threshold over a sliding
+                    time window (a consecutive run is not countable against a
+                    provider that answers headers and stalls bodies), plus an
+                    exclusive
                     half-open probe slot (bounded by PROBE_TIMEOUT_MS so a caller
                     that never reports cannot hold it for the life of the
                     process); assertAvailable runs before the concurrency gate,

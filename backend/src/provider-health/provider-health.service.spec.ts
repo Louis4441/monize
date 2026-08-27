@@ -138,9 +138,7 @@ describe("ProviderHealthService", () => {
       driveOpen();
       const refusal = new ProviderUnavailableError("Yahoo Finance", 1000, null);
       service.recordFailure(PROVIDER, refusal);
-      expect(service.snapshot(PROVIDER).consecutiveFailures).toBe(
-        FAILURE_THRESHOLD,
-      );
+      expect(service.snapshot(PROVIDER).recentFailures).toBe(FAILURE_THRESHOLD);
     });
 
     it("logs the outage once, with the cause, when the breaker opens", () => {
@@ -149,7 +147,7 @@ describe("ProviderHealthService", () => {
       const line = String(serviceLogger.error.mock.calls[0][0]);
       expect(line).toContain("Yahoo Finance");
       expect(line).toContain("EAI_AGAIN");
-      expect(line).toContain(`${FAILURE_THRESHOLD} consecutive`);
+      expect(line).toContain(`${FAILURE_THRESHOLD} transport failures`);
     });
 
     it("writes the outage to provider_health so it survives the restart", async () => {
@@ -175,10 +173,12 @@ describe("ProviderHealthService", () => {
       const insert = statements().find((sql) =>
         sql.includes("INSERT INTO provider_health"),
       ) as string;
-      // A restarted container has a fresh in-memory failingSince, so the
-      // clock the alert reads can only be protected by the write itself.
-      expect(insert).toContain("provider_health.state = 'down'");
-      expect(insert).toContain("THEN provider_health.outage_started_at");
+      // A restarted container has a fresh in-memory failingSince, so the clock
+      // the alert reads can only be protected by the write itself: only a write
+      // that opens an episode may set the start, and only when one is not
+      // already recorded.
+      expect(insert).toContain("WHEN EXCLUDED.state = 'down'");
+      expect(insert).toContain("ELSE provider_health.outage_started_at");
     });
 
     it("does not write a row for a failure run below the threshold", async () => {
@@ -441,9 +441,7 @@ describe("ProviderHealthService", () => {
       expect(service.tryRequest(PROVIDER)).toBe("probe");
       // ...and nothing was counted either way: the breaker is still open with
       // the same failure run behind it.
-      expect(service.snapshot(PROVIDER).consecutiveFailures).toBe(
-        FAILURE_THRESHOLD,
-      );
+      expect(service.snapshot(PROVIDER).recentFailures).toBe(FAILURE_THRESHOLD);
     });
 
     it("does nothing at all when no probe is out", () => {
@@ -517,7 +515,10 @@ describe("ProviderHealthService", () => {
           String(call[0]).includes("INSERT INTO provider_health"),
         )?.[0],
       );
-      expect(insert).toContain("THEN provider_health.outage_started_at");
+      // An `up` write carries no episode start, and must not clear the stored
+      // one: a restart between the recovery write and the alert sweep would
+      // otherwise leave the all-clear reporting an outage that lasted 0 min.
+      expect(insert).toContain("ELSE provider_health.outage_started_at");
     });
   });
 });

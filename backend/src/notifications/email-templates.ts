@@ -646,7 +646,7 @@ export interface ProviderOutageEmailData {
   since: string;
   /** How long it has been down, already localized. */
   duration: string;
-  consecutiveFailures: number;
+  recentFailures: number;
   lastFailureReason: string | null;
   /** Last successful response, formatted, or null when there has never been one. */
   lastSuccessAt: string | null;
@@ -680,7 +680,7 @@ export function providerOutageTemplate(
       <p style="color: #374151;">${t("emails.providerOutage.intro", `Monize has not been able to reach <strong>${provider}</strong> since ${since} (${duration}). Requests to it are suspended for now and retried at widening intervals.`, { provider, since, duration })}</p>
       <table style="width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #e5e7eb; border-radius: 8px;">
         <tbody>
-          <tr><td style="${label}">${t("emails.providerOutage.labelFailures", "Failed attempts")}</td><td style="${cell}">${data.consecutiveFailures}</td></tr>
+          <tr><td style="${label}">${t("emails.providerOutage.labelFailures", "Failed attempts")}</td><td style="${cell}">${data.recentFailures}</td></tr>
           <tr><td style="${label}">${t("emails.providerOutage.labelLastError", "Last error")}</td><td style="${cell}"><code>${reason}</code></td></tr>
           <tr><td style="${label}">${t("emails.providerOutage.labelLastSuccess", "Last successful response")}</td><td style="${cell}">${lastSuccess}</td></tr>
         </tbody>

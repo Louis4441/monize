@@ -34,9 +34,14 @@ export class ProviderHealth {
   @Column({ type: "varchar", length: 16, default: "up" })
   state: string;
 
+  /**
+   * Transport failures among the provider's last few attempts, as the breaker
+   * counts them: a sliding window rather than a consecutive run, because a
+   * provider that answers headers and stalls bodies never produces a run.
+   */
   @ApiProperty()
-  @Column({ name: "consecutive_failures", type: "integer", default: 0 })
-  consecutiveFailures: number;
+  @Column({ name: "recent_failures", type: "integer", default: 0 })
+  recentFailures: number;
 
   /**
    * First failure of the current outage episode, preserved across restarts: the

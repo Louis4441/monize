@@ -445,13 +445,24 @@ export class MarketIndexService implements OnApplicationBootstrap {
         start = addDays(end, 1);
       }
 
-      // Requested one after another, not together. Together, exactly one of
-      // eleven concurrent chunks can hold the breaker's half-open probe and the
-      // other ten are refused -- so even a *successful* probe produced a failed
-      // fetch and locked the index behind its six-hour cooldown. Sequentially,
-      // the first chunk is the probe: it closes the breaker for the ten behind
-      // it, or it stops the loop before they are attempted at all.
+      // The first window goes alone; the rest go together behind it.
+      //
+      // All eleven at once was wrong once the breaker existed: exactly one of
+      // them can hold the half-open probe, so even a *successful* probe left
+      // ten refusals behind it and the whole fetch failed. All eleven in series
+      // was wrong too -- `ensureHistory` is awaited inside a chart request, and
+      // a cold index went from the slowest of eleven round trips to their sum.
+      // One probe, then the batch: the breaker's answer is known before the ten
+      // are attempted, and they still overlap.
       const prices: HistoricalPrice[] = [];
+      const fetchWindow = (window: { start: string; end: string }) =>
+        this.yahooFinanceService.fetchHistoricalWindow(
+          index.yahooSymbol,
+          null,
+          new Date(`${window.start}T00:00:00Z`),
+          new Date(`${window.end}T23:59:59Z`),
+        );
+
       // `last_attempt_at` drives a six-hour cooldown, so it is stamped for a
       // request that actually left the process and not before: a call the
       // breaker refused is not an attempt, and recording one meant a provider
@@ -460,42 +471,25 @@ export class MarketIndexService implements OnApplicationBootstrap {
       // "is the breaker open", because once the window has elapsed the request
       // below becomes the probe -- which is how a deployment holding no
       // securities at all (issue #1265's own) ever discovers Yahoo is back.
-      let attempted = false;
-      for (const { start, end } of chunks) {
-        if (this.health.wouldRefuse(HEALTH_PROVIDER_ID)) {
-          // Nothing asked, nothing to record -- unless earlier windows in this
-          // same fetch did go out, in which case the series is incomplete and
-          // the failure is real.
-          if (!attempted) return;
-          await this.recordFailure(
-            index.code,
-            this.noAnswerReason(index, start, end),
-          );
-          return;
-        }
+      if (this.health.wouldRefuse(HEALTH_PROVIDER_ID)) return;
 
-        const chunk = await this.yahooFinanceService.fetchHistoricalWindow(
-          index.yahooSymbol,
-          null,
-          new Date(`${start}T00:00:00Z`),
-          new Date(`${end}T23:59:59Z`),
-        );
-        // The client swallows a refusal into the same `null` a failure gives,
-        // and the breaker can open between the check above and the call: if it
-        // is refusing now and nothing came back, treat it as the request that
-        // never left rather than stamping an attempt for it.
-        if (chunk === null && this.health.wouldRefuse(HEALTH_PROVIDER_ID)) {
-          if (!attempted) return;
-          await this.recordFailure(
-            index.code,
-            this.noAnswerReason(index, start, end),
-          );
-          return;
-        }
-        if (!attempted) {
-          await this.recordAttempt(index.code);
-          attempted = true;
-        }
+      const first = await fetchWindow(chunks[0]);
+      // The client swallows a refusal into the same `null` a failure gives, and
+      // the breaker can open between the check above and the call: if it is
+      // refusing now and nothing came back, this is the request that never left
+      // rather than an attempt to stamp.
+      if (first === null && this.health.wouldRefuse(HEALTH_PROVIDER_ID)) return;
+      await this.recordAttempt(index.code);
+
+      const rest =
+        first === null
+          ? []
+          : await Promise.all(chunks.slice(1).map(fetchWindow));
+      const fetched = [first, ...rest];
+
+      for (let i = 0; i < fetched.length; i++) {
+        const chunk = fetched[i];
+        const { start, end } = chunks[i];
 
         // `null` is "no usable answer" -- a refusal, a transport failure, a
         // throttled response that outlasted its retries. `[]` is the provider
@@ -506,9 +500,9 @@ export class MarketIndexService implements OnApplicationBootstrap {
         // years around it, for the reason the granularity guard below gives:
         // an index whose stored history has a hole draws a benchmark that is
         // silently wrong, while an unpriced index is reported as an exclusion
-        // the user can act on. Stopping here also means the remaining windows
-        // are not attempted, so a provider that has stopped answering costs one
-        // request per index rather than eleven.
+        // the user can act on. A first window with no answer also means the ten
+        // behind it are never asked, so a provider that has stopped answering
+        // costs one request per index rather than eleven.
         if (chunk === null) {
           await this.recordFailure(
             index.code,

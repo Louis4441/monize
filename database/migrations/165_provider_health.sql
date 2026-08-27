@@ -23,7 +23,7 @@
 CREATE TABLE IF NOT EXISTS provider_health (
     provider VARCHAR(64) PRIMARY KEY,
     state VARCHAR(16) NOT NULL DEFAULT 'up',
-    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    recent_failures INTEGER NOT NULL DEFAULT 0,
     outage_started_at TIMESTAMPTZ,
     last_failure_at TIMESTAMPTZ,
     last_failure_reason TEXT,

@@ -42,7 +42,7 @@ describe("provider health against a real database", () => {
 
   const row = async (): Promise<{
     state: string;
-    consecutive_failures: number;
+    recent_failures: number;
     outage_started_at: Date | null;
     outage_notified_at: Date | null;
     last_notified_at: Date | null;
@@ -171,7 +171,7 @@ describe("provider health against a real database", () => {
       // An outage that began well before the fifteen-minute gate.
       await dataSource.query(
         `INSERT INTO provider_health (
-           provider, state, consecutive_failures, outage_started_at,
+           provider, state, recent_failures, outage_started_at,
            last_failure_at, last_failure_reason
          ) VALUES ($1, 'down', 137, CURRENT_TIMESTAMP - INTERVAL '2 hours',
                    CURRENT_TIMESTAMP, 'TypeError: fetch failed [code=EAI_AGAIN]')`,
@@ -194,7 +194,7 @@ describe("provider health against a real database", () => {
     it("does not send a second notice for the same episode", async () => {
       await dataSource.query(
         `INSERT INTO provider_health (
-           provider, state, consecutive_failures, outage_started_at,
+           provider, state, recent_failures, outage_started_at,
            last_failure_at, last_failure_reason
          ) VALUES ($1, 'down', 5, CURRENT_TIMESTAMP - INTERVAL '2 hours',
                    CURRENT_TIMESTAMP, 'down')`,
@@ -211,7 +211,7 @@ describe("provider health against a real database", () => {
     it("waits out the fifteen-minute gate", async () => {
       await dataSource.query(
         `INSERT INTO provider_health (
-           provider, state, consecutive_failures, outage_started_at,
+           provider, state, recent_failures, outage_started_at,
            last_failure_at, last_failure_reason
          ) VALUES ($1, 'down', 5, CURRENT_TIMESTAMP - INTERVAL '5 minutes',
                    CURRENT_TIMESTAMP, 'down')`,
@@ -227,7 +227,7 @@ describe("provider health against a real database", () => {
     it("sends one all-clear, and clears the episode marker with it", async () => {
       await dataSource.query(
         `INSERT INTO provider_health (
-           provider, state, consecutive_failures, outage_started_at,
+           provider, state, recent_failures, outage_started_at,
            last_failure_at, last_success_at, outage_notified_at, last_notified_at
          ) VALUES ($1, 'up', 0, CURRENT_TIMESTAMP - INTERVAL '3 hours',
                    CURRENT_TIMESTAMP - INTERVAL '1 hour', CURRENT_TIMESTAMP,
@@ -249,7 +249,7 @@ describe("provider health against a real database", () => {
       // The provider flapped: down again, but an alert went out an hour ago.
       await dataSource.query(
         `INSERT INTO provider_health (
-           provider, state, consecutive_failures, outage_started_at,
+           provider, state, recent_failures, outage_started_at,
            last_failure_at, last_notified_at
          ) VALUES ($1, 'down', 5, CURRENT_TIMESTAMP - INTERVAL '30 minutes',
                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP - INTERVAL '1 hour')`,

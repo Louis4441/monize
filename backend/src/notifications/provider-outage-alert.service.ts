@@ -41,7 +41,7 @@ export const ALERT_QUIET_PERIOD_MS = 6 * 60 * 60_000;
 interface HealthRow {
   provider: string;
   state: string;
-  consecutive_failures: number | string;
+  recent_failures: number | string;
   outage_started_at: Date | null;
   last_failure_reason: string | null;
   last_success_at: Date | null;
@@ -170,7 +170,7 @@ export class ProviderOutageAlertService {
   private async pendingRows(): Promise<HealthRow[]> {
     return withScopedDb(this.dataSource, (manager) =>
       manager.query(
-        `SELECT provider, state, consecutive_failures, outage_started_at,
+        `SELECT provider, state, recent_failures, outage_started_at,
                 last_failure_reason, last_success_at, outage_notified_at
            FROM provider_health
           WHERE state = 'down' OR outage_notified_at IS NOT NULL`,
@@ -221,7 +221,7 @@ export class ProviderOutageAlertService {
             AND outage_started_at <= CURRENT_TIMESTAMP - ($2::text || ' milliseconds')::interval
             AND (last_notified_at IS NULL
                  OR last_notified_at <= CURRENT_TIMESTAMP - ($3::text || ' milliseconds')::interval)
-        RETURNING provider, state, consecutive_failures, outage_started_at,
+        RETURNING provider, state, recent_failures, outage_started_at,
                   last_failure_reason, last_success_at, outage_notified_at`,
           [row.provider, String(MIN_OUTAGE_MS), String(ALERT_QUIET_PERIOD_MS)],
         ),
@@ -244,7 +244,7 @@ export class ProviderOutageAlertService {
           provider: label,
           since: formatUtcMinute(startedAt),
           duration: formatOutageDuration(outageMs, t),
-          consecutiveFailures: Number(won.consecutive_failures) || 0,
+          recentFailures: Number(won.recent_failures) || 0,
           lastFailureReason: won.last_failure_reason,
           lastSuccessAt: won.last_success_at
             ? formatUtcMinute(new Date(won.last_success_at))
@@ -289,7 +289,7 @@ export class ProviderOutageAlertService {
           WHERE provider = $1
             AND state = 'up'
             AND outage_notified_at IS NOT NULL
-        RETURNING provider, state, consecutive_failures, outage_started_at,
+        RETURNING provider, state, recent_failures, outage_started_at,
                   last_failure_reason, last_success_at, outage_notified_at`,
           [row.provider],
         ),

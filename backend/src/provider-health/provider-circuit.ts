@@ -13,10 +13,15 @@
  * The breaker turns "the provider is down" from a per-call discovery into a
  * fact the process holds:
  *
- * - **closed** -- normal. Consecutive transport failures are counted; the
- *   count is reset by any success, because a breaker that counted failures
- *   forever would open on an unrelated blip a week later.
- * - **open** -- `FAILURE_THRESHOLD` consecutive transport failures. No request
+ * - **closed** -- normal. Transport failures are counted inside a sliding
+ *   *time* window (`FAILURE_WINDOW_MS`), not as a consecutive run. A run is
+ *   what a breaker usually counts, and it is wrong for the failure mode that
+ *   matters here: a provider that accepts the connection and then stalls the
+ *   body answers its *headers* every time, so a success landed on every request
+ *   and the run never reached two. Time is what bounds the count in the other
+ *   direction -- five failures a week apart are not an outage, and now they age
+ *   out instead of needing a success to clear them.
+ * - **open** -- `FAILURE_THRESHOLD` failures inside that window. No request
  *   leaves the process until the window elapses; callers get
  *   `ProviderUnavailableError` immediately instead of a 10-60s timeout. Each
  *   consecutive open window is twice as long as the last, capped, so an outage
@@ -37,7 +42,15 @@
  * causes.
  */
 
-/** Consecutive transport failures that open the breaker. */
+/**
+ * How far back the open decision looks.
+ *
+ * Long enough that a provider failing every few seconds reaches the threshold,
+ * short enough that yesterday's blip is not evidence about now.
+ */
+export const FAILURE_WINDOW_MS = 5 * 60_000;
+
+/** Transport failures within that window that open the breaker. */
 export const FAILURE_THRESHOLD = 5;
 
 /** How long the first open window lasts. */
@@ -65,7 +78,8 @@ export type ProviderCircuitTransition = "opened" | "recovered" | null;
 
 export interface ProviderCircuitSnapshot {
   readonly state: ProviderCircuitState;
-  readonly consecutiveFailures: number;
+  /** Transport failures inside the last `FAILURE_WINDOW_MS`. */
+  readonly recentFailures: number;
   /** First failure of the current run of failures, null when there is none. */
   readonly failingSince: number | null;
   readonly lastFailureAt: number | null;
@@ -102,7 +116,15 @@ export interface ProviderCircuitOutcome {
 
 export class ProviderCircuit {
   private state: ProviderCircuitState = "closed";
-  private consecutiveFailures = 0;
+  /**
+   * When each transport failure still inside the window happened, oldest first.
+   * Rebuilt rather than mutated, like every other array in this codebase.
+   *
+   * Successes are not recorded here at all, which is the point: a provider that
+   * answers headers and stalls bodies interleaves them one for one, and any
+   * scheme where a success cancels a failure never reaches the threshold.
+   */
+  private failures: readonly number[] = [];
   private failingSince: number | null = null;
   private lastFailureAt: number | null = null;
   private lastFailureReason: string | null = null;
@@ -152,10 +174,22 @@ export class ProviderCircuit {
     return this.admission(this.now()) === "refuse";
   }
 
+  /** Failures still inside the window, dropping the ones that have aged out. */
+  private failureCount(): number {
+    const cutoff = this.now() - FAILURE_WINDOW_MS;
+    return this.failures.filter((at) => at > cutoff).length;
+  }
+
+  /** Record a failure, and forget the ones the window has moved past. */
+  private pushFailure(at: number): void {
+    const cutoff = at - FAILURE_WINDOW_MS;
+    this.failures = [...this.failures.filter((t) => t > cutoff), at];
+  }
+
   snapshot(): ProviderCircuitSnapshot {
     return {
       state: this.state,
-      consecutiveFailures: this.consecutiveFailures,
+      recentFailures: this.failureCount(),
       failingSince: this.failingSince,
       lastFailureAt: this.lastFailureAt,
       lastFailureReason: this.lastFailureReason,
@@ -236,8 +270,17 @@ export class ProviderCircuit {
     const wasOpen = this.state !== "closed";
     this.state = "closed";
     this.probeStartedAt = null;
-    this.consecutiveFailures = 0;
-    this.failingSince = null;
+    // A recovery clears the window; an ordinary success does not touch it. That
+    // is what makes a half-answering provider reach the threshold at all -- it
+    // answers headers on every request, so cancelling a failure with a success
+    // would leave the count pinned at one forever.
+    if (wasOpen) {
+      this.failures = [];
+      this.failingSince = null;
+    } else if (this.failureCount() === 0) {
+      this.failures = [];
+      this.failingSince = null;
+    }
     this.lastSuccessAt = this.now();
     this.retryAt = null;
     this.openWindowMs = OPEN_WINDOW_MS;
@@ -257,8 +300,9 @@ export class ProviderCircuit {
     const now = this.now();
     const wasProbe = this.state === "half-open";
     this.probeStartedAt = null;
-    this.consecutiveFailures++;
-    if (this.failingSince === null) this.failingSince = now;
+    this.pushFailure(now);
+    // The oldest failure still inside the window is when this episode began.
+    this.failingSince = this.failures[0] ?? now;
     this.lastFailureAt = now;
     this.lastFailureReason = reason;
 
@@ -285,10 +329,7 @@ export class ProviderCircuit {
       };
     }
 
-    if (
-      this.state === "closed" &&
-      this.consecutiveFailures >= FAILURE_THRESHOLD
-    ) {
+    if (this.state === "closed" && this.failureCount() >= FAILURE_THRESHOLD) {
       this.state = "open";
       this.openWindowMs = OPEN_WINDOW_MS;
       this.retryAt = now + this.openWindowMs;

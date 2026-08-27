@@ -94,6 +94,17 @@ export interface SecurityNewsItem {
  */
 const SYMBOL_ABSENT_STATUSES: ReadonlySet<number> = new Set([404, 422]);
 
+/**
+ * `chart.error.code` values that mean the same thing in a 200 body.
+ *
+ * Yahoo reports throttling, auth and its own faults through this field too, so
+ * the set is an allowlist rather than "an error is present".
+ */
+const SYMBOL_ABSENT_ERROR_CODES: ReadonlySet<string> = new Set([
+  "Not Found",
+  "Bad Request",
+]);
+
 const YAHOO_SECTOR_NAMES: Record<string, string> = {
   realestate: "Real Estate",
   consumer_cyclical: "Consumer Cyclical",
@@ -351,7 +362,7 @@ export class YahooFinanceService implements QuoteProvider {
         // Deliberately *not* a recorded success. The cookie sources are
         // fc.yahoo.com and finance.yahoo.com; everything else in this client
         // talks to query1.finance.yahoo.com. Counting a cookie response as
-        // "the provider answered" kept `consecutiveFailures` oscillating
+        // "the provider answered" kept the failure count oscillating
         // between 0 and 1 while the API host was down, so the breaker never
         // opened -- and it closed a half-open probe on evidence about a
         // different host, resetting the escalation.
@@ -677,12 +688,18 @@ export class YahooFinanceService implements QuoteProvider {
 
       const data = await response.json();
       const result = data.chart?.result?.[0];
-      // No result object. With a `chart.error` beside it, that *is* an answer
-      // about the symbol ("No data found, symbol may be delisted"); without
-      // one, the body is not something this client understands, so it stays
-      // `null`. Either way the caller's alternate-symbol fallback gets its turn,
-      // because that turns on bars rather than on an answer.
-      if (!result) return data.chart?.error ? [] : null;
+      // No result object. A `chart.error` beside it is an answer about the
+      // symbol only when it says the symbol is the problem -- Yahoo puts
+      // "Unauthorized", "Too Many Requests" and "Internal Server Error" in the
+      // same field, and reading one of those as "no such series" writes the
+      // negative cache the status allowlist above exists to protect. Anything
+      // else is a body this client does not understand, which is also not an
+      // answer. Either way the caller's alternate-symbol fallback still gets
+      // its turn, because that turns on bars rather than on an answer.
+      if (!result) {
+        const code = String(data.chart?.error?.code ?? "");
+        return SYMBOL_ABSENT_ERROR_CODES.has(code) ? [] : null;
+      }
       // A result with no timestamps *is* an answer: the window predates the
       // instrument, or it did not trade in it. Returning `null` for that made
       // "answered with nothing" and "no usable answer" indistinguishable, and

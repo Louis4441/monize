@@ -649,7 +649,8 @@ describe("MarketIndexService", () => {
 
     it("names the failing window, and stops asking for the rest", async () => {
       // Stopping matters as much as the wording: a provider that has stopped
-      // answering costs one request per index rather than eleven.
+      // answering costs one request per index rather than eleven -- the first
+      // window goes alone precisely so the other ten are never attempted.
       manager.query.mockResolvedValue([]);
       yahoo.fetchHistoricalWindow.mockResolvedValue(null);
 
@@ -774,6 +775,33 @@ describe("MarketIndexService", () => {
         ),
       ).toBe(false);
       expect(failureReason()).toContain("no answer");
+    });
+
+    it("asks the remaining windows together once the first answered", async () => {
+      // Strictly sequential would be safe but slow: `ensureHistory` is awaited
+      // inside a chart request, and a cold index would go from the slowest of
+      // eleven round trips to their sum.
+      manager.query.mockResolvedValue([]);
+      let pending = 0;
+      let mostAtOnce = 0;
+      yahoo.fetchHistoricalWindow.mockImplementation(() => {
+        pending++;
+        mostAtOnce = Math.max(mostAtOnce, pending);
+        return new Promise((resolve) =>
+          setImmediate(() => {
+            pending--;
+            resolve([]);
+          }),
+        );
+      });
+
+      await service.ensureHistory(["SP500"], "2015-01-01");
+
+      // More than one window outstanding at once, which a sequential loop could
+      // never produce -- and the first one alone, which is what makes the
+      // breaker's answer known before the rest are attempted.
+      expect(yahoo.fetchHistoricalWindow.mock.calls.length).toBeGreaterThan(2);
+      expect(mostAtOnce).toBeGreaterThan(1);
     });
 
     it("stores a series whose empty years the provider answered for", async () => {

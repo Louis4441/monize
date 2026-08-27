@@ -36,12 +36,19 @@ an operator whose only signal was the flood.
 ## What now happens
 
 **A breaker per provider** (`backend/src/provider-health/provider-circuit.ts`).
-Five consecutive *transport* failures (`isTransportFailure`: no response
-arrived -- an HTTP status, however bad, proves the host answered) open it for one
-minute; each consecutive failed probe doubles the window to a 15-minute cap; one
-probe is admitted per window, and its success closes the breaker and resets the
-escalation. A refused call raises `ProviderUnavailableError` **before** the
-concurrency gate, so it costs no socket and no wait.
+Five *transport* failures (`isTransportFailure`: no response arrived -- an HTTP
+status, however bad, proves the host answered) inside a five-minute sliding
+window open it for one minute; each consecutive failed probe doubles the window
+to a 15-minute cap; one probe is admitted per window, and its success closes the
+breaker and resets the escalation. A refused call raises
+`ProviderUnavailableError` **before** the concurrency gate, so it costs no socket
+and no wait.
+
+The window is over *time*, not over a consecutive run, and that is not a detail:
+a provider that accepts the connection and then stalls the body answers its
+headers on every request, so a run-based breaker recorded a success per request
+and never reached two failures. Successes therefore do not cancel failures --
+only the clock does, and a recovery clears the window outright.
 
 **One log line, with the cause** (`describeFetchFailure`). Nothing in this
 deployment restricts Nest's log levels, so "suppressed" has to mean *not

@@ -140,7 +140,10 @@ describe("MsnFinanceService", () => {
         });
         return error;
       };
-      global.fetch = jest.fn().mockRejectedValue(dnsFailure());
+      // A fresh error per call, as undici produces: the health service counts
+      // one error object once, so a shared instance would report five failures
+      // as one and the breaker would never open.
+      global.fetch = jest.fn(() => Promise.reject(dnsFailure()));
 
       // Drive the breaker open through this client's own door.
       for (let i = 0; i < 6; i++) {
@@ -180,7 +183,10 @@ describe("MsnFinanceService", () => {
         });
         return error;
       };
-      global.fetch = jest.fn().mockRejectedValue(dnsFailure());
+      // A fresh error per call, as undici produces: the health service counts
+      // one error object once, so a shared instance would report five failures
+      // as one and the breaker would never open.
+      global.fetch = jest.fn(() => Promise.reject(dnsFailure()));
 
       expect(await service.resolveInstrumentId("AAPL", "NASDAQ")).toBeNull();
       expect(

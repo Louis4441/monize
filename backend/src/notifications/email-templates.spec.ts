@@ -1175,7 +1175,7 @@ describe("Email Templates", () => {
       provider: "Yahoo Finance",
       since: "2026-08-26 19:03 UTC",
       duration: "2 h 15 min",
-      consecutiveFailures: 137,
+      recentFailures: 137,
       lastFailureReason:
         "TypeError: fetch failed <- getaddrinfo EAI_AGAIN query1.finance.yahoo.com [code=EAI_AGAIN]",
       lastSuccessAt: "2026-08-26 17:10 UTC",

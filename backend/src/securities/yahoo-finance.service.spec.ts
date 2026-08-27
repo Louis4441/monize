@@ -2260,6 +2260,19 @@ describe("YahooFinanceService", () => {
     });
   });
   describe("provider availability (issue #1265)", () => {
+    /**
+     * Rejects with a *fresh* error each call, as undici does.
+     *
+     * One throw is one piece of evidence -- the health service counts an error
+     * object once however many layers hand it on -- so a mock that rejects with
+     * the same instance every time reports five failures as one and the breaker
+     * never opens. `A mock must return what the real collaborator returns`
+     * (backend/CLAUDE.md).
+     */
+    const rejectEveryFetch = (make: () => Error) => {
+      global.fetch = jest.fn(() => Promise.reject(make()));
+    };
+
     /** The error undici raises when the container cannot resolve the host. */
     const dnsFailure = () => {
       const error = new TypeError("fetch failed");
@@ -2280,7 +2293,7 @@ describe("YahooFinanceService", () => {
       // The bug: every chart render, every index chunk and every quote kept
       // calling out, so the log filled and the event loop carried hundreds of
       // doomed sockets. Five failures is enough evidence.
-      mockFetchError(dnsFailure());
+      rejectEveryFetch(dnsFailure);
       const fetchMock = global.fetch as jest.Mock;
 
       for (let i = 0; i < 5; i++) {
@@ -2295,7 +2308,7 @@ describe("YahooFinanceService", () => {
     });
 
     it("refuses quotes, lookups and intraday from the same breaker", async () => {
-      mockFetchError(dnsFailure());
+      rejectEveryFetch(dnsFailure);
       const fetchMock = global.fetch as jest.Mock;
       for (let i = 0; i < 5; i++) {
         await service.fetchQuote("AAPL");
@@ -2313,10 +2326,57 @@ describe("YahooFinanceService", () => {
       expect(fetchMock.mock.calls.length).toBe(callsWhenOpened);
     });
 
+    it("opens on a provider that answers headers and then stalls the body", async () => {
+      // `recordSuccess` fires when the response headers arrive, and the body is
+      // read by the caller -- so a provider that accepts the connection and then
+      // stalls used to reset the failure run on every request, and the breaker
+      // never opened. Counting happens at the log door as well for exactly this.
+      const bodyStall = () =>
+        Object.assign(new TypeError("terminated"), {
+          cause: Object.assign(new Error("body timeout"), {
+            code: "UND_ERR_BODY_TIMEOUT",
+          }),
+        });
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(bodyStall()),
+          text: () => Promise.reject(bodyStall()),
+        } as never),
+      );
+      const fetchMock = global.fetch as jest.Mock;
+
+      for (let i = 0; i < 5; i++) {
+        expect(await service.fetchHistorical("^RUT", null, "1y")).toBeNull();
+      }
+      const callsWhenOpened = fetchMock.mock.calls.length;
+
+      for (let i = 0; i < 20; i++) {
+        expect(await service.fetchHistorical("^RUT", null, "1y")).toBeNull();
+      }
+      expect(fetchMock.mock.calls.length).toBe(callsWhenOpened);
+    });
+
+    it("counts one throw once, however many layers report it", async () => {
+      // The fetch helper counts what it catches and rethrows; the caller's catch
+      // hands the same object to the log door. Counting it twice would open the
+      // breaker on three failures while the constant says five.
+      rejectEveryFetch(dnsFailure);
+
+      await service.fetchHistorical("SYM", null, "1y");
+
+      // One count per request that failed, not one per layer that reported it.
+      const fetchMock = global.fetch as jest.Mock;
+      expect(health.snapshot("yahoo_finance").recentFailures).toBe(
+        fetchMock.mock.calls.length,
+      );
+    });
+
     it("logs what actually failed, not `TypeError: fetch failed`", async () => {
       const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
       try {
-        mockFetchError(dnsFailure());
+        rejectEveryFetch(dnsFailure);
         await service.fetchHistorical("^RUT", null, "1y");
 
         const lines = warn.mock.calls.map((call) => String(call[0]));
@@ -2332,7 +2392,7 @@ describe("YahooFinanceService", () => {
     it("logs one line for a flood of identical failures", async () => {
       const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
       try {
-        mockFetchError(dnsFailure());
+        rejectEveryFetch(dnsFailure);
         for (let i = 0; i < 40; i++) {
           await service.fetchHistorical(`SYM${i}`, null, "1y");
         }
@@ -2353,7 +2413,7 @@ describe("YahooFinanceService", () => {
       const timedHealth = createTestProviderHealth(() => clock);
       const timedService = new YahooFinanceService(timedHealth);
 
-      mockFetchError(dnsFailure());
+      rejectEveryFetch(dnsFailure);
       for (let i = 0; i < 5; i++) {
         await timedService.fetchHistorical("^RUT", null, "1y");
       }
@@ -2387,7 +2447,7 @@ describe("YahooFinanceService", () => {
       const timedHealth = createTestProviderHealth(() => clock);
       const timedService = new YahooFinanceService(timedHealth);
 
-      mockFetchError(dnsFailure());
+      rejectEveryFetch(dnsFailure);
       for (let i = 0; i < 5; i++) {
         await timedService.fetchHistorical("^RUT", null, "1y");
       }
@@ -2422,7 +2482,7 @@ describe("YahooFinanceService", () => {
       ).fetchYahooCookie = jest.fn().mockResolvedValue("A1=cookie");
 
       // The API host refuses every connection; the cookie host is fine.
-      global.fetch = jest.fn().mockRejectedValue(dnsFailure());
+      rejectEveryFetch(dnsFailure);
       for (let i = 0; i < 5; i++) {
         await (
           timedService as unknown as { fetchCrumb: () => Promise<boolean> }
@@ -2441,7 +2501,7 @@ describe("YahooFinanceService", () => {
       const timedHealth = createTestProviderHealth(() => clock);
       const timedService = new YahooFinanceService(timedHealth);
 
-      mockFetchError(dnsFailure());
+      rejectEveryFetch(dnsFailure);
       for (let i = 0; i < 5; i++) {
         await timedService.fetchHistorical("^RUT", null, "1y");
       }
@@ -2458,7 +2518,7 @@ describe("YahooFinanceService", () => {
 
       // Nothing was learned, so the failure run stands -- but the next caller
       // may probe rather than waiting out the probe timeout.
-      expect(timedHealth.snapshot("yahoo_finance").consecutiveFailures).toBe(5);
+      expect(timedHealth.snapshot("yahoo_finance").recentFailures).toBe(5);
       expect(timedHealth.wouldRefuse("yahoo_finance")).toBe(false);
       expect(timedHealth.tryRequest("yahoo_finance")).toBe("probe");
     });
@@ -2468,7 +2528,7 @@ describe("YahooFinanceService", () => {
       const timedHealth = createTestProviderHealth(() => clock);
       const timedService = new YahooFinanceService(timedHealth);
 
-      mockFetchError(dnsFailure());
+      rejectEveryFetch(dnsFailure);
       for (let i = 0; i < 5; i++) {
         await timedService.fetchHistorical("^RUT", null, "1y");
       }
