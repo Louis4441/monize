@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Setoran Aktif",
     "summaryMonthlyNet": "Bersih Bulanan",
     "summaryAmountUnavailable": "Tidak tersedia",
+    "summaryNetMissingRates": "Tidak ada nilai tukar untuk {currencies} — tambahkan di Mata Uang",
+    "summaryNetUnpriceable": "Satu atau beberapa jadwal tidak dapat dihitung nilainya",
     "summaryDueNow": "Jatuh Tempo Sekarang",
     "loadingText": "Memuat transaksi terjadwal...",
     "chartUnavailable": "Grafik sementara tidak tersedia"

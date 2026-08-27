@@ -993,6 +993,73 @@ describe("BillReminderService", () => {
           expect(jobClaims.releaseLease).toHaveBeenCalled();
         });
 
+        /**
+         * A run that crosses local midnight measures both of its windows from
+         * one day.
+         *
+         * Each pass used to read `todayYMD()` for itself. The selecting pass ran
+         * at 23:59 and matched a bill due that day; the delivering pass ran a
+         * minute later, on the next date, and its window opened AFTER the
+         * occurrence -- so the bill vanished, nothing was emailed, and the next
+         * run (now also on D+1) no longer selected it either. A reminder nobody
+         * would ever get, and no record that one was owed.
+         *
+         * The window's date is a value passed down, so advancing the clock
+         * mid-run cannot move it.
+         */
+        it("measures both passes from one date when the run crosses midnight", async () => {
+          const oneSecond = 1000;
+          // 23:59:30 local, so a minute's advance lands on the next date whatever
+          // the runner's timezone. Derived from the boundary the defect is about,
+          // not a hardcoded instant.
+          const almostMidnight = new Date(2026, 2, 15, 23, 59, 30);
+          jest.useFakeTimers({
+            now: almostMidnight,
+            // `Date` only: faking the microtask queue under the async repository
+            // doubles below deadlocks the run rather than failing it.
+            doNotFake: [
+              "nextTick",
+              "queueMicrotask",
+              "setImmediate",
+              "setTimeout",
+              "setInterval",
+            ],
+          });
+          try {
+            const bill = makeBill({
+              userId: userId1,
+              nextDueDate: daysFromNow(0),
+              // Zero, so the window is exactly one day and a one-day slip moves
+              // the occurrence out of it entirely.
+              reminderDaysBefore: 0,
+            });
+            scheduledTransactionsRepo.find.mockResolvedValue([bill]);
+            overridesRepo.find.mockResolvedValue([]);
+            preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
+            // The clock crosses midnight between the two passes: this read
+            // happens inside the delivering pass, before it computes its window.
+            usersRepo.findOne.mockImplementation(async () => {
+              jest.setSystemTime(
+                new Date(almostMidnight.getTime() + 60 * oneSecond),
+              );
+              return mockUser1 as User;
+            });
+
+            await service.sendBillReminders();
+
+            // The bill is still reported, against the date the run started on.
+            expect(emailService.sendMail).toHaveBeenCalledTimes(1);
+            expect(emailService.sendMail).toHaveBeenCalledWith(
+              "user1@example.com",
+              "Monize: 1 upcoming bill needs attention",
+              expect.any(String),
+            );
+            expect(jobClaims.markDelivered).toHaveBeenCalled();
+          } finally {
+            jest.useRealTimers();
+          }
+        });
+
         it("groups multiple bills for the same user into one email", async () => {
           const bill1 = makeBill({
             id: "bill-1",

@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Aktif Mevduatlar",
     "summaryMonthlyNet": "Aylık Net",
     "summaryAmountUnavailable": "Kullanılamıyor",
+    "summaryNetMissingRates": "{currencies} için döviz kuru yok — Para Birimleri sayfasından ekleyin",
+    "summaryNetUnpriceable": "Bir veya daha fazla planın tutarı hesaplanamadı",
     "summaryDueNow": "Şimdi Vadesi Gelen",
     "loadingText": "Zamanlanmış işlemler yükleniyor...",
     "chartUnavailable": "Grafik geçici olarak kullanılamıyor"

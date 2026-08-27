@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "सक्रिय जमा",
     "summaryMonthlyNet": "मासिक शुद्ध",
     "summaryAmountUnavailable": "उपलब्ध नहीं",
+    "summaryNetMissingRates": "{currencies} के लिए कोई विनिमय दर नहीं — मुद्राएं में एक जोड़ें",
+    "summaryNetUnpriceable": "एक या अधिक शेड्यूल की राशि तय नहीं की जा सकी",
     "summaryDueNow": "अभी देय",
     "loadingText": "निर्धारित लेनदेन लोड हो रहे हैं...",
     "chartUnavailable": "चार्ट अस्थायी रूप से अनुपलब्ध"

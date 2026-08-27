@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Активные поступления",
     "summaryMonthlyNet": "Чистый ежемесячный итог",
     "summaryAmountUnavailable": "Недоступно",
+    "summaryNetMissingRates": "Нет курса обмена для {currencies} — добавьте его в разделе Валюты",
+    "summaryNetUnpriceable": "Не удалось рассчитать сумму одного или нескольких расписаний",
     "summaryDueNow": "К оплате сейчас",
     "loadingText": "Загрузка запланированных проводок...",
     "chartUnavailable": "График временно недоступен"

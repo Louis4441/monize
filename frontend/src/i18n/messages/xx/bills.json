@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "[XX-Active Deposits-XX]",
     "summaryMonthlyNet": "[XX-Monthly Net-XX]",
     "summaryAmountUnavailable": "[XX-Not available-XX]",
+    "summaryNetMissingRates": "[XX-No exchange rate for {currencies} — add one on Currencies-XX]",
+    "summaryNetUnpriceable": "[XX-One or more schedules could not be priced-XX]",
     "summaryDueNow": "[XX-Due Now-XX]",
     "loadingText": "[XX-Loading scheduled transactions...-XX]",
     "chartUnavailable": "[XX-Chart temporarily unavailable-XX]"

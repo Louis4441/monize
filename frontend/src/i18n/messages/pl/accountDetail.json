@@ -37,6 +37,7 @@
   },
   "forecastUnavailable": {
     "intro": "Prognozowane saldo nie jest pokazywane, ponieważ dla co najmniej jednej nadchodzącej zaplanowanej pozycji nie da się jeszcze ustalić kwoty. Prognoza przenosi każdy dzień na następny, więc jedna nieznana kwota zafałszowałaby każdy kolejny dzień.",
+    "reasonUnavailable": "Nie podano przyczyny. Sprawdź kursy wymiany dla zaplanowanych pozycji w obcej walucie.",
     "missingRatePair": "{name}: brak kursu wymiany z {from} na {to}, więc kwota, jaką zaksięguje ta pozycja, jest nieznana.",
     "missingRate": "{name}: kurs wymiany, po jakim rozliczy się ta pozycja, jest niedostępny, więc kwota jest nieznana.",
     "crossCurrencyTransfer": "{name}: transfer przychodzący z konta w {from}, gdy to konto jest w {to}. Kwota, która tu wpłynie, ustalana jest przy księgowaniu, więc nie da się jej z góry prognozować.",

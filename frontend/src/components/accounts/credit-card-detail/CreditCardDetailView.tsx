@@ -16,7 +16,11 @@ import { InterestAndFeesPanel } from './InterestAndFeesPanel';
 import { RecurringChargesPanel } from '@/components/accounts/shared/RecurringChargesPanel';
 import { PayoffCalculator } from './PayoffCalculator';
 import type { Account } from '@/types/account';
-import type { BalanceForecastGap } from '@/types/banking-detail';
+import {
+  EMPTY_BALANCE_FORECAST_STATE,
+  readBalanceForecast,
+  type BalanceForecastState,
+} from '../shared/balance-forecast-state';
 import { BalanceForecastUnavailable } from '@/components/accounts/shared/BalanceForecastUnavailable';
 import type { GroupedTotal } from '@/types/transaction';
 import type { StatementCycle, InterestPaid } from '@/types/credit-card-detail';
@@ -42,10 +46,13 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
   const [spending, setSpending] = useState<GroupedTotal[]>([]);
   const [interest, setInterest] = useState<InterestPaid | null>(null);
   const [historicalBalances, setHistoricalBalances] = useState<DailyBalancePoint[]>([]);
-  const [forecastPoints, setForecastPoints] = useState<DailyBalancePoint[]>([]);
-  // Issue #1247: an incomplete projection is withheld, not truncated; `gaps` says
-  // which schedule stopped it so the reader is not left with a blank forward line.
-  const [forecastGaps, setForecastGaps] = useState<BalanceForecastGap[]>([]);
+  // ONE piece of state: whether the projection is withheld is one decision, and
+  // `gaps` explains it rather than deciding it (issue #1247 re-audit -- held as
+  // two, the render site re-derived the answer from the gap list and disagreed
+  // with the loader whenever the server withheld without naming a cause).
+  const [forecast, setForecast] = useState<BalanceForecastState>(
+    EMPTY_BALANCE_FORECAST_STATE,
+  );
   // Deriving loading from the last-resolved id avoids a synchronous setState in
   // the effect (matching LineOfCreditView).
   const [loadedForId, setLoadedForId] = useState<string | null>(null);
@@ -99,20 +106,8 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
       setSpending(totalsData);
       setInterest(interestData);
       setHistoricalBalances(balancesData.map((r) => ({ date: r.date, balance: r.balance })));
-      // An incomplete forecast carries only today's anchor; adopting it would
-      // draw a line that stops at today with nothing saying why (issue #1247).
-      // `complete === false` is the server SAYING it withheld the line. Anything
-      // else -- true, or the field absent from an older backend mid rolling
-      // deploy -- means it did not, and that response's points are the ones it
-      // has always sent: withholding them here would invent a problem the
-      // response never reported (issue #1247).
-      const forecastWithheld = forecastData?.complete === false;
-      setForecastPoints(
-        forecastData && !forecastWithheld
-          ? forecastData.points.map((p) => ({ date: p.date, balance: p.balance }))
-          : [],
-      );
-      setForecastGaps(forecastWithheld ? (forecastData?.gaps ?? []) : []);
+      // Read once, by the shared reader that owns the whole withholding rule.
+      setForecast(readBalanceForecast(forecastData));
       setLoadedForId(account.id);
     })();
     return () => {
@@ -123,8 +118,8 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
   // One chart series: history up to today, then the projected forecast. The
   // forecast's first point is today (== the last history point), so drop it.
   const dailyBalances = useMemo(
-    () => [...historicalBalances, ...forecastPoints.slice(1)],
-    [historicalBalances, forecastPoints],
+    () => [...historicalBalances, ...forecast.points.slice(1)],
+    [historicalBalances, forecast.points],
   );
 
   // Deep link into the register filtered to this card and category for the
@@ -156,8 +151,8 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
           {t('chart.title')}
         </h2>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6 space-y-4">
-          {!isLoading && forecastGaps.length > 0 && (
-            <BalanceForecastUnavailable gaps={forecastGaps} />
+          {!isLoading && forecast.withheld && (
+            <BalanceForecastUnavailable gaps={forecast.gaps} />
           )}
           {!isLoading && dailyBalances.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-center py-8">{t('chart.empty')}</p>

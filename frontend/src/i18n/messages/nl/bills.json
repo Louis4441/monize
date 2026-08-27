@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Actieve stortingen",
     "summaryMonthlyNet": "Maandelijks netto",
     "summaryAmountUnavailable": "Niet beschikbaar",
+    "summaryNetMissingRates": "Geen wisselkoers voor {currencies} — voeg er een toe bij Valuta's",
+    "summaryNetUnpriceable": "Een of meer schema's konden niet worden gewaardeerd",
     "summaryDueNow": "Nu verschuldigd",
     "loadingText": "Geplande transacties laden...",
     "chartUnavailable": "Grafiek tijdelijk niet beschikbaar"

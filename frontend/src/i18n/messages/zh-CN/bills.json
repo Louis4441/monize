@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "活跃存款",
     "summaryMonthlyNet": "月净额",
     "summaryAmountUnavailable": "不可用",
+    "summaryNetMissingRates": "没有 {currencies} 的汇率 — 请在“货币”中添加",
+    "summaryNetUnpriceable": "一个或多个计划无法计算金额",
     "summaryDueNow": "当前到期",
     "loadingText": "正在加载定期交易...",
     "chartUnavailable": "图表暂时不可用"

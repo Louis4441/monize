@@ -113,6 +113,16 @@ export class BillReminderService {
     // interchangeable is how the wrong one gets picked up.
     const billsByUser = new Map<string, ScheduledTransaction[]>();
 
+    // ONE date for the whole run, read once and passed down.
+    //
+    // The two passes each used to call `todayYMD()` for themselves, so a run that
+    // crossed local midnight between them asked two different questions: pass one
+    // selected against D and pass two re-expanded against D+1, dropping every
+    // bill due exactly on D. The survivors were emailed and `delivered_at` was
+    // written for a claim key fingerprinted on the FULL set -- and the next run,
+    // now on D+1, no longer selects the D bill either, so its reminder was never
+    // sent and nothing recorded that it was owed. A window is only reproducible
+    // if the date it is measured from is a value, not a second clock read.
     const todayStr = todayYMD();
     for (const bill of manualBills) {
       // "Is this bill due inside its own reminder window" is a question about an
@@ -162,7 +172,7 @@ export class BillReminderService {
       // the delivery record and the release share one identity with the reads
       // between them.
       const sent = await withUserContext(userId, () =>
-        this.deliverForUser(userId, bills, appUrl),
+        this.deliverForUser(userId, bills, appUrl, todayStr),
       );
       if (sent) sentCount++;
       else skipCount++;
@@ -184,6 +194,12 @@ export class BillReminderService {
     userId: string,
     bills: readonly ScheduledTransaction[],
     appUrl: string,
+    /**
+     * The run's date, from the caller. Deliberately NOT read here: this pass and
+     * the selecting pass have to measure their windows from the same day, and a
+     * second `todayYMD()` is how they came to disagree across midnight.
+     */
+    todayStr: string,
   ): Promise<boolean> {
     // Claim this user's reminder for today before doing anything that leaves
     // the process.
@@ -258,7 +274,9 @@ export class BillReminderService {
       // The direction comes from the occurrence too (`directionAmount`), which is
       // the occurrence's own amount when known and the snapshot's sign only when
       // it is not.
-      const todayStr = todayYMD();
+      //
+      // `todayStr` is the caller's, so this window and the selecting pass's are
+      // measured from one day.
       // Reduced rather than spread: `Math.max(...xs)` over a per-user array is a
       // stack-depth limit disguised as an aggregate, and this array is as long as
       // the user's manual-bill list.
@@ -318,6 +336,25 @@ export class BillReminderService {
         );
         await this.releaseClaim(userId, claimKey, leaseToken);
         return false;
+      }
+
+      // A PARTIAL disagreement is sent, and said out loud.
+      //
+      // With one pinned date the two passes ask the same question, so a bill that
+      // drops out here did so for a real reason -- an override moved its
+      // occurrence, or the walk guard truncated a long-overdue daily schedule --
+      // and a bill that is no longer due is one there is nothing to remind about.
+      // So the email carries the survivors and `delivered_at` still settles the
+      // claim key, which fingerprints the pass-one set. What must not happen is
+      // this passing unremarked: the claim key covering more bills than the email
+      // listed is exactly the shape of the empty-email defect above, one bill
+      // short of it, and the log line is how a recurring cause gets noticed.
+      if (billData.length < bills.length) {
+        this.logger.warn(
+          `Bill reminder for user ${userId}: ${bills.length} bill(s) selected, ` +
+            `${billData.length} with an occurrence to report; emailing those and ` +
+            `settling the claim for the selected set`,
+        );
       }
 
       const lang = prefs?.language || DEFAULT_LOCALE;

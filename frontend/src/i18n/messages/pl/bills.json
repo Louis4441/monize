@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Aktywne wpłaty",
     "summaryMonthlyNet": "Saldo miesięczne",
     "summaryAmountUnavailable": "Niedostępna",
+    "summaryNetMissingRates": "Brak kursu wymiany dla {currencies} — dodaj go w Walutach",
+    "summaryNetUnpriceable": "Nie udało się wyznaczyć kwoty jednego lub więcej harmonogramów",
     "summaryDueNow": "Do zapłaty teraz",
     "loadingText": "Wczytywanie zaplanowanych transakcji...",
     "chartUnavailable": "Wykres chwilowo niedostępny"

@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Активні надходження",
     "summaryMonthlyNet": "Місячний підсумок",
     "summaryAmountUnavailable": "Недоступно",
+    "summaryNetMissingRates": "Немає курсу обміну для {currencies} — додайте його в розділі Валюти",
+    "summaryNetUnpriceable": "Не вдалося визначити суму одного або кількох розписів",
     "summaryDueNow": "До сплати зараз",
     "loadingText": "Завантаження запланованих транзакцій...",
     "chartUnavailable": "Графік тимчасово недоступний"

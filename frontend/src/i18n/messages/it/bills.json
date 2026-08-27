@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Versamenti attivi",
     "summaryMonthlyNet": "Netto mensile",
     "summaryAmountUnavailable": "Non disponibile",
+    "summaryNetMissingRates": "Nessun tasso di cambio per {currencies} — aggiungine uno in Valute",
+    "summaryNetUnpriceable": "Non è stato possibile valorizzare una o più pianificazioni",
     "summaryDueNow": "In scadenza",
     "loadingText": "Caricamento transazioni pianificate...",
     "chartUnavailable": "Grafico temporaneamente non disponibile"

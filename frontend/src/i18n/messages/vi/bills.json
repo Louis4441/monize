@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Tiền gửi đang hoạt động",
     "summaryMonthlyNet": "Ròng hàng tháng",
     "summaryAmountUnavailable": "Không có",
+    "summaryNetMissingRates": "Không có tỷ giá cho {currencies} — hãy thêm một tỷ giá ở Tiền tệ",
+    "summaryNetUnpriceable": "Không thể xác định số tiền của một hoặc nhiều lịch trình",
     "summaryDueNow": "Đến hạn ngay",
     "loadingText": "Đang tải giao dịch theo lịch...",
     "chartUnavailable": "Biểu đồ tạm thời không khả dụng"

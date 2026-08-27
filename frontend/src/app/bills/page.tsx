@@ -50,6 +50,8 @@ import { scheduleEffectiveAmount } from '@/lib/scheduled-effective-amount';
 import { advanceByFrequency, isOneTime, monthlyEquivalent } from '@/lib/frequency';
 import type { FutureTransaction } from '@/lib/forecast';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { combineTotals, isComplete, sumConverted } from '@/lib/currency-total';
 import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { useFormModal } from '@/hooks/useFormModal';
@@ -113,6 +115,9 @@ function BillsContent() {
   // scroll to the row without opening the post flow that ?postBillId triggers.
   const highlightId = useHighlightParam();
   const { formatCurrency } = useNumberFormat();
+  // The reader's reporting currency and the converter into it. The monthly net
+  // spans one currency or none (issue #1247).
+  const { convertToDefault, defaultCurrency } = useExchangeRates();
   const [scheduledTransactions, setScheduledTransactions] = useState<ScheduledTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -518,13 +523,18 @@ function BillsContent() {
 
     let totalBills = 0;
     let totalDeposits = 0;
-    let monthlyBills = 0;
-    let monthlyDeposits = 0;
     let dueCount = 0;
     // One schedule whose current amount cannot be worked out makes the monthly
     // net unknowable rather than smaller (issue #1247). The count of schedules is
     // unaffected: how many bills there are is still known.
-    let monthlyAmountsComplete = true;
+    let amountsResolved = true;
+    // Each schedule's monthly equivalent kept WITH the currency it is in, and
+    // converted only once the whole set is collected. A running `+=` sums a CAD
+    // investment schedule beside a USD bill and labels the result with whichever
+    // currency the reader happens to prefer -- the same defect the report and the
+    // budget were fixed for (issue #1247 re-audit).
+    const billComponents: { monthly: number; currencyCode: string }[] = [];
+    const depositComponents: { monthly: number; currencyCode: string }[] = [];
 
     for (const t of scheduledTransactions) {
       // The amount this schedule would post today, not the persisted snapshot:
@@ -547,15 +557,23 @@ function BillsContent() {
         // Neither bucket can claim it, and the net cannot be complete without
         // it: the server could not derive which side of zero this occurrence
         // falls on (issue #1247 re-audit).
-        monthlyAmountsComplete = false;
+        amountsResolved = false;
       } else if (kind === 'bill') {
         totalBills++;
-        if (effective === null) monthlyAmountsComplete = false;
-        else monthlyBills += monthlyEquivalent(Math.abs(amount), t.frequency);
+        if (effective === null) amountsResolved = false;
+        else
+          billComponents.push({
+            monthly: monthlyEquivalent(Math.abs(amount), t.frequency),
+            currencyCode: effectiveAmount.currencyCode,
+          });
       } else if (kind === 'deposit') {
         totalDeposits++;
-        if (effective === null) monthlyAmountsComplete = false;
-        else monthlyDeposits += monthlyEquivalent(amount, t.frequency);
+        if (effective === null) amountsResolved = false;
+        else
+          depositComponents.push({
+            monthly: monthlyEquivalent(amount, t.frequency),
+            currencyCode: effectiveAmount.currencyCode,
+          });
       }
 
       if (t.isActive && t.nextDueDate) {
@@ -568,15 +586,41 @@ function BillsContent() {
       }
     }
 
+    // Converted into ONE currency -- the reader's default, which is also what
+    // the card's `formatCurrency` labels a bare amount with -- and a pair with
+    // no rate withholds the net rather than shrinking it.
+    const bills = sumConverted(
+      billComponents,
+      (c) => c.monthly,
+      (c) => c.currencyCode,
+      convertToDefault,
+    );
+    const deposits = sumConverted(
+      depositComponents,
+      (c) => c.monthly,
+      (c) => c.currencyCode,
+      convertToDefault,
+    );
+    // Incompleteness is the union: a complete deposits total beside a partial
+    // bills total makes the net partial.
+    const monthlyNet = combineTotals(
+      [deposits, bills],
+      ([depositTotal, billTotal]) => depositTotal - billTotal,
+    );
+
     return {
       totalBills,
       totalDeposits,
-      monthlyBills,
-      monthlyDeposits,
-      monthlyAmountsComplete,
+      monthlyNet,
+      // Two causes, and the card says which: an occurrence the server could not
+      // price (`amountsResolved`) sends the reader to the schedule, a missing
+      // display rate to the Currencies page. A bare "unavailable" is a dead end.
+      monthlyAmountsComplete: amountsResolved && isComplete(monthlyNet),
+      monthlyMissingRates: monthlyNet.missingCurrencies,
+      amountsResolved,
       dueCount,
     };
-  }, [scheduledTransactions]);
+  }, [scheduledTransactions, convertToDefault]);
 
   // Generate upcoming occurrences for calendar view
   const getNextOccurrences = (st: ScheduledTransaction, _monthsAhead: number = 3): Date[] => {
@@ -668,14 +712,25 @@ function BillsContent() {
             label={t('page.summaryMonthlyNet')}
             value={
               summary.monthlyAmountsComplete
-                ? formatCurrency(summary.monthlyDeposits - summary.monthlyBills)
+                ? formatCurrency(summary.monthlyNet.value, defaultCurrency)
                 : t('page.summaryAmountUnavailable')
+            }
+            // A withheld figure names its cause, so the reader knows whether to
+            // look at a schedule or add a rate (issue #1247 re-audit).
+            hint={
+              summary.monthlyAmountsComplete
+                ? undefined
+                : summary.monthlyMissingRates.length > 0
+                  ? t('page.summaryNetMissingRates', {
+                      currencies: summary.monthlyMissingRates.join(', '),
+                    })
+                  : t('page.summaryNetUnpriceable')
             }
             icon={SummaryIcons.money}
             valueColor={
               !summary.monthlyAmountsComplete
                 ? 'default'
-                : summary.monthlyDeposits - summary.monthlyBills >= 0
+                : summary.monthlyNet.value >= 0
                   ? 'green'
                   : 'red'
             }

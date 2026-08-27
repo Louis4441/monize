@@ -37,6 +37,7 @@
   },
   "forecastUnavailable": {
     "intro": "Il saldo previsto non viene mostrato perché almeno una scadenza pianificata non può ancora essere valorizzata. Una proiezione riporta ogni giorno su quello successivo, quindi un solo importo sconosciuto renderebbe errati tutti i giorni seguenti.",
+    "reasonUnavailable": "Il motivo non è stato segnalato. Controlla i tassi di cambio per eventuali voci pianificate in valuta estera.",
     "missingRatePair": "{name}: non è disponibile alcun tasso di cambio da {from} a {to}, quindi l'importo che questa scadenza registrerà è sconosciuto.",
     "missingRate": "{name}: il tasso di cambio con cui questa scadenza si regola non è disponibile, quindi l'importo è sconosciuto.",
     "crossCurrencyTransfer": "{name}: un giroconto in arrivo da un conto in {from} mentre questo conto è in {to}. L'importo che arriva qui viene definito alla registrazione, quindi non è proiettabile in anticipo.",

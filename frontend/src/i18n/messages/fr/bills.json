@@ -7,6 +7,8 @@
     "summaryActiveDeposits": "Dépôts actifs",
     "summaryMonthlyNet": "Net mensuel",
     "summaryAmountUnavailable": "Non disponible",
+    "summaryNetMissingRates": "Aucun taux de change pour {currencies} — ajoutez-en un dans Devises",
+    "summaryNetUnpriceable": "Une ou plusieurs planifications n'ont pas pu être évaluées",
     "summaryDueNow": "À payer maintenant",
     "loadingText": "Chargement des transactions récurrentes...",
     "chartUnavailable": "Graphique temporairement indisponible"

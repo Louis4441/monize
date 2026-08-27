@@ -4,7 +4,15 @@ import { useTranslations } from 'next-intl';
 import type { BalanceForecastGap } from '@/types/banking-detail';
 
 interface BalanceForecastUnavailableProps {
-  /** The schedules the server could not price. Never empty when this renders. */
+  /**
+   * The schedules the server could not price. MAY be empty: the panel renders
+   * on the server's own `complete === false`, and a response can withhold the
+   * projection without attributing it (an unrecognised gap reason, a narrowed
+   * payload, a cause the server cannot name). Gating the panel on this list
+   * being non-empty is what let a withheld forecast render as no notice at all
+   * beside the current balance printed under "Projected" -- so the empty case
+   * gets a line saying the reason is unavailable, not an empty bullet list.
+   */
   gaps: BalanceForecastGap[];
 }
 
@@ -33,6 +41,9 @@ export function BalanceForecastUnavailable({ gaps }: BalanceForecastUnavailableP
       className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200"
     >
       <p>{t('forecastUnavailable.intro')}</p>
+      {gaps.length === 0 && (
+        <p className="mt-2">{t('forecastUnavailable.reasonUnavailable')}</p>
+      )}
       <ul className="mt-2 list-disc pl-5 space-y-1">
         {gaps.map((gap) => (
           <li key={gap.scheduledTransactionId}>
