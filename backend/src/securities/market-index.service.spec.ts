@@ -6,6 +6,7 @@ import { YahooFinanceService } from "./yahoo-finance.service";
 import { HistoricalPrice } from "./providers/quote-provider.interface";
 import { MARKET_INDEXES } from "./market-indexes";
 import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { OPEN_WINDOW_MS } from "../provider-health/provider-circuit";
 import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 import {
   createScopedDbMocks,
@@ -63,6 +64,15 @@ function routeQueries(
   });
 }
 
+/** The error undici raises when the container cannot resolve the provider. */
+function transportFailure(): Error {
+  return Object.assign(new TypeError("fetch failed"), {
+    cause: Object.assign(new Error("getaddrinfo EAI_AGAIN"), {
+      code: "EAI_AGAIN",
+    }),
+  });
+}
+
 /** A provider bar, typed so the fixture cannot claim a shape Yahoo never sends. */
 function bar(
   date: string,
@@ -88,6 +98,8 @@ describe("MarketIndexService", () => {
     Pick<YahooFinanceService, "fetchHistorical" | "fetchHistoricalWindow">
   >;
   let health: ProviderHealthService;
+  /** The breaker's clock, so its windows can be moved without waiting. */
+  let breakerClock: number;
 
   /** SQL statements the service issued, in order. */
   const statements = (): string[] =>
@@ -103,7 +115,8 @@ describe("MarketIndexService", () => {
       fetchHistorical: jest.fn().mockResolvedValue(null),
       fetchHistoricalWindow: jest.fn().mockResolvedValue(null),
     };
-    health = createTestProviderHealth();
+    breakerClock = Date.now();
+    health = createTestProviderHealth(() => breakerClock);
     service = new MarketIndexService(
       dataSource as never,
       yahoo as never,
@@ -598,26 +611,58 @@ describe("MarketIndexService", () => {
       expect(storedReason()).toContain("no history returned");
     });
 
-    it("says the provider was not called when the breaker is open", async () => {
+    it("says the provider was not called when it went down mid-refresh", async () => {
       // The client turns a transport failure into null, which is
       // indistinguishable here from "this symbol has no history" -- and
       // "nothing came back" sends whoever reads market_index_sync.last_error
       // looking for a symbol problem that does not exist.
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistoricalWindow.mockResolvedValue(null);
-      const failure = Object.assign(new TypeError("fetch failed"), {
-        cause: Object.assign(new Error("getaddrinfo EAI_AGAIN"), {
-          code: "EAI_AGAIN",
-        }),
+      yahoo.fetchHistoricalWindow.mockImplementation(() => {
+        health.recordFailure("yahoo_finance", transportFailure());
+        return Promise.resolve(null);
       });
-      for (let i = 0; i < 5; i++)
-        health.recordFailure("yahoo_finance", failure);
 
       await service.refreshAll();
 
       expect(storedReason()).toContain("not fetched");
       expect(storedReason()).toContain("unavailable");
       expect(storedReason()).toContain("EAI_AGAIN");
+    });
+
+    it("does not stamp an attempt for a call that never left the process", async () => {
+      // `last_attempt_at` drives a six-hour cooldown. Stamping it for a request
+      // the breaker refused meant a two-minute outage cost every index six
+      // hours of no history -- long after the provider was answering again.
+      manager.query.mockResolvedValue([]);
+      for (let i = 0; i < 5; i++) {
+        health.recordFailure("yahoo_finance", transportFailure());
+      }
+
+      await service.refreshAll();
+
+      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(
+        statements().filter((sql) =>
+          sql.includes("INSERT INTO market_index_sync"),
+        ),
+      ).toHaveLength(0);
+    });
+
+    it("still fetches once the open window has elapsed", async () => {
+      // The alternative -- skipping whenever the breaker is open -- locks out a
+      // deployment holding no securities, where nothing else ever calls the
+      // provider and so nothing would discover that it is back. That is the
+      // deployment in issue #1265: the reporter had no investments recorded.
+      manager.query.mockResolvedValue([]);
+      for (let i = 0; i < 5; i++) {
+        health.recordFailure("yahoo_finance", transportFailure());
+      }
+      breakerClock += OPEN_WINDOW_MS + 1_000;
+
+      yahoo.fetchHistoricalWindow.mockResolvedValue([bar("2026-08-25", 1400)]);
+      await service.refreshAll();
+
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalled();
     });
   });
 

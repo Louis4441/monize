@@ -74,6 +74,11 @@ describe("outbound provider calls are answerable to the breaker", () => {
       );
       expect(source).toMatch(/this\.health\.(tryRequest|assertAvailable)\(/);
       expect(source).toContain("this.health.recordSuccess(");
+      // `wouldRefuse` reads without taking the half-open probe slot, so as a
+      // gate it lets every caller through the instant an open window elapses --
+      // the herd the slot exists to prevent. It is for deciding whether to skip
+      // work (MarketIndexService), never for admitting a request.
+      expect(source).not.toContain("wouldRefuse");
     },
   );
 

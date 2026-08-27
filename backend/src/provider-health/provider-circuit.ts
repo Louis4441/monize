@@ -120,6 +120,38 @@ export class ProviderCircuit {
    */
   constructor(private readonly now: () => number = Date.now) {}
 
+  /**
+   * What `beforeRequest` would do, computed once so the read-only predicate and
+   * the mutating gate cannot drift apart.
+   */
+  private admission(now: number): "open-gate" | "probe" | "refuse" {
+    if (this.state === "closed") return "open-gate";
+    if (this.state === "open" && this.retryAt !== null && now >= this.retryAt) {
+      return "probe";
+    }
+    if (
+      this.state === "half-open" &&
+      (this.probeStartedAt === null ||
+        now - this.probeStartedAt >= PROBE_TIMEOUT_MS)
+    ) {
+      return "probe";
+    }
+    return "refuse";
+  }
+
+  /**
+   * Whether a request would be refused right now, taking nothing.
+   *
+   * For a caller deciding whether to *skip work*, never as the gate before a
+   * request: a gate has to take the slot. Notably true only while there is
+   * genuinely no way through -- a half-open state whose probe was handed back
+   * admits the next caller, and reporting that as "refused" would strand a
+   * deployment whose only Yahoo caller is the one asking.
+   */
+  wouldRefuse(): boolean {
+    return this.admission(this.now()) === "refuse";
+  }
+
   snapshot(): ProviderCircuitSnapshot {
     return {
       state: this.state,
@@ -140,7 +172,10 @@ export class ProviderCircuit {
    * here -- the caller decides whether to throw, return null or skip.
    */
   beforeRequest(): ProviderCircuitDecision {
-    if (this.state === "closed") {
+    const now = this.now();
+    const decision = this.admission(now);
+
+    if (decision === "open-gate") {
       return {
         allowed: true,
         state: "closed",
@@ -150,28 +185,12 @@ export class ProviderCircuit {
       };
     }
 
-    const now = this.now();
-    if (this.state === "open" && this.retryAt !== null && now >= this.retryAt) {
-      // Window elapsed: this caller becomes the probe.
+    if (decision === "probe") {
+      // Either the window elapsed and this caller becomes the probe, or the
+      // previous probe never reported an outcome and its slot has timed out --
+      // holding the exclusive slot forever would leave the provider uncalled
+      // for the life of the process.
       this.state = "half-open";
-      this.probeStartedAt = now;
-      return {
-        allowed: true,
-        state: "half-open",
-        retryAfterMs: 0,
-        suppressedCalls: 0,
-        lastFailureReason: this.lastFailureReason,
-      };
-    }
-
-    if (
-      this.state === "half-open" &&
-      (this.probeStartedAt === null ||
-        now - this.probeStartedAt >= PROBE_TIMEOUT_MS)
-    ) {
-      // The probe never reported an outcome. Admit another rather than holding
-      // the exclusive slot forever, which would leave the provider uncalled for
-      // the life of the process.
       this.probeStartedAt = now;
       return {
         allowed: true,
@@ -196,6 +215,19 @@ export class ProviderCircuit {
       suppressedCalls: this.suppressedCalls,
       lastFailureReason: this.lastFailureReason,
     };
+  }
+
+  /**
+   * Hand back a probe slot without claiming to have learned anything.
+   *
+   * For a caller that took the slot and then could not reach the provider's own
+   * host at all -- the Yahoo crumb handshake gives up before it ever calls the
+   * API host if no cookie source answers with a cookie. Reporting that as a
+   * success would close the breaker on evidence about a different host;
+   * reporting nothing would hold the exclusive slot until it times out.
+   */
+  releaseProbe(): void {
+    if (this.state === "half-open") this.probeStartedAt = null;
   }
 
   /** Record a request that got an answer. Closes the breaker if it was not. */

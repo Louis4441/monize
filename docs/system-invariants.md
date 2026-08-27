@@ -1036,6 +1036,7 @@ Required tests      Present: provider-circuit.spec.ts, provider-health.service
                     prove.
 Status              enforced
 ```
+
 ### INV-RLS-001 -- enforced mode refuses a privileged role
 
 ```text

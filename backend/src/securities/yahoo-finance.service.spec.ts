@@ -2369,6 +2369,60 @@ describe("YahooFinanceService", () => {
       expect(timedHealth.snapshot("yahoo_finance").state).toBe("closed");
     });
 
+    it("does not let a cookie host's answer stand in for the API host", async () => {
+      // The cookie sources are fc.yahoo.com and finance.yahoo.com; everything
+      // else talks to query1.finance.yahoo.com. Counting a cookie response as
+      // "the provider answered" kept the failure run oscillating between 0 and
+      // 1 while the API host was down, so the breaker never opened.
+      const clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+      (
+        timedService as unknown as { fetchYahooCookie: () => Promise<string> }
+      ).fetchYahooCookie = jest.fn().mockResolvedValue("A1=cookie");
+
+      // The API host refuses every connection; the cookie host is fine.
+      global.fetch = jest.fn().mockRejectedValue(dnsFailure());
+      for (let i = 0; i < 5; i++) {
+        await (
+          timedService as unknown as { fetchCrumb: () => Promise<boolean> }
+        ).fetchCrumb();
+      }
+
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("open");
+    });
+
+    it("gives the probe back when the API host was never reached", async () => {
+      // Every cookie source answers, none with a cookie: the handshake gives up
+      // before calling the API host, so there is nothing to record -- but the
+      // slot still has to go back, or two minutes of Yahoo calls are refused
+      // for a provider nothing has shown to be down.
+      let clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+
+      mockFetchError(dnsFailure());
+      for (let i = 0; i < 5; i++) {
+        await timedService.fetchHistorical("^RUT", null, "1y");
+      }
+      clock += OPEN_WINDOW_MS + 1;
+      (
+        timedService as unknown as { fetchYahooCookie: () => Promise<string> }
+      ).fetchYahooCookie = jest.fn().mockResolvedValue("");
+
+      expect(
+        await (
+          timedService as unknown as { fetchCrumb: () => Promise<boolean> }
+        ).fetchCrumb(),
+      ).toBe(false);
+
+      // Nothing was learned, so the failure run stands -- but the next caller
+      // may probe rather than waiting out the probe timeout.
+      expect(timedHealth.snapshot("yahoo_finance").consecutiveFailures).toBe(5);
+      expect(timedHealth.wouldRefuse("yahoo_finance")).toBe(false);
+      expect(timedHealth.tryRequest("yahoo_finance")).toBe(true);
+    });
+
     it("resumes once the provider answers again", async () => {
       let clock = 1_700_000_000_000;
       const timedHealth = createTestProviderHealth(() => clock);

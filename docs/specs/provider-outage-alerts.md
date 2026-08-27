@@ -43,8 +43,10 @@ probe is admitted per window, and its success closes the breaker and resets the
 escalation. A refused call raises `ProviderUnavailableError` **before** the
 concurrency gate, so it costs no socket and no wait.
 
-**One log line, with the cause** (`describeFetchFailure`). The chain and the
-socket-level fields become one bounded line -- `TypeError: fetch failed <-
+**One log line, with the cause** (`describeFetchFailure`). Nothing in this
+deployment restricts Nest's log levels, so "suppressed" has to mean *not
+printed at all* -- a `debug` line per refused call is the same flood one level
+quieter. The chain and the socket-level fields become one bounded line -- `TypeError: fetch failed <-
 getaddrinfo EAI_AGAIN query1.finance.yahoo.com [code=EAI_AGAIN
 syscall=getaddrinfo hostname=query1.finance.yahoo.com]`. It is rate-limited to
 one line per provider per minute, counts what it suppressed, and prints *nothing*
@@ -87,6 +89,20 @@ no SMTP does nothing at all.
   stored.
 - **Availability bookkeeping never fails a request.** The write is
   fire-and-forget, outside the caller's transaction, and swallows its own errors.
+- **A gate takes the probe slot; a skip-decision does not.** `assertAvailable`
+  and `tryRequest` admit one request and owe an outcome (`recordSuccess`,
+  `recordFailure`, or `releaseProbe` when the attempt learned nothing about the
+  provider's own host). `wouldRefuse` is the read-only predicate, for deciding
+  whether to skip work -- `MarketIndexService` uses it so a refused call does
+  not stamp `last_attempt_at` and burn a six-hour cooldown for a request that
+  never left the process. Using it as a gate would let every caller through the
+  instant a window elapsed; `provider-call.guard.spec.ts` fails on that.
+- **Per-replica breakers can disagree, and the row takes the last word.** With
+  more than one replica, one that can still reach the provider writes `up` on
+  its first success and clears an episode another replica is living through.
+  That costs the outage its alert, and it is the right way round: if any replica
+  is serving prices, the deployment is not down in the way this alert is about.
+  A shared breaker would instead let one replica's bad NIC mute a healthy one.
 
 ## Not yet adopted
 

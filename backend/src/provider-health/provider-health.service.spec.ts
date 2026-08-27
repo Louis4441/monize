@@ -300,6 +300,24 @@ describe("ProviderHealthService", () => {
       }
       expect(logger.warn).not.toHaveBeenCalled();
       expect(logger.error).not.toHaveBeenCalled();
+      // Nor at debug: nothing in this deployment restricts Nest's log levels
+      // (`main.ts`), so a debug line per refused call is the same flood one
+      // level quieter.
+      expect(logger.debug).not.toHaveBeenCalled();
+    });
+
+    it("prints nothing for a suppressed failure either", () => {
+      const logger = fakeLogger();
+      for (let i = 0; i < 264; i++) {
+        service.logFailure(
+          logger as never,
+          PROVIDER,
+          `chunk ${i}`,
+          transportError(),
+        );
+      }
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.debug).not.toHaveBeenCalled();
     });
 
     it("starts fresh after a recovery rather than reporting a stale count", () => {
@@ -349,6 +367,50 @@ describe("ProviderHealthService", () => {
         advance(1_000);
         expect(service.tryRequest(PROVIDER)).toBe(false);
       }
+    });
+  });
+
+  describe("releaseProbe", () => {
+    it("hands the slot back without claiming to know anything", () => {
+      driveOpen();
+      advance(OPEN_WINDOW_MS + 1);
+      expect(service.tryRequest(PROVIDER)).toBe(true);
+      expect(service.tryRequest(PROVIDER)).toBe(false);
+
+      service.releaseProbe(PROVIDER);
+
+      // The next caller may probe...
+      expect(service.tryRequest(PROVIDER)).toBe(true);
+      // ...and nothing was counted either way: the breaker is still open with
+      // the same failure run behind it.
+      expect(service.snapshot(PROVIDER).consecutiveFailures).toBe(
+        FAILURE_THRESHOLD,
+      );
+    });
+
+    it("does nothing at all when no probe is out", () => {
+      service.releaseProbe(PROVIDER);
+      expect(service.snapshot(PROVIDER).state).toBe("closed");
+    });
+  });
+
+  describe("wouldRefuse", () => {
+    it("reads without taking the slot", () => {
+      driveOpen();
+      advance(OPEN_WINDOW_MS + 1);
+      expect(service.wouldRefuse(PROVIDER)).toBe(false);
+      expect(service.wouldRefuse(PROVIDER)).toBe(false);
+      // The probe is still there for the caller that actually makes a request.
+      expect(service.tryRequest(PROVIDER)).toBe(true);
+    });
+
+    it("is true while the window has not elapsed", () => {
+      driveOpen();
+      expect(service.wouldRefuse(PROVIDER)).toBe(true);
+    });
+
+    it("is false while the provider answers", () => {
+      expect(service.wouldRefuse(PROVIDER)).toBe(false);
     });
   });
 

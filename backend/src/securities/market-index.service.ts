@@ -431,6 +431,15 @@ export class MarketIndexService implements OnApplicationBootstrap {
     to: string,
     options: { replaceExisting?: boolean } = {},
   ): Promise<void> {
+    // A request the breaker would refuse is not an attempt, and recording one
+    // burns this index's six-hour cooldown for a call that never left the
+    // process -- so a provider that recovered two minutes later would still
+    // leave the benchmark undrawable until the evening. Deliberately "would it
+    // be refused *now*" rather than "is the breaker open": once the window has
+    // elapsed the fetch below becomes the probe, which is how a deployment
+    // holding no securities at all -- the one in issue #1265 -- ever discovers
+    // that Yahoo is back.
+    if (this.health.wouldRefuse(HEALTH_PROVIDER_ID)) return;
     await this.recordAttempt(index.code);
     try {
       const chunks: Array<{ start: string; end: string }> = [];

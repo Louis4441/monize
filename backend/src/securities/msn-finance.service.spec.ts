@@ -167,6 +167,53 @@ describe("MsnFinanceService", () => {
       );
     });
 
+    it("does not cache a null a transport failure produced, below the threshold", async () => {
+      // The breaker opens after five consecutive failures; the four before it
+      // produce exactly the same uninformative `null`, and caching those for 24
+      // hours is the same poisoning one step earlier.
+      const dnsFailure = () => {
+        const error = new TypeError("fetch failed");
+        Object.assign(error, {
+          cause: Object.assign(new Error("getaddrinfo EAI_AGAIN"), {
+            code: "EAI_AGAIN",
+          }),
+        });
+        return error;
+      };
+      global.fetch = jest.fn().mockRejectedValue(dnsFailure());
+
+      expect(await service.resolveInstrumentId("AAPL", "NASDAQ")).toBeNull();
+      expect(
+        module.get(ProviderHealthService).snapshot("msn_finance").state,
+      ).toBe("closed");
+
+      global.fetch = jest.fn().mockReturnValue(
+        createResponse({
+          data: {
+            stocks: [{ Symbol: "AAPL", SecId: "a1u3p2", Exchange: "XNAS" }],
+          },
+        }),
+      );
+      expect(await service.resolveInstrumentId("AAPL", "NASDAQ")).toBe(
+        "a1u3p2",
+      );
+    });
+
+    it('still caches a genuine "no such instrument" answer', async () => {
+      // The cache has to keep working, or every unknown symbol re-asks MSN
+      // twice on every price refresh.
+      global.fetch = jest
+        .fn()
+        .mockReturnValue(createResponse({ data: { stocks: [] } }));
+
+      expect(await service.resolveInstrumentId("NOPE", "NASDAQ")).toBeNull();
+      const callsAfterFirst = (global.fetch as jest.Mock).mock.calls.length;
+      expect(await service.resolveInstrumentId("NOPE", "NASDAQ")).toBeNull();
+      expect((global.fetch as jest.Mock).mock.calls.length).toBe(
+        callsAfterFirst,
+      );
+    });
+
     it("prefers the exchange match when multiple candidates are returned", async () => {
       global.fetch = jest.fn().mockReturnValueOnce(
         createResponse({

@@ -142,6 +142,26 @@ export class ProviderHealthService {
     return this.circuit(provider).beforeRequest().allowed;
   }
 
+  /**
+   * Give back a slot taken by `tryRequest`/`assertAvailable` when the attempt
+   * produced no evidence about this provider at all. Counts nothing.
+   */
+  releaseProbe(provider: string): void {
+    this.circuit(provider).releaseProbe();
+  }
+
+  /**
+   * Whether a request would be refused right now, without taking the slot.
+   *
+   * For deciding whether to *skip work*, never as the gate before a request:
+   * a gate has to take the slot, or every caller pours through the instant an
+   * open window elapses. `provider-call.guard.spec.ts` fails if an outbound
+   * client uses this in place of `tryRequest`.
+   */
+  wouldRefuse(provider: string): boolean {
+    return this.circuit(provider).wouldRefuse();
+  }
+
   /** The provider answered. Closes the breaker and clears the failure run. */
   recordSuccess(provider: string): void {
     const outcome = this.circuit(provider).recordSuccess();
@@ -222,11 +242,15 @@ export class ProviderHealthService {
     };
 
     if (isProviderUnavailable(error)) {
+      // Counted, not printed -- and not printed at `debug` either. Nothing in
+      // this deployment restricts Nest's log levels (`main.ts`), so a debug line
+      // per refused call is the same flood one level quieter: 264 lines for one
+      // market-index refresh. What was suppressed is reported on the next line
+      // that does print, and on recovery.
       this.logStates.set(provider, {
         ...state,
         suppressed: state.suppressed + 1,
       });
-      logger.debug(`Skipped ${context}: ${error.message}`);
       return;
     }
 
@@ -237,9 +261,6 @@ export class ProviderHealthService {
         ...state,
         suppressed: state.suppressed + 1,
       });
-      logger.debug(
-        `${label}: ${context} failed: ${describeFetchFailure(error)}`,
-      );
       return;
     }
 

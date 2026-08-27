@@ -321,15 +321,20 @@ export class YahooFinanceService implements QuoteProvider {
     if (!this.health.tryRequest(HEALTH_PROVIDER_ID)) return false;
     let lastStatus: number | string = "no cookies";
     let lastError: unknown = null;
+    // Whether anything here produced evidence about the API host. The slot
+    // `tryRequest` just took is exclusive, so it has to be given back one way
+    // or another before this returns.
+    let reported = false;
     for (const source of YahooFinanceService.COOKIE_SOURCES) {
       try {
         const cookieStr = await this.fetchYahooCookie(source);
-        // A response arrived, cookies or not: the host is reachable. Recording
-        // it is not optional bookkeeping -- `tryRequest` above took the
-        // exclusive half-open probe slot, and a probe that reports no outcome
-        // holds it for PROBE_TIMEOUT_MS, during which every Yahoo call in the
-        // process is refused with the provider healthy.
-        this.health.recordSuccess(HEALTH_PROVIDER_ID);
+        // Deliberately *not* a recorded success. The cookie sources are
+        // fc.yahoo.com and finance.yahoo.com; everything else in this client
+        // talks to query1.finance.yahoo.com. Counting a cookie response as
+        // "the provider answered" kept `consecutiveFailures` oscillating
+        // between 0 and 1 while the API host was down, so the breaker never
+        // opened -- and it closed a half-open probe on evidence about a
+        // different host, resetting the escalation.
         if (!cookieStr) {
           lastStatus = "no cookies";
           continue;
@@ -346,8 +351,9 @@ export class YahooFinanceService implements QuoteProvider {
           },
         );
 
-        // Answered, whatever it thinks of the request.
+        // The API host answered, whatever it thinks of the request.
         this.health.recordSuccess(HEALTH_PROVIDER_ID);
+        reported = true;
         if (!crumbResp.ok) {
           lastStatus = crumbResp.status;
           await crumbResp.text().catch(() => undefined);
@@ -365,11 +371,22 @@ export class YahooFinanceService implements QuoteProvider {
         this.crumbExpiresAt = Date.now() + 60 * 60 * 1000;
         return true;
       } catch (error) {
+        // A cookie host that will not answer is weaker evidence than an API
+        // host that will not, but it is evidence in the safe direction: both
+        // are Yahoo, and over-counting a failure at worst opens the breaker on
+        // a provider that is broadly unreachable. Under-counting was the defect.
         this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+        reported = true;
         lastStatus = describeFetchFailure(error);
         lastError = error;
       }
     }
+
+    // Every cookie source answered, none with a cookie: the API host was never
+    // called, so there is nothing to record -- but the probe slot still has to
+    // go back, or the next two minutes of Yahoo calls are refused for a
+    // provider nothing has shown to be down.
+    if (!reported) this.health.releaseProbe(HEALTH_PROVIDER_ID);
 
     // Through the rate-limited door like every other provider failure: the
     // handshake is attempted per v10 caller, so a bare warn here is one line
