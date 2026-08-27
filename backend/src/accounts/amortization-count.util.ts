@@ -28,8 +28,14 @@ export function paymentsToClear(
   periodicRate: number,
   paymentAmount: number,
 ): number {
-  if (paymentAmount <= 0) return Infinity;
+  // Settled first, and deliberately before the payment test: a cleared balance
+  // needs no payments whatever the installment is, and answering `Infinity`
+  // ("never amortizes") for a zero balance with a zero installment put a
+  // year-2126 payoff date and `totalPayments: -1` on the same response as
+  // `residualPayoffAmount: 0` -- the schedule reported unknowable and
+  // known-zero at once. Zero needs no rate, and it needs no payment either.
   if (principal <= 0) return 0;
+  if (paymentAmount <= 0) return Infinity;
   if (periodicRate === 0) {
     return Math.ceil(principal / paymentAmount);
   }

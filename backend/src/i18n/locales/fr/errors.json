@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "Les comptes hypothécaires nécessitent mortgagePaymentFrequency, paymentStartDate, sourceAccountId et amortizationMonths",
     "mortgageRequiresInterestRate": "Les comptes hypothécaires nécessitent un taux d'intérêt",
     "mortgageFrequencyUnsupported": "Les prêts hypothécaires canadiens ne peuvent pas être planifiés à une fréquence de paiement {frequency}",
+    "paymentFrequencyUnsupported": "Une fréquence de paiement {frequency} ne peut pas être planifiée",
     "mortgageRequiresInstitution": "Les comptes hypothécaires nécessitent un nom d'établissement",
     "onlyMortgageAccounts": "Cette opération n'est valide que pour les comptes hypothécaires",
     "updateRateClosed": "Impossible de mettre à jour le taux d'un compte fermé",

@@ -10,9 +10,11 @@ import {
 import {
   MORTGAGE_PAYMENT_FREQUENCIES,
   PAYMENT_FREQUENCIES,
+  toMortgagePaymentFrequency,
 } from '@/types/account';
 import enAccounts from '@/i18n/messages/en/accounts.json';
 import { advanceByFrequency } from '@/lib/frequency';
+import type { FrequencyType } from '@/types/scheduled-transaction';
 
 /**
  * `accounts.payment_frequency` holds whichever spelling wrote it, and two paths
@@ -158,34 +160,132 @@ describe('loan payment frequency contract', () => {
     }
   });
 
-  it('steps semi-monthly exactly as the recurrence engine does', () => {
+  it('steps every cadence exactly as the recurrence engine does', () => {
     // The projection's row dates and the scheduler's posting dates are the same
-    // calendar to a borrower, so they have to be the same calendar in code. The
-    // engine's convention is the 15th and the last day of the month; projecting
-    // the 1st and the 15th showed dates the register never has.
+    // calendar to a borrower, so they are the same calendar in code:
+    // `advanceDate` delegates to `advanceByFrequency` through one Record.
     //
-    // `advanceDate` spells the rule out rather than importing the recurrence
-    // module (that import would put loan-schedule.ts in the other guard's
-    // domain), so the agreement is asserted here over a couple of years --
-    // including the short and leap Februaries, where a clamp is easiest to get
-    // wrong.
-    for (const spelling of ['SEMI_MONTHLY', 'SEMIMONTHLY'] as ScheduleFrequency[]) {
-      let mine = new Date(2026, 0, 1);
-      let theirs = new Date(2026, 0, 1);
-      for (let i = 0; i < 60; i++) {
-        mine = advanceDate(mine, spelling);
-        theirs = advanceByFrequency(theirs, 'SEMIMONTHLY');
-        expect(mine.getTime()).toBe(theirs.getTime());
-      }
-      // And it really did move: 60 steps is two and a half years.
-      expect(mine.getFullYear()).toBeGreaterThan(2027);
-    }
+    // This walk is what stops a second calendar reappearing. Only semi-monthly
+    // used to be aligned; the month cadences stepped with `Date.setMonth(+1)`,
+    // which OVERFLOWS -- 31 January to 3 March, February skipped -- while the
+    // backend clamped to 28 February, so a loan paid on the 31st had every
+    // projected row three days off the schedule its payoff date bounded.
+    //
+    // The anchors are chosen to make a clamp mandatory: the 31st visits every
+    // month too short to hold it, and 29 February 2028 is the leap day a yearly
+    // cadence must clamp on its anniversary.
+    const ANCHORS = [
+      new Date(2026, 0, 1),
+      new Date(2026, 0, 15),
+      new Date(2026, 0, 31), // month-end, where overflow and clamp disagree
+      new Date(2026, 1, 28),
+      new Date(2028, 1, 29), // leap day
+      new Date(2026, 10, 30),
+    ];
+    const RECURRENCE_OF: Record<string, FrequencyType> = {
+      WEEKLY: 'WEEKLY',
+      ACCELERATED_WEEKLY: 'WEEKLY',
+      BIWEEKLY: 'BIWEEKLY',
+      ACCELERATED_BIWEEKLY: 'BIWEEKLY',
+      SEMI_MONTHLY: 'SEMIMONTHLY',
+      SEMIMONTHLY: 'SEMIMONTHLY',
+      MONTHLY: 'MONTHLY',
+      QUARTERLY: 'QUARTERLY',
+      YEARLY: 'YEARLY',
+    };
 
-    // A leap February, where "last day" is the 29th.
-    let leap = new Date(2028, 1, 10);
-    leap = advanceDate(leap, 'SEMIMONTHLY');
-    expect(leap.getMonth()).toBe(1);
-    expect(leap.getDate()).toBe(29);
+    for (const frequency of Object.keys(RECURRENCE_OF) as ScheduleFrequency[]) {
+      for (const anchor of ANCHORS) {
+        let mine = anchor;
+        let theirs = anchor;
+        // Long enough that an accumulating clamp difference has to show: 40
+        // monthly steps cross three Februaries, 40 weekly ones a year and a bit.
+        for (let step = 0; step < 40; step++) {
+          mine = advanceDate(mine, frequency);
+          theirs = advanceByFrequency(theirs, RECURRENCE_OF[frequency]);
+          expect(
+            `${frequency}@${anchor.toDateString()}+${step + 1}: ${mine.toDateString()}`,
+          ).toBe(
+            `${frequency}@${anchor.toDateString()}+${step + 1}: ${theirs.toDateString()}`,
+          );
+        }
+      }
+    }
+  });
+
+  it('maps every account-storable frequency onto a recurrence the engine has', () => {
+    // The Record inside `loan-schedule.ts` is the browser twin of the backend's
+    // two tables, and the walk above proves it agrees with the engine only for
+    // the cadences it names. This asserts it names them all: a value the account
+    // column can hold but the Record omits falls to the `?? 'MONTHLY'` runtime
+    // fallback, which is the semi-monthly defect again.
+    for (const frequency of [
+      ...PAYMENT_FREQUENCIES,
+      ...MORTGAGE_PAYMENT_FREQUENCIES,
+    ]) {
+      const start = new Date(2026, 0, 31);
+      const stepped = advanceDate(start, frequency as ScheduleFrequency);
+      // Monthly is the fallback's answer, so a genuinely monthly cadence cannot
+      // be told from a missing one by the date alone -- assert against the
+      // period count, which the same list already pins.
+      const periods = getPeriodsPerYear(frequency as ScheduleFrequency);
+      const monthlyAnswer = advanceDate(start, 'MONTHLY');
+      if (periods !== 12) {
+        expect(stepped.getTime()).not.toBe(monthlyAnswer.getTime());
+      } else {
+        expect(stepped.getTime()).toBe(monthlyAnswer.getTime());
+      }
+    }
+  });
+
+  it('agrees with the backend about which cadences a mortgage can hold', () => {
+    // `toMortgagePaymentFrequency` exists on both sides: the server refuses a
+    // cadence its mortgage helpers cannot express (400), and the setup dialog
+    // must not OFFER one. Two copies of a refusal is exactly how a form comes to
+    // present a choice the server rejects, so the browser copy is checked
+    // against the backend switch rather than trusted.
+    const backendSource = readFileSync(
+      join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'backend',
+        'src',
+        'accounts',
+        'payment-frequency.util.ts',
+      ),
+      'utf8',
+    );
+    const body = backendSource.slice(
+      backendSource.indexOf('export function toMortgagePaymentFrequency'),
+    );
+    if (!body.startsWith('export function toMortgagePaymentFrequency')) {
+      throw new Error(
+        'backend toMortgagePaymentFrequency not found -- update this guard to read whatever replaced it',
+      );
+    }
+    const switchBody = body.slice(0, body.indexOf('\n}'));
+    const passThrough = [...switchBody.matchAll(/case "([A-Z_]+)":/g)].map(
+      (m) => m[1],
+    );
+    expect(passThrough.length).toBeGreaterThan(0);
+
+    // Every case the backend accepts, the browser accepts.
+    for (const frequency of passThrough) {
+      expect(toMortgagePaymentFrequency(frequency)).not.toBeNull();
+    }
+    // And every value the account column can hold gets the same verdict on both
+    // sides: accepted iff the backend names it.
+    for (const frequency of [
+      ...PAYMENT_FREQUENCIES,
+      ...MORTGAGE_PAYMENT_FREQUENCIES,
+    ]) {
+      expect([frequency, toMortgagePaymentFrequency(frequency) !== null]).toEqual([
+        frequency,
+        passThrough.includes(frequency),
+      ]);
+    }
   });
 
   it('treats both spellings of semi-monthly identically', () => {

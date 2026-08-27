@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "Akun hipotek memerlukan mortgagePaymentFrequency, paymentStartDate, sourceAccountId, dan amortizationMonths",
     "mortgageRequiresInterestRate": "Akun hipotek memerlukan tingkat bunga",
     "mortgageFrequencyUnsupported": "Hipotek Kanada tidak dapat dijadwalkan dengan frekuensi pembayaran {frequency}",
+    "paymentFrequencyUnsupported": "Frekuensi pembayaran {frequency} tidak dapat dijadwalkan",
     "mortgageRequiresInstitution": "Akun hipotek memerlukan nama institusi",
     "onlyMortgageAccounts": "Operasi ini hanya berlaku untuk akun hipotek",
     "updateRateClosed": "Tidak dapat memperbarui tarif pada akun yang sudah ditutup",

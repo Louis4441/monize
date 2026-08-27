@@ -14,6 +14,7 @@ import {
   MAX_DATEABLE_PAYMENTS,
   PaymentFrequency,
   advancePaymentDates,
+  unpayableEndDate,
 } from "./payment-frequency.util";
 
 /**
@@ -190,8 +191,7 @@ export function calculateEndDate(
     totalPayments > MAX_DATEABLE_PAYMENTS
   ) {
     // Return a far future date to indicate the loan won't be paid off
-    date.setFullYear(date.getFullYear() + 100);
-    return date;
+    return unpayableEndDate(date);
   }
 
   // No payments at all: there is no final payment to date, so the caller gets

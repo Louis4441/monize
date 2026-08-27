@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "Tài khoản thế chấp yêu cầu mortgagePaymentFrequency, paymentStartDate, sourceAccountId và amortizationMonths",
     "mortgageRequiresInterestRate": "Tài khoản thế chấp yêu cầu lãi suất",
     "mortgageFrequencyUnsupported": "Không thể lên lịch thế chấp Canada với tần suất thanh toán {frequency}",
+    "paymentFrequencyUnsupported": "Không thể lên lịch tần suất thanh toán {frequency}",
     "mortgageRequiresInstitution": "Tài khoản thế chấp yêu cầu tên tổ chức",
     "onlyMortgageAccounts": "Thao tác này chỉ hợp lệ cho tài khoản thế chấp",
     "updateRateClosed": "Không thể cập nhật lãi suất cho tài khoản đã đóng",

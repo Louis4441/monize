@@ -92,22 +92,27 @@ export function ComparisonSummaryCards({
   // The resulting monthly outlay: a fixed budget shows that budget as-is;
   // for lower-installment the recomputed smaller installment; otherwise the
   // unchanged installment plus any per-payment extra.
-  // `finalPaymentAmount` is the installment at the last row PROJECTED, which is
-  // the last payment only when the schedule paid off. On a truncated schedule it
-  // is a mid-schedule figure, so the resulting-payment card is unknown too --
-  // otherwise it printed a confident number beside an "Unknown" installment drop
-  // for the same underlying quantity. A fixed budget is the borrower's own input
-  // and stays known either way.
+  //
+  // Only the LOWER_INSTALLMENT branch loses its answer to truncation, and the
+  // gate belongs there rather than over both. `finalPaymentAmount` is the level
+  // installment at the last row PROJECTED: for LOWER_INSTALLMENT that is a
+  // re-levelled figure mid-schedule, so a horizon-truncated plan has no
+  // resulting installment to report. For SHORTEN_TERM the installment is the
+  // contractual input the plan never changes, so it is known whether or not the
+  // schedule reached payoff -- and `null` there printed "Unknown" over a figure
+  // the borrower had typed in themselves. `null` means not known; a state that
+  // IS known must not use it. A fixed budget is the borrower's own input and
+  // stays known either way.
   const monthlyPayment =
     fixedMonthlyPayment != null
       ? fixedMonthlyPayment
-      : !scenario.paidOff
-        ? null
-        : isLowerInstallment
-          ? // The overpayment IS the reduction here; adding it on top would count
-            // the same money twice.
+      : isLowerInstallment
+        ? scenario.paidOff
+          ? // The overpayment IS the reduction here; adding it on top would
+            // count the same money twice.
             scenario.finalPaymentAmount
-          : Math.round((scenario.finalPaymentAmount + perPaymentExtra) * 100) / 100;
+          : null
+        : Math.round((scenario.finalPaymentAmount + perPaymentExtra) * 100) / 100;
 
   const overpaymentNote =
     fixedMonthlyPayment == null && !isLowerInstallment && opAmount > 0

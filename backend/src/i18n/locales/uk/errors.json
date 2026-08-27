@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "Іпотечні рахунки вимагають mortgagePaymentFrequency, paymentStartDate, sourceAccountId та amortizationMonths",
     "mortgageRequiresInterestRate": "Іпотечні рахунки вимагають відсоткову ставку",
     "mortgageFrequencyUnsupported": "Канадську іпотеку не можна запланувати з періодичністю платежів {frequency}",
+    "paymentFrequencyUnsupported": "Періодичність платежів {frequency} не можна запланувати",
     "mortgageRequiresInstitution": "Іпотечні рахунки вимагають назву установи",
     "onlyMortgageAccounts": "Ця операція дійсна лише для іпотечних рахунків",
     "updateRateClosed": "Неможливо оновити ставку для закритого рахунку",

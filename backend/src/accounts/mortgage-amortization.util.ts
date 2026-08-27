@@ -20,6 +20,7 @@ import {
   MORTGAGE_FREQUENCY_TO_RECURRENCE,
   MortgagePaymentFrequency,
   advancePaymentDates,
+  unpayableEndDate,
 } from "./payment-frequency.util";
 
 /**
@@ -313,8 +314,7 @@ export function calculateMortgageEndDate(
     totalPayments < 0 ||
     totalPayments > MAX_DATEABLE_PAYMENTS
   ) {
-    date.setFullYear(date.getFullYear() + 100);
-    return date;
+    return unpayableEndDate(date);
   }
 
   // No payments at all: there is no final payment to date, so the caller gets

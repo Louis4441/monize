@@ -73,6 +73,30 @@ export const MORTGAGE_PAYMENT_FREQUENCIES = [
 export type MortgagePaymentFrequency =
   (typeof MORTGAGE_PAYMENT_FREQUENCIES)[number];
 
+/**
+ * The mortgage-domain spelling of a payment frequency, or `null` when the
+ * mortgage helpers cannot express it -- the browser-side twin of the backend's
+ * `toMortgagePaymentFrequency` (`backend/src/accounts/payment-frequency.util.ts`).
+ *
+ * Quarterly and yearly return `null`: a mortgage in this model has no such
+ * cadence, and the server refuses one with a 400 rather than splitting the
+ * payment at a confidently wrong rate. The setup dialog exists on this side of
+ * that refusal, so it must not OFFER a cadence the server will reject -- it
+ * offered quarterly and yearly to Canadian mortgages and turned a working flow
+ * into a hard failure the user could not read off the form.
+ *
+ * `loan-frequency.guard.test.ts` reads the backend switch and fails when the two
+ * disagree, so this is a copy the machine checks rather than one it trusts.
+ */
+export function toMortgagePaymentFrequency(
+  frequency: string,
+): MortgagePaymentFrequency | null {
+  if ((MORTGAGE_PAYMENT_FREQUENCIES as readonly string[]).includes(frequency)) {
+    return frequency as MortgagePaymentFrequency;
+  }
+  return frequency === 'SEMIMONTHLY' ? 'SEMI_MONTHLY' : null;
+}
+
 export interface Account {
   id: string;
   userId: string;

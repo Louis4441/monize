@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "抵押贷款账户需要 mortgagePaymentFrequency、paymentStartDate、sourceAccountId 和 amortizationMonths",
     "mortgageRequiresInterestRate": "抵押贷款账户需要利率",
     "mortgageFrequencyUnsupported": "加拿大抵押贷款无法按 {frequency} 的还款频率安排",
+    "paymentFrequencyUnsupported": "无法按 {frequency} 的还款频率安排",
     "mortgageRequiresInstitution": "抵押贷款账户需要机构名称",
     "onlyMortgageAccounts": "此操作仅适用于抵押贷款账户",
     "updateRateClosed": "无法更新已关闭账户的利率",

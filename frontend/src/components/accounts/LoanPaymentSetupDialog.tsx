@@ -10,7 +10,12 @@ import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Combobox } from '@/components/ui/Combobox';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Account, DetectedLoanPayment, SetupLoanPaymentsData } from '@/types/account';
+import {
+  Account,
+  DetectedLoanPayment,
+  SetupLoanPaymentsData,
+  toMortgagePaymentFrequency,
+} from '@/types/account';
 import { Payee } from '@/types/payee';
 import { Category } from '@/types/category';
 import { accountsApi } from '@/lib/accounts';
@@ -64,7 +69,7 @@ export function LoanPaymentSetupDialog({
   // Use detected split ratio from imported transactions
   const [useDetectedSplit, setUseDetectedSplit] = useState(false);
 
-  const paymentFrequencyOptions = [
+  const allPaymentFrequencyOptions = [
     { value: 'WEEKLY', label: t('loanPaymentSetup.frequencyOptions.weekly') },
     { value: 'BIWEEKLY', label: t('loanPaymentSetup.frequencyOptions.biweekly') },
     { value: 'SEMIMONTHLY', label: t('loanPaymentSetup.frequencyOptions.semiMonthly') },
@@ -77,6 +82,28 @@ export function LoanPaymentSetupDialog({
   const isMortgage = loanAccount.accountType === 'MORTGAGE';
   const currencySymbol = getCurrencySymbol(loanAccount.currencyCode || 'USD');
   const [isCanadianMortgage, setIsCanadianMortgage] = useState(false);
+
+  // A Canadian mortgage is split by the mortgage helpers, which have no
+  // quarterly or yearly cadence: the server answers 400 rather than compute the
+  // split at a monthly rate, so offering those two here would be a control whose
+  // only outcome is a failure the form cannot explain. Filtered rather than
+  // validated on submit, so the choice never exists.
+  //
+  // The current selection is corrected by DERIVING the effective value instead
+  // of writing state -- ticking the box while "Quarterly" is selected must not
+  // submit a value the list no longer offers, and unticking it restores what the
+  // user had chosen.
+  const restrictToMortgageCadences = isMortgage && isCanadianMortgage;
+  const paymentFrequencyOptions = restrictToMortgageCadences
+    ? allPaymentFrequencyOptions.filter(
+        (option) => toMortgagePaymentFrequency(option.value) !== null,
+      )
+    : allPaymentFrequencyOptions;
+  const effectivePaymentFrequency =
+    restrictToMortgageCadences &&
+    toMortgagePaymentFrequency(paymentFrequency) === null
+      ? 'MONTHLY'
+      : paymentFrequency;
   const [isVariableRate, setIsVariableRate] = useState(false);
   const [amortizationMonths, setAmortizationMonths] = useState<number | undefined>(undefined);
   const [termMonths, setTermMonths] = useState<number | undefined>(undefined);
@@ -193,7 +220,11 @@ export function LoanPaymentSetupDialog({
     try {
       const data: SetupLoanPaymentsData = {
         paymentAmount: totalPaymentAmount,
-        paymentFrequency,
+        // The value the control shows, not the raw selection behind it: a
+        // Canadian mortgage's list drops the cadences the server refuses, so
+        // submitting the pre-restriction choice would send exactly the 400 the
+        // filtering exists to prevent.
+        paymentFrequency: effectivePaymentFrequency,
         sourceAccountId,
         nextDueDate,
         interestRate,
@@ -230,7 +261,7 @@ export function LoanPaymentSetupDialog({
       setIsSubmitting(false);
     }
   }, [
-    totalPaymentAmount, paymentFrequency, sourceAccountId, nextDueDate,
+    totalPaymentAmount, effectivePaymentFrequency, sourceAccountId, nextDueDate,
     interestRate, interestCategoryId, selectedPayeeId, payeeName, autoPost,
     includeExtraPrincipal, extraPrincipal, useDetectedSplit, detected,
     isMortgage, isCanadianMortgage, isVariableRate, amortizationMonths, termMonths,
@@ -356,7 +387,7 @@ export function LoanPaymentSetupDialog({
               <div>
                 <Select
                   label={t('loanPaymentSetup.paymentFrequency')}
-                  value={paymentFrequency}
+                  value={effectivePaymentFrequency}
                   onChange={(e) => setPaymentFrequency(e.target.value)}
                   options={paymentFrequencyOptions}
                 />

@@ -25,6 +25,7 @@ import {
   toMortgagePaymentFrequency,
 } from "./mortgage-amortization.util";
 import { allocateLoanPayment } from "./loan-payment-waterfall.util";
+import { FrequencyType as FrequencyTypeDto } from "../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { tr } from "../i18n/translate";
 import { withScopedDb } from "../common/db/scoped-db";
 
@@ -206,9 +207,25 @@ export class LoanPaymentSetupService {
     // mortgage ones, so both tables are merged rather than a third copy written.
     // Deriving it means a new frequency in either domain is scheduled correctly
     // here without anybody remembering this line.
+    //
+    // Refused rather than defaulted. `?? "MONTHLY"` scheduled an unmapped
+    // frequency twelve times a year and said nothing -- the same silent
+    // fall-through migration 165 exists to heal -- and the `as any` that used to
+    // sit on the payload below hid it from the compiler too. A frequency the
+    // table cannot express is a 400, and `loan-payment-frequency.guard.spec.ts`
+    // reads the DTO's own `@IsIn` list so the refusal is unreachable for every
+    // value the DTO actually accepts.
     const scheduledFrequency =
-      SCHEDULED_FREQUENCY_BY_PAYMENT_FREQUENCY[dto.paymentFrequency] ??
-      "MONTHLY";
+      SCHEDULED_FREQUENCY_BY_PAYMENT_FREQUENCY[dto.paymentFrequency];
+    if (!scheduledFrequency) {
+      throw new BadRequestException(
+        tr(
+          "errors.accounts.paymentFrequencyUnsupported",
+          "This payment frequency cannot be scheduled",
+          { frequency: dto.paymentFrequency },
+        ),
+      );
+    }
 
     // Build scheduled transaction splits
     const splits: Array<{
@@ -255,7 +272,7 @@ export class LoanPaymentSetupService {
         payeeName: dto.payeeName || account.institution || undefined,
         amount: -parentAmount,
         currencyCode: account.currencyCode,
-        frequency: scheduledFrequency as any,
+        frequency: FrequencyTypeDto[scheduledFrequency],
         nextDueDate: dto.nextDueDate,
         startDate: dto.nextDueDate,
         isActive: true,

@@ -398,25 +398,39 @@ those payments -- and not by a calendar of its own. `calculateEndDate` and
 `calculateMortgageEndDate` convert through the frequency tables above and call
 `advancePaymentDates`.
 
-The same reasoning reaches the *projection*, for semi-monthly only: a borrower
-reads projected row dates and posted dates as one calendar, so `advanceDate` in
-`frontend/src/lib/loan-schedule.ts` steps semi-monthly the way
-`advanceByFrequency` does (the 15th and the last day of the month), not the 1st
-and the 15th. It spells the rule out rather than importing the recurrence module,
-because that import would put the file in the scheduled-transaction domain of
-`frequency.guard.test.ts` -- whose point is that loan cadences are a different
-domain -- so `loan-frequency.guard.test.ts` asserts the two steppings agree over
-two years instead. The month-end question for the *other* frequencies stays open
-(see the register in section 10): nothing posts against those row dates.
+The same reasoning reaches the *projection*, and for every cadence rather than
+semi-monthly alone: a borrower reads projected row dates and posted dates as one
+calendar. `advanceDate` in `frontend/src/lib/loan-schedule.ts` therefore delegates
+to `advanceByFrequency` through one `Record`
+(`SCHEDULE_FREQUENCY_TO_RECURRENCE`), the browser-side twin of the two backend
+tables. It used to spell the rule out instead, to keep the file out of the
+scheduled-transaction domain of `frequency.guard.test.ts`, and only semi-monthly
+was ever aligned: the month cadences stepped with `Date.setMonth(+1)`, which
+overflows rather than clamps, so a loan paid on the 31st had its second projected
+row dated 3 March -- February skipped -- while the backend's `calculateEndDate`
+clamped to 28 February. Avoiding a guard's domain is not a reason to keep a
+second calendar; the switch became a `Record` (as did `getPeriodsPerYear` and
+`overpaymentsPerYear`), so the file is in that guard's scope and passes on its
+merits. `loan-frequency.guard.test.ts` walks every cadence against
+`advanceByFrequency`, month-end anchors included.
 
 A hand-rolled semi-monthly step (the 1st and the 15th) against the engine's own
 (the 15th and the last day of the month) dated payment 24 of a 24-payment
 schedule *before* the final installment, so the schedule it bounded posted 23 of
 them. It follows that month-end drift in a payoff date is whatever the
 scheduler's drift is, by construction -- which is the only answer that keeps the
-two consistent, and is deliberately narrower than the open month-end question for
-a *projection's* row dates (`advanceDate` in the frontend engine, which no
-scheduler consumes).
+two consistent, and is now also what a *projection's* row dates do, since
+`advanceDate` steps through the same engine.
+
+A `Date` carrying a calendar date is UTC-midnight throughout these helpers, the
+convention `ensureYMD` and `formatDateYMD` already share: every caller builds one
+from a date-only string and every consumer reads it back in UTC. Reading LOCAL
+components in between put every payoff date one day early outside UTC, by two
+routes -- west of Greenwich the input read landed on the previous day, east of it
+the local-midnight output did -- and CI's `TZ=UTC` cannot see either. Setting
+`process.env.TZ` inside a Jest worker does not move `Date`, so
+`backend/src/accounts/payment-frequency.timezone.spec.ts` walks the offsets in
+child processes and scans the three helpers for a local accessor.
 
 A negative count is unknown, not "at most one payment": `-1` is the sentinel
 `calculateResidualPayoff` returns for a schedule it could not work out, and both
@@ -467,12 +481,14 @@ So occurrences are dated: they fall on the cadence anchor (the overpayment's
 start date, never before the first projected payment) and every cadence step
 after it, and each one is applied at the first loan payment on or after its due
 date. Each is derived from the anchor **by index**, not accumulated from the one
-before it, and its day is clamped to the target month's length -- `setMonth(+1)`
-overflows a 31st into the following month and then keeps every later occurrence
-on the new day, which skipped February and paid 11 times a year. That is
-deliberately not the month-end question `advanceDate` leaves open for loan
-*payments*, which follow the lender's own schedule: a cadence has no lender, and
-its count per year is the invariant. `recurringOccurrencesDue` in `frontend/src/lib/loan-schedule.ts` is the
+before it, and its day is clamped to the target month's length. Accumulation is
+the defect, not the arithmetic: any month step that has to clamp is lossy, so 31
+January becomes 28 February and then stays the 28th for the rest of the loan.
+(Before `advanceDate` was delegated to the recurrence engine it overflowed
+instead -- 31 January to 3 March -- skipping February and paying 11 times a
+year.) A loan *payment* keeps the accumulating step on purpose, because it
+follows the recorded schedule: a cadence has no lender, and its count per year is
+the invariant. `recurringOccurrencesDue` in `frontend/src/lib/loan-schedule.ts` is the
 only place that decision is made, and it makes the cadence exact in both
 directions: `MONTHLY`, `QUARTERLY` and `ANNUALLY` are calendar cadences, so they
 contribute exactly 12, 4 and 1 occurrences per calendar year on a weekly,

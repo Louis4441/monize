@@ -630,12 +630,14 @@ Retry semantics     --
 Crash semantics     -- (projection only; nothing is persisted)
 Failure response    --
                     Each occurrence is derived from the anchor by index rather
-                    than accumulated from the one before it: `advanceDate`'s
-                    Date.setMonth(+1) overflows a 31st into the following month
-                    and then holds every later occurrence on the new day, which
-                    skipped February and paid 11 times a year -- the same defect
-                    from the other direction. The day is clamped to the target
-                    month's length, as a standing order is.
+                    than accumulated from the one before it. Accumulation is
+                    lossy whenever a month step has to clamp: 31 January becomes
+                    28 February and then stays the 28th for the rest of the loan.
+                    (`advanceDate` used to OVERFLOW instead -- 31 January to 3
+                    March -- skipping February and paying 11 times a year, the
+                    same defect from the other direction; it now delegates to
+                    `advanceByFrequency`, which clamps.) The day is clamped to
+                    the target month's length, as a standing order is.
                     ONE_OFF is excluded from RecurringExtra.frequency by TYPE
                     (RecurringOverpaymentFrequency), not by convention: it is a
                     single dated payment and belongs in lumpSums, and accepted as
@@ -834,12 +836,36 @@ Enforcement         calculateEndDate (loan-amortization.util.ts) and
                     (1st, 15th) against the engine's (15th, last day of month)
                     dated payment 24 of 24 before the final installment, and the
                     schedule posted 23.
+                    A Date carrying a calendar date is UTC-midnight throughout
+                    these helpers -- the convention ensureYMD and formatDateYMD
+                    already share. Reading local components in between put every
+                    payoff date a day early outside UTC, and CI's TZ=UTC cannot
+                    see it (nor can a Jest worker: setting process.env.TZ does
+                    not move Date there).
 Concurrency scope   --
 Failure response    The start date itself for a zero- or one-payment schedule.
+Data already written
+                    Migration 166 steps the affected scheduled_transactions.endDate
+                    back one interval, scoped to active loan/mortgage schedules
+                    whose bound is still in the future and is a whole number of
+                    the schedule's own intervals from its start date. It is a
+                    one-shot body (registered in NON_RERUNNABLE_DATA_MIGRATIONS),
+                    run once per database by schema_migrations.
+                    Two populations are deliberately NOT healed, because the old
+                    value is not invertible in SQL rather than because it is
+                    right: a month cadence anchored on the 29th to 31st (the old
+                    stepper overflowed -- 31 January to 3 March -- and carried
+                    the new day forward), and SEMIMONTHLY (the old mortgage
+                    stepper used the 1st and the 15th where the engine uses the
+                    15th and the last day of the month, so the stored bound sits
+                    on a different calendar). Re-running payment setup on those
+                    accounts rewrites the bound correctly.
 Required tests      Present: the calculateEndDate and calculateMortgageEndDate
                     blocks in both specs assert exact calendar dates (12 monthly
                     payments from 2026-01-01 end on 2026-12-01), including the
-                    one-payment and zero-payment cases.
+                    one-payment and zero-payment cases;
+                    payment-frequency.timezone.spec.ts walks the offsets in child
+                    processes and scans the three helpers for a local accessor.
 Status              enforced
 ```
 

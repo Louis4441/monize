@@ -18,7 +18,11 @@
  * orders.
  */
 
-import { FrequencyType, calculateNextDueDate } from "../common/recurrence";
+import {
+  FrequencyType,
+  calculateNextDueDate,
+  ensureYMD,
+} from "../common/recurrence";
 
 /**
  * Payment frequencies a loan account can carry.
@@ -159,23 +163,52 @@ export const MAX_DATEABLE_PAYMENTS = 10000;
  * posted 23 of them. It follows that month-end drift here is whatever the
  * scheduler's drift is, by construction.
  *
- * The conversion is local-time in both directions, so a `Date` built as
- * `new Date(2026, 0, 1)` round-trips to the same wall-clock day whatever the
- * container's offset -- `ensureYMD` reads UTC and would shift the day west of
- * Greenwich.
+ * The conversion is UTC in both directions, because that is what a `Date`
+ * carrying a calendar date means here: every caller builds one from a date-only
+ * string (`new Date("2026-01-15")` is UTC midnight) and every consumer reads it
+ * back with `formatDateYMD`, which takes UTC components -- the same convention
+ * `ensureYMD` follows. Reading LOCAL components instead put the payoff date one
+ * day early in every non-UTC zone, and by two different routes: west of
+ * Greenwich the *input* read landed on the previous day, east of it the
+ * local-midnight *output* did. Both are invisible under CI's `TZ=UTC`;
+ * `payment-frequency.timezone.spec.ts` runs the helpers across four offsets.
+ *
+ * The loop is deliberate, and cheap enough to keep: stepping through the engine
+ * is what makes a payoff date a date the scheduler reaches, and the pathological
+ * ceiling (`MAX_DATEABLE_PAYMENTS` weekly steps) measures 4.6ms -- an ordinary
+ * 360-payment loan is under 0.2ms. Deriving the date arithmetically instead
+ * would be a second calendar again.
  */
 export function advancePaymentDates(
   date: Date,
   frequency: FrequencyType,
   steps: number,
 ): Date {
-  let ymd = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-    2,
-    "0",
-  )}-${String(date.getDate()).padStart(2, "0")}`;
+  let ymd = ensureYMD(date);
   for (let i = 0; i < steps; i++) {
     ymd = calculateNextDueDate(ymd, frequency);
   }
   const [year, month, day] = ymd.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+/**
+ * The sentinel a loan that never pays off is dated to: a century past its first
+ * payment.
+ *
+ * Shared by both end-date helpers, and UTC for the same reason
+ * `advancePaymentDates` is -- `date.setFullYear(date.getFullYear() + 100)` on a
+ * UTC-midnight `Date` reads local components, so west of Greenwich the sentinel
+ * came back a day early too. A sentinel nobody reads as a real date still has to
+ * be the same string in every deployment, or a snapshot test is a test of the
+ * container's timezone.
+ */
+export function unpayableEndDate(startDate: Date): Date {
+  return new Date(
+    Date.UTC(
+      startDate.getUTCFullYear() + 100,
+      startDate.getUTCMonth(),
+      startDate.getUTCDate(),
+    ),
+  );
 }

@@ -152,9 +152,17 @@ describe('advanceDate', () => {
   });
 
   it('advances monthly, quarterly, and yearly by calendar units', () => {
-    expect(advanceDate(new Date(2026, 0, 31), 'MONTHLY').getMonth()).toBe(2); // Jan 31 -> Mar 3 (JS overflow)
+    // Clamped, not overflowed. This assertion used to read `.toBe(2)` with the
+    // comment "Jan 31 -> Mar 3 (JS overflow)" -- a test pinning the defect: the
+    // projection skipped February outright while the backend's own end date,
+    // stepped by the recurrence engine, clamped to 28 February. `advanceDate`
+    // delegates to that engine now, so the two calendars are one.
+    expect(advanceDate(new Date(2026, 0, 31), 'MONTHLY')).toEqual(new Date(2026, 1, 28));
+    expect(advanceDate(new Date(2028, 0, 31), 'MONTHLY')).toEqual(new Date(2028, 1, 29));
     expect(advanceDate(new Date(2026, 0, 15), 'QUARTERLY')).toEqual(new Date(2026, 3, 15));
     expect(advanceDate(new Date(2026, 0, 15), 'YEARLY')).toEqual(new Date(2027, 0, 15));
+    // A leap-day anniversary clamps rather than rolling into March.
+    expect(advanceDate(new Date(2028, 1, 29), 'YEARLY')).toEqual(new Date(2029, 1, 28));
   });
 });
 

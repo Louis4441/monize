@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "I conti mutuo richiedono mortgagePaymentFrequency, paymentStartDate, sourceAccountId e amortizationMonths",
     "mortgageRequiresInterestRate": "I conti mutuo richiedono un tasso d'interesse",
     "mortgageFrequencyUnsupported": "I mutui canadesi non possono essere pianificati con una frequenza di pagamento {frequency}",
+    "paymentFrequencyUnsupported": "Una frequenza di pagamento {frequency} non può essere pianificata",
     "mortgageRequiresInstitution": "I conti mutuo richiedono un nome istituto",
     "onlyMortgageAccounts": "Questa operazione è valida solo per i conti mutuo",
     "updateRateClosed": "Impossibile aggiornare il tasso su un conto chiuso",

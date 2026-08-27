@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "Hypothekenkonten erfordern mortgagePaymentFrequency, paymentStartDate, sourceAccountId und amortizationMonths",
     "mortgageRequiresInterestRate": "Hypothekenkonten erfordern einen Zinssatz",
     "mortgageFrequencyUnsupported": "Kanadische Hypotheken können nicht mit der Zahlungsfrequenz {frequency} geplant werden",
+    "paymentFrequencyUnsupported": "Eine Zahlungsfrequenz von {frequency} kann nicht als Zahlungsplan angelegt werden",
     "mortgageRequiresInstitution": "Hypothekenkonten erfordern einen Institutsnamen",
     "onlyMortgageAccounts": "Dieser Vorgang ist nur für Hypothekenkonten gültig",
     "updateRateClosed": "Zinssatz eines geschlossenen Kontos kann nicht aktualisiert werden",

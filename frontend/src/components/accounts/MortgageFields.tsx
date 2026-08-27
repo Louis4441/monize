@@ -437,7 +437,7 @@ export function MortgageFields({
                   <span className="text-gray-500 dark:text-gray-400">{t('mortgageFields.previewPayoffDate')}</span>{' '}
                   <span className="font-medium">
                     {mortgagePreview.totalPayments > 0
-                      ? formatDate(new Date(mortgagePreview.endDate))
+                      ? formatDate(mortgagePreview.endDate)
                       : t('mortgageFields.previewNA')}
                   </span>
                 </div>

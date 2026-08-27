@@ -208,7 +208,7 @@ export function LoanFields({
               <span className="text-gray-500 dark:text-gray-400">{t('loanFields.previewEstPayoff')}</span>{' '}
               <span className="font-medium">
                 {amortizationPreview.totalPayments > 0
-                  ? formatDate(new Date(amortizationPreview.endDate))
+                  ? formatDate(amortizationPreview.endDate)
                   : t('loanFields.previewNA')}
               </span>
             </div>

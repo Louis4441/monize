@@ -11,9 +11,11 @@ import {
   PAYMENT_FREQUENCIES,
 } from "./dto/create-account.dto";
 import {
+  calculateMortgageAmortization,
   getMortgagePeriodsPerYear,
   toMortgagePaymentFrequency,
 } from "./mortgage-amortization.util";
+import { formatDateYMD } from "../common/date-utils";
 import { calculateNextDueDate } from "../common/recurrence";
 import { paymentsToClear } from "./amortization-count.util";
 
@@ -280,5 +282,36 @@ describe("paymentsToClear", () => {
 
   it("needs no payments for nothing owed", () => {
     expect(paymentsToClear(0, 0.005, 1000)).toBe(0);
+  });
+
+  it("needs no payments for nothing owed even at a zero installment", () => {
+    // Settled is decided BEFORE the installment is looked at. The other order
+    // answered Infinity here -- "never amortizes" for a debt that is already
+    // repaid -- and calculateMortgageAmortization then reported totalPayments:
+    // -1 with a year-2126 payoff date on the same response as
+    // residualPayoffAmount: 0, so one schedule was unknowable and known-zero at
+    // once. Zero needs no rate, and it needs no payment either.
+    expect(paymentsToClear(0, 0.005, 0)).toBe(0);
+    expect(paymentsToClear(-25, 0.005, 0)).toBe(0);
+    expect(paymentsToClear(0, 0, 0)).toBe(0);
+  });
+
+  it("answers one schedule, not two, for a repaid mortgage", () => {
+    // The end-to-end shape of the same defect: nothing outstanding, so the
+    // count, the payoff date and the residual all describe a settled loan.
+    const result = calculateMortgageAmortization({
+      principal: 0,
+      annualRate: 5,
+      amortizationMonths: 300,
+      paymentFrequency: "ACCELERATED_BIWEEKLY",
+      isCanadian: false,
+      isVariableRate: false,
+      startDate: new Date("2026-01-15"),
+    });
+    expect(result.totalPayments).toBe(0);
+    expect(result.residualPayoffAmount).toBe(0);
+    expect(result.totalInterest).toBe(0);
+    // Not the far-future sentinel: a settled debt is paid off today, not in 2126.
+    expect(formatDateYMD(result.endDate)).toBe("2026-01-15");
   });
 });

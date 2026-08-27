@@ -1,5 +1,7 @@
 import { format } from 'date-fns';
 import { parseLocalDate } from '@/lib/utils';
+import { advanceByFrequency } from '@/lib/frequency';
+import type { FrequencyType } from '@/types/scheduled-transaction';
 
 /**
  * Shared loan/mortgage schedule engine.
@@ -84,22 +86,26 @@ export type RecurringOverpaymentFrequency = Exclude<
   'ONE_OFF'
 >;
 
+/**
+ * Overpayments per year for each frequency. `ONE_OFF` is 0 -- a single dated
+ * payment has no annual rate, and a caller spreading an amount over a year must
+ * treat it separately rather than divide by zero occurrences.
+ *
+ * A `Record` rather than a `switch`, so a new member of `OverpaymentFrequency`
+ * is a compile error here instead of a silent `default: 0`.
+ */
+const OVERPAYMENTS_PER_YEAR: Record<OverpaymentFrequency, number> = {
+  ONE_OFF: 0,
+  WEEKLY: 52,
+  BIWEEKLY: 26,
+  MONTHLY: 12,
+  QUARTERLY: 4,
+  ANNUALLY: 1,
+};
+
 /** Overpayments per year for each recurring frequency (ONE_OFF is not recurring). */
 export function overpaymentsPerYear(frequency: OverpaymentFrequency): number {
-  switch (frequency) {
-    case 'WEEKLY':
-      return 52;
-    case 'BIWEEKLY':
-      return 26;
-    case 'MONTHLY':
-      return 12;
-    case 'QUARTERLY':
-      return 4;
-    case 'ANNUALLY':
-      return 1;
-    default:
-      return 0;
-  }
+  return OVERPAYMENTS_PER_YEAR[frequency] ?? 0;
 }
 
 /**
@@ -401,25 +407,30 @@ function resolveMaxPayments(
   );
 }
 
+/**
+ * Payment periods a year for each cadence a loan account can store.
+ *
+ * A `Record` rather than a `switch` with a `default: 12`: the default is how
+ * semi-monthly was silently projected at twelve periods a year -- roughly double
+ * the remaining interest and a payoff date twice as far out -- and a table makes
+ * a new member of `ScheduleFrequency` a compile error instead. The runtime
+ * fallback below survives only for the cast at `buildLoanProjectionInput`, where
+ * a value out of the database has not been through the compiler at all.
+ */
+const PERIODS_PER_YEAR: Record<ScheduleFrequency, number> = {
+  WEEKLY: 52,
+  ACCELERATED_WEEKLY: 52,
+  BIWEEKLY: 26,
+  ACCELERATED_BIWEEKLY: 26,
+  SEMI_MONTHLY: 24,
+  SEMIMONTHLY: 24,
+  MONTHLY: 12,
+  QUARTERLY: 4,
+  YEARLY: 1,
+};
+
 export function getPeriodsPerYear(frequency: ScheduleFrequency): number {
-  switch (frequency) {
-    case 'WEEKLY':
-    case 'ACCELERATED_WEEKLY':
-      return 52;
-    case 'BIWEEKLY':
-    case 'ACCELERATED_BIWEEKLY':
-      return 26;
-    case 'SEMI_MONTHLY':
-    case 'SEMIMONTHLY':
-      return 24;
-    case 'QUARTERLY':
-      return 4;
-    case 'YEARLY':
-      return 1;
-    case 'MONTHLY':
-    default:
-      return 12;
-  }
+  return PERIODS_PER_YEAR[frequency] ?? 12;
 }
 
 /**
@@ -496,46 +507,52 @@ export function firstPeriodInterest(
   );
 }
 
+/**
+ * The recurrence frequency each loan cadence is posted at.
+ *
+ * The projection's row dates and the scheduler's posting dates are the same
+ * calendar to a borrower, so they are the same calendar in code: this table maps
+ * a loan cadence onto the recurrence engine's own frequency, and `advanceDate`
+ * steps through `advanceByFrequency`. The accelerated cadences pay a fraction of
+ * the monthly installment on their base cadence, so they step as that base.
+ *
+ * A `Record`, so a new member of `ScheduleFrequency` is a compile error rather
+ * than a silent monthly `default`. It is the browser-side twin of the backend's
+ * `LOAN_FREQUENCY_TO_RECURRENCE` / `MORTGAGE_FREQUENCY_TO_RECURRENCE`
+ * (`backend/src/accounts/payment-frequency.util.ts`).
+ */
+const SCHEDULE_FREQUENCY_TO_RECURRENCE: Record<ScheduleFrequency, FrequencyType> = {
+  WEEKLY: 'WEEKLY',
+  ACCELERATED_WEEKLY: 'WEEKLY',
+  BIWEEKLY: 'BIWEEKLY',
+  ACCELERATED_BIWEEKLY: 'BIWEEKLY',
+  SEMI_MONTHLY: 'SEMIMONTHLY',
+  SEMIMONTHLY: 'SEMIMONTHLY',
+  MONTHLY: 'MONTHLY',
+  QUARTERLY: 'QUARTERLY',
+  YEARLY: 'YEARLY',
+};
+
+/**
+ * The next payment date after `date` on the loan's cadence.
+ *
+ * Delegated to `advanceByFrequency`, the engine that posts these payments, and
+ * not a second calendar beside it. The hand-rolled version got two things wrong
+ * at once. Semi-monthly stepped the 1st and the 15th where the engine steps the
+ * 15th and the last day of the month, showing a borrower dates their register
+ * never has. And the month cadences used `Date.setMonth(+1)`, which OVERFLOWS
+ * rather than clamps: a loan paid on the 31st had its second row dated 3 March
+ * -- February skipped entirely -- and every later row three days off the
+ * schedule the backend's `calculateEndDate` bounds. `advanceByFrequency` clamps
+ * (`addMonthsClamped`), so 31 January steps to 28 February, and INV-LOAN-005's
+ * requirement -- that a projected payoff is a date the scheduler reaches --
+ * holds by construction on this side too.
+ *
+ * `loan-frequency.guard.test.ts` walks every cadence against the engine,
+ * including the month-end anchors, so the two cannot drift apart again.
+ */
 export function advanceDate(date: Date, frequency: ScheduleFrequency): Date {
-  const next = new Date(date);
-  switch (frequency) {
-    case 'WEEKLY':
-    case 'ACCELERATED_WEEKLY':
-      next.setDate(next.getDate() + 7);
-      break;
-    case 'BIWEEKLY':
-    case 'ACCELERATED_BIWEEKLY':
-      next.setDate(next.getDate() + 14);
-      break;
-    case 'SEMI_MONTHLY':
-    case 'SEMIMONTHLY':
-      // The 15th and the last day of the month, alternating -- the convention
-      // `advanceByFrequency` in @/lib/frequency uses, because that is the
-      // engine that will actually post these payments. Projecting the 1st and
-      // the 15th instead showed a semi-monthly borrower dates their register
-      // never has. Spelled out rather than imported: importing the recurrence
-      // module would put this file in the scheduled-transaction domain of
-      // `frequency.guard.test.ts`, whose whole point is that loan cadences are
-      // a different domain. `loan-frequency.guard.test.ts` asserts the two
-      // steppings agree, so the duplication is proven rather than trusted.
-      if (next.getDate() <= 15) {
-        next.setMonth(next.getMonth() + 1, 0); // day 0 of next month = last of this
-      } else {
-        next.setMonth(next.getMonth() + 1, 15);
-      }
-      break;
-    case 'QUARTERLY':
-      next.setMonth(next.getMonth() + 3);
-      break;
-    case 'YEARLY':
-      next.setFullYear(next.getFullYear() + 1);
-      break;
-    case 'MONTHLY':
-    default:
-      next.setMonth(next.getMonth() + 1);
-      break;
-  }
-  return next;
+  return advanceByFrequency(date, SCHEDULE_FREQUENCY_TO_RECURRENCE[frequency] ?? 'MONTHLY');
 }
 
 /** Cadence step of each recurring overpayment frequency: days, or months. */
@@ -554,12 +571,15 @@ const OVERPAYMENT_CADENCE: Record<
  * The `index`-th occurrence date of a cadence, derived from the anchor rather
  * than accumulated from the occurrence before it.
  *
- * `advanceDate` is deliberately not reused for the month cadences. It steps with
- * `Date.setMonth(+1)`, which overflows a 31st into the following month (Jan 31
- * becomes Mar 3) and then keeps every later occurrence on the new day -- so a
- * monthly overpayment anchored on the 29th to 31st skipped a month and paid 11
- * times in the first year, the exact defect INV-LOAN-001 exists to prevent, from
- * the other direction. Deriving the nth date from the anchor removes the
+ * `advanceDate` is deliberately not reused for the month cadences, and the
+ * reason is accumulation rather than arithmetic. It steps one occurrence from
+ * the one before, and any month step that has to clamp is lossy: 31 January
+ * clamps to 28 February, and every later occurrence then keeps the 28th, so an
+ * overpayment anchored on the 31st quietly becomes an overpayment on the 28th
+ * for the rest of the loan. (Before it was delegated to the recurrence engine it
+ * OVERFLOWED instead -- 31 January to 3 March -- which lost a month outright and
+ * paid 11 times in the first year, the defect INV-LOAN-001 exists to prevent,
+ * from the other direction.) Deriving the nth date from the anchor removes the
  * accumulation, and clamping the day to the target month's length keeps the
  * anchor day in every month long enough to hold it: the 31st falls on the 30th
  * of a 30-day month and on the 28th or 29th of February, the way a standing
@@ -567,10 +587,10 @@ const OVERPAYMENT_CADENCE: Record<
  *
  * The day cadences cannot drift, but are derived the same way for one code path.
  *
- * This is not the month-end question `advanceDate` leaves open for loan
- * *payments* (which follow the recorded schedule, whatever convention the lender
- * uses): an overpayment cadence has no lender, and its count per year is an
- * invariant, so it needs an answer here.
+ * A loan *payment* is the opposite case and keeps the accumulating step on
+ * purpose: it follows the recorded schedule, so its convention is the recurrence
+ * engine's, whatever the lender does. An overpayment cadence has no lender, and
+ * its count per year is an invariant, so it needs its own answer here.
  */
 function overpaymentOccurrenceDate(
   anchor: Date,

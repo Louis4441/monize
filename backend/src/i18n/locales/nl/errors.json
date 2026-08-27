@@ -28,6 +28,7 @@
     "mortgageRequiredFields": "Hypotheekrekeningen vereisen mortgagePaymentFrequency, paymentStartDate, sourceAccountId en amortizationMonths",
     "mortgageRequiresInterestRate": "Hypotheekrekeningen vereisen een rentepercentage",
     "mortgageFrequencyUnsupported": "Canadese hypotheken kunnen niet worden ingepland met betalingsfrequentie {frequency}",
+    "paymentFrequencyUnsupported": "Een betalingsfrequentie {frequency} kan niet worden ingepland",
     "mortgageRequiresInstitution": "Hypotheekrekeningen vereisen een instellingsnaam",
     "onlyMortgageAccounts": "Deze bewerking is alleen geldig voor hypotheekrekeningen",
     "updateRateClosed": "Kan het tarief van een gesloten rekening niet bijwerken",

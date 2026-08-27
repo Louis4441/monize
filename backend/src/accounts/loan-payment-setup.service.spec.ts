@@ -424,5 +424,63 @@ describe("LoanPaymentSetupService", () => {
       const createCall = scheduledTransactionsService.create.mock.calls[0][1];
       expect(createCall.name).toBe("Mortgage Payment - Home Mortgage");
     });
+
+    it("refuses a Canadian mortgage at a cadence the helpers cannot express", async () => {
+      // getMortgagePeriodsPerYear has no QUARTERLY case, so casting the DTO's
+      // value in used to reach its `default: 12` and split the payment at three
+      // times the correct interest for the life of the mortgage. A refusal is
+      // the only honest answer -- and the setup dialog no longer OFFERS these
+      // two to a Canadian mortgage, so this is the server half of one rule.
+      const mortgageAccount = {
+        ...mockLoanAccount,
+        id: "mortgage-2",
+        accountType: AccountType.MORTGAGE,
+        isCanadianMortgage: true,
+        isVariableRate: false,
+      };
+
+      for (const paymentFrequency of ["QUARTERLY", "YEARLY"]) {
+        accountsRepository.findOne
+          .mockResolvedValueOnce(mortgageAccount)
+          .mockResolvedValueOnce(mockSourceAccount);
+        scheduledTransactionsService.create.mockClear();
+
+        await expect(
+          service.setupLoanPayments("user-1", "mortgage-2", {
+            paymentAmount: 1500,
+            paymentFrequency,
+            sourceAccountId: "source-1",
+            nextDueDate: "2026-04-01",
+            interestRate: 4.25,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        // Rejection happens before the write: no schedule, no account update.
+        expect(scheduledTransactionsService.create).not.toHaveBeenCalled();
+      }
+    });
+
+    it("refuses a frequency the recurrence table cannot schedule", async () => {
+      // The DTO's @IsIn list keeps this unreachable through the controller, and
+      // loan-payment-frequency.guard.spec.ts holds the two lists together -- but
+      // the fallback that used to stand here (`?? "MONTHLY"`, behind an `as any`
+      // the compiler could not see through) scheduled an unmapped cadence twelve
+      // times a year and said nothing. A refusal fails loudly instead.
+      accountsRepository.findOne
+        .mockResolvedValueOnce(mockLoanAccount)
+        .mockResolvedValueOnce(mockSourceAccount);
+      scheduledTransactionsService.create.mockClear();
+
+      await expect(
+        service.setupLoanPayments("user-1", "loan-1", {
+          paymentAmount: 500,
+          paymentFrequency: "FORTNIGHTLY_ISH",
+          sourceAccountId: "source-1",
+          nextDueDate: "2026-04-01",
+          interestRate: 5,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(scheduledTransactionsService.create).not.toHaveBeenCalled();
+    });
   });
 });

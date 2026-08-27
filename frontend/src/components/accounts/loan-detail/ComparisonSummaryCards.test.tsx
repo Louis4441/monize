@@ -105,14 +105,65 @@ describe('ComparisonSummaryCards', () => {
 
     expect(screen.getByText('Interest Saved')).toBeInTheDocument();
     expect(screen.getByText('Time Saved')).toBeInTheDocument();
-    // Three: the time saved, the interest saved, and the resulting monthly
-    // payment -- whose figure is the installment at the last row PROJECTED, not
-    // at the last payment, so it is unknown for the same reason.
-    expect(screen.getAllByText('Unknown')).toHaveLength(3);
+    // Two: the time saved and the interest saved, both differences of two
+    // schedules where one never ended. The resulting monthly payment is NOT one
+    // of them -- this is a SHORTEN_TERM plan, so its installment is the
+    // contractual figure the plan never changes, known whether or not the
+    // schedule reached payoff. It used to read "Unknown" as well, printing "not
+    // known" over a number the borrower had typed in themselves.
+    expect(screen.getAllByText('Unknown')).toHaveLength(2);
     // And nothing anywhere claiming a zero saving.
     expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
     expect(screen.queryByText('0 payments')).not.toBeInTheDocument();
     expect(screen.queryByText('0 months')).not.toBeInTheDocument();
+  });
+
+  it('keeps a SHORTEN_TERM installment known when the schedule is truncated', () => {
+    // Truncation makes a DIFFERENCE unknown -- time saved, interest saved, the
+    // installment drop -- because each subtracts two schedules and one of them
+    // never ended. It does not make the borrower's own inputs unknown: a
+    // shorten-term plan keeps the contractual installment, so the resulting
+    // outlay is installment + extra whether or not the projection reached
+    // payoff. `null` means "not known", and a state that IS known must not use
+    // it.
+    const comparison = makeIncomparable();
+    expect(comparison.scenario.paidOff).toBe(false);
+    render(
+      <ComparisonSummaryCards
+        comparison={comparison}
+        currencyCode="CAD"
+        recurringOverpayment={{ amount: 100, frequency: 'MONTHLY', mode: 'SHORTEN_TERM' }}
+        loanFrequency="MONTHLY"
+      />,
+    );
+
+    const expected =
+      Math.round((comparison.scenario.finalPaymentAmount + 100) * 100) / 100;
+    expect(screen.getByText(`$${expected.toFixed(2)}`)).toBeInTheDocument();
+    // The two genuine unknowns are still unknown.
+    expect(screen.getAllByText('Unknown')).toHaveLength(2);
+  });
+
+  it('leaves a LOWER_INSTALLMENT installment unknown when the schedule is truncated', () => {
+    // The branch the gate really belongs to: here `finalPaymentAmount` is a
+    // re-levelled figure at whatever row the horizon stopped on, so a truncated
+    // plan has no resulting installment to report.
+    const comparison = makeIncomparable();
+    render(
+      <ComparisonSummaryCards
+        comparison={comparison}
+        currencyCode="CAD"
+        recurringOverpayment={{ amount: 100, frequency: 'MONTHLY', mode: 'LOWER_INSTALLMENT' }}
+        loanFrequency="MONTHLY"
+      />,
+    );
+
+    expect(screen.getByText('Monthly Payment')).toBeInTheDocument();
+    const wouldBe = comparison.scenario.finalPaymentAmount;
+    expect(screen.queryByText(`$${wouldBe.toFixed(2)}`)).not.toBeInTheDocument();
+    // Three unknowns here: time saved, interest saved, and the installment drop
+    // -- plus the payment card itself, which shares the drop's reason.
+    expect(screen.getAllByText('Unknown').length).toBeGreaterThanOrEqual(3);
   });
 
   it('reads the mode from the plan, not from the installment drop', () => {
