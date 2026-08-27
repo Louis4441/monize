@@ -549,9 +549,15 @@ describe('InvestmentValueChart', () => {
       vi.setSystemTime(new Date(2026, 7, 12));
       try {
         render(<InvestmentValueChart />);
-        await vi.waitFor(() =>
-          expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalled(),
-        );
+        // Not `vi.waitFor`: it polls outside act, so the state the response
+        // sets commits outside it and the assertions below read a tree React
+        // has not finished with. Draining the fake clock inside `act` settles
+        // the request and its render together. RTL's own `waitFor` is not the
+        // way out either -- it cannot drive Vitest's fake timers.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
       }
