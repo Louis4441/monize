@@ -405,18 +405,29 @@ export class ScheduledTransactionsService {
   constructor(
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
+    // forwardRef on the next four: each of these classes sits on a require
+    // cycle back to this file, so its reflected parameter type is `undefined`
+    // under some load orders and Nest reports "can't resolve dependencies of
+    // the ScheduledTransactionsService (..., ?, ...)" at boot. The occurrence
+    // pair joined that cycle with issue #1247, through
+    // ScheduledEffectiveAmountService -> InvestmentTransactionsService ->
+    // AccountsService. See `src/module-graph.spec.ts`.
+    @Inject(forwardRef(() => TransactionsService))
     private transactionsService: TransactionsService,
+    @Inject(forwardRef(() => InvestmentTransactionsService))
     private investmentTransactionsService: InvestmentTransactionsService,
     // The single server-side answer to "what would this occurrence post today"
     // (issue #1247). Every FX/provenance decision the schedule makes -- the
     // projection, the posting and the read models AI, MCP, the dashboard, the
     // budget and the reports consume -- comes from here, so no surface can grow
     // its own copy of the #1167 rules.
+    @Inject(forwardRef(() => ScheduledEffectiveAmountService))
     private effectiveAmounts: ScheduledEffectiveAmountService,
     // The single server-side answer to "which occurrence is due, and when"
     // (issue #1247). Centralizing the arithmetic was half the fix: every surface
     // still chose its own member of the resolver's result, so this owns the
     // recurrence expansion and the override selection as well.
+    @Inject(forwardRef(() => ScheduledOccurrenceService))
     private occurrences: ScheduledOccurrenceService,
     private overrideService: ScheduledTransactionOverrideService,
     private loanService: ScheduledTransactionLoanService,

@@ -49,7 +49,9 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     // ScheduledTransactionsModule (issue #1247), so this edge closes a
     // module cycle -- see `src/module-graph.spec.ts`.
     forwardRef(() => NotificationsModule),
-    DelegationModule,
+    // ...and DelegationModule imports NotificationsModule, so this edge sits on
+    // the same cycle -- see `src/module-graph.spec.ts`.
+    forwardRef(() => DelegationModule),
     forwardRef(() => LoanRateChangesModule),
     forwardRef(() => CurrenciesModule),
   ],

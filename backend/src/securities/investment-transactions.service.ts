@@ -355,6 +355,10 @@ export class InvestmentTransactionsService {
     private accountsService: AccountsService,
     @Inject(forwardRef(() => TransactionsService))
     private transactionsService: TransactionsService,
+    // forwardRef: HoldingsService sits on a require cycle back to this file, so
+    // its reflected parameter type is `undefined` under some load orders --
+    // see `src/module-graph.spec.ts`.
+    @Inject(forwardRef(() => HoldingsService))
     private holdingsService: HoldingsService,
     private portfolioCalculationService: PortfolioCalculationService,
     private securitiesService: SecuritiesService,

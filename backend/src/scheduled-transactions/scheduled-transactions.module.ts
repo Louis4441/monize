@@ -28,11 +28,13 @@ import { DelegationModule } from "../delegation/delegation.module";
       Tag,
     ]),
     forwardRef(() => AccountsModule),
-    TransactionsModule,
+    // forwardRef on both: each lies on a require cycle, so a bare reference is
+    // `undefined` here under some load orders -- see `src/module-graph.spec.ts`.
+    forwardRef(() => TransactionsModule),
     forwardRef(() => SecuritiesModule),
     forwardRef(() => CurrenciesModule),
     ActionHistoryModule,
-    DelegationModule,
+    forwardRef(() => DelegationModule),
   ],
   providers: [
     ScheduledTransactionsService,
