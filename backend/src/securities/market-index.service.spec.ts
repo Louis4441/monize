@@ -546,10 +546,11 @@ describe("MarketIndexService", () => {
     });
 
     it("drops bars the provider could not price, rather than storing a zero", async () => {
-      // Only the first chunk answers; the rest are years the provider has
-      // nothing for.
+      // Only the first chunk carries bars; the rest are years the provider
+      // answered for and had nothing in. That answer is `[]`, not `null` --
+      // `null` means no usable answer, which refuses the whole fetch.
       yahoo.fetchHistoricalWindow
-        .mockResolvedValue(null)
+        .mockResolvedValue([])
         .mockResolvedValueOnce([
           bar("2025-01-02", 5900),
           bar("2025-01-03", 0),
@@ -663,6 +664,54 @@ describe("MarketIndexService", () => {
       await service.refreshAll();
 
       expect(yahoo.fetchHistoricalWindow).toHaveBeenCalled();
+    });
+  });
+
+  // --- a partly-answered fetch is not a series -----------------------------
+
+  describe("a window with no answer", () => {
+    /** The reason string the service stored, from the recordFailure call. */
+    const failureReason = (): string | undefined => {
+      const call = manager.query.mock.calls.find((entry) =>
+        String(entry[0]).includes("last_error = $2"),
+      );
+      return call ? String((call[1] as unknown[])[1]) : undefined;
+    };
+
+    it("refuses the whole fetch rather than storing a stub", async () => {
+      // The yearly chunks go out together, so when the breaker opens partway
+      // through, exactly one can hold the half-open probe and the rest are
+      // refused. Read as empty years, that stored a single year as the index's
+      // whole history, recorded a success, and locked the index behind its
+      // six-hour cooldown.
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow
+        .mockResolvedValue(null)
+        .mockResolvedValueOnce([bar("2025-01-02", 5900)]);
+
+      await service.refreshAll();
+
+      expect(
+        statements().some((sql) =>
+          sql.includes("INSERT INTO market_index_prices"),
+        ),
+      ).toBe(false);
+      expect(failureReason()).toContain("no answer");
+    });
+
+    it("stores a series whose empty years the provider answered for", async () => {
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow
+        .mockResolvedValue([])
+        .mockResolvedValueOnce([bar("2025-01-02", 5900)]);
+
+      await service.refreshAll();
+
+      expect(
+        statements().some((sql) =>
+          sql.includes("INSERT INTO market_index_prices"),
+        ),
+      ).toBe(true);
     });
   });
 

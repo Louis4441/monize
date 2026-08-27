@@ -3,6 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { DataSource } from "typeorm";
 import { I18nService } from "nestjs-i18n";
 import { withScopedDb } from "../common/db/scoped-db";
+import { returnedRows } from "../common/db/query-result";
 import { withSystemContext } from "../common/db/with-context";
 import { EmailT, emailTranslator } from "../i18n/email-translator";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -199,9 +200,16 @@ export class ProviderOutageAlertService {
       return;
     }
 
-    const claimed: HealthRow[] = await withScopedDb(
-      this.dataSource,
-      (manager) =>
+    // `returnedRows`, not `result[0]`: TypeORM's postgres driver returns the
+    // tuple `[rows, rowCount]` for an UPDATE -- with or without RETURNING -- so
+    // reading position 0 hands back the *row list* and every field of the
+    // "claimed row" is undefined. The send then threw inside the template with
+    // the claim already committed, which is the worst failure this path has:
+    // the episode is marked notified and nobody was told. Every unit test
+    // passed, because a mocked manager returns the flat shape; the integration
+    // spec against a real database is what found it.
+    const claimed = returnedRows<HealthRow>(
+      await withScopedDb(this.dataSource, (manager) =>
         manager.query(
           `UPDATE provider_health
             SET outage_notified_at = CURRENT_TIMESTAMP,
@@ -217,6 +225,7 @@ export class ProviderOutageAlertService {
                   last_failure_reason, last_success_at, outage_notified_at`,
           [row.provider, String(MIN_OUTAGE_MS), String(ALERT_QUIET_PERIOD_MS)],
         ),
+      ),
     );
     const won = claimed[0];
     if (!won) return;
@@ -269,9 +278,10 @@ export class ProviderOutageAlertService {
       return;
     }
 
-    const claimed: HealthRow[] = await withScopedDb(
-      this.dataSource,
-      (manager) =>
+    // The same driver-shape trap as the outage claim above: an UPDATE's rows
+    // arrive inside `[rows, rowCount]`.
+    const claimed = returnedRows<HealthRow>(
+      await withScopedDb(this.dataSource, (manager) =>
         manager.query(
           `UPDATE provider_health
             SET outage_notified_at = NULL,
@@ -283,6 +293,7 @@ export class ProviderOutageAlertService {
                   last_failure_reason, last_success_at, outage_notified_at`,
           [row.provider],
         ),
+      ),
     );
     const won = claimed[0];
     if (!won) return;

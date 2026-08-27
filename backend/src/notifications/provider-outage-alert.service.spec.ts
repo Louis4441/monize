@@ -35,6 +35,11 @@ function healthRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** What `manager.query` returns for an UPDATE: the `[rows, rowCount]` tuple. */
+function updateResult(rows: unknown[]): [unknown[], number] {
+  return [rows, rows.length];
+}
+
 function adminRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "admin-1",
@@ -64,11 +69,18 @@ describe("ProviderOutageAlertService", () => {
       if (text.includes("SELECT provider, state")) {
         return Promise.resolve(data.pending ?? []);
       }
+      // Driver shape, not a convenient one: TypeORM's postgres driver returns
+      // `[rows, rowCount]` for an UPDATE, with or without RETURNING. A mock
+      // that hands back bare rows lets `result[0]` look like a claimed row --
+      // which is exactly the defect that reached a real database, where every
+      // field of that "row" was undefined and the send threw with the claim
+      // already committed. `A mock must return what the real collaborator
+      // returns` (backend/CLAUDE.md).
       if (text.includes("SET outage_notified_at = CURRENT_TIMESTAMP")) {
-        return Promise.resolve(data.outageClaim ?? []);
+        return Promise.resolve(updateResult(data.outageClaim ?? []));
       }
       if (text.includes("SET outage_notified_at = NULL")) {
-        return Promise.resolve(data.recoveryClaim ?? []);
+        return Promise.resolve(updateResult(data.recoveryClaim ?? []));
       }
       if (text.includes("FROM users u")) {
         return Promise.resolve(data.admins ?? [adminRow()]);

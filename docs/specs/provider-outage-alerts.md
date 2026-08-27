@@ -129,3 +129,5 @@ half-open probe slot, so every taker owes an outcome.
 | One alert per episode, per replica set, with the floor | `provider-outage-alert.service.spec.ts` |
 | The provider's own error text cannot inject HTML | `email-templates.spec.ts` |
 | Every guarded client is answerable to the breaker | `provider-health/provider-call.guard.spec.ts` |
+| The episode start survives a restart, and three concurrent sweeps send one email | `test/integration/provider-health.integration.spec.ts`, against a real PostgreSQL |
+| An empty answer is not a refusal, anywhere it gets cached | `msn-finance.service.spec.ts`, `security-price.service.spec.ts`, `exchange-rate.service.spec.ts` |

@@ -143,6 +143,29 @@ export class ProviderHealthService {
   }
 
   /**
+   * Whether the provider answered every request made since `before` was taken.
+   *
+   * The one test for "may I cache this empty result". A refusal, and a
+   * transport failure below the breaker's threshold, both produce exactly the
+   * same empty answer as "this symbol has no history" -- and every one of those
+   * caches holds for hours, so remembering one turns a two-minute outage into
+   * an afternoon of poisoned lookups across a whole portfolio. Before the
+   * breaker each poisoning at least cost a real timeout, so it could not fan
+   * out; now it is instant, which is what makes this the rule rather than a
+   * nicety.
+   *
+   * Deliberately conservative: the counter is shared, so an unrelated
+   * concurrent failure costs this caller its cache entry. A missed cache write
+   * is the cheap direction.
+   */
+  answeredSince(provider: string, before: ProviderCircuitSnapshot): boolean {
+    const after = this.circuit(provider).snapshot();
+    return (
+      after.state === "closed" && after.lastFailureAt === before.lastFailureAt
+    );
+  }
+
+  /**
    * Give back a slot taken by `tryRequest`/`assertAvailable` when the attempt
    * produced no evidence about this provider at all. Counts nothing.
    */
@@ -191,10 +214,15 @@ export class ProviderHealthService {
    * Record one failed attempt. Only transport failures count towards the
    * breaker -- a 404 or an unparseable body is this request's problem, and
    * opening the breaker on it would take the provider down for everyone else.
+   *
+   * @returns whether the failure counted. A caller holding the half-open probe
+   *   slot must act on `false`: an uncounted failure is not an outcome, so the
+   *   slot has to go back through `releaseProbe` rather than be held for the
+   *   probe timeout against a provider nothing has shown to be down.
    */
-  recordFailure(provider: string, error: unknown): void {
-    if (isProviderUnavailable(error)) return;
-    if (!isTransportFailure(error)) return;
+  recordFailure(provider: string, error: unknown): boolean {
+    if (isProviderUnavailable(error)) return false;
+    if (!isTransportFailure(error)) return false;
     const reason = describeFetchFailure(error);
     const circuit = this.circuit(provider);
     const outcome = circuit.recordTransportFailure(reason);
@@ -211,7 +239,7 @@ export class ProviderHealthService {
           `Last failure: ${reason}`,
       );
       this.persist(provider, outcome.snapshot, "down");
-      return;
+      return true;
     }
 
     // A failure run that has not reached the threshold is not an outage, so
@@ -219,6 +247,7 @@ export class ProviderHealthService {
     if (outcome.snapshot.state !== "closed" && this.dueForHeartbeat(provider)) {
       this.persist(provider, outcome.snapshot, "down");
     }
+    return true;
   }
 
   /**
@@ -264,10 +293,15 @@ export class ProviderHealthService {
       return;
     }
 
+    // The span is measured, not assumed: `suppressed` keeps accumulating until
+    // the next line actually prints, which during an open window is the whole
+    // window -- quoting a fixed 60s there would describe fifteen minutes of
+    // refusals as one minute's worth.
+    const quietForMs = state.lastLoggedAt > 0 ? now - state.lastLoggedAt : 0;
     const suffix =
       state.suppressed > 0
-        ? ` (${state.suppressed} similar failure(s) suppressed in the last ` +
-          `${Math.round(LOG_INTERVAL_MS / 1000)}s)`
+        ? ` (${state.suppressed} similar failure(s) suppressed in the previous ` +
+          `${Math.max(1, Math.round(quietForMs / 1000))}s)`
         : "";
     logger.warn(
       `${label}: ${context} failed: ${describeFetchFailure(error)}${suffix}`,

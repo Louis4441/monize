@@ -461,6 +461,26 @@ export class MarketIndexService implements OnApplicationBootstrap {
       );
 
       const prices: HistoricalPrice[] = [];
+      // A chunk that came back `null` is not an empty year: the client returns
+      // null when it got no usable answer -- a transport failure, or a refusal
+      // once the breaker opened partway through. The chunks go out together, so
+      // exactly one of them can hold the half-open probe and the other ten are
+      // refused; treating those as "the index did not exist yet" stored one
+      // year as if it were the whole history, recorded a success, and locked
+      // the index behind its six-hour cooldown with a stub in the store.
+      //
+      // The whole fetch is refused instead. That leaves the index unpriced,
+      // which the comparison reports as an exclusion the user can act on --
+      // the same call the coarse-bar guard below makes, for the same reason.
+      if (fetched.some((chunk) => chunk === null)) {
+        const missing = fetched.filter((chunk) => chunk === null).length;
+        await this.recordFailure(
+          index.code,
+          `${missing} of ${fetched.length} window(s) for ${index.yahooSymbol} ` +
+            `came back with no answer: ${this.emptyFetchReason(index)}`,
+        );
+        return;
+      }
       for (const chunk of fetched) {
         // An empty chunk is a year before the index existed, not a failure.
         if (!chunk?.length) continue;

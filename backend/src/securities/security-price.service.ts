@@ -40,6 +40,8 @@ import {
   monthFetchWindow,
 } from "../common/time-series/history-fill";
 import { daysBetween } from "../common/time-series/price-boundary.util";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { TrackedProviderId } from "../provider-health/providers";
 
 export { SecurityLookupResult } from "./providers/quote-provider.interface";
 
@@ -215,6 +217,14 @@ interface HistoricalWithProvider {
   provider: QuoteProviderName;
 }
 
+/**
+ * The provider whose availability decides whether an empty window may be
+ * remembered. The registry can route a *security* to MSN, but the empty-window
+ * memory is a report-wide 30-minute cache, and the fill path's own history
+ * fetches go to Yahoo -- so this is the one whose silence must not be cached.
+ */
+const HEALTH_PROVIDER_ID: TrackedProviderId = "yahoo_finance";
+
 @Injectable()
 export class SecurityPriceService {
   private readonly logger = new Logger(SecurityPriceService.name);
@@ -229,6 +239,7 @@ export class SecurityPriceService {
     private dataSource: DataSource,
     private netWorthService: NetWorthService,
     private providers: QuoteProviderRegistry,
+    private readonly health: ProviderHealthService,
   ) {}
 
   // ─── User preference loading ─────────────────────────────────────────────
@@ -1643,6 +1654,9 @@ export class SecurityPriceService {
           unattempted += 1;
           return 0;
         }
+        // What the breaker knew before the fetch, so "no history" can be told
+        // apart from "we never got an answer" afterwards.
+        const beforeFetch = this.health.snapshot(HEALTH_PROVIDER_ID);
         try {
           const stored = await this.fillPriceWindow(
             security,
@@ -1651,10 +1665,19 @@ export class SecurityPriceService {
             end,
             date,
           );
-          if (stored === 0) {
+          if (
+            stored === 0 &&
+            this.health.answeredSince(HEALTH_PROVIDER_ID, beforeFetch)
+          ) {
             // No history for this symbol in this era -- an instrument that did
             // not trade yet, or one the provider does not carry. Note it, so a
             // report reloaded on the same date does not re-ask.
+            //
+            // Only when the provider actually answered: a refusal or a
+            // transport failure produces the same zero, and this memory holds
+            // for 30 minutes across every security in the report -- so caching
+            // one would take a two-minute outage and leave a whole portfolio
+            // unpriced long after the provider came back.
             this.emptyPriceWindows.remember(security.id, month);
             this.logger.warn(
               `No historical prices available for ${security.symbol} over ${start} to ${end}`,

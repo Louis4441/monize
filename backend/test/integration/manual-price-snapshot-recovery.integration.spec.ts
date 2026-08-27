@@ -8,8 +8,12 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
-import { withUserContext, withPreserveTimestamps } from "@/common/db/with-context";
+import {
+  withUserContext,
+  withPreserveTimestamps,
+} from "@/common/db/with-context";
 import { withScopedDb } from "@/common/db/scoped-db";
+import { createTestProviderHealth } from "../../src/test-helpers/provider-health-testing";
 
 /**
  * MZ-1242-R5 / R9 -- crash recovery for a manual-price snapshot invalidation,
@@ -58,6 +62,7 @@ describe("manual-price crash recovery (integration, MZ-1242-R5/R9)", () => {
       dataSource,
       netWorth,
       {} as never,
+      createTestProviderHealth(),
     );
   });
 
@@ -151,7 +156,10 @@ describe("manual-price crash recovery (integration, MZ-1242-R5/R9)", () => {
     await withUserContext(userId, () =>
       priceService.createManualPrice(
         securityId,
-        { priceDate: new Date().toISOString().slice(0, 10), closePrice: MANUAL_PRICE },
+        {
+          priceDate: new Date().toISOString().slice(0, 10),
+          closePrice: MANUAL_PRICE,
+        },
         userId,
       ),
     );

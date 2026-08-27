@@ -384,22 +384,12 @@ export class MsnFinanceService implements QuoteProvider {
       }
     }
 
-    // Cache "MSN has no such instrument" only if MSN actually said so. A
+    // Cache "MSN has no such instrument" only if MSN actually said so: a
     // refusal and a transport failure produce the same `null` from
-    // `httpGetJson`, and this cache holds for 24 hours: caching either turns a
-    // two-minute outage into a day of poisoned lookups for every symbol a price
-    // sweep touched. (Before the breaker each poisoning at least cost a real
-    // 10-second timeout, so it could not fan out.)
-    //
-    // The test is "did the breaker learn of a failure while we were asking",
-    // not "is the breaker open": a failure run below the threshold leaves the
-    // state closed, and those nulls are just as uninformative. Concurrent
-    // symbols share the counter, so an unrelated failure can cost this one its
-    // cache entry -- a missed cache write, which is the cheap direction.
-    const after = this.health.snapshot(HEALTH_PROVIDER_ID);
-    const answered =
-      after.state === "closed" && after.lastFailureAt === before.lastFailureAt;
-    if (answered) {
+    // `httpGetJson`, and this cache holds for 24 hours, so caching either turns
+    // a two-minute outage into a day of poisoned lookups for every symbol a
+    // price sweep touched. `answeredSince` owns the test.
+    if (this.health.answeredSince(HEALTH_PROVIDER_ID, before)) {
       this.setCached(key, null);
     }
     return null;

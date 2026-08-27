@@ -638,14 +638,37 @@ describe("YahooFinanceService", () => {
       expect(result).toBeNull();
     });
 
-    it("should return null when timestamps are missing", async () => {
+    it("returns an empty series when the window has no bars", async () => {
+      // A result object with no timestamps is Yahoo answering "nothing traded
+      // in that window" -- a year before the instrument existed, typically.
+      // It is deliberately not `null`: null means no usable answer, and the
+      // market-index chunking has to tell the two apart or it reads a refused
+      // window as an empty year and stores a stub as the whole history.
       mockFetchResponse({
         chart: { result: [{ indicators: { quote: [{ close: [100] }] } }] },
       });
 
       const result = await service.fetchHistorical("AAPL");
 
-      expect(result).toBeNull();
+      expect(result).toEqual([]);
+    });
+
+    it("still returns null for a result it cannot parse", async () => {
+      // Timestamps with no quote series is malformed, not empty: the caller's
+      // alternate-symbol fallback should still get its turn.
+      mockFetchResponse({
+        chart: { result: [{ timestamp: [1700000000], indicators: {} }] },
+      });
+
+      expect(await service.fetchHistorical("AAPL")).toBeNull();
+    });
+
+    it("returns null when the provider carries no such symbol", async () => {
+      mockFetchResponse({
+        chart: { result: null, error: { code: "Not Found" } },
+      });
+
+      expect(await service.fetchHistorical("NOPE")).toBeNull();
     });
 
     it("should return null when indicators are missing", async () => {

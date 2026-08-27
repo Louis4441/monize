@@ -190,7 +190,12 @@ export class YahooFinanceService implements QuoteProvider {
           });
         } catch (error) {
           // No response at all: the availability signal the breaker counts.
-          this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+          // An error it does not count (a bad URL, an aborted body read) is not
+          // an outcome either, so the probe slot this request may be holding
+          // goes back rather than being held against a healthy provider.
+          if (!this.health.recordFailure(HEALTH_PROVIDER_ID, error)) {
+            this.health.releaseProbe(HEALTH_PROVIDER_ID);
+          }
           throw error;
         }
         // It answered. Whatever the status, the provider is reachable -- a 404
@@ -375,8 +380,10 @@ export class YahooFinanceService implements QuoteProvider {
         // host that will not, but it is evidence in the safe direction: both
         // are Yahoo, and over-counting a failure at worst opens the breaker on
         // a provider that is broadly unreachable. Under-counting was the defect.
-        this.health.recordFailure(HEALTH_PROVIDER_ID, error);
-        reported = true;
+        // Only a counted failure is an outcome: an error the breaker ignores
+        // leaves the slot to be handed back below.
+        reported =
+          this.health.recordFailure(HEALTH_PROVIDER_ID, error) || reported;
         lastStatus = describeFetchFailure(error);
         lastError = error;
       }
@@ -634,9 +641,19 @@ export class YahooFinanceService implements QuoteProvider {
 
       const data = await response.json();
       const result = data.chart?.result?.[0];
-      if (!result?.timestamp || !result?.indicators?.quote?.[0]) {
-        return null;
-      }
+      // No result object at all: an unknown symbol, or an error payload. That
+      // is not an answer about this window, so it stays `null` and the caller's
+      // alternate-symbol fallback gets its turn.
+      if (!result) return null;
+      // A result with no timestamps *is* an answer: the window predates the
+      // instrument, or it did not trade in it. Returning `null` for that made
+      // "answered with nothing" and "no usable answer" indistinguishable, and
+      // the market-index chunking read every refused window as "the index did
+      // not exist yet" -- storing one year as if it were the whole history.
+      if (!result.timestamp) return [];
+      // Timestamps but no quote series is a malformed answer, not an empty
+      // window: null, so the caller can try an alternate symbol.
+      if (!result.indicators?.quote?.[0]) return null;
 
       const gbx = isGbxCurrency(result.meta?.currency);
       const convertPrice = (v: number | null | undefined): number | null => {

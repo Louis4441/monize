@@ -1030,10 +1030,20 @@ Failure response    ProviderUnavailableError to the caller, which every provider
                     leaves data unpriced, never a failed user request.
 Required tests      Present: provider-circuit.spec.ts, provider-health.service
                     .spec.ts, provider-outage-alert.service.spec.ts,
-                    provider-call.guard.spec.ts, and the end-to-end pair in
-                    yahoo-finance.service.spec.ts. Owed: a two-instance test that
-                    two live replicas send one email, which a mocked claim cannot
-                    prove.
+                    provider-call.guard.spec.ts, the end-to-end pair in
+                    yahoo-finance.service.spec.ts, and -- for the two properties
+                    that live in SQL rather than in TypeScript --
+                    test/integration/provider-health.integration.spec.ts against
+                    a real PostgreSQL: the upsert's CASE preserving
+                    `outage_started_at` across a restart, and three concurrent
+                    sweeps producing exactly one email. That spec is what caught
+                    the claim being read as `result[0]` when the driver returns
+                    `[rows, rowCount]` for an UPDATE -- every unit test passed
+                    against a mock that returned the flat shape, and in
+                    production the send threw with the claim already committed.
+                    Owed: nothing exercises two *processes*, so the exclusion is
+                    proven across concurrent transactions rather than across
+                    replicas.
 Status              enforced
 ```
 

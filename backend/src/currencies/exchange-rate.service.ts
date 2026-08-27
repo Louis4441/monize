@@ -71,6 +71,11 @@ export interface HistoricalRateBackfillSummary {
   results: HistoricalRateBackfillResult[];
 }
 
+/** The provider the historical rate fills go to. */
+const HEALTH_PROVIDER_ID: TrackedProviderId = "yahoo_finance";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { TrackedProviderId } from "../provider-health/providers";
+
 @Injectable()
 export class ExchangeRateService implements OnModuleInit {
   private readonly logger = new Logger(ExchangeRateService.name);
@@ -82,6 +87,7 @@ export class ExchangeRateService implements OnModuleInit {
     private dataSource: DataSource,
     @Inject(forwardRef(() => YahooFinanceService))
     private yahooFinanceService: YahooFinanceService,
+    private readonly health: ProviderHealthService,
   ) {}
 
   /**
@@ -744,6 +750,9 @@ export class ExchangeRateService implements OnModuleInit {
       due,
       FX_FETCH_CONCURRENCY,
       async ([key, pair]) => {
+        // What the breaker knew before the fetch, so "no rates" can be told
+        // apart from "we never got an answer" afterwards.
+        const beforeFetch = this.health.snapshot(HEALTH_PROVIDER_ID);
         try {
           const stored = await this.fillRateWindow(
             pair.from,
@@ -751,10 +760,19 @@ export class ExchangeRateService implements OnModuleInit {
             start,
             end,
           );
-          if (stored === 0) {
+          if (
+            stored === 0 &&
+            this.health.answeredSince(HEALTH_PROVIDER_ID, beforeFetch)
+          ) {
             // Nothing exists for this pair in this era -- a currency that
             // predates the provider's history, or one it does not carry. Note
             // it, so a report reloaded on the same date does not re-ask.
+            //
+            // Only when the provider actually answered: a refusal and a
+            // transport failure produce the same zero, and this memory holds
+            // for 30 minutes -- long enough for a two-minute outage to leave
+            // every foreign-currency total in the report null well after the
+            // provider came back.
             this.emptyRateWindows.remember(key, month);
             this.logger.warn(
               `No historical rates available for ${pair.from}/${pair.to} over ${start} to ${end}`,
