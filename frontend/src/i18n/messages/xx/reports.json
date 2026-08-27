@@ -842,7 +842,8 @@
     "typeLineOfCredit": "[XX-Line of Credit-XX]",
     "typeLoan": "[XX-Loan-XX]",
     "typeMortgage": "[XX-Mortgage-XX]",
-    "pdfSubtitlePaymentsSummary": "[XX-{count} payments made, {interest} total interest-XX]"
+    "pdfSubtitlePaymentsSummary": "[XX-{count} payments made, {interest} total interest-XX]",
+    "pdfSubtitlePaymentsProjection": "[XX-{count} payments made, {interest} interest over projection-XX]"
   },
   "monteCarlo": {
     "toasts": {

@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Linia kredytowa",
     "typeLoan": "Pożyczka",
     "typeMortgage": "Kredyt hipoteczny",
-    "pdfSubtitlePaymentsSummary": "wykonane spłaty: {count}, łączne odsetki: {interest}"
+    "pdfSubtitlePaymentsSummary": "wykonane spłaty: {count}, łączne odsetki: {interest}",
+    "pdfSubtitlePaymentsProjection": "Wykonano {count} płatności, {interest} odsetek w okresie prognozy"
   },
   "monteCarlo": {
     "toasts": {

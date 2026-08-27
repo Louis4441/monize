@@ -205,3 +205,46 @@ describe('a target cannot be met by a truncated schedule', () => {
     expect(solved.status).toBe('baseline-incomplete');
   });
 });
+
+describe('a fractional step still yields a multiple of the step', () => {
+  /** `n` is an exact multiple of `step`, to the last representable digit. */
+  const isMultipleOf = (n: number, step: number): boolean =>
+    Number.isInteger(Number((n / step).toFixed(6))) &&
+    String(n) === String(Number(n.toFixed(10)));
+
+  it('keeps a fractional-step answer on the step grid', () => {
+    // `Math.ceil(585 / 0.01) * 0.01` is 585.0000000000001, and subtracting the
+    // step four more times from there compounds it -- the value is written onto
+    // `RecurringExtra.amount` and persisted, so an answer that is not a multiple
+    // of the step is a stored figure nobody can reproduce. Every caller passes
+    // 1 today; the parameter is public and documents otherwise.
+    const result = solveRecurringForPayoffMonth(
+      {
+        startingBalance: 120000,
+        annualRate: 5,
+        paymentAmount: 900,
+        frequency: 'MONTHLY',
+        firstPaymentDate: new Date(2026, 0, 15),
+      },
+      '2033-01-01',
+      'SHORTEN_TERM',
+      0.05,
+    );
+    expect(result.status).toBe('ok');
+    const amount = result.amount!;
+    // `Math.ceil(x / 0.05) * 0.05` and four `-= 0.05` steps land on
+    // 584.8000000000002; the assertion is exactness, not closeness, because the
+    // value is persisted as the scenario's overpayment amount.
+    expect(String(amount)).toBe(String(Number(amount.toFixed(10))));
+    expect(isMultipleOf(amount, 0.05)).toBe(true);
+  });
+
+  it('would catch the drift, so the assertion is not vacuous', () => {
+    // The shape the implementation replaced, on the same grid.
+    const drifted = [0, 1, 2, 3].reduce(
+      (n) => n - 0.05,
+      Math.ceil(585 / 0.05) * 0.05,
+    );
+    expect(isMultipleOf(drifted, 0.05)).toBe(false);
+  });
+});

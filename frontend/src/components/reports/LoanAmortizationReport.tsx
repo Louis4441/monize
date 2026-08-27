@@ -247,16 +247,22 @@ export function LoanAmortizationReport() {
     await exportToPdf({
       title: `${t('loanAmortization.pdfTitlePrefix')}${selectedAccount?.name || t('loanAmortization.typeLoan')}`,
       // Only a lifetime figure goes under the "total interest" wording; a
-      // projection truncated at the horizon carries the same subtotal the card
-      // beside it labels "Interest Over Projection", and the PDF is the artifact
-      // the reader keeps.
-      subtitle:
-        summary && summary.hasLifetimeTotal
-          ? t('loanAmortization.pdfSubtitlePaymentsSummary', {
+      // projection truncated at the horizon is RELABELLED, exactly as the card
+      // beside it is, rather than dropped -- the PDF is the artifact the reader
+      // keeps, and withholding the line took the payments-made count (which is
+      // perfectly known) away with the interest figure, so the export and the
+      // screen disagreed about what could be shown.
+      subtitle: summary
+        ? t(
+            summary.hasLifetimeTotal
+              ? 'loanAmortization.pdfSubtitlePaymentsSummary'
+              : 'loanAmortization.pdfSubtitlePaymentsProjection',
+            {
               count: historicalCount,
               interest: formatCurrency(summary.totalInterest, currency),
-            })
-          : undefined,
+            },
+          )
+        : undefined,
       summaryCards: cards.length > 0 ? cards : undefined,
       tableData: { headers, rows },
       filename: `amortization-${accountName}`,

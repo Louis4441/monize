@@ -94,10 +94,16 @@ function minimizeToStep(
   meets: (candidate: number) => boolean,
 ): number {
   const resolution = step > 0 ? step : 1;
+  // Counted in STEPS and multiplied back once, rather than subtracted four
+  // times: repeated `-= 0.01` walks off the step's grid, and the answer is
+  // persisted as the scenario's overpayment amount.
+  let steps = 0;
   let best = amount;
-  for (let i = 0; i < 4 && best - resolution > 0; i++) {
-    if (!meets(best - resolution)) break;
-    best -= resolution;
+  for (let i = 0; i < 4; i++) {
+    const candidate = snapToStep(amount / resolution - (steps + 1), resolution);
+    if (candidate <= 0 || !meets(candidate)) break;
+    steps++;
+    best = candidate;
   }
   return best;
 }
@@ -163,7 +169,25 @@ function upperBound(base: LoanScheduleInput): number {
  *  (more overpayment can only help). */
 function roundUpTo(amount: number, step: number): number {
   if (step <= 0) return Math.ceil(amount);
-  return Math.ceil(amount / step) * step;
+  return snapToStep(Math.ceil(amount / step), step);
+}
+
+/**
+ * `multiple * step`, rounded back onto the step's own decimal grid.
+ *
+ * `Math.ceil(585 / 0.01) * 0.01` is 585.0000000000001, and `minimizeToStep`
+ * subtracts the step a few more times from there -- so a fractional step
+ * produced an amount that was not a multiple of it, written onto
+ * `RecurringExtra.amount` and persisted. Every caller passes 1 today, which is
+ * exactly why this was invisible: the parameter is public and its documented
+ * meaning ("rounded up to `step`") has to hold for the fractional values the
+ * signature invites.
+ *
+ * Nine significant decimals is past any money or rate precision this app stores
+ * and well inside a double's exact range for these magnitudes.
+ */
+function snapToStep(multiple: number, step: number): number {
+  return Number((multiple * step).toFixed(9));
 }
 
 /**

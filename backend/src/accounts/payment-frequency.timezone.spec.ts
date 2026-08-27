@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { mortgageTermEndDate } from "./payment-frequency.util";
 import { formatDateYMD } from "../common/date-utils";
@@ -56,16 +56,26 @@ const CASES: Record<string, string> = {
   // The degenerate case still crosses both conversions -- the cheapest proof
   // that the round trip itself is offset-free.
   "zero steps": "2026-01-15",
-  // A five-year-and-one-month term from a month-end anchor: the clamp lands on
-  // the last day of February, where `setMonth` would have overflowed into March
-  // and a local read would have moved the anchor a day first.
-  "term end": "2031-02-28",
+  // A five-year-and-one-month term from a month-end anchor, as PostgreSQL
+  // receives it: the clamp lands on the last day of February, where `setMonth`
+  // would have overflowed into March.
+  //
+  // Asserted through TypeORM's own serializer rather than `formatDateYMD`,
+  // because that is the only thing this value is ever handed to. The two read
+  // opposite components -- `formatDateYMD` UTC, a `date` column local -- so a
+  // value can be right for one and a day out for the other, and asserting the
+  // wrong one is exactly how the stored term end went unnoticed. The same for
+  // the start date, which anchors every later amortization.
+  "term end stored": "2031-02-28",
+  "start date stored": "2026-01-31",
 };
 
 const CHILD_SCRIPT = `
 const { calculateEndDate } = require("./src/accounts/loan-amortization.util");
 const { calculateMortgageEndDate } = require("./src/accounts/mortgage-amortization.util");
 const { advancePaymentDates, mortgageTermEndDate } = require("./src/accounts/payment-frequency.util");
+const { localDateForColumn } = require("./src/common/date-utils");
+const { DateUtils } = require("typeorm/util/DateUtils");
 const { formatDateYMD } = require("./src/common/date-utils");
 const f = formatDateYMD;
 process.stdout.write(JSON.stringify({
@@ -77,7 +87,15 @@ process.stdout.write(JSON.stringify({
   "semi-monthly": f(advancePaymentDates(new Date("2026-01-15"), "SEMIMONTHLY", 24)),
   "never pays off": f(calculateEndDate(new Date("2026-01-15"), "MONTHLY", Infinity)),
   "zero steps": f(advancePaymentDates(new Date("2026-01-15"), "MONTHLY", 0)),
-  "term end": f(mortgageTermEndDate(new Date("2026-01-31"), 61)),
+  // What PostgreSQL actually receives for a DATE column, which TypeORM
+  // serializes with LOCAL getters -- so this is the assertion that the stored
+  // value is right, not merely the computed one.
+  "term end stored": DateUtils.mixedDateToDateString(
+    mortgageTermEndDate(new Date("2026-01-31"), 61),
+  ),
+  "start date stored": DateUtils.mixedDateToDateString(
+    localDateForColumn("2026-01-31"),
+  ),
 }));
 `;
 
@@ -151,6 +169,45 @@ describe("the amortization date helpers read UTC components only", () => {
       .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
       .join("\n");
   }
+
+  /**
+   * The other half of the same rule, and the opposite direction.
+   *
+   * A `Date` bound for a TypeORM `date` COLUMN must be LOCAL midnight, because
+   * `DateUtils.mixedDateToDateString` reads local components -- so
+   * `new Date("2026-01-31")` (UTC midnight) is stored as the 30th west of
+   * Greenwich. `localDateForColumn` is the one door; a bare `new Date(...)` on
+   * one of these two properties is the defect, and it anchors every amortization
+   * the account later computes.
+   */
+  it("builds no date-column value with a bare new Date()", () => {
+    const COLUMN_DATE_ASSIGNMENT =
+      /\b(paymentStartDate|termEndDate)\s*[:=]\s*new Date\(/g;
+    const offenders = readdirSync(join(__dirname, "..", "accounts"))
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".spec.ts"))
+      .map(
+        (file) =>
+          [file, readFileSync(join(__dirname, file), "utf8")] as [
+            string,
+            string,
+          ],
+      )
+      .filter(([, source]) => COLUMN_DATE_ASSIGNMENT.test(code(source)))
+      .map(([file]) => file);
+    expect(offenders).toEqual([]);
+
+    // And the pattern matches what it claims to.
+    expect(
+      /\b(paymentStartDate|termEndDate)\s*[:=]\s*new Date\(/.test(
+        "paymentStartDate: new Date(dto.nextDueDate),",
+      ),
+    ).toBe(true);
+    expect(
+      /\b(paymentStartDate|termEndDate)\s*[:=]\s*new Date\(/.test(
+        "paymentStartDate: localDateForColumn(dto.nextDueDate),",
+      ),
+    ).toBe(false);
+  });
 
   it.each(SUBJECTS)("%s uses no local date accessor", (file) => {
     // `readFileSync` throws when the file moves, which is the failure we want:

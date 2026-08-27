@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Jalur Kredit",
     "typeLoan": "Pinjaman",
     "typeMortgage": "Hipotek",
-    "pdfSubtitlePaymentsSummary": "{count} pembayaran dilakukan, {interest} total bunga"
+    "pdfSubtitlePaymentsSummary": "{count} pembayaran dilakukan, {interest} total bunga",
+    "pdfSubtitlePaymentsProjection": "{count} pembayaran dilakukan, bunga {interest} selama proyeksi"
   },
   "monteCarlo": {
     "toasts": {

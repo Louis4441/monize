@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Ligne de crédit",
     "typeLoan": "Prêt",
     "typeMortgage": "Hypothèque",
-    "pdfSubtitlePaymentsSummary": "{count} paiements effectués, {interest} d'intérêts au total"
+    "pdfSubtitlePaymentsSummary": "{count} paiements effectués, {interest} d'intérêts au total",
+    "pdfSubtitlePaymentsProjection": "{count} paiements effectués, {interest} d'intérêts sur la projection"
   },
   "monteCarlo": {
     "toasts": {

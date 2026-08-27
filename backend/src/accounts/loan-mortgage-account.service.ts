@@ -32,7 +32,7 @@ import {
   mortgageTermEndDate,
   periodsPerYearForStoredFrequency,
 } from "./payment-frequency.util";
-import { formatDateYMD } from "../common/date-utils";
+import { formatDateYMD, localDateForColumn } from "../common/date-utils";
 import { roundMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 import { LoanRateChangesService } from "../loan-rate-changes/loan-rate-changes.service";
@@ -161,7 +161,10 @@ export class LoanMortgageAccountService {
         institution,
         paymentAmount,
         paymentFrequency,
-        paymentStartDate: new Date(paymentStartDate),
+        // A TypeORM `date` column, serialized with local getters: a UTC-midnight
+        // value is stored a day early west of Greenwich, and this date anchors
+        // every amortization the account later computes.
+        paymentStartDate: localDateForColumn(paymentStartDate),
         sourceAccountId,
         interestCategoryId: interestCatId || null,
       });
@@ -313,7 +316,10 @@ export class LoanMortgageAccountService {
         institution,
         paymentAmount: amortization.paymentAmount,
         paymentFrequency: mortgagePaymentFrequency,
-        paymentStartDate: new Date(paymentStartDate),
+        // A TypeORM `date` column, serialized with local getters: a UTC-midnight
+        // value is stored a day early west of Greenwich, and this date anchors
+        // every amortization the account later computes.
+        paymentStartDate: localDateForColumn(paymentStartDate),
         sourceAccountId,
         interestCategoryId: interestCatId || null,
         isCanadianMortgage,

@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Kredi Limiti",
     "typeLoan": "Kredi",
     "typeMortgage": "İpotek",
-    "pdfSubtitlePaymentsSummary": "{count} ödeme yapıldı, {interest} toplam faiz"
+    "pdfSubtitlePaymentsSummary": "{count} ödeme yapıldı, {interest} toplam faiz",
+    "pdfSubtitlePaymentsProjection": "{count} ödeme yapıldı, projeksiyon boyunca {interest} faiz"
   },
   "monteCarlo": {
     "toasts": {

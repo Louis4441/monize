@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Linea di credito",
     "typeLoan": "Prestito",
     "typeMortgage": "Mutuo",
-    "pdfSubtitlePaymentsSummary": "{count} pagamenti effettuati, {interest} interessi totali"
+    "pdfSubtitlePaymentsSummary": "{count} pagamenti effettuati, {interest} interessi totali",
+    "pdfSubtitlePaymentsProjection": "{count} pagamenti effettuati, {interest} di interessi sulla proiezione"
   },
   "monteCarlo": {
     "toasts": {

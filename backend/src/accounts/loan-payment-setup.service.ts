@@ -25,6 +25,7 @@ import {
   toMortgagePaymentFrequency,
 } from "./mortgage-amortization.util";
 import { mortgageTermEndDate } from "./payment-frequency.util";
+import { localDateForColumn } from "../common/date-utils";
 import { allocateLoanPayment } from "./loan-payment-waterfall.util";
 import { FrequencyType as FrequencyTypeDto } from "../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { tr } from "../i18n/translate";
@@ -297,7 +298,11 @@ export class LoanPaymentSetupService {
       // once a transient clamp (an interest spike) has passed.
       extraPaymentAmount: extraPrincipal,
       paymentFrequency: dto.paymentFrequency,
-      paymentStartDate: new Date(dto.nextDueDate),
+      // Through `localDateForColumn`, not `new Date(...)`: this is a TypeORM
+      // `date` column, serialized with local getters, so a UTC-midnight value
+      // is stored a day early west of Greenwich -- and this date anchors every
+      // amortization the account later computes.
+      paymentStartDate: localDateForColumn(dto.nextDueDate),
       sourceAccountId: dto.sourceAccountId,
       interestCategoryId,
       scheduledTransactionId: scheduledTransaction.id,

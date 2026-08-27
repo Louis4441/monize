@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Kredietlijn",
     "typeLoan": "Lening",
     "typeMortgage": "Hypotheek",
-    "pdfSubtitlePaymentsSummary": "{count} betalingen gedaan, {interest} totale rente"
+    "pdfSubtitlePaymentsSummary": "{count} betalingen gedaan, {interest} totale rente",
+    "pdfSubtitlePaymentsProjection": "{count} betalingen gedaan, {interest} rente over de projectie"
   },
   "monteCarlo": {
     "toasts": {

@@ -842,7 +842,8 @@
     "typeLineOfCredit": "信用額度",
     "typeLoan": "貸款",
     "typeMortgage": "抵押貸款",
-    "pdfSubtitlePaymentsSummary": "{count} 筆付款已完成，總利息 {interest}"
+    "pdfSubtitlePaymentsSummary": "{count} 筆付款已完成，總利息 {interest}",
+    "pdfSubtitlePaymentsProjection": "已還款 {count} 期，預測期內利息 {interest}"
   },
   "monteCarlo": {
     "toasts": {

@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Linha de Crédito",
     "typeLoan": "Empréstimo",
     "typeMortgage": "Crédito Habitação",
-    "pdfSubtitlePaymentsSummary": "{count} pagamentos efetuados, {interest} de juros totais"
+    "pdfSubtitlePaymentsSummary": "{count} pagamentos efetuados, {interest} de juros totais",
+    "pdfSubtitlePaymentsProjection": "{count} pagamentos efetuados, {interest} de juros durante a projeção"
   },
   "monteCarlo": {
     "toasts": {

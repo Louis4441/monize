@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Kreditlinie",
     "typeLoan": "Darlehen",
     "typeMortgage": "Hypothek",
-    "pdfSubtitlePaymentsSummary": "{count} Zahlungen geleistet, {interest} Zinsen gesamt"
+    "pdfSubtitlePaymentsSummary": "{count} Zahlungen geleistet, {interest} Zinsen gesamt",
+    "pdfSubtitlePaymentsProjection": "{count} Zahlungen geleistet, {interest} Zinsen über den Projektionszeitraum"
   },
   "monteCarlo": {
     "toasts": {

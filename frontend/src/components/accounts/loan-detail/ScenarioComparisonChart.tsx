@@ -20,7 +20,7 @@ import { ExportIconButton } from '@/components/ui/ExportIconButton';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { OverpaymentFrequency } from '@/lib/loan-schedule';
-import { FREQUENCY_LABEL_KEY } from '@/components/accounts/loan-detail/loan-scenario-labels';
+import { frequencyLabelKey } from '@/components/accounts/loan-detail/loan-scenario-labels';
 
 export interface ScenarioOutcome {
   id: string;
@@ -138,12 +138,12 @@ export function ScenarioComparisonChart({
   const overpaymentLabel = (o: ScenarioOutcome): string => {
     const parts: string[] = [];
     if (o.recurringExtra && o.recurringExtra > 0) {
-      const freq = o.recurringFrequency;
+      const freqKey = frequencyLabelKey(o.recurringFrequency);
       parts.push(
-        freq && freq !== 'MONTHLY'
+        freqKey && o.recurringFrequency !== 'MONTHLY'
           ? t('loanDetail.scenarios.overpaymentWithFrequency', {
               amount: formatCurrency(o.recurringExtra, currencyCode),
-              frequency: t(FREQUENCY_LABEL_KEY[freq]),
+              frequency: t(freqKey),
             })
           : t('loanDetail.scenarioChart.extraShort', {
               amount: formatCurrency(o.recurringExtra, currencyCode),

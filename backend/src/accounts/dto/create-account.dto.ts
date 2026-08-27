@@ -33,28 +33,26 @@ import { IsCurrencyCode } from "../../common/validators/is-currency-code.validat
  * `PaymentFrequency` in loan-amortization.util.ts is -- and
  * `loan-payment-frequency.guard.spec.ts` holds the two lists equal.
  */
-export const PAYMENT_FREQUENCIES = [
-  "WEEKLY",
-  "BIWEEKLY",
-  "SEMIMONTHLY",
-  "MONTHLY",
-  "QUARTERLY",
-  "YEARLY",
-] as const;
+import {
+  MORTGAGE_PAYMENT_FREQUENCIES,
+  MortgagePaymentFrequency,
+  PAYMENT_FREQUENCIES,
+  PaymentFrequency,
+} from "../payment-frequency.util";
 
-export type PaymentFrequency = (typeof PAYMENT_FREQUENCIES)[number];
-
-export const MORTGAGE_PAYMENT_FREQUENCIES = [
-  "MONTHLY",
-  "SEMI_MONTHLY",
-  "BIWEEKLY",
-  "ACCELERATED_BIWEEKLY",
-  "WEEKLY",
-  "ACCELERATED_WEEKLY",
-] as const;
-
-export type MortgagePaymentFrequency =
-  (typeof MORTGAGE_PAYMENT_FREQUENCIES)[number];
+/**
+ * Re-exported, because every caller has always taken these from the DTO. The
+ * lists themselves live in `payment-frequency.util.ts` beside the tables keyed
+ * by them, so a new cadence is a COMPILE error in every Record that has to
+ * handle it -- they were declared twice, here as `as const` arrays and there as
+ * hand-written unions, with only a runtime spec holding the two together.
+ */
+export {
+  MORTGAGE_PAYMENT_FREQUENCIES,
+  PAYMENT_FREQUENCIES,
+  MortgagePaymentFrequency,
+  PaymentFrequency,
+};
 
 export class CreateAccountDto {
   @ApiProperty({

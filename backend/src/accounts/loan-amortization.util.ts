@@ -265,39 +265,9 @@ export function calculatePaymentForTerm(
   periods: number,
   frequency: PaymentFrequency,
 ): number {
-  return calculatePaymentForTermAtPeriods(
-    balance,
-    annualRate,
-    periods,
-    getPeriodsPerYear(frequency),
-  );
-}
+  if (balance <= 0 || periods <= 0) return 0;
 
-/**
- * The same annuity, given the periods per year directly.
- *
- * The frequency overload above is the one to reach for; this exists because a
- * caller holding a cadence out of `accounts.payment_frequency` holds a STRING,
- * and casting it into `PaymentFrequency` just to have `getPeriodsPerYear` map it
- * back is the shape that made three recognised cadences resolve to monthly.
- * `periodsPerYearForStoredFrequency` answers that question honestly and its
- * answer comes here.
- *
- * @param balance - Balance to amortize (positive number)
- * @param annualRate - Annual interest rate as percentage (e.g., 5.5)
- * @param periods - Number of remaining payment periods (must be > 0)
- * @param periodsPerYear - Payments a year, used only to derive the periodic rate
- * @returns The installment; a 0% rate splits the balance evenly
- */
-export function calculatePaymentForTermAtPeriods(
-  balance: number,
-  annualRate: number,
-  periods: number,
-  periodsPerYear: number,
-): number {
-  if (balance <= 0 || periods <= 0 || periodsPerYear <= 0) return 0;
-
-  const periodicRate = annualRate / 100 / periodsPerYear;
+  const periodicRate = annualRate / 100 / getPeriodsPerYear(frequency);
   if (periodicRate === 0) {
     return roundMoney(balance / periods);
   }

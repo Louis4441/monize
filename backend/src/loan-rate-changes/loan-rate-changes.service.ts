@@ -16,10 +16,10 @@ import { CreateLoanRateChangeDto } from "./dto/create-loan-rate-change.dto";
 import { UpdateLoanRateChangeDto } from "./dto/update-loan-rate-change.dto";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import {
+  calculatePaymentAmount,
   getPeriodicRate,
   recalculateMortgageAfterRateChange,
 } from "../accounts/mortgage-amortization.util";
-import { calculatePaymentForTermAtPeriods } from "../accounts/loan-amortization.util";
 import { roundMoney } from "../common/round.util";
 import { todayYMD, formatDateYMDLocal } from "../common/date-utils";
 import {
@@ -612,14 +612,23 @@ export class LoanRateChangesService {
       const periodsPerYear =
         periodsPerYearForStoredFrequency(account.paymentFrequency) ??
         DEFAULT_PERIODS_PER_YEAR;
-      return calculatePaymentForTermAtPeriods(
+      // The COMPOUNDING is still the account's own, even where the cadence is
+      // not one the mortgage helpers can express. Amortizing on the nominal
+      // convention here would have derived the persisted installment one way
+      // and the split this file computes 200 lines above it the other, for the
+      // same Canadian account -- two conventions for one mortgage.
+      return calculatePaymentAmount(
         currentBalance,
-        annualRate,
+        getPeriodicRate(
+          annualRate,
+          periodsPerYear,
+          account.isCanadianMortgage || false,
+          account.isVariableRate || false,
+        ),
         Math.max(
           1,
           Math.round((remainingAmortizationMonths * periodsPerYear) / 12),
         ),
-        periodsPerYear,
       );
     }
 

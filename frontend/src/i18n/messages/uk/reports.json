@@ -842,7 +842,8 @@
     "typeLineOfCredit": "Кредитна лінія",
     "typeLoan": "Позика",
     "typeMortgage": "Іпотека",
-    "pdfSubtitlePaymentsSummary": "{count} платежів здійснено, {interest} загальних відсотків"
+    "pdfSubtitlePaymentsSummary": "{count} платежів здійснено, {interest} загальних відсотків",
+    "pdfSubtitlePaymentsProjection": "Внесено платежів: {count}, відсотки за період прогнозу: {interest}"
   },
   "monteCarlo": {
     "toasts": {

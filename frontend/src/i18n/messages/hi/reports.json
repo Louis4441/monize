@@ -842,7 +842,8 @@
     "typeLineOfCredit": "ऋण-सीमा",
     "typeLoan": "ऋण",
     "typeMortgage": "बंधक",
-    "pdfSubtitlePaymentsSummary": "{count} भुगतान किए गए, {interest} कुल ब्याज"
+    "pdfSubtitlePaymentsSummary": "{count} भुगतान किए गए, {interest} कुल ब्याज",
+    "pdfSubtitlePaymentsProjection": "{count} भुगतान किए गए, प्रक्षेपण अवधि में {interest} ब्याज"
   },
   "monteCarlo": {
     "toasts": {

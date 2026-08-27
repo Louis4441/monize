@@ -12,7 +12,10 @@ import {
 } from '@/lib/loan-schedule';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
-import { FREQUENCY_LABEL_KEY } from '@/components/accounts/loan-detail/loan-scenario-labels';
+import {
+  FREQUENCY_LABEL_KEY,
+  frequencyLabelKey,
+} from '@/components/accounts/loan-detail/loan-scenario-labels';
 
 interface ComparisonSummaryCardsProps {
   comparison: ScenarioComparison;
@@ -117,7 +120,13 @@ export function ComparisonSummaryCards({
   const overpaymentNote =
     fixedMonthlyPayment == null && !isLowerInstallment && opAmount > 0
       ? t('loanDetail.comparison.overpaymentAtFrequency', {
-          frequency: t(FREQUENCY_LABEL_KEY[opFrequency ?? 'MONTHLY']),
+          // A saved cadence can be any string the column holds, and
+          // `t(undefined)` throws -- so an unrecognised one reads as monthly
+          // rather than taking the loan page down with it.
+          frequency: t(
+            frequencyLabelKey(opFrequency) ??
+              FREQUENCY_LABEL_KEY.MONTHLY,
+          ),
           amount: formatCurrency(opAmount, currencyCode),
         })
       : undefined;

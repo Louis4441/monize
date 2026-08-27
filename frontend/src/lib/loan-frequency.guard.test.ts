@@ -355,9 +355,27 @@ describe('loan payment frequency contract', () => {
     );
     expect(passThrough.length).toBeGreaterThan(0);
 
-    // Every case the backend accepts, the browser accepts.
+    // The one case that returns something OTHER than its own name: the backend
+    // spells it `case "SEMIMONTHLY": return "SEMI_MONTHLY";`, and it is exactly
+    // the pair the two spellings exist for.
+    const rewritten = /case "([A-Z_]+)":\s*\n\s*return "([A-Z_]+)";/.exec(
+      switchBody,
+    );
+    expect(rewritten).not.toBeNull();
+
+    // What each side MAPS to, not merely which it accepts. Checking non-null
+    // alone would pass while the browser copy answered 'BIWEEKLY' for
+    // SEMIMONTHLY -- still accepted, still offered, and the server would then
+    // split that mortgage at 26 periods a year instead of 24.
     for (const frequency of passThrough) {
-      expect(toMortgagePaymentFrequency(frequency)).not.toBeNull();
+      // A pass-through case returns its own name; the rewritten one is checked
+      // against the value the backend actually returns.
+      const expected =
+        rewritten && rewritten[1] === frequency ? rewritten[2] : frequency;
+      expect([frequency, toMortgagePaymentFrequency(frequency)]).toEqual([
+        frequency,
+        expected,
+      ]);
     }
     // And every value the account column can hold gets the same verdict on both
     // sides: accepted iff the backend names it.

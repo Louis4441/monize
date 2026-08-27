@@ -24,6 +24,7 @@ import {
   calculateNextDueDate,
   ensureYMD,
 } from "../common/recurrence";
+import { localDateForColumn } from "../common/date-utils";
 
 /**
  * Payment frequencies a loan account can carry.
@@ -38,21 +39,35 @@ import {
  * the correct rate. `loan-payment-frequency.guard.spec.ts` reads the DTO's
  * `@IsIn` list and fails on any accepted value this module cannot handle.
  */
-export type PaymentFrequency =
-  | "WEEKLY"
-  | "BIWEEKLY"
-  | "SEMIMONTHLY"
-  | "MONTHLY"
-  | "QUARTERLY"
-  | "YEARLY";
+export const PAYMENT_FREQUENCIES = [
+  "WEEKLY",
+  "BIWEEKLY",
+  "SEMIMONTHLY",
+  "MONTHLY",
+  "QUARTERLY",
+  "YEARLY",
+] as const;
+
+export type PaymentFrequency = (typeof PAYMENT_FREQUENCIES)[number];
+
+/**
+ * Mortgage cadences. `SEMI_MONTHLY` is 24 a year (the 15th and the last day of
+ * the month); `BIWEEKLY` and `ACCELERATED_BIWEEKLY` are both 26, `WEEKLY` and
+ * `ACCELERATED_WEEKLY` both 52 -- an accelerated cadence pays a fraction of the
+ * monthly installment on the same dates as its base, so it differs in the
+ * AMOUNT, never in the count or the calendar.
+ */
+export const MORTGAGE_PAYMENT_FREQUENCIES = [
+  "MONTHLY",
+  "SEMI_MONTHLY",
+  "BIWEEKLY",
+  "ACCELERATED_BIWEEKLY",
+  "WEEKLY",
+  "ACCELERATED_WEEKLY",
+] as const;
 
 export type MortgagePaymentFrequency =
-  | "MONTHLY"
-  | "SEMI_MONTHLY" // 24 payments/year (the 15th and the last day of the month)
-  | "BIWEEKLY" // 26 payments/year
-  | "ACCELERATED_BIWEEKLY" // 26 payments/year, but each = monthly/2
-  | "WEEKLY" // 52 payments/year
-  | "ACCELERATED_WEEKLY"; // 52 payments/year, but each = monthly/4
+  (typeof MORTGAGE_PAYMENT_FREQUENCIES)[number];
 
 /**
  * The recurrence frequency each loan payment frequency schedules at.
@@ -170,6 +185,18 @@ export const MORTGAGE_PERIODS_PER_YEAR: Record<
 };
 
 /**
+ * What a caller assumes when `accounts.payment_frequency` holds a string neither
+ * domain names.
+ *
+ * A named constant rather than a `default: 12` inside a switch, because those
+ * defaults were how three recognised cadences silently became monthly. This one
+ * is only reachable for a value nothing writes -- both writers go through a
+ * validated `@IsIn` list, and migration 165 healed the one spelling that
+ * escaped -- so it covers a corrupt row, not a supported frequency.
+ */
+export const DEFAULT_PERIODS_PER_YEAR = 12;
+
+/**
  * Payment periods a year for a frequency read out of `accounts.payment_frequency`,
  * or `null` when the column holds something neither domain names.
  *
@@ -185,18 +212,6 @@ export const MORTGAGE_PERIODS_PER_YEAR: Record<
  *
  * `mortgage-frequency-cast.guard.spec.ts` scans `src/` for a revived cast.
  */
-/**
- * What a caller assumes when `accounts.payment_frequency` holds a string neither
- * domain names.
- *
- * A named constant rather than a `default: 12` inside a switch, because those
- * defaults were how three recognised cadences silently became monthly. This one
- * is only reachable for a value nothing writes -- both writers go through a
- * validated `@IsIn` list, and migration 165 healed the one spelling that
- * escaped -- so it covers a corrupt row, not a supported frequency.
- */
-export const DEFAULT_PERIODS_PER_YEAR = 12;
-
 export function periodsPerYearForStoredFrequency(
   frequency: string | null | undefined,
 ): number | null {
@@ -289,21 +304,23 @@ export function unpayableEndDate(startDate: Date): Date {
  * January, where stepping sixty times would have clamped to the 28th at the
  * first February and stayed there.
  *
- * UTC in and out, like everything else here. Both call sites spelled this as
- * `d.setMonth(d.getMonth() + termMonths)` on a `Date` built from a date-only
- * string, which is two defects at once: local accessors on a UTC-midnight
- * instant, and `setMonth`'s overflow (31 January plus one month became 3 March,
- * skipping February) where the scheduler's own calendar clamps.
+ * Three call sites spelled this as `d.setMonth(d.getMonth() + termMonths)` on a
+ * `Date` built from a date-only string, which is two defects at once: local
+ * accessors on a UTC-midnight instant, and `setMonth`'s overflow (31 January
+ * plus one month became 3 March, skipping February) where the scheduler's own
+ * calendar clamps.
+ *
+ * The result is LOCAL midnight, not UTC, and that is not an inconsistency with
+ * the rest of this module: it is the only `Date` here that goes into a TypeORM
+ * `date` COLUMN, and TypeORM serializes those with local getters -- so a
+ * UTC-midnight value is stored a day early west of Greenwich. `localDateForColumn`
+ * carries the reasoning; which convention applies is decided by the destination.
  */
 export function mortgageTermEndDate(
-  paymentStartDate: Date,
+  paymentStartDate: Date | string,
   termMonths: number,
 ): Date {
-  const [year, month, day] = addMonthsClamped(
-    ensureYMD(paymentStartDate),
-    termMonths,
-  )
-    .split("-")
-    .map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
+  return localDateForColumn(
+    addMonthsClamped(ensureYMD(paymentStartDate), termMonths),
+  );
 }

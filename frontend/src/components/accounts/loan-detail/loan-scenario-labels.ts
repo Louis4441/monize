@@ -19,6 +19,29 @@ export const FREQUENCY_LABEL_KEY: Record<OverpaymentFrequency, string> = {
 };
 
 /**
+ * The catalog key for a saved cadence, or `null` when the stored value is not a
+ * cadence this app knows.
+ *
+ * `loan_scenarios.recurring_extra_frequency` is an unconstrained VARCHAR whose
+ * only enforcement is `@IsIn` at write time, so a legacy row or a restored
+ * backup can carry anything -- which is why `recurringOccurrencesDue` contributes
+ * zero for an unrecognised value rather than guessing. Indexing
+ * `FREQUENCY_LABEL_KEY` directly gave `undefined`, and next-intl throws on a
+ * non-string key: the schedule engine survived the row and the label took the
+ * whole loan detail view down with it. A label is the cheapest thing on the
+ * page; it degrades.
+ */
+export function frequencyLabelKey(
+  frequency: string | null | undefined,
+): string | null {
+  if (!frequency) return null;
+  return (
+    (FREQUENCY_LABEL_KEY as Record<string, string | undefined>)[frequency] ??
+    null
+  );
+}
+
+/**
  * Formatting hooks the labels need, passed in by the caller so the same
  * wording renders in the SavedScenariosPanel table and in the loan page's
  * PDF export. Method syntax keeps `t` assignable from next-intl's narrower
@@ -46,12 +69,14 @@ export function createScenarioLabels({
     }
     const parts: string[] = [];
     if (scenario.recurringExtraAmount && scenario.recurringExtraAmount > 0) {
-      const freq = scenario.recurringExtraFrequency;
+      // Through `frequencyLabelKey`, not the table: the column is an
+      // unconstrained VARCHAR, and `t(undefined)` throws.
+      const freqKey = frequencyLabelKey(scenario.recurringExtraFrequency);
       parts.push(
-        freq && freq !== 'MONTHLY'
+        freqKey && scenario.recurringExtraFrequency !== 'MONTHLY'
           ? t('loanDetail.scenarios.overpaymentWithFrequency', {
               amount: formatCurrency(scenario.recurringExtraAmount, currencyCode),
-              frequency: t(FREQUENCY_LABEL_KEY[freq]),
+              frequency: t(freqKey),
             })
           : t('loanDetail.scenarios.recurringSummary', {
               amount: formatCurrency(scenario.recurringExtraAmount, currencyCode),
@@ -74,11 +99,11 @@ export function createScenarioLabels({
     }
     if (!scenario.recurringExtraAmount || scenario.recurringExtraAmount <= 0) return '—';
     const amount = formatCurrency(scenario.recurringExtraAmount, currencyCode);
-    const freq = scenario.recurringExtraFrequency;
-    return freq && freq !== 'MONTHLY'
+    const freqKey = frequencyLabelKey(scenario.recurringExtraFrequency);
+    return freqKey && scenario.recurringExtraFrequency !== 'MONTHLY'
       ? t('loanDetail.scenarios.overpaymentWithFrequency', {
           amount,
-          frequency: t(FREQUENCY_LABEL_KEY[freq]),
+          frequency: t(freqKey),
         })
       : amount;
   };
