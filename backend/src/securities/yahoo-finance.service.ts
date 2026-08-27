@@ -84,6 +84,16 @@ export interface SecurityNewsItem {
   relatedTickers: string[];
 }
 
+/**
+ * Statuses that mean "there is no such series", as opposed to "not now".
+ *
+ * Only these may be reported to a caller as an empty answer: a 429, a 5xx or a
+ * 401 (a stale crumb) says nothing about whether the symbol has history, and
+ * caching one as "no history" is how a throttled minute becomes half an hour of
+ * a report rendering unpriced.
+ */
+const SYMBOL_ABSENT_STATUSES: ReadonlySet<number> = new Set([404, 422]);
+
 const YAHOO_SECTOR_NAMES: Record<string, string> = {
   realestate: "Real Estate",
   consumer_cyclical: "Consumer Cyclical",
@@ -656,15 +666,23 @@ export class YahooFinanceService implements QuoteProvider {
         this.logger.warn(
           `Yahoo Finance API returned ${response.status} for historical ${yahooSymbol}`,
         );
-        return null;
+        // A 404 or 422 is the provider answering *about this symbol*: it has no
+        // such series. A 429, a 5xx or a 401 is not an answer -- it is the
+        // provider declining to give one -- and the difference decides whether
+        // a caller may remember the window as empty. Collapsing both into
+        // `null` meant a symbol nobody carries was re-asked on every report
+        // render, because the negative cache could never be written for it.
+        return SYMBOL_ABSENT_STATUSES.has(response.status) ? [] : null;
       }
 
       const data = await response.json();
       const result = data.chart?.result?.[0];
-      // No result object at all: an unknown symbol, or an error payload. That
-      // is not an answer about this window, so it stays `null` and the caller's
-      // alternate-symbol fallback gets its turn.
-      if (!result) return null;
+      // No result object. With a `chart.error` beside it, that *is* an answer
+      // about the symbol ("No data found, symbol may be delisted"); without
+      // one, the body is not something this client understands, so it stays
+      // `null`. Either way the caller's alternate-symbol fallback gets its turn,
+      // because that turns on bars rather than on an answer.
+      if (!result) return data.chart?.error ? [] : null;
       // A result with no timestamps *is* an answer: the window predates the
       // instrument, or it did not trade in it. Returning `null` for that made
       // "answered with nothing" and "no usable answer" indistinguishable, and

@@ -663,12 +663,29 @@ describe("YahooFinanceService", () => {
       expect(await service.fetchHistorical("AAPL")).toBeNull();
     });
 
-    it("returns null when the provider carries no such symbol", async () => {
+    it("treats a delisted-symbol error as an answer, not a failure", async () => {
+      // "No data found, symbol may be delisted" is the provider telling us
+      // about the symbol. A caller may remember that; it may not remember a
+      // 429 or a 5xx, which says nothing about the symbol at all.
       mockFetchResponse({
         chart: { result: null, error: { code: "Not Found" } },
       });
 
-      expect(await service.fetchHistorical("NOPE")).toBeNull();
+      expect(await service.fetchHistorical("NOPE")).toEqual([]);
+    });
+
+    it("returns null for a body it does not understand", async () => {
+      mockFetchResponse({ unexpected: true });
+
+      expect(await service.fetchHistorical("AAPL")).toBeNull();
+    });
+
+    it("reads a 404 as an answer and a 503 as none", async () => {
+      mockFetchResponse({}, false, 404);
+      expect(await service.fetchHistorical("NOPE")).toEqual([]);
+
+      mockFetchResponse({}, false, 503);
+      expect(await service.fetchHistorical("AAPL")).toBeNull();
     });
 
     it("should return null when indicators are missing", async () => {

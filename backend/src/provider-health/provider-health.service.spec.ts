@@ -63,6 +63,14 @@ describe("ProviderHealthService", () => {
     now += ms;
   };
 
+  /**
+   * The health write is deliberately off the caller's path -- fire-and-forget,
+   * and chained per provider so a `down` and an `up` cannot land backwards --
+   * so a spec that asserts on it has to let the queue drain first.
+   */
+  const flushWrites = (): Promise<void> =>
+    new Promise((resolve) => setImmediate(resolve));
+
   /** Drive the breaker open the way an outage does. */
   const driveOpen = () => {
     for (let i = 0; i < FAILURE_THRESHOLD; i++) {
@@ -144,8 +152,9 @@ describe("ProviderHealthService", () => {
       expect(line).toContain(`${FAILURE_THRESHOLD} consecutive`);
     });
 
-    it("writes the outage to provider_health so it survives the restart", () => {
+    it("writes the outage to provider_health so it survives the restart", async () => {
       driveOpen();
+      await flushWrites();
       const insert = statements().find((sql) =>
         sql.includes("INSERT INTO provider_health"),
       );
@@ -160,8 +169,9 @@ describe("ProviderHealthService", () => {
       expect(String(params[5])).toContain("EAI_AGAIN");
     });
 
-    it("preserves an already-recorded episode start in SQL, not in memory", () => {
+    it("preserves an already-recorded episode start in SQL, not in memory", async () => {
       driveOpen();
+      await flushWrites();
       const insert = statements().find((sql) =>
         sql.includes("INSERT INTO provider_health"),
       ) as string;
@@ -171,20 +181,22 @@ describe("ProviderHealthService", () => {
       expect(insert).toContain("THEN provider_health.outage_started_at");
     });
 
-    it("does not write a row for a failure run below the threshold", () => {
+    it("does not write a row for a failure run below the threshold", async () => {
       service.recordFailure(PROVIDER, transportError());
+      await flushWrites();
       expect(
         statements().filter((sql) => sql.includes("provider_health")),
       ).toHaveLength(0);
     });
 
-    it("does not write on every failure while it stays down", () => {
+    it("does not write on every failure while it stays down", async () => {
       driveOpen();
       // Twenty minutes of probes failing, one every ten seconds.
       for (let i = 0; i < 120; i++) {
         advance(10_000);
         service.recordFailure(PROVIDER, transportError());
       }
+      await flushWrites();
       // One write for the transition, then a heartbeat every five minutes --
       // not one per failed symbol, which is the flood in another form.
       const writes = statements().filter((sql) =>
@@ -205,7 +217,7 @@ describe("ProviderHealthService", () => {
   });
 
   describe("recordSuccess", () => {
-    it("says so once when the provider comes back, with what was refused", () => {
+    it("says so once when the provider comes back, with what was refused", async () => {
       driveOpen();
       service.assertAvailable.bind(service);
       for (let i = 0; i < 3; i++) {
@@ -218,6 +230,7 @@ describe("ProviderHealthService", () => {
       advance(OPEN_WINDOW_MS + 1);
       service.assertAvailable(PROVIDER);
       service.recordSuccess(PROVIDER);
+      await flushWrites();
 
       expect(serviceLogger.log).toHaveBeenCalledTimes(1);
       const line = String(serviceLogger.log.mock.calls[0][0]);
@@ -230,10 +243,11 @@ describe("ProviderHealthService", () => {
       expect(params[1]).toBe("up");
     });
 
-    it("says nothing in the log for a success that follows a success", () => {
+    it("says nothing in the log for a success that follows a success", async () => {
       service.recordSuccess(PROVIDER);
       service.recordSuccess(PROVIDER);
       service.recordSuccess(PROVIDER);
+      await flushWrites();
       expect(serviceLogger.log).not.toHaveBeenCalled();
       // One write, from the first success of the process, which is what
       // corrects a row a dead process left saying `down`. Not one per priced
@@ -466,7 +480,7 @@ describe("ProviderHealthService", () => {
       return fresh;
     };
 
-    it("records the provider as up on its first success, transition or not", () => {
+    it("records the provider as up on its first success, transition or not", async () => {
       // The row was left saying `down` by the process that died. Nothing else
       // will ever correct it: a success in a fresh process is not a transition,
       // notifyRecovery needs state='up', and the outage claim needs
@@ -474,6 +488,7 @@ describe("ProviderHealthService", () => {
       // outage alert for this provider would be lost.
       const fresh = restarted();
       fresh.recordSuccess(PROVIDER);
+      await flushWrites();
 
       const writes = manager.query.mock.calls.filter((call) =>
         String(call[0]).includes("INSERT INTO provider_health"),
@@ -482,9 +497,10 @@ describe("ProviderHealthService", () => {
       expect((writes[0][1] as unknown[])[1]).toBe("up");
     });
 
-    it("is silent for every success after the first", () => {
+    it("is silent for every success after the first", async () => {
       const fresh = restarted();
       for (let i = 0; i < 500; i++) fresh.recordSuccess(PROVIDER);
+      await flushWrites();
       expect(
         manager.query.mock.calls.filter((call) =>
           String(call[0]).includes("INSERT INTO provider_health"),
@@ -492,9 +508,10 @@ describe("ProviderHealthService", () => {
       ).toHaveLength(1);
     });
 
-    it("leaves the stored episode start alone, so the alert clock survives", () => {
+    it("leaves the stored episode start alone, so the alert clock survives", async () => {
       const fresh = restarted();
       fresh.recordSuccess(PROVIDER);
+      await flushWrites();
       const insert = String(
         manager.query.mock.calls.find((call) =>
           String(call[0]).includes("INSERT INTO provider_health"),

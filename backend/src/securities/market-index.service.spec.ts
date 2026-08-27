@@ -603,14 +603,28 @@ describe("MarketIndexService", () => {
       return call ? String((call[1] as unknown[])[1]) : undefined;
     };
 
-    it("says the provider was not called when it went down mid-refresh", async () => {
-      // The client turns a transport failure into null, which is
-      // indistinguishable here from "this symbol has no history" -- and
-      // "nothing came back" sends whoever reads market_index_sync.last_error
-      // looking for a symbol problem that does not exist.
+    it("names the window and the cause when a fetch simply failed", async () => {
+      // A failure that does not trip the breaker: the request went out, so this
+      // index really was attempted and the reason belongs in its sync row.
       manager.query.mockResolvedValue([]);
       yahoo.fetchHistoricalWindow.mockImplementation(() => {
-        // The window that fails is also the one that opens the breaker.
+        health.recordFailure("yahoo_finance", transportFailure());
+        return Promise.resolve(null);
+      });
+
+      await service.refreshAll();
+
+      expect(storedReason()).toContain("no answer");
+      expect(storedReason()).toContain("no usable response");
+    });
+
+    it("records nothing at all when the breaker trips mid-refresh", async () => {
+      // Now the same failure opens the breaker. The refusal and the failure are
+      // the same `null` from here, so this counts as the request that never
+      // left: no attempt stamped, and therefore no six-hour cooldown for an
+      // index that will be wanted again the moment the provider answers.
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockImplementation(() => {
         for (let i = 0; i < 5; i++) {
           health.recordFailure("yahoo_finance", transportFailure());
         }
@@ -619,9 +633,9 @@ describe("MarketIndexService", () => {
 
       await service.refreshAll();
 
-      expect(storedReason()).toContain("no answer");
-      expect(storedReason()).toContain("unavailable");
-      expect(storedReason()).toContain("EAI_AGAIN");
+      expect(
+        statements().filter((sql) => sql.includes("market_index_sync")),
+      ).toHaveLength(0);
     });
 
     it("distinguishes a window the provider answered as empty", async () => {
@@ -649,7 +663,27 @@ describe("MarketIndexService", () => {
       );
     });
 
-    it("does not stamp an attempt when the breaker opens between check and call", async () => {
+    it("does not stamp an attempt when the call is refused after the check", async () => {
+      // The breaker can open in the gap between the check and the request, and
+      // the client swallows the refusal into the same `null` a failure gives.
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockImplementation(() => {
+        for (let i = 0; i < 5; i++) {
+          health.recordFailure("yahoo_finance", transportFailure());
+        }
+        return Promise.resolve(null);
+      });
+
+      await service.refreshAll();
+
+      expect(
+        statements().filter((sql) =>
+          sql.includes("INSERT INTO market_index_sync"),
+        ),
+      ).toHaveLength(0);
+    });
+
+    it("does not stamp an attempt when the breaker is already refusing", async () => {
       // The window can close in the gap: the check said "go", another caller's
       // failures opened the breaker, and the first chunk was refused. That is
       // still a call that never left the process, so it must not cost the index

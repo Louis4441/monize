@@ -480,6 +480,18 @@ export class MarketIndexService implements OnApplicationBootstrap {
           new Date(`${start}T00:00:00Z`),
           new Date(`${end}T23:59:59Z`),
         );
+        // The client swallows a refusal into the same `null` a failure gives,
+        // and the breaker can open between the check above and the call: if it
+        // is refusing now and nothing came back, treat it as the request that
+        // never left rather than stamping an attempt for it.
+        if (chunk === null && this.health.wouldRefuse(HEALTH_PROVIDER_ID)) {
+          if (!attempted) return;
+          await this.recordFailure(
+            index.code,
+            this.noAnswerReason(index, start, end),
+          );
+          return;
+        }
         if (!attempted) {
           await this.recordAttempt(index.code);
           attempted = true;

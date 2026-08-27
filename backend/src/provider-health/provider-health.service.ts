@@ -93,6 +93,12 @@ export class ProviderHealthService {
   private readonly successPersisted = new Set<string>();
 
   /**
+   * One in-flight write per provider, chained. See `persist`: ordering between
+   * a `down` and an `up` write is not cosmetic.
+   */
+  private readonly writeQueues = new Map<string, Promise<void>>();
+
+  /**
    * @param now injected clock: the windows are the behaviour under test, and a
    *   test that waits out a real minute is a test nobody runs. `@Optional()` is
    *   load-bearing, not decoration: TypeScript emits `Function` as this
@@ -384,7 +390,20 @@ export class ProviderHealthService {
     state: "up" | "down",
   ): void {
     this.lastPersistedAt.set(provider, this.now());
-    void this.writeHealth(provider, snapshot, state);
+    // Chained per provider, not fired in parallel. An `opened` and a
+    // `recovered` write can be issued milliseconds apart -- a probe failing
+    // while another caller succeeds -- and two `void`ed promises can commit in
+    // either order. Landing them backwards leaves the row saying `down` for a
+    // provider that is answering, which is not a stale display: it produces a
+    // false outage email fifteen minutes later, no all-clear (recovery needs
+    // `state = 'up'`), and permanent suppression of the next real outage
+    // (the claim needs `outage_notified_at IS NULL`).
+    const previous = this.writeQueues.get(provider) ?? Promise.resolve();
+    const next = previous.then(() =>
+      this.writeHealth(provider, snapshot, state),
+    );
+    this.writeQueues.set(provider, next);
+    void next;
   }
 
   /** The write itself. Never rejects: a caller may `void` it safely. */
@@ -410,7 +429,25 @@ export class ProviderHealthService {
                  last_failure_at, last_failure_reason, last_success_at
                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
                ON CONFLICT (provider) DO UPDATE SET
-                 state = EXCLUDED.state,
+                 -- Ordered by observation time, not by arrival. Within a
+                 -- process the writes are chained, but two replicas observe
+                 -- independently, and a down written from an observation older
+                 -- than the stored success (or the reverse) would undo a
+                 -- fresher fact. The timestamps come from the observations
+                 -- themselves, so the guard holds across replicas too.
+                 state = CASE
+                   WHEN EXCLUDED.state = 'down'
+                        AND provider_health.last_success_at IS NOT NULL
+                        AND EXCLUDED.last_failure_at IS NOT NULL
+                        AND provider_health.last_success_at > EXCLUDED.last_failure_at
+                     THEN provider_health.state
+                   WHEN EXCLUDED.state = 'up'
+                        AND provider_health.last_failure_at IS NOT NULL
+                        AND EXCLUDED.last_success_at IS NOT NULL
+                        AND provider_health.last_failure_at > EXCLUDED.last_success_at
+                     THEN provider_health.state
+                   ELSE EXCLUDED.state
+                 END,
                  consecutive_failures = EXCLUDED.consecutive_failures,
                  -- An episode already recorded as down keeps its start, so a
                  -- container restarting inside the outage does not reset the
@@ -423,9 +460,9 @@ export class ProviderHealthService {
                      THEN provider_health.outage_started_at
                    ELSE EXCLUDED.outage_started_at
                  END,
-                 last_failure_at = COALESCE(EXCLUDED.last_failure_at, provider_health.last_failure_at),
+                 last_failure_at = GREATEST(EXCLUDED.last_failure_at, provider_health.last_failure_at),
                  last_failure_reason = COALESCE(EXCLUDED.last_failure_reason, provider_health.last_failure_reason),
-                 last_success_at = COALESCE(EXCLUDED.last_success_at, provider_health.last_success_at)`,
+                 last_success_at = GREATEST(EXCLUDED.last_success_at, provider_health.last_success_at)`,
               [
                 provider,
                 state,
