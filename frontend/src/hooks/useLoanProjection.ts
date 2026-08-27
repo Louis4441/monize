@@ -8,7 +8,10 @@ import {
   fetchLoanInterestTransactions,
   resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
-import { loanRateChangesApi } from '@/lib/loan-rate-changes';
+import {
+  loanRateChangesApi,
+  RATE_CHANGE_ACCOUNT_TYPES,
+} from '@/lib/loan-rate-changes';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
 import { deriveLoanFigures, type LoanFigures } from '@/lib/loan-figures';
 import { createLogger } from '@/lib/logger';
@@ -18,11 +21,20 @@ import type { LoanRateChange } from '@/types/loan-rate-change';
 
 const logger = createLogger('useLoanProjection');
 
-/** The account types this projection describes: amortizing debt. */
-const AMORTIZING_DEBT_TYPES: ReadonlySet<Account['accountType']> = new Set([
-  'LOAN',
-  'MORTGAGE',
-]);
+/**
+ * The account types this projection describes: amortizing debt.
+ *
+ * Derived from the rate-changes precondition rather than spelled again -- and
+ * this hook is why the derivation matters, not merely why it is tidy. It
+ * fetches `loanRateChangesApi.getAll` unconditionally for every type in here,
+ * so a type present in this set but absent from `RATE_CHANGE_ACCOUNT_TYPES`
+ * would take a **400** on every load and report the projection as `error`. The
+ * two lists coincide for one reason: a revolving line does not amortize, which
+ * is the same fact that leaves it no contractual rate to change.
+ */
+const AMORTIZING_DEBT_TYPES: ReadonlySet<Account['accountType']> = new Set(
+  RATE_CHANGE_ACCOUNT_TYPES,
+);
 
 export type LoanProjectionStatus =
   /** Not an amortizing debt account -- there is nothing to project. */

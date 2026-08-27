@@ -583,6 +583,45 @@ describe('buildLoanProjectionInput seed payment', () => {
     expect(generateLoanSchedule(input!).rows.length).toBeGreaterThan(0);
   });
 
+  it('does not seed a principal-only figure just because it exceeds the interest', () => {
+    // Issue #1255's own numbers: 20,000 at 5.5% costs 91.67 a month, and the
+    // last row is a 285 principal-only transfer. 285 clears 91.67, so listing
+    // the observation first seeded 285 -- a fraction of the real 1,200
+    // installment -- and the documented contractual fallback only ever fired
+    // when the principal-only number happened to be the smaller one.
+    const acct = makeAccount({
+      openingBalance: -20000,
+      currentBalance: -20000,
+      interestRate: 5.5,
+      paymentAmount: 1200,
+      paymentFrequency: 'MONTHLY',
+    });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 285 }),
+    ]);
+    const input = buildLoanProjectionInput(acct, history);
+    expect(input!.paymentAmount).toBe(1200);
+    expect(resolveCurrentLoanTerms(acct, history).payment).toBe(1200);
+  });
+
+  it('reports no installment when nothing complete is known', () => {
+    // Principal-only history and no contractual payment: the installment is
+    // unknown, so there is no projection and no Current Payment -- rather than a
+    // payoff computed from a fraction of the real payment.
+    const acct = makeAccount({
+      openingBalance: -20000,
+      currentBalance: -20000,
+      interestRate: 5.5,
+      paymentAmount: null as unknown as number,
+      paymentFrequency: 'MONTHLY',
+    });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2024-01-05', amount: 285 }),
+    ]);
+    expect(resolveCurrentLoanTerms(acct, history).payment).toBeNull();
+    expect(buildLoanProjectionInput(acct, history)).toBeNull();
+  });
+
   it('prefers the derived installment over the contractual one when it amortizes', () => {
     // Interest recorded on the payment: the derived figure is the borrower's
     // real installment and wins even though the contractual one also amortizes.
@@ -895,10 +934,11 @@ describe('buildLoanProjectionInput rate authority', () => {
       { effectiveDate: '2099-01-01', annualRate: 12, newPaymentAmount: 2000 },
     ]);
     expect(future!.annualRate).toBe(5);
-    // At 5% the 600 derived from history already amortizes, so it wins -- the
-    // point is that the 2000 named by the future row is not adopted as today's.
+    // The point is that the 2000 named by the future row is not adopted as
+    // today's. The 600 from history is principal-only (incomplete), so it is not
+    // a candidate either and the contractual 1500 is used.
     expect(future!.paymentAmount).not.toBe(2000);
-    expect(future!.paymentAmount).toBe(600);
+    expect(future!.paymentAmount).toBe(1500);
     expect(future!.rateChanges).toHaveLength(1); // still bends the projection ahead
   });
 });
@@ -951,6 +991,57 @@ describe('readRecordedInterest provenance', () => {
       ]),
     ]);
     expect(history.events[0].interest).toBe(320);
+  });
+
+  it('does not zero a single recorded line just because the configured category differs', () => {
+    // Setting or changing a loan's interest category must not rewrite its
+    // history. Splits recorded before that setting existed, or filed under a
+    // since-changed category, still hold the real interest -- returning "no
+    // interest" for them wiped Interest Paid, every cumulative total and the
+    // exports the moment the field was filled in.
+    const withOtherCategory = makeAccount({ interestCategoryId: 'cat-different' });
+    const history = deriveLoanPaymentHistory(withOtherCategory, [
+      splitPayment([LOAN_LINE, INTEREST_LINE]),
+    ]);
+    expect(history.events[0].interest).toBe(300);
+    expect(history.cumulativeInterest).toBe(300);
+  });
+
+  it('lets a paired separate expense outrank the split\'s unmatched line', () => {
+    // The split's single line might be escrow; a separate expense booked against
+    // the date is the stronger signal for a loan that books interest outside the
+    // split, so it wins over the fallback.
+    const withOtherCategory = makeAccount({ interestCategoryId: 'cat-different' });
+    const history = deriveLoanPaymentHistory(
+      withOtherCategory,
+      [splitPayment([LOAN_LINE, ESCROW_LINE])],
+      [],
+      [
+        {
+          transactionDate: '2026-01-15',
+          amount: -275,
+          isTransfer: false,
+        } as Transaction,
+      ],
+    );
+    expect(history.events[0].interest).toBe(275);
+  });
+
+  it('prefers the configured category over a paired expense', () => {
+    // The other direction: an exact provenance match is not overridden.
+    const history = deriveLoanPaymentHistory(
+      withInterestCategory,
+      [splitPayment([LOAN_LINE, INTEREST_LINE])],
+      [],
+      [
+        {
+          transactionDate: '2026-01-15',
+          amount: -999,
+          isTransfer: false,
+        } as Transaction,
+      ],
+    );
+    expect(history.events[0].interest).toBe(300);
   });
 
   it('refuses to guess between two category lines with no configured category', () => {

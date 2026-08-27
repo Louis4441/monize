@@ -591,7 +591,11 @@ describe('LoanAmortizationReport', () => {
     });
     // The schedule must not be drawn from a history that failed to load: an
     // empty one projects a plausible payoff from no payments at all.
-    expect(screen.queryByText('Select Loan')).not.toBeInTheDocument();
+    expect(screen.queryByText(/payments made/)).not.toBeInTheDocument();
+    // But the picker stays: the selection is persisted, so replacing the whole
+    // report would restore this loan's error on every visit with no way to
+    // choose another account.
+    expect(screen.getByText('Select Loan')).toBeInTheDocument();
   });
 
   it('shows a retryable error when the interest lookup fails, not a zero-interest schedule', async () => {

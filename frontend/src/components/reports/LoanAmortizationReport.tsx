@@ -161,23 +161,37 @@ export function LoanAmortizationReport() {
   );
 
   const isLoading = accountsLoading || loanDataLoading;
-  const error = accountsError || loanDataError;
   const reload = () => {
     reloadAccounts();
     reloadLoanData();
   };
+  // Two error scopes, because they need different screens. Without the account
+  // list there is no report at all. A failure loading ONE loan's data must keep
+  // the picker on screen: the selection is persisted, so replacing the whole
+  // report leaves that loan's error restored on every visit with no way to
+  // choose another account -- which is the trap the LOC 400 fell into.
+  const error = accountsError;
+  const loanError = loanDataError;
+
+  // One derivation, shared by the schedule and the terms shown above it. It was
+  // computed twice per render, which is both wasted work over the whole ledger
+  // and two chances for the two to disagree.
+  const history = useMemo(
+    () =>
+      selectedAccount
+        ? deriveLoanPaymentHistory(
+            selectedAccount,
+            transactions,
+            rateChanges,
+            interestTransactions,
+          )
+        : null,
+    [selectedAccount, transactions, rateChanges, interestTransactions],
+  );
 
   // Build payment history from actual transactions + projected future payments
   const paymentHistory = useMemo((): PaymentRow[] => {
-    if (!selectedAccount) return [];
-
-    // --- Historical payments from actual transactions ---
-    const history = deriveLoanPaymentHistory(
-      selectedAccount,
-      transactions,
-      rateChanges,
-      interestTransactions,
-    );
+    if (!selectedAccount || !history) return [];
     const payments: PaymentRow[] = history.events.map((event, index) => ({
       paymentNumber: index + 1,
       date: event.date,
@@ -207,22 +221,19 @@ export function LoanAmortizationReport() {
     }
 
     return payments;
-  }, [selectedAccount, transactions, interestTransactions, rateChanges]);
+  }, [selectedAccount, history, rateChanges]);
 
   // The terms in effect, from the same resolution the schedule below is built
   // from. `selectedAccount.interestRate` / `.paymentAmount` are the scalars a
   // rate-change mutation deliberately never writes, so printing them put "5% /
   // $500" directly above a projection withheld because the real rate is 12%.
-  const currentTerms = useMemo(() => {
-    if (!selectedAccount) return { annualRate: null, payment: null };
-    const history = deriveLoanPaymentHistory(
-      selectedAccount,
-      transactions,
-      rateChanges,
-      interestTransactions,
-    );
-    return resolveCurrentLoanTerms(selectedAccount, history, rateChanges);
-  }, [selectedAccount, transactions, rateChanges, interestTransactions]);
+  const currentTerms = useMemo(
+    () =>
+      selectedAccount && history
+        ? resolveCurrentLoanTerms(selectedAccount, history, rateChanges)
+        : { annualRate: null, payment: null },
+    [selectedAccount, history, rateChanges],
+  );
 
   const historicalCount = useMemo(() => paymentHistory.filter((r) => !r.isProjected).length, [paymentHistory]);
   const hasProjection = useMemo(() => paymentHistory.some((r) => r.isProjected), [paymentHistory]);
@@ -385,8 +396,11 @@ export function LoanAmortizationReport() {
         </div>
       </div>
 
+      {/* A failure loading THIS loan keeps the picker above it usable. */}
+      {loanError && <ReportError onRetry={reloadLoanData} />}
+
       {/* Summary Cards */}
-      {selectedAccount && (
+      {!loanError && selectedAccount && (
         <div className={`grid grid-cols-2 ${summary?.hasProjection ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4`}>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('loanAmortization.currentBalance')}</div>
@@ -465,7 +479,10 @@ export function LoanAmortizationReport() {
         </div>
       )}
 
-      {/* Payment History Table */}
+      {/* Payment History Table -- withheld while this loan's data failed to
+          load, so an empty schedule is never mistaken for a loan with no
+          payments. */}
+      {!loanError && (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -613,6 +630,7 @@ export function LoanAmortizationReport() {
           </>
         )}
       </div>
+      )}
     </div>
   );
 }

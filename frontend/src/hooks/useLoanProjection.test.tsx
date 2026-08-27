@@ -14,7 +14,12 @@ vi.mock('@/lib/transactions', () => ({
 }));
 
 const getRateChanges = vi.fn();
-vi.mock('@/lib/loan-rate-changes', () => ({
+// `importOriginal` rather than a bare factory: the hook derives
+// `AMORTIZING_DEBT_TYPES` from this module's `RATE_CHANGE_ACCOUNT_TYPES`, and a
+// factory listing only the api object replaces the real export with
+// `undefined` -- which is the derivation this file is meant to be exercising.
+vi.mock('@/lib/loan-rate-changes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/loan-rate-changes')>()),
   loanRateChangesApi: {
     getAll: (...args: unknown[]) => getRateChanges(...args),
   },

@@ -182,20 +182,32 @@ export function DebtPayoffTimelineReport() {
     reloadRateChanges();
   };
 
+  // One derivation for both readers below. Replaying the register twice per
+  // render is not merely wasted work: the curve and the terms strip beside it
+  // would be two independent answers, so a change to how history is derived
+  // could move one and leave the other.
+  const history = useMemo(
+    () =>
+      selectedAccount
+        ? deriveLoanPaymentHistory(
+            selectedAccount,
+            transactions,
+            rateChanges,
+            interestTransactions,
+          )
+        : null,
+    [selectedAccount, transactions, rateChanges, interestTransactions],
+  );
+
   // Build payment timeline from actual transactions + projected future payments
   const { payoffSchedule, projectionStartLabel } = useMemo((): {
     payoffSchedule: PayoffScheduleItem[];
     projectionStartLabel: string | null;
   } => {
-    if (!selectedAccount) return { payoffSchedule: [], projectionStartLabel: null };
+    if (!selectedAccount || !history)
+      return { payoffSchedule: [], projectionStartLabel: null };
 
     // --- Historical payments from actual transactions ---
-    const history = deriveLoanPaymentHistory(
-      selectedAccount,
-      transactions,
-      rateChanges,
-      interestTransactions,
-    );
     const schedule: PayoffScheduleItem[] = history.events.map((event) => ({
       date: event.date,
       label: formatChartDate(event.date, 'MMM yyyy'),
@@ -286,19 +298,13 @@ export function DebtPayoffTimelineReport() {
     }
 
     return { payoffSchedule: monthlySchedule, projectionStartLabel: startLabel };
-  }, [selectedAccount, transactions, interestTransactions, rateChanges, formatChartDate]);
+  }, [selectedAccount, history, rateChanges, formatChartDate]);
 
-  // The terms in effect, from the same resolution the curve is projected from.
+  // The terms in effect, from the same history the curve is projected from.
   const currentTerms = useMemo(() => {
-    if (!selectedAccount) return { annualRate: null, payment: null };
-    const history = deriveLoanPaymentHistory(
-      selectedAccount,
-      transactions,
-      rateChanges,
-      interestTransactions,
-    );
+    if (!selectedAccount || !history) return { annualRate: null, payment: null };
     return resolveCurrentLoanTerms(selectedAccount, history, rateChanges);
-  }, [selectedAccount, transactions, rateChanges, interestTransactions]);
+  }, [selectedAccount, history, rateChanges]);
 
   const summary = useMemo(() => {
     if (payoffSchedule.length === 0 || !selectedAccount) return null;

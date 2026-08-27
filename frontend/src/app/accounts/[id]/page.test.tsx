@@ -124,7 +124,8 @@ vi.mock('@/lib/loan-scenarios', async (importOriginal) => {
 });
 
 const mockGetAllRateChanges = vi.fn();
-vi.mock('@/lib/loan-rate-changes', () => ({
+vi.mock('@/lib/loan-rate-changes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/loan-rate-changes')>()),
   loanRateChangesApi: {
     getAll: (...args: unknown[]) => mockGetAllRateChanges(...args),
     create: vi.fn(),

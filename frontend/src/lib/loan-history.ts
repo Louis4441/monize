@@ -472,17 +472,28 @@ function resolveSeedPayment(
   } else if (observed?.complete) {
     payment = observed.amount;
   } else {
-    // The `initial` row's payment sits here rather than at rank 1: it is a real
-    // observed installment when detection wrote it and a stale copy of
-    // `account.paymentAmount` when the first-rate-change hook did, and the row
-    // does not say which. Tested like the contractual figure, both readings come
-    // out right -- an observation that amortizes is used, a stale copy that no
-    // longer covers the interest falls through to the corrected scalar.
-    const candidates = [
-      observed?.amount,
-      effective.snapshotPaymentAmount,
-      contractual,
-    ].filter((value): value is number => value != null && value > 0);
+    // The incomplete observation is deliberately NOT a candidate. It is a PART
+    // of the installment -- `principal + 0` for a loan booking interest outside
+    // the app -- so using it as the whole payment understates the installment and
+    // overstates the payoff, and it slips through the amortization guard easily
+    // because a principal-only figure usually does exceed one period's interest
+    // (issue #1255's own example: 285 of principal against 91.67 of interest,
+    // seeded as 285 when the contractual installment is 1,200). Listing it first
+    // made the documented contractual fallback fire only for the narrow case
+    // where the principal-only number happened to be smaller than the interest.
+    //
+    // The `initial` row's payment does belong here: detection writes a real
+    // observed installment under that source and the first-rate-change hook
+    // writes a stale copy of `account.paymentAmount`, with nothing on the row to
+    // tell them apart. Tested like the contractual figure, both readings come out
+    // right -- an observation that amortizes is used, a stale copy that no longer
+    // covers the interest falls through to the corrected scalar.
+    const candidates = [effective.snapshotPaymentAmount, contractual].filter(
+      (value): value is number => value != null && value > 0,
+    );
+    // No complete figure anywhere: the installment is unknown, so there is no
+    // projection and no Current Payment. Better than a payoff computed from a
+    // fraction of the real payment.
     payment = candidates.find(amortizes) ?? candidates[0] ?? null;
   }
 
@@ -594,18 +605,28 @@ function classifyPayment(
     account.interestCategoryId,
     processedParentIds,
   );
-  if (recorded !== null) {
-    return { interest: recorded, type: 'REGULAR' };
+  // The configured category names the interest line, so nothing outranks it.
+  if (recorded.kind === 'exact') {
+    return { interest: recorded.amount, type: 'REGULAR' };
   }
+  // Otherwise a separate expense booked against this date is the stronger
+  // signal: a loan that books interest outside the split records it there, and
+  // the split's single line might be escrow.
   const paired = takeSeparateInterest();
   if (paired != null) {
     return { interest: paired, type: 'REGULAR' };
   }
-  // Neither a recorded split nor a paired separate expense: the ledger records
-  // no interest against this payment, so it moved principal only. That is a
-  // measured zero, not an unknown -- the alternative, estimating it from the
-  // balance and the account's rate, reported interest the borrower never paid
-  // (issue #1255).
+  // No paired expense, so the split's one unambiguous line is the best evidence
+  // there is -- and the reason it is used even when it does not carry the
+  // configured category: splits recorded before that setting existed, or filed
+  // under a since-changed category, still hold the real interest.
+  if (recorded.kind === 'fallback') {
+    return { interest: recorded.amount, type: 'REGULAR' };
+  }
+  // Nothing anywhere: the ledger records no interest against this payment, so it
+  // moved principal only. That is a measured zero, not an unknown -- the
+  // alternative, estimating it from the balance and the account's rate, reported
+  // interest the borrower never paid (issue #1255).
   return { interest: 0, type: 'REGULAR' };
 }
 
@@ -731,6 +752,31 @@ function matchesOverpaymentMemo(
 }
 
 /**
+ * What a parent's splits say about interest. Three answers, because "the
+ * configured category names this amount" and "this is the only line it could be"
+ * are different strengths of evidence and a separate interest expense sits
+ * between them:
+ *
+ *   - `exact`    -- the loan's configured interest category names this amount;
+ *                   nothing outranks it. Also the `0` for a sibling loan
+ *                   transfer of a parent already counted, so a source payment
+ *                   covering several loan transfers is counted once.
+ *   - `fallback` -- the single unambiguous line, offered when no configured
+ *                   category matched. A separate interest expense paired to the
+ *                   date is a stronger signal and wins over it.
+ *   - `none`     -- nothing here identifies interest, so the caller falls
+ *                   through to a paired separate expense and then to a measured
+ *                   zero. Returned for a parent with no splits, for an ambiguous
+ *                   one (two or more categorized lines, none of them the
+ *                   configured category -- guessing one is what this function
+ *                   used to do), and for a parent whose every line is a transfer.
+ */
+type RecordedInterest =
+  | { kind: 'exact'; amount: number }
+  | { kind: 'fallback'; amount: number }
+  | { kind: 'none' };
+
+/**
  * The recorded interest of a payment, from the splits of the linked
  * source-account transaction. A single source payment covering several loan
  * transfers is counted only once.
@@ -744,19 +790,15 @@ function matchesOverpaymentMemo(
  * interest was $300, and into every cumulative total, export and projection
  * seed downstream. The loan already names its interest category, so use it.
  *
- * Three outcomes:
- *   - a number: interest this parent records, rounded to cents like every other
- *     interest path in this module;
- *   - `0`: only reached for a sibling loan transfer of a parent already counted,
- *     so the pair's interest is not counted twice;
- *   - `null`: nothing here identifies interest, so the caller falls through to a
- *     separate interest expense paired to the date, and then to zero. Returned
- *     for a parent with no splits; for an *ambiguous* one (two or more
- *     categorized lines and no configured interest category to pick between them
- *     -- guessing one is what this function used to do); for a configured
- *     category with no matching line; and for a parent whose every line is a
- *     transfer. Those last two are the cases where the interest is usually
- *     sitting in a standalone expense, and answering `0` would drop it.
+ * `RecordedInterest` above states the three answers. Every amount is rounded to
+ * cents like every other interest path in this module.
+ *
+ * A configured category with no matching line is deliberately **not** the end of
+ * the search: it returns the single unambiguous line as a `fallback` instead. An
+ * earlier revision answered "none" there, which zeroed a loan's entire Interest
+ * Paid the moment its interest category was set or changed -- splits recorded
+ * before the setting existed, or filed under a since-renamed category, still hold
+ * the real interest.
  *
  * "A categorized line" means the same thing here as in the backend's
  * `ScheduledTransactionLoanService`, which recalculates the templates this reads
@@ -772,10 +814,12 @@ function readRecordedInterest(
   loanAccountId: string,
   interestCategoryId: string | null | undefined,
   processedParentIds: Set<string>,
-): number | null {
+): RecordedInterest {
   const linkedTx = transaction.linkedTransaction;
-  if (!linkedTx?.splits || linkedTx.splits.length === 0) return null;
-  if (processedParentIds.has(linkedTx.id)) return 0;
+  if (!linkedTx?.splits || linkedTx.splits.length === 0) return { kind: 'none' };
+  // A sibling loan transfer of a parent already counted: its interest has been
+  // attributed once, so this row adds none.
+  if (processedParentIds.has(linkedTx.id)) return { kind: 'exact', amount: 0 };
   processedParentIds.add(linkedTx.id);
 
   const cents = (value: number) => Math.round(Math.abs(value) * 100) / 100;
@@ -796,26 +840,34 @@ function readRecordedInterest(
     const matching = categoryLines.filter(
       (s) => s.categoryId === interestCategoryId,
     );
-    if (matching.length > 0) return sumCents(matching);
-    // Configured but no matching line: this parent does not record the interest,
-    // and a loan with an interest category configured is usually one that books
-    // interest as a separate expense -- so fall through and let the expense
-    // paired to this date answer. Returning 0 here would drop a real interest
-    // charge for a payment split across principal and escrow.
-    return null;
+    if (matching.length > 0) return { kind: 'exact', amount: sumCents(matching) };
   }
 
-  // No configured category. One categorized line is unambiguous -- the canonical
-  // shape ScheduledTransactionLoanService builds, and what every loan without a
-  // configured interest category has always relied on. Two or more cannot be
-  // told apart, so fall through rather than pick by position.
-  if (categoryLines.length === 1) return cents(Number(categoryLines[0].amount));
-  if (categoryLines.length > 1) return null;
+  // Nothing carries the configured category -- or none is configured. A single
+  // categorized line is still unambiguous: it is the canonical shape
+  // ScheduledTransactionLoanService writes, and it is what every loan without a
+  // configured interest category has always relied on.
+  //
+  // Crucially this applies whether or not a category is configured. Returning
+  // "no interest" for a single line that simply does not match zeroed the loan's
+  // whole Interest Paid the moment a user SET or CHANGED its interest category:
+  // splits recorded before the setting, or filed under a since-renamed category,
+  // still hold the real interest. It is offered as a `fallback` so a separate
+  // interest expense paired to the date -- a stronger signal about a loan that
+  // books interest outside the split -- still wins if one exists.
+  if (categoryLines.length === 1) {
+    return { kind: 'fallback', amount: cents(Number(categoryLines[0].amount)) };
+  }
+  // Several categorized lines and none matching: escrow, insurance, interest --
+  // indistinguishable, and picking by position is the defect this replaced.
+  if (categoryLines.length > 1) return { kind: 'none' };
   // No categorized line at all: a single uncategorized expense line is still
   // unambiguous (legacy splits), and a transfer-only parent records nothing here
   // -- its interest, if any, is the separate expense the caller looks for next.
-  if (nonTransfer.length === 1) return cents(Number(nonTransfer[0].amount));
-  return null;
+  if (nonTransfer.length === 1) {
+    return { kind: 'fallback', amount: cents(Number(nonTransfer[0].amount)) };
+  }
+  return { kind: 'none' };
 }
 
 /**

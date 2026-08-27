@@ -25,11 +25,16 @@ const cachePrefix = (accountId: string) => `loan-rate-changes:${accountId}`;
  * selected line of credit turned the whole report into its error state --
  * persisted in localStorage, so it stayed broken across reloads with no in-page
  * way to choose another account.
+ *
+ * Exported because two other lists answer the same question for their own
+ * reasons and must not be spelled a second time: the projection hook's
+ * "amortizing debt" set (a revolving line does not amortize, which is the same
+ * fact that gives it no contractual rate to change) derives from this one, and
+ * `loan-rate-changes.contract.test.ts` checks the derivation, the backend's
+ * copy of the list, and the account page's detail-view registry against it.
  */
-const RATE_CHANGE_ACCOUNT_TYPES: ReadonlyArray<Account['accountType']> = [
-  'LOAN',
-  'MORTGAGE',
-];
+export const RATE_CHANGE_ACCOUNT_TYPES: ReadonlyArray<Account['accountType']> =
+  ['LOAN', 'MORTGAGE'];
 
 /** Whether `/accounts/:id/rate-changes` will answer for this account at all. */
 export function supportsRateChanges(

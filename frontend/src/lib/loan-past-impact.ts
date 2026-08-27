@@ -103,10 +103,16 @@ export function computePastImpact(
         ? account.termMonths
         : null;
 
+  // The rate condition asks whether a rate is known ANYWHERE, not whether the
+  // account's scalar is set. A loan configured only through the rate-history UI
+  // has a null scalar, and gating on it made this panel disappear while the
+  // summary cards and the projection beside it -- which resolve from the same
+  // history -- showed the loan's rate and its payoff.
+  const hasRecordedRate = account.interestRate != null || rateChanges.length > 0;
   if (
     originalPrincipal <= 0 ||
     !startDate ||
-    account.interestRate == null ||
+    !hasRecordedRate ||
     !account.paymentFrequency ||
     !configuredTermMonths
   ) {
@@ -120,7 +126,7 @@ export function computePastImpact(
   // The origination rate comes from the rate history when one exists; the
   // account's scalar rate is only the *current* rate and would corrupt the
   // baseline after any recorded change.
-  const timeline = buildRateTimeline(rateChanges, startDate, account.interestRate);
+  const timeline = buildRateTimeline(rateChanges, startDate, account.interestRate ?? 0);
 
   const periodsPerYear = getPeriodsPerYear(frequency);
 

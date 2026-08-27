@@ -46,6 +46,22 @@ function makeHistory(
 }
 
 describe('computePastImpact', () => {
+  it('computes for a loan whose rate is only in its history', () => {
+    // Gating on account.interestRate made this panel vanish for a loan
+    // configured through the rate-history UI, while the cards and the payoff
+    // beside it resolved the same rate from that history and displayed it.
+    const account = makeAccount({
+      interestRate: null as unknown as number,
+    });
+    const impact = computePastImpact(
+      account,
+      makeHistory(account, [500, 500, 800]),
+      null,
+      [{ effectiveDate: '2024-12-15', annualRate: 6, newPaymentAmount: 500 }],
+    );
+    expect(impact).not.toBeNull();
+  });
+
   it('returns null without a rate, frequency, or determinable payment', () => {
     const account = makeAccount();
     const history = makeHistory(account, [450]);
