@@ -625,6 +625,12 @@ Statement           Interest attributed to a historical loan payment is a
                     history keeps its configured rate on a zero-interest row,
                     while a variable-rate loan's rate for that date stays null
                     rather than inheriting today's scalar.
+                    And 0% is a rate, distinct from "no rate recorded", at every
+                    step: a fixed interest-free loan carries 0 on every row
+                    (`Number(null)` is also 0, so the test is `!= null`, never
+                    `> 0`), its `principal + 0` installment is COMPLETE rather
+                    than partial because the interest is known to be zero, and
+                    every surface renders it as `0%` rather than "Not set".
                     A forward PROJECTION may estimate -- that is its job, and
                     its rows are labelled projected. The prohibition is on a
                     historical row.
@@ -644,9 +650,19 @@ Enforcement         One producer: frontend/src/lib/loan-history.ts
                     forward schedules (accounts/mortgage-amortization.util.ts,
                     for previews and scheduled-payment setup), so no second
                     producer of the historical figure exists.
-                    frontend/src/lib/loan-history.guard.test.ts scans the module
-                    for any catch, since a swallowed lookup failure resolves to
-                    [] and [] is read as "no interest was booked".
+                    frontend/src/lib/loan-history.guard.test.ts holds two source
+                    scans: no catch anywhere in the module, since a swallowed
+                    lookup failure resolves to [] and [] is read as "no interest
+                    was booked"; and no truthiness read of a resolved annual rate
+                    anywhere in frontend/src, since `0` is a rate and five sites
+                    rendered a recorded 0% as "Not set". The second carries a
+                    self-test over known good and bad lines, because a scanning
+                    pattern that quietly matches nothing is worse than no scan.
+                    frontend/src/lib/loan-rate-changes.contract.test.ts holds the
+                    rate-history endpoint's precondition as one list -- against
+                    the backend constant that decides the 400, the two frontend
+                    lists that coincide with it, and every caller of
+                    loanRateChangesApi.getAll.
 Concurrency scope   -- (read path)
 Failure response    The rejection propagates to the caller's error-and-retry
                     state: useReportData in the three loan reports, the
@@ -666,7 +682,11 @@ Required tests      Present: the principal-only matrix in
                     refusal to guess between two uncategorized lines, a transfer
                     leg never counting), the rate-authority group (a stale scalar
                     losing to the timeline, a future-dated row being a step and
-                    not the current state), the rejection test, the source scan
+                    not the current state), the interest-free group (0% carried
+                    on every row while an unconfigured rate stays null, the
+                    COMPLETE `principal + 0` installment at 0% against the
+                    incomplete one at 6%, and 0% rendering as 0%), the rejection
+                    test, the two source scans and the endpoint contract test
                     above, the report's error-and-retry and rate-history-wiring
                     tests in
                     frontend/src/components/reports/LoanAmortizationReport.test.tsx,

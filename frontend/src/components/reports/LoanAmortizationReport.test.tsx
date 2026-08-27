@@ -294,6 +294,32 @@ describe('LoanAmortizationReport', () => {
     });
   });
 
+  it('shows 0% -- not "Not set" -- for an interest-free loan', async () => {
+    // The resolved rate is `number | null` precisely so absence travels; reading
+    // it for truthiness throws that away again and reports a recorded 0% as
+    // unconfigured. 0 is a rate.
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loan-0', name: 'Interest-free loan', accountType: 'LOAN',
+        currentBalance: -900, openingBalance: -1200, interestRate: 0,
+        paymentAmount: 150, paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false, isVariableRate: false, isClosed: false,
+      },
+    ]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [
+        { id: 'tx-1', transactionDate: '2026-01-15', amount: 150, linkedTransaction: null },
+        { id: 'tx-2', transactionDate: '2026-02-15', amount: 150, linkedTransaction: null },
+      ],
+      pagination: { hasMore: false },
+    });
+    render(<LoanAmortizationReport />);
+    await waitFor(() => {
+      expect(screen.getByText('0%')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Not set')).not.toBeInTheDocument();
+  });
+
   it('displays account details section with correct type labels', async () => {
     mockGetAllAccounts.mockResolvedValue([
       {

@@ -53,7 +53,7 @@ export function LoanSummaryCards({
 
   const isCanadianFixed = account.isCanadianMortgage && !account.isVariableRate;
   const effectiveRate =
-    isCanadianFixed && currentAnnualRate
+    isCanadianFixed && currentAnnualRate != null
       ? (Math.pow(1 + currentAnnualRate / 100 / 2, 2) - 1) * 100
       : null;
 

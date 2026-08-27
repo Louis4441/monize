@@ -134,6 +134,11 @@ export function AccountInfoWidget({
   const displayedRate =
     loan.currentAnnualRate ??
     (account.interestRate != null ? Number(account.interestRate) : null);
+  // The `!== 0` is deliberate HERE and nowhere else, and it is a statement about
+  // this widget's audience rather than about the number: it renders for every
+  // account type, and a chequing or asset account carrying a stored 0 has no
+  // meaningful rate to show. On a loan surface 0% is a real rate and renders as
+  // "0%" -- see the resolved-rate rule in CLAUDE.md.
   if (displayedRate != null && displayedRate !== 0) {
     details.push({
       label: t('accountWidget.interestRate'),

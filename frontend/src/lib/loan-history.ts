@@ -289,9 +289,11 @@ function debtMagnitude(signedBalance: number): number {
 export interface ObservedInstallment {
   amount: number;
   /**
-   * True when the row's interest was recorded (a split, or a paired separate
-   * expense). False for `principal + 0`, which is an incomplete installment
-   * rather than a smaller one -- see `resolveSeedPayment`.
+   * True when the row's interest is KNOWN -- either recorded (a split, or a
+   * paired separate expense) or known to be zero because the rate in effect on
+   * that date was 0%. False for `principal + 0` at an unknown or non-zero rate,
+   * which is an incomplete installment rather than a smaller one -- see
+   * `resolveSeedPayment`.
    */
   complete: boolean;
 }
@@ -319,7 +321,17 @@ export function observedInstallment(
   const amount =
     Math.round((lastRegular.principal + lastRegular.interest) * 100) / 100;
   if (amount <= 0) return null;
-  return { amount, complete: lastRegular.interest > 0 };
+  // Recorded interest, or a rate of exactly 0% -- at which the interest for the
+  // row is known, and known to be zero, so `principal + 0` IS the whole
+  // installment. Strict `=== 0`: null/undefined is "the rate on this date is
+  // unknown", which is the incomplete case. Without this an interest-free loan
+  // with no stored `paymentAmount` had its real, fully-stated installment
+  // discarded and its payoff refused, though the ledger states both terms
+  // exactly -- "`null` is not the safe answer either", from the other side.
+  return {
+    amount,
+    complete: lastRegular.interest > 0 || lastRegular.annualRate === 0,
+  };
 }
 
 /** The loan's rate and payment in effect: one answer for every surface. */
@@ -387,9 +399,19 @@ interface SeedPayment {
  *      now", so one that no longer covers the interest is a fact about the loan
  *      (a rate rise the installment has not caught up with) and the schedule
  *      must be allowed to refuse rather than be handed a different number;
- *   2. otherwise the installment derived from history (`principal + interest` of
- *      the last regular payment), if it covers one period's interest;
- *   3. otherwise the stored contractual `paymentAmount`, if it does.
+ *   2. otherwise a COMPLETE observed installment -- `principal + interest` of the
+ *      last regular payment, where that interest is known -- also unconditionally,
+ *      for the same reason: it is a complete statement of what is being paid;
+ *   3. otherwise the `initial` row's snapshot payment, then the stored
+ *      contractual `paymentAmount`, first one that covers a period's interest.
+ *
+ * An INCOMPLETE observation is not a candidate at any rank. `principal + 0` for
+ * a loan booking interest outside the app is a PART of the installment, not a
+ * smaller one, and it clears the amortization guard easily -- a principal-only
+ * figure usually does exceed one period's interest (issue #1255's own example:
+ * 285 of principal against 91.67 of interest, against a contractual 1,200). So
+ * ranking it ahead of the contractual figure made that documented fallback fire
+ * only when the principal-only number happened to be the smaller one.
  *
  * An `initial` row's payment is not rank 1: it is a real observed installment
  * when detection wrote it and a verbatim copy of `account.paymentAmount` when
@@ -399,13 +421,11 @@ interface SeedPayment {
  * observation. It joins rank 3 instead, ahead of the scalar and tested like it.
  *
  * The contractual figure is last because it is often stale, but it is a real
- * stored fact and it is what a loan booking its interest outside the app has
- * left: history alone then yields `principal + 0`, under one period's interest,
- * and the estimate that used to top it up was the defect in issue #1255. When
- * neither amortizes the derived installment is passed through so
- * `generateLoanSchedule` refuses exactly as it does for a genuinely underfunded
- * loan; the payoff and remaining interest then read as unknown rather than as a
- * figure built on an installment nobody is paying.
+ * stored fact and it is the only complete payment a loan booking its interest
+ * outside the app has left. When nothing complete resolves the payment is null:
+ * the payoff and remaining interest read as unknown rather than as a figure
+ * built on a fraction of the real installment, which is what the estimate in
+ * issue #1255 was quietly supplying.
  */
 function resolveSeedPayment(
   account: Account,
@@ -431,6 +451,15 @@ function resolveSeedPayment(
   // lands on row 1. Testing today's rate instead passes a candidate the very
   // next line then refuses -- the "a preview computes what the commit will do,
   // through the same code" rule, applied to the guard.
+  // The `?? 0` covers two different states on purpose, and neither is the
+  // "0% when unknown" conflation this module bans elsewhere. A genuine 0% loan
+  // has no period interest, so 0 is the right figure. An UNKNOWN rate also
+  // yields 0, which reduces the guard to "is the candidate positive" -- and that
+  // is the honest degenerate case: with no rate there is nothing to test a
+  // payment against, and `buildLoanProjectionInput` refuses the projection
+  // outright a few lines later on `seed.annualRate == null`. The rate itself
+  // stays `number | null` (`effective.annualRate`); only this guard's input is
+  // flattened.
   const firstPaymentDate = advanceDate(new Date(), frequency);
   const firstRowAnnualRate =
     resolveEffectiveLoanTerms(
@@ -1017,7 +1046,15 @@ function assignObservedRates(
   // the account's scalar rate is the only reference available -- both to
   // sanity-check a reconstructed figure against and, for a fixed-rate loan, as
   // the rate of a row that charged no interest to reconstruct from.
-  const configuredRate = Number(account.interestRate);
+  //
+  // `number | null`, not `Number(account.interestRate)`: that is 0 for an
+  // unconfigured rate, and 0 is a rate. A fixed 0% loan (interest-free
+  // financing, a family loan) has a known rate on every row and books no
+  // interest on any of them, so a `> 0` test hides exactly the loan whose rate
+  // is most certain -- the same conflation this module fixed one level up for
+  // zero-*interest* rows.
+  const configuredRate =
+    account.interestRate != null ? Number(account.interestRate) : null;
   let lastInterestDateKey: string | null = null;
   for (const event of events) {
     const balanceBefore = event.balance + event.principal;
@@ -1050,15 +1087,21 @@ function assignObservedRates(
           ? periodicRate * periodsPerYear * 100
           : (Math.pow(1 + periodicRate, periodsPerYear / 2) - 1) * 2 * 100
         : periodicRate * (365 / days) * 100;
+      // A 0% loan expects no interest, so it has nothing to check the
+      // observation against -- same as an unconfigured rate, and reached here
+      // only by a row whose interest contradicts the loan's own rate.
       const expectedFullPeriodInterest =
-        configuredRate > 0
+        configuredRate != null && configuredRate > 0
           ? balanceBefore * getPeriodicRate(configuredRate, periodsPerYear, isCanadian, isVariable)
           : 0;
+      // A partial period falls back to the configured rate, which this branch
+      // can only reach when there is one: `expectedFullPeriodInterest > 0`
+      // implies a configured rate above zero.
       const isFullPeriod =
         expectedFullPeriodInterest <= 0 ||
         event.interest >= expectedFullPeriodInterest * FULL_PERIOD_INTEREST_RATIO;
-      event.annualRate = isFullPeriod ? observed : configuredRate;
-    } else if (event.type === 'REGULAR' && !isVariable && configuredRate > 0) {
+      event.annualRate = isFullPeriod ? observed : (configuredRate ?? observed);
+    } else if (event.type === 'REGULAR' && !isVariable && configuredRate != null) {
       // Nothing to reconstruct from (a principal-only payment, or a row against
       // no balance), but a fixed loan's configured rate was still the rate in
       // effect on this date -- so the Rate column keeps it rather than dropping

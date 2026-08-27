@@ -474,6 +474,7 @@ describe('observedInstallment', () => {
       principal: number;
       interest: number;
       type: 'REGULAR' | 'OVERPAYMENT';
+      annualRate?: number | null;
     }>,
   ) => ({
     events: events.map((e, i) => ({
@@ -484,6 +485,7 @@ describe('observedInstallment', () => {
       cumulativePrincipal: 0,
       cumulativeInterest: 0,
       type: e.type,
+      annualRate: e.annualRate,
     })),
     startingBalance: 0,
     currentBalance: 0,
@@ -530,6 +532,37 @@ describe('observedInstallment', () => {
     // partial installment, not a lower one.
     expect(
       observedInstallment(history([{ principal: 450, interest: 0, type: 'REGULAR' }])),
+    ).toEqual({ amount: 450, complete: false });
+  });
+
+  it('marks a principal-only row COMPLETE at a known 0% rate', () => {
+    // A measured zero, not a missing figure: at 0% the interest for this row is
+    // known and known to be zero, so principal + 0 IS the whole installment.
+    // Treating it as incomplete discarded a fully stated installment and left an
+    // interest-free loan with no payoff at all when no contractual payment was
+    // stored -- "null is not the safe answer either", from the other side.
+    expect(
+      observedInstallment(
+        history([{ principal: 450, interest: 0, type: 'REGULAR', annualRate: 0 }]),
+      ),
+    ).toEqual({ amount: 450, complete: true });
+  });
+
+  it('keeps a principal-only row incomplete at a known NON-zero rate', () => {
+    expect(
+      observedInstallment(
+        history([{ principal: 450, interest: 0, type: 'REGULAR', annualRate: 5 }]),
+      ),
+    ).toEqual({ amount: 450, complete: false });
+  });
+
+  it('keeps a principal-only row incomplete when the rate is unknown', () => {
+    // A variable-rate loan with no recorded history: this row's rate is genuinely
+    // unknown, so the interest could be anything. Strictly `=== 0`, never falsy.
+    expect(
+      observedInstallment(
+        history([{ principal: 450, interest: 0, type: 'REGULAR', annualRate: null }]),
+      ),
     ).toEqual({ amount: 450, complete: false });
   });
 
@@ -900,6 +933,60 @@ describe('buildLoanProjectionInput rate authority', () => {
     });
     const history = deriveLoanPaymentHistory(acct, []);
     expect(buildLoanProjectionInput(acct, history)).toBeNull();
+  });
+
+  it('projects an interest-free loan from its observed installment alone', () => {
+    // 0% with no stored paymentAmount: the ledger states BOTH terms exactly --
+    // the rate is recorded as 0 and the installment is `principal + 0`, which at
+    // 0% is the whole payment rather than a fraction of it. Treating that as an
+    // incomplete observation refused the payoff of the one loan whose figures
+    // are fully known, which is the "null is not the safe answer either" half of
+    // the missing-data rule.
+    const acct = makeAccount({
+      interestRate: 0,
+      isVariableRate: false,
+      paymentAmount: null as unknown as number,
+      openingBalance: -1200,
+      currentBalance: -900,
+    });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2026-01-15', amount: 150 }),
+      makeTransaction({ transactionDate: '2026-02-15', amount: 150 }),
+    ]);
+    expect(history.events[1].interest).toBe(0);
+
+    const terms = resolveCurrentLoanTerms(acct, history);
+    expect(terms.annualRate).toBe(0);
+    expect(terms.payment).toBe(150);
+
+    const input = buildLoanProjectionInput(acct, history);
+    expect(input).not.toBeNull();
+    expect(input!.annualRate).toBe(0);
+    expect(input!.paymentAmount).toBe(150);
+    // 900 remaining at 150 a month with no interest: six payments, paid off.
+    const schedule = generateLoanSchedule(input!);
+    expect(schedule.paidOff).toBe(true);
+    expect(schedule.rows).toHaveLength(6);
+    expect(schedule.totalInterest).toBe(0);
+  });
+
+  it('still refuses a 6% loan whose only observation is principal-only', () => {
+    // Negative control for the case above: the 0% exemption must not leak into a
+    // loan that charges interest, where `principal + 0` really is a fraction of
+    // the installment.
+    const acct = makeAccount({
+      interestRate: 6,
+      isVariableRate: false,
+      paymentAmount: null as unknown as number,
+      openingBalance: -1200,
+      currentBalance: -900,
+    });
+    const history = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2026-01-15', amount: 150 }),
+      makeTransaction({ transactionDate: '2026-02-15', amount: 150 }),
+    ]);
+    expect(buildLoanProjectionInput(acct, history)).toBeNull();
+    expect(resolveCurrentLoanTerms(acct, history).payment).toBeNull();
   });
 
   it('reports an absent rate as unknown, not as 0%', () => {
@@ -1305,6 +1392,36 @@ describe('deriveLoanPaymentHistory reconstructed rate (no rate history)', () => 
     ]);
     expect(events[0].interest).toBe(0);
     expect(events[0].annualRate).toBeCloseTo(6, 4);
+  });
+
+  it('shows 0% -- not "--" -- for a fixed interest-free loan', () => {
+    // `Number(null)` is 0, so a `configuredRate > 0` gate cannot tell an
+    // interest-free loan from one with no rate configured, and hid the rate of
+    // the loan whose rate is the most certain of all: 0% is recorded, every row
+    // books no interest, and every row's rate is known.
+    const account = makeAccount({
+      interestRate: 0,
+      isVariableRate: false,
+      openingBalance: -10000,
+      currentBalance: -9550,
+    });
+    const { events } = deriveLoanPaymentHistory(account, [
+      makeTransaction({ transactionDate: '2026-01-15', amount: 450 }),
+    ]);
+    expect(events[0].interest).toBe(0);
+    expect(events[0].annualRate).toBe(0);
+  });
+
+  it('still shows no rate when none is configured at all', () => {
+    // The other side of the same distinction: absent is not 0%.
+    const account = makeAccount({
+      interestRate: null as unknown as number,
+      isVariableRate: false,
+    });
+    const { events } = deriveLoanPaymentHistory(account, [
+      makeTransaction({ transactionDate: '2026-01-15', amount: 450 }),
+    ]);
+    expect(events[0].annualRate).toBeNull();
   });
 
   it('shows no rate for a variable-rate loan with nothing to reconstruct from', () => {

@@ -126,7 +126,17 @@ export function computePastImpact(
   // The origination rate comes from the rate history when one exists; the
   // account's scalar rate is only the *current* rate and would corrupt the
   // baseline after any recorded change.
-  const timeline = buildRateTimeline(rateChanges, startDate, account.interestRate ?? 0);
+  //
+  // The `0` is not a "0% when unknown" default -- that conflation is what this
+  // work exists to remove. `buildRateTimeline` reads this fallback only when
+  // `rateChanges` is empty, and the guard above (`hasRecordedRate`) refuses the
+  // whole computation unless a rate exists somewhere; so an empty timeline
+  // implies a non-null scalar and the branch reaching this value cannot be
+  // taken. It is spelled out rather than left as a bare `?? 0` because the next
+  // reader has no other way to know that.
+  const scalarRate =
+    account.interestRate != null ? Number(account.interestRate) : null;
+  const timeline = buildRateTimeline(rateChanges, startDate, scalarRate ?? 0);
 
   const periodsPerYear = getPeriodsPerYear(frequency);
 

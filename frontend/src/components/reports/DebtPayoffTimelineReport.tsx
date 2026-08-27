@@ -388,7 +388,9 @@ export function DebtPayoffTimelineReport() {
         ? t('accountBalances.accountTypes.LINE_OF_CREDIT' as Parameters<typeof t>[0])
         : selectedAccount.accountType.charAt(0) + selectedAccount.accountType.slice(1).toLowerCase(),
       formatCurrency(Math.abs(selectedAccount.currentBalance)),
-      currentTerms.annualRate ? `${currentTerms.annualRate}%` : t('debtPayoff.notSet'),
+      currentTerms.annualRate != null
+        ? `${currentTerms.annualRate}%`
+        : t('debtPayoff.notSet'),
       currentTerms.payment ? formatCurrency(currentTerms.payment) : t('debtPayoff.notSet'),
     ]] : [];
     await exportToPdf({
@@ -746,7 +748,9 @@ export function DebtPayoffTimelineReport() {
             <div>
               <span className="text-gray-500 dark:text-gray-400">{t('debtPayoff.colInterestRate')}</span>
               <p className="font-medium text-gray-900 dark:text-gray-100">
-                {currentTerms.annualRate ? `${currentTerms.annualRate}%` : t('debtPayoff.notSet')}
+                {currentTerms.annualRate != null
+                  ? `${currentTerms.annualRate}%`
+                  : t('debtPayoff.notSet')}
               </p>
             </div>
             <div>
