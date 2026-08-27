@@ -352,6 +352,10 @@ The request key is every selector that changes the *meaning* of the response, no
 
 **A dirty keyed form is data.** Changing the request key while a form has unsaved edits calls for a confirmation, a preserved draft, or an explicit save/discard flow; silently unmounting it is data loss. A form rendered for scenario A must also stop being editable once scenario B is the current selection -- two obligations, and meeting the second by discarding the first is not meeting both.
 
+**A background load finishing is not the user acting.** State a page throws away when the user changes a filter -- a selection, a draft, a scroll position -- keys off the criteria the *user* chose, never off a derived object the page recomputes as data lands. The transactions page's `bulkUpdateFilters` falls back to every visible account when no account filter is set, so it changes the moment the accounts request answers; `useTransactionSelection` compared that object and silently cleared a selection the user had already made (CI run #2873 saw it as a bulk-update banner that never appeared). Pass the user's own criteria as the reset key and keep the resolved scope for the server payload -- derived from the one object, so the two lists cannot drift. The row set carries the same distinction: the first page of rows arriving is a load finishing, not a page change.
+
+**A `useMemo` that sorts copies first.** `Array.prototype.sort` reorders in place, so a display memo sorting a shared memoized array reorders what every other consumer reads, and the value then depends on which memo happened to run first -- `accountFilterOptions` sorting `filteredAccounts` decided the bulk-update account scope's order as a side effect of rendering a dropdown. Write `[...xs].sort(...)`, always.
+
 Regression tests for this class need deferred promises, and must assert on what the user *can do*, not only on what is rendered (`docs/testing-contract.md` carries the wider adversarial list):
 
 | Case | Assertion |
@@ -364,6 +368,83 @@ Regression tests for this class need deferred promises, and must assert on what 
 | Save on the default selection, nothing else happens | the response is adopted |
 
 **Both sides of that comparison must come from the same place.** The origin key a mutation captures and the key the loader is holding have to be produced by one expression -- take the origin from what the loader actually stamped (`dataKey` on `useReportData`), never rebuild it from the rendered payload's fields. The GEM report built its page key from a `strategyId` *state* unset until the user picks from a switcher, and the save's origin from `data.strategy.id`, always a real id: they could never match on the ordinary path, so every save was discarded with no refetch behind it. A key comparison that silently drops the common case looks exactly like one that works.
+
+### An act() warning is a failure, not a log line
+
+A test asserting on a tree React has not finished updating reads whatever
+happened to be committed when the assertion ran -- it passes or fails on
+timing, not on behaviour. React says so, on stderr, and nobody is watching
+stderr in a 14,000-test run: CI run #2873 carried fifteen act warnings under a
+green tick, in the same job whose one real failure was a race. So `src/test/setup.ts`
+routes them into `src/test/act-guard.ts`, which **fails** the test that earned
+them. `act-guard.test.ts` checks the behaviour and scans `setup.ts` for the
+wiring, because a guard nothing calls is not a guard.
+
+Fix the update, never the message. In order of preference: await the thing that
+lands late (`await screen.findBy...`, `await waitFor(...)`); or wrap the trigger
+in `await act(async () => { ... })`. Adding the text to a console filter is the
+one response that is always wrong.
+
+**Exactly one message is that failure**: `An update to <Component> inside a test
+was not wrapped in act(...)`. React's other act-related line -- `The current
+testing environment is not configured to support act(...)` -- is a different
+condition and is deliberately *not* failed on. It fires when an update is
+checked while `IS_REACT_ACT_ENVIRONMENT` is unset, which happens during teardown
+after RTL has restored the flag; it names no component, so it points at nothing,
+and it depends on timing the suite does not control. Matching it turned `main`
+red on CI run #2875, on a test nothing had changed and that neither the PR run
+nor three full local runs of the same commit had flagged. **A guard against
+flakiness that is itself timing-dependent is worse than none.**
+
+And a guard classifies in one place: `recordIfActWarning` both recognises and
+records, because the two were separate functions that disagreed -- the
+classifier rejected a message the recorder stored anyway, so a warning nothing
+recognised could still fail a test.
+
+Three sources produce nearly all of them here:
+
+- **A synchronous test with a request still in flight.** The response commits
+  after the test returns, into whichever tree is mounted by then. Settle it
+  before returning, even when the assertion is about the state *before* it
+  arrives (`useStaleReconciliation.test.ts`).
+- **`vi.waitFor` and `element.dispatchEvent`, which are not act-aware.** Prefer
+  RTL's `waitFor` and `fireEvent`; `fireEvent(element, event)` takes an event
+  object when a test needs to spy on that exact one. Where Vitest's fake timers
+  rule out RTL's `waitFor` -- it cannot drive them -- drain the clock inside
+  act: `await act(async () => { await vi.advanceTimersByTimeAsync(n); })`.
+- **A store write with the tree mounted.** Zustand notifies subscribers
+  synchronously, so `useDensityStore.setState(...)` re-renders outside act
+  unless wrapped. Writing *before* the render does not need it.
+
+### Awaiting static chrome synchronises nothing
+
+`await screen.findByText('Portfolio Value Over Time')` resolves on the page's
+title -- markup that renders before any request does. Every assertion keyed off
+it is asserting on an async call it never waited for. Wait for the thing being
+asserted (`await waitFor(() => expect(api.x).toHaveBeenCalledTimes(1))`), which
+cannot mask a real failure: a call that never happens still times out.
+
+The trap is worst where a call is **second-stage** -- issued only after an
+earlier response commits. The Portfolio Value chart's prior-close baseline is
+gated on `chartPoints[0]`, so it cannot fire until the intraday response lands;
+tests asserting it right after the title passed on a fast machine and failed on
+CI run #2877. Before asserting that a request was made, ask what has to resolve
+first.
+
+Two exceptions, both real: an assertion already inside a `waitFor` callback, and
+one inside a pinned clock -- RTL's `waitFor` cannot drive Vitest's fake timers
+and will hang until the test times out, so there the act-wrapped drain is the
+barrier. A blanket sweep over a file with mixed timer regimes walks into that.
+
+### Test isolation is every storage, not just `localStorage`
+
+`src/test/setup.ts` clears `localStorage` between tests, and for a long time
+cleared nothing else. The Portfolio Value chart caches its intraday response in
+`sessionStorage`, and a leaked entry hydrates the next test's chart
+*synchronously on mount* -- which moves a second-stage request to immediate and
+silently changes what that test is exercising. Anything a component persists is
+shared state between tests: clear it, or the suite's behaviour depends on
+ordering.
 
 ### A busy flag shared by nesting operations is a counter, not a boolean
 

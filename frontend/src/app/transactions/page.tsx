@@ -773,10 +773,27 @@ function TransactionsContent() {
     return institutions.find((i) => i.id === widgetAccount.institutionId);
   }, [widgetAccount, institutions]);
 
+  // The selection resets on the criteria the *user* chose, not on
+  // `bulkUpdateFilters`: that object falls back to every visible account when
+  // no account filter is set, so it changes the moment the accounts request
+  // lands, and clearing there dropped a selection the user had already made.
+  // Derived from `bulkUpdateFilters` -- with only the derived account scope
+  // swapped for the user's own choice -- so the two lists cannot drift apart.
+  const selectionUserFilterKey = useMemo(
+    () =>
+      JSON.stringify({
+        ...bulkUpdateFilters,
+        accountIds: filters.filterAccountIds,
+        accountStatus: filters.filterAccountStatus,
+      }),
+    [bulkUpdateFilters, filters.filterAccountIds, filters.filterAccountStatus],
+  );
+
   const selection = useTransactionSelection(
     transactions,
     pagination?.total ?? 0,
     bulkUpdateFilters,
+    selectionUserFilterKey,
   );
 
   const handleBulkUpdate = useCallback(async (updateFields: Partial<Pick<BulkUpdateData, 'payeeId' | 'payeeName' | 'categoryId' | 'description' | 'status' | 'tagIds'>>) => {

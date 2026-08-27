@@ -220,34 +220,29 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   }
 
   // Totals use the full list; display is capped at maxItems. An item with no
-  // rate is excluded and its currency named, so "due" is marked as a subtotal
-  // rather than quietly understating what is owed. Transfers and zero-amount
-  // reminders are classified out by scheduledKind, not summed.
+  // rate is excluded and its currency named, so the total is marked as a
+  // subtotal rather than quietly understating it. Bills, transfers and
+  // zero-amount reminders are classified out by scheduledKind, not summed.
+  //
+  // The "Total due" row this widget used to draw was removed upstream (#1264),
+  // so the bills side is no longer totalled here. The three rules below govern
+  // the one total that is left -- they were written for both and are not
+  // weakened by there being one (issue #1247):
+  //
   // An item whose current amount is unknown is excluded and counted, so the
-  // figure is marked a subtotal rather than quietly understating what is owed
-  // (issue #1247). It goes through `sumConverted`'s non-finite branch -- a value
-  // failure with no currency to blame, which is exactly what an unresolvable
-  // settlement rate is; the missing-rate branch below still names a currency
-  // when it is the *display* conversion that has no rate.
-  // An occurrence whose direction the server could not derive belongs to EITHER
-  // bucket, so it withholds BOTH totals rather than being quietly left out of
-  // both: filtering it away left "Total due" and "Total incoming" rendering as
-  // complete figures beside a row that says its own amount is unknown. Its amount
-  // is null, which is what `sumConverted`'s non-finite branch withholds on.
+  // figure is marked a subtotal rather than quietly understating what is coming
+  // in. It goes through `sumConverted`'s non-finite branch -- a value failure
+  // with no currency to blame, which is exactly what an unresolvable settlement
+  // rate is; the missing-rate branch below still names a currency when it is the
+  // *display* conversion that has no rate.
+  //
+  // An occurrence whose direction the server could not derive might be a
+  // deposit, so it is counted here and withholds this total rather than being
+  // quietly left out: filtering it away left "Total incoming" rendering as a
+  // complete figure beside a row that says its own amount is unknown. Its
+  // amount is null, which is what that same non-finite branch withholds on.
   const unclassified = upcomingItems.filter(
     (item) => getItemType(item) === 'unknown',
-  );
-  const totalDue = sumConverted(
-    [
-      ...upcomingItems.filter((item) => getItemType(item) === 'bill'),
-      ...unclassified,
-    ],
-    (item) => getEffective(item).amount ?? NaN,
-    (item) => getEffective(item).currencyCode,
-    (amount, currency) => {
-      const converted = convertToDefault(amount, currency);
-      return converted === null ? null : Math.abs(converted);
-    },
   );
   const totalIncoming = sumConverted(
     [
@@ -351,16 +346,6 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
         {/* Also shown when the value is 0 but items were excluded for want of a
             rate, so the missing-currency marker still tells the user the total
             could not be worked out rather than hiding the row entirely. */}
-        {(totalDue.value > 0 || totalDue.excludedCount > 0) && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">{t('upcomingBills.totalDue')}</span>
-            <span className="font-semibold text-red-600 dark:text-red-400">
-              <PartialTotal total={totalDue} displayCurrency={defaultCurrency}>
-                {'-'}{formatCurrencyBase(totalDue.value)}
-              </PartialTotal>
-            </span>
-          </div>
-        )}
         {(totalIncoming.value > 0 || totalIncoming.excludedCount > 0) && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600 dark:text-gray-400">{t('upcomingBills.totalIncoming')}</span>
