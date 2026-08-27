@@ -117,7 +117,8 @@ function BillsContent() {
   const { formatCurrency } = useNumberFormat();
   // The reader's reporting currency and the converter into it. The monthly net
   // spans one currency or none (issue #1247).
-  const { convertToDefault, defaultCurrency } = useExchangeRates();
+  const { convertToDefault, defaultCurrency, ratesUnavailable } =
+    useExchangeRates();
   const [scheduledTransactions, setScheduledTransactions] = useState<ScheduledTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -612,15 +613,46 @@ function BillsContent() {
       totalBills,
       totalDeposits,
       monthlyNet,
-      // Two causes, and the card says which: an occurrence the server could not
-      // price (`amountsResolved`) sends the reader to the schedule, a missing
-      // display rate to the Currencies page. A bare "unavailable" is a dead end.
+      // Two causes, and the card names BOTH when both apply: an occurrence the
+      // server could not price sends the reader to the schedule, a missing
+      // display rate to the Currencies page. A bare "unavailable" is a dead
+      // end, and naming only one of two makes the reader fix it and watch
+      // nothing change.
       monthlyAmountsComplete: amountsResolved && isComplete(monthlyNet),
       monthlyMissingRates: monthlyNet.missingCurrencies,
-      amountsResolved,
+      monthlyHasUnpriceable: !amountsResolved,
       dueCount,
     };
   }, [scheduledTransactions, convertToDefault]);
+
+  /**
+   * Why the Monthly Net is withheld, or `undefined` when it is not.
+   *
+   * `ratesUnavailable` comes first because it makes the other diagnoses
+   * untrustworthy: with the rate table still loading or its fetch failed, every
+   * cross-currency conversion returns `null`, so "no exchange rate for CAD"
+   * would be a statement about this request rather than about the user's rates --
+   * an instruction to add a rate that is very likely already there.
+   */
+  const monthlyNetUnavailableHint = useMemo(() => {
+    if (summary.monthlyAmountsComplete) return undefined;
+    if (ratesUnavailable) return t('page.summaryNetRatesUnavailable');
+    const missingRates = summary.monthlyMissingRates.length > 0;
+    // Three cases, three catalog strings -- never two joined here. A sentence
+    // built by concatenating fragments is one a translator cannot reorder or
+    // punctuate, and the both-causes case is a real sentence in its own right.
+    if (missingRates && summary.monthlyHasUnpriceable) {
+      return t('page.summaryNetMissingRatesAndUnpriceable', {
+        currencies: summary.monthlyMissingRates.join(', '),
+      });
+    }
+    if (missingRates) {
+      return t('page.summaryNetMissingRates', {
+        currencies: summary.monthlyMissingRates.join(', '),
+      });
+    }
+    return t('page.summaryNetUnpriceable');
+  }, [summary, ratesUnavailable, t]);
 
   // Generate upcoming occurrences for calendar view
   const getNextOccurrences = (st: ScheduledTransaction, _monthsAhead: number = 3): Date[] => {
@@ -717,15 +749,7 @@ function BillsContent() {
             }
             // A withheld figure names its cause, so the reader knows whether to
             // look at a schedule or add a rate (issue #1247 re-audit).
-            hint={
-              summary.monthlyAmountsComplete
-                ? undefined
-                : summary.monthlyMissingRates.length > 0
-                  ? t('page.summaryNetMissingRates', {
-                      currencies: summary.monthlyMissingRates.join(', '),
-                    })
-                  : t('page.summaryNetUnpriceable')
-            }
+            hint={monthlyNetUnavailableHint}
             icon={SummaryIcons.money}
             valueColor={
               !summary.monthlyAmountsComplete

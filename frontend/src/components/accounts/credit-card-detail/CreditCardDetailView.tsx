@@ -151,8 +151,11 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
           {t('chart.title')}
         </h2>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6 space-y-4">
-          {!isLoading && forecast.withheld && (
-            <BalanceForecastUnavailable gaps={forecast.gaps} />
+          {!isLoading && (forecast.withheld || forecast.unavailable) && (
+            <BalanceForecastUnavailable
+              gaps={forecast.gaps}
+              reason={forecast.unavailable ? 'requestFailed' : 'withheld'}
+            />
           )}
           {!isLoading && dailyBalances.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-center py-8">{t('chart.empty')}</p>

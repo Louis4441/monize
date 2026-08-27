@@ -227,8 +227,11 @@ export function BankingDetailView({ account }: BankingDetailViewProps) {
           {/* The history still draws; only the forward line is withheld, so the
               panel sits above it and says which schedule stopped the projection
               and how to fix it (issue #1247). */}
-          {!isLoading && forecast.withheld && (
-            <BalanceForecastUnavailable gaps={forecast.gaps} />
+          {!isLoading && (forecast.withheld || forecast.unavailable) && (
+            <BalanceForecastUnavailable
+              gaps={forecast.gaps}
+              reason={forecast.unavailable ? 'requestFailed' : 'withheld'}
+            />
           )}
           {!isLoading && chartData.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-center py-8">{t('chart.empty')}</p>

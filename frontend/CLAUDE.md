@@ -427,6 +427,10 @@ Whoever adds the `null` on the server owns how it looks; a component test assert
 
 Same currency is 1:1 *by definition* and stays a known conversion -- keep it distinguishable from the missing case, and keep a real zero rendering as a number.
 
+**And a rate table that has not loaded is not a table missing that rate.** `useExchangeRates` starts with no rates and keeps none if the fetch fails, so every cross-currency `convert` returns `null` in both states: a surface that names the missing pair then instructs the reader to add a rate that already exists. Check `ratesUnavailable` (loading or failed) before naming any pair; `ratesFailed` tells an outage from a table still arriving. The reporting currency itself comes from `preferredCurrency` (`lib/default-currency.ts`) -- never a hand-written `|| 'CAD'`, which is how ten call sites came to disagree with each other and with the server.
+
+**Where more than one thing can withhold a figure, the reader is told about all of them.** The bills page's Monthly Net can be incomplete because a schedule could not be priced *and* because a currency has no rate; naming one makes the reader fix it and watch nothing change. Compose the causes, do not pick between them.
+
 ## `accountsApi.getAll()` is not "the user's accounts"
 
 In own context the endpoint returns a **union**: accounts the caller owns, plus accounts another owner shared with them jointly, told apart by `account.isJoint` (true means the row belongs to someone else; `ownerLabel` names the owner). Any screen treating the list as "mine" is wrong for whichever half it forgot.
@@ -497,6 +501,10 @@ Never use synchronous `act(() => {...})` for calls that trigger async side-effec
 - A **synchronous `render(...)` of a component that fetches on mount** -- even in a test that only asserts static copy, and even with a stubbed `mockResolvedValue([])`. Give the file one `await act(async () => { render(...) })` helper and use it everywhere.
 - An **awaited handler behind a click**: `fireEvent.click` is act-wrapped, but the `finally { setBusy(false) }` after an `await` lands in a later microtask. Wrap the click in `await act(async () => ...)`.
 - A **bare `await new Promise(r => setTimeout(r, n))`** used to let a `requestAnimationFrame` run -- put the wait inside `await act(async () => { ... })`.
+
+**A fixture that means "the reader's own currency" says so through the constant, not by spelling a code.** Four test files pinned behaviour against a reader on CAD -- one by hardcoding the conversion target inside its own `useExchangeRates` mock, one by giving the security `currencyCode: 'USD'` to mean *foreign*, one by setting `defaultCurrency` in a `usePreferencesStore` mock that ignored its selector (so the value never reached the component and every case silently ran on the fallback). All four passed for as long as the fallback happened to be CAD, and when it moved to USD they failed with the components correct: the fixtures had been asserting the opposite of their own names. Derive from `FALLBACK_DEFAULT_CURRENCY` (`lib/default-currency.ts`) where a case is about the reader's own currency, and pick a code that can never be the fallback where it is about a foreign one.
+
+**A mocked selector hook applies the selector.** `usePreferencesStore: () => ({ preferences: {...} })` returns the whole state whatever it is asked for, so `usePreferencesStore((s) => s.preferences)` gets one level too deep and every read off it is `undefined` -- the component takes its no-preferences branch while the fixture claims to have set one. `src/test/test-hygiene.test.ts` scans for a zero-argument mock of any selector store.
 
 **A mocked hook must return a stable object if the real one does.** `useRouter()` returns the same router every render; a mock written as `useRouter: () => ({ push: vi.fn(), ... })` returns a new one per call, so every `useCallback([router])` changes identity each render and an effect that also sets state loops forever (the Transactions page made 83 `getAll` calls in 300ms under its own local mock). The mock in `src/test/setup.ts` builds one router for the run; a file overriding it to observe `push` must do the same (build it lazily inside the factory -- `vi.mock` is hoisted above the `const mockPush` it closes over). Applies to any mocked hook returning an object or array.
 

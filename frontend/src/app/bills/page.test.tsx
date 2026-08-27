@@ -147,9 +147,25 @@ vi.mock('@/hooks/useNumberFormat', () => ({
  */
 const mockRates = new Map<string, number>();
 
+/**
+ * Whether the rate table can be consulted at all.
+ *
+ * The real hook is `true` while the request is in flight and stays `true` if it
+ * failed, and with no rates loaded every cross-currency conversion returns
+ * `null` -- so a surface that reads only the missing-pair list reports "add a
+ * rate on Currencies" for a rate that is very likely already there.
+ */
+let mockRatesUnavailable = false;
+
 vi.mock('@/hooks/useExchangeRates', () => ({
   useExchangeRates: () => ({
     defaultCurrency: 'USD',
+    get ratesUnavailable() {
+      return mockRatesUnavailable;
+    },
+    get ratesFailed() {
+      return mockRatesUnavailable;
+    },
     // Mirrors the real hook's contract: same currency is 1:1 BY DEFINITION, an
     // unknown pair is `null` -- never the amount passed through.
     convertToDefault: (amount: number, from: string) => {
@@ -309,6 +325,7 @@ describe('BillsPage', () => {
     // A cold rate table by default: every fixture above is USD, so nothing needs
     // one, and a test that adds a foreign schedule has to say what its rate is.
     mockRates.clear();
+    mockRatesUnavailable = false;
     // Filters (type tab + panel selections) now persist to localStorage;
     // reset it so each case starts from the default unfiltered view.
     localStorage.clear();
@@ -1066,6 +1083,54 @@ describe('BillsPage', () => {
       const hint = screen.getByTestId('summary-hint-Monthly Net');
       expect(hint).toHaveTextContent('could not be priced');
       expect(hint).not.toHaveTextContent('exchange rate');
+    });
+
+    it('says the rates are unavailable rather than blaming a currency', async () => {
+      // While the rate table is loading -- or after its fetch failed -- every
+      // cross-currency conversion returns null. Reporting that as "no exchange
+      // rate for CAD" is a statement about this request, not about the user's
+      // rates, and sends them to fix something that is not broken.
+      mockRatesUnavailable = true;
+      mockGetAll.mockResolvedValue(twoCurrencySchedules());
+      render(<BillsPage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-Monthly Net')).toHaveTextContent(
+          'Not available',
+        );
+      });
+      const hint = screen.getByTestId('summary-hint-Monthly Net');
+      expect(hint).toHaveTextContent('not available right now');
+      expect(hint).not.toHaveTextContent('add one on Currencies');
+    });
+
+    it('names both causes when both apply', async () => {
+      // One CAD bill with no rate, and one schedule the server could not price.
+      // Naming only the rate makes the reader add it and watch nothing change.
+      mockGetAll.mockResolvedValue([
+        ...twoCurrencySchedules(),
+        {
+          id: 'st-inv',
+          currencyCode: 'USD',
+          name: 'Monthly ETF buy',
+          amount: -1000,
+          frequency: 'MONTHLY',
+          nextDueDate: '2026-03-01',
+          isActive: true,
+          isTransfer: false,
+          isInvestment: true,
+          effectiveAmount: null,
+          effectiveAmountComplete: false,
+        },
+      ]);
+      render(<BillsPage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-Monthly Net')).toHaveTextContent(
+          'Not available',
+        );
+      });
+      const hint = screen.getByTestId('summary-hint-Monthly Net');
+      expect(hint).toHaveTextContent('CAD');
+      expect(hint).toHaveTextContent('could not be priced');
     });
 
     it("needs no rate for a net that is entirely in the reader's currency", async () => {

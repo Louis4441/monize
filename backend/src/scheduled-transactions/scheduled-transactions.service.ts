@@ -66,11 +66,13 @@ import { roundMoney, sumMoney } from "../common/round.util";
 import {
   applyFxConversion,
   normalizeFxEntry,
-  resolveFxRateOrNull,
   roundFxRate,
 } from "../common/fx-entry.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
-import { FxAggregate } from "../common/fx-aggregate";
+import {
+  convertingTotal,
+  memoizedRateResolver,
+} from "../common/converting-total";
 import { resolveUserDefaultCurrency } from "../common/default-currency.util";
 import { tr } from "../i18n/translate";
 
@@ -1691,18 +1693,23 @@ export class ScheduledTransactionsService {
       this.dataSource,
       userId,
     );
-    const rateFor = this.memoizedRateResolver(totalsCurrency, today);
-    const billsTotal = await this.totalConvertedInto(
+    // One cache across BOTH buckets: an unclassified occurrence is in each of
+    // them, so a per-bucket cache would ask for its pair twice.
+    const rateFor = memoizedRateResolver(
+      this.exchangeRateService,
+      totalsCurrency,
+      today,
+    );
+    const billsTotal = await convertingTotal(
       [...bills, ...unclassified],
       totalsCurrency,
       rateFor,
       (a) => Math.abs(a),
     );
-    const depositsTotal = await this.totalConvertedInto(
+    const depositsTotal = await convertingTotal(
       [...deposits, ...unclassified],
       totalsCurrency,
       rateFor,
-      (a) => a,
     );
     const missingRatePairs = [
       ...new Set([...billsTotal.missingPairs, ...depositsTotal.missingPairs]),
@@ -1741,84 +1748,6 @@ export class ScheduledTransactionsService {
       ...(unknownAmountItems.length > 0 ? { unknownAmountItems } : {}),
       ...(missingRatePairs.length > 0 ? { missingRatePairs } : {}),
       items,
-    };
-  }
-
-  /**
-   * One rate lookup per currency PAIR for the life of one read, not one per
-   * item: twelve CAD bills in a USD answer asked the identical question twelve
-   * times, in series, and on a cold pair the first fetches a provider window
-   * while the other eleven wait behind it. `asOf` is fixed across the read, so
-   * the pair is the whole key.
-   */
-  private memoizedRateResolver(
-    into: string,
-    asOf: string,
-  ): (from: string) => Promise<number | null> {
-    const cache = new Map<string, Promise<number | null>>();
-    return (from: string) => {
-      let pending = cache.get(from);
-      if (!pending) {
-        // Through `resolveFxRateOrNull`, never the raw service call: a stored
-        // rate of zero or a negative one is ABSENT, not applicable, and
-        // multiplying by it converts a 1,350 bill to zero under a total that
-        // still reports itself complete.
-        pending = resolveFxRateOrNull(
-          this.exchangeRateService,
-          from,
-          into,
-          asOf,
-        );
-        cache.set(from, pending);
-      }
-      return pending;
-    };
-  }
-
-  /**
-   * A bucket's total in one currency, or `null` when any component is unknown --
-   * whether because the occurrence's own amount could not be resolved (no pair
-   * to blame) or because its currency has no rate into `into` (named, so the
-   * reader can go and fix that rate).
-   *
-   * `sign` maps a signed amount into the bucket's own convention; bills are
-   * reported as positive magnitudes.
-   */
-  private async totalConvertedInto(
-    items: { amount: number | null; currency: string }[],
-    into: string,
-    rateFor: (from: string) => Promise<number | null>,
-    sign: (amount: number) => number,
-  ): Promise<{
-    total: number | null;
-    knownSubtotal: number;
-    missingPairs: string[];
-  }> {
-    const agg = new FxAggregate();
-    for (const item of items) {
-      if (item.amount === null) {
-        // Unknown in EVERY currency, so there is no pair to name: the
-        // occurrence's own settlement rate is what is missing, and it already
-        // reported that through `unknownAmountItems`.
-        agg.addUnknown();
-        continue;
-      }
-      const amount = sign(item.amount);
-      if (item.currency === into) {
-        agg.addConverted(amount);
-        continue;
-      }
-      const rate = await rateFor(item.currency);
-      agg.add(
-        rate === null ? null : roundMoney(amount * rate),
-        item.currency,
-        into,
-      );
-    }
-    return {
-      total: agg.total,
-      knownSubtotal: agg.knownSubtotal,
-      missingPairs: agg.missingPairs,
     };
   }
 

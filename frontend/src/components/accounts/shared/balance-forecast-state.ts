@@ -30,12 +30,26 @@ export interface BalanceForecastState {
   withheld: boolean;
   /** Why, when the server said. May be empty even when `withheld` is true. */
   gaps: BalanceForecastGap[];
+  /**
+   * The request never produced a forecast -- it failed, or has not run.
+   *
+   * A THIRD state, because "the server withheld the projection" and "we never
+   * heard back" are both different from "this account has nothing scheduled",
+   * and only the last of the three has a number to show. Folded into
+   * `withheld: false`, a 500 on `GET /accounts/:id/balance-forecast` made
+   * `projectedBalanceFrom` fall back to the account's CURRENT balance and print
+   * it under "Projected" with no notice -- an outage rendered as a measured
+   * answer. `frontend/CLAUDE.md`: five states stay distinguishable, and failed is
+   * one of them.
+   */
+  unavailable: boolean;
 }
 
 export const EMPTY_BALANCE_FORECAST_STATE: BalanceForecastState = {
   points: [],
   withheld: false,
   gaps: [],
+  unavailable: true,
 };
 
 /**
@@ -55,6 +69,7 @@ export function readBalanceForecast(
       : forecast.points.map((p) => ({ date: p.date, balance: p.balance })),
     withheld,
     gaps: withheld ? (forecast.gaps ?? []) : [],
+    unavailable: false,
   };
 }
 
@@ -62,17 +77,18 @@ export function readBalanceForecast(
  * The projected balance a detail view shows, or `null` when there is none to
  * show.
  *
- * `null` where the forecast was withheld, because the alternative -- the
- * account's current balance -- is today's figure under a projection's label.
- * `currentBalance` is the fallback only for the genuinely empty case: an account
- * with nothing scheduled projects to what it holds now, which is a known answer,
- * not an unknown one.
+ * `null` where the forecast was withheld OR never arrived, because the
+ * alternative -- the account's current balance -- is today's figure under a
+ * projection's label. `currentBalance` is the fallback only for the genuinely
+ * empty case: an account with nothing scheduled projects to what it holds now,
+ * which is a known answer, not an unknown one. That distinction is the whole
+ * reason `unavailable` exists as its own field.
  */
 export function projectedBalanceFrom(
   state: BalanceForecastState,
   currentBalance: number,
 ): number | null {
-  if (state.withheld) return null;
+  if (state.withheld || state.unavailable) return null;
   const last = state.points[state.points.length - 1];
   return last && last.balance !== null ? last.balance : currentBalance;
 }

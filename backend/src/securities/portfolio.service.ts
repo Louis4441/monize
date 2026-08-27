@@ -1273,7 +1273,10 @@ export class PortfolioService {
     };
   }
 
-  /** The user's default display currency, falling back to CAD. */
+  /**
+   * The user's default display currency, through the one shared reader so this
+   * surface reports in the same currency as every other one.
+   */
   private resolveDefaultCurrency(userId: string): Promise<string> {
     return resolveUserDefaultCurrency(this.dataSource, userId);
   }

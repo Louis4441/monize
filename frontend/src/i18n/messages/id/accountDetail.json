@@ -37,6 +37,7 @@
   },
   "forecastUnavailable": {
     "intro": "Saldo proyeksi tidak ditampilkan karena setidaknya satu item terjadwal mendatang belum dapat dinilai. Proyeksi meneruskan setiap hari ke hari berikutnya, sehingga satu jumlah yang tidak diketahui akan membuat setiap hari sesudahnya salah.",
+    "requestFailed": "Saldo perkiraan tidak dapat dimuat. Muat ulang halaman untuk mencoba lagi.",
     "reasonUnavailable": "Alasannya tidak dilaporkan. Periksa nilai tukar untuk item terjadwal apa pun dalam mata uang asing.",
     "missingRatePair": "{name}: tidak ada nilai tukar dari {from} ke {to}, jadi jumlah yang akan dicatat oleh kejadian ini tidak diketahui.",
     "missingRate": "{name}: nilai tukar penyelesaian kejadian ini tidak tersedia, jadi jumlahnya tidak diketahui.",

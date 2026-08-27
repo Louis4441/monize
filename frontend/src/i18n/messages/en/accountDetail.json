@@ -37,6 +37,7 @@
   },
   "forecastUnavailable": {
     "intro": "The projected balance is not shown because at least one upcoming scheduled item cannot be priced yet. A projection runs one day into the next, so a single unknown amount would make every day after it wrong.",
+    "requestFailed": "The projected balance could not be loaded. Reload the page to try again.",
     "reasonUnavailable": "The reason was not reported. Check the exchange rates for any scheduled item in a foreign currency.",
     "missingRatePair": "{name}: no exchange rate is available for {from} to {to}, so the amount this occurrence will post is unknown.",
     "missingRate": "{name}: the exchange rate this occurrence settles at is not available, so the amount it will post is unknown.",

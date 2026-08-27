@@ -34,9 +34,11 @@ import {
 import { formatDateYMD, todayYMD } from "../common/date-utils";
 import { formatCurrency } from "../common/format-currency.util";
 import { roundMoney, sumMoney } from "../common/round.util";
-import { FxAggregate } from "../common/fx-aggregate";
+import {
+  convertingTotal,
+  memoizedRateResolver,
+} from "../common/converting-total";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
-import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { ActionHistoryService } from "../action-history/action-history.service";
 
 export interface UpcomingBill {
@@ -561,51 +563,22 @@ export class BudgetsService {
     // partial sum travels beside the total under its own name and never stands in
     // for it, and `upcomingBillsMissingRates` names the pairs so a withheld
     // figure comes with the reason (an unexplained blank is a dead end).
-    const upcomingBillsAgg = new FxAggregate();
-    // One lookup per PAIR, not per bill. Twelve CAD bills in a USD budget asked
-    // the identical question twelve times, in series, and on a cold pair the
-    // first fetches a provider window while the other eleven wait for it. The
-    // rate is a property of the pair, and `todayStr` is fixed across this read --
-    // the same shape `ScheduledEffectiveAmountService` uses for its own pairs.
-    const rateCache = new Map<string, Promise<number | null>>();
-    const rateFor = (from: string): Promise<number | null> => {
-      let pending = rateCache.get(from);
-      if (!pending) {
-        // Through `resolveFxRateOrNull`, never the raw service call: a stored
-        // rate of 0 or a negative one is ABSENT, not applicable, and multiplying
-        // by it would convert a 1,350 bill to zero and report the total complete.
-        pending = resolveFxRateOrNull(
-          this.exchangeRates,
-          from,
-          budget.currencyCode,
-          todayStr,
-        );
-        rateCache.set(from, pending);
-      }
-      return pending;
-    };
-    for (const bill of upcomingBills) {
-      if (bill.amount === null) {
-        // No currency to blame: the settlement rate behind the occurrence itself
-        // is what is missing, and the occurrence already reported that.
-        upcomingBillsAgg.addUnknown();
-        continue;
-      }
-      if (bill.currencyCode === budget.currencyCode) {
-        upcomingBillsAgg.addConverted(bill.amount);
-        continue;
-      }
-      const rate = await rateFor(bill.currencyCode);
-      upcomingBillsAgg.add(
-        rate === null ? null : roundMoney(bill.amount * rate),
-        bill.currencyCode,
-        budget.currencyCode,
-      );
-    }
-    const upcomingBillsComplete = upcomingBillsAgg.isComplete;
-    const knownUpcomingBillsSubtotal = upcomingBillsAgg.knownSubtotal;
-    const totalUpcomingBills = upcomingBillsAgg.total;
-    const upcomingBillsMissingRates = upcomingBillsAgg.missingPairs;
+    // Through the one shared accumulator (`common/converting-total.ts`), which
+    // owns the memoized per-pair lookup, the rejecting rate resolver, and both
+    // ways a component goes missing. This block used to be written out here and
+    // again in the AI/MCP rollup, comments included.
+    const billsTotal = await convertingTotal(
+      upcomingBills.map((bill) => ({
+        amount: bill.amount,
+        currency: bill.currencyCode,
+      })),
+      budget.currencyCode,
+      memoizedRateResolver(this.exchangeRates, budget.currencyCode, todayStr),
+    );
+    const upcomingBillsComplete = billsTotal.total !== null;
+    const knownUpcomingBillsSubtotal = billsTotal.knownSubtotal;
+    const totalUpcomingBills = billsTotal.total;
+    const upcomingBillsMissingRates = billsTotal.missingPairs;
 
     const dailyBurnRate = currentSpent / daysElapsed;
     const projectedTotal = dailyBurnRate * totalDays;

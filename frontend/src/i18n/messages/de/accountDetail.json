@@ -37,6 +37,7 @@
   },
   "forecastUnavailable": {
     "intro": "Der prognostizierte Saldo wird nicht angezeigt, weil mindestens ein anstehender geplanter Eintrag noch nicht bewertet werden kann. Eine Prognose überträgt jeden Tag auf den nächsten, deshalb würde ein einziger unbekannter Betrag jeden folgenden Tag verfälschen.",
+    "requestFailed": "Der prognostizierte Saldo konnte nicht geladen werden. Laden Sie die Seite neu, um es erneut zu versuchen.",
     "reasonUnavailable": "Der Grund wurde nicht gemeldet. Prüfen Sie die Wechselkurse für geplante Posten in einer Fremdwährung.",
     "missingRatePair": "{name}: Für {from} zu {to} ist kein Wechselkurs verfügbar, daher ist der Betrag dieser Fälligkeit unbekannt.",
     "missingRate": "{name}: Der Wechselkurs für die Abrechnung dieser Fälligkeit ist nicht verfügbar, daher ist der Betrag unbekannt.",

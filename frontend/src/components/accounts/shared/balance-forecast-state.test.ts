@@ -81,8 +81,31 @@ describe('readBalanceForecast', () => {
   it('treats a failed request as no forecast, not as a withheld one', () => {
     expect(readBalanceForecast(null)).toEqual(EMPTY_BALANCE_FORECAST_STATE);
     expect(readBalanceForecast(undefined)).toEqual(EMPTY_BALANCE_FORECAST_STATE);
-    // No claim about why, because nothing was learned.
+    // No claim about WHY, because nothing was learned about the schedules.
     expect(readBalanceForecast(null).gaps).toEqual([]);
+    expect(readBalanceForecast(null).withheld).toBe(false);
+  });
+
+  /**
+   * A failed request is a THIRD state, and the one that costs a number.
+   *
+   * Folded into `withheld: false` alongside "this account has nothing
+   * scheduled", a 500 on the forecast endpoint made `projectedBalanceFrom` fall
+   * back to the account's CURRENT balance and print it under "Projected" with
+   * nothing on screen saying so -- an outage rendered as a measured answer,
+   * which is the same class of mistake as drawing a withheld projection.
+   */
+  it('does not project from the current balance when the request failed', () => {
+    const failed = readBalanceForecast(null);
+    expect(failed.unavailable).toBe(true);
+    expect(projectedBalanceFrom(failed, 1234)).toBeNull();
+  });
+
+  it('separates a failed request from an account with nothing scheduled', () => {
+    // Empty is a known answer (project to what it holds now); failed is not.
+    const empty = readBalanceForecast(forecast({ points: [] }));
+    expect(empty.unavailable).toBe(false);
+    expect(projectedBalanceFrom(empty, 1234)).toBe(1234);
   });
 });
 
@@ -128,15 +151,16 @@ describe('the withholding rule has one home', () => {
     }
   });
 
-  it('renders the panel off `withheld`, never off the gap list', () => {
+  it('renders the panel off the state, never off the gap list', () => {
     for (const file of viewFiles) {
       const source = readFileSync(join(accountsRoot, file), 'utf8');
       const panel = source.indexOf('<BalanceForecastUnavailable');
       expect(panel).toBeGreaterThan(-1);
-      // The condition sits immediately above the element.
-      expect(source.slice(Math.max(0, panel - 200), panel)).toContain(
-        'forecast.withheld',
-      );
+      // The condition sits immediately above the element, and covers both
+      // states that leave the reader without a forward line.
+      const condition = source.slice(Math.max(0, panel - 200), panel);
+      expect(condition).toContain('forecast.withheld');
+      expect(condition).toContain('forecast.unavailable');
     }
   });
 });

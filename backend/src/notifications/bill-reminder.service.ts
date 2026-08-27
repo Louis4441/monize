@@ -212,7 +212,7 @@ export class BillReminderService {
     // The key is the local date plus a hash of what the email says, so a bill
     // that becomes due later the same day still produces a reminder while an
     // identical run does not.
-    const claimKey = buildReminderClaimKey(bills);
+    const claimKey = buildReminderClaimKey(bills, todayStr);
     // A **lease**, not a permanent claim, plus a durable delivery record.
     //
     // `claimOnce` was taken before the send and was the only record that the
@@ -416,12 +416,22 @@ export class BillReminderService {
  * amounts the email quotes: the claim answers "have we already reminded this
  * user about these bills today", and a mid-day exchange-rate move is not a
  * second reminder to send (issue #1247).
+ *
+ * `todayStr` is the RUN's date, supplied by the caller and never read here.
+ * This was the last clock read in the cron, and it governs the value the whole
+ * single-shot guarantee rests on: with the two expansion passes pinned but the
+ * key still reading `new Date()` per user, a run spanning local midnight claimed
+ * the early users under `key(D)` and the rest under `key(D+1)` while every
+ * window was measured from D -- so the next run re-selected a user emailed at
+ * 23:59:59, found no delivery record under its own `key(D+1)`, and sent the same
+ * reminder twice. Pinning the windows and leaving the key unpinned moved the
+ * midnight bug rather than fixing it.
  */
 export function buildReminderClaimKey(
   bills: readonly ScheduledTransaction[],
+  todayStr: string,
 ): string {
-  const today = new Date();
-  const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const date = todayStr;
   const fingerprint = [...bills]
     .map((b) => `${b.id}:${String(b.nextDueDate).split("T")[0]}:${b.amount}`)
     .sort()

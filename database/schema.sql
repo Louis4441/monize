@@ -755,6 +755,11 @@ CREATE TABLE scheduled_transaction_overrides (
 
 CREATE INDEX idx_sched_txn_overrides_sched_txn_id ON scheduled_transaction_overrides(scheduled_transaction_id);
 CREATE INDEX idx_sched_txn_overrides_date ON scheduled_transaction_overrides(override_date);
+-- The override-due predicates every occurrence read runs are
+-- `(scheduled_transaction_id, override_date)`. Migration 166 retired the unique
+-- constraint that used to supply this index as a side effect of its own; it is
+-- declared explicitly now so nothing depends on a constraint for a lookup.
+CREATE INDEX idx_sched_txn_overrides_sched_txn_override_date ON scheduled_transaction_overrides(scheduled_transaction_id, override_date);
 
 -- Posted occurrences (migration 140). The occurrence -- not the schedule -- is
 -- the thing that must happen once, and this unique key is its name. Manual and

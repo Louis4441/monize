@@ -1060,6 +1060,143 @@ describe("BillReminderService", () => {
           }
         });
 
+        /**
+         * Every claim in one run carries the run's date, not the date the user's
+         * turn happened to fall on.
+         *
+         * The claim key is what makes the reminder single-shot, and it is built
+         * once per user inside the loop. Reading the clock there, a run that
+         * spans local midnight claims the early users under `key(D)` and the
+         * rest under `key(D+1)` while every window is measured from D -- so the
+         * next run re-selects a user emailed at 23:59:59, finds no delivery
+         * record under its own `key(D+1)`, and sends the identical reminder a
+         * second time. Pinning the windows and leaving the key unpinned moves the
+         * midnight bug rather than fixing it.
+         */
+        it("keys every user's claim on the run's date, not on their turn's", async () => {
+          const almostMidnight = new Date(2026, 2, 15, 23, 59, 30);
+          jest.useFakeTimers({
+            now: almostMidnight,
+            doNotFake: [
+              "nextTick",
+              "queueMicrotask",
+              "setImmediate",
+              "setTimeout",
+              "setInterval",
+            ],
+          });
+          try {
+            scheduledTransactionsRepo.find.mockResolvedValue([
+              makeBill({
+                id: "bill-u1",
+                userId: userId1,
+                nextDueDate: daysFromNow(0),
+                reminderDaysBefore: 0,
+              }),
+              makeBill({
+                id: "bill-u2",
+                userId: userId2,
+                nextDueDate: daysFromNow(0),
+                reminderDaysBefore: 0,
+              }),
+            ]);
+            overridesRepo.find.mockResolvedValue([]);
+            preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
+            // The clock crosses midnight while the FIRST user is being served,
+            // so the second user's turn happens on the next date.
+            let served = 0;
+            usersRepo.findOne.mockImplementation(async () => {
+              served += 1;
+              if (served === 1) {
+                jest.setSystemTime(
+                  new Date(almostMidnight.getTime() + 60 * 1000),
+                );
+              }
+              return (served === 1 ? mockUser1 : mockUser2) as User;
+            });
+
+            await service.sendBillReminders();
+
+            const runDate = `${almostMidnight.getFullYear()}-${String(
+              almostMidnight.getMonth() + 1,
+            ).padStart(
+              2,
+              "0",
+            )}-${String(almostMidnight.getDate()).padStart(2, "0")}`;
+            expect(jobClaims.claimLease).toHaveBeenCalledTimes(2);
+            const claimKeys = jobClaims.claimLease.mock.calls.map((call) =>
+              String(call[2]),
+            );
+            for (const key of claimKeys) {
+              expect(key.startsWith(`${runDate}#`)).toBe(true);
+            }
+            // Two users, two different bill sets, so two different digests --
+            // the date prefix being shared is the point, not the whole key.
+            expect(new Set(claimKeys).size).toBe(2);
+          } finally {
+            jest.useRealTimers();
+          }
+        });
+
+        /**
+         * The partial case: pass one selected two bills, pass two can report
+         * only one.
+         *
+         * Reachable through the same divergence as the empty case above -- pass
+         * one reads the overrides hydrated on the row, pass two re-reads them
+         * from the database -- so an override written in between can move ONE of
+         * the two occurrences out of the window. The email must describe what it
+         * actually lists (a subject counted from the pre-expansion list is how
+         * "1 upcoming bill needs attention" came to sit over an empty table), and
+         * the claim still settles: a bill that is no longer due is one there is
+         * nothing to remind about.
+         */
+        it("emails the bills it can report when only some survive the second pass", async () => {
+          const staying = makeBill({
+            id: "bill-staying",
+            userId: userId1,
+            nextDueDate: daysFromNow(0),
+            reminderDaysBefore: 3,
+            name: "Rent",
+          });
+          const moving = makeBill({
+            id: "bill-moving",
+            userId: userId1,
+            nextDueDate: daysFromNow(1),
+            reminderDaysBefore: 3,
+            name: "Hydro",
+          });
+          scheduledTransactionsRepo.find.mockResolvedValue([staying, moving]);
+          preferencesRepo.findOne.mockResolvedValue(mockPrefsEmailEnabled);
+          usersRepo.findOne.mockResolvedValue(mockUser1);
+          overridesRepo.find.mockResolvedValue([
+            {
+              id: "ovr-moved",
+              scheduledTransactionId: "bill-moving",
+              originalDate: String(moving.nextDueDate).split("T")[0],
+              overrideDate: daysFromNow(90),
+              amount: null,
+            },
+          ]);
+
+          await service.sendBillReminders();
+
+          expect(emailService.sendMail).toHaveBeenCalledTimes(1);
+          // Counted from the body, not from what pass one selected.
+          expect(emailService.sendMail).toHaveBeenCalledWith(
+            "user1@example.com",
+            "Monize: 1 upcoming bill needs attention",
+            expect.any(String),
+          );
+          const html = String(emailService.sendMail.mock.calls[0][2]);
+          expect(html).toContain("Rent");
+          expect(html).not.toContain("Hydro");
+          // Something was sent, so the claim settles rather than being handed
+          // back -- the empty case above is the one that releases.
+          expect(jobClaims.markDelivered).toHaveBeenCalled();
+          expect(jobClaims.releaseLease).not.toHaveBeenCalled();
+        });
+
         it("groups multiple bills for the same user into one email", async () => {
           const bill1 = makeBill({
             id: "bill-1",
