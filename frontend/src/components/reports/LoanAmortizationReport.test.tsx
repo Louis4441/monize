@@ -44,6 +44,22 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
+const loanWithSeparateInterest = {
+  id: 'loan-1',
+  name: 'Mortgage',
+  accountType: 'MORTGAGE',
+  currentBalance: -100000,
+  openingBalance: -120000,
+  interestRate: 5.0,
+  paymentAmount: 800,
+  paymentFrequency: 'MONTHLY',
+  interestCategoryId: 'cat-int',
+  sourceAccountId: 'src-1',
+  isCanadianMortgage: false,
+  isVariableRate: false,
+  isClosed: false,
+};
+
 describe('LoanAmortizationReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,7 +98,12 @@ describe('LoanAmortizationReport', () => {
       },
     ]);
     mockGetAllTransactions.mockResolvedValue({
+      // `fetchAllAccountTransactions` pages on `result.pagination.hasMore`, so a
+      // fixture without it throws. It used to be omitted here and nothing
+      // noticed: the report caught every history failure and rendered an empty
+      // one, so this test was green against an error screen.
       data: [{ id: 'p1', transactionDate: '2024-06-01', amount: 500, linkedTransaction: null }],
+      pagination: { hasMore: false },
     });
     mockGetAllPages.mockResolvedValue([
       { id: 'i1', transactionDate: '2024-06-01', amount: -300, categoryId: 'cat-int', isTransfer: false },
@@ -98,6 +119,57 @@ describe('LoanAmortizationReport', () => {
         categoryIds: ['cat-int'],
         accountIds: ['src-1'],
       }),
+    );
+  });
+
+  it('shows a retriable error when the interest lookup fails, not a zero-interest history', async () => {
+    // The failure this surface used to swallow. Its loader caught the rejection
+    // and replaced BOTH arrays with `[]`, so a transient 500 on the interest
+    // query rendered a complete-looking loan history -- and with the interest
+    // list empty, every row took the analytic estimate rather than the booked
+    // interest. A failed lookup is not an empty dataset: the report has an
+    // error-and-retry state and this is what reaches it.
+    mockGetAllAccounts.mockResolvedValue([loanWithSeparateInterest]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [{ id: 'p1', transactionDate: '2024-06-01', amount: 500, linkedTransaction: null }],
+      pagination: { hasMore: false },
+    });
+    mockGetAllPages.mockRejectedValue(new Error('interest lookup failed'));
+
+    render(<LoanAmortizationReport />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to load report data/)).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /Try again/ })).toBeInTheDocument();
+    // And nothing that looks like a history: no table, no summary figure.
+    expect(screen.queryByText(/Payment History/)).not.toBeInTheDocument();
+  });
+
+  it('retries the history load, not only the accounts list', async () => {
+    // Both loaders sit behind one button, so a retry that reloaded only the
+    // accounts would leave the surface in the error state for ever.
+    mockGetAllAccounts.mockResolvedValue([loanWithSeparateInterest]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [{ id: 'p1', transactionDate: '2024-06-01', amount: 500, linkedTransaction: null }],
+      pagination: { hasMore: false },
+    });
+    mockGetAllPages.mockRejectedValue(new Error('interest lookup failed'));
+
+    render(<LoanAmortizationReport />);
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to load report data/)).toBeInTheDocument(),
+    );
+
+    mockGetAllPages.mockResolvedValue([
+      { id: 'i1', transactionDate: '2024-06-01', amount: -300, categoryId: 'cat-int', isTransfer: false },
+    ]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Try again/ }));
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Failed to load report data/)).not.toBeInTheDocument(),
     );
   });
 
