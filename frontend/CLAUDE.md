@@ -371,6 +371,22 @@ lands late (`await screen.findBy...`, `await waitFor(...)`); or wrap the trigger
 in `await act(async () => { ... })`. Adding the text to a console filter is the
 one response that is always wrong.
 
+**Exactly one message is that failure**: `An update to <Component> inside a test
+was not wrapped in act(...)`. React's other act-related line -- `The current
+testing environment is not configured to support act(...)` -- is a different
+condition and is deliberately *not* failed on. It fires when an update is
+checked while `IS_REACT_ACT_ENVIRONMENT` is unset, which happens during teardown
+after RTL has restored the flag; it names no component, so it points at nothing,
+and it depends on timing the suite does not control. Matching it turned `main`
+red on CI run #2875, on a test nothing had changed and that neither the PR run
+nor three full local runs of the same commit had flagged. **A guard against
+flakiness that is itself timing-dependent is worse than none.**
+
+And a guard classifies in one place: `recordIfActWarning` both recognises and
+records, because the two were separate functions that disagreed -- the
+classifier rejected a message the recorder stored anyway, so a warning nothing
+recognised could still fail a test.
+
 Three sources produce nearly all of them here:
 
 - **A synchronous test with a request still in flight.** The response commits

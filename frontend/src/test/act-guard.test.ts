@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import { describe, expect, it } from 'vitest';
 
-import { failOnActWarnings, isActWarning, pendingActWarnings, recordActWarning } from './act-guard';
+import { failOnActWarnings, pendingActWarnings, recordIfActWarning } from './act-guard';
 
 // React's real message, verbatim, including the printf placeholder that carries
 // the component name as a separate argument.
@@ -13,26 +13,46 @@ const REACT_ACT_WARNING =
 
 describe('act-guard', () => {
   it('recognizes React act warnings and nothing else', () => {
-    expect(isActWarning([REACT_ACT_WARNING, 'TransactionsPage'])).toBe(true);
-    expect(
-      isActWarning(['Warning: The current testing environment is not configured to support act(...)']),
-    ).toBe(true);
-    expect(isActWarning(['<path> attribute d: Expected number'])).toBe(false);
-    expect(isActWarning(['[useTransactionSelection]', 'Save failed'])).toBe(false);
-    expect(isActWarning([new Error('boom')])).toBe(false);
+    expect(recordIfActWarning([REACT_ACT_WARNING, 'TransactionsPage'])).toBe(true);
+    expect(recordIfActWarning(['<path> attribute d: Expected number'])).toBe(false);
+    expect(recordIfActWarning(['[useTransactionSelection]', 'Save failed'])).toBe(false);
+    expect(recordIfActWarning([new Error('boom')])).toBe(false);
+    // Only the first was recognised, so only it is pending. Draining here keeps
+    // it from failing the next test in this file.
+    expect(pendingActWarnings()).toHaveLength(1);
+    expect(() => failOnActWarnings()).toThrow();
+  });
+
+  // Regression: CI run #2875 turned `main` red on `DividendIncomeReport`, a test
+  // nothing had changed. React's environment message is a different condition,
+  // it names no component, and it fires from teardown timing the suite does not
+  // control -- so it is not a test failure. See the note in `act-guard.ts`.
+  it('does not fail a test on the "environment is not configured" message', () => {
+    const envMessage =
+      'Warning: The current testing environment is not configured to support act(...)';
+    expect(recordIfActWarning([envMessage])).toBe(false);
+    expect(pendingActWarnings()).toHaveLength(0);
+    expect(() => failOnActWarnings()).not.toThrow();
+  });
+
+  // Classifying and recording are one call, so a message the guard does not
+  // recognise cannot be recorded by a second door and fail a test anyway.
+  it('records only what it recognises', () => {
+    recordIfActWarning(['some unrelated console.error']);
+    expect(pendingActWarnings()).toHaveLength(0);
   });
 
   it('fails the test, naming the component React named', () => {
-    recordActWarning([REACT_ACT_WARNING, 'TransactionsPage']);
+    recordIfActWarning([REACT_ACT_WARNING, 'TransactionsPage']);
     expect(pendingActWarnings()).toHaveLength(1);
 
     expect(() => failOnActWarnings()).toThrow(/An update to TransactionsPage inside a test/);
   });
 
   it('reports once per distinct warning, and resets so it fails only the test that earned it', () => {
-    recordActWarning([REACT_ACT_WARNING, 'DateInput']);
-    recordActWarning([REACT_ACT_WARNING, 'DateInput']);
-    recordActWarning([REACT_ACT_WARNING, 'SecurityList']);
+    recordIfActWarning([REACT_ACT_WARNING, 'DateInput']);
+    recordIfActWarning([REACT_ACT_WARNING, 'DateInput']);
+    recordIfActWarning([REACT_ACT_WARNING, 'SecurityList']);
 
     expect(() => failOnActWarnings()).toThrow(/2 act\(\) warnings/);
     // Reported once: a warning left in the buffer would fail every later test
@@ -52,8 +72,7 @@ describe('act-guard', () => {
     const setup = readFileSync(join(__dirname, 'setup.ts'), 'utf8');
 
     it('routes console.error through the guard', () => {
-      expect(setup).toMatch(/isActWarning\(args\)/);
-      expect(setup).toMatch(/recordActWarning\(args\)/);
+      expect(setup).toMatch(/recordIfActWarning\(args\)/);
     });
 
     it('fails after every test and after the last one', () => {

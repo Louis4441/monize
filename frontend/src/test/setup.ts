@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, vi } from 'vitest';
 
-import { failOnActWarnings, isActWarning, recordActWarning } from './act-guard';
+import { failOnActWarnings, recordIfActWarning } from './act-guard';
 
 afterEach(async () => {
   cleanup();
@@ -44,8 +44,7 @@ console.error = (...args: unknown[]) => {
   // Recorded rather than printed: the failure raised in `afterEach` names the
   // test, which one line on stderr in a 14,000-test run does not. See
   // `act-guard.ts` for why these are failures and not noise.
-  if (isActWarning(args)) {
-    recordActWarning(args);
+  if (recordIfActWarning(args)) {
     return;
   }
   if (
