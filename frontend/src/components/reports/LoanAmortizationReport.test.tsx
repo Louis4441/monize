@@ -61,9 +61,19 @@ describe('LoanAmortizationReport', () => {
     mockGetRateChanges.mockResolvedValue([]);
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     mockGetAllAccounts.mockReturnValue(new Promise(() => {}));
-    render(<LoanAmortizationReport />);
+    // The report has a SECOND loader beside the account list -- this loan's
+    // transactions, interest and rate history -- and with no account selected
+    // yet it resolves immediately with empty lists. That resolution is a state
+    // update, so a synchronous `render` leaves it to land after the test body,
+    // which is the act() warning the guard fails on (`src/test/act-guard.ts`).
+    // Wrapping the render is the file's own convention for a component that
+    // fetches on mount; the assertion is unchanged, because the account list
+    // never resolves and the report therefore cannot leave its loading state.
+    await act(async () => {
+      render(<LoanAmortizationReport />);
+    });
     expect(document.querySelector('.animate-pulse')).toBeTruthy();
   });
 

@@ -602,6 +602,7 @@ Never use synchronous `act(() => {...})` for calls that trigger async side-effec
 **Three quieter sources of the same warning:**
 
 - A **synchronous `render(...)` of a component that fetches on mount** -- even in a test that only asserts static copy, and even with a stubbed `mockResolvedValue([])`. Give the file one `await act(async () => { render(...) })` helper and use it everywhere.
+- **Moving a `setState` out of an effect and into a data hook changes WHEN it lands, so a passing synchronous-`render` test can start failing on a component whose fetching nobody changed.** `LoanAmortizationReport` already fetched on mount, and its "shows loading state initially" test was safe for a reason that had nothing to do with that: the loader's *no-selection* branch called `setTransactions([])` synchronously inside the effect, so it committed inside `render`. Routing the same branch through `useReportData` made it resolve a promise instead, and the update moved to a microtask after the test body. The trigger for this guard is not "does the component fetch" but **"can any branch of its loaders resolve through a promise"** -- including the early-return branch that fetches nothing.
 - An **awaited handler behind a click**: `fireEvent.click` is act-wrapped, but the `finally { setBusy(false) }` after an `await` lands in a later microtask. Wrap the click in `await act(async () => ...)`.
 - A **bare `await new Promise(r => setTimeout(r, n))`** used to let a `requestAnimationFrame` run -- put the wait inside `await act(async () => { ... })`.
 
