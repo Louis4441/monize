@@ -61,13 +61,20 @@ export function LoanSummaryCards({
     ? t(`loanDetail.frequency.${account.paymentFrequency}` as Parameters<typeof t>[0])
     : null;
 
-  // The stored paymentAmount is often principal-only (separately-booked
-  // interest) and stale; prefer the real installment derived from history.
+  // No `?? account.paymentAmount` here any more, and its absence is the point:
+  // `resolveCurrentLoanTerms` -- which produced `currentInstallment` -- already
+  // ranks that scalar as its last candidate, so a fallback to it here was a
+  // SECOND place the payment gets decided. Provably a no-op today (the resolver
+  // returns null only when the scalar is itself absent or non-positive, and
+  // `deriveLoanFigures` maps a non-positive installment to null regardless), but
+  // one decision in one place is the rule this work exists to establish, and a
+  // redundant fallback reads as a policy the card is entitled to have.
+  //
   // `deriveLoanFigures` decides when each figure is known -- the same decision
   // the transactions Details sidebar shows, made once so the two cannot drift.
   const figures = deriveLoanFigures({
     currentBalance: account.currentBalance,
-    currentInstallment: currentInstallment ?? account.paymentAmount ?? null,
+    currentInstallment,
     baseline,
   });
 

@@ -139,6 +139,25 @@ describe('LoanSummaryCards', () => {
     expect(screen.getAllByText('N/A').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('does not resolve the payment a second time from the account scalar', () => {
+    // The resolved installment is the only source. The card used to fall back to
+    // `account.paymentAmount`, which `resolveCurrentLoanTerms` already ranks --
+    // a second place the payment gets decided, and the only value the fallback
+    // could ever contribute is the non-positive one the resolver rejected.
+    render(
+      <LoanSummaryCards
+        account={makeAccount({ paymentAmount: 0 })}
+        startingBalance={10000}
+        currentInstallment={null}
+        currentAnnualRate={6}
+        baseline={null}
+      />,
+    );
+
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Not set').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('shows Paid off when the balance is zero', () => {
     render(
       <LoanSummaryCards
