@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Wekelijks",
       "biweekly": "Elke 2 weken",
+      "semiMonthly": "Halfmaandelijks",
       "monthly": "Maandelijks",
       "quarterly": "Driemaandelijks",
       "yearly": "Jaarlijks"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Voorbeeld berekenen...",
     "frequencyOptions": {
       "monthly": "Maandelijks",
-      "semiMonthly": "Twee keer per maand (1e & 15e)",
+      "semiMonthly": "Halfmaandelijks (15e & einde maand)",
       "biweekly": "Twee keer per week",
       "acceleratedBiweekly": "Versneld twee keer per week",
       "weekly": "Wekelijks",

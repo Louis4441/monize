@@ -65,6 +65,12 @@ that cannot must say so in the pull request.
 `required` means the invariant is not verified without it. `supporting` means it
 adds value but proves nothing on its own. `--` means not applicable.
 
+`required (not yet met)` is the one cell that is a statement about the code
+rather than about the test kind: the invariant needs that test and does not have
+it. It is spelled out because `--` reads as "nothing owed", and an acknowledged
+gap recorded as "not applicable" is a gap that disappears from the audit --
+INV-LOAN-002's entry names the missing source scan while its row said `--`.
+
 | Invariant | Unit | Source scan | PG integration | Two connections | Two instances | Failpoint | Provider | E2E |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | INV-IMPORT-001 one active import | supporting | -- | required | **required** | required | supporting | -- | optional |
@@ -79,8 +85,8 @@ adds value but proves nothing on its own. `--` means not applicable.
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |
 | INV-REPORT-001 report account scope | supporting | **required** | **required** | -- | -- | -- | -- | optional |
 | INV-LOAN-001 overpayment cadence | **required** | -- | -- | -- | -- | -- | -- | optional |
-| INV-LOAN-002 no truncated total | **required** | -- | -- | -- | -- | -- | -- | optional |
-| INV-LOAN-003 compounding convention | **required** | -- | -- | -- | -- | -- | -- | -- |
+| INV-LOAN-002 no truncated total | **required** | **required** (not yet met) | -- | -- | -- | -- | -- | optional |
+| INV-LOAN-003 compounding convention | **required** | **required** | -- | -- | -- | -- | -- | -- |
 | INV-LOAN-004 residual final payment | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-LOAN-005 first payment is payment 1 | **required** | **required** | -- | -- | -- | -- | -- | -- |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |

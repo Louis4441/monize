@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { OverpaymentPlan, ScenarioComparison } from '@/lib/loan-schedule';
 import { loanScenariosApi, planToScenarioData, scenarioToPlan } from '@/lib/loan-scenarios';
+import { effectiveOverpaymentMode } from '@/lib/loan-schedule';
 import {
   BaselineOutcome,
   ScenarioComparisonChart,
@@ -217,7 +218,7 @@ export function SavedScenariosPanel({
                           comparisonTable's export -- inferring it from the
                           installment drop made the visible table and its own CSV
                           disagree for the same row. */}
-                      {timeSavedLabel(comparison, scenario.recurringExtraMode)}
+                      {timeSavedLabel(comparison, effectiveOverpaymentMode(scenarioToPlan(scenario)))}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap text-green-600 dark:text-green-400">
                       {interestSavedLabel(comparison)}

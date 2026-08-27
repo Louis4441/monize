@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "साप्ताहिक",
       "biweekly": "हर 2 सप्ताह",
+      "semiMonthly": "अर्ध-मासिक",
       "monthly": "मासिक",
       "quarterly": "त्रैमासिक",
       "yearly": "वार्षिक"
@@ -314,7 +315,7 @@
     "calculatingPreview": "पूर्वावलोकन गणना हो रही है...",
     "frequencyOptions": {
       "monthly": "मासिक",
-      "semiMonthly": "अर्ध-मासिक (1 और 15 तारीख)",
+      "semiMonthly": "अर्ध-मासिक (15 तारीख और महीने का अंत)",
       "biweekly": "द्वि-साप्ताहिक",
       "acceleratedBiweekly": "त्वरित द्वि-साप्ताहिक",
       "weekly": "साप्ताहिक",

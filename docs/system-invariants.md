@@ -638,6 +638,18 @@ Failure response    --
                     same defect from the other direction; it now delegates to
                     `advanceByFrequency`, which clamps.) The day is clamped to
                     the target month's length, as a standing order is.
+                    A plan names its mode in three places
+                    (targetMonthlyPaymentMode, recurringExtra.mode, and each
+                    lump sum's), so consumers read effectiveOverpaymentMode(plan)
+                    rather than one carrier: reading recurringExtraMode alone
+                    left a saved BUDGET scenario with no mode and fell back to
+                    the installmentReduction heuristic, which is null exactly
+                    when a schedule truncated -- the case the explicit mode
+                    exists for. Precedence follows the engine: a budget ignores
+                    the other two, and otherwise any LOWER_INSTALLMENT carrier
+                    makes the plan one, because the engine re-levels when any
+                    does and adding the overpayment on top of a re-levelled
+                    installment counts the same money twice.
                     ONE_OFF is excluded from RecurringExtra.frequency by TYPE
                     (RecurringOverpaymentFrequency), not by convention: it is a
                     single dated payment and belongs in lumpSums, and accepted as
@@ -846,11 +858,18 @@ Concurrency scope   --
 Failure response    The start date itself for a zero- or one-payment schedule.
 Data already written
                     Migration 166 steps the affected scheduled_transactions.endDate
-                    back one interval, scoped to active loan/mortgage schedules
-                    whose bound is still in the future and is a whole number of
-                    the schedule's own intervals from its start date. It is a
-                    one-shot body (registered in NON_RERUNNABLE_DATA_MIGRATIONS),
-                    run once per database by schema_migrations.
+                    back one interval, scoped to the schedule a LOAN or MORTGAGE
+                    account NAMES as its payment schedule
+                    (accounts.scheduled_transaction_id, written by exactly the
+                    two paths that write this end_date), still active, its bound
+                    still in the future, and a whole number of the schedule's own
+                    intervals from its start date. Matching "a transfer split
+                    points at a debt account" instead would have caught a user's
+                    own extra-principal transfer: "monthly, for ten years" is a
+                    whole number of intervals too, and this body is not
+                    re-runnable. It is a one-shot (registered in
+                    NON_RERUNNABLE_DATA_MIGRATIONS), run once per database by
+                    schema_migrations.
                     Two populations are deliberately NOT healed, because the old
                     value is not invertible in SQL rather than because it is
                     right: a month cadence anchored on the 29th to 31st (the old

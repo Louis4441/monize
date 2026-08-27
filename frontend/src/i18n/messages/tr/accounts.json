@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Haftalık",
       "biweekly": "2 Haftada Bir",
+      "semiMonthly": "Ayda iki kez",
       "monthly": "Aylık",
       "quarterly": "3 Aylık",
       "yearly": "Yıllık"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Önizleme hesaplanıyor...",
     "frequencyOptions": {
       "monthly": "Aylık",
-      "semiMonthly": "Ayda İki Kez (1. ve 15.)",
+      "semiMonthly": "Ayda iki kez (15'i ve ay sonu)",
       "biweekly": "2 Haftada Bir",
       "acceleratedBiweekly": "Hızlandırılmış 2 Haftada Bir",
       "weekly": "Haftalık",

@@ -32,7 +32,23 @@ const logger = createLogger('LoanPaymentSetupDialog');
 interface LoanPaymentSetupDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  loanAccount: { accountId: string; accountName: string; accountType: string; currencyCode?: string };
+  /**
+   * The debt being set up. The two mortgage flags are optional because the
+   * import flow builds this from a freshly imported account that has neither --
+   * but where the caller HAS them (the account form), they must travel: the
+   * dialog's own checkboxes are what it submits, so an unseeded `false` on a
+   * Canadian mortgage both flipped the stored flag off (`updateData
+   * .isCanadianMortgage = dto.isCanadianMortgage` whenever it is defined) and
+   * left the quarterly/yearly options on a list the server refuses.
+   */
+  loanAccount: {
+    accountId: string;
+    accountName: string;
+    accountType: string;
+    currencyCode?: string;
+    isCanadianMortgage?: boolean;
+    isVariableRate?: boolean;
+  };
   accounts: Account[];
   onSetupComplete?: () => void;
 }
@@ -81,7 +97,9 @@ export function LoanPaymentSetupDialog({
   // Mortgage-specific
   const isMortgage = loanAccount.accountType === 'MORTGAGE';
   const currencySymbol = getCurrencySymbol(loanAccount.currencyCode || 'USD');
-  const [isCanadianMortgage, setIsCanadianMortgage] = useState(false);
+  const [isCanadianMortgage, setIsCanadianMortgage] = useState(
+    loanAccount.isCanadianMortgage ?? false,
+  );
 
   // A Canadian mortgage is split by the mortgage helpers, which have no
   // quarterly or yearly cadence: the server answers 400 rather than compute the
@@ -104,7 +122,9 @@ export function LoanPaymentSetupDialog({
     toMortgagePaymentFrequency(paymentFrequency) === null
       ? 'MONTHLY'
       : paymentFrequency;
-  const [isVariableRate, setIsVariableRate] = useState(false);
+  const [isVariableRate, setIsVariableRate] = useState(
+    loanAccount.isVariableRate ?? false,
+  );
   const [amortizationMonths, setAmortizationMonths] = useState<number | undefined>(undefined);
   const [termMonths, setTermMonths] = useState<number | undefined>(undefined);
 

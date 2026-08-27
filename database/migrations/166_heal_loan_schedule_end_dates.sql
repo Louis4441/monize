@@ -47,8 +47,15 @@
 -- Do not replay it by hand against a populated database.
 --
 -- Scope, narrowest first:
---   * the schedule pays a LOAN or MORTGAGE account (its transfer split names
---     one) -- these two code paths are the only writers of this column;
+--   * the schedule is the one a LOAN or MORTGAGE account NAMES as its payment
+--     schedule (accounts.scheduled_transaction_id), which is written by exactly
+--     the two paths that write this end_date and by nothing else. Matching on
+--     "a transfer split points at a debt account" instead would have caught a
+--     user's own extra-principal transfer to their mortgage: an ordinary
+--     "monthly, for ten years" bound is a whole number of intervals from its
+--     start date too, so the interval test below cannot tell it apart, and this
+--     body is not re-runnable. LoanPaymentSetupService sets the same link but
+--     writes no end_date, so those rows fall out on end_date IS NOT NULL;
 --   * it is still active, so its bound can still change what posts;
 --   * its end_date is still in the future, so nothing already posted is being
 --     rewritten -- an extra installment that has already happened is a
@@ -61,9 +68,10 @@
 -- five healed cadences (including an accelerated mortgage's biweekly bound on
 -- day 28) each moved back exactly one interval, and every excluded row was left
 -- untouched -- the 29th/30th/31st anchors, SEMIMONTHLY, an inactive schedule, a
--- bound already in the past, a schedule paying a CHEQUING account, one with no
--- transfer split, one whose end date is not a whole number of intervals from its
--- start, one with no end date, and a single-payment schedule.
+-- bound already in the past, a schedule no debt account names (including a
+-- user's own extra-principal transfer whose split points at the mortgage), one
+-- whose end date is not a whole number of intervals from its start, one with no
+-- end date, and a single-payment schedule.
 UPDATE scheduled_transactions AS st
 SET end_date = CASE st.frequency
         WHEN 'WEEKLY' THEN st.end_date - INTERVAL '7 days'
@@ -82,9 +90,8 @@ WHERE st.is_active
   AND st.end_date > st.start_date
   AND EXISTS (
       SELECT 1
-      FROM scheduled_transaction_splits sts
-      JOIN accounts a ON a.id = sts.transfer_account_id
-      WHERE sts.scheduled_transaction_id = st.id
+      FROM accounts a
+      WHERE a.scheduled_transaction_id = st.id
         AND a.account_type IN ('LOAN', 'MORTGAGE')
   )
   AND (

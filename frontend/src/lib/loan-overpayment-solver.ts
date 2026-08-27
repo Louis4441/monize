@@ -127,17 +127,28 @@ function meetsInterestTarget(
   return result.paidOff && result.totalInterest <= targetInterest;
 }
 
+/**
+ * One candidate schedule. `lowerEndPeriod` is the no-overpayment payoff length,
+ * which a LOWER_INSTALLMENT candidate otherwise derives by generating a whole
+ * second schedule of its own -- the same schedule for every candidate, so a
+ * bisection paid for it thirty times. Every solver here already has it as its
+ * baseline (`scheduleWith(base, 0, mode)` IS that schedule), so it is threaded
+ * through rather than recomputed. Omitted for the `amount <= 0` call, which is
+ * that baseline.
+ */
 function scheduleWith(
   base: LoanScheduleInput,
   amount: number,
   mode: OverpaymentMode,
   window: SolveWindow = {},
+  lowerEndPeriod?: number,
 ): LoanScheduleResult {
   if (amount <= 0) {
     return generateLoanSchedule({ ...base, overpayments: undefined });
   }
   return generateLoanSchedule({
     ...base,
+    lowerEndPeriod: lowerEndPeriod ?? base.lowerEndPeriod,
     overpayments: { recurringExtra: { amount, mode, ...window } },
   });
 }
@@ -206,7 +217,12 @@ function solveTargetInterestWithBaseline(
     return { status: 'already-met', amount: 0, result: baseline, interestSaved: 0 };
   }
   const hi0 = upperBound(base);
-  if (!meetsInterestTarget(scheduleWith(base, hi0, mode, window), targetInterest)) {
+  if (
+    !meetsInterestTarget(
+      scheduleWith(base, hi0, mode, window, baseline.numPayments),
+      targetInterest,
+    )
+  ) {
     return { status: 'unreachable', amount: null, result: null, interestSaved: null };
   }
   let lo = 0;
@@ -214,13 +230,22 @@ function solveTargetInterestWithBaseline(
   const iterations = iterationsFor(hi0, step);
   for (let i = 0; i < iterations; i++) {
     const mid = (lo + hi) / 2;
-    if (meetsInterestTarget(scheduleWith(base, mid, mode, window), targetInterest)) hi = mid;
+    if (
+      meetsInterestTarget(
+        scheduleWith(base, mid, mode, window, baseline.numPayments),
+        targetInterest,
+      )
+    )
+      hi = mid;
     else lo = mid;
   }
   const amount = minimizeToStep(roundUpTo(hi, step), step, (candidate) =>
-    meetsInterestTarget(scheduleWith(base, candidate, mode, window), targetInterest),
+    meetsInterestTarget(
+      scheduleWith(base, candidate, mode, window, baseline.numPayments),
+      targetInterest,
+    ),
   );
-  const result = scheduleWith(base, amount, mode, window);
+  const result = scheduleWith(base, amount, mode, window, baseline.numPayments);
   return {
     status: 'ok',
     amount,
@@ -285,7 +310,7 @@ export function solveRecurringForPayoffMonth(
     return { status: 'already-met', amount: 0, result: baseline, interestSaved: 0 };
   }
   const hi0 = upperBound(base);
-  if (!paysOffBy(scheduleWith(base, hi0, mode, window))) {
+  if (!paysOffBy(scheduleWith(base, hi0, mode, window, baseline.numPayments))) {
     return { status: 'unreachable', amount: null, result: null, interestSaved: null };
   }
   let lo = 0;
@@ -293,13 +318,13 @@ export function solveRecurringForPayoffMonth(
   const iterations = iterationsFor(hi0, step);
   for (let i = 0; i < iterations; i++) {
     const mid = (lo + hi) / 2;
-    if (paysOffBy(scheduleWith(base, mid, mode, window))) hi = mid;
+    if (paysOffBy(scheduleWith(base, mid, mode, window, baseline.numPayments))) hi = mid;
     else lo = mid;
   }
   const amount = minimizeToStep(roundUpTo(hi, step), step, (candidate) =>
-    paysOffBy(scheduleWith(base, candidate, mode, window)),
+    paysOffBy(scheduleWith(base, candidate, mode, window, baseline.numPayments)),
   );
-  const result = scheduleWith(base, amount, mode, window);
+  const result = scheduleWith(base, amount, mode, window, baseline.numPayments);
   return {
     status: 'ok',
     amount,

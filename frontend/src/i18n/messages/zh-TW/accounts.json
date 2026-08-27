@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "每週",
       "biweekly": "每兩週",
+      "semiMonthly": "每月兩次",
       "monthly": "每月",
       "quarterly": "每季",
       "yearly": "每年"
@@ -314,7 +315,7 @@
     "calculatingPreview": "計算預覽中...",
     "frequencyOptions": {
       "monthly": "每月",
-      "semiMonthly": "每月兩次（1日及15日）",
+      "semiMonthly": "每月兩次（15 日與月底）",
       "biweekly": "每兩週",
       "acceleratedBiweekly": "加速雙週還款",
       "weekly": "每週",

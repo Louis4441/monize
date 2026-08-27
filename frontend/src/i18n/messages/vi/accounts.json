@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Hàng tuần",
       "biweekly": "Mỗi 2 tuần",
+      "semiMonthly": "Hai lần một tháng",
       "monthly": "Hàng tháng",
       "quarterly": "Hàng quý",
       "yearly": "Hàng năm"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Đang tính xem trước...",
     "frequencyOptions": {
       "monthly": "Hàng tháng",
-      "semiMonthly": "Nửa tháng (ngày 1 & 15)",
+      "semiMonthly": "Hai lần một tháng (ngày 15 & cuối tháng)",
       "biweekly": "Mỗi 2 tuần",
       "acceleratedBiweekly": "Mỗi 2 tuần tăng tốc",
       "weekly": "Hàng tuần",

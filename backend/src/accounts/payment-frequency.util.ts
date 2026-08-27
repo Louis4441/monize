@@ -47,7 +47,7 @@ export type PaymentFrequency =
 
 export type MortgagePaymentFrequency =
   | "MONTHLY"
-  | "SEMI_MONTHLY" // 24 payments/year (1st and 15th)
+  | "SEMI_MONTHLY" // 24 payments/year (the 15th and the last day of the month)
   | "BIWEEKLY" // 26 payments/year
   | "ACCELERATED_BIWEEKLY" // 26 payments/year, but each = monthly/2
   | "WEEKLY" // 52 payments/year

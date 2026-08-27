@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Settimanale",
       "biweekly": "Ogni 2 settimane",
+      "semiMonthly": "Bimensile",
       "monthly": "Mensile",
       "quarterly": "Trimestrale",
       "yearly": "Annuale"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Calcolo anteprima...",
     "frequencyOptions": {
       "monthly": "Mensile",
-      "semiMonthly": "Bimensile (1° e 15°)",
+      "semiMonthly": "Bimensile (15 e fine mese)",
       "biweekly": "Bisettimanale",
       "acceleratedBiweekly": "Bisettimanale accelerato",
       "weekly": "Settimanale",

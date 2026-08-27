@@ -259,9 +259,6 @@ export function DebtPayoffTimelineReport() {
     // interest is a subtotal -- both unknown, not measured (INV-LOAN-002).
     const projectionComplete = hasProjection && projectionPaidOff;
     const projectedPayoffDate = projectionComplete ? lastItem.label : null;
-    const projectedTotalInterest = projectionComplete
-      ? lastItem.cumulativeInterest
-      : null;
     return {
       lastPaymentDate: lastItem.label,
       totalPayments: payoffSchedule.length,
@@ -275,7 +272,6 @@ export function DebtPayoffTimelineReport() {
       percentPaid: originalBalance > 0 ? ((originalBalance - currentBalance) / originalBalance) * 100 : 0,
       hasProjection,
       projectedPayoffDate,
-      projectedTotalInterest,
     };
   }, [payoffSchedule, selectedAccount, projectionPaidOff]);
 

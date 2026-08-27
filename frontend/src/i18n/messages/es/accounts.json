@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Semanal",
       "biweekly": "Cada 2 Semanas",
+      "semiMonthly": "Quincenal (2 al mes)",
       "monthly": "Mensual",
       "quarterly": "Trimestral",
       "yearly": "Anual"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Calculando vista previa...",
     "frequencyOptions": {
       "monthly": "Mensual",
-      "semiMonthly": "Quincenal (1 y 15)",
+      "semiMonthly": "Quincenal (día 15 y fin de mes)",
       "biweekly": "Quincenal (cada 2 semanas)",
       "acceleratedBiweekly": "Quincenal Acelerado",
       "weekly": "Semanal",

@@ -52,8 +52,11 @@ export function LoanSummaryCards({
   // law, so calling the shared `effectiveAnnualRate` changes no displayed
   // number. It removes a third inline copy of the compounding convention
   // (INV-LOAN-003) and nothing else: a DRY change, not a behaviour fix. The
-  // frequency is still passed rather than hardcoded, because it is the correct
-  // argument if this card ever shows a non-Canadian mortgage.
+  // The frequency and both flags are passed rather than hardcoded, because they
+  // are the correct arguments if this card ever shows a non-Canadian mortgage.
+  // Hardcoding `true, false` beside a comment defending the frequency argument
+  // was the worst of both: widen the guard and the call takes the semi-annual
+  // branch for a US mortgage, on which the frequency is ignored anyway.
   const isCanadianFixed = account.isCanadianMortgage && !account.isVariableRate;
   const effectiveRate =
     // `!= null`, not truthiness: the card above prints `0%` from
@@ -63,8 +66,8 @@ export function LoanSummaryCards({
       ? effectiveAnnualRate(
           account.interestRate,
           getPeriodsPerYear((account.paymentFrequency ?? 'MONTHLY') as ScheduleFrequency),
-          true,
-          false,
+          account.isCanadianMortgage ?? false,
+          account.isVariableRate ?? false,
         )
       : null;
 

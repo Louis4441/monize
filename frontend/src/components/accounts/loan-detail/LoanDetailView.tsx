@@ -39,6 +39,7 @@ import {
   OverpaymentPlan,
   ScenarioComparison,
   compareSchedules,
+  effectiveOverpaymentMode,
   generateLoanSchedule,
 } from '@/lib/loan-schedule';
 import { scenarioToPlan } from '@/lib/loan-scenarios';
@@ -323,14 +324,20 @@ export function LoanDetailView({
                         comparison={comparison}
                         currencyCode={account.currencyCode}
                         recurringOverpayment={
-                          plan?.recurringExtra
+                          plan
                             ? {
-                                amount: plan.recurringExtra.amount,
-                                frequency: plan.recurringExtra.frequency,
+                                amount: plan.recurringExtra?.amount ?? 0,
+                                frequency: plan.recurringExtra?.frequency,
                                 // The mode travels with the plan rather than
                                 // being inferred from the installment drop,
-                                // which is unknown on a truncated schedule.
-                                mode: plan.recurringExtra.mode,
+                                // which is unknown on a truncated schedule --
+                                // and it is read off the whole plan, because a
+                                // budget or a lump sum carries its own. Keyed on
+                                // `plan` rather than `plan.recurringExtra` for
+                                // the same reason: a budget-only plan has no
+                                // recurring extra and used to arrive with no
+                                // mode at all.
+                                mode: effectiveOverpaymentMode(plan) ?? undefined,
                               }
                             : undefined
                         }

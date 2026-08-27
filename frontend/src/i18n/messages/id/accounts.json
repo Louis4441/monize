@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Mingguan",
       "biweekly": "Setiap 2 Minggu",
+      "semiMonthly": "Dua Kali Sebulan",
       "monthly": "Bulanan",
       "quarterly": "Kuartalan",
       "yearly": "Tahunan"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Menghitung pratinjau...",
     "frequencyOptions": {
       "monthly": "Bulanan",
-      "semiMonthly": "Dua Kali Sebulan (tgl 1 & 15)",
+      "semiMonthly": "Dua Kali Sebulan (tanggal 15 & akhir bulan)",
       "biweekly": "Dua Mingguan",
       "acceleratedBiweekly": "Dua Mingguan Dipercepat",
       "weekly": "Mingguan",

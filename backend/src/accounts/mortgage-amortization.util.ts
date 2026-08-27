@@ -265,28 +265,6 @@ export function calculateMortgagePayment(
   return calculatePaymentAmount(principal, periodicRate, totalPayments);
 }
 
-/**
- * Calculate how many payments needed to pay off with accelerated payments
- *
- * Accelerated payments result in more payments per year than standard,
- * which reduces the amortization period.
- */
-function calculateAcceleratedPayments(
-  principal: number,
-  annualRate: number,
-  paymentAmount: number,
-  periodsPerYear: number,
-  isCanadian: boolean,
-  isVariableRate: boolean,
-): number {
-  const periodicRate = getPeriodicRate(
-    annualRate,
-    periodsPerYear,
-    isCanadian,
-    isVariableRate,
-  );
-  return paymentsToClear(principal, periodicRate, paymentAmount);
-}
 
 /**
  * Date of the final payment, given the date of the *first* one.
@@ -491,34 +469,24 @@ export function calculateMortgageAmortization(
   // Calculate payment amount
   const paymentAmount = calculateMortgagePayment(input);
 
-  // Determine total payments
   const periodsPerYear = getMortgagePeriodsPerYear(paymentFrequency);
-  let totalPayments: number;
-
-  if (
-    paymentFrequency === "ACCELERATED_BIWEEKLY" ||
-    paymentFrequency === "ACCELERATED_WEEKLY"
-  ) {
-    // Accelerated payments pay off faster
-    totalPayments = calculateAcceleratedPayments(
-      principal,
-      annualRate,
-      paymentAmount,
-      periodsPerYear,
-      isCanadian,
-      isVariableRate,
-    );
-  } else {
-    totalPayments = Math.round((amortizationMonths * periodsPerYear) / 12);
-  }
-
-  // Calculate first payment split
   const periodicRate = getPeriodicRate(
     annualRate,
     periodsPerYear,
     isCanadian,
     isVariableRate,
   );
+
+  // An accelerated schedule pays a fraction of the monthly installment on a
+  // faster cadence, so its term is not the nominal amortization -- it is however
+  // long that installment takes to clear the balance. Called directly rather
+  // than through a `calculateAcceleratedPayments` wrapper whose whole body was
+  // this line plus a second `getPeriodicRate` on the same arguments.
+  const totalPayments =
+    paymentFrequency === "ACCELERATED_BIWEEKLY" ||
+    paymentFrequency === "ACCELERATED_WEEKLY"
+      ? paymentsToClear(principal, periodicRate, paymentAmount)
+      : Math.round((amortizationMonths * periodsPerYear) / 12);
   const interestPayment = roundMoney(principal * periodicRate);
   const principalPayment = roundMoney(paymentAmount - interestPayment);
 

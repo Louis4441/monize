@@ -167,7 +167,7 @@ describe('MortgageFields', () => {
     expect(screen.getByText('Monthly')).toBeInTheDocument();
     expect(screen.getByText('Bi-Weekly')).toBeInTheDocument();
     expect(screen.getByText('Weekly')).toBeInTheDocument();
-    expect(screen.getByText('Semi-Monthly (1st & 15th)')).toBeInTheDocument();
+    expect(screen.getByText('Semi-Monthly (15th & month end)')).toBeInTheDocument();
     expect(screen.getByText('Accelerated Bi-Weekly')).toBeInTheDocument();
     expect(screen.getByText('Accelerated Weekly')).toBeInTheDocument();
   });

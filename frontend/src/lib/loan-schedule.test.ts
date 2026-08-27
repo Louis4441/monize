@@ -1515,3 +1515,71 @@ describe('a truncated schedule is not a lifetime total', () => {
     expect(compareSchedules(baseline, scenario).interestSaved).toBeGreaterThan(0);
   });
 });
+
+describe('lowerEndPeriod', () => {
+  const input = {
+    startingBalance: 250000,
+    annualRate: 5.5,
+    paymentAmount: 1600,
+    frequency: 'MONTHLY' as const,
+    firstPaymentDate: new Date(2026, 0, 15),
+    overpayments: {
+      recurringExtra: {
+        amount: 300,
+        frequency: 'MONTHLY' as const,
+        mode: 'LOWER_INSTALLMENT' as const,
+      },
+    },
+  };
+  const baselineTerm = generateLoanSchedule({
+    ...input,
+    overpayments: undefined,
+  }).numPayments;
+
+  it('reproduces the schedule the engine derives for itself', () => {
+    // The field is a performance shortcut for a value the engine would compute
+    // by generating a second schedule -- so the only thing that makes it safe is
+    // that supplying the right value changes nothing. A goal-seek runs ~30
+    // candidates and every one of them used to pay for that second schedule.
+    const derived = generateLoanSchedule(input);
+    const supplied = generateLoanSchedule({
+      ...input,
+      lowerEndPeriod: baselineTerm,
+    });
+    expect(supplied.rows).toEqual(derived.rows);
+    expect(supplied.payoffDate).toBe(derived.payoffDate);
+    expect(supplied.totalInterest).toBe(derived.totalInterest);
+    expect(supplied.finalPaymentAmount).toBe(derived.finalPaymentAmount);
+  });
+
+  it('is load-bearing, so the equality above is not vacuous', () => {
+    // A wrong term re-levels the installment toward a schedule the loan does not
+    // have. If this passed, the field would be ignored and the test above would
+    // prove nothing.
+    const wrong = generateLoanSchedule({
+      ...input,
+      lowerEndPeriod: Math.round(baselineTerm / 2),
+    });
+    expect(wrong.finalPaymentAmount).not.toBe(
+      generateLoanSchedule(input).finalPaymentAmount,
+    );
+  });
+
+  it('is ignored where the engine has no use for it', () => {
+    // SHORTEN_TERM keeps the installment, so there is no term to re-level
+    // toward; fixedEndPeriod supersedes it outright. Neither may be perturbed by
+    // a value a caller threads through generically.
+    const shorten = {
+      ...input,
+      overpayments: {
+        recurringExtra: { amount: 300, frequency: 'MONTHLY' as const },
+      },
+    };
+    expect(
+      generateLoanSchedule({ ...shorten, lowerEndPeriod: 7 }).rows,
+    ).toEqual(generateLoanSchedule(shorten).rows);
+    expect(
+      generateLoanSchedule({ ...input, fixedEndPeriod: 240, lowerEndPeriod: 7 }).rows,
+    ).toEqual(generateLoanSchedule({ ...input, fixedEndPeriod: 240 }).rows);
+  });
+});

@@ -1,4 +1,5 @@
 import { Account } from '@/types/account';
+import { parseLocalDate } from '@/lib/utils';
 import { LoanHistoryResult } from '@/lib/loan-history';
 import {
   LoanScheduleInput,
@@ -185,7 +186,7 @@ export function computePastImpact(
     frequency,
     isCanadian,
     isVariableRate,
-    firstPaymentDate: parseIsoDate(startDate),
+    firstPaymentDate: parseLocalDate(startDate),
   };
   // Accelerated payments (monthly / 2 or / 4) are larger than the amortizing
   // installment, so the contractual loan pays off before its nominal term.
@@ -296,7 +297,3 @@ export function computePastImpact(
   };
 }
 
-function parseIsoDate(isoDate: string): Date {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}

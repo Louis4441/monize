@@ -4,6 +4,8 @@ import type {
   OverpaymentMode,
   ScenarioComparison,
 } from '@/lib/loan-schedule';
+import { effectiveOverpaymentMode } from '@/lib/loan-schedule';
+import { scenarioToPlan } from '@/lib/loan-scenarios';
 
 /** i18n key for each overpayment frequency's label, shared across the scenario
  *  summaries, table, chart and PDF so a saved cadence reads the same way. */
@@ -150,7 +152,7 @@ export function createScenarioLabels({
         overpaymentLabel(scenario),
         describeScenario(scenario),
         payoffLabel(comparison),
-        timeSavedLabel(comparison, scenario.recurringExtraMode),
+        timeSavedLabel(comparison, effectiveOverpaymentMode(scenarioToPlan(scenario))),
         interestSavedLabel(comparison),
       ];
     }),

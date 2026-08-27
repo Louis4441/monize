@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Еженедельно",
       "biweekly": "Каждые 2 недели",
+      "semiMonthly": "Дважды в месяц",
       "monthly": "Ежемесячно",
       "quarterly": "Ежеквартально",
       "yearly": "Ежегодно"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Расчёт предпросмотра...",
     "frequencyOptions": {
       "monthly": "Ежемесячно",
-      "semiMonthly": "Дважды в месяц (1-е и 15-е)",
+      "semiMonthly": "Дважды в месяц (15-е и конец месяца)",
       "biweekly": "Раз в две недели",
       "acceleratedBiweekly": "Ускоренный раз в две недели",
       "weekly": "Еженедельно",

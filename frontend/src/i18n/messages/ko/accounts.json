@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "매주",
       "biweekly": "격주",
+      "semiMonthly": "월 2회",
       "monthly": "매월",
       "quarterly": "분기별",
       "yearly": "매년"
@@ -314,7 +315,7 @@
     "calculatingPreview": "미리보기 계산 중...",
     "frequencyOptions": {
       "monthly": "매월",
-      "semiMonthly": "월 2회 (1일 및 15일)",
+      "semiMonthly": "월 2회(15일 및 월말)",
       "biweekly": "격주",
       "acceleratedBiweekly": "가속 격주",
       "weekly": "매주",

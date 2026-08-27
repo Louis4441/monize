@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Щотижня",
       "biweekly": "Кожні 2 тижні",
+      "semiMonthly": "Двічі на місяць",
       "monthly": "Щомісяця",
       "quarterly": "Щокварталу",
       "yearly": "Щороку"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Розрахунок попереднього перегляду...",
     "frequencyOptions": {
       "monthly": "Щомісяця",
-      "semiMonthly": "Двічі на місяць (1-е та 15-е)",
+      "semiMonthly": "Двічі на місяць (15-те і кінець місяця)",
       "biweekly": "Кожні два тижні",
       "acceleratedBiweekly": "Прискорено кожні два тижні",
       "weekly": "Щотижня",

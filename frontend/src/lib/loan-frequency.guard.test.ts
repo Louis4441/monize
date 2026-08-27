@@ -56,6 +56,57 @@ function dialogFrequencies(): string[] {
   return values;
 }
 
+/**
+ * The cadences the Add/Edit Account form's loan section offers.
+ *
+ * A second list existed here and was missing SEMIMONTHLY, so a loan could be
+ * given that cadence by the setup dialog but never created with it -- and this
+ * guard read only the dialog, so nothing failed. `LoanFields.tsx` derives its
+ * options from `PAYMENT_FREQUENCIES` now, and the label key for each is a
+ * `Record` over the same union; this reads that table so a value silently
+ * dropped from the map is a failure here rather than a missing option nobody
+ * notices.
+ */
+function loanFormFrequencies(): string[] {
+  const source = readFileSync(
+    join(__dirname, '..', 'components', 'accounts', 'LoanFields.tsx'),
+    'utf8',
+  );
+  const table = /LOAN_FREQUENCY_LABEL_KEY:\s*Record<[^>]*>\s*=\s*\{([^}]*)\}/.exec(
+    source,
+  );
+  if (!table) {
+    throw new Error(
+      'LoanFields.tsx no longer declares LOAN_FREQUENCY_LABEL_KEY; update this ' +
+        'guard to read whatever names its frequency options now',
+    );
+  }
+  return [...table[1].matchAll(/^\s*([A-Z_]+):/gm)].map((m) => m[1]);
+}
+
+/** The same table read as frequency -> catalog key. */
+function loanFormLabelKeys(): Record<string, string> {
+  const source = readFileSync(
+    join(__dirname, '..', 'components', 'accounts', 'LoanFields.tsx'),
+    'utf8',
+  );
+  const table = /LOAN_FREQUENCY_LABEL_KEY:\s*Record<[^>]*>\s*=\s*\{([^}]*)\}/.exec(
+    source,
+  );
+  if (!table) {
+    throw new Error(
+      'LoanFields.tsx no longer declares LOAN_FREQUENCY_LABEL_KEY; update this ' +
+        'guard to read whatever names its frequency options now',
+    );
+  }
+  return Object.fromEntries(
+    [...table[1].matchAll(/^\s*([A-Z_]+):\s*'([A-Za-z]+)'/gm)].map((m) => [
+      m[1],
+      m[2],
+    ]),
+  );
+}
+
 describe('loan payment frequency contract', () => {
   it('reads a non-empty option set out of the setup dialog', () => {
     const offered = dialogFrequencies();
@@ -149,6 +200,30 @@ describe('loan payment frequency contract', () => {
         expected[frequency],
       );
     }
+  });
+
+  it('offers every storable cadence on the account form, not a subset', () => {
+    // Both surfaces write accounts.payment_frequency, and `optionalEnum` maps an
+    // unlisted value to undefined -- so a form list missing a cadence does not
+    // merely hide it, it ERASES that frequency from any loan the other surface
+    // created, the first time somebody edits the account.
+    expect(loanFormFrequencies()).toEqual([...PAYMENT_FREQUENCIES]);
+  });
+
+  it('gives each account-form cadence its own catalog key', () => {
+    // Two halves a name check alone would miss: a key the catalog does not hold
+    // renders the key path with a MISSING_MESSAGE in the console, and a key
+    // REUSED by two cadences renders one of them under the other's name --
+    // "Semi-Monthly" offered as a second "Monthly" is a wrong option, not a
+    // missing one, and it is the shape a hand-edited table produces.
+    const keys = loanFormLabelKeys();
+    const catalog = Object.keys(enAccounts.loanFields.frequencyOptions);
+    for (const key of Object.values(keys)) {
+      expect(catalog).toContain(key);
+    }
+    expect(new Set(Object.values(keys)).size).toBe(
+      Object.keys(keys).length,
+    );
   });
 
   it('offers only frequencies the account type list can store', () => {

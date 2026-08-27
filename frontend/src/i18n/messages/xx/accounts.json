@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "[XX-Weekly-XX]",
       "biweekly": "[XX-Every 2 Weeks-XX]",
+      "semiMonthly": "[XX-Semi-Monthly-XX]",
       "monthly": "[XX-Monthly-XX]",
       "quarterly": "[XX-Quarterly-XX]",
       "yearly": "[XX-Yearly-XX]"
@@ -324,7 +325,7 @@
     "calculatingPreview": "[XX-Calculating preview...-XX]",
     "frequencyOptions": {
       "monthly": "[XX-Monthly-XX]",
-      "semiMonthly": "[XX-Semi-Monthly (1st & 15th)-XX]",
+      "semiMonthly": "[XX-Semi-Monthly (15th & month end)-XX]",
       "biweekly": "[XX-Bi-Weekly-XX]",
       "acceleratedBiweekly": "[XX-Accelerated Bi-Weekly-XX]",
       "weekly": "[XX-Weekly-XX]",

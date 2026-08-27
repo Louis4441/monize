@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import { parseLocalDate } from '@/lib/utils';
 import { advanceByFrequency } from '@/lib/frequency';
 import type { FrequencyType } from '@/types/scheduled-transaction';
@@ -44,6 +43,28 @@ export type ScheduleFrequency =
   | 'YEARLY'
   | 'ACCELERATED_WEEKLY'
   | 'ACCELERATED_BIWEEKLY';
+
+/**
+ * A local calendar day as `yyyy-MM-dd`.
+ *
+ * date-fns `format` with this pattern, without the pattern parser: the schedule
+ * loop calls it once per row, and a goal-seek runs thirty schedules of up to
+ * `HARD_MAX_PAYMENTS` rows per keystroke, so it is the hottest line in the
+ * engine. Local components, matching `format`'s reading of a local `Date` and
+ * `parseLocalDate`'s construction of one.
+ *
+ * The invalid-date throw is kept deliberately: `format` raises `RangeError` on
+ * one, and a hand-rolled builder that emits "NaN-NaN-NaN" instead would put that
+ * string in a row date, a payoff date and a saved scenario rather than failing.
+ */
+function isoDay(date: Date): string {
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError('Invalid time value');
+  }
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${date.getFullYear()}-${month < 10 ? '0' : ''}${month}-${day < 10 ? '0' : ''}${day}`;
+}
 
 export interface LumpSum {
   /** ISO date (yyyy-MM-dd) the lump sum is paid */
@@ -183,6 +204,46 @@ export interface OverpaymentPlan {
 }
 
 /**
+ * The mode a plan actually behaves as, from whichever of its three carriers is
+ * in force.
+ *
+ * A plan can name its mode in three places -- `targetMonthlyPaymentMode`,
+ * `recurringExtra.mode`, and each lump sum's -- and reading only the second was
+ * how the heuristic it replaced kept coming back: a saved BUDGET scenario has
+ * `recurringExtraMode = null` and its mode on `targetMonthlyPaymentMode`, so the
+ * caller fell through to `installmentReduction > 0.005`, which is null exactly
+ * when a schedule truncated -- the case the explicit mode was added for.
+ *
+ * The precedence follows the engine, not a preference. A budget IGNORES
+ * `recurringExtra` and `lumpSums` (see `OverpaymentPlan.targetMonthlyPayment`),
+ * so when one is set its mode is the only one that describes anything, and its
+ * default matches the engine's `?? 'LOWER_INSTALLMENT'`. Otherwise the engine
+ * re-levels the installment when ANY overpayment asks it to
+ * (`anyLowerOverpayment`), so any LOWER_INSTALLMENT carrier makes the plan one:
+ * a consumer that adds the overpayment on top of an installment a lump sum has
+ * already re-levelled down counts the same money twice.
+ *
+ * `null` means the plan carries no overpayment at all -- distinct from
+ * SHORTEN_TERM, which is a plan that overpays and keeps its installment.
+ */
+export function effectiveOverpaymentMode(
+  plan: OverpaymentPlan | undefined | null,
+): OverpaymentMode | null {
+  if (!plan) return null;
+  if ((plan.targetMonthlyPayment ?? 0) > 0) {
+    return plan.targetMonthlyPaymentMode ?? 'LOWER_INSTALLMENT';
+  }
+  const carriers = [
+    ...(plan.recurringExtra ? [plan.recurringExtra.mode] : []),
+    ...(plan.lumpSums ?? []).map((lump) => lump.mode),
+  ];
+  if (carriers.length === 0) return null;
+  return carriers.some((mode) => (mode ?? 'SHORTEN_TERM') === 'LOWER_INSTALLMENT')
+    ? 'LOWER_INSTALLMENT'
+    : 'SHORTEN_TERM';
+}
+
+/**
  * What a bank holds fixed after an overpayment:
  * - SHORTEN_TERM (PL *skrócenie okresu*): keep the installment, pay off sooner.
  * - LOWER_INSTALLMENT (PL *obniżenie raty*): keep the end date, recompute a
@@ -256,6 +317,23 @@ export interface LoanScheduleInput {
    * instead of stopping. Superseded by `fixedEndPeriod` (which already rescues).
    */
   rescueEndPeriod?: number;
+  /**
+   * The no-overpayment payoff length, when the caller has already computed it.
+   *
+   * A LOWER_INSTALLMENT overpayment re-levels the installment toward the term
+   * the loan would have run WITHOUT any overpayment, so the engine derives that
+   * term by generating a whole second schedule with `overpayments: undefined`.
+   * Inside a goal-seek that is the same schedule thirty times over -- the solver
+   * already computes it once as its own baseline, and every candidate differs
+   * only in the overpayment. Supplying it here skips the recursion; the value
+   * MUST be `generateLoanSchedule({ ...input, overpayments: undefined })
+   * .numPayments` for this exact input, or the installment is re-levelled toward
+   * a term the loan does not have.
+   *
+   * Ignored when `fixedEndPeriod` is set, which supersedes it, and when the plan
+   * carries no LOWER_INSTALLMENT overpayment, which needs no such term.
+   */
+  lowerEndPeriod?: number;
   /** Seed for cumulative principal (e.g. historical principal already paid) */
   initialCumulativePrincipal?: number;
   /** Seed for cumulative interest (e.g. historical interest already paid) */
@@ -681,7 +759,7 @@ export function recurringOccurrencesDue(
     };
   }
 
-  const firstPaymentIso = format(firstPaymentDate, 'yyyy-MM-dd');
+  const firstPaymentIso = isoDay(firstPaymentDate);
   const anchor =
     extra.startDate && extra.startDate > firstPaymentIso
       ? parseLocalDate(extra.startDate)
@@ -710,9 +788,8 @@ export function recurringOccurrencesDue(
       let count = 0;
       for (;;) {
         if (pendingDueIso === null) {
-          pendingDueIso = format(
+          pendingDueIso = isoDay(
             overpaymentOccurrenceDate(anchor, cadence, nextIndex),
-            'yyyy-MM-dd',
           );
         }
         // Not yet due: it stays pending for a later payment.
@@ -861,7 +938,7 @@ export function generateBudgetSchedule(
   let paymentNumber = 0;
 
   while (balance > PAYOFF_EPSILON && paymentNumber < cap) {
-    const rowDate = format(currentDate, 'yyyy-MM-dd');
+    const rowDate = isoDay(currentDate);
     while (
       rateChangeIndex < rateChanges.length &&
       rateChanges[rateChangeIndex].effectiveDate <= rowDate
@@ -1011,7 +1088,8 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
   const reLevelEveryPeriod = input.fixedEndPeriod ?? null;
   const lowerEnd =
     reLevelEveryPeriod === null && anyLowerOverpayment
-      ? generateLoanSchedule({ ...input, overpayments: undefined }).numPayments
+      ? (input.lowerEndPeriod ??
+        generateLoanSchedule({ ...input, overpayments: undefined }).numPayments)
       : null;
   // Term to re-level toward if a rate rise would otherwise stall the payment.
   // An explicit `rescueEndPeriod` supplies this rescue without the every-period
@@ -1062,7 +1140,7 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
   let paymentNumber = 0;
 
   while (balance > PAYOFF_EPSILON && paymentNumber < maxPayments) {
-    const rowDate = format(currentDate, 'yyyy-MM-dd');
+    const rowDate = isoDay(currentDate);
 
     // Rate steps land on the first payment on or after their effective date
     // (steps dated before the first payment apply to row 1)

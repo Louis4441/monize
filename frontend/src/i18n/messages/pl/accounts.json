@@ -210,6 +210,7 @@
     "frequencyOptions": {
       "weekly": "Co tydzień",
       "biweekly": "Co 2 tygodnie",
+      "semiMonthly": "Dwa razy w miesiącu",
       "monthly": "Miesięczny",
       "quarterly": "Co kwartał",
       "yearly": "Co rok"
@@ -314,7 +315,7 @@
     "calculatingPreview": "Obliczanie podglądu...",
     "frequencyOptions": {
       "monthly": "Miesięczny",
-      "semiMonthly": "Dwa razy w miesiącu (1. i 15.)",
+      "semiMonthly": "Dwa razy w miesiącu (15. i koniec miesiąca)",
       "biweekly": "Co 2 tygodnie",
       "acceleratedBiweekly": "Przyspieszone co 2 tygodnie",
       "weekly": "Co tydzień",

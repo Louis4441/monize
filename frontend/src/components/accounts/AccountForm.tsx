@@ -969,6 +969,11 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
             accountName: account.name,
             accountType: account.accountType,
             currencyCode: account.currencyCode,
+            // Both flags travel: the dialog submits its own checkboxes, so
+            // starting them at false on a Canadian mortgage turned the flag off
+            // on save and offered cadences the server refuses.
+            isCanadianMortgage: account.isCanadianMortgage,
+            isVariableRate: account.isVariableRate,
           }}
           accounts={accounts}
           onSetupComplete={() => {

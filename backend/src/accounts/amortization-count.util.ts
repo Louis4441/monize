@@ -5,8 +5,14 @@
  * `calculateAcceleratedPayments` and `calculateResidualPayoff` in
  * mortgage-amortization.util.ts, and `calculateTotalPayments` in
  * loan-amortization.util.ts. Three copies of one financial formula is exactly
- * the drift the "written once, in the place that can check it" rule targets --
- * and two of them were being evaluated on the same inputs in a single call.
+ * the drift the "written once, in the place that can check it" rule targets.
+ *
+ * One implementation is not one CALL: an accelerated mortgage still evaluates it
+ * twice on the same inputs in a single `calculateMortgageAmortization` -- once
+ * for the term and once inside `calculateResidualPayoff`, which derives its own
+ * clearing count rather than trusting a number a caller passed it. Two
+ * logarithms is the price of that independence, and it is the right trade; the
+ * point of this module is that both calls compute the same thing.
  */
 
 /**

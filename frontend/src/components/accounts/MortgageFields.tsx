@@ -418,14 +418,20 @@ export function MortgageFields({
                       : t('mortgageFields.previewNA')}
                   </span>
                 </div>
-                {/* The final payment is the residual payoff. It is shown only
-                    when it is materially smaller than the installment (an
-                    accelerated schedule, whose analytic payment count is
-                    fractional), so a standard schedule does not repeat its own
-                    payment amount. Read defensively: an older API omits it. */}
+                {/* The final payment is the residual payoff. It is shown when
+                    it differs materially from the installment in EITHER
+                    direction, so a standard schedule does not repeat its own
+                    payment amount. The one-sided test hid the direction most
+                    worth telling: a caller's payment count one short of the
+                    clearing count leaves a last payment LARGER than every other,
+                    and the borrower saw only the level installment. Read
+                    defensively: an older API omits the field. */}
                 {mortgagePreview.residualPayoffAmount != null &&
                   mortgagePreview.residualPayoffAmount >= 0 &&
-                  mortgagePreview.paymentAmount - mortgagePreview.residualPayoffAmount > 1 && (
+                  Math.abs(
+                    mortgagePreview.paymentAmount -
+                      mortgagePreview.residualPayoffAmount,
+                  ) > 1 && (
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">{t('mortgageFields.previewFinalPayment')}</span>{' '}
                       <span className="font-medium">
