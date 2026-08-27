@@ -177,7 +177,7 @@ export class YahooFinanceService implements QuoteProvider {
   ): Promise<Response> {
     const maxRetries = opts.maxRetries ?? YahooFinanceService.MAX_RETRIES;
     const timeoutMs = opts.timeoutMs ?? YahooFinanceService.FETCH_TIMEOUT_MS;
-    this.health.assertAvailable(HEALTH_PROVIDER_ID);
+    const admission = this.health.assertAvailable(HEALTH_PROVIDER_ID);
     await this.acquireSlot();
     try {
       let lastResponse: Response | null = null;
@@ -193,7 +193,11 @@ export class YahooFinanceService implements QuoteProvider {
           // An error it does not count (a bad URL, an aborted body read) is not
           // an outcome either, so the probe slot this request may be holding
           // goes back rather than being held against a healthy provider.
-          if (!this.health.recordFailure(HEALTH_PROVIDER_ID, error)) {
+          // Only the probe holder may hand the slot back: a straggler admitted
+          // through a closed breaker owns nothing, and releasing then would
+          // free somebody else's probe and let a second one out beside it.
+          const counted = this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+          if (!counted && admission === "probe") {
             this.health.releaseProbe(HEALTH_PROVIDER_ID);
           }
           throw error;
@@ -323,7 +327,8 @@ export class YahooFinanceService implements QuoteProvider {
     // not cached -- so while Yahoo is unreachable every v10 caller used to pay
     // two cookie timeouts plus a getcrumb timeout before failing. Refuse it
     // with the same breaker the rest of the client uses.
-    if (!this.health.tryRequest(HEALTH_PROVIDER_ID)) return false;
+    const admission = this.health.tryRequest(HEALTH_PROVIDER_ID);
+    if (admission === "refused") return false;
     let lastStatus: number | string = "no cookies";
     let lastError: unknown = null;
     // Whether anything here produced evidence about the API host. The slot
@@ -386,6 +391,11 @@ export class YahooFinanceService implements QuoteProvider {
           this.health.recordFailure(HEALTH_PROVIDER_ID, error) || reported;
         lastStatus = describeFetchFailure(error);
         lastError = error;
+        // That failure may have re-armed the window. Trying the second cookie
+        // source anyway would put a second ungated socket on a provider the
+        // breaker has just refused -- two per window, where the whole point of
+        // half-open is one.
+        if (this.health.wouldRefuse(HEALTH_PROVIDER_ID)) break;
       }
     }
 
@@ -393,7 +403,9 @@ export class YahooFinanceService implements QuoteProvider {
     // called, so there is nothing to record -- but the probe slot still has to
     // go back, or the next two minutes of Yahoo calls are refused for a
     // provider nothing has shown to be down.
-    if (!reported) this.health.releaseProbe(HEALTH_PROVIDER_ID);
+    if (!reported && admission === "probe") {
+      this.health.releaseProbe(HEALTH_PROVIDER_ID);
+    }
 
     // Through the rate-limited door like every other provider failure: the
     // handshake is attempted per v10 caller, so a bare warn here is one line

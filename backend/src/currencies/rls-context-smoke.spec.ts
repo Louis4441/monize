@@ -4,7 +4,6 @@ import { Currency } from "./entities/currency.entity";
 import { ExchangeRate } from "./entities/exchange-rate.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
-import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 
 /**
  * RLS smoke for the currencies module's cron and bootstrap entry points (R6).
@@ -67,11 +66,7 @@ describe("currencies module RLS context smoke (real withScopedDb)", () => {
       .mockResolvedValueOnce([{ user_id: USER_ID }]) // usersWithForeignAccounts
       .mockResolvedValue([]); // the per-user backfill's discovery queries
 
-    const service = new ExchangeRateService(
-      dataSource as never,
-      {} as never,
-      createTestProviderHealth(),
-    );
+    const service = new ExchangeRateService(dataSource as never, {} as never);
     const errorSpy = jest
       .spyOn(service["logger"], "error")
       .mockImplementation(() => undefined);
@@ -92,11 +87,7 @@ describe("currencies module RLS context smoke (real withScopedDb)", () => {
     const { manager, dataSource } = createScopedDbMocks([]);
     manager.query.mockResolvedValue([{ code: "USD" }]);
 
-    const service = new ExchangeRateService(
-      dataSource as never,
-      {} as never,
-      createTestProviderHealth(),
-    );
+    const service = new ExchangeRateService(dataSource as never, {} as never);
     const errorSpy = jest
       .spyOn(service["logger"], "error")
       .mockImplementation(() => undefined);

@@ -378,7 +378,6 @@ describe("SecurityPriceService", () => {
       dataSource as never,
       netWorthService as never,
       providers,
-      health,
     );
   });
 
@@ -3551,7 +3550,10 @@ describe("SecurityPriceService", () => {
     // The one case the fetch can never satisfy is the one that would otherwise
     // repeat on every page load.
     it("does not ask again for a security-month that came back empty", async () => {
-      windowSpy.mockResolvedValue(null);
+      // `[]`, not `null`: the provider answering "no bars in that window" is
+      // what may be remembered. `null` is no answer at all -- a failure or a
+      // refusal -- and remembering that poisons the month for everyone.
+      windowSpy.mockResolvedValue([]);
 
       await service.ensurePricesForDate(["sec-1"], "2017-08-18");
       const afterFirst = windowSpy.mock.calls.length;
@@ -3564,7 +3566,7 @@ describe("SecurityPriceService", () => {
     });
 
     it("does ask again for a different month", async () => {
-      windowSpy.mockResolvedValue(null);
+      windowSpy.mockResolvedValue([]);
 
       await service.ensurePricesForDate(["sec-1"], "2017-08-18");
       const afterFirst = windowSpy.mock.calls.length;

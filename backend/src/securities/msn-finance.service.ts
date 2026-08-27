@@ -325,7 +325,8 @@ export class MsnFinanceService implements QuoteProvider {
     // host is unreachable, a refusal is instant and silent rather than one
     // 10-second timeout and one log line per symbol (issue #1265's shape, with
     // this provider's endpoints in place of Yahoo's).
-    if (!this.health.tryRequest(HEALTH_PROVIDER_ID)) return null;
+    const admission = this.health.tryRequest(HEALTH_PROVIDER_ID);
+    if (admission === "refused") return null;
     try {
       const response = await fetch(url, {
         headers: {
@@ -344,11 +345,14 @@ export class MsnFinanceService implements QuoteProvider {
       }
       return (await response.json()) as T;
     } catch (error) {
-      // An uncounted failure is not an outcome, and this call is holding the
-      // exclusive half-open probe slot: hand it back rather than refusing every
+      // An uncounted failure is not an outcome. If this call is the one holding
+      // the exclusive half-open slot, hand it back rather than refusing every
       // MSN call for the probe timeout against a provider nothing has shown to
-      // be down.
-      if (!this.health.recordFailure(HEALTH_PROVIDER_ID, error)) {
+      // be down -- and only then, or a straggler frees somebody else's probe.
+      if (
+        !this.health.recordFailure(HEALTH_PROVIDER_ID, error) &&
+        admission === "probe"
+      ) {
         this.health.releaseProbe(HEALTH_PROVIDER_ID);
       }
       this.health.logFailure(
@@ -1171,7 +1175,8 @@ export class MsnFinanceService implements QuoteProvider {
     // surface for sector data is limited and may not be available for all
     // security types.
     const url = `${STOCK_DETAILS_PAGE}/fi-${encodeURIComponent(instrumentId)}`;
-    if (!this.health.tryRequest(HEALTH_PROVIDER_ID)) return null;
+    const admission = this.health.tryRequest(HEALTH_PROVIDER_ID);
+    if (admission === "refused") return null;
     try {
       const response = await fetch(url, {
         headers: {
@@ -1189,7 +1194,10 @@ export class MsnFinanceService implements QuoteProvider {
       if (!sector && !industry) return { sector: null, industry: null };
       return { sector, industry };
     } catch (error) {
-      if (!this.health.recordFailure(HEALTH_PROVIDER_ID, error)) {
+      if (
+        !this.health.recordFailure(HEALTH_PROVIDER_ID, error) &&
+        admission === "probe"
+      ) {
         this.health.releaseProbe(HEALTH_PROVIDER_ID);
       }
       this.health.logFailure(

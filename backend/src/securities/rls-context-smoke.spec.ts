@@ -6,7 +6,6 @@ import { InvestmentTransaction } from "./entities/investment-transaction.entity"
 import { Security } from "./entities/security.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
-import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 
 /**
  * RLS smoke for the securities module's cron entry points (task R3).
@@ -77,7 +76,6 @@ describe("securities module RLS context smoke (real withScopedDb)", () => {
       dataSource as never,
       { recalculateAllInvestmentSnapshots: jest.fn() } as never,
       {} as never,
-      createTestProviderHealth(),
     );
     const errorSpy = jest
       .spyOn(service["logger"], "error")
@@ -104,7 +102,6 @@ describe("securities module RLS context smoke (real withScopedDb)", () => {
       dataSource as never,
       {} as never,
       {} as never,
-      createTestProviderHealth(),
     );
 
     await expect(service.refreshAllPrices()).resolves.toMatchObject({
@@ -124,7 +121,6 @@ describe("securities module RLS context smoke (real withScopedDb)", () => {
       dataSource as never,
       {} as never,
       {} as never,
-      createTestProviderHealth(),
     );
 
     await expect(

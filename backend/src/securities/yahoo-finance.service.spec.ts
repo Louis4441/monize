@@ -2443,7 +2443,7 @@ describe("YahooFinanceService", () => {
       // may probe rather than waiting out the probe timeout.
       expect(timedHealth.snapshot("yahoo_finance").consecutiveFailures).toBe(5);
       expect(timedHealth.wouldRefuse("yahoo_finance")).toBe(false);
-      expect(timedHealth.tryRequest("yahoo_finance")).toBe(true);
+      expect(timedHealth.tryRequest("yahoo_finance")).toBe("probe");
     });
 
     it("resumes once the provider answers again", async () => {

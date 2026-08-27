@@ -1523,7 +1523,11 @@ describe("ExchangeRateService", () => {
     // The one case the fetch can never satisfy is the one that would otherwise
     // repeat on every page load: a date before the pair's history begins.
     it("does not ask again for a pair-month the provider had nothing for", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+      // `[]`, not `null`: an answered-empty window is what may be remembered.
+      // `null` means no answer -- a failure, or a call the breaker refused --
+      // and remembering that leaves every foreign-currency total in the report
+      // null for half an hour after the provider came back.
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([]);
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],

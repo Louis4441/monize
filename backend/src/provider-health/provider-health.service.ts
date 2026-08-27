@@ -29,6 +29,14 @@ const HEARTBEAT_MS = 5 * 60_000;
 /** At most one failure line per provider per window, however many failed. */
 const LOG_INTERVAL_MS = 60_000;
 
+/**
+ * What a gate granted. `"probe"` is the exclusive half-open slot, and its holder
+ * owes an outcome -- a success, a counted failure, or `releaseProbe`.
+ * `"open-gate"` is an ordinary admission through a closed breaker, which owns
+ * nothing and must never release.
+ */
+export type ProviderAdmission = "open-gate" | "probe";
+
 /** Per-provider logging bookkeeping, so the flood becomes one line a minute. */
 interface LogState {
   lastLoggedAt: number;
@@ -119,9 +127,11 @@ export class ProviderHealthService {
    * five in-flight 60-second timeouts costs the caller everything the breaker
    * was meant to save.
    */
-  assertAvailable(provider: string): void {
+  assertAvailable(provider: string): ProviderAdmission {
     const decision = this.circuit(provider).beforeRequest();
-    if (decision.allowed) return;
+    if (decision.allowed) {
+      return decision.state === "half-open" ? "probe" : "open-gate";
+    }
     throw new ProviderUnavailableError(
       providerLabel(provider),
       decision.retryAfterMs,
@@ -138,8 +148,10 @@ export class ProviderHealthService {
    * half-open is that a still-dead provider costs one socket per window. Use
    * `snapshot()` when you genuinely only want to look.
    */
-  tryRequest(provider: string): boolean {
-    return this.circuit(provider).beforeRequest().allowed;
+  tryRequest(provider: string): ProviderAdmission | "refused" {
+    const decision = this.circuit(provider).beforeRequest();
+    if (!decision.allowed) return "refused";
+    return decision.state === "half-open" ? "probe" : "open-gate";
   }
 
   /**
@@ -197,8 +209,14 @@ export class ProviderHealthService {
   }
 
   /**
-   * Give back a slot taken by `tryRequest`/`assertAvailable` when the attempt
-   * produced no evidence about this provider at all. Counts nothing.
+   * Give back the probe slot when the attempt produced no evidence about this
+   * provider at all. Counts nothing.
+   *
+   * **Only the caller that was admitted as `"probe"` may call this.** The slot
+   * is a single piece of shared state, so a straggler admitted while the
+   * breaker was still closed would otherwise free somebody else's probe and let
+   * a second one out beside it -- which is the herd the slot exists to prevent.
+   * That is why both gates return which kind of admission they granted.
    */
   releaseProbe(provider: string): void {
     this.circuit(provider).releaseProbe();

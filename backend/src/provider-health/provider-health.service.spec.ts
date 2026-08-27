@@ -333,13 +333,15 @@ describe("ProviderHealthService", () => {
   });
 
   describe("tryRequest", () => {
-    it("is true while the provider answers", () => {
-      expect(service.tryRequest(PROVIDER)).toBe(true);
+    it("admits an ordinary call while the provider answers", () => {
+      // "open-gate", not "probe": this caller owns no slot and must never
+      // release one.
+      expect(service.tryRequest(PROVIDER)).toBe("open-gate");
     });
 
-    it("is false while the window has not elapsed", () => {
+    it("refuses while the window has not elapsed", () => {
       driveOpen();
-      expect(service.tryRequest(PROVIDER)).toBe(false);
+      expect(service.tryRequest(PROVIDER)).toBe("refused");
     });
 
     it("takes the probe slot, so a dead provider costs one call per window", () => {
@@ -349,15 +351,15 @@ describe("ProviderHealthService", () => {
       // exactly the ones with no throw in their contract.
       driveOpen();
       advance(OPEN_WINDOW_MS + 1);
-      expect(service.tryRequest(PROVIDER)).toBe(true);
-      expect(service.tryRequest(PROVIDER)).toBe(false);
-      expect(service.tryRequest(PROVIDER)).toBe(false);
+      expect(service.tryRequest(PROVIDER)).toBe("probe");
+      expect(service.tryRequest(PROVIDER)).toBe("refused");
+      expect(service.tryRequest(PROVIDER)).toBe("refused");
     });
 
     it("keeps refusing after a post-window failure, not forever admitting", () => {
       driveOpen();
       advance(OPEN_WINDOW_MS + 1);
-      expect(service.tryRequest(PROVIDER)).toBe(true);
+      expect(service.tryRequest(PROVIDER)).toBe("probe");
       service.recordFailure(PROVIDER, transportError());
 
       // The bug this pins: the failure left retryAt in the past, so every later
@@ -365,7 +367,7 @@ describe("ProviderHealthService", () => {
       // for one minute and was then a permanent no-op.
       for (let i = 0; i < 20; i++) {
         advance(1_000);
-        expect(service.tryRequest(PROVIDER)).toBe(false);
+        expect(service.tryRequest(PROVIDER)).toBe("refused");
       }
     });
   });
@@ -416,13 +418,13 @@ describe("ProviderHealthService", () => {
     it("hands the slot back without claiming to know anything", () => {
       driveOpen();
       advance(OPEN_WINDOW_MS + 1);
-      expect(service.tryRequest(PROVIDER)).toBe(true);
-      expect(service.tryRequest(PROVIDER)).toBe(false);
+      expect(service.tryRequest(PROVIDER)).toBe("probe");
+      expect(service.tryRequest(PROVIDER)).toBe("refused");
 
       service.releaseProbe(PROVIDER);
 
       // The next caller may probe...
-      expect(service.tryRequest(PROVIDER)).toBe(true);
+      expect(service.tryRequest(PROVIDER)).toBe("probe");
       // ...and nothing was counted either way: the breaker is still open with
       // the same failure run behind it.
       expect(service.snapshot(PROVIDER).consecutiveFailures).toBe(
@@ -443,7 +445,7 @@ describe("ProviderHealthService", () => {
       expect(service.wouldRefuse(PROVIDER)).toBe(false);
       expect(service.wouldRefuse(PROVIDER)).toBe(false);
       // The probe is still there for the caller that actually makes a request.
-      expect(service.tryRequest(PROVIDER)).toBe(true);
+      expect(service.tryRequest(PROVIDER)).toBe("probe");
     });
 
     it("is true while the window has not elapsed", () => {

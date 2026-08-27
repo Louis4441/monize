@@ -649,6 +649,30 @@ describe("MarketIndexService", () => {
       );
     });
 
+    it("does not stamp an attempt when the breaker opens between check and call", async () => {
+      // The window can close in the gap: the check said "go", another caller's
+      // failures opened the breaker, and the first chunk was refused. That is
+      // still a call that never left the process, so it must not cost the index
+      // its six-hour cooldown.
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockImplementation(() => {
+        throw new Error("the provider should not have been called");
+      });
+      // Open the breaker after `refreshAll` has begun by opening it right
+      // before: the per-window check is what has to catch it.
+      for (let i = 0; i < 5; i++) {
+        health.recordFailure("yahoo_finance", transportFailure());
+      }
+
+      await service.refreshAll();
+
+      expect(
+        statements().filter((sql) =>
+          sql.includes("INSERT INTO market_index_sync"),
+        ),
+      ).toHaveLength(0);
+    });
+
     it("does not stamp an attempt for a call that never left the process", async () => {
       // `last_attempt_at` drives a six-hour cooldown. Stamping it for a request
       // the breaker refused meant a two-minute outage cost every index six

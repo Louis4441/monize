@@ -90,9 +90,11 @@ no SMTP does nothing at all.
 - **Availability bookkeeping never fails a request.** The write is
   fire-and-forget, outside the caller's transaction, and swallows its own errors.
 - **A gate takes the probe slot; a skip-decision does not.** `assertAvailable`
-  and `tryRequest` admit one request and owe an outcome (`recordSuccess`,
-  `recordFailure`, or `releaseProbe` when the attempt learned nothing about the
-  provider's own host). `wouldRefuse` is the read-only predicate, for deciding
+  and `tryRequest` admit one request and return which kind of admission it was;
+  a `"probe"` holder owes an outcome (`recordSuccess`, `recordFailure`, or
+  `releaseProbe` when the attempt learned nothing about the provider's own
+  host), and only a probe holder may release, or a straggler frees somebody
+  else's slot. `wouldRefuse` is the read-only predicate, for deciding
   whether to skip work -- `MarketIndexService` uses it so a refused call does
   not stamp `last_attempt_at` and burn a six-hour cooldown for a request that
   never left the process. Using it as a gate would let every caller through the

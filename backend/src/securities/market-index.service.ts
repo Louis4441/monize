@@ -437,16 +437,6 @@ export class MarketIndexService implements OnApplicationBootstrap {
     to: string,
     options: { replaceExisting?: boolean } = {},
   ): Promise<void> {
-    // A request the breaker would refuse is not an attempt, and recording one
-    // burns this index's six-hour cooldown for a call that never left the
-    // process -- so a provider that recovered two minutes later would still
-    // leave the benchmark undrawable until the evening. Deliberately "would it
-    // be refused *now*" rather than "is the breaker open": once the window has
-    // elapsed the fetch below becomes the probe, which is how a deployment
-    // holding no securities at all -- the one in issue #1265 -- ever discovers
-    // that Yahoo is back.
-    if (this.health.wouldRefuse(HEALTH_PROVIDER_ID)) return;
-    await this.recordAttempt(index.code);
     try {
       const chunks: Array<{ start: string; end: string }> = [];
       for (let start = from; start <= to; ) {
@@ -462,13 +452,38 @@ export class MarketIndexService implements OnApplicationBootstrap {
       // the first chunk is the probe: it closes the breaker for the ten behind
       // it, or it stops the loop before they are attempted at all.
       const prices: HistoricalPrice[] = [];
+      // `last_attempt_at` drives a six-hour cooldown, so it is stamped for a
+      // request that actually left the process and not before: a call the
+      // breaker refused is not an attempt, and recording one meant a provider
+      // that recovered two minutes later still left the benchmark undrawable
+      // until the evening. The check is "would it be refused *now*" rather than
+      // "is the breaker open", because once the window has elapsed the request
+      // below becomes the probe -- which is how a deployment holding no
+      // securities at all (issue #1265's own) ever discovers Yahoo is back.
+      let attempted = false;
       for (const { start, end } of chunks) {
+        if (this.health.wouldRefuse(HEALTH_PROVIDER_ID)) {
+          // Nothing asked, nothing to record -- unless earlier windows in this
+          // same fetch did go out, in which case the series is incomplete and
+          // the failure is real.
+          if (!attempted) return;
+          await this.recordFailure(
+            index.code,
+            this.noAnswerReason(index, start, end),
+          );
+          return;
+        }
+
         const chunk = await this.yahooFinanceService.fetchHistoricalWindow(
           index.yahooSymbol,
           null,
           new Date(`${start}T00:00:00Z`),
           new Date(`${end}T23:59:59Z`),
         );
+        if (!attempted) {
+          await this.recordAttempt(index.code);
+          attempted = true;
+        }
 
         // `null` is "no usable answer" -- a refusal, a transport failure, a
         // throttled response that outlasted its retries. `[]` is the provider

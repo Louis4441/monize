@@ -76,9 +76,15 @@ describe("outbound provider calls are answerable to the breaker", () => {
       expect(source).toContain("this.health.recordSuccess(");
       // `wouldRefuse` reads without taking the half-open probe slot, so as a
       // gate it lets every caller through the instant an open window elapses --
-      // the herd the slot exists to prevent. It is for deciding whether to skip
-      // work (MarketIndexService), never for admitting a request.
-      expect(source).not.toContain("wouldRefuse");
+      // the herd the slot exists to prevent.
+      //
+      // The ban is on the *negated* form, because that is exactly the misuse:
+      // `if (!wouldRefuse(...)) { fetch(...) }` reads "may I call", which is a
+      // gate. The positive form reads "should I stop", which is what it is for
+      // -- skipping work whose gate has already been taken (the crumb
+      // handshake's second cookie source) or that should not be started at all
+      // (MarketIndexService's per-index cooldown).
+      expect(source).not.toMatch(/!\s*this\.health\.wouldRefuse\(/);
     },
   );
 
