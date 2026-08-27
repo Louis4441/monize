@@ -402,6 +402,36 @@ Three sources produce nearly all of them here:
   synchronously, so `useDensityStore.setState(...)` re-renders outside act
   unless wrapped. Writing *before* the render does not need it.
 
+### Awaiting static chrome synchronises nothing
+
+`await screen.findByText('Portfolio Value Over Time')` resolves on the page's
+title -- markup that renders before any request does. Every assertion keyed off
+it is asserting on an async call it never waited for. Wait for the thing being
+asserted (`await waitFor(() => expect(api.x).toHaveBeenCalledTimes(1))`), which
+cannot mask a real failure: a call that never happens still times out.
+
+The trap is worst where a call is **second-stage** -- issued only after an
+earlier response commits. The Portfolio Value chart's prior-close baseline is
+gated on `chartPoints[0]`, so it cannot fire until the intraday response lands;
+tests asserting it right after the title passed on a fast machine and failed on
+CI run #2877. Before asserting that a request was made, ask what has to resolve
+first.
+
+Two exceptions, both real: an assertion already inside a `waitFor` callback, and
+one inside a pinned clock -- RTL's `waitFor` cannot drive Vitest's fake timers
+and will hang until the test times out, so there the act-wrapped drain is the
+barrier. A blanket sweep over a file with mixed timer regimes walks into that.
+
+### Test isolation is every storage, not just `localStorage`
+
+`src/test/setup.ts` clears `localStorage` between tests, and for a long time
+cleared nothing else. The Portfolio Value chart caches its intraday response in
+`sessionStorage`, and a leaked entry hydrates the next test's chart
+*synchronously on mount* -- which moves a second-stage request to immediate and
+silently changes what that test is exercising. Anything a component persists is
+shared state between tests: clear it, or the suite's behaviour depends on
+ordering.
+
 ### A busy flag shared by nesting operations is a counter, not a boolean
 
 One mutation can start another ("save and carry on" runs the deferred scenario create from inside the settings save's own `onSaved`). With a single boolean the inner sets it, the outer's `finally` clears it, and the page goes live over a request still on the wire. Count the operations in flight and derive the flag (`pending > 0`); every begin needs exactly one end, on both success and failure paths.
