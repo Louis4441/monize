@@ -66,9 +66,12 @@ import { roundMoney, sumMoney } from "../common/round.util";
 import {
   applyFxConversion,
   normalizeFxEntry,
+  resolveFxRateOrNull,
   roundFxRate,
 } from "../common/fx-entry.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { FxAggregate } from "../common/fx-aggregate";
+import { resolveUserDefaultCurrency } from "../common/default-currency.util";
 import { tr } from "../i18n/translate";
 
 /**
@@ -122,13 +125,21 @@ export interface LlmUpcomingScheduledResult {
   itemCount: number;
   overdueCount: number;
   /**
-   * `null` when any included bill's current amount is unknown -- an aggregate is
-   * only a total when every component is known, and substituting a stale
-   * persisted amount would report a confident wrong number (issue #1247).
-   * `knownUpcomingBillsSubtotal` then carries what did resolve.
+   * `null` when any included bill's current amount is unknown, or when one of
+   * them is in a currency with no rate into `totalsCurrency` -- an aggregate is
+   * only a total when every component is known AND in one currency, and
+   * substituting a stale persisted amount or adding two currencies as numbers
+   * both report a confident wrong number (issue #1247).
+   * `knownUpcomingBillsSubtotal` then carries what did convert.
    */
   totalUpcomingBills: number | null;
   totalUpcomingDeposits: number | null;
+  /**
+   * The currency both totals are expressed in: the user's default. Each item
+   * keeps its OWN `currency`, which need not be this one -- a scheduled
+   * investment settles in its settlement account's currency.
+   */
+  totalsCurrency: string;
   /** Present only when the matching total is `null`. Never a total's stand-in. */
   knownUpcomingBillsSubtotal?: number;
   knownUpcomingDepositsSubtotal?: number;
@@ -136,6 +147,12 @@ export interface LlmUpcomingScheduledResult {
   amountsComplete: boolean;
   /** The items whose current amount is unknown, so an answer can name them. */
   unknownAmountItems?: string[];
+  /**
+   * The currency pairs a component could not be converted through, so a withheld
+   * total says why rather than leaving a bare `null`. Empty when every component
+   * converted.
+   */
+  missingRatePairs?: string[];
   items: LlmScheduledItem[];
 }
 
@@ -1654,22 +1671,42 @@ export class ScheduledTransactionsService {
     const deposits = items.filter((i) => i.kind === "deposit");
     // An occurrence whose direction is not derivable could belong to EITHER
     // bucket, so it withholds both totals rather than being quietly left out of
-    // both -- its amount is null, which is what `totalOfKnownAmounts` withholds
+    // both -- its amount is null, which is what `totalConvertedInto` withholds
     // on. It stays out of the two item lists, because a list of bills that
     // includes something that might be a deposit is a worse answer than a named
     // unknown (issue #1247 re-audit).
     const unclassified = rollupBase.filter((i) => i.kind === "unknown");
-    // A bucket's total exists only when every item in it resolved; the partial
+    // A bucket's total exists only when every item in it resolved AND every one
+    // of them converted into the currency the total is reported in; the partial
     // sum travels in its own explicitly-named field so nothing reads it as a
     // total. Each bucket otherwise answers for itself -- an unknown deposit does
     // not make the bills total unknowable.
-    const billsTotal = totalOfKnownAmounts([...bills, ...unclassified], (a) =>
-      Math.abs(a),
+    //
+    // An item's `currency` is its SETTLEMENT currency, which for an investment
+    // schedule is neither the brokerage account's nor the reader's: summing the
+    // raw numbers published a 1,350 CAD occurrence beside a 500 USD bill as a
+    // confident `1850` under one label, which is the exact figure both tool
+    // descriptions promise cannot appear (issue #1247 re-audit).
+    const totalsCurrency = await resolveUserDefaultCurrency(
+      this.dataSource,
+      userId,
     );
-    const depositsTotal = totalOfKnownAmounts(
+    const rateFor = this.memoizedRateResolver(totalsCurrency, today);
+    const billsTotal = await this.totalConvertedInto(
+      [...bills, ...unclassified],
+      totalsCurrency,
+      rateFor,
+      (a) => Math.abs(a),
+    );
+    const depositsTotal = await this.totalConvertedInto(
       [...deposits, ...unclassified],
+      totalsCurrency,
+      rateFor,
       (a) => a,
     );
+    const missingRatePairs = [
+      ...new Set([...billsTotal.missingPairs, ...depositsTotal.missingPairs]),
+    ].sort();
     // Named from the rollup base for the same reason: an unknown the kind filter
     // removed from the list still makes the totals incomplete, so the caller has
     // to be told which item it was.
@@ -1687,15 +1724,101 @@ export class ScheduledTransactionsService {
       overdueCount: items.filter((i) => i.daysUntilDue < 0).length,
       totalUpcomingBills: billsTotal.total,
       totalUpcomingDeposits: depositsTotal.total,
+      totalsCurrency,
       ...(billsTotal.total === null
         ? { knownUpcomingBillsSubtotal: billsTotal.knownSubtotal }
         : {}),
       ...(depositsTotal.total === null
         ? { knownUpcomingDepositsSubtotal: depositsTotal.knownSubtotal }
         : {}),
-      amountsComplete: unknownAmountItems.length === 0,
+      // A withheld total has two causes and the reader needs to know which:
+      // an item whose own amount could not be worked out (named here) and an
+      // item in a currency with no rate into the reporting one (named below).
+      // Reporting the second as the first sends the reader to the schedule
+      // instead of to the rate.
+      amountsComplete:
+        unknownAmountItems.length === 0 && missingRatePairs.length === 0,
       ...(unknownAmountItems.length > 0 ? { unknownAmountItems } : {}),
+      ...(missingRatePairs.length > 0 ? { missingRatePairs } : {}),
       items,
+    };
+  }
+
+  /**
+   * One rate lookup per currency PAIR for the life of one read, not one per
+   * item: twelve CAD bills in a USD answer asked the identical question twelve
+   * times, in series, and on a cold pair the first fetches a provider window
+   * while the other eleven wait behind it. `asOf` is fixed across the read, so
+   * the pair is the whole key.
+   */
+  private memoizedRateResolver(
+    into: string,
+    asOf: string,
+  ): (from: string) => Promise<number | null> {
+    const cache = new Map<string, Promise<number | null>>();
+    return (from: string) => {
+      let pending = cache.get(from);
+      if (!pending) {
+        // Through `resolveFxRateOrNull`, never the raw service call: a stored
+        // rate of zero or a negative one is ABSENT, not applicable, and
+        // multiplying by it converts a 1,350 bill to zero under a total that
+        // still reports itself complete.
+        pending = resolveFxRateOrNull(
+          this.exchangeRateService,
+          from,
+          into,
+          asOf,
+        );
+        cache.set(from, pending);
+      }
+      return pending;
+    };
+  }
+
+  /**
+   * A bucket's total in one currency, or `null` when any component is unknown --
+   * whether because the occurrence's own amount could not be resolved (no pair
+   * to blame) or because its currency has no rate into `into` (named, so the
+   * reader can go and fix that rate).
+   *
+   * `sign` maps a signed amount into the bucket's own convention; bills are
+   * reported as positive magnitudes.
+   */
+  private async totalConvertedInto(
+    items: { amount: number | null; currency: string }[],
+    into: string,
+    rateFor: (from: string) => Promise<number | null>,
+    sign: (amount: number) => number,
+  ): Promise<{
+    total: number | null;
+    knownSubtotal: number;
+    missingPairs: string[];
+  }> {
+    const agg = new FxAggregate();
+    for (const item of items) {
+      if (item.amount === null) {
+        // Unknown in EVERY currency, so there is no pair to name: the
+        // occurrence's own settlement rate is what is missing, and it already
+        // reported that through `unknownAmountItems`.
+        agg.addUnknown();
+        continue;
+      }
+      const amount = sign(item.amount);
+      if (item.currency === into) {
+        agg.addConverted(amount);
+        continue;
+      }
+      const rate = await rateFor(item.currency);
+      agg.add(
+        rate === null ? null : roundMoney(amount * rate),
+        item.currency,
+        into,
+      );
+    }
+    return {
+      total: agg.total,
+      knownSubtotal: agg.knownSubtotal,
+      missingPairs: agg.missingPairs,
     };
   }
 
@@ -3496,24 +3619,6 @@ function classifyScheduledKind(
   if (row.isInvestment) return "investment";
   if (occurrence.directionAmount === null) return "unknown";
   return occurrence.directionAmount < 0 ? "bill" : "deposit";
-}
-
-/**
- * The total of a bucket of items, or `null` when any of them has an unknown
- * amount, with the partial sum kept separately (`docs/financial-semantics.md`:
- * a subtotal is not a total). `sign` maps a signed amount into the bucket's own
- * convention -- bills are reported as positive magnitudes.
- */
-function totalOfKnownAmounts(
-  items: { amount: number | null }[],
-  sign: (amount: number) => number,
-): { total: number | null; knownSubtotal: number } {
-  const known = items.filter((i): i is { amount: number } => i.amount !== null);
-  const knownSubtotal = sumMoney(known.map((i) => sign(i.amount)));
-  return {
-    total: known.length === items.length ? knownSubtotal : null,
-    knownSubtotal,
-  };
 }
 
 function daysBetweenYMD(fromYMD: string, toYMD: string): number {

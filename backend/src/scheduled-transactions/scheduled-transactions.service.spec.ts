@@ -13,6 +13,8 @@ import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-spli
 import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
 import { Account } from "../accounts/entities/account.entity";
 import { Tag } from "../tags/entities/tag.entity";
+import { UserPreference } from "../users/entities/user-preference.entity";
+import { FALLBACK_DEFAULT_CURRENCY } from "../common/default-currency.util";
 import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
@@ -41,6 +43,7 @@ describe("ScheduledTransactionsService", () => {
   let overridesRepo: Record<string, jest.Mock>;
   let accountsRepo: Record<string, jest.Mock>;
   let tagRepo: Record<string, jest.Mock>;
+  let preferencesRepo: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
   let transactionsService: Record<string, jest.Mock>;
   // The FX trio the effective-amount resolver reads, plus the `create` the
@@ -205,12 +208,20 @@ describe("ScheduledTransactionsService", () => {
       getRateForDate: jest.fn().mockResolvedValue(null),
     };
 
+    // The reader's reporting currency, which the AI/MCP rollups convert into.
+    // USD by default so the fixtures' own USD schedules need no rate at all;
+    // a cross-currency test overrides the row or the rate deliberately.
+    preferencesRepo = {
+      findOne: jest.fn().mockResolvedValue({ defaultCurrency: "USD" }),
+    };
+
     const tenantMocks = createScopedDbMocks([
       [ScheduledTransaction, scheduledRepo],
       [ScheduledTransactionSplit, splitsRepo],
       [ScheduledTransactionOverride, overridesRepo],
       [Account, accountsRepo],
       [Tag, tagRepo],
+      [UserPreference, preferencesRepo],
     ]);
     mockDataSource = tenantMocks.dataSource;
     // The timezone fan-out now runs through withScopedDb too, so its raw SQL
@@ -1365,6 +1376,185 @@ describe("ScheduledTransactionsService", () => {
       expect(result.knownUpcomingBillsSubtotal).toBe(1200);
       expect(result.amountsComplete).toBe(false);
       expect(result.unknownAmountItems).toEqual(["Sell shares, pay the fee"]);
+    });
+
+    describe("the rollups span one currency or none", () => {
+      // A CAD bill beside a USD one. Added as their raw numbers these are the
+      // 1,850 the tool descriptions promise the caller will never be handed:
+      // both totals are published in ONE currency (the reader's default), so a
+      // component in another either converts or takes the total with it.
+      const twoCurrencyBills = () => [
+        makeScheduled({
+          id: "s-usd",
+          name: "Rent",
+          amount: -500,
+          currencyCode: "USD",
+        }),
+        makeScheduled({
+          id: "s-cad",
+          name: "Hydro",
+          amount: -1350,
+          currencyCode: "CAD",
+        }),
+      ];
+
+      it("converts each component into the reporting currency", async () => {
+        mockExchangeRateService.getRateForDate.mockResolvedValue(0.74);
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder(twoCurrencyBills()),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+        expect(result.totalsCurrency).toBe("USD");
+        // 500 USD + 1350 CAD x 0.74 = 1499 USD. Never 1850.
+        expect(result.totalUpcomingBills).toBe(1499);
+        expect(result.amountsComplete).toBe(true);
+        expect(result.missingRatePairs).toBeUndefined();
+        // Each item keeps its OWN currency -- the totals' currency is not a
+        // relabelling of the rows.
+        expect(
+          result.items.map((i) => `${i.name}|${i.amount}|${i.currency}`).sort(),
+        ).toEqual(["Hydro|-1350|CAD", "Rent|-500|USD"]);
+      });
+
+      it("withholds the total and names the pair when a rate is missing", async () => {
+        mockExchangeRateService.getRateForDate.mockResolvedValue(null);
+        mockExchangeRateService.getLatestRate.mockResolvedValue(null);
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder(twoCurrencyBills()),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+        expect(result.totalUpcomingBills).toBeNull();
+        expect(result.knownUpcomingBillsSubtotal).toBe(500);
+        expect(result.amountsComplete).toBe(false);
+        expect(result.missingRatePairs).toEqual(["CAD->USD"]);
+        // A missing RATE is not an unresolvable amount: both figures are known,
+        // and naming the schedule would send the reader to fix the wrong thing.
+        expect(result.unknownAmountItems).toBeUndefined();
+      });
+
+      it("treats a non-positive stored rate as absent, not as a conversion", async () => {
+        // Multiplying by 0 would convert the 1,350 bill to nothing and report
+        // the total complete -- a plausible 500 in place of an honest refusal.
+        mockExchangeRateService.getRateForDate.mockResolvedValue(0);
+        mockExchangeRateService.getLatestRate.mockResolvedValue(0);
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder(twoCurrencyBills()),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+        expect(result.totalUpcomingBills).toBeNull();
+        expect(result.missingRatePairs).toEqual(["CAD->USD"]);
+      });
+
+      it("asks for a rate once per pair, not once per bill", async () => {
+        mockExchangeRateService.getRateForDate.mockResolvedValue(0.74);
+        const rows = [
+          ...twoCurrencyBills(),
+          makeScheduled({
+            id: "s-cad-2",
+            name: "Internet",
+            amount: -100,
+            currencyCode: "CAD",
+          }),
+          makeScheduled({
+            id: "s-cad-3",
+            name: "Phone",
+            amount: -60,
+            currencyCode: "CAD",
+          }),
+        ];
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder(rows),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+        // 500 + (1350 + 100 + 60) x 0.74 = 500 + 1117.40
+        expect(result.totalUpcomingBills).toBe(1617.4);
+        // Three CAD bills, one lookup. The same-currency ones ask for none.
+        const cadCalls =
+          mockExchangeRateService.getRateForDate.mock.calls.filter(
+            ([from, to]) => from === "CAD" && to === "USD",
+          );
+        expect(cadCalls).toHaveLength(1);
+      });
+
+      it("converts deposits too, and each bucket answers for itself", async () => {
+        mockExchangeRateService.getRateForDate.mockImplementation(
+          async (from: string) => (from === "CAD" ? 0.74 : null),
+        );
+        mockExchangeRateService.getLatestRate.mockResolvedValue(null);
+        const rows = [
+          makeScheduled({
+            id: "s-dep",
+            name: "Salary",
+            amount: 2000,
+            currencyCode: "CAD",
+          }),
+          makeScheduled({
+            id: "s-bill-eur",
+            name: "Server",
+            amount: -80,
+            currencyCode: "EUR",
+          }),
+        ];
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder(rows),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+        // The deposit converted; only the bills bucket holds the EUR gap.
+        expect(result.totalUpcomingDeposits).toBe(1480);
+        expect(result.totalUpcomingBills).toBeNull();
+        expect(result.knownUpcomingBillsSubtotal).toBe(0);
+        expect(result.missingRatePairs).toEqual(["EUR->USD"]);
+      });
+
+      it("reports in the reader's own currency, not the schedules'", async () => {
+        preferencesRepo.findOne.mockResolvedValue({ defaultCurrency: "CAD" });
+        mockExchangeRateService.getRateForDate.mockResolvedValue(1.35);
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder(twoCurrencyBills()),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+        expect(result.totalsCurrency).toBe("CAD");
+        // 500 USD x 1.35 + 1350 CAD = 2025 CAD.
+        expect(result.totalUpcomingBills).toBe(2025);
+        expect(result.amountsComplete).toBe(true);
+      });
+
+      it("falls back to the shared reporting currency when the reader has no preference", async () => {
+        // A missing preference row is not a missing currency: every surface
+        // falls back to the same one, so the total is still denominated and
+        // still printable. Asserted against the constant rather than a literal,
+        // because the point is that this surface uses the shared answer.
+        preferencesRepo.findOne.mockResolvedValue(null);
+        scheduledRepo.createQueryBuilder.mockReturnValue(
+          mockQueryBuilder([
+            makeScheduled({
+              id: "s-home",
+              name: "Hydro",
+              amount: -1350,
+              currencyCode: FALLBACK_DEFAULT_CURRENCY,
+            }),
+          ]),
+        );
+
+        const result = await service.getLlmUpcomingBillsAndDeposits(userId);
+
+        expect(result.totalsCurrency).toBe(FALLBACK_DEFAULT_CURRENCY);
+        // Same currency as the one bill, so it converts with no rate at all.
+        expect(result.totalUpcomingBills).toBe(1350);
+        expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
+      });
     });
 
     it("filters by kind", async () => {

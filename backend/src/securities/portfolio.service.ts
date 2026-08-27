@@ -2,6 +2,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { FxAggregate } from "../common/fx-aggregate";
+import {
+  preferredCurrency,
+  resolveUserDefaultCurrency,
+} from "../common/default-currency.util";
 import { Holding } from "./entities/holding.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -565,7 +569,7 @@ export class PortfolioService {
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
-    const defaultCurrency = pref?.defaultCurrency || "CAD";
+    const defaultCurrency = preferredCurrency(pref);
     const rateCache: FxRateCache = new Map();
 
     // Get investment accounts
@@ -1270,11 +1274,8 @@ export class PortfolioService {
   }
 
   /** The user's default display currency, falling back to CAD. */
-  private async resolveDefaultCurrency(userId: string): Promise<string> {
-    const pref = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(UserPreference).findOne({ where: { userId } }),
-    );
-    return pref?.defaultCurrency || "CAD";
+  private resolveDefaultCurrency(userId: string): Promise<string> {
+    return resolveUserDefaultCurrency(this.dataSource, userId);
   }
 
   /**
@@ -1683,8 +1684,7 @@ export class PortfolioService {
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
-    const displayCurrency =
-      query.displayCurrency || pref?.defaultCurrency || "CAD";
+    const displayCurrency = query.displayCurrency || preferredCurrency(pref);
 
     const cacheKey = this.buildIntradayCacheKey(
       userId,

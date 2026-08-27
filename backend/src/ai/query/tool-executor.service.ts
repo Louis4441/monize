@@ -2245,12 +2245,22 @@ export class ToolExecutorService {
       total !== null
         ? total.toFixed(2)
         : `unknown (subtotal of the items that resolved: ${(knownSubtotal ?? 0).toFixed(2)})`;
-    const incompletePart = data.amountsComplete
-      ? ""
-      : ` Current amounts could not be determined for: ${(data.unknownAmountItems ?? []).join(", ")}; totals including them are incomplete.`;
+    // Two distinct causes, and the reader has to be able to tell them apart: an
+    // occurrence whose own amount is unknown is a schedule to look at, while a
+    // missing rate is a rate to go and fix. Folding both into one sentence sent
+    // the model (and the user) to the wrong place.
+    const unresolvedPart = (data.unknownAmountItems ?? []).length
+      ? ` Current amounts could not be determined for: ${(data.unknownAmountItems ?? []).join(", ")}; totals including them are incomplete.`
+      : "";
+    const missingRatePart = (data.missingRatePairs ?? []).length
+      ? ` No exchange rate for ${(data.missingRatePairs ?? []).join(", ")}, so totals covering those items are incomplete.`
+      : "";
     return {
       data,
-      summary: `${data.itemCount} upcoming ${kindDesc} in the next ${days} day${days === 1 ? "" : "s"}${overduePart}. Bills: ${describeTotal(data.totalUpcomingBills, data.knownUpcomingBillsSubtotal)}, Deposits: ${describeTotal(data.totalUpcomingDeposits, data.knownUpcomingDepositsSubtotal)}.${incompletePart}`,
+      // The totals' currency is named in the same breath as the totals: each
+      // item keeps its own settlement currency, so two figures with no code
+      // between them is exactly how a 1,350 CAD occurrence got read as USD.
+      summary: `${data.itemCount} upcoming ${kindDesc} in the next ${days} day${days === 1 ? "" : "s"}${overduePart}. Bills: ${describeTotal(data.totalUpcomingBills, data.knownUpcomingBillsSubtotal)} ${data.totalsCurrency}, Deposits: ${describeTotal(data.totalUpcomingDeposits, data.knownUpcomingDepositsSubtotal)} ${data.totalsCurrency}.${unresolvedPart}${missingRatePart}`,
       sources: [
         {
           type: "scheduled_transactions",

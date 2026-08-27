@@ -758,12 +758,22 @@ Aggregation rule    A total is null when any component is unknown; the partial s
                     occurrence is converted into the reporting currency before it
                     joins a sum, and a pair with no rate withholds the total and
                     is NAMED (getVelocity's upcomingBillsMissingRates,
+                    LlmUpcomingScheduledResult.missingRatePairs,
                     ConvertedTotal.missingCurrencies) so the reader knows which
                     rate to fix. Backend aggregation goes through FxAggregate,
                     client aggregation through sumConverted /
                     sumEffectiveOccurrences; a currency-blind adder is the defect
                     (the report summed 1,350 CAD beside 500 USD and printed 1,850
-                    in the reader's default currency).
+                    in the reader's default currency, and the AI/MCP rollup did
+                    the same after the report was fixed).
+                    A published total also NAMES its currency
+                    (LlmUpcomingScheduledResult.totalsCurrency, echoed in the
+                    executor's summary line), because the items beside it carry
+                    their own settlement currencies. The currency a reader falls
+                    back to with no preference row is one constant
+                    (FALLBACK_DEFAULT_CURRENCY, backend/src/common/
+                    default-currency.util.ts) -- thirteen copies had drifted to
+                    two different currencies.
 Direction           Bill or deposit, outflow or income, is decided from
                     EffectiveScheduledOccurrence.directionAmount -- the
                     occurrence's own amount when known, the snapshot's sign only

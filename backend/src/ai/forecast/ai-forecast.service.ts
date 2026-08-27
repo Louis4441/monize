@@ -20,6 +20,7 @@ import {
   ForecastRiskFlag,
   ForecastKeyExpense,
 } from "./dto/ai-forecast.dto";
+import { preferredCurrency } from "../../common/default-currency.util";
 
 const MIN_FORECAST_INTERVAL_HOURS = 6;
 const DEFAULT_FORECAST_MONTHS = 3;
@@ -52,7 +53,7 @@ export class AiForecastService {
         where: { userId },
       }),
     );
-    const currency = preferences?.defaultCurrency || "USD";
+    const currency = preferredCurrency(preferences);
 
     let aggregates: ForecastAggregates;
     try {
