@@ -96,6 +96,41 @@ Each feature module under `src/` follows the standard layout. Use `ls src/` or L
 
 Controllers are thin and delegate to services. Services always take `userId` as the first parameter and filter by it for multi-tenancy.
 
+### An edge on a require cycle is deferred, or it is `undefined`
+
+Module and service files are CommonJS, so a circular `import` hands the second
+file a half-filled `exports`: the `@Module({ imports: [...] })` array holds an
+`undefined`, or a constructor's reflected parameter type does, and Nest refuses
+to build the application -- "Nest cannot create the NetWorthModule instance...
+index [1] ... is undefined", or "can't resolve dependencies of the
+ScheduledTransactionsService (AccountsService, TransactionsService, ?, ...)".
+
+**Whether it bites depends on which file `require` reached first**, so the same
+code boots from one entry point and dies from another: `AppModule` from the
+compiled server entry point, `TransactionsModule` from an integration
+`RootTestModule`,
+whichever module a spec happens to import. Issue #1247 shipped green through
+`npm run test:unit` and took out the integration suite, all four E2E shards and
+Lighthouse.
+
+The rule is exact and it is checked: an `imports` entry, or a constructor
+parameter, whose class can reach the declaring file back through `import`
+statements must be `forwardRef(() => X)` / `@Inject(forwardRef(() => X))`.
+`src/module-graph.spec.ts` proves it two ways -- statically over every load order
+at once (naming the offending edge), then at runtime from every module file in
+turn, walking `imports` and every provider's `design:paramtypes` as Nest reads
+them. Reordering imports is not a fix; defer the edge.
+
+### A stub standing in for a real module inherits its export list
+
+`test/helpers/integration-setup.ts` replaces `ScheduledTransactionsModule` with
+a stub, so that stub's `exports` are a claim about the real module. It derives
+them from `Reflect.getMetadata("exports", ScheduledTransactionsModule)` rather
+than restating them: a hand-written copy keeps compiling until a consumer of the
+newly added export appears, and then eighteen suites fail somewhere else
+entirely ("argument ScheduledOccurrenceService at index [5] is available in the
+NotificationsModule module").
+
 ## Configuration
 
 - **Path alias:** `@/*` maps to `src/*` (tsconfig + Jest moduleNameMapper)

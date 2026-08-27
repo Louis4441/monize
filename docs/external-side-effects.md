@@ -223,7 +223,7 @@ Failures propagate as `null`, deliberately. `getRateForDate`'s own comment says
 it "returns null when no rate can be determined (so the caller can reject or flag
 the operation rather than silently assuming 1.0)". The provider layer is
 therefore *not* where the missing-rate defects in
-`docs/financial-semantics.md` section 9 come from -- it reports honestly and
+`docs/financial-semantics.md` section 10 come from -- it reports honestly and
 callers discard the honesty.
 
 **Provider *availability* is now durable state, and it is the one place a

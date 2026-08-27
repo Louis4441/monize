@@ -61,9 +61,11 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
     forwardRef(() => AccountsModule),
     forwardRef(() => TransactionsModule),
     forwardRef(() => CurrenciesModule),
-    NetWorthModule,
+    // forwardRef on both: each lies on a require cycle, so a bare reference is
+    // `undefined` here under some load orders -- see `src/module-graph.spec.ts`.
+    forwardRef(() => NetWorthModule),
     ActionHistoryModule,
-    DelegationModule,
+    forwardRef(() => DelegationModule),
   ],
   providers: [
     SecuritiesService,
