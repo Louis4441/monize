@@ -2,7 +2,12 @@
 
 import { useTranslations } from 'next-intl';
 import { Account } from '@/types/account';
-import { LoanScheduleResult } from '@/lib/loan-schedule';
+import {
+  LoanScheduleResult,
+  ScheduleFrequency,
+  effectiveAnnualRate,
+  getPeriodsPerYear,
+} from '@/lib/loan-schedule';
 import { deriveLoanFigures } from '@/lib/loan-figures';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
@@ -51,10 +56,36 @@ export function LoanSummaryCards({
   const formatChartDate = useChartDateFormat();
   const currency = account.currencyCode;
 
+  // The card is shown only for Canadian fixed-rate mortgages, where the
+  // semi-annual compounding the law requires makes the effective rate differ
+  // visibly from the quoted one -- and that branch is frequency-independent by
+  // law, so calling the shared `effectiveAnnualRate` changes no displayed
+  // number. It removes a third inline copy of the compounding convention
+  // (INV-LOAN-003) and nothing else: a DRY change, not a behaviour fix. The
+  // The frequency and both flags are passed rather than hardcoded, because they
+  // are the correct arguments if this card ever shows a non-Canadian mortgage.
+  // Hardcoding `true, false` beside a comment defending the frequency argument
+  // was the worst of both: widen the guard and the call takes the semi-annual
+  // branch for a US mortgage, on which the frequency is ignored anyway.
   const isCanadianFixed = account.isCanadianMortgage && !account.isVariableRate;
+  // Both halves of this line were changed independently and both are needed.
+  // From upstream: derive through the shared `effectiveAnnualRate` rather than a
+  // third inline copy of the compounding convention (INV-LOAN-003), and test
+  // `!= null` rather than truthiness so a known 0.000% is not reported as
+  // "could not be worked out". From this branch: the rate is the RESOLVED one,
+  // not `account.interestRate` -- the scalar a rate-change mutation deliberately
+  // never writes, so on any loan whose rate was changed through the rate-history
+  // UI it is the old rate, and the note would compound a rate nobody pays. The
+  // card's own value directly below reads `currentAnnualRate`, so taking the
+  // scalar here would also make the headline and its note disagree.
   const effectiveRate =
     isCanadianFixed && currentAnnualRate != null
-      ? (Math.pow(1 + currentAnnualRate / 100 / 2, 2) - 1) * 100
+      ? effectiveAnnualRate(
+          currentAnnualRate,
+          getPeriodsPerYear((account.paymentFrequency ?? 'MONTHLY') as ScheduleFrequency),
+          account.isCanadianMortgage ?? false,
+          account.isVariableRate ?? false,
+        )
       : null;
 
   const frequencyLabel = account.paymentFrequency

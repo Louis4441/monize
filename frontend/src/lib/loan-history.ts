@@ -1172,6 +1172,28 @@ export async function fetchAllAccountTransactions(accountId: string): Promise<Tr
  * counts (an interest-only grace period or migrated history included). Pointing
  * two loans at one interest category would therefore merge them -- give each
  * loan its own interest category to keep them apart.
+ *
+ * **A failed lookup REJECTS; it is not an empty result.** `[]` means one of two
+ * things and only those two: the loan is not configured for separate-interest
+ * booking, or the query ran and this loan genuinely has no standalone interest
+ * expenses. A `catch { return [] }` here made a transient 500 or timeout
+ * indistinguishable from the second -- and every one of this function's callers
+ * already has the error state it should have reached. `useLoanProjection`
+ * reports the projection as unknown, the account detail page has an outer error
+ * boundary, and both the Debt Payoff Timeline and the Overpayment Simulator run
+ * on `useReportData`'s error-and-retry. The helper was swallowing the failure
+ * before any of them could see it, so the history was recomputed from a
+ * fabricated empty interest list.
+ *
+ * What that produced changed with this work, and both readings are worth
+ * keeping. Against the analytic estimate this module used to carry, every row
+ * of a loan that books interest separately fell back to an INVENTED figure, so
+ * the outage rendered a full history of plausible interest. With the estimate
+ * deleted (issue #1255) the same outage renders a measured **zero** instead --
+ * quieter, and no less wrong, because "the ledger recorded no interest" is a
+ * claim this function is not entitled to make on a failed read. The rule in
+ * `frontend/CLAUDE.md` covers both: a failed lookup is not an empty dataset,
+ * and rendering the failure as emptiness turns an outage into an answer.
  */
 export async function fetchLoanInterestTransactions(
   account: Account,

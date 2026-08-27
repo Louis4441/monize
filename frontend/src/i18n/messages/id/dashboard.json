@@ -37,7 +37,8 @@
       "bill": "Tagihan",
       "deposit": "Setoran",
       "transfer": "Transfer",
-      "reminder": "Pengingat"
+      "reminder": "Pengingat",
+      "unknown": "Tidak diketahui"
     }
   },
   "gettingStarted": {

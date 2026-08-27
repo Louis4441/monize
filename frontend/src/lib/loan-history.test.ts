@@ -1310,11 +1310,24 @@ describe('fetchLoanInterestTransactions', () => {
     expect(transactionsApi.getAllPages).not.toHaveBeenCalled();
   });
 
+  it('returns [] when the query runs and this loan has no interest expenses', async () => {
+    // The positive control for the rejection below: a genuinely empty result
+    // must stay an empty result, or the fix would just trade one wrong answer
+    // for another.
+    vi.mocked(transactionsApi.getAllPages).mockResolvedValue([]);
+    expect(await fetchLoanInterestTransactions(account)).toEqual([]);
+  });
+
   it('rejects on a failed lookup rather than reporting an empty ledger', async () => {
-    // [] is a claim: deriveLoanPaymentHistory reads it as "these payments booked
-    // no interest", so a swallowed timeout rendered a schedule of $0.00 interest
-    // indistinguishable from a real one. The failure has to reach the caller's
-    // error-and-retry state.
+    // `catch { return [] }` made a transient 500 or timeout indistinguishable
+    // from the case above. `[]` is a claim: `deriveLoanPaymentHistory` reads it
+    // as "these payments booked no interest", so a swallowed timeout renders a
+    // schedule of $0.00 interest that a user cannot tell from a real one.
+    //
+    // Every caller already has the error state it should have reached --
+    // `useLoanProjection` reports the projection unknown, the account page has
+    // its own retryable error, both loan reports run on `useReportData` -- and
+    // the helper was starving all of them.
     vi.mocked(transactionsApi.getAllPages).mockRejectedValue(new Error('timeout'));
 
     await expect(fetchLoanInterestTransactions(account)).rejects.toThrow('timeout');

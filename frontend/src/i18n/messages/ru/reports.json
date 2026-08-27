@@ -438,6 +438,7 @@
     "currentBalance": "Текущий остаток",
     "principalPaid": "Основной долг уплачен",
     "estTotalInterest": "Расч. общие проценты",
+    "interestOverProjection": "Проценты за прогнозный период",
     "interestPaid": "Проценты уплачены",
     "progress": "Прогресс",
     "estPayoff": "Расч. погашение",
@@ -808,6 +809,7 @@
     "originalAmount": "Первоначальная сумма",
     "interestRate": "Процентная ставка",
     "estTotalInterest": "Расч. общие проценты",
+    "interestOverProjection": "Проценты за прогнозный период",
     "totalInterestPaid": "Всего уплачено процентов",
     "paymentsMade": "Платежей произведено",
     "estPayoff": "Расч. погашение",
@@ -840,7 +842,8 @@
     "typeLineOfCredit": "Кредитная линия",
     "typeLoan": "Займ",
     "typeMortgage": "Ипотека",
-    "pdfSubtitlePaymentsSummary": "{count} платежей произведено, {interest} общие проценты"
+    "pdfSubtitlePaymentsSummary": "{count} платежей произведено, {interest} общие проценты",
+    "pdfSubtitlePaymentsProjection": "Внесено платежей: {count}, проценты за период прогноза: {interest}"
   },
   "monteCarlo": {
     "toasts": {
@@ -1549,12 +1552,16 @@
     "csvColBillName": "Название счёта",
     "csvColDueDate": "Дата платежа",
     "csvColAmount": "Сумма",
+    "csvColCurrency": "Валюта",
     "csvColFrequency": "Частота",
     "csvColAccount": "Счёт",
     "csvColStatus": "Статус",
     "csvStatusOverdue": "Просрочено",
     "csvStatusAuto": "Авто",
     "csvStatusManual": "Ручной",
+    "amountUnavailable": "Недоступно",
+    "occurrencesUnavailable": "Не удалось загрузить прогнозируемые события, поэтому календарь и суммы ниже недоступны. Сами платежи при этом не изменились.",
+    "csvAmountUnavailable": "Недоступно (нет текущего курса обмена)",
     "pdfTitle": "Отчёт о предстоящих платежах",
     "pdfSubtitle": "{month} | {count} активных счетов",
     "pdfActiveBills": "Активные счета",

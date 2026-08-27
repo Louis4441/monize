@@ -72,6 +72,7 @@ import { exportToCsv } from '@/lib/csv-export';
 import { PAGE_SIZE } from '@/lib/constants';
 import { budgetsApi } from '@/lib/budgets';
 import { CategoryBudgetStatus } from '@/types/budget';
+import { preferredCurrency } from '@/lib/default-currency';
 
 const logger = createLogger('Transactions');
 
@@ -101,7 +102,9 @@ function TransactionsContent() {
   const router = useRouter();
   const { formatDate } = useDateFormat();
   const weekStartsOn = (usePreferencesStore((s) => s.preferences?.weekStartsOn) ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
-  const defaultCurrency = usePreferencesStore((s) => s.preferences?.defaultCurrency) || 'CAD';
+  const defaultCurrency = preferredCurrency(
+    usePreferencesStore((s) => s.preferences?.defaultCurrency),
+  );
   const { convertToDefault } = useExchangeRates();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);

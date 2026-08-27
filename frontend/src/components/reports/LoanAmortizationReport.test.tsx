@@ -54,6 +54,28 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
+/**
+ * Render the report and let its two loaders settle inside `act`.
+ *
+ * The report fetches on mount -- the accounts list and, keyed off the resulting
+ * selection, that loan's transactions, booked interest and rate history -- so a
+ * bare `render(...)` leaves those updates landing outside `act` and the
+ * assertions run against a tree React has not finished. `frontend/CLAUDE.md`:
+ * give the file one helper and use it everywhere.
+ */
+async function renderReport() {
+  let result: ReturnType<typeof render>;
+  await act(async () => {
+    result = render(<LoanAmortizationReport />);
+  });
+  // A second flush, because the two loaders are SEQUENTIAL: the accounts fetch
+  // settles inside the first, which seeds the selection, and only then does the
+  // history fetch start -- so its resolution lands in a later microtask. One
+  // flush leaves those updates outside `act`.
+  await act(async () => {});
+  return result!;
+}
+
 describe('LoanAmortizationReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,15 +93,13 @@ describe('LoanAmortizationReport', () => {
     // Wrapping the render is the file's own convention for a component that
     // fetches on mount; the assertion is unchanged, because the account list
     // never resolves and the report therefore cannot leave its loading state.
-    await act(async () => {
-      render(<LoanAmortizationReport />);
-    });
+    await renderReport();
     expect(document.querySelector('.animate-pulse')).toBeTruthy();
   });
 
   it('renders empty state when no loan accounts', async () => {
     mockGetAllAccounts.mockResolvedValue([]);
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText(/No loan or mortgage accounts found/)).toBeInTheDocument();
     });
@@ -111,7 +131,7 @@ describe('LoanAmortizationReport', () => {
       { id: 'i1', transactionDate: '2024-06-01', amount: -300, categoryId: 'cat-int', isTransfer: false },
     ]);
 
-    render(<LoanAmortizationReport />);
+    await renderReport();
 
     // The report pulls the loan's interest expenses, scoped to its configured
     // interest category + source account, so its interest matches the loan
@@ -146,7 +166,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Select Loan')).toBeInTheDocument();
     });
@@ -178,7 +198,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Payment Amount')).toBeInTheDocument();
     });
@@ -202,7 +222,7 @@ describe('LoanAmortizationReport', () => {
     mockGetAllTransactions.mockResolvedValue({
       data: [], pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Select Loan')).toBeInTheDocument();
     });
@@ -229,7 +249,7 @@ describe('LoanAmortizationReport', () => {
     mockGetAllTransactions.mockResolvedValue({
       data: [], pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Select Loan')).toBeInTheDocument();
     });
@@ -249,7 +269,7 @@ describe('LoanAmortizationReport', () => {
     mockGetAllTransactions.mockResolvedValue({
       data: [], pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText(/No payments found for this loan/)).toBeInTheDocument();
     });
@@ -271,7 +291,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Current Balance')).toBeInTheDocument();
     });
@@ -296,7 +316,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       // Multiple "Not set" texts (interestRate, paymentFrequency, paymentAmount are all null)
       const notSetElements = screen.getAllByText('Not set');
@@ -323,7 +343,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('0%')).toBeInTheDocument();
     });
@@ -345,7 +365,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Account Type')).toBeInTheDocument();
     });
@@ -371,7 +391,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Closed')).toBeInTheDocument();
     });
@@ -393,7 +413,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('#')).toBeInTheDocument();
     });
@@ -428,7 +448,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       // Check payment history header shows correct count after transactions load
       expect(screen.getByText(/1 payments made/)).toBeInTheDocument();
@@ -450,7 +470,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Payment History & Projection')).toBeInTheDocument();
     });
@@ -471,7 +491,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Payment History')).toBeInTheDocument();
     });
@@ -492,7 +512,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Projected Future Payments')).toBeInTheDocument();
     });
@@ -513,7 +533,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Est. Payoff')).toBeInTheDocument();
     });
@@ -534,7 +554,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Est. Total Interest')).toBeInTheDocument();
     });
@@ -555,7 +575,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Total Interest Paid')).toBeInTheDocument();
     });
@@ -576,7 +596,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Mortgage')).toBeInTheDocument();
     });
@@ -597,7 +617,7 @@ describe('LoanAmortizationReport', () => {
       ],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Line of Credit')).toBeInTheDocument();
     });
@@ -605,7 +625,7 @@ describe('LoanAmortizationReport', () => {
 
   it('shows a retryable error when loading accounts fails', async () => {
     mockGetAllAccounts.mockRejectedValue(new Error('boom'));
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Try again')).toBeInTheDocument();
     });
@@ -621,7 +641,7 @@ describe('LoanAmortizationReport', () => {
       },
     ]);
     mockGetAllTransactions.mockRejectedValue(new Error('boom'));
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Try again')).toBeInTheDocument();
     });
@@ -655,7 +675,7 @@ describe('LoanAmortizationReport', () => {
     });
     mockGetAllPages.mockRejectedValue(new Error('timeout'));
 
-    render(<LoanAmortizationReport />);
+    await renderReport();
 
     await waitFor(() => {
       expect(screen.getByText('Try again')).toBeInTheDocument();
@@ -684,7 +704,7 @@ describe('LoanAmortizationReport', () => {
       { id: 'i1', transactionDate: '2024-06-01', amount: -300, categoryId: 'cat-int', isTransfer: false },
     ]);
 
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Try again')).toBeInTheDocument();
     });
@@ -721,7 +741,7 @@ describe('LoanAmortizationReport', () => {
   it('loads the loan rate history for the selected account', async () => {
     mockGetAllAccounts.mockResolvedValue(divergentRateAccount);
     mockGetAllTransactions.mockResolvedValue(onePayment);
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => expect(mockGetRateChanges).toHaveBeenCalledWith('loan-1'));
   });
 
@@ -730,7 +750,7 @@ describe('LoanAmortizationReport', () => {
     mockGetAllAccounts.mockResolvedValue(divergentRateAccount);
     mockGetAllTransactions.mockResolvedValue(onePayment);
     mockGetRateChanges.mockResolvedValue([]);
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Projected Future Payments')).toBeInTheDocument();
     });
@@ -745,7 +765,7 @@ describe('LoanAmortizationReport', () => {
     mockGetRateChanges.mockResolvedValue([
       { id: 'r1', effectiveDate: '2024-02-01', annualRate: 12, newPaymentAmount: null },
     ]);
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Select Loan')).toBeInTheDocument();
     });
@@ -773,7 +793,7 @@ describe('LoanAmortizationReport', () => {
       pagination: { hasMore: false },
     });
 
-    render(<LoanAmortizationReport />);
+    await renderReport();
 
     await waitFor(() => {
       expect(screen.getByText('Select Loan')).toBeInTheDocument();
@@ -800,7 +820,7 @@ describe('LoanAmortizationReport', () => {
       data: [{ id: 'tx-1', transactionDate: '2024-01-15', amount: 300, linkedTransaction: null }],
       pagination: { hasMore: false },
     });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Select Loan')).toBeInTheDocument();
     });
@@ -842,7 +862,7 @@ describe('LoanAmortizationReport', () => {
       },
     ]);
     mockGetAllTransactions.mockResolvedValue({ data: txs, pagination: { hasMore: false } });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText(/Show all/)).toBeInTheDocument();
     });
@@ -868,7 +888,7 @@ describe('LoanAmortizationReport', () => {
         },
       ]);
       mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
-      const { unmount } = render(<LoanAmortizationReport />);
+      const { unmount } = await renderReport();
       await waitFor(() => {
         expect(screen.getByText('Select Loan')).toBeInTheDocument();
       });
@@ -886,7 +906,7 @@ describe('LoanAmortizationReport', () => {
       },
     ]);
     mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByText(/No payments found/)).toBeInTheDocument();
     });
@@ -911,7 +931,7 @@ describe('LoanAmortizationReport', () => {
         data: [{ id: 'tx-2', transactionDate: '2024-02-15', amount: 300, linkedTransaction: null }],
         pagination: { hasMore: false },
       });
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(mockGetAllTransactions).toHaveBeenCalledTimes(2);
     });
@@ -998,7 +1018,7 @@ describe('LoanAmortizationReport', () => {
     ]);
     mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
     mockGetAllPages.mockResolvedValue([]);
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByRole('combobox')).toHaveValue('loan-2');
     });
@@ -1024,7 +1044,7 @@ describe('LoanAmortizationReport', () => {
       }]);
     mockGetAllTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
     mockGetAllPages.mockResolvedValue([]);
-    render(<LoanAmortizationReport />);
+    await renderReport();
     await waitFor(() => {
       expect(screen.getByRole('combobox')).toHaveValue('loan-1');
     });

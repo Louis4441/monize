@@ -33,6 +33,25 @@ const allSources = import.meta.glob('/src/**/*.{ts,tsx}', {
 /** A `catch` clause, with or without a bound error, and `.catch(` on a promise. */
 const CATCH = /(^|[^.\w])catch\s*(\([^)]*\))?\s*\{|\.catch\s*\(/;
 
+/**
+ * Blank out comments, keeping line numbering, so the scan reads CODE.
+ *
+ * The rule is about what the module does, and the docblock explaining the rule
+ * necessarily quotes the banned pattern (`catch { return [] }`) to name the
+ * defect it prevents. Scanning raw text made that documentation fail the guard,
+ * which is the wrong pressure entirely: it would have been "fixed" by weakening
+ * the comment. A scan that prose can trip is also a scan that prose can satisfy.
+ *
+ * Deliberately crude -- a `//` inside a string literal would be blanked too.
+ * That direction is safe here: it can only hide code from the scan, and the
+ * negative control below fails if the scan stops seeing a real `catch`.
+ */
+function withoutComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
+    .replace(/\/\/[^\n]*/g, (line) => ' '.repeat(line.length));
+}
+
 describe('loan-history.ts lets a failed lookup fail', () => {
   it('is the one module this project ships, and it contains no catch', () => {
     // Sanity: the glob resolved to the module (an empty match set would make
@@ -40,9 +59,22 @@ describe('loan-history.ts lets a failed lookup fail', () => {
     expect(Object.keys(sources)).toEqual(['/src/lib/loan-history.ts']);
   });
 
+  it('strips comments but still sees code', () => {
+    // The stripper is load-bearing in both directions, so it is tested in both.
+    const stripped = withoutComments(
+      ['// catch {', '/* catch { */', 'try { x() } catch { return []; }'].join('\n'),
+    );
+    const lines = stripped.split('\n');
+    expect(CATCH.test(lines[0])).toBe(false);
+    expect(CATCH.test(lines[1])).toBe(false);
+    expect(CATCH.test(lines[2])).toBe(true);
+    // Line numbering must survive, or the offender report points at the wrong line.
+    expect(lines).toHaveLength(3);
+  });
+
   it('never converts a rejected fetch into an empty ledger', () => {
     const [path, content] = Object.entries(sources)[0];
-    const offendingLines = content
+    const offendingLines = withoutComments(content)
       .split('\n')
       .map((line, index) => ({ line, number: index + 1 }))
       .filter(({ line }) => CATCH.test(line))

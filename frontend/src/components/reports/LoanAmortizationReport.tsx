@@ -25,6 +25,7 @@ import { usePersistedAccountId } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import { useTranslations } from 'next-intl';
 
+
 type AmortizationSortField = 'paymentNumber' | 'date' | 'payment' | 'principal' | 'interest' | 'balance';
 
 interface PaymentRow {
@@ -39,7 +40,7 @@ interface PaymentRow {
 
 const ACCOUNT_STORAGE_KEY = 'monize-reports-loan-amortization-account';
 
-/** Stable empty list, so "nothing loaded yet" is not a new dependency each render. */
+/** Stable empty lists, so "nothing loaded yet" is not a new dependency each render. */
 const NO_TRANSACTIONS: Transaction[] = [];
 const NO_RATE_CHANGES: LoanRateChange[] = [];
 
@@ -62,12 +63,10 @@ export function LoanAmortizationReport() {
   );
 
   // Load all accounts and filter for loans.
-  const {
-    data: fetchedAccounts,
-    isLoading: accountsLoading,
-    error: accountsError,
-    reload: reloadAccounts,
-  } = useReportData(() => accountsApi.getAll(true), []);
+  const { data: fetchedAccounts, isLoading, error, reload } = useReportData(
+    () => accountsApi.getAll(true),
+    [],
+  );
 
   const accounts = useMemo(
     () =>
@@ -97,81 +96,70 @@ export function LoanAmortizationReport() {
   // Load the loan account's transactions plus its separately-booked interest
   // expenses, so the derived interest matches the loan detail page (see #893).
   //
-  // Folded into the report's shared error + retry state rather than caught and
-  // replaced with empty lists: an empty interest list is what tells the
-  // derivation that these payments booked no interest, so a failed load
-  // rendered a schedule of zero interest that looks exactly like a real one
-  // (audit of PR #1258). A failure the user can retry is the only honest
-  // rendering of "we do not know what this loan paid".
+  // Through `useReportData`, like every other loader on this surface and like
+  // the Debt Payoff Timeline's own interest load. It was a bare effect whose
+  // `catch` replaced BOTH arrays with `[]` and carried on -- so a failed history
+  // load rendered as a loan with no payments and no booked interest, and the
+  // derived rows took the analytic estimate. A failed lookup is not an empty
+  // dataset; the report has an error-and-retry state and this now reaches it.
   const {
-    data: loanData,
-    dataKey: loanDataKey,
-    isLoading: loanDataLoading,
-    error: loanDataError,
-    reload: reloadLoanData,
+    data: historyData,
+    dataKey: historyKey,
+    isLoading: historyLoading,
+    error: historyError,
+    reload: reloadHistory,
   } = useReportData(
     async () => {
       if (!selectedAccountId) {
         return {
           transactions: [] as Transaction[],
-          interestTransactions: [] as Transaction[],
+          interest: [] as Transaction[],
           rateChanges: [] as LoanRateChange[],
         };
       }
       const account = accounts.find((a) => a.id === selectedAccountId);
-      // The rate history rides in the same request key as the rest: recording a
-      // rate change never writes the account's own interestRate, so projecting
-      // without these rows uses a stale scalar and disagrees with the loan
-      // detail page about the same loan's payoff date.
-      const [txns, interest, rates] = await Promise.all([
+      // The rate history rides in the same request key as the rest. It is not
+      // decoration: recording a rate change never writes the account's own
+      // interestRate, so projecting without these rows uses a stale scalar and
+      // gives the same loan a different payoff date here than on its detail page.
+      const [transactions, interest, rateChanges] = await Promise.all([
         fetchAllAccountTransactions(selectedAccountId),
-        account
-          ? fetchLoanInterestTransactions(account)
-          : Promise.resolve([] as Transaction[]),
+        account ? fetchLoanInterestTransactions(account) : Promise.resolve([] as Transaction[]),
         // A line of credit is in this report's account list and the endpoint
         // answers 400 for one, which would replace the report with its error
-        // state -- persisted, so it would stay broken across reloads.
+        // state -- persisted, so it would stay broken across reloads with no
+        // in-page way to pick another account.
         supportsRateChanges(account)
           ? loanRateChangesApi.getAll(selectedAccountId)
           : Promise.resolve([] as LoanRateChange[]),
       ]);
-      return { transactions: txns, interestTransactions: interest, rateChanges: rates };
+      return { transactions, interest, rateChanges };
     },
     [selectedAccountId, accounts],
     { requestKey: selectedAccountId },
   );
 
   // The payload and the request it answers travel together: until the held data
-  // belongs to the loan on screen, there is nothing to draw for this selection.
-  const loanDataForSelection = useMemo(
-    () => (loanDataKey === selectedAccountId ? loanData : null),
-    [loanData, loanDataKey, selectedAccountId],
+  // belongs to the loan on screen there is nothing to draw for this selection.
+  // Without this, the one render between a selection change and the refetch drew
+  // the previous loan's rows -- and for the rate history that means projecting
+  // one loan's rate onto another.
+  const historyForSelection = useMemo(
+    () => (historyKey === selectedAccountId ? historyData : null),
+    [historyData, historyKey, selectedAccountId],
   );
-  const transactions = useMemo(
-    () => loanDataForSelection?.transactions ?? NO_TRANSACTIONS,
-    [loanDataForSelection],
+  const transactions = useMemo<Transaction[]>(
+    () => historyForSelection?.transactions ?? NO_TRANSACTIONS,
+    [historyForSelection],
   );
-  const interestTransactions = useMemo(
-    () => loanDataForSelection?.interestTransactions ?? NO_TRANSACTIONS,
-    [loanDataForSelection],
+  const interestTransactions = useMemo<Transaction[]>(
+    () => historyForSelection?.interest ?? NO_TRANSACTIONS,
+    [historyForSelection],
   );
-  const rateChanges = useMemo(
-    () => loanDataForSelection?.rateChanges ?? NO_RATE_CHANGES,
-    [loanDataForSelection],
+  const rateChanges = useMemo<LoanRateChange[]>(
+    () => historyForSelection?.rateChanges ?? NO_RATE_CHANGES,
+    [historyForSelection],
   );
-
-  const isLoading = accountsLoading || loanDataLoading;
-  const reload = () => {
-    reloadAccounts();
-    reloadLoanData();
-  };
-  // Two error scopes, because they need different screens. Without the account
-  // list there is no report at all. A failure loading ONE loan's data must keep
-  // the picker on screen: the selection is persisted, so replacing the whole
-  // report leaves that loan's error restored on every visit with no way to
-  // choose another account -- which is the trap the LOC 400 fell into.
-  const error = accountsError;
-  const loanError = loanDataError;
 
   // One derivation, shared by the schedule and the terms shown above it. It was
   // computed twice per render, which is both wasted work over the whole ledger
@@ -189,9 +177,20 @@ export function LoanAmortizationReport() {
     [selectedAccount, transactions, rateChanges, interestTransactions],
   );
 
-  // Build payment history from actual transactions + projected future payments
-  const paymentHistory = useMemo((): PaymentRow[] => {
-    if (!selectedAccount || !history) return [];
+  // Build payment history from actual transactions + projected future payments.
+  // `projectionPaidOff` travels with the rows because the summary below cannot
+  // tell a completed projection from one truncated at the horizon by looking at
+  // them -- and only the first yields a payoff date or a lifetime interest total
+  // (INV-LOAN-002).
+  const { paymentHistory, projectionPaidOff } = useMemo((): {
+    paymentHistory: PaymentRow[];
+    projectionPaidOff: boolean;
+  } => {
+    if (!selectedAccount || !history)
+      return { paymentHistory: [], projectionPaidOff: false };
+    let projectionPaidOff = false;
+
+    // --- Historical payments from the hoisted derivation above ---
     const payments: PaymentRow[] = history.events.map((event, index) => ({
       paymentNumber: index + 1,
       date: event.date,
@@ -206,6 +205,7 @@ export function LoanAmortizationReport() {
     const projectionInput = buildLoanProjectionInput(selectedAccount, history, rateChanges);
     if (projectionInput) {
       const projection = generateLoanSchedule(projectionInput);
+      projectionPaidOff = projection.paidOff;
 
       for (const row of projection.rows) {
         payments.push({
@@ -220,13 +220,13 @@ export function LoanAmortizationReport() {
       }
     }
 
-    return payments;
+    return { paymentHistory: payments, projectionPaidOff };
   }, [selectedAccount, history, rateChanges]);
 
-  // The terms in effect, from the same resolution the schedule below is built
-  // from. `selectedAccount.interestRate` / `.paymentAmount` are the scalars a
-  // rate-change mutation deliberately never writes, so printing them put "5% /
-  // $500" directly above a projection withheld because the real rate is 12%.
+  // The terms in effect, from the same history the schedule above is built from.
+  // `selectedAccount.interestRate` / `.paymentAmount` are the scalars a
+  // rate-change mutation deliberately never writes, so printing them put
+  // "5% / $500" directly above a projection withheld because the real rate is 12%.
   const currentTerms = useMemo(
     () =>
       selectedAccount && history
@@ -256,9 +256,25 @@ export function LoanAmortizationReport() {
       lastPaymentDate: lastRow.date,
       originalBalance,
       hasProjection,
-      projectedPayoffDate: hasProjection ? lastRow.date : null,
+      // Only a completed projection has a payoff date; truncated at the horizon
+      // the last row is 50 years out with a balance still owing.
+      projectedPayoffDate: hasProjection && projectionPaidOff ? lastRow.date : null,
+      /** Whether `totalInterest` is the loan's lifetime interest rather than the
+       *  interest over a projection that never reached payoff. */
+      hasLifetimeTotal: !hasProjection || projectionPaidOff,
     };
-  }, [paymentHistory, selectedAccount, historicalCount, hasProjection]);
+  }, [paymentHistory, selectedAccount, historicalCount, hasProjection, projectionPaidOff]);
+
+  // See DebtPayoffTimelineReport: the caption names what the figure is, and an
+  // interest total over a projection that never paid off is not a lifetime one.
+  const interestLabel = (
+    s: { hasProjection: boolean; hasLifetimeTotal: boolean } | null,
+  ) =>
+    !s?.hasProjection
+      ? t('loanAmortization.totalInterestPaid')
+      : s.hasLifetimeTotal
+        ? t('loanAmortization.estTotalInterest')
+        : t('loanAmortization.interestOverProjection');
 
   const getExportData = (formatted: boolean) => {
     const headers = [t('loanAmortization.colNumber'), t('loanAmortization.colDate'), t('loanAmortization.colPayment'), t('loanAmortization.colPrincipal'), t('loanAmortization.colInterest'), t('loanAmortization.colBalance'), t('loanAmortization.colType')];
@@ -292,16 +308,32 @@ export function LoanAmortizationReport() {
         { label: t('loanAmortization.currentBalance'), value: formatCurrency(Math.abs(selectedAccount.currentBalance), currency), color: '#dc2626' },
         { label: t('loanAmortization.originalAmount'), value: formatCurrency(summary?.originalBalance || Math.abs(selectedAccount.openingBalance), currency), color: '#111827' },
         { label: t('loanAmortization.interestRate'), value: currentTerms.annualRate != null ? `${currentTerms.annualRate}%` : t('loanAmortization.notSet'), color: '#111827' },
-        { label: summary?.hasProjection ? t('loanAmortization.estTotalInterest') : t('loanAmortization.totalInterestPaid'), value: formatCurrency(summary?.totalInterest || 0, currency), color: '#ea580c' },
+        { label: interestLabel(summary), value: formatCurrency(summary?.totalInterest || 0, currency), color: '#ea580c' },
         { label: t('loanAmortization.paymentsMade'), value: String(historicalCount), color: '#16a34a' },
       );
-      if (summary?.hasProjection && summary.projectedPayoffDate) {
+      if (summary?.projectedPayoffDate) {
         cards.push({ label: t('loanAmortization.estPayoff'), value: format(parseISO(summary.projectedPayoffDate), 'MMM yyyy'), color: '#9333ea' });
       }
     }
     await exportToPdf({
       title: `${t('loanAmortization.pdfTitlePrefix')}${selectedAccount?.name || t('loanAmortization.typeLoan')}`,
-      subtitle: summary ? t('loanAmortization.pdfSubtitlePaymentsSummary', { count: historicalCount, interest: formatCurrency(summary.totalInterest, currency) }) : undefined,
+      // Only a lifetime figure goes under the "total interest" wording; a
+      // projection truncated at the horizon is RELABELLED, exactly as the card
+      // beside it is, rather than dropped -- the PDF is the artifact the reader
+      // keeps, and withholding the line took the payments-made count (which is
+      // perfectly known) away with the interest figure, so the export and the
+      // screen disagreed about what could be shown.
+      subtitle: summary
+        ? t(
+            summary.hasLifetimeTotal
+              ? 'loanAmortization.pdfSubtitlePaymentsSummary'
+              : 'loanAmortization.pdfSubtitlePaymentsProjection',
+            {
+              count: historicalCount,
+              interest: formatCurrency(summary.totalInterest, currency),
+            },
+          )
+        : undefined,
       summaryCards: cards.length > 0 ? cards : undefined,
       tableData: { headers, rows },
       filename: `amortization-${accountName}`,
@@ -341,11 +373,25 @@ export function LoanAmortizationReport() {
     ? sortedPaymentHistory
     : sortedPaymentHistory.slice(0, 24);
 
+  // Two error scopes, because they need different screens. Without the ACCOUNT
+  // LIST there is no report at all, so that one replaces it. A failure loading
+  // ONE loan's data must keep the picker on screen instead: the selection is
+  // persisted, so replacing the whole report leaves that loan's error restored
+  // on every visit with no way to choose another account -- which is exactly the
+  // trap the line-of-credit 400 fell into. `historyError` is rendered inline
+  // below, beneath the picker.
   if (error) {
-    return <ReportError onRetry={reload} />;
+    return (
+      <ReportError
+        onRetry={() => {
+          reload();
+          reloadHistory();
+        }}
+      />
+    );
   }
 
-  if (isLoading) {
+  if (isLoading || historyLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
         <div className="space-y-4">
@@ -396,12 +442,19 @@ export function LoanAmortizationReport() {
         </div>
       </div>
 
-      {/* A failure loading THIS loan keeps the picker above it usable. */}
-      {loanError && <ReportError onRetry={reloadLoanData} />}
+      {/* A failure loading THIS loan's history keeps the picker above it usable,
+          so the user can select a different account. */}
+      {historyError && <ReportError onRetry={reloadHistory} />}
 
       {/* Summary Cards */}
-      {!loanError && selectedAccount && (
-        <div className={`grid grid-cols-2 ${summary?.hasProjection ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4`}>
+      {!historyError && selectedAccount && (
+        // The sixth column exists only when the sixth card does; sizing on
+        // `hasProjection` alone left a blank column for a truncated projection.
+        <div
+          className={`grid grid-cols-2 ${
+            summary?.projectedPayoffDate ? 'md:grid-cols-6' : 'md:grid-cols-5'
+          } gap-4`}
+        >
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('loanAmortization.currentBalance')}</div>
             <div className="text-lg font-bold text-red-600 dark:text-red-400">
@@ -424,7 +477,7 @@ export function LoanAmortizationReport() {
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              {summary?.hasProjection ? t('loanAmortization.estTotalInterest') : t('loanAmortization.totalInterestPaid')}
+              {interestLabel(summary)}
             </div>
             <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
               {formatCurrency(summary?.totalInterest || 0)}
@@ -436,7 +489,7 @@ export function LoanAmortizationReport() {
               {historicalCount}
             </div>
           </div>
-          {summary?.hasProjection && summary.projectedPayoffDate && (
+          {summary?.projectedPayoffDate && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
               <div className="text-sm text-gray-500 dark:text-gray-400">{t('loanAmortization.estPayoff')}</div>
               <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
@@ -448,7 +501,7 @@ export function LoanAmortizationReport() {
       )}
 
       {/* Account Details */}
-      {selectedAccount && (
+      {!historyError && selectedAccount && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
@@ -481,10 +534,10 @@ export function LoanAmortizationReport() {
         </div>
       )}
 
-      {/* Payment History Table -- withheld while this loan's data failed to
-          load, so an empty schedule is never mistaken for a loan with no
-          payments. */}
-      {!loanError && (
+      {/* Payment History Table -- withheld while this loan's history failed to
+          load, so an empty schedule is never mistaken for a loan that has made
+          no payments. */}
+      {!historyError && (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">

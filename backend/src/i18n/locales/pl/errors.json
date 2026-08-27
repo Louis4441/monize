@@ -27,6 +27,8 @@
     "loanRequiresInstitution": "Konta pożyczek wymagają nazwy instytucji",
     "mortgageRequiredFields": "Konta kredytów hipotecznych wymagają mortgagePaymentFrequency, paymentStartDate, sourceAccountId oraz amortizationMonths",
     "mortgageRequiresInterestRate": "Konta kredytów hipotecznych wymagają oprocentowania",
+    "mortgageFrequencyUnsupported": "Kanadyjskich kredytów hipotecznych nie można zaplanować z częstotliwością spłat {frequency}",
+    "paymentFrequencyUnsupported": "Nie można zaplanować częstotliwości spłat {frequency}",
     "mortgageRequiresInstitution": "Konta kredytów hipotecznych wymagają nazwy instytucji",
     "onlyMortgageAccounts": "Ta operacja jest dozwolona tylko dla kont kredytów hipotecznych",
     "updateRateClosed": "Nie można zaktualizować oprocentowania na zamkniętym koncie",
