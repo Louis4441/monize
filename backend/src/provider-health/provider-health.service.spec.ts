@@ -416,15 +416,14 @@ describe("ProviderHealthService", () => {
       expect(service.answeredSince(PROVIDER, before)).toBe(false);
     });
 
-    it("asks about every provider when the work could reach any of them", () => {
-      const before = service.snapshotAll();
-      expect(service.allAnsweredSince(before)).toBe(true);
-
-      // A price fill routes per user preference and falls back between
-      // providers, so the other one's outage poisons the same cache.
+    it("answers about one provider, not about the process", () => {
+      // Callers that could reach more than one provider do not ask the breakers
+      // at all -- the code that made the call reports whether anyone answered
+      // (`fillPriceWindow`/`fillRateWindow`), because it knows which providers
+      // it reached. So this stays per provider.
+      const before = service.snapshot(PROVIDER);
       service.recordFailure("msn_finance", transportError());
-      expect(service.allAnsweredSince(before)).toBe(false);
-      expect(service.answeredSince(PROVIDER, before[PROVIDER])).toBe(true);
+      expect(service.answeredSince(PROVIDER, before)).toBe(true);
     });
   });
 

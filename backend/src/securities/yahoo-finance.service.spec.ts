@@ -2358,6 +2358,85 @@ describe("YahooFinanceService", () => {
       expect(fetchMock.mock.calls.length).toBe(callsWhenOpened);
     });
 
+    it("does not treat a stalled body as a recovered probe", async () => {
+      // The flap this prevents: the probe got headers, the breaker called that a
+      // recovery, the body then stalled, and four more requests went out before
+      // it opened again -- once a window, forever. Each fresh episode also reset
+      // the alert's fifteen-minute clock, so no alert was ever sent.
+      let clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+      const bodyStall = () =>
+        Object.assign(new TypeError("terminated"), {
+          cause: Object.assign(new Error("body timeout"), {
+            code: "UND_ERR_BODY_TIMEOUT",
+          }),
+        });
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(bodyStall()),
+          text: () => Promise.reject(bodyStall()),
+        } as never),
+      );
+
+      for (let i = 0; i < 5; i++) {
+        await timedService.fetchHistorical("^RUT", null, "1y");
+      }
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("open");
+      const startedAt = timedHealth.snapshot("yahoo_finance").failingSince;
+
+      // The window elapses, the probe goes out, and its body stalls too.
+      clock += OPEN_WINDOW_MS + 1;
+      await timedService.fetchHistorical("^RUT", null, "1y");
+
+      const after = timedHealth.snapshot("yahoo_finance");
+      expect(after.state).toBe("open");
+      // Same episode, and the next window is longer rather than reset.
+      expect(after.failingSince).toBe(startedAt);
+      expect(timedHealth.wouldRefuse("yahoo_finance")).toBe(true);
+    });
+
+    it("closes on a probe whose body actually arrives", async () => {
+      // The other half: a completed request has to close it, or an outage never
+      // ends.
+      let clock = 1_700_000_000_000;
+      const timedHealth = createTestProviderHealth(() => clock);
+      const timedService = new YahooFinanceService(timedHealth);
+
+      global.fetch = jest.fn(() => Promise.reject(dnsFailure()));
+      for (let i = 0; i < 5; i++) {
+        await timedService.fetchHistorical("^RUT", null, "1y");
+      }
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("open");
+
+      clock += OPEN_WINDOW_MS + 1;
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              chart: {
+                result: [
+                  {
+                    meta: { currency: "USD" },
+                    timestamp: [1700000000],
+                    indicators: { quote: [{ close: [10] }] },
+                  },
+                ],
+              },
+            }),
+        } as never),
+      );
+
+      expect(
+        await timedService.fetchHistorical("^RUT", null, "1y"),
+      ).not.toBeNull();
+      expect(timedHealth.snapshot("yahoo_finance").state).toBe("closed");
+    });
+
     it("counts one throw once, however many layers report it", async () => {
       // The fetch helper counts what it catches and rethrows; the caller's catch
       // hands the same object to the log door. Counting it twice would open the

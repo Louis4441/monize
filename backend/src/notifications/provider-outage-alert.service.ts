@@ -237,33 +237,37 @@ export class ProviderOutageAlertService {
     const label = providerLabel(won.provider);
 
     for (const recipient of recipients) {
-      const t = await this.translatorFor(recipient.userId);
-      const html = providerOutageTemplate(
-        recipient.firstName,
-        {
-          provider: label,
-          since: formatUtcMinute(startedAt),
-          duration: formatOutageDuration(outageMs, t),
-          recentFailures: Number(won.recent_failures) || 0,
-          lastFailureReason: won.last_failure_reason,
-          lastSuccessAt: won.last_success_at
-            ? formatUtcMinute(new Date(won.last_success_at))
-            : null,
-          quietPeriodHours: ALERT_QUIET_PERIOD_MS / 3_600_000,
-        },
-        t,
-      );
-      await this.send(
-        recipient,
-        t(
-          "emails.providerOutage.subject",
-          `Monize: ${label} is not responding`,
+      // The whole per-recipient body is isolated, not just the send: resolving
+      // one administrator's locale is a database read, and letting it throw out
+      // of the loop cost every administrator after them their notice -- with
+      // the claim already committed and a six-hour floor behind it, so it was
+      // never re-sent.
+      await this.deliver(recipient, async () => {
+        const t = await this.translatorFor(recipient.userId);
+        const html = providerOutageTemplate(
+          recipient.firstName,
           {
             provider: label,
+            since: formatUtcMinute(startedAt),
+            duration: formatOutageDuration(outageMs, t),
+            recentFailures: Number(won.recent_failures) || 0,
+            lastFailureReason: won.last_failure_reason,
+            lastSuccessAt: won.last_success_at
+              ? formatUtcMinute(new Date(won.last_success_at))
+              : null,
+            quietPeriodHours: ALERT_QUIET_PERIOD_MS / 3_600_000,
           },
-        ),
-        html,
-      );
+          t,
+        );
+        return {
+          subject: t(
+            "emails.providerOutage.subject",
+            `Monize: ${label} is not responding`,
+            { provider: label },
+          ),
+          html,
+        };
+      });
     }
   }
 
@@ -307,28 +311,29 @@ export class ProviderOutageAlertService {
     const label = providerLabel(won.provider);
 
     for (const recipient of recipients) {
-      const t = await this.translatorFor(recipient.userId);
-      const html = providerRecoveryTemplate(
-        recipient.firstName,
-        {
-          provider: label,
-          restoredAt: formatUtcMinute(restoredAt),
-          duration: formatOutageDuration(
-            startedAt ? restoredAt.getTime() - startedAt.getTime() : 0,
-            t,
+      await this.deliver(recipient, async () => {
+        const t = await this.translatorFor(recipient.userId);
+        const html = providerRecoveryTemplate(
+          recipient.firstName,
+          {
+            provider: label,
+            restoredAt: formatUtcMinute(restoredAt),
+            duration: formatOutageDuration(
+              startedAt ? restoredAt.getTime() - startedAt.getTime() : 0,
+              t,
+            ),
+          },
+          t,
+        );
+        return {
+          subject: t(
+            "emails.providerRecovery.subject",
+            `Monize: ${label} is answering again`,
+            { provider: label },
           ),
-        },
-        t,
-      );
-      await this.send(
-        recipient,
-        t(
-          "emails.providerRecovery.subject",
-          `Monize: ${label} is answering again`,
-          { provider: label },
-        ),
-        html,
-      );
+          html,
+        };
+      });
     }
   }
 
@@ -404,15 +409,20 @@ export class ProviderOutageAlertService {
   }
 
   /**
-   * One recipient's send, isolated: an address SMTP rejects must not cost the
-   * other administrators their notice.
+   * One recipient's notice, isolated end to end.
+   *
+   * Rendering is inside the boundary as much as sending is: the locale comes
+   * from a database read, and an SMTP rejection is only the most obvious way one
+   * recipient can fail. Either must cost that recipient their notice and
+   * nobody else theirs -- the claim is already committed, so there is no second
+   * attempt for the ones further down the list.
    */
-  private async send(
+  private async deliver(
     recipient: Recipient,
-    subject: string,
-    html: string,
+    build: () => Promise<{ subject: string; html: string }>,
   ): Promise<void> {
     try {
+      const { subject, html } = await build();
       await this.emailService.sendMail(recipient.email, subject, html);
     } catch (error) {
       this.logger.error(

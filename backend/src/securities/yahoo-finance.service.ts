@@ -223,9 +223,14 @@ export class YahooFinanceService implements QuoteProvider {
           }
           throw error;
         }
-        // It answered. Whatever the status, the provider is reachable -- a 404
-        // is this symbol's problem, not the host's.
-        this.health.recordSuccess(HEALTH_PROVIDER_ID);
+        // Deliberately *not* a recorded success. Headers are not a completed
+        // request: a provider that accepts the connection and then stalls the
+        // body answers them every time, and recording that as success closed
+        // the breaker on every probe -- so it flapped once a window, the
+        // escalation never grew, and each fresh episode reset the alert's
+        // fifteen-minute clock so no alert was ever sent. Completion is
+        // recorded where the body is read, by `readBody` and by the branches
+        // that legitimately read none.
         lastResponse = response;
         if (!YahooFinanceService.THROTTLED_STATUSES.has(response.status)) {
           return response;
@@ -261,6 +266,33 @@ export class YahooFinanceService implements QuoteProvider {
         YahooFinanceService.INTER_REQUEST_GAP_MS,
       );
     }
+  }
+
+  /**
+   * Read a response body, and record the request as *completed* if it arrives.
+   *
+   * This is where a Yahoo request becomes a success as far as the breaker is
+   * concerned. Headers alone are not enough (see `throttledFetch`), and a body
+   * that stalls rejects here with `UND_ERR_BODY_TIMEOUT` -- counted by the
+   * caller's catch through `logFailure`, which is the single door for that.
+   */
+  private async readBody<T>(
+    response: Response,
+    as: "json" | "text" = "json",
+  ): Promise<T> {
+    const value = (await (as === "json"
+      ? response.json()
+      : response.text())) as T;
+    this.health.recordSuccess(HEALTH_PROVIDER_ID);
+    return value;
+  }
+
+  /**
+   * Record a response the client will not read a body from -- a non-2xx status,
+   * typically. The host answered in full; there is nothing left to stall on.
+   */
+  private recordAnsweredWithoutBody(): void {
+    this.health.recordSuccess(HEALTH_PROVIDER_ID);
   }
 
   private async ensureCrumb(forceRefresh = false): Promise<boolean> {
@@ -382,16 +414,17 @@ export class YahooFinanceService implements QuoteProvider {
           },
         );
 
-        // The API host answered, whatever it thinks of the request.
-        this.health.recordSuccess(HEALTH_PROVIDER_ID);
-        reported = true;
         if (!crumbResp.ok) {
+          // The API host answered in full; there is no body to stall on.
+          this.recordAnsweredWithoutBody();
+          reported = true;
           lastStatus = crumbResp.status;
           await crumbResp.text().catch(() => undefined);
           continue;
         }
 
-        const crumbText = await crumbResp.text();
+        const crumbText = await this.readBody<string>(crumbResp, "text");
+        reported = true;
         if (!crumbText || crumbText.length > 50 || crumbText.startsWith("{")) {
           lastStatus = "invalid crumb";
           continue;
@@ -510,13 +543,15 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
+        // The host answered in full; nothing left to stall on.
+        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance API returned ${response.status} for ${yahooSymbol}`,
         );
         return null;
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
 
       if (data.chart?.result?.[0]?.meta) {
         const result = data.chart.result[0];
@@ -674,6 +709,10 @@ export class YahooFinanceService implements QuoteProvider {
       );
 
       if (!response.ok) {
+        // The host answered in full; nothing left to stall on.
+        this.recordAnsweredWithoutBody();
+        // The host answered in full; nothing left to stall on.
+        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance API returned ${response.status} for historical ${yahooSymbol}`,
         );
@@ -686,7 +725,7 @@ export class YahooFinanceService implements QuoteProvider {
         return SYMBOL_ABSENT_STATUSES.has(response.status) ? [] : null;
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
       const result = data.chart?.result?.[0];
       // No result object. A `chart.error` beside it is an answer about the
       // symbol only when it says the symbol is the problem -- Yahoo puts
@@ -821,13 +860,15 @@ export class YahooFinanceService implements QuoteProvider {
       );
 
       if (!response.ok) {
+        // The host answered in full; nothing left to stall on.
+        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance intraday returned ${response.status} for ${yahooSymbol} (${interval}/${range})`,
         );
         return null;
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
       const result = data.chart?.result?.[0];
       if (!result?.timestamp || !result.indicators?.quote?.[0]) {
         return null;
@@ -898,13 +939,15 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
+        // The host answered in full; nothing left to stall on.
+        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance search API returned ${response.status} for query: ${query}`,
         );
         return [];
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
       const quotes: YahooSearchResult[] = data.quotes || [];
 
       if (quotes.length === 0) {
@@ -1220,13 +1263,15 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
+        // The host answered in full; nothing left to stall on.
+        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo Finance search returned ${response.status} for ${yahooSymbol}`,
         );
         return null;
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
       const quotes = data.quotes || [];
 
       const match = quotes.find(
@@ -1316,7 +1361,7 @@ export class YahooFinanceService implements QuoteProvider {
         return { sectors: null, assets: null };
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
       const topHoldings = data.quoteSummary?.result?.[0]?.topHoldings;
       if (!topHoldings) return { sectors: [], assets: [] };
 
@@ -1419,7 +1464,7 @@ export class YahooFinanceService implements QuoteProvider {
         return { description: null, website: null };
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
       const result = data.quoteSummary?.result?.[0];
       if (!result) return { description: null, website: null };
 
@@ -1542,13 +1587,15 @@ export class YahooFinanceService implements QuoteProvider {
       });
 
       if (!response.ok) {
+        // The host answered in full; nothing left to stall on.
+        this.recordAnsweredWithoutBody();
         this.logger.warn(
           `Yahoo news lookup returned ${response.status} for ${symbol}`,
         );
         return [];
       }
 
-      const data = await response.json();
+      const data = await this.readBody<any>(response);
       const items: YahooNewsItem[] = data.news || [];
       return items.flatMap((item) => this.toNewsItem(item));
     } catch (error) {

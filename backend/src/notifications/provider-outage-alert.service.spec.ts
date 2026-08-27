@@ -229,6 +229,35 @@ describe("ProviderOutageAlertService", () => {
       ).toHaveLength(0);
     });
 
+    it("keeps rendering for the rest when one recipient's locale read fails", async () => {
+      // Rendering is inside the per-recipient boundary as much as sending is:
+      // the locale comes from a database read, and the claim is already
+      // committed, so a throw out of the loop cost every administrator after
+      // this one their notice for good.
+      route({
+        pending: [healthRow()],
+        outageClaim: [healthRow()],
+        admins: [
+          adminRow(),
+          adminRow({ id: "admin-2", email: "second@example.com" }),
+        ],
+      });
+      let call = 0;
+      manager.getRepository.mockReturnValue({
+        findOne: jest.fn(() => {
+          call++;
+          return call === 1
+            ? Promise.reject(new Error("connection terminated"))
+            : Promise.resolve({ userId: "admin-2", language: "en" });
+        }),
+      });
+
+      await service.sweepProviderHealth();
+
+      expect(emailService.sendMail).toHaveBeenCalledTimes(1);
+      expect(emailService.sendMail.mock.calls[0][0]).toBe("second@example.com");
+    });
+
     it("emails every administrator, and one bad address costs only itself", async () => {
       route({
         pending: [healthRow()],

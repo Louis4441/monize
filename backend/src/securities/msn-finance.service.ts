@@ -337,13 +337,19 @@ export class MsnFinanceService implements QuoteProvider {
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
-      // It answered: reachable, whatever it thinks of the request.
-      this.health.recordSuccess(HEALTH_PROVIDER_ID);
       if (!response.ok) {
+        // The host answered in full; there is no body to stall on.
+        this.health.recordSuccess(HEALTH_PROVIDER_ID);
         this.logger.warn(`MSN Finance GET ${url} returned ${response.status}`);
         return null;
       }
-      return (await response.json()) as T;
+      // Recorded once the body is in hand, not when the headers arrive: a
+      // provider that accepts the connection and then stalls answers headers
+      // every time, and calling that a success closes the breaker on every
+      // probe. `yahoo-finance.service.ts` has the long form.
+      const parsed = (await response.json()) as T;
+      this.health.recordSuccess(HEALTH_PROVIDER_ID);
+      return parsed;
     } catch (error) {
       // An uncounted failure is not an outcome. If this call is the one holding
       // the exclusive half-open slot, hand it back rather than refusing every
@@ -1186,9 +1192,12 @@ export class MsnFinanceService implements QuoteProvider {
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
-      this.health.recordSuccess(HEALTH_PROVIDER_ID);
-      if (!response.ok) return null;
+      if (!response.ok) {
+        this.health.recordSuccess(HEALTH_PROVIDER_ID);
+        return null;
+      }
       const html = await response.text();
+      this.health.recordSuccess(HEALTH_PROVIDER_ID);
       const sector = matchInText(html, /"sector"\s*:\s*"([^"]+)"/i);
       const industry = matchInText(html, /"industry"\s*:\s*"([^"]+)"/i);
       if (!sector && !industry) return { sector: null, industry: null };

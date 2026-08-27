@@ -18,7 +18,7 @@ import {
   ProviderUnavailableError,
   isProviderUnavailable,
 } from "./provider-unavailable.error";
-import { TRACKED_PROVIDERS, providerLabel } from "./providers";
+import { providerLabel } from "./providers";
 
 /**
  * How often a still-failing provider's row is refreshed while it is down.
@@ -168,18 +168,6 @@ export class ProviderHealthService {
   }
 
   /**
-   * Every tracked provider's state, for a caller that is about to do work which
-   * could reach more than one of them.
-   */
-  snapshotAll(): Record<string, ProviderCircuitSnapshot> {
-    const all: Record<string, ProviderCircuitSnapshot> = {};
-    for (const provider of Object.keys(TRACKED_PROVIDERS)) {
-      all[provider] = this.circuit(provider).snapshot();
-    }
-    return all;
-  }
-
-  /**
    * Whether the provider answered every request made since `before` was taken.
    *
    * The one test for "may I cache this empty result". A refusal, and a
@@ -205,19 +193,6 @@ export class ProviderHealthService {
     const after = this.circuit(provider).snapshot();
     return (
       after.state === "closed" && after.lastFailureAt === before.lastFailureAt
-    );
-  }
-
-  /**
-   * `answeredSince` for a caller whose work could have gone to any provider.
-   *
-   * The price fill routes per user preference and falls back between providers,
-   * so "did Yahoo answer" is the wrong question there: an MSN outage poisons the
-   * same cache just as thoroughly.
-   */
-  allAnsweredSince(before: Record<string, ProviderCircuitSnapshot>): boolean {
-    return Object.entries(before).every(([provider, snapshot]) =>
-      this.answeredSince(provider, snapshot),
     );
   }
 
