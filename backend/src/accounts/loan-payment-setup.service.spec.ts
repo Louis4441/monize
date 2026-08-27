@@ -460,6 +460,43 @@ describe("LoanPaymentSetupService", () => {
       }
     });
 
+    it("lets an explicit false override a stored Canadian flag", async () => {
+      // The same request writes the flag, so unticking the box means "this is
+      // not a Canadian mortgage" and must decide the split it arrives with.
+      // Under `||` the stored `true` won: the account was saved as non-Canadian
+      // while its first split was computed the Canadian way, and the setup
+      // dialog -- which filters its cadence list on the checkbox -- offered
+      // quarterly to an account the server then refused with a 400.
+      const storedCanadian = {
+        ...mockLoanAccount,
+        id: "mortgage-3",
+        accountType: AccountType.MORTGAGE,
+        isCanadianMortgage: true,
+        isVariableRate: false,
+      };
+
+      accountsRepository.findOne
+        .mockResolvedValueOnce(storedCanadian)
+        .mockResolvedValueOnce(mockSourceAccount);
+      scheduledTransactionsService.create.mockClear();
+
+      await service.setupLoanPayments("user-1", "mortgage-3", {
+        paymentAmount: 1500,
+        paymentFrequency: "QUARTERLY",
+        sourceAccountId: "source-1",
+        nextDueDate: "2026-04-01",
+        interestRate: 4.25,
+        isCanadianMortgage: false,
+      });
+
+      // No refusal, and the flag is written as the request asked.
+      expect(scheduledTransactionsService.create).toHaveBeenCalled();
+      expect(accountsRepository.update).toHaveBeenCalledWith(
+        "mortgage-3",
+        expect.objectContaining({ isCanadianMortgage: false }),
+      );
+    });
+
     it("refuses a frequency the recurrence table cannot schedule", async () => {
       // The DTO's @IsIn list keeps this unreachable through the controller, and
       // loan-payment-frequency.guard.spec.ts holds the two lists together -- but

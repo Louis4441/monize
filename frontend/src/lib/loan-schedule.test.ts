@@ -1067,27 +1067,49 @@ describe('recurringOccurrencesDue', () => {
     }
   });
 
-  it('keeps a month-end anchor on its day instead of drifting', () => {
-    // `advanceDate`'s MONTHLY step is `setMonth(+1)`, which overflows Jan 31 into
-    // Mar 3 and then holds every later occurrence on the 3rd -- February skipped
-    // and 11 occurrences in the first year, the same defect from the other
-    // direction. Each occurrence is derived from the anchor instead, with the day
-    // clamped to the target month's length.
+  it('steps a month-end anchor on the loan\'s own calendar', () => {
+    // The cadence walks the recurrence engine, the same calendar the loan's
+    // payment dates walk. Deriving each occurrence from the anchor instead
+    // (2026-01-31, 02-28, 03-31, 04-30 ...) looked tidier in isolation and was
+    // wrong where it mattered: a monthly loan first paid on the 31st has rows on
+    // 01-31, 02-28, 03-28, 04-28, so the occurrence due 03-31 arrived AFTER the
+    // March row, waited for 04-28, and the borrower paid eleven monthly extras
+    // in the first calendar year and two on one row the next February.
+    //
+    // So a clamp is absorbed once and kept: after February the cadence settles
+    // onto the 28th, exactly where the loan's payments have settled.
     const counter = recurringOccurrencesDue(
       { amount: 100, frequency: 'MONTHLY' },
       new Date(2026, 0, 31),
     );
-    // Feb 2026 has 28 days, so the February occurrence is the 28th -- and March
-    // is back on the 31st rather than stuck on whatever February overflowed to.
     expect(counter.dueBy('2026-01-31')).toBe(1);
     expect(counter.dueBy('2026-02-27')).toBe(0);
     expect(counter.dueBy('2026-02-28')).toBe(1);
-    expect(counter.dueBy('2026-03-30')).toBe(0);
-    expect(counter.dueBy('2026-03-31')).toBe(1);
-    // April has 30 days, and May is on the 31st again: no drift.
-    expect(counter.dueBy('2026-04-30')).toBe(1);
-    expect(counter.dueBy('2026-05-30')).toBe(0);
-    expect(counter.dueBy('2026-05-31')).toBe(1);
+    expect(counter.dueBy('2026-03-27')).toBe(0);
+    expect(counter.dueBy('2026-03-28')).toBe(1);
+    expect(counter.dueBy('2026-04-27')).toBe(0);
+    expect(counter.dueBy('2026-04-28')).toBe(1);
+  });
+
+  it('lands every occurrence on a payment of a month-end monthly loan', () => {
+    // The whole reason the cadence follows the engine. Twelve rows in 2026,
+    // twelve occurrences, one each -- no month with none and no row carrying
+    // two. The anchor-derived cadence gave 11 and then a doubled February.
+    const result = generateLoanSchedule(
+      baseInput({
+        startingBalance: 100000,
+        annualRate: 5,
+        paymentAmount: 1000,
+        frequency: 'MONTHLY',
+        firstPaymentDate: new Date(2026, 0, 31),
+        overpayments: { recurringExtra: { amount: 200, frequency: 'MONTHLY' } },
+      }),
+    );
+    const in2026 = result.rows.filter((r) => r.date.startsWith('2026'));
+    expect(in2026).toHaveLength(12);
+    for (const row of in2026) {
+      expect(row.extraPrincipal).toBeCloseTo(200, 2);
+    }
   });
 
   it('yields 12 monthly occurrences a year from any anchor day', () => {
@@ -1147,11 +1169,19 @@ describe('recurringOccurrencesDue', () => {
     const february = result.rows.find((r) => r.date === '2026-02-28');
     expect(february?.extraPrincipal).toBeCloseTo(100, 2);
 
-    // All twelve of 2026's occurrences are paid; the last one is due 2026-12-31
-    // and the first payment on or after it is 2027-01-02, so the twelve are
-    // complete by then and no 2027 occurrence (2027-01-31) has fallen yet.
+    // Twelve occurrences fall in 2026 -- the cadence absorbed February's clamp
+    // and settled onto the 28th, so the last of the twelve is due 2026-12-28 and
+    // the thirteenth is 2027-01-28. Twelve to a calendar year from any anchor
+    // day is the invariant; which day of the month they land on is not.
+    //
+    // The PAYMENT carrying the twelfth is 2027-01-02, because a biweekly row
+    // does not exist on 2026-12-28: an occurrence is applied at the first
+    // payment on or after its due date, so a year's worth of cadence can be
+    // completed a few days into the next year. That is the cadence being a
+    // calendar of its own, which is the point.
+    expect(paidBy('2026-12-31')).toBeCloseTo(1100, 2);
     expect(paidBy('2027-01-02')).toBeCloseTo(1200, 2);
-    expect(paidBy('2027-01-30')).toBeCloseTo(1200, 2);
+    expect(paidBy('2027-01-27')).toBeCloseTo(1200, 2);
   });
 
   it('refuses a rowDate that goes backwards', () => {

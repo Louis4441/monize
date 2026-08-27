@@ -20,6 +20,7 @@
 
 import {
   FrequencyType,
+  addMonthsClamped,
   calculateNextDueDate,
   ensureYMD,
 } from "../common/recurrence";
@@ -141,6 +142,73 @@ export function toMortgagePaymentFrequency(
 }
 
 /**
+ * Payment periods a year for each cadence, in both domains.
+ *
+ * `Record`s over the two unions, so a new member of either is a compile error
+ * here rather than a `default: 12`. They are the source both
+ * `getPeriodsPerYear` and `getMortgagePeriodsPerYear` read.
+ */
+export const LOAN_PERIODS_PER_YEAR: Record<PaymentFrequency, number> = {
+  WEEKLY: 52,
+  BIWEEKLY: 26,
+  SEMIMONTHLY: 24,
+  MONTHLY: 12,
+  QUARTERLY: 4,
+  YEARLY: 1,
+};
+
+export const MORTGAGE_PERIODS_PER_YEAR: Record<
+  MortgagePaymentFrequency,
+  number
+> = {
+  MONTHLY: 12,
+  SEMI_MONTHLY: 24,
+  BIWEEKLY: 26,
+  ACCELERATED_BIWEEKLY: 26,
+  WEEKLY: 52,
+  ACCELERATED_WEEKLY: 52,
+};
+
+/**
+ * Payment periods a year for a frequency read out of `accounts.payment_frequency`,
+ * or `null` when the column holds something neither domain names.
+ *
+ * That column is a bare `VARCHAR(20)` written by both paths -- the mortgage form
+ * stores the mortgage enum's spelling, the loan-payment setup dialog stores the
+ * recurrence's -- so a caller reading it back holds a string, not a member of
+ * either union. Six of them cast it to `MortgagePaymentFrequency` and asked
+ * `getMortgagePeriodsPerYear`, whose `default: 12` turned SEMIMONTHLY into a
+ * monthly rate: a semi-monthly mortgage booked twice the correct interest on
+ * every posted split, at every rate change, and in every recalculation, for the
+ * life of the loan. A cast cannot be type-checked, which is why this takes a
+ * `string` and answers `null` instead.
+ *
+ * `mortgage-frequency-cast.guard.spec.ts` scans `src/` for a revived cast.
+ */
+/**
+ * What a caller assumes when `accounts.payment_frequency` holds a string neither
+ * domain names.
+ *
+ * A named constant rather than a `default: 12` inside a switch, because those
+ * defaults were how three recognised cadences silently became monthly. This one
+ * is only reachable for a value nothing writes -- both writers go through a
+ * validated `@IsIn` list, and migration 165 healed the one spelling that
+ * escaped -- so it covers a corrupt row, not a supported frequency.
+ */
+export const DEFAULT_PERIODS_PER_YEAR = 12;
+
+export function periodsPerYearForStoredFrequency(
+  frequency: string | null | undefined,
+): number | null {
+  if (!frequency) return null;
+  return (
+    (LOAN_PERIODS_PER_YEAR as Record<string, number>)[frequency] ??
+    (MORTGAGE_PERIODS_PER_YEAR as Record<string, number>)[frequency] ??
+    null
+  );
+}
+
+/**
  * Highest payment count the end-date helpers will date. Above it the loan is
  * treated as never paying off.
  *
@@ -211,4 +279,31 @@ export function unpayableEndDate(startDate: Date): Date {
       startDate.getUTCDate(),
     ),
   );
+}
+
+/**
+ * The date a mortgage's TERM ends: `termMonths` after the first payment.
+ *
+ * A single clamped month offset from the anchor, not an accumulation of monthly
+ * steps -- a five-year term on a loan first paid on 31 January ends on 31
+ * January, where stepping sixty times would have clamped to the 28th at the
+ * first February and stayed there.
+ *
+ * UTC in and out, like everything else here. Both call sites spelled this as
+ * `d.setMonth(d.getMonth() + termMonths)` on a `Date` built from a date-only
+ * string, which is two defects at once: local accessors on a UTC-midnight
+ * instant, and `setMonth`'s overflow (31 January plus one month became 3 March,
+ * skipping February) where the scheduler's own calendar clamps.
+ */
+export function mortgageTermEndDate(
+  paymentStartDate: Date,
+  termMonths: number,
+): Date {
+  const [year, month, day] = addMonthsClamped(
+    ensureYMD(paymentStartDate),
+    termMonths,
+  )
+    .split("-")
+    .map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
 }

@@ -629,15 +629,24 @@ Concurrency scope   --
 Retry semantics     --
 Crash semantics     -- (projection only; nothing is persisted)
 Failure response    --
-                    Each occurrence is derived from the anchor by index rather
-                    than accumulated from the one before it. Accumulation is
-                    lossy whenever a month step has to clamp: 31 January becomes
-                    28 February and then stays the 28th for the rest of the loan.
-                    (`advanceDate` used to OVERFLOW instead -- 31 January to 3
-                    March -- skipping February and paying 11 times a year, the
-                    same defect from the other direction; it now delegates to
-                    `advanceByFrequency`, which clamps.) The day is clamped to
-                    the target month's length, as a standing order is.
+                    The cadence steps the recurrence engine, the same calendar
+                    the loan's payment rows step. Deriving each occurrence from
+                    the anchor by index instead kept a 31st anchor on month-end
+                    (31 Jan, 28 Feb, 31 Mar, 30 Apr) while the rows accumulated
+                    the engine's clamp (31 Jan, 28 Feb, 28 Mar, 28 Apr), so on a
+                    monthly loan first paid on the 31st the occurrence due 31
+                    March arrived after the 28 March row, waited for 28 April,
+                    and the year paid ELEVEN -- this invariant broken by two
+                    calendars disagreeing rather than by arithmetic. (Earlier
+                    still, `advanceDate` OVERFLOWED -- 31 January to 3 March --
+                    which lost February outright.) The price is that an
+                    accumulating clamp is lossy: an anchor on the 31st settles
+                    onto the 28th after its first February instead of returning
+                    to month-end. On a loan whose own payments have settled there
+                    that is not a cost, and for any anchor on the 28th or earlier
+                    the two are identical. Twelve to a calendar year from every
+                    anchor day is the invariant and holds either way; the
+                    alignment does not.
                     A plan names its mode in three places
                     (targetMonthlyPaymentMode, recurringExtra.mode, and each
                     lump sum's), so consumers read effectiveOverpaymentMode(plan)
@@ -737,6 +746,22 @@ Enforcement         The convention is the nominal annual rate divided by the
                     takes periodsPerYear and compounds at the payment frequency,
                     so the displayed EAR describes the rate the schedule charges
                     rather than a monthly one nothing used.
+                    A cadence read back out of accounts.payment_frequency is a
+                    STRING -- the column is a bare VARCHAR(20) written in both
+                    spellings -- so it goes through
+                    periodsPerYearForStoredFrequency, which answers null rather
+                    than guessing, or through toMortgagePaymentFrequency where a
+                    mortgage-domain value is genuinely needed. Six call sites
+                    cast it to MortgagePaymentFrequency and asked
+                    getMortgagePeriodsPerYear instead, whose default of 12 turned
+                    SEMIMONTHLY into a monthly rate: the per-posting P/I split,
+                    the rate-change recalculation and its scheduled-transaction
+                    sync, the inference warning and the account service's own
+                    split all booked twice the correct interest on a semi-monthly
+                    mortgage, three times on a quarterly one.
+                    mortgage-frequency-cast.guard.spec.ts scans src/ for a
+                    revived cast, because fixing five of six is what happened
+                    the first time.
                     The frequency a periodic rate is divided by must itself be
                     real: SetupLoanPaymentsDto accepts SEMIMONTHLY and the
                     service casts it into calculatePaymentSplit, where

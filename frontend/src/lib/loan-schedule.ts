@@ -633,60 +633,40 @@ export function advanceDate(date: Date, frequency: ScheduleFrequency): Date {
   return advanceByFrequency(date, SCHEDULE_FREQUENCY_TO_RECURRENCE[frequency] ?? 'MONTHLY');
 }
 
-/** Cadence step of each recurring overpayment frequency: days, or months. */
-const OVERPAYMENT_CADENCE: Record<
-  RecurringOverpaymentFrequency,
-  { days?: number; months?: number }
-> = {
-  WEEKLY: { days: 7 },
-  BIWEEKLY: { days: 14 },
-  MONTHLY: { months: 1 },
-  QUARTERLY: { months: 3 },
-  ANNUALLY: { months: 12 },
-};
-
 /**
- * The `index`-th occurrence date of a cadence, derived from the anchor rather
- * than accumulated from the occurrence before it.
+ * The recurrence frequency each overpayment cadence steps on.
  *
- * `advanceDate` is deliberately not reused for the month cadences, and the
- * reason is accumulation rather than arithmetic. It steps one occurrence from
- * the one before, and any month step that has to clamp is lossy: 31 January
- * clamps to 28 February, and every later occurrence then keeps the 28th, so an
- * overpayment anchored on the 31st quietly becomes an overpayment on the 28th
- * for the rest of the loan. (Before it was delegated to the recurrence engine it
- * OVERFLOWED instead -- 31 January to 3 March -- which lost a month outright and
- * paid 11 times in the first year, the defect INV-LOAN-001 exists to prevent,
- * from the other direction.) Deriving the nth date from the anchor removes the
- * accumulation, and clamping the day to the target month's length keeps the
- * anchor day in every month long enough to hold it: the 31st falls on the 30th
- * of a 30-day month and on the 28th or 29th of February, the way a standing
- * order does.
+ * The same engine the loan's own payment dates use, and for the same reason: an
+ * occurrence is applied at the first loan payment on or after its due date, so
+ * two calendars that clamp differently make an occurrence miss the payment it
+ * belongs to. They did. Occurrences were derived from the anchor by index and
+ * clamped per month (31 Jan, 28 Feb, 31 Mar, 30 Apr ...) while the loan's rows
+ * accumulate the engine's clamp (31 Jan, 28 Feb, 28 Mar, 28 Apr ...), so on a
+ * monthly loan first paid on the 31st the occurrence due 31 March arrived after
+ * the row dated 28 March, waited for 28 April, and the borrower paid ELEVEN
+ * monthly extras in the first calendar year and two on one row the next
+ * February -- the count INV-LOAN-001 exists to protect, broken by the calendars
+ * disagreeing rather than by the arithmetic.
  *
- * The day cadences cannot drift, but are derived the same way for one code path.
- *
- * A loan *payment* is the opposite case and keeps the accumulating step on
- * purpose: it follows the recorded schedule, so its convention is the recurrence
- * engine's, whatever the lender does. An overpayment cadence has no lender, and
- * its count per year is an invariant, so it needs its own answer here.
+ * The price is the one the anchor-derived version was written to avoid: an
+ * accumulating clamp is lossy, so a cadence anchored on the 31st settles onto
+ * the 28th after its first February instead of returning to month-end the way a
+ * standing order would. On a loan paid on the 31st that is not a cost -- the
+ * loan's own payments have settled onto the 28th too, and the overpayment
+ * follows them -- and for any anchor on the 28th or earlier the two are
+ * identical. The count per year, which is the invariant, is preserved either
+ * way; the alignment is not.
  */
-function overpaymentOccurrenceDate(
-  anchor: Date,
-  step: { days?: number; months?: number },
-  index: number,
-): Date {
-  if (step.days) {
-    const date = new Date(anchor);
-    date.setDate(date.getDate() + step.days * index);
-    return date;
-  }
-  const absoluteMonth = anchor.getMonth() + (step.months ?? 1) * index;
-  const year = anchor.getFullYear() + Math.floor(absoluteMonth / 12);
-  const month = ((absoluteMonth % 12) + 12) % 12;
-  // Day 0 of the next month is the last day of this one.
-  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
-  return new Date(year, month, Math.min(anchor.getDate(), lastDayOfMonth));
-}
+const CADENCE_RECURRENCE: Record<
+  RecurringOverpaymentFrequency,
+  FrequencyType
+> = {
+  WEEKLY: 'WEEKLY',
+  BIWEEKLY: 'BIWEEKLY',
+  MONTHLY: 'MONTHLY',
+  QUARTERLY: 'QUARTERLY',
+  ANNUALLY: 'YEARLY',
+};
 
 /** Counts the overpayment occurrences a given loan payment has to carry. */
 export interface RecurringOccurrenceCounter {
@@ -739,9 +719,7 @@ export function recurringOccurrencesDue(
   // annual overpayment into 5000 a month with a payoff and a saving to match.
   // Contributing nothing is the direction that cannot invent a saving.
   const declaredCadence = extra.frequency
-    ? (OVERPAYMENT_CADENCE[extra.frequency] as
-        | { days?: number; months?: number }
-        | undefined)
+    ? (CADENCE_RECURRENCE[extra.frequency] as FrequencyType | undefined)
     : null;
 
   if (declaredCadence === undefined) {
@@ -765,7 +743,11 @@ export function recurringOccurrencesDue(
       ? parseLocalDate(extra.startDate)
       : new Date(firstPaymentDate);
 
-  let nextIndex = 0;
+  // Occurrence 0 is the anchor itself; each consumed occurrence steps the cursor
+  // once, so the walk is one engine step per occurrence rather than a fresh
+  // derivation per row -- and consuming in order is already this counter's
+  // contract (the out-of-order guard below).
+  let cursor = new Date(anchor);
   let lastRowDate: string | null = null;
   // The pending occurrence's ISO date, cached because most rows consume nothing:
   // re-deriving and re-formatting it per row cost one date-fns `format` on every
@@ -788,9 +770,7 @@ export function recurringOccurrencesDue(
       let count = 0;
       for (;;) {
         if (pendingDueIso === null) {
-          pendingDueIso = isoDay(
-            overpaymentOccurrenceDate(anchor, cadence, nextIndex),
-          );
+          pendingDueIso = isoDay(cursor);
         }
         // Not yet due: it stays pending for a later payment.
         if (pendingDueIso > rowDate) break;
@@ -798,7 +778,7 @@ export function recurringOccurrencesDue(
         // stays parked so subsequent rows count nothing.
         if (extra.endDate && pendingDueIso > extra.endDate) break;
         count++;
-        nextIndex++;
+        cursor = advanceByFrequency(cursor, cadence);
         pendingDueIso = null;
       }
       return count;

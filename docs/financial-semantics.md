@@ -481,14 +481,16 @@ So occurrences are dated: they fall on the cadence anchor (the overpayment's
 start date, never before the first projected payment) and every cadence step
 after it, and each one is applied at the first loan payment on or after its due
 date. Each is derived from the anchor **by index**, not accumulated from the one
-before it, and its day is clamped to the target month's length. Accumulation is
-the defect, not the arithmetic: any month step that has to clamp is lossy, so 31
-January becomes 28 February and then stays the 28th for the rest of the loan.
-(Before `advanceDate` was delegated to the recurrence engine it overflowed
-instead -- 31 January to 3 March -- skipping February and paying 11 times a
-year.) A loan *payment* keeps the accumulating step on purpose, because it
-follows the recorded schedule: a cadence has no lender, and its count per year is
-the invariant. `recurringOccurrencesDue` in `frontend/src/lib/loan-schedule.ts` is the
+the one before it, on the recurrence engine -- the same calendar the loan's own
+payment rows walk. Deriving each occurrence from the anchor by index kept a 31st
+anchor on month-end (31 Jan, 28 Feb, 31 Mar, 30 Apr) while the rows accumulated
+the engine's clamp (31 Jan, 28 Feb, 28 Mar, 28 Apr), so the occurrence due 31
+March arrived after the 28 March row and the year paid eleven. (Earlier still,
+`advanceDate` overflowed -- 31 January to 3 March -- losing February outright.)
+The cost of the accumulating step is that a 31st anchor settles onto the 28th
+after its first February rather than returning to month-end; on a loan whose own
+payments have settled there it is no cost, and below the 29th the two are
+identical. The count per calendar year is the invariant and survives both. `recurringOccurrencesDue` in `frontend/src/lib/loan-schedule.ts` is the
 only place that decision is made, and it makes the cadence exact in both
 directions: `MONTHLY`, `QUARTERLY` and `ANNUALLY` are calendar cadences, so they
 contribute exactly 12, 4 and 1 occurrences per calendar year on a weekly,

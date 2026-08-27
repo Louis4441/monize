@@ -21,13 +21,17 @@ import {
 } from "./loan-amortization.util";
 import {
   calculateMortgageAmortization,
-  getMortgagePeriodsPerYear,
   getPeriodicRate,
   MORTGAGE_FREQUENCY_TO_RECURRENCE,
   MortgagePaymentFrequency,
   MortgageAmortizationInput,
   MortgageAmortizationResult,
 } from "./mortgage-amortization.util";
+import {
+  DEFAULT_PERIODS_PER_YEAR,
+  mortgageTermEndDate,
+  periodsPerYearForStoredFrequency,
+} from "./payment-frequency.util";
 import { formatDateYMD } from "../common/date-utils";
 import { roundMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
@@ -287,18 +291,16 @@ export class LoanMortgageAccountService {
       principal: mortgageAmount,
       annualRate: interestRate,
       amortizationMonths,
-      paymentFrequency: mortgagePaymentFrequency as MortgagePaymentFrequency,
+      paymentFrequency: mortgagePaymentFrequency,
       isCanadian: isCanadianMortgage,
       isVariableRate,
       startDate: new Date(paymentStartDate),
     };
     const amortization = calculateMortgageAmortization(amortizationInput);
 
-    let termEndDate: Date | null = null;
-    if (termMonths) {
-      termEndDate = new Date(paymentStartDate);
-      termEndDate.setMonth(termEndDate.getMonth() + termMonths);
-    }
+    const termEndDate = termMonths
+      ? mortgageTermEndDate(new Date(paymentStartDate), termMonths)
+      : null;
 
     const savedAccount = await withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(Account);
@@ -331,9 +333,7 @@ export class LoanMortgageAccountService {
     // date, so the occurrence was due forever and the mortgage's payment
     // schedule never advanced. Migration 165 heals the rows that copy wrote.
     const scheduledFrequency =
-      MORTGAGE_FREQUENCY_TO_RECURRENCE[
-        mortgagePaymentFrequency as MortgagePaymentFrequency
-      ];
+      MORTGAGE_FREQUENCY_TO_RECURRENCE[mortgagePaymentFrequency];
 
     const endDateStr =
       // The same ceiling the end-date helpers date up to. Two literals
@@ -470,9 +470,12 @@ export class LoanMortgageAccountService {
       rateChange.newPaymentAmount ?? (Number(account.paymentAmount) || 0);
     const periodicRate = getPeriodicRate(
       newRate,
-      getMortgagePeriodsPerYear(
-        (account.paymentFrequency || "MONTHLY") as MortgagePaymentFrequency,
-      ),
+      // The STORED cadence, read through the lookup that knows both spellings.
+      // Casting it to MortgagePaymentFrequency and asking
+      // getMortgagePeriodsPerYear turned SEMIMONTHLY into its monthly default,
+      // so a semi-monthly mortgage's posted split carried twice the interest.
+      periodsPerYearForStoredFrequency(account.paymentFrequency) ??
+        DEFAULT_PERIODS_PER_YEAR,
       account.isCanadianMortgage || false,
       account.isVariableRate || false,
     );

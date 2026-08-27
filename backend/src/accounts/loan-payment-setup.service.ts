@@ -24,6 +24,7 @@ import {
   calculateMortgagePaymentSplit,
   toMortgagePaymentFrequency,
 } from "./mortgage-amortization.util";
+import { mortgageTermEndDate } from "./payment-frequency.util";
 import { allocateLoanPayment } from "./loan-payment-waterfall.util";
 import { FrequencyType as FrequencyTypeDto } from "../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { tr } from "../i18n/translate";
@@ -129,7 +130,14 @@ export class LoanPaymentSetupService {
       }
     } else if (
       account.accountType === AccountType.MORTGAGE &&
-      (dto.isCanadianMortgage || account.isCanadianMortgage)
+      // `??`, not `||`: the same request WRITES this flag
+      // (`updateData.isCanadianMortgage = dto.isCanadianMortgage` below), so an
+      // explicit `false` means "this is not a Canadian mortgage" and must decide
+      // the split it is submitted with. Under `||` the stored flag won, and the
+      // account was saved as non-Canadian with a split computed the Canadian
+      // way -- and the setup dialog, which filters its cadence list on the
+      // checkbox, offered quarterly to an account the server then refused.
+      (dto.isCanadianMortgage ?? account.isCanadianMortgage)
     ) {
       // Use mortgage-specific calculation for Canadian mortgages.
       //
@@ -311,9 +319,10 @@ export class LoanPaymentSetupService {
       }
       if (dto.termMonths) {
         updateData.termMonths = dto.termMonths;
-        const termEndDate = new Date(dto.nextDueDate);
-        termEndDate.setMonth(termEndDate.getMonth() + dto.termMonths);
-        updateData.termEndDate = termEndDate;
+        updateData.termEndDate = mortgageTermEndDate(
+          new Date(dto.nextDueDate),
+          dto.termMonths,
+        );
       }
       if (!account.originalPrincipal) {
         updateData.originalPrincipal = Math.abs(Number(account.openingBalance));

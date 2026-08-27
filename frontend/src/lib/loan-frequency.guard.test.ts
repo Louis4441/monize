@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import {
   ScheduleFrequency,
@@ -319,19 +319,28 @@ describe('loan payment frequency contract', () => {
     // must not OFFER one. Two copies of a refusal is exactly how a form comes to
     // present a choice the server rejects, so the browser copy is checked
     // against the backend switch rather than trusted.
-    const backendSource = readFileSync(
-      join(
-        __dirname,
-        '..',
-        '..',
-        '..',
-        'backend',
-        'src',
-        'accounts',
-        'payment-frequency.util.ts',
-      ),
-      'utf8',
+    // The only cross-package source read in this suite, so it says so when the
+    // sibling tree is not there: a frontend-only checkout, a sparse clone or an
+    // extracted package would otherwise fail this file with an ENOENT that reads
+    // like a broken guard rather than a missing dependency.
+    const backendPath = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'backend',
+      'src',
+      'accounts',
+      'payment-frequency.util.ts',
     );
+    if (!existsSync(backendPath)) {
+      throw new Error(
+        `${backendPath} is not present: this guard compares the browser copy of ` +
+          'toMortgagePaymentFrequency against the backend original, so it needs ' +
+          'the full repository checkout, not just frontend/',
+      );
+    }
+    const backendSource = readFileSync(backendPath, 'utf8');
     const body = backendSource.slice(
       backendSource.indexOf('export function toMortgagePaymentFrequency'),
     );

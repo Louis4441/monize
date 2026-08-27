@@ -1,6 +1,8 @@
 import { spawn } from "child_process";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { mortgageTermEndDate } from "./payment-frequency.util";
+import { formatDateYMD } from "../common/date-utils";
 
 /**
  * A payoff date is the same calendar day in every deployment.
@@ -54,12 +56,16 @@ const CASES: Record<string, string> = {
   // The degenerate case still crosses both conversions -- the cheapest proof
   // that the round trip itself is offset-free.
   "zero steps": "2026-01-15",
+  // A five-year-and-one-month term from a month-end anchor: the clamp lands on
+  // the last day of February, where `setMonth` would have overflowed into March
+  // and a local read would have moved the anchor a day first.
+  "term end": "2031-02-28",
 };
 
 const CHILD_SCRIPT = `
 const { calculateEndDate } = require("./src/accounts/loan-amortization.util");
 const { calculateMortgageEndDate } = require("./src/accounts/mortgage-amortization.util");
-const { advancePaymentDates } = require("./src/accounts/payment-frequency.util");
+const { advancePaymentDates, mortgageTermEndDate } = require("./src/accounts/payment-frequency.util");
 const { formatDateYMD } = require("./src/common/date-utils");
 const f = formatDateYMD;
 process.stdout.write(JSON.stringify({
@@ -71,6 +77,7 @@ process.stdout.write(JSON.stringify({
   "semi-monthly": f(advancePaymentDates(new Date("2026-01-15"), "SEMIMONTHLY", 24)),
   "never pays off": f(calculateEndDate(new Date("2026-01-15"), "MONTHLY", Infinity)),
   "zero steps": f(advancePaymentDates(new Date("2026-01-15"), "MONTHLY", 0)),
+  "term end": f(mortgageTermEndDate(new Date("2026-01-31"), 61)),
 }));
 `;
 
@@ -130,6 +137,7 @@ describe("the amortization date helpers read UTC components only", () => {
     "payment-frequency.util.ts",
     "loan-amortization.util.ts",
     "mortgage-amortization.util.ts",
+    "amortization-count.util.ts",
   ];
 
   /** `getMonth(`, `setFullYear(` and friends -- the local half of each pair. */
@@ -167,5 +175,48 @@ describe("the amortization date helpers read UTC components only", () => {
       ].join("\n"),
     );
     expect(fine.match(LOCAL_ACCESSOR)).toBeNull();
+  });
+});
+
+/**
+ * A mortgage's term end is a single clamped month offset from the first payment,
+ * not an accumulation and not `Date.setMonth`.
+ *
+ * Three services computed it, all three the same way -- `d.setMonth(d.getMonth()
+ * + termMonths)` on a `Date` built from a date-only string. That is two defects
+ * in one line: local accessors on a UTC-midnight instant (the day moves with the
+ * container's offset) and `setMonth`'s overflow where the scheduler's own
+ * calendar clamps.
+ */
+describe("mortgageTermEndDate", () => {
+  it("clamps a month-end anchor instead of overflowing it", () => {
+    // The plain wrong answer this replaced: `new Date(Date.UTC(2026, 0, 31))`
+    // with `setMonth(+1)` gives 3 March.
+    expect(formatDateYMD(mortgageTermEndDate(new Date("2026-01-31"), 1))).toBe(
+      "2026-02-28",
+    );
+    expect(formatDateYMD(mortgageTermEndDate(new Date("2028-01-31"), 1))).toBe(
+      "2028-02-29",
+    );
+    expect(formatDateYMD(mortgageTermEndDate(new Date("2026-01-31"), 3))).toBe(
+      "2026-04-30",
+    );
+  });
+
+  it("offsets from the anchor rather than accumulating clamped steps", () => {
+    // Sixty accumulating monthly steps from 31 January clamp to the 28th at the
+    // first February and stay there; a five-year TERM ends on the 31st.
+    expect(formatDateYMD(mortgageTermEndDate(new Date("2026-01-31"), 60))).toBe(
+      "2031-01-31",
+    );
+  });
+
+  it("leaves an ordinary anchor alone", () => {
+    expect(formatDateYMD(mortgageTermEndDate(new Date("2026-03-15"), 60))).toBe(
+      "2031-03-15",
+    );
+    expect(formatDateYMD(mortgageTermEndDate(new Date("2026-03-15"), 0))).toBe(
+      "2026-03-15",
+    );
   });
 });

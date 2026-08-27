@@ -18,6 +18,7 @@ import { paymentsToClear } from "./amortization-count.util";
 import {
   MAX_DATEABLE_PAYMENTS,
   MORTGAGE_FREQUENCY_TO_RECURRENCE,
+  MORTGAGE_PERIODS_PER_YEAR,
   MortgagePaymentFrequency,
   advancePaymentDates,
   unpayableEndDate,
@@ -86,20 +87,9 @@ export interface MortgageAmortizationResult {
 export function getMortgagePeriodsPerYear(
   frequency: MortgagePaymentFrequency,
 ): number {
-  switch (frequency) {
-    case "MONTHLY":
-      return 12;
-    case "SEMI_MONTHLY":
-      return 24;
-    case "BIWEEKLY":
-    case "ACCELERATED_BIWEEKLY":
-      return 26;
-    case "WEEKLY":
-    case "ACCELERATED_WEEKLY":
-      return 52;
-    default:
-      return 12;
-  }
+  // As with the loan table: the fallback is only reachable through a cast, and
+  // `periodsPerYearForStoredFrequency` is the door for a stored string.
+  return MORTGAGE_PERIODS_PER_YEAR[frequency] ?? 12;
 }
 
 /**
@@ -264,7 +254,6 @@ export function calculateMortgagePayment(
 
   return calculatePaymentAmount(principal, periodicRate, totalPayments);
 }
-
 
 /**
  * Date of the final payment, given the date of the *first* one.

@@ -61,8 +61,19 @@
 --     rewritten -- an extra installment that has already happened is a
 --     transaction to reverse, not a bound to move;
 --   * the gap between start_date and end_date is a whole positive number of the
---     schedule's own intervals, which is what a machine-written bound looks like
---     and an arbitrary hand-set date does not.
+--     schedule's own intervals -- what a machine-written bound looks like;
+--   * the schedule has not yet advanced past the healed bound, so the repair
+--     cannot itself retire a live schedule.
+--
+-- One residual risk, stated rather than argued away: a borrower who noticed the
+-- extra installment and corrected the end date BY HAND has written the same
+-- value the heal produces, and nothing distinguishes the two -- a monthly
+-- cadence's every anchor-day date is a whole number of intervals from its start.
+-- Such a schedule is moved one period further back and retires a payment early.
+-- The population is small (it needs the defect to have been noticed and fixed on
+-- the debt account's own payment schedule) and the error is one payment in the
+-- opposite direction, against leaving every uncorrected bound one payment long.
+-- The next_due_date guard keeps that error from ever being immediate.
 --
 -- Exercised against PostgreSQL 16 over a fixture covering both directions: the
 -- five healed cadences (including an accelerated mortgage's biweekly bound on
@@ -88,6 +99,16 @@ WHERE st.is_active
   AND st.end_date IS NOT NULL
   AND st.end_date > CURRENT_DATE
   AND st.end_date > st.start_date
+  -- The healed bound must still be ahead of where the schedule has got to, so
+  -- the repair can shorten a schedule but never retire one outright.
+  AND st.next_due_date <= st.end_date - CASE st.frequency
+        WHEN 'WEEKLY' THEN INTERVAL '7 days'
+        WHEN 'BIWEEKLY' THEN INTERVAL '14 days'
+        WHEN 'MONTHLY' THEN INTERVAL '1 month'
+        WHEN 'QUARTERLY' THEN INTERVAL '3 months'
+        WHEN 'YEARLY' THEN INTERVAL '1 year'
+        ELSE INTERVAL '0'
+      END
   AND EXISTS (
       SELECT 1
       FROM accounts a

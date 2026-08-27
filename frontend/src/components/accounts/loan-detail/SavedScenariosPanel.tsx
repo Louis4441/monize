@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { OverpaymentPlan, ScenarioComparison } from '@/lib/loan-schedule';
+import { OverpaymentPlan, ScenarioComparison, effectiveOverpaymentMode } from '@/lib/loan-schedule';
 import { loanScenariosApi, planToScenarioData, scenarioToPlan } from '@/lib/loan-scenarios';
-import { effectiveOverpaymentMode } from '@/lib/loan-schedule';
 import {
   BaselineOutcome,
   ScenarioComparisonChart,
