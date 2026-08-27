@@ -251,8 +251,19 @@ records where it is implemented additively instead.
 ## 7. Scheduled occurrences
 
 An occurrence may carry an override. `scheduled_transaction_overrides` is unique
-on `(scheduled_transaction_id, override_date)`, so one occurrence has at most one
-override.
+on `(scheduled_transaction_id, original_date)`
+(`uq_sched_txn_overrides_occurrence`, migration 166), so one occurrence has at
+most one override.
+
+That constraint used to name `override_date`, and the sentence above was drawn
+from it as if the two were interchangeable -- they are not, and the conclusion
+was false in both directions. `original_date` is the occurrence's identity;
+`override_date` is where the override moved it. Keyed on the latter, two
+overrides could replace one slot (the reader kept whichever row came first, so
+row order chose the amount, category and date a posting used) while two genuinely
+different occurrences could not be moved onto the same day. `createOverride`'s
+SELECT-then-INSERT was the only thing between the API and the first state, and a
+SELECT is not a lock.
 
 ```text
 FIN-004

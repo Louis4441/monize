@@ -27,9 +27,13 @@ function assertWindowDate(value: string, field: "from" | "through"): void {
 export interface OccurrenceOverrideInput {
   /**
    * The recurrence slot this override replaces. This -- not `overrideDate` -- is
-   * the occurrence's identity, and the database says so: the unique index is
-   * `(scheduled_transaction_id, original_date)`. Keying an override lookup on
-   * `overrideDate` silently misses every occurrence the user moved.
+   * the occurrence's identity, and since migration 166 the database says so:
+   * `uq_sched_txn_overrides_occurrence` is
+   * `UNIQUE (scheduled_transaction_id, original_date)`. It used to be keyed on
+   * `override_date`, which permitted two overrides for one slot and left the
+   * `byOriginal` map below picking whichever row it saw first. Keying an
+   * override lookup on `overrideDate` silently misses every occurrence the user
+   * moved.
    */
   originalDate: string | Date;
   /** The date the occurrence actually falls on. Equal to `originalDate` unless moved. */
@@ -111,6 +115,10 @@ export function expandOccurrenceSlots<O extends OccurrenceOverrideInput>(
   assertWindowDate(window.through, "through");
   if (window.from !== undefined) assertWindowDate(window.from, "from");
 
+  // One override per slot, which the database now enforces
+  // (`uq_sched_txn_overrides_occurrence`, migration 166). The first-wins guard
+  // stays: this function is also handed override lists a caller assembled, and
+  // silently overwriting would make the answer depend on array order.
   const byOriginal = new Map<string, O>();
   for (const override of overrides) {
     const key = ensureYMD(override.originalDate as string);

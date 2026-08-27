@@ -743,12 +743,18 @@ CREATE TABLE scheduled_transaction_overrides (
     investment_total_amount NUMERIC(20, 4),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(scheduled_transaction_id, override_date) -- NOTE: DB uses override_date, not original_date
+    -- An occurrence's IDENTITY is its recurrence slot, so that is what is
+    -- unique: `override_date` is the day the occurrence was moved TO, an
+    -- attribute of the override rather than its name. Keyed on override_date
+    -- (migration 166) this permitted two overrides for one slot -- the posting
+    -- then used whichever row the reader's map happened to keep -- and refused
+    -- two different occurrences moved onto the same day, which is legitimate.
+    CONSTRAINT uq_sched_txn_overrides_occurrence
+        UNIQUE (scheduled_transaction_id, original_date)
 );
 
 CREATE INDEX idx_sched_txn_overrides_sched_txn_id ON scheduled_transaction_overrides(scheduled_transaction_id);
 CREATE INDEX idx_sched_txn_overrides_date ON scheduled_transaction_overrides(override_date);
-CREATE INDEX idx_sched_txn_overrides_orig ON scheduled_transaction_overrides(scheduled_transaction_id, original_date);
 
 -- Posted occurrences (migration 140). The occurrence -- not the schedule -- is
 -- the thing that must happen once, and this unique key is its name. Manual and
