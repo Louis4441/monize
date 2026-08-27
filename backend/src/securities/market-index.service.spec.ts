@@ -603,7 +603,28 @@ describe("MarketIndexService", () => {
       return call ? String((call[1] as unknown[])[1]) : undefined;
     };
 
-    it("says the provider had nothing when the provider answered", async () => {
+    it("says the provider was not called when it went down mid-refresh", async () => {
+      // The client turns a transport failure into null, which is
+      // indistinguishable here from "this symbol has no history" -- and
+      // "nothing came back" sends whoever reads market_index_sync.last_error
+      // looking for a symbol problem that does not exist.
+      manager.query.mockResolvedValue([]);
+      yahoo.fetchHistoricalWindow.mockImplementation(() => {
+        // The window that fails is also the one that opens the breaker.
+        for (let i = 0; i < 5; i++) {
+          health.recordFailure("yahoo_finance", transportFailure());
+        }
+        return Promise.resolve(null);
+      });
+
+      await service.refreshAll();
+
+      expect(storedReason()).toContain("no answer");
+      expect(storedReason()).toContain("unavailable");
+      expect(storedReason()).toContain("EAI_AGAIN");
+    });
+
+    it("distinguishes a window the provider answered as empty", async () => {
       manager.query.mockResolvedValue([]);
       yahoo.fetchHistoricalWindow.mockResolvedValue([]);
 
@@ -612,22 +633,20 @@ describe("MarketIndexService", () => {
       expect(storedReason()).toContain("no history returned");
     });
 
-    it("says the provider was not called when it went down mid-refresh", async () => {
-      // The client turns a transport failure into null, which is
-      // indistinguishable here from "this symbol has no history" -- and
-      // "nothing came back" sends whoever reads market_index_sync.last_error
-      // looking for a symbol problem that does not exist.
+    it("names the failing window, and stops asking for the rest", async () => {
+      // Stopping matters as much as the wording: a provider that has stopped
+      // answering costs one request per index rather than eleven.
       manager.query.mockResolvedValue([]);
-      yahoo.fetchHistoricalWindow.mockImplementation(() => {
-        health.recordFailure("yahoo_finance", transportFailure());
-        return Promise.resolve(null);
-      });
+      yahoo.fetchHistoricalWindow.mockResolvedValue(null);
 
       await service.refreshAll();
 
-      expect(storedReason()).toContain("not fetched");
-      expect(storedReason()).toContain("unavailable");
-      expect(storedReason()).toContain("EAI_AGAIN");
+      expect(yahoo.fetchHistoricalWindow).toHaveBeenCalledTimes(
+        MARKET_INDEXES.length,
+      );
+      expect(storedReason()).toMatch(
+        /over \d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}/,
+      );
     });
 
     it("does not stamp an attempt for a call that never left the process", async () => {

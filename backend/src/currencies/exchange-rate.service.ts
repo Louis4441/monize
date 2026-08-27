@@ -22,6 +22,8 @@ import { roundFxRate } from "../common/fx-entry.util";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { ProviderHealthService } from "../provider-health/provider-health.service";
+import { TrackedProviderId } from "../provider-health/providers";
 import {
   EmptyWindowMemory,
   monthFetchWindow,
@@ -73,8 +75,6 @@ export interface HistoricalRateBackfillSummary {
 
 /** The provider the historical rate fills go to. */
 const HEALTH_PROVIDER_ID: TrackedProviderId = "yahoo_finance";
-import { ProviderHealthService } from "../provider-health/provider-health.service";
-import { TrackedProviderId } from "../provider-health/providers";
 
 @Injectable()
 export class ExchangeRateService implements OnModuleInit {

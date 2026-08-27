@@ -344,7 +344,13 @@ export class MsnFinanceService implements QuoteProvider {
       }
       return (await response.json()) as T;
     } catch (error) {
-      this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+      // An uncounted failure is not an outcome, and this call is holding the
+      // exclusive half-open probe slot: hand it back rather than refusing every
+      // MSN call for the probe timeout against a provider nothing has shown to
+      // be down.
+      if (!this.health.recordFailure(HEALTH_PROVIDER_ID, error)) {
+        this.health.releaseProbe(HEALTH_PROVIDER_ID);
+      }
       this.health.logFailure(
         this.logger,
         HEALTH_PROVIDER_ID,
@@ -1183,7 +1189,9 @@ export class MsnFinanceService implements QuoteProvider {
       if (!sector && !industry) return { sector: null, industry: null };
       return { sector, industry };
     } catch (error) {
-      this.health.recordFailure(HEALTH_PROVIDER_ID, error);
+      if (!this.health.recordFailure(HEALTH_PROVIDER_ID, error)) {
+        this.health.releaseProbe(HEALTH_PROVIDER_ID);
+      }
       this.health.logFailure(
         this.logger,
         HEALTH_PROVIDER_ID,

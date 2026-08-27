@@ -14,7 +14,7 @@ import {
   ProviderUnavailableError,
   isProviderUnavailable,
 } from "./provider-unavailable.error";
-import { providerLabel } from "./providers";
+import { TRACKED_PROVIDERS, providerLabel } from "./providers";
 
 /**
  * How often a still-failing provider's row is refreshed while it is down.
@@ -143,6 +143,18 @@ export class ProviderHealthService {
   }
 
   /**
+   * Every tracked provider's state, for a caller that is about to do work which
+   * could reach more than one of them.
+   */
+  snapshotAll(): Record<string, ProviderCircuitSnapshot> {
+    const all: Record<string, ProviderCircuitSnapshot> = {};
+    for (const provider of Object.keys(TRACKED_PROVIDERS)) {
+      all[provider] = this.circuit(provider).snapshot();
+    }
+    return all;
+  }
+
+  /**
    * Whether the provider answered every request made since `before` was taken.
    *
    * The one test for "may I cache this empty result". A refusal, and a
@@ -154,14 +166,33 @@ export class ProviderHealthService {
    * out; now it is instant, which is what makes this the rule rather than a
    * nicety.
    *
-   * Deliberately conservative: the counter is shared, so an unrelated
-   * concurrent failure costs this caller its cache entry. A missed cache write
-   * is the cheap direction.
+   * Both ends are checked. A breaker that was *already* open when the caller
+   * started refused the call outright, and `recordSuccess` does not clear
+   * `lastFailureAt` -- so comparing only the timestamps would read a concurrent
+   * probe's success as "this caller's request was answered".
+   *
+   * Deliberately conservative in the other direction too: the counter is
+   * shared, so an unrelated concurrent failure costs this caller its cache
+   * entry. A missed cache write is the cheap direction.
    */
   answeredSince(provider: string, before: ProviderCircuitSnapshot): boolean {
+    if (before.state !== "closed") return false;
     const after = this.circuit(provider).snapshot();
     return (
       after.state === "closed" && after.lastFailureAt === before.lastFailureAt
+    );
+  }
+
+  /**
+   * `answeredSince` for a caller whose work could have gone to any provider.
+   *
+   * The price fill routes per user preference and falls back between providers,
+   * so "did Yahoo answer" is the wrong question there: an MSN outage poisons the
+   * same cache just as thoroughly.
+   */
+  allAnsweredSince(before: Record<string, ProviderCircuitSnapshot>): boolean {
+    return Object.entries(before).every(([provider, snapshot]) =>
+      this.answeredSince(provider, snapshot),
     );
   }
 

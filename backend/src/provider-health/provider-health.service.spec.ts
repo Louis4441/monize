@@ -370,6 +370,48 @@ describe("ProviderHealthService", () => {
     });
   });
 
+  describe("answeredSince", () => {
+    it("is true when nothing failed while the caller was asking", () => {
+      const before = service.snapshot(PROVIDER);
+      expect(service.answeredSince(PROVIDER, before)).toBe(true);
+    });
+
+    it("is false when a failure landed while the caller was asking", () => {
+      const before = service.snapshot(PROVIDER);
+      service.recordFailure(PROVIDER, transportError());
+      // One failure, well below the threshold: the breaker is still closed, and
+      // the empty result the caller is holding is just as uninformative.
+      expect(service.snapshot(PROVIDER).state).toBe("closed");
+      expect(service.answeredSince(PROVIDER, before)).toBe(false);
+    });
+
+    it("is false when the breaker was already open when the caller started", () => {
+      // The call was refused outright. `recordSuccess` does not clear
+      // lastFailureAt, so a concurrent probe closing the breaker would make the
+      // timestamps match and read as "answered" -- which is why both ends are
+      // checked.
+      driveOpen();
+      const before = service.snapshot(PROVIDER);
+      advance(OPEN_WINDOW_MS + 1);
+      service.tryRequest(PROVIDER);
+      service.recordSuccess(PROVIDER);
+
+      expect(service.snapshot(PROVIDER).state).toBe("closed");
+      expect(service.answeredSince(PROVIDER, before)).toBe(false);
+    });
+
+    it("asks about every provider when the work could reach any of them", () => {
+      const before = service.snapshotAll();
+      expect(service.allAnsweredSince(before)).toBe(true);
+
+      // A price fill routes per user preference and falls back between
+      // providers, so the other one's outage poisons the same cache.
+      service.recordFailure("msn_finance", transportError());
+      expect(service.allAnsweredSince(before)).toBe(false);
+      expect(service.answeredSince(PROVIDER, before[PROVIDER])).toBe(true);
+    });
+  });
+
   describe("releaseProbe", () => {
     it("hands the slot back without claiming to know anything", () => {
       driveOpen();

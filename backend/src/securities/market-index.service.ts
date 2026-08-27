@@ -422,8 +422,14 @@ export class MarketIndexService implements OnApplicationBootstrap {
    * each carrying the month's close under the wrong date; stored, those drew
    * the benchmark as a horizontal stub repeated for days and then a gap. A
    * one-year window always comes back daily, so the chunking is what makes the
-   * daily series actually arrive. Chunks are requested together; the provider
-   * client's own throttle paces them.
+   * daily series actually arrive.
+   *
+   * The windows are requested **one after another**. They used to go out
+   * together, which the circuit breaker turned into a defect: only one of them
+   * can hold the half-open probe, so the rest were refused and read as empty
+   * years -- one year stored as the whole history, with a success recorded over
+   * it. Sequentially the first window is the probe and the ten behind it follow
+   * a decision that has already been made, in either direction.
    */
   private async fetchInto(
     index: MarketIndexDefinition,
@@ -449,47 +455,45 @@ export class MarketIndexService implements OnApplicationBootstrap {
         start = addDays(end, 1);
       }
 
-      const fetched = await Promise.all(
-        chunks.map(({ start, end }) =>
-          this.yahooFinanceService.fetchHistoricalWindow(
-            index.yahooSymbol,
-            null,
-            new Date(`${start}T00:00:00Z`),
-            new Date(`${end}T23:59:59Z`),
-          ),
-        ),
-      );
-
+      // Requested one after another, not together. Together, exactly one of
+      // eleven concurrent chunks can hold the breaker's half-open probe and the
+      // other ten are refused -- so even a *successful* probe produced a failed
+      // fetch and locked the index behind its six-hour cooldown. Sequentially,
+      // the first chunk is the probe: it closes the breaker for the ten behind
+      // it, or it stops the loop before they are attempted at all.
       const prices: HistoricalPrice[] = [];
-      // A chunk that came back `null` is not an empty year: the client returns
-      // null when it got no usable answer -- a transport failure, or a refusal
-      // once the breaker opened partway through. The chunks go out together, so
-      // exactly one of them can hold the half-open probe and the other ten are
-      // refused; treating those as "the index did not exist yet" stored one
-      // year as if it were the whole history, recorded a success, and locked
-      // the index behind its six-hour cooldown with a stub in the store.
-      //
-      // The whole fetch is refused instead. That leaves the index unpriced,
-      // which the comparison reports as an exclusion the user can act on --
-      // the same call the coarse-bar guard below makes, for the same reason.
-      if (fetched.some((chunk) => chunk === null)) {
-        const missing = fetched.filter((chunk) => chunk === null).length;
-        await this.recordFailure(
-          index.code,
-          `${missing} of ${fetched.length} window(s) for ${index.yahooSymbol} ` +
-            `came back with no answer: ${this.emptyFetchReason(index)}`,
+      for (const { start, end } of chunks) {
+        const chunk = await this.yahooFinanceService.fetchHistoricalWindow(
+          index.yahooSymbol,
+          null,
+          new Date(`${start}T00:00:00Z`),
+          new Date(`${end}T23:59:59Z`),
         );
-        return;
-      }
-      for (const chunk of fetched) {
-        // An empty chunk is a year before the index existed, not a failure.
-        if (!chunk?.length) continue;
+
+        // `null` is "no usable answer" -- a refusal, a transport failure, a
+        // throttled response that outlasted its retries. `[]` is the provider
+        // saying the window is empty, which is an ordinary year before the
+        // index existed.
+        //
+        // A missing window refuses the *whole* fetch rather than storing the
+        // years around it, for the reason the granularity guard below gives:
+        // an index whose stored history has a hole draws a benchmark that is
+        // silently wrong, while an unpriced index is reported as an exclusion
+        // the user can act on. Stopping here also means the remaining windows
+        // are not attempted, so a provider that has stopped answering costs one
+        // request per index rather than eleven.
+        if (chunk === null) {
+          await this.recordFailure(
+            index.code,
+            this.noAnswerReason(index, start, end),
+          );
+          return;
+        }
+        if (chunk.length === 0) continue;
+
         // A chunk coarser than daily is not a sparse daily series, it is a
         // different series -- and storing it beside daily closes produces a
-        // benchmark with no price for most of every month. Refusing the whole
-        // fetch leaves the index unpriced, which the comparison reports as an
-        // exclusion the user can act on; storing the fine chunks around it
-        // would hide the hole.
+        // benchmark with no price for most of every month.
         const spacing = medianGapDays(chunk.map((price) => price.date));
         if (spacing !== null && spacing > MAX_DAILY_GAP_DAYS) {
           await this.recordFailure(
@@ -502,12 +506,13 @@ export class MarketIndexService implements OnApplicationBootstrap {
       }
 
       if (prices.length === 0) {
-        // "Nothing came back" has two causes and an operator reads this string:
-        // the provider answered with an empty series, or it was never called
-        // because the breaker is open. Saying the first when it was the second
-        // sends whoever reads `market_index_sync.last_error` looking for a
-        // symbol problem that does not exist.
-        await this.recordFailure(index.code, this.emptyFetchReason(index));
+        // Every window answered, and every one of them was empty -- a window
+        // with no answer stopped the loop above, so this really is the provider
+        // saying it has no history for the symbol.
+        await this.recordFailure(
+          index.code,
+          `no history returned for ${index.yahooSymbol}`,
+        );
         return;
       }
 
@@ -583,24 +588,30 @@ export class MarketIndexService implements OnApplicationBootstrap {
   }
 
   /**
-   * Why a fetch came back with no usable bars, in the words an operator needs.
+   * Why one window came back with no usable answer, in the words an operator
+   * needs.
    *
-   * The provider client turns a transport failure into `null`, which is
-   * indistinguishable here from "this symbol has no history in that window", so
-   * the breaker is asked instead of the response.
+   * The provider client turns both a transport failure and a refusal into
+   * `null`, and only the breaker knows which -- so it is asked rather than the
+   * response. Saying "the index returned nothing" when nothing was *asked*
+   * sends whoever reads `market_index_sync.last_error` looking for a symbol
+   * problem that does not exist.
    */
-  private emptyFetchReason(index: MarketIndexDefinition): string {
+  private noAnswerReason(
+    index: MarketIndexDefinition,
+    start: string,
+    end: string,
+  ): string {
     const health = this.health.snapshot(HEALTH_PROVIDER_ID);
-    if (health.state === "closed") {
-      return `no history returned for ${index.yahooSymbol}`;
-    }
-    return (
-      `${index.yahooSymbol} was not fetched: the provider is currently ` +
-      `unavailable` +
-      (health.lastFailureReason
-        ? ` (last failure: ${health.lastFailureReason})`
-        : "")
-    );
+    const because =
+      health.state === "closed"
+        ? "the provider gave no usable response"
+        : `the provider is currently unavailable${
+            health.lastFailureReason
+              ? ` (last failure: ${health.lastFailureReason})`
+              : ""
+          }`;
+    return `no answer for ${index.yahooSymbol} over ${start}..${end}: ${because}`;
   }
 
   /** Where each index's stored history begins and ends. */

@@ -603,15 +603,23 @@ export class YahooFinanceService implements QuoteProvider {
   ): Promise<HistoricalPrice[] | null> {
     const primary = this.getYahooSymbol(symbol, exchange);
     const prices = await this.fetchHistoricalRaw(primary, query);
-    if (prices) return prices;
+    if (prices?.length) return prices;
 
+    // Bars, not merely an answer. An empty answer used to be `null` and so fell
+    // through to the alternates by accident; now that it is `[]` -- which is
+    // truthy -- returning on it would silently retire the alternate-symbol
+    // fallback for every windowed fetch (a `.TO` listing asked for a window
+    // before it listed on the primary exchange, say).
     if (primary === symbol) {
       for (const altSymbol of this.getAlternateSymbols(symbol)) {
         const alt = await this.fetchHistoricalRaw(altSymbol, query);
-        if (alt) return alt;
+        if (alt?.length) return alt;
       }
     }
-    return null;
+
+    // No alternate had bars either. The primary's own answer decides what this
+    // was: `[]` if it answered with an empty window, `null` if nothing did.
+    return prices;
   }
 
   private async fetchHistoricalRaw(

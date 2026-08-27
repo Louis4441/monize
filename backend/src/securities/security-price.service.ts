@@ -41,7 +41,6 @@ import {
 } from "../common/time-series/history-fill";
 import { daysBetween } from "../common/time-series/price-boundary.util";
 import { ProviderHealthService } from "../provider-health/provider-health.service";
-import { TrackedProviderId } from "../provider-health/providers";
 
 export { SecurityLookupResult } from "./providers/quote-provider.interface";
 
@@ -216,14 +215,6 @@ interface HistoricalWithProvider {
   prices: HistoricalPrice[];
   provider: QuoteProviderName;
 }
-
-/**
- * The provider whose availability decides whether an empty window may be
- * remembered. The registry can route a *security* to MSN, but the empty-window
- * memory is a report-wide 30-minute cache, and the fill path's own history
- * fetches go to Yahoo -- so this is the one whose silence must not be cached.
- */
-const HEALTH_PROVIDER_ID: TrackedProviderId = "yahoo_finance";
 
 @Injectable()
 export class SecurityPriceService {
@@ -1654,9 +1645,12 @@ export class SecurityPriceService {
           unattempted += 1;
           return 0;
         }
-        // What the breaker knew before the fetch, so "no history" can be told
-        // apart from "we never got an answer" afterwards.
-        const beforeFetch = this.health.snapshot(HEALTH_PROVIDER_ID);
+        // What every breaker knew before the fetch, so "no history" can be
+        // told apart from "we never got an answer" afterwards. Every provider,
+        // not just one: the fill routes per user preference and falls back
+        // between them, so an MSN outage poisons this cache exactly as well as
+        // a Yahoo one.
+        const beforeFetch = this.health.snapshotAll();
         try {
           const stored = await this.fillPriceWindow(
             security,
@@ -1665,10 +1659,7 @@ export class SecurityPriceService {
             end,
             date,
           );
-          if (
-            stored === 0 &&
-            this.health.answeredSince(HEALTH_PROVIDER_ID, beforeFetch)
-          ) {
+          if (stored === 0 && this.health.allAnsweredSince(beforeFetch)) {
             // No history for this symbol in this era -- an instrument that did
             // not trade yet, or one the provider does not carry. Note it, so a
             // report reloaded on the same date does not re-ask.
