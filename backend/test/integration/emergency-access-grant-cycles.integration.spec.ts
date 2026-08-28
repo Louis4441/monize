@@ -71,7 +71,7 @@ describe("emergency access across grant cycles", () => {
   /** A real encryption service, so the stored credential really round-trips. */
   const encryption = new EncryptionService({
     get: (key: string, fallback?: string) =>
-      key === "AI_ENCRYPTION_KEY"
+      key === "ENCRYPTION_KEY"
         ? "integration-test-key-of-at-least-32-chars"
         : fallback,
   } as unknown as ConfigService);
@@ -391,7 +391,10 @@ describe("emergency access across grant cycles", () => {
           grantAfterDays: 14,
           reminderAfterDays: 7,
         }),
-      ).rejects.toThrow(/AI_ENCRYPTION_KEY/);
+        // Names the variable an operator has to set, under its current name --
+        // `AI_ENCRYPTION_KEY` is still read, but telling somebody to set the
+        // deprecated one is how a rename never finishes.
+      ).rejects.toThrow(/until ENCRYPTION_KEY is set/);
       const view = await keyless.getView(owner);
       expect(view.credentialEncryptionConfigured).toBe(false);
     });
