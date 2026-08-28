@@ -746,7 +746,7 @@ CREATE TABLE scheduled_transaction_overrides (
     -- An occurrence's IDENTITY is its recurrence slot, so that is what is
     -- unique: `override_date` is the day the occurrence was moved TO, an
     -- attribute of the override rather than its name. Keyed on override_date
-    -- (migration 166) this permitted two overrides for one slot -- the posting
+    -- (migration 168) this permitted two overrides for one slot -- the posting
     -- then used whichever row the reader's map happened to keep -- and refused
     -- two different occurrences moved onto the same day, which is legitimate.
     CONSTRAINT uq_sched_txn_overrides_occurrence
