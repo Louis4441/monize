@@ -1,0 +1,294 @@
+diff --git a/Backup-and-Restore.md b/Backup-and-Restore.md
+index 5283e4b..073757f 100644
+--- a/Backup-and-Restore.md
++++ b/Backup-and-Restore.md
+@@ -1,6 +1,8 @@
+ # Backup and Restore
+ 
+-Monize includes a full backup and restore system to protect your financial data. You can create manual backups on demand, schedule automatic backups with intelligent retention policies, optionally encrypt backups with a password, and restore from any backup file.
++Monize includes a full backup and restore system to protect your financial data. You can create manual backups on demand, schedule automatic backups with intelligent retention policies, and restore from any backup file.
++
++**Backups are encrypted by default.** If you sign in with an email and password, every backup Monize writes is encrypted with that password -- there is nothing to switch on, and nothing extra to remember. That also means a backup file is only as recoverable as the password it was written under, so read [Passwords, Keys, and What You Must Not Lose](#passwords-keys-and-what-you-must-not-lose) before you rely on these files.
+ 
+ ---
+ 
+@@ -8,9 +10,10 @@ Monize includes a full backup and restore system to protect your financial data.
+ 
+ - [Manual Backup](#manual-backup)
+ - [Restoring from a Backup](#restoring-from-a-backup)
++- [Passwords, Keys, and What You Must Not Lose](#passwords-keys-and-what-you-must-not-lose)
+ - [Encrypted Backups](#encrypted-backups)
+   - [Why Encrypt Backups](#why-encrypt-backups)
+-  - [Enabling Encrypted Backups (Local-Password Users)](#enabling-encrypted-backups-local-password-users)
++  - [Encryption for Local-Password Users](#encryption-for-local-password-users)
+   - [Setting a Backup Password (OIDC / SSO Users)](#setting-a-backup-password-oidc--sso-users)
+   - [Downloading an Encrypted Backup](#downloading-an-encrypted-backup)
+   - [Restoring an Encrypted Backup](#restoring-an-encrypted-backup)
+@@ -38,13 +41,16 @@ You can download a full backup of your data at any time from the **Settings** pa
+ 
+ 1. Navigate to **Settings** (gear icon in the top-right corner)
+ 2. Scroll to the **Backup & Restore** section
+-3. Click **Export Backup**
+-4. Your browser will download a file named `monize-backup-YYYY-MM-DD.json.gz`
++3. Click **Download Backup**
++4. Enter your password when prompted -- this is the password the file will be encrypted with
++5. Your browser will download a file named `monize-backup-YYYY-MM-DD.mzbe`
++
++If your backups are not encrypted (an SSO account that has set no backup password), there is no prompt and the file is named `monize-backup-YYYY-MM-DD.json.gz` instead.
+ 
+ ![Backup & Restore](images/backup-restore-section.png)
+ <!-- Screenshot: The Backup & Restore section showing the Export and Restore buttons -->
+ 
+-The backup is a gzip-compressed JSON file containing all of your financial data. It is streamed from the server to avoid memory issues with large datasets.
++The backup contains all of your financial data as gzip-compressed JSON, wrapped in an encrypted envelope when encryption is on. It is streamed from the server to avoid memory issues with large datasets.
+ 
+ ---
+ 
+@@ -80,38 +86,120 @@ If any step fails, the entire operation is rolled back and no data is changed.
+ 
+ ---
+ 
++## Passwords, Keys, and What You Must Not Lose
++
++Encrypted backups protect your data from anyone who gets hold of the file. The
++same property is what makes them unrecoverable if you lose what opens them, and
++**Monize has no master override** -- the server genuinely cannot read a backup
++without the password it was written under.
++
++There are two separate secrets, they do different jobs, and losing them has
++different consequences. Both are worth writing down somewhere durable.
++
++### 1. The password a backup was written with (you)
++
++A backup file opens with **the password that was in effect when that file was
++written** -- not your current one.
++
++- **If you sign in with an email and password**, that is your login password on
++  the day of the backup. Change your password, and every backup taken before the
++  change still needs the **old** one. Monize keeps your current password ready so
++  restoring a recent backup usually asks nothing, but a six-month-old file taken
++  before a password change will ask -- and only the old password will do.
++- **If you sign in with SSO**, it is the backup password you set in Settings, as
++  it was at the time of writing. Changing it later does not re-encrypt anything
++  already on disk.
++
++> **Before you change your password, ask what would open your oldest backup.**
++> The safest habit is to keep every backup password you have ever used in a
++> password manager, dated. The second safest is to download a fresh backup
++> immediately after changing your password, and treat the older files as needing
++> the old one.
++
++### 2. `ENCRYPTION_KEY` (whoever runs the server)
++
++`ENCRYPTION_KEY` is a server setting, not something you type. It encrypts what
++the *database* holds: your AI provider API keys, emergency-access credentials,
++and the copy of your password that lets scheduled backups run without prompting
++you every night.
++
++**If it is not set, your automatic backups are not encrypted.** Monize still
++starts -- and says so loudly in its startup log every time, including that a
++future release will refuse to start without it -- but until an administrator
++sets it, there is nowhere to keep the password those backups would be encrypted
++with. If your backup files are `.json.gz` rather than `.mzbe`, this is usually
++why.
++
++**Keep it safe, and keep it the same.** Store it with your other deployment
++secrets -- the same place you keep `JWT_SECRET` and your database password.
++Changing it does not re-encrypt anything; it simply makes what is already stored
++unreadable.
++
++If `ENCRYPTION_KEY` is lost or changed:
++
++| What happens | What it takes to recover |
++|---|---|
++| Automatic backups **stop**, reporting an error rather than quietly writing unencrypted files (this is the *changed* case; a key that was never set at all just produces unencrypted backups) | Each user signs in again (or confirms their password in Settings), which stores a fresh copy |
++| Stored AI provider API keys become unreadable | Re-enter them in **Settings > AI** |
++| Emergency-access credentials and messages become unreadable | Re-configure emergency access |
++| **Your existing backup files are unaffected** | Nothing -- they open with the password they were written under, exactly as before |
++
++That last row is the one people get wrong in both directions. `ENCRYPTION_KEY`
++does not unlock a backup file, so losing it does not strand your backups; and
++having it does not rescue a backup whose password you have forgotten.
++
++> **Upgrading from an older version?** This setting used to be called
++> `AI_ENCRYPTION_KEY` and was documented as being for AI providers only. The old
++> name still works and still takes precedence, so an existing deployment needs no
++> changes. If you never set it, your automatic backups were -- and still are --
++> being written **unencrypted**: set `ENCRYPTION_KEY` (`openssl rand -hex 32`),
++> restart, and sign in once so Monize can capture your password. Backups written
++> from then on will be `.mzbe`.
++
++---
++
+ ## Encrypted Backups
+ 
+-By default, backups are gzip-compressed JSON files -- if someone obtains the file (intercepted in transit, stolen from a cloud-sync folder, recovered from an old drive), they can read every transaction, payee, and account name. Encryption wraps the backup in a password-protected envelope so the contents stay confidential even if the file leaks.
++An unencrypted backup is a gzip-compressed JSON file -- anyone who obtains it (intercepted in transit, copied from a cloud-sync folder, recovered from an old drive) can read every transaction, payee, and account name. Encryption wraps the backup in a password-protected envelope so the contents stay confidential even if the file leaks.
+ 
+-Both manual downloads and scheduled [automatic backups](#automatic-backups) honour the setting -- once you opt in, every backup written from then on is encrypted.
++Both manual downloads and scheduled [automatic backups](#automatic-backups) are encrypted whenever Monize has a usable password for your account, which for a password account is all the time.
+ 
+ ### Why Encrypt Backups
+ 
+-Encryption is worth turning on when:
++Encryption is the default rather than an option because a backup is the one file that contains everything, and it is the file most likely to end up somewhere you did not plan:
+ 
+-- You sync your backups folder to cloud storage (Dropbox, OneDrive, Google Drive, Backblaze) and don't trust the cloud provider with your financial data
+-- You email backups to yourself or upload them to remote storage
+-- You share a server, NAS, or backup volume with other people
+-- You want defence-in-depth against a stolen laptop, USB drive, or external HDD
++- Backups folders get synced to cloud storage (Dropbox, OneDrive, Google Drive, Backblaze)
++- Backups get emailed, copied to a NAS, or uploaded to remote storage
++- Servers, volumes, and external drives get shared, sold, or stolen
+ 
+-You can skip it if your backups never leave a fully trusted machine -- the local disk is the only place the file ever sits.
++The cost of that default is the thing to be deliberate about: an encrypted backup is exactly as recoverable as the password it was written with. See [Passwords, Keys, and What You Must Not Lose](#passwords-keys-and-what-you-must-not-lose).
+ 
+-### Enabling Encrypted Backups (Local-Password Users)
++### Encryption for Local-Password Users
+ 
+-If you log in with an email and password (the default), Monize reuses your login password as the backup encryption password. There is no separate password to remember.
++If you log in with an email and password (the default), your backups are
++encrypted with that password automatically. There is no separate password to
++invent, and nothing to switch on: Monize captures your password at the only
++moment it ever sees it -- when you register, sign in, or change it -- stores an
++encrypted copy under the server's `ENCRYPTION_KEY`, and uses that copy so the
++nightly job can encrypt without prompting you. **Your password is never stored
++in plaintext.**
+ 
+-1. Navigate to **Settings > Backup & Restore**
+-2. In the **Backup Encryption** section, click **Enable Encrypted Backups**
+-3. Re-enter your current login password to confirm
+-4. Click **Confirm**
++**Settings > Backup & Restore** shows the state under **Backup Encryption**:
++
++| What you see | What it means |
++|---|---|
++| **Enabled** -- "Backups are encrypted with your login password." | Nothing to do. |
++| **Not enabled**, with an **Enable with My Login Password** button | Monize has no copy of your password yet -- usually because you have stayed signed in since before this feature existed. Click the button and confirm your login password; backups from then on are encrypted. Signing out and back in does the same thing. |
++| "This server is not configured to encrypt backups" | The server has no `ENCRYPTION_KEY`, so **your backups are being written unencrypted**. That is a deployment setting an administrator has to fix -- see [ENCRYPTION_KEY](#2-encryption_key-whoever-runs-the-server). |
+ 
+ ![Backup Encryption Enable](images/backup-encryption-enable.png)
+ <!-- Screenshot: The "Enable Encrypted Backups" modal showing the password confirmation field -->
+ 
+-Once enabled, the section displays a green **Enabled** badge with a **Disable** button.
+-
+-The system stores an encrypted copy of your login password (encrypted with the server's master key, `AI_ENCRYPTION_KEY`) so the scheduled auto-backup job can use it without prompting you each time. **Your password is never stored in plaintext.** When you change your login password, the stored copy is updated automatically.
++There is no **Disable** button for a password account: your password is
++re-captured every time you sign in, so turning encryption off would last until
++your next login. When you change your login password, the stored copy is updated
++automatically -- but files already on disk keep needing the password they were
++written with.
+ 
+ ### Setting a Backup Password (OIDC / SSO Users)
+ 
+@@ -161,7 +249,7 @@ Enter the original password (the one in effect at the time the backup was writte
+ 
+ ### Changing or Disabling the Backup Password
+ 
+-- **Local users:** changing your login password automatically updates the stored copy used by auto-backups. To stop encrypting backups, click **Disable** in the **Backup Encryption** section -- new backups will be plain `.json.gz` again, but previously-encrypted files still require the old password to restore.
++- **Local users:** changing your login password automatically updates the stored copy used by auto-backups, so backups written from then on use the new password. Files already written still need the password that was active when they were created -- keep it. There is no way to turn encryption off for a password account, because the password is re-captured at every sign-in.
+ - **OIDC users:** click **Change Backup Password** to set a new one, or **Disable** to turn encryption off entirely. As with local users, existing encrypted backups still require whichever password was active when they were written.
+ 
+ ### Encrypted Backup File Format
+@@ -260,7 +348,7 @@ Backup files are automatically named based on their retention tier:
+ 
+ When [encrypted backups](#encrypted-backups) are enabled, the extension changes from `.json.gz` to `.mzbe` (Monize Backup Encrypted). Retention promotion and cleanup recognise both extensions so unencrypted backups from before you enabled the feature are still managed correctly.
+ 
+-> **Note:** If you enable encrypted backups but the server cannot decrypt the stored backup password (for example, because the `AI_ENCRYPTION_KEY` environment variable changed), the scheduled backup will fail rather than silently write an unencrypted file. Re-enable encryption from Settings to refresh the stored password.
++> **Note:** If the server cannot decrypt the stored backup password -- typically because `ENCRYPTION_KEY` changed -- the scheduled backup **fails** rather than silently writing an unencrypted file. Sign in again (or confirm your password in **Settings > Backup & Restore**) to store a fresh copy. A backup that goes out unencrypted for any other reason is recorded as a warning in the server log.
+ 
+ ### Run Backup Now
+ 
+@@ -373,7 +461,8 @@ Backup and restore operations include several security measures:
+ |---------|-------------|
+ | **Authentication** | All backup operations require a valid login session |
+ | **Restore verification** | Restoring requires password re-entry or OIDC re-authentication |
+-| **Optional file encryption** | Backups can be wrapped in an AES-256-GCM envelope keyed by your password (see [Encrypted Backups](#encrypted-backups)) |
++| **File encryption by default** | Backups are wrapped in an AES-256-GCM envelope keyed by your own password whenever the server holds a usable copy of it -- automatic for password accounts (see [Encrypted Backups](#encrypted-backups)) |
++| **Server-side key** | The stored copy of that password, AI provider keys and emergency-access credentials are encrypted with `ENCRYPTION_KEY`. Without it nothing can be stored encrypted and backups go out in the clear; the server warns at every start and a future release will require it |
+ | **User isolation** | Backups only contain data belonging to the authenticated user |
+ | **SQL injection prevention** | Column names are validated against the database schema; all values use parameterized queries |
+ | **Table allowlist** | Only the 24 approved data tables can be restored |
+@@ -389,8 +478,9 @@ Backup and restore operations include several security measures:
+ - **Export a backup before major changes** -- Before bulk-deleting data, re-importing, or updating Monize, download a manual backup first
+ - **Test your backups** -- Periodically verify that a backup can be restored successfully by restoring on a test instance
+ - **Use auto-backup with retention** -- Enable automatic backups with the default retention settings (7 daily, 4 weekly, 6 monthly) for comprehensive coverage without excessive storage use
+-- **Encrypt off-site backups** -- Enable [Encrypted Backups](#encrypted-backups) before syncing the auto-backup folder to a cloud provider, NAS, or any storage you do not fully control
+-- **Save your backup password** -- Store the encryption password in a password manager. A lost password means a lost backup -- there is no master override
++- **Check that your backups actually are encrypted** -- Look at **Settings > Backup & Restore**: it should say **Enabled**, and your backup files should end in `.mzbe`. A `.json.gz` file is readable by anyone who has it
++- **Save every backup password you have used, dated** -- A backup opens with the password in effect when it was written, not your current one. A lost password means a lost backup: there is no master override. See [Passwords, Keys, and What You Must Not Lose](#passwords-keys-and-what-you-must-not-lose)
++- **Back up `ENCRYPTION_KEY` with your other deployment secrets** -- If you run the server, store it wherever you keep `JWT_SECRET` and your database password. Losing it does not lock you out of your backup *files*, but it does make every stored API key and credential unreadable and stops automatic backups until each user signs in again
+ - **Map the backup volume to durable storage** -- Point your Docker volume at a path that is covered by your server's own backup or sync strategy
+ - **Keep off-site copies** -- Periodically download a manual backup and store it separately from your server (e.g., cloud storage or external drive) for disaster recovery
+ - **Set a quiet backup time** -- Schedule auto-backups during off-peak hours (e.g., 2:00 AM) to minimize any performance impact
+diff --git a/Emergency-Access.md b/Emergency-Access.md
+index b583954..a9c800b 100644
+--- a/Emergency-Access.md
++++ b/Emergency-Access.md
+@@ -137,7 +137,7 @@ After verification, the message is unlocked for a few minutes -- a countdown dis
+ 
+ The message card shows whether a message is set, its character count, and the last time it was updated -- but the content stays hidden until you click **Reveal message** and re-verify.
+ 
+-> **Security Note:** The message ciphertext is stored in the database under your account, encrypted with AES-256-GCM using the server's `AI_ENCRYPTION_KEY`. A database dump alone cannot leak the plaintext. The running server holds the key and decrypts the message when including it in a grant email or showing it to you after step-up verification.
++> **Security Note:** The message ciphertext is stored in the database under your account, encrypted with AES-256-GCM using the server's `ENCRYPTION_KEY`. A database dump alone cannot leak the plaintext. The running server holds the key and decrypts the message when including it in a grant email or showing it to you after step-up verification.
+ 
+ ---
+ 
+@@ -238,7 +238,7 @@ To remove the message or contacts permanently, edit them individually before dis
+ 
+ | Concern | Mitigation |
+ |---------|------------|
+-| **Database leak of the message** | The message body is encrypted at rest with AES-256-GCM keyed by the server's `AI_ENCRYPTION_KEY` |
++| **Database leak of the message** | The message body is encrypted at rest with AES-256-GCM keyed by the server's `ENCRYPTION_KEY` |
+ | **Claim token leak from database** | Only the SHA-256 hash of the token is stored. The plaintext token only exists in the email and in the contact's browser |
+ | **Brute-forcing claim tokens** | 32-byte (256-bit) random tokens; 5-requests-per-15-minutes rate limit per IP on both preview and complete |
+ | **Token reuse / replay** | Single-use: once a token is consumed, all sibling tokens for the same owner are voided in the same transaction |
+diff --git a/Getting-Started.md b/Getting-Started.md
+index b8128bf..2cd3c9e 100644
+--- a/Getting-Started.md
++++ b/Getting-Started.md
+@@ -65,11 +65,12 @@ hunt for settings elsewhere. The sections are:
+ | Update Checks | New-version notifications |
+ | Frontend | Local development only |
+ 
+-At minimum, set a `JWT_SECRET` and a database password before starting:
++At minimum, set `JWT_SECRET`, `ENCRYPTION_KEY` and a database password before starting:
+ 
+ ```bash
+ # Required
+ JWT_SECRET=your-secret-key-minimum-32-characters-long
++ENCRYPTION_KEY=your-encryption-key-minimum-32-characters
+ 
+ # Database (defaults shown)
+ POSTGRES_USER=monize
+@@ -77,7 +78,28 @@ POSTGRES_PASSWORD=your-database-password
+ POSTGRES_DB=monize
+ ```
+ 
+-> **Important:** The `JWT_SECRET` must be at least 32 characters long. The application will refuse to start with a shorter secret. Generate one with `openssl rand -base64 32`.
++> **Important:** Both must be at least 32 characters long. The application
++> refuses to start without `JWT_SECRET`; `ENCRYPTION_KEY` is not enforced yet,
++> but the server warns about it on every start and a future release **will**
++> require it. Generate them with `openssl rand -base64 32` and
++> `openssl rand -hex 32`.
++
++> **Set `ENCRYPTION_KEY`, keep it safe, and never change it.** It encrypts what
++> Monize stores in the database: AI provider API keys, emergency-access
++> credentials, and the copy of each user's password that automatic backups are
++> encrypted with. **Without it, your automatic backups are written unencrypted**
++> and no API key or emergency-access contact can be saved at all. Changing it
++> later does not re-encrypt anything -- it makes what is already stored
++> unreadable, and automatic backups stop until every user signs in again. Store
++> it wherever you keep your other deployment secrets, and back it up.
++> ([Backup and Restore](Backup-and-Restore#passwords-keys-and-what-you-must-not-lose)
++> has the full picture of what depends on it.)
++>
++> Upgrading from a version before this setting existed? It was called
++> `AI_ENCRYPTION_KEY`. The old name is still accepted, so an existing deployment
++> keeps working untouched -- but if you never set it, your automatic backups
++> were, and still are, being written unencrypted. The server now says so in its
++> startup log on every boot.
+ 
+ 3. Start the application:
+ 
