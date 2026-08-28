@@ -102,9 +102,59 @@ export class ScheduledTransactionLoanService {
         (s) =>
           s.transferAccountId === loanAccountId && s !== extraPrincipalSplit,
       );
-      const interestSplit = splits.find(
+      // Prefer the loan's configured interest category. "The first categorized
+      // line" is an absence predicate -- it says the line is not the principal
+      // transfer, not that it is interest -- so on a template a user has added
+      // an escrow or insurance line to it recalculates whichever line happens to
+      // be listed first. The configured category is the explicit statement, and
+      // it is order-independent.
+      const categoryLines = splits.filter(
         (s) => s.categoryId && !s.transferAccountId,
       );
+      const interestSplit = loanAccount.interestCategoryId
+        ? categoryLines.find(
+            (s) => s.categoryId === loanAccount.interestCategoryId,
+          )
+        : categoryLines.length === 1
+          ? categoryLines[0]
+          : undefined;
+
+      // This method understands exactly one template shape: a principal
+      // transfer, one interest line, and optionally an extra-principal transfer.
+      // It rewrites the parent to principal + interest + extra, which is the
+      // whole template only for that shape -- so a template carrying an escrow,
+      // insurance or tax line ends up with a parent that no longer equals the
+      // sum of its children, and the posting path's exact-4dp split validator
+      // then refuses every occurrence. The schedule stops posting silently, with
+      // the amount it would have charged nowhere on screen.
+      //
+      // So it declines rather than rewriting what it cannot account for. The
+      // cost is a P/I split that stays at last period's figures; the alternative
+      // cost is a bill that never posts again. Declining also removes the last
+      // place a line was chosen by position: with several categorized lines and
+      // no configured category, there is nothing here that identifies interest,
+      // and guessing is what put an amortization figure onto a property-tax line.
+      const unmanagedLines = splits.filter(
+        (s) =>
+          s !== interestSplit &&
+          s !== principalSplit &&
+          s !== extraPrincipalSplit,
+      );
+      if (!interestSplit || unmanagedLines.length > 0) {
+        this.logger.warn(
+          `Skipping loan recalculation for scheduled transaction ${scheduledTransactionId}: ` +
+            `${
+              interestSplit
+                ? `${unmanagedLines.length} line(s) beyond principal/interest/extra`
+                : loanAccount.interestCategoryId
+                  ? "no line carries the loan's configured interest category"
+                  : `${categoryLines.length} categorized lines and no interest category configured on account ${loanAccountId}`
+            }. ` +
+            `Rewriting the parent would leave it unequal to the sum of its children and the occurrence would stop posting. ` +
+            `Set the loan's interest category, or keep the template to principal + interest (+ extra principal).`,
+        );
+        return;
+      }
 
       // What the template holds is what was just posted -- including any clamp
       // a previous pass wrote for that one installment (a final payment, an

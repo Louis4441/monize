@@ -132,6 +132,169 @@ describe("ScheduledTransactionLoanService", () => {
       expect(interestSave[0].amount).toBeLessThan(0);
     });
 
+    it("declines a template carrying a line it cannot account for", async () => {
+      // Escrow beside principal and interest. Preferring the configured interest
+      // category fixes WHICH line gets the amortization figure, but not the
+      // arithmetic: the parent is rewritten to principal + interest + extra,
+      // which is not this template's total, so parent and children stop
+      // matching and the posting path's exact-4dp validator refuses every
+      // occurrence from then on. Declining leaves a slightly stale P/I split;
+      // rewriting leaves a bill that never posts again.
+      const loanAccount = makeLoanAccount({
+        currentBalance: -20000,
+        interestCategoryId: "cat-interest",
+      });
+      accountsRepository.findOne.mockResolvedValue(loanAccount);
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction({
+          amount: -700,
+          splits: [
+            {
+              id: "split-principal",
+              transferAccountId: loanAccountId,
+              categoryId: null,
+              amount: -390,
+              memo: "Principal",
+            },
+            {
+              id: "split-escrow",
+              transferAccountId: null,
+              categoryId: "cat-escrow",
+              amount: -200,
+              memo: "Property tax",
+            },
+            {
+              id: "split-interest",
+              transferAccountId: null,
+              categoryId: "cat-interest",
+              amount: -110,
+              memo: "Interest",
+            },
+          ],
+        } as unknown as Partial<ScheduledTransaction>),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      expect(splitsRepository.save).not.toHaveBeenCalled();
+      expect(scheduledTransactionsRepository.update).not.toHaveBeenCalled();
+    });
+
+    it("declines when no line carries the configured interest category", async () => {
+      // The loan says its interest category is X and the template's only
+      // categorized line is Y: nothing here identifies interest, and the old
+      // code would have written the amortization figure onto Y by position.
+      const loanAccount = makeLoanAccount({
+        currentBalance: -20000,
+        interestCategoryId: "cat-interest",
+      });
+      accountsRepository.findOne.mockResolvedValue(loanAccount);
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction({
+          amount: -590,
+          splits: [
+            {
+              id: "split-principal",
+              transferAccountId: loanAccountId,
+              categoryId: null,
+              amount: -390,
+              memo: "Principal",
+            },
+            {
+              id: "split-escrow",
+              transferAccountId: null,
+              categoryId: "cat-escrow",
+              amount: -200,
+              memo: "Property tax",
+            },
+          ],
+        } as unknown as Partial<ScheduledTransaction>),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      expect(splitsRepository.save).not.toHaveBeenCalled();
+      expect(scheduledTransactionsRepository.update).not.toHaveBeenCalled();
+    });
+
+    it("recalculates the canonical principal + interest template", async () => {
+      // The shape this service writes itself, with the interest category
+      // configured: identified by provenance, and fully accounted for, so the
+      // parent and children stay in step.
+      const loanAccount = makeLoanAccount({
+        currentBalance: -20000,
+        interestCategoryId: "cat-interest",
+      });
+      accountsRepository.findOne.mockResolvedValue(loanAccount);
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction(),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      const saved = splitsRepository.save.mock.calls.map((call: any) => call[0]);
+      expect(saved.some((sp: any) => sp.id === "split-interest")).toBe(true);
+      expect(saved.some((sp: any) => sp.id === "split-principal")).toBe(true);
+    });
+
+    it("keeps the parent equal to the sum of its children on a multi-line template", async () => {
+      // The posting path validates parent == sum(children) to exact 4dp. This
+      // method rewrites the parent to principal + interest + extra, which is the
+      // whole template only when there are no other lines -- so an escrow line
+      // it leaves untouched puts the two out of balance and the occurrence stops
+      // posting.
+      const loanAccount = makeLoanAccount({
+        currentBalance: -20000,
+        interestCategoryId: "cat-interest",
+      });
+      accountsRepository.findOne.mockResolvedValue(loanAccount);
+      const splits = [
+        {
+          id: "split-principal",
+          transferAccountId: loanAccountId,
+          categoryId: null,
+          amount: -390,
+          memo: "Principal",
+        },
+        {
+          id: "split-escrow",
+          transferAccountId: null,
+          categoryId: "cat-escrow",
+          amount: -200,
+          memo: "Property tax",
+        },
+        {
+          id: "split-interest",
+          transferAccountId: null,
+          categoryId: "cat-interest",
+          amount: -110,
+          memo: "Interest",
+        },
+      ];
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction({
+          amount: -700,
+          splits,
+        } as unknown as Partial<ScheduledTransaction>),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      // Whatever it decided to do, the template must still balance.
+      const updateCalls = scheduledTransactionsRepository.update.mock.calls;
+      const parentUpdate = updateCalls.length
+        ? updateCalls[updateCalls.length - 1][1]
+        : undefined;
+      const parentAmount = parentUpdate
+        ? Math.abs(Number(parentUpdate.amount))
+        : 700;
+      const childSum = splits.reduce(
+        (total: number, sp: any) => total + Math.abs(Number(sp.amount)),
+        0,
+      );
+      expect(parentAmount).toBeCloseTo(childSum, 4);
+    });
+
     describe("the stored cadence decides the periodic rate", () => {
       /**
        * `accounts.payment_frequency` is a bare VARCHAR written in two spellings,

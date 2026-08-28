@@ -44,7 +44,7 @@ CREATE TABLE users (
     pending_oidc_subject VARCHAR(255),
     is_delegate_only BOOLEAN NOT NULL DEFAULT false, -- true when the row exists solely as an owner-managed delegate identity (created via Shared Access, never claimed via /register)
     backup_encryption_enabled BOOLEAN NOT NULL DEFAULT false,
-    backup_password_enc TEXT -- backup password (login password for local, dedicated password for OIDC) encrypted with AI_ENCRYPTION_KEY for auto-backup use
+    backup_password_enc TEXT -- backup password (login password for local, dedicated password for OIDC) encrypted with ENCRYPTION_KEY for auto-backup use
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token) WHERE reset_token IS NOT NULL;
@@ -746,7 +746,7 @@ CREATE TABLE scheduled_transaction_overrides (
     -- An occurrence's IDENTITY is its recurrence slot, so that is what is
     -- unique: `override_date` is the day the occurrence was moved TO, an
     -- attribute of the override rather than its name. Keyed on override_date
-    -- (migration 166) this permitted two overrides for one slot -- the posting
+    -- (migration 168) this permitted two overrides for one slot -- the posting
     -- then used whichever row the reader's map happened to keep -- and refused
     -- two different occurrences moved onto the same day, which is legitimate.
     CONSTRAINT uq_sched_txn_overrides_occurrence
@@ -1142,7 +1142,7 @@ CREATE INDEX idx_delegate_net_worth_exclusions_user
 -- Emergency Access. Lets the owner pre-designate one or more contacts who
 -- receive a magic link to take over the account after a configurable
 -- period of inactivity. The free-form message body is stored as
--- AES-256-GCM ciphertext (AiEncryptionService, keyed by AI_ENCRYPTION_KEY)
+-- AES-256-GCM ciphertext (EncryptionService, keyed by ENCRYPTION_KEY)
 -- so a database dump cannot leak it; the running app decrypts on demand.
 CREATE TABLE emergency_access_settings (
     owner_user_id         UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -1191,7 +1191,7 @@ CREATE TABLE emergency_access_contacts (
     -- to say so (audit RRV4-004). NULL means never notified.
     notified_grant_generation INTEGER,
     -- The undelivered credential (migration 149), AES-256-GCM under
-    -- AI_ENCRYPTION_KEY. Written with the hash before the first send, re-read by a
+    -- ENCRYPTION_KEY. Written with the hash before the first send, re-read by a
     -- retry so it re-sends the *same* link rather than minting one that kills the
     -- link already in the recipient's inbox, and cleared in the statement that
     -- records delivery. A credential at rest, so it does not outlive the delivery

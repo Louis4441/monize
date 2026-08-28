@@ -32,7 +32,7 @@ import { useLoanRateEditing } from '@/components/accounts/loan-detail/useLoanRat
 import {
   buildLoanProjectionInput,
   deriveLoanPaymentHistory,
-  resolveCurrentInstallment,
+  resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { computePastImpact } from '@/lib/loan-past-impact';
 import {
@@ -116,11 +116,14 @@ export function LoanDetailView({
   // The borrower's real current installment (principal + interest) from the
   // payment history, shown on the summary card and used to seed the projection.
   // The stored paymentAmount is often principal-only for separately-booked
-  // interest, so it is only a fallback when there is no usable history yet.
-  const currentInstallment = useMemo(
-    () => resolveCurrentInstallment(history, account.paymentAmount),
-    [history, account.paymentAmount],
+  // interest, so it is only a fallback when there is no usable history yet --
+  // and the same resolution the projection is seeded with, so the card and the
+  // payoff beside it cannot describe two different installments.
+  const currentTerms = useMemo(
+    () => resolveCurrentLoanTerms(account, history, rateChanges),
+    [account, history, rateChanges],
   );
+  const currentInstallment = currentTerms.payment;
 
   const projectionInput = useMemo(
     () => buildLoanProjectionInput(account, history, rateChanges),
@@ -248,8 +251,8 @@ export function LoanDetailView({
         {
           label: t('loanDetail.summary.interestRate'),
           value:
-            account.interestRate != null
-              ? `${account.interestRate}%`
+            currentTerms.annualRate != null
+              ? `${currentTerms.annualRate}%`
               : t('loanDetail.summary.notSet'),
           color: '#ea580c',
         },
@@ -291,6 +294,7 @@ export function LoanDetailView({
         account={account}
         startingBalance={history.startingBalance}
         currentInstallment={currentInstallment}
+        currentAnnualRate={currentTerms.annualRate}
         baseline={baseline}
       />
 

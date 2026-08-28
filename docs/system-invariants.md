@@ -102,6 +102,7 @@ implied.
 | INV-LOAN-003 | One named compounding convention, from preview to projection to displayed EAR | enforced |
 | INV-LOAN-004 | The final payment is the residual payoff, not another installment | enforced |
 | INV-LOAN-005 | The first payment date is payment number 1 | enforced |
+| INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -944,6 +945,149 @@ Required tests      Present: the calculateEndDate and calculateMortgageEndDate
                     processes and scans the three helpers for a local accessor.
 Status              enforced
 ```
+### INV-LOAN-HISTORY-001 -- historical loan interest counted as paid is ledger-backed
+
+```text
+Statement           Interest attributed to a historical loan payment is a
+                    recorded interest split of that payment, or the separate
+                    interest expense paired to its date. Absent both, after a
+                    SUCCESSFUL read, the interest is a measured zero -- never a
+                    figure derived from the balance and the account's rate. A
+                    FAILED read is unknown, not zero, and must not be rendered
+                    as a schedule.
+                    "Ledger-backed" is not enough on its own: the row has to be
+                    an INTEREST row. Escrow, property tax, insurance and fees are
+                    all ledger-backed and none of them is interest, so the line
+                    is identified by provenance -- the loan's configured interest
+                    category -- and never by "the split that is not the principal
+                    transfer". Changing the order of a payment's split lines must
+                    not change Interest Paid.
+                    The rate is a separate fact from the interest and does not
+                    fall with it: a fixed-rate loan with no recorded rate
+                    history keeps its configured rate on a zero-interest row,
+                    while a variable-rate loan's rate for that date stays null
+                    rather than inheriting today's scalar.
+                    And 0% is a rate, distinct from "no rate recorded", at every
+                    step: a fixed interest-free loan carries 0 on every row
+                    (`Number(null)` is also 0, so the test is `!= null`, never
+                    `> 0`), its `principal + 0` installment is COMPLETE rather
+                    than partial because the interest is known to be zero, and
+                    every surface renders it as `0%` rather than "Not set".
+                    A forward PROJECTION may estimate -- that is its job, and
+                    its rows are labelled projected. The prohibition is on a
+                    historical row.
+Source of truth     transaction_splits (the payment's recorded interest leg,
+                    identified by accounts.interest_category_id) and the
+                    interest-category expenses on the loan's configured source
+                    account. Not accounts.interest_rate, which describes the loan
+                    and not what any payment settled -- and, for the projection
+                    that reads this history, not accounts.interest_rate as the
+                    CURRENT rate either: recording a rate change never writes it,
+                    so loan_rate_changes at or before today is the current rate.
+Enforcement         One producer: frontend/src/lib/loan-history.ts
+                    deriveLoanPaymentHistory / classifyPayment, which takes
+                    neither the running balance nor the rate timeline as an
+                    argument, so there is nothing for an estimate to be computed
+                    from. analyticInterest is deleted. The backend computes only
+                    forward schedules (accounts/mortgage-amortization.util.ts,
+                    for previews and scheduled-payment setup), so no second
+                    producer of the historical figure exists.
+                    frontend/src/lib/loan-history.guard.test.ts holds two source
+                    scans: no catch anywhere in the module, since a swallowed
+                    lookup failure resolves to [] and [] is read as "no interest
+                    was booked"; and no truthiness read of a resolved annual rate
+                    anywhere in frontend/src, since `0` is a rate and five sites
+                    rendered a recorded 0% as "Not set". The second carries a
+                    self-test over known good and bad lines, because a scanning
+                    pattern that quietly matches nothing is worse than no scan.
+                    frontend/src/lib/loan-rate-changes.contract.test.ts holds the
+                    rate-history endpoint's precondition as one list -- against
+                    the backend constant that decides the 400, the two frontend
+                    lists that coincide with it, and every caller of
+                    loanRateChangesApi.getAll.
+Concurrency scope   -- (read path)
+Failure response    The rejection propagates to the caller's error-and-retry
+                    state: useReportData in the three loan reports, the
+                    failedAccountId branch of hooks/useLoanProjection.ts, the
+                    page error on the account detail route. A success retires
+                    the same account's earlier failure, or the figures stay
+                    unavailable after recovery.
+Required tests      Present: the principal-only matrix in
+                    frontend/src/lib/loan-history.test.ts (every account type x
+                    Canadian/variable flag x frequency x rate-timeline
+                    presence -- each was a separate door into the estimate), the
+                    fixed-rate and variable-rate Rate-column cases, the
+                    reconstruction paths re-pinned against RECORDED interest so
+                    the Canadian semi-annual and day-count annualizations stay
+                    covered, the split-provenance group (escrow before interest
+                    and interest before escrow yielding the same figure, the
+                    refusal to guess between two uncategorized lines, a transfer
+                    leg never counting), the rate-authority group (a stale scalar
+                    losing to the timeline, a future-dated row being a step and
+                    not the current state), the interest-free group (0% carried
+                    on every row while an unconfigured rate stays null, the
+                    COMPLETE `principal + 0` installment at 0% against the
+                    incomplete one at 6%, and 0% rendering as 0%), the rejection
+                    test, the two source scans and the endpoint contract test
+                    above, the report's error-and-retry and rate-history-wiring
+                    tests in
+                    frontend/src/components/reports/LoanAmortizationReport.test.tsx,
+                    the failed-rate-history refusal in
+                    frontend/src/app/accounts/[id]/page.test.tsx, and the
+                    failure-then-refresh-then-success recovery test in
+                    frontend/src/hooks/useLoanProjection.test.tsx.
+Known gap           **Standalone interest is attributed by `(interest category,
+                    source account)`, which is not per-loan.** A loan's separate
+                    interest expenses are fetched with exactly that pair
+                    (`fetchLoanInterestTransactions`) and nothing on those rows
+                    names the loan they belong to. Two loans paid from one
+                    account and sharing one interest category therefore merge:
+                    each one's history absorbs the other's interest, and
+                    `pairSeparateInterestByDate` sums both onto whichever
+                    payment date matches. The source comment has always said to
+                    give each loan its own category; what makes the state normal
+                    rather than exceptional is the DEFAULT --
+                    `LoanPaymentSetupService` falls back to
+                    `CategoriesService.findLoanCategories`, which resolves one
+                    user-level `Loan -> Loan Interest` category for every loan.
+                    Worked example: Loan A pays 800 principal + 200 interest and
+                    Loan B pays 500 + 100 on the same date from the same
+                    chequing account; A's history reports 300 of interest and an
+                    1,100 installment instead of 200 and 1,000.
+                    Closing it needs a durable provenance link (the loan account
+                    id, or the principal payment / scheduled occurrence, recorded
+                    on the interest transaction) plus a decision about existing
+                    data and about the setup default. Both are schema/product
+                    decisions, so the status is `partial` and says so rather than
+                    the catalogue claiming a guarantee the code does not give.
+                    A second, smaller gap: `accounts.interest_booking_mode`
+                    (`AUTO | SPLIT | SEPARATE`) is persisted, offered in the
+                    account form and written by the MNY importer, but no reader
+                    branches on it -- so it constrains nothing here, and a
+                    `SPLIT` loan can still consume a standalone expense. Its
+                    cross-layer meaning is undefined and needs a truth table
+                    before any reader starts honouring it.
+Status              partial -- the estimate is gone and the provenance of a
+                    SPLIT-recorded interest line is enforced; the provenance of
+                    a STANDALONE interest expense is not.
+```
+
+Issue #1255: a $450 principal-only transfer on a $10,000 loan at 6% rendered as
+Payment $500 / Principal $450 / Interest $50. The $50 was never paid, and it
+reached Interest Paid, every cumulative total, the CSV and PDF exports, and the
+installment the forward projection was seeded with.
+
+Two things the estimate was quietly holding up, and both are the interesting
+half of the fix. The Rate column was reconstructed *from* the interest charged,
+so removing the interest removed the rate as well -- for a fixed-rate loan that
+is a known fact being discarded, not an unknown being reported. And
+`observedInstallment` returns `principal + interest`, which for a loan
+booking its interest outside the app is now under one period's interest, so
+`generateLoanSchedule` refuses the seed: `buildLoanProjectionInput` falls back
+to the stored contractual payment, and where the rate timeline records the
+payment in effect that value is authoritative even when it does not amortize
+(`INV-LOAN-HISTORY-001` covers the interest; the payment's authority ordering is
+documented in `frontend/CLAUDE.md`).
 
 ## Scheduled occurrences
 
@@ -1501,6 +1645,22 @@ Encryption is settled and worth not re-litigating: a support backup is
 unconditionally encrypted because it exists to leave the user's machine, and an
 automatic backup whose stored password cannot be decrypted is *refused* rather
 than written in clear.
+
+What was *not* settled, and is the one thing this invariant does not claim: that
+an automatic backup is encrypted at all. It is encrypted whenever the server
+holds a usable copy of the user's password, and until issue #1269 that copy was
+keyed on `AI_ENCRYPTION_KEY` while that variable was optional -- so a deployment
+that configured no AI provider wrote plaintext indefinitely, and nothing said so.
+The key is `ENCRYPTION_KEY` (`common/encryption/encryption-key.ts`); the former
+name is still read. It is not enforced at startup yet -- a deployment without one
+boots and is warned, on every start, that backups are unencrypted and that a
+future release will refuse to serve -- so the enforcement today is entirely
+*visibility*: the boot warning, a warning on every unencrypted automatic backup,
+and `getStatus` reporting "this server cannot encrypt" separately from "this user
+has not enabled it". Plaintext remains a legitimate outcome for an account with
+no captured password, which is why the boot check announces rather than refuses;
+when the requirement lands, the unkeyed branch of `logEncryptionKeyStatus`
+becomes a throw and this paragraph becomes one sentence.
 
 ### INV-CRON-001 -- one logical effect per tick
 
