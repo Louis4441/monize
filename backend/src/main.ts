@@ -30,7 +30,7 @@ import { parseRlsMode } from "./common/db/rls-config";
 import { assertRuntimeRoleSafe } from "./common/db/runtime-role-check";
 import { assertRequiredDbFunctions } from "./common/db/required-db-functions";
 import { ConfigService } from "@nestjs/config";
-import { assertEncryptionKeyConfigured } from "./common/encryption/encryption-key";
+import { logEncryptionKeyStatus } from "./common/encryption/encryption-key";
 
 // node-oidc-provider writes its notices straight to console.info/console.warn,
 // which would otherwise be the only unformatted lines in the log. Installed
@@ -140,29 +140,23 @@ async function assertRequiredDbFunctionsOrExit(
 }
 
 /**
- * Verify this deployment has an encryption key, and exit if not.
+ * Say what this deployment's encryption key situation is, at every boot.
  *
- * `ENCRYPTION_KEY` is mandatory, and refusing the boot is what makes it so.
- * While it was optional -- under its old name `AI_ENCRYPTION_KEY`, documented as
- * being for cloud AI providers -- a deployment that configured no provider set
- * nothing, and the copy of each user's password that automatic backups are
- * encrypted with had nowhere to be stored: every backup went out in plaintext,
- * silently (issue #1269). A key that three features depend on is not something
- * to discover the absence of at the moment a secret needs storing.
- *
- * Same shape as the two checks below it: log the reason and exit, because an
- * operator restarting a crash-looping container reads the first ten lines.
+ * Deliberately a warning and not a refusal, unlike the two database checks
+ * below. `ENCRYPTION_KEY` is not required yet: refusing to boot would turn an
+ * upgrade into an outage for every deployment that never set the variable under
+ * its old name, `AI_ENCRYPTION_KEY`, which was optional and documented as being
+ * for cloud AI providers. But an unkeyed server is precisely the state issue
+ * #1269 was reported from -- backups written in plaintext with nothing saying so
+ * -- so the absence is announced loudly, on every start, and named as a coming
+ * hard requirement. The individual write paths still refuse; only the boot does
+ * not.
  */
-function assertEncryptionKeyOrExit(configService: ConfigService): void {
-  const logger = new Logger("EncryptionKeyCheck");
-  try {
-    assertEncryptionKeyConfigured((name) =>
-      configService.get<string>(name, ""),
-    );
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
+function reportEncryptionKeyStatus(configService: ConfigService): void {
+  logEncryptionKeyStatus(
+    (name) => configService.get<string>(name, ""),
+    new Logger("EncryptionKeyCheck"),
+  );
 }
 
 async function bootstrap() {
@@ -171,8 +165,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Before anything that could store a secret: a server with no key writes
-  // plaintext where it promises ciphertext, and says nothing.
-  assertEncryptionKeyOrExit(app.get(ConfigService));
+  // plaintext where it promises ciphertext, and used to say nothing.
+  reportEncryptionKeyStatus(app.get(ConfigService));
 
   // RLS_MODE=enforce promises a database-level tenant boundary. Selecting the
   // application role and supplying its password does not deliver one: a

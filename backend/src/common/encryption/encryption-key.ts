@@ -59,52 +59,62 @@ export function resolveEncryptionKey(
 }
 
 /**
- * The message an operator gets when neither name supplies a usable key.
+ * What an operator is told, line by line, when neither name supplies a usable key.
  *
- * Exported so the startup refusal and the test that pins it read the same
- * string: an operator meeting this has to learn the variable's name, its floor,
- * and how to produce one, in the first ten lines of a crash-looping container's
- * log.
+ * One array rather than one multi-line string because every line in this
+ * application's log carries the `[Nest] pid - date LEVEL [Context]` prefix, and
+ * a message with embedded newlines only gets it on the first one. Exported so
+ * the startup path and the test that pins it read the same words.
+ *
+ * The wording is doing a job. `ENCRYPTION_KEY` is not required *yet* -- this
+ * release still starts without it, because refusing to boot would turn an
+ * upgrade into an outage for every deployment that never set the variable under
+ * its old name. But that is exactly the state issue #1269 was reported from, so
+ * a quiet log line is not enough: the operator has to learn that their backups
+ * are going out unencrypted today, and that a future release will refuse to
+ * start.
  */
-export function missingEncryptionKeyMessage(): string {
-  return (
-    `${ENCRYPTION_KEY_ENV} is required and must be at least ` +
-    `${MIN_ENCRYPTION_KEY_LENGTH} characters. It encrypts AI provider API keys, ` +
-    "emergency-access credentials and the password your backups are encrypted " +
-    `with, so a server without it stores none of them. Generate one with ` +
-    `"openssl rand -hex 32" and set ${ENCRYPTION_KEY_ENV} in your environment. ` +
-    `(Deployments that already set ${LEGACY_ENCRYPTION_KEY_ENV}, the former name ` +
-    "for this variable, keep working unchanged.)"
-  );
-}
+export const MISSING_ENCRYPTION_KEY_WARNING_LINES: readonly string[] = [
+  `${ENCRYPTION_KEY_ENV} is not set. THIS WILL BECOME A HARD REQUIREMENT IN A ` +
+    "FUTURE RELEASE, and the server will then refuse to start without it.",
+  "Until it is set, this deployment cannot store any secret it is asked to " +
+    "keep: automatic backups are written UNENCRYPTED, AI provider API keys " +
+    "cannot be saved, and emergency access cannot be enabled.",
+  `Fix it now: generate a key with "openssl rand -hex 32" and set ` +
+    `${ENCRYPTION_KEY_ENV} (minimum ${MIN_ENCRYPTION_KEY_LENGTH} characters). ` +
+    "Nothing else changes, and existing data is unaffected.",
+  `Keep the value stable once set -- changing it re-encrypts nothing, it makes ` +
+    "every stored secret unreadable. Back it up with your other deployment " +
+    `secrets. (${LEGACY_ENCRYPTION_KEY_ENV} is the former name of this ` +
+    "variable and is still accepted.)",
+];
 
 /**
- * Refuse to start without a key.
+ * Say, at startup, which of the three configuration states this deployment is
+ * in: keyed by the current name (silent), keyed by the deprecated one (a rename
+ * notice), or unkeyed (the deprecation warning above).
  *
- * Mandatory, not best-effort, and that is the change: while it was optional,
- * `AI_ENCRYPTION_KEY` was documented as being for cloud AI providers, so a
- * deployment that configured none set nothing -- and every automatic backup was
- * written in plaintext because the password capture had nowhere to store its
- * copy, with no log line and nothing on the Settings page (issue #1269). A
- * feature that is on by default cannot depend on configuration a deployment is
- * told it does not need.
+ * Deliberately not a refusal. The requirement is announced in this release and
+ * enforced in a later one, so a deployment that has been running for a year
+ * without the variable takes the upgrade, keeps serving, and gets told -- on
+ * every boot -- what it is losing and what to do. When the enforcement lands,
+ * turn the unkeyed branch into a throw; every caller and test is already shaped
+ * for it.
+ *
+ * A rename nobody is told about is a rename that never happens, which is why
+ * the legacy branch warns rather than staying quiet: the old name keeps working
+ * forever if the only place it is mentioned is a changelog.
  */
-export function assertEncryptionKeyConfigured(read: EnvReader): void {
-  if (!resolveEncryptionKey(read)) {
-    throw new Error(missingEncryptionKeyMessage());
+export function logEncryptionKeyStatus(read: EnvReader, logger: Logger): void {
+  const resolved = resolveEncryptionKey(read);
+
+  if (!resolved) {
+    for (const line of MISSING_ENCRYPTION_KEY_WARNING_LINES) {
+      logger.warn(line);
+    }
+    return;
   }
-}
 
-/**
- * One line, at startup, naming the variable that supplied the key.
- *
- * A rename nobody is told about is a rename that never happens: the legacy name
- * keeps working forever if the only place it is mentioned is a changelog.
- */
-export function logEncryptionKeySource(
-  resolved: ResolvedEncryptionKey,
-  logger: Logger,
-): void {
   if (resolved.source === LEGACY_ENCRYPTION_KEY_ENV) {
     logger.warn(
       `${LEGACY_ENCRYPTION_KEY_ENV} is deprecated and has been renamed to ` +
@@ -115,4 +125,21 @@ export function logEncryptionKeySource(
         "makes every stored secret unreadable.",
     );
   }
+}
+
+/**
+ * The error a write path raises when it is asked to encrypt on a deployment
+ * that has no key. Not a startup message: the server starts, and only the
+ * operations that genuinely need a key fail, each saying why.
+ */
+export function missingEncryptionKeyMessage(): string {
+  return (
+    `${ENCRYPTION_KEY_ENV} is not configured (minimum ` +
+    `${MIN_ENCRYPTION_KEY_LENGTH} characters). It encrypts AI provider API ` +
+    "keys, emergency-access credentials and the password your backups are " +
+    "encrypted with, so a server without it stores none of them. Generate one " +
+    `with "openssl rand -hex 32" and set ${ENCRYPTION_KEY_ENV} in your ` +
+    `environment. (${LEGACY_ENCRYPTION_KEY_ENV}, the former name for this ` +
+    "variable, is still accepted.)"
+  );
 }

@@ -222,10 +222,12 @@ backend:
   # -- General application settings
   # NOTE: JWT_SECRET and ENCRYPTION_KEY must be provided via a Secret.
   # Use extraEnvFrom with a secretRef, or extraEnv with valueFrom.secretKeyRef.
-  # The backend refuses to start without ENCRYPTION_KEY (minimum 32 characters):
-  # it encrypts AI provider keys, emergency-access credentials and the password
-  # each user's automatic backups are encrypted with. Keep the value stable --
-  # rotating it does not re-encrypt anything, it makes what is stored unreadable.
+  # ENCRYPTION_KEY (minimum 32 characters) encrypts AI provider keys,
+  # emergency-access credentials and the password each user's automatic backups
+  # are encrypted with. It is not enforced at startup yet -- the backend warns on
+  # every boot while it is missing, and a future release will require it -- but
+  # without it backups are written unencrypted. Keep the value stable once set:
+  # rotating it re-encrypts nothing, it makes what is stored unreadable.
   # AI_ENCRYPTION_KEY is the former name and is still accepted, so an existing
   # release needs no change.
   app:

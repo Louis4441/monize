@@ -1,8 +1,7 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { encrypt, decrypt } from "../../auth/crypto.util";
 import {
-  logEncryptionKeySource,
   missingEncryptionKeyMessage,
   resolveEncryptionKey,
   ResolvedEncryptionKey,
@@ -16,23 +15,23 @@ import {
  * It was `AiEncryptionService`, keyed on `AI_ENCRYPTION_KEY`, and the name is
  * why issue #1269 happened: a variable documented as being for cloud AI
  * providers was left unset by every deployment that configured none, and the
- * backup password capture silently had nowhere to store its copy. The key is
- * `ENCRYPTION_KEY`, it is mandatory (`assertEncryptionKeyConfigured`, called at
- * startup), and `AI_ENCRYPTION_KEY` is still read so an existing deployment
- * takes the upgrade without re-keying a single column.
+ * backup password capture silently had nowhere to store its copy.
+ *
+ * The key is `ENCRYPTION_KEY`. It is not required to boot in this release --
+ * `logEncryptionKeyStatus` warns on every start that it will be -- but a
+ * deployment without one stores no secret at all, so every method here refuses
+ * rather than inventing a fallback. `AI_ENCRYPTION_KEY` is still read, and
+ * still wins where both are set, so an existing deployment takes the upgrade
+ * without re-keying a single column.
  */
 @Injectable()
 export class EncryptionService {
-  private readonly logger = new Logger(EncryptionService.name);
   private readonly resolved: ResolvedEncryptionKey | null;
 
   constructor(private readonly configService: ConfigService) {
     this.resolved = resolveEncryptionKey((name) =>
       this.configService.get<string>(name, ""),
     );
-    if (this.resolved) {
-      logEncryptionKeySource(this.resolved, this.logger);
-    }
   }
 
   isConfigured(): boolean {

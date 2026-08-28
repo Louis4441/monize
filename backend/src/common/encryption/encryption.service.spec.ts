@@ -80,9 +80,9 @@ describe("EncryptionService", () => {
       expect(enc1).not.toBe(enc2);
     });
 
-    // Unreachable in a booted server -- startup refuses without a key -- but a
-    // spec or a script can construct the service outside that path, and
-    // ciphertext-shaped garbage would be worse than a throw.
+    // Reachable: this release starts without a key (it warns instead), so a
+    // deployment that has not set one meets the refusal here -- on the request
+    // that tried to store a secret -- rather than at boot.
     it("throws when encryption key is not configured", async () => {
       mockConfigService.get = jest.fn().mockReturnValue("");
 
@@ -96,10 +96,10 @@ describe("EncryptionService", () => {
       const unconfiguredService =
         module.get<EncryptionService>(EncryptionService);
       expect(() => unconfiguredService.encrypt("test")).toThrow(
-        /ENCRYPTION_KEY is required/,
+        /ENCRYPTION_KEY is not configured/,
       );
       expect(() => unconfiguredService.decrypt("test")).toThrow(
-        /ENCRYPTION_KEY is required/,
+        /ENCRYPTION_KEY is not configured/,
       );
     });
   });

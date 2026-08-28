@@ -396,7 +396,7 @@ bulk update filtered to uncategorized must not reach it.
 
 Key env vars (see `.env.example` for full list):
 - `JWT_SECRET` -- minimum 32 chars, enforced at startup
-- `ENCRYPTION_KEY` -- minimum 32 chars, mandatory (startup refuses without it); encrypts AI provider keys, emergency-access credentials and the stored backup password. `AI_ENCRYPTION_KEY` is the former name, still read and still preferred where both are set
+- `ENCRYPTION_KEY` -- minimum 32 chars; encrypts AI provider keys, emergency-access credentials and the stored backup password. Not yet enforced at startup (a deployment without one boots and is warned on every start that a future release will require it), but nothing that needs a secret works without it. `AI_ENCRYPTION_KEY` is the former name, still read and still preferred where both are set
 - `DATABASE_*` -- PostgreSQL connection
 - `DEMO_MODE=true` -- enables demo restrictions, daily reset at 4 AM UTC
 - `LOCAL_AUTH_ENABLED` / `REGISTRATION_ENABLED` -- auth toggles

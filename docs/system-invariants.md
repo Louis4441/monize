@@ -1506,12 +1506,16 @@ an automatic backup is encrypted at all. It is encrypted whenever the server
 holds a usable copy of the user's password, and until issue #1269 that copy was
 keyed on `AI_ENCRYPTION_KEY` while that variable was optional -- so a deployment
 that configured no AI provider wrote plaintext indefinitely, and nothing said so.
-The key is `ENCRYPTION_KEY` (`common/encryption/encryption-key.ts`), mandatory,
-and `main.ts` exits rather than serving without it; the former name is still
-read. Plaintext remains a legitimate outcome for an account with no captured
-password, so beyond that refusal the enforcement is *visibility*: every
-unencrypted automatic backup logs a warning, and `getStatus` reports "this server
-cannot encrypt" separately from "this user has not enabled it".
+The key is `ENCRYPTION_KEY` (`common/encryption/encryption-key.ts`); the former
+name is still read. It is not enforced at startup yet -- a deployment without one
+boots and is warned, on every start, that backups are unencrypted and that a
+future release will refuse to serve -- so the enforcement today is entirely
+*visibility*: the boot warning, a warning on every unencrypted automatic backup,
+and `getStatus` reporting "this server cannot encrypt" separately from "this user
+has not enabled it". Plaintext remains a legitimate outcome for an account with
+no captured password, which is why the boot check announces rather than refuses;
+when the requirement lands, the unkeyed branch of `logEncryptionKeyStatus`
+becomes a throw and this paragraph becomes one sentence.
 
 ### INV-CRON-001 -- one logical effect per tick
 

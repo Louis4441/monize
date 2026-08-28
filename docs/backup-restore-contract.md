@@ -841,16 +841,23 @@ this one, and it is what would replace a measured multiple with a bound.
   user is `partial-` in the name it shows them. The service returns a message
   saying more (`runManualBackup`) and the frontend does not use it.
 
-- **Encryption is on by default, and its key comes from mandatory configuration
+- **Encryption is on by default, and its key is announced before it is enforced
   (issue #1269).** An automatic backup is encrypted with the user's own password
   whenever the server holds a usable copy: captured for a local account when they
   type it (registration, login, password change) or when they confirm it in
   Settings, and set explicitly by an OIDC account. The copy lives in
   `users.backup_password_enc` under `EncryptionService`, keyed by
-  `ENCRYPTION_KEY` — mandatory, checked at startup, and refused rather than
-  defaulted. `AI_ENCRYPTION_KEY` is the variable's former name: still read, and
-  still preferred where both are set, so an existing deployment upgrades without
-  re-keying a column.
+  `ENCRYPTION_KEY`. `AI_ENCRYPTION_KEY` is the variable's former name: still
+  read, and still preferred where both are set, so an existing deployment
+  upgrades without re-keying a column.
+
+  The key is **announced before it is enforced**. A deployment with neither
+  variable still boots — refusing would turn an upgrade into an outage for
+  exactly the deployments that have the problem — but `logEncryptionKeyStatus`
+  warns at every start that backups are going out unencrypted and that a future
+  release will require the variable. Until that release, the refusals live on
+  the write paths: `EncryptionService` throws rather than inventing a fallback,
+  so no secret is ever stored in the clear.
 
   The previous arrangement keyed this on `AI_ENCRYPTION_KEY` while that variable
   was optional and documented as being for cloud AI providers: a deployment that
