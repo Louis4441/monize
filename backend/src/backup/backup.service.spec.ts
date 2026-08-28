@@ -26,6 +26,7 @@ import { ATTACHMENT_EXPORT_SQL } from "./export-attachments";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
+import { BackupPasswordCipher } from "./backup-password-cipher";
 import { encryptBackup } from "./backup-crypto.util";
 import * as bcrypt from "bcryptjs";
 import {
@@ -125,6 +126,32 @@ function insertColumnMap(call: unknown[]): Record<string, unknown> {
   const columns = colMatch[1].split(",").map((c) => c.trim().replace(/"/g, ""));
   const values = (call[1] as unknown[]) ?? [];
   return Object.fromEntries(columns.map((col, i) => [col, values[i]]));
+}
+
+/**
+ * A double for either of the two ciphers this module injects.
+ *
+ * `decrypt` throws on anything this instance did not encrypt, because the real
+ * one does: AES-GCM authenticates, so a wrong key raises rather than returning
+ * plausible bytes. A passthrough made "ciphertext from another instance"
+ * indistinguishable from plaintext, which is the exact case the export has to
+ * get right. `canDecrypt` mirrors the same answer -- a blanket `true` would make
+ * the restore's undecryptable-key report untestable.
+ */
+function aiEncryptionDouble() {
+  return {
+    isConfigured: jest.fn().mockReturnValue(true),
+    encrypt: jest.fn((value: string) => `enc:${value}`),
+    decrypt: jest.fn((value: string) => {
+      if (!value.startsWith("enc:")) {
+        throw new Error("Unsupported state or unable to authenticate data");
+      }
+      return value.slice(4);
+    }),
+    canDecrypt: jest.fn(
+      (value: unknown) => typeof value === "string" && value.startsWith("enc:"),
+    ),
+  };
 }
 
 describe("BackupService", () => {
@@ -650,31 +677,18 @@ describe("BackupService", () => {
         // survived (P2-005).
         OidcReauthService,
         userMaintenanceProvider(maintenance),
+        // Two ciphers, deliberately: `AiEncryptionService` still owns the
+        // provider API keys the export carries, while the stored backup password
+        // moved to `BackupPasswordCipher` (whose key does not depend on optional
+        // configuration). Both doubles behave identically, so a test that
+        // mistakes one for the other still fails on the provider list.
         {
           provide: AiEncryptionService,
-          useValue: {
-            isConfigured: jest.fn().mockReturnValue(true),
-            encrypt: jest.fn((s: string) => `enc:${s}`),
-            // Throws on anything this instance did not encrypt, because the
-            // real one does: AES-GCM authenticates, so a wrong key raises
-            // rather than returning plausible bytes. A passthrough here made
-            // "ciphertext from another instance" indistinguishable from
-            // plaintext, which is the exact case the export has to get right.
-            decrypt: jest.fn((s: string) => {
-              if (!s.startsWith("enc:")) {
-                throw new Error(
-                  "Unsupported state or unable to authenticate data",
-                );
-              }
-              return s.slice(4);
-            }),
-            // Mirrors the real service's answer: a ciphertext this instance
-            // produced reads back, anything else does not. A blanket `true`
-            // would make the restore's undecryptable-key report untestable.
-            canDecrypt: jest.fn(
-              (s: unknown) => typeof s === "string" && s.startsWith("enc:"),
-            ),
-          },
+          useValue: aiEncryptionDouble(),
+        },
+        {
+          provide: BackupPasswordCipher,
+          useValue: aiEncryptionDouble(),
         },
         {
           provide: ATTACHMENT_STORAGE_PROVIDER,
@@ -1628,7 +1642,7 @@ describe("BackupService", () => {
       expect(service.resolveStoredBackupPassword(user)).toBeNull();
     });
 
-    it("decrypts the stored password via AiEncryptionService", () => {
+    it("decrypts the stored password via BackupPasswordCipher", () => {
       const user = {
         ...mockUser,
         backupEncryptionEnabled: true,
@@ -1641,9 +1655,9 @@ describe("BackupService", () => {
       // The mock decrypt throws when called -- this also exercises the catch
       // block that maps a thrown error to a null return value.
       const failingService = service as unknown as {
-        aiEncryption: { decrypt: jest.Mock };
+        backupPasswordCipher: { decrypt: jest.Mock };
       };
-      failingService.aiEncryption.decrypt = jest.fn(() => {
+      failingService.backupPasswordCipher.decrypt = jest.fn(() => {
         throw new Error("bad ciphertext");
       });
       const user = {

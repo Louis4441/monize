@@ -1501,6 +1501,17 @@ unconditionally encrypted because it exists to leave the user's machine, and an
 automatic backup whose stored password cannot be decrypted is *refused* rather
 than written in clear.
 
+What was *not* settled, and is the one thing this invariant does not claim: that
+an automatic backup is encrypted at all. It is encrypted whenever the server
+holds a usable copy of the user's password, and until issue #1269 that copy was
+keyed on the optional `AI_ENCRYPTION_KEY` -- so a deployment that configured no
+AI provider wrote plaintext indefinitely, and nothing said so. The key now comes
+from `JWT_SECRET` (`backup-password-cipher.ts`), which startup enforces. Plaintext
+remains a legitimate outcome for an account with no captured password, so the
+enforcement is *visibility*, not refusal: every unencrypted automatic backup logs
+a warning, and `getStatus` reports "this server cannot encrypt" separately from
+"this user has not enabled it".
+
 ### INV-CRON-001 -- one logical effect per tick
 
 ```text

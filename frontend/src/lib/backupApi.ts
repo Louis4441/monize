@@ -156,13 +156,26 @@ async function normalizeBlobError(error: unknown): Promise<never> {
 export interface BackupEncryptionStatus {
   enabled: boolean;
   /**
-   * Whether the user decides this. False for local-auth accounts: the server
-   * keeps a copy of the password they typed at sign-in and encrypts with it, so
-   * there is nothing for them to turn on or off. True for OIDC accounts, which
-   * have no password of ours and must set a dedicated backup password (or leave
-   * their backups unencrypted).
+   * Whether the dedicated backup-password controls belong to this user. False
+   * for local-auth accounts: the server keeps a copy of the password they typed
+   * at sign-in and encrypts with it, so there is no second password to invent.
+   * True for OIDC accounts, which have no password of ours and must set a
+   * dedicated backup password (or leave their backups unencrypted).
    */
   manageable: boolean;
+  /**
+   * Which password opens this user's backups. `login-password` for local
+   * accounts, `backup-password` for OIDC ones. Mirrors the backend's
+   * `BackupEncryptionStatus`.
+   */
+  method: 'login-password' | 'backup-password';
+  /**
+   * Whether the server holds key material to store a password at all. Off means
+   * no backup this deployment writes can be encrypted, which is a different
+   * thing from this user not having turned it on -- and the difference is the
+   * whole point of showing it.
+   */
+  available: boolean;
 }
 
 // Error code surfaced by the backend when an encrypted backup can't be
@@ -354,6 +367,16 @@ export const backupApi = {
   setBackupPassword: async (backupPassword: string): Promise<void> => {
     await apiClient.post('/backup/encryption/backup-password', {
       backupPassword,
+    });
+  },
+
+  // Turn on encryption for a local account by confirming the login password it
+  // already has. The sign-in capture is the primary path; this exists for a
+  // session that outlived the deploy which shipped it, where nothing would
+  // otherwise ask for the password again.
+  enableWithLoginPassword: async (loginPassword: string): Promise<void> => {
+    await apiClient.post('/backup/encryption/login-password', {
+      loginPassword,
     });
   },
 

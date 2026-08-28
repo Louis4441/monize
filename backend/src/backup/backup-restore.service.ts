@@ -28,6 +28,7 @@ import {
 } from "./backup-crypto.util";
 import { resolveRestoreExpandedLimitBytes } from "./backup-limits";
 import { resolveStoredBackupPassword } from "./backup-password.util";
+import { BackupPasswordCipher } from "./backup-password-cipher";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { RESTORE_PLAN } from "./restore-plan";
 import {
@@ -64,6 +65,7 @@ export class BackupRestoreService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly aiEncryption: AiEncryptionService,
+    private readonly backupPasswordCipher: BackupPasswordCipher,
     private readonly oidcReauth: OidcReauthService,
     private readonly attachments: BackupAttachmentTransferService,
     private readonly db: BackupRestoreDatabaseService,
@@ -347,7 +349,7 @@ export class BackupRestoreService {
     if (input.password) candidates.push(input.password);
     const stored = resolveStoredBackupPassword(
       user,
-      this.aiEncryption,
+      this.backupPasswordCipher,
       this.logger,
     );
     if (stored) candidates.push(stored);

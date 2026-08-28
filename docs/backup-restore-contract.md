@@ -841,6 +841,28 @@ this one, and it is what would replace a measured multiple with a bound.
   user is `partial-` in the name it shows them. The service returns a message
   saying more (`runManualBackup`) and the frontend does not use it.
 
+- **Encryption is on by default, and its key comes from mandatory configuration
+  (issue #1269).** An automatic backup is encrypted with the user's own password
+  whenever the server holds a usable copy: captured for a local account when they
+  type it (registration, login, password change) or when they confirm it in
+  Settings, and set explicitly by an OIDC account. The copy lives in
+  `users.backup_password_enc` under `BackupPasswordCipher`, whose key is derived
+  from `JWT_SECRET` with `derivePurposeKey` — `AI_ENCRYPTION_KEY` is preferred
+  where one is configured, and both keys are accepted on read, so adding or
+  removing it strands no stored copy.
+
+  The previous arrangement keyed this on `AI_ENCRYPTION_KEY` alone, which is
+  optional and documented as being for cloud AI providers: a deployment that
+  configured no provider stored no password and wrote every automatic backup in
+  plaintext, while the release notes, the docs and Settings all said backups were
+  encrypted by default. Two rules follow. **A plaintext automatic backup is
+  logged, every time** — it stays a legitimate outcome (an OIDC account with no
+  backup password; a local account whose password has not been captured yet) but
+  never a silent one. And **"this server cannot encrypt" is reported separately
+  from "this user has not enabled it"** (`available` beside `enabled` in
+  `getStatus`), because the two have different fixes and rendering both as a
+  blank space is what made the defect invisible.
+
 On Kubernetes this needs `backend.persistence.backups.enabled` (see
 `helm/README.md`). With a read-only root filesystem and no mount, a schedule
 reports errors forever while the UI shows it as configured.
