@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Clé de chiffrement requise",
-      "body": "L'accès d'urgence nécessite que AI_ENCRYPTION_KEY soit défini sur le serveur. Un octroi stocke le lien d'accès de chaque contact sous forme chiffrée afin qu'une nouvelle tentative puisse renvoyer le même lien ; sans cette clé, aucun lien ne peut être envoyé."
+      "body": "L'accès d'urgence nécessite que ENCRYPTION_KEY soit défini sur le serveur. Un octroi stocke le lien d'accès de chaque contact sous forme chiffrée afin qu'une nouvelle tentative puisse renvoyer le même lien ; sans cette clé, aucun lien ne peut être envoyé."
     },
     "alreadyGranted": {
       "heading": "Accès d'urgence déjà accordé",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "Fournisseurs d'IA",
     "addButton": "Ajouter un fournisseur",
-    "encryptionWarning": "AI_ENCRYPTION_KEY n'est pas configurée. Vous pouvez utiliser Ollama (local, sans clé API) mais les fournisseurs cloud nécessitent le chiffrement pour stocker les clés API en toute sécurité.",
+    "encryptionWarning": "ENCRYPTION_KEY n'est pas configurée. Vous pouvez utiliser Ollama (local, sans clé API) mais les fournisseurs cloud nécessitent le chiffrement pour stocker les clés API en toute sécurité.",
     "systemDefault": {
       "heading": "Fournisseur d'IA par défaut du système disponible",
       "description": "Un fournisseur d'IA central a été configuré par votre administrateur",

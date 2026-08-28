@@ -29,6 +29,8 @@ import { DataSource } from "typeorm";
 import { parseRlsMode } from "./common/db/rls-config";
 import { assertRuntimeRoleSafe } from "./common/db/runtime-role-check";
 import { assertRequiredDbFunctions } from "./common/db/required-db-functions";
+import { ConfigService } from "@nestjs/config";
+import { assertEncryptionKeyConfigured } from "./common/encryption/encryption-key";
 
 // node-oidc-provider writes its notices straight to console.info/console.warn,
 // which would otherwise be the only unformatted lines in the log. Installed
@@ -137,10 +139,40 @@ async function assertRequiredDbFunctionsOrExit(
   }
 }
 
+/**
+ * Verify this deployment has an encryption key, and exit if not.
+ *
+ * `ENCRYPTION_KEY` is mandatory, and refusing the boot is what makes it so.
+ * While it was optional -- under its old name `AI_ENCRYPTION_KEY`, documented as
+ * being for cloud AI providers -- a deployment that configured no provider set
+ * nothing, and the copy of each user's password that automatic backups are
+ * encrypted with had nowhere to be stored: every backup went out in plaintext,
+ * silently (issue #1269). A key that three features depend on is not something
+ * to discover the absence of at the moment a secret needs storing.
+ *
+ * Same shape as the two checks below it: log the reason and exit, because an
+ * operator restarting a crash-looping container reads the first ten lines.
+ */
+function assertEncryptionKeyOrExit(configService: ConfigService): void {
+  const logger = new Logger("EncryptionKeyCheck");
+  try {
+    assertEncryptionKeyConfigured((name) =>
+      configService.get<string>(name, ""),
+    );
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
 async function bootstrap() {
   logger.log("Starting application");
 
   const app = await NestFactory.create(AppModule);
+
+  // Before anything that could store a secret: a server with no key writes
+  // plaintext where it promises ciphertext, and says nothing.
+  assertEncryptionKeyOrExit(app.get(ConfigService));
 
   // RLS_MODE=enforce promises a database-level tenant boundary. Selecting the
   // application role and supplying its password does not deliver one: a

@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Şifreleme anahtarı gerekli",
-      "body": "Acil durum erişimi, sunucuda AI_ENCRYPTION_KEY ayarlanmış olmasını gerektirir. Erişim verme işlemi her kişinin erişim bağlantısını şifreli olarak saklar; böylece yeniden deneme aynı bağlantıyı tekrar gönderebilir. Bu anahtar olmadan hiçbir bağlantı gönderilemez."
+      "body": "Acil durum erişimi, sunucuda ENCRYPTION_KEY ayarlanmış olmasını gerektirir. Erişim verme işlemi her kişinin erişim bağlantısını şifreli olarak saklar; böylece yeniden deneme aynı bağlantıyı tekrar gönderebilir. Bu anahtar olmadan hiçbir bağlantı gönderilemez."
     },
     "alreadyGranted": {
       "heading": "Acil durum erişimi zaten verildi",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "AI Sağlayıcıları",
     "addButton": "Sağlayıcı Ekle",
-    "encryptionWarning": "AI_ENCRYPTION_KEY yapılandırılmamış. Ollama'yı (yerel, API anahtarı gerekmez) kullanabilirsiniz, ancak bulut sağlayıcıları API anahtarlarını güvenle depolamak için şifreleme gerektirir.",
+    "encryptionWarning": "ENCRYPTION_KEY yapılandırılmamış. Ollama'yı (yerel, API anahtarı gerekmez) kullanabilirsiniz, ancak bulut sağlayıcıları API anahtarlarını güvenle depolamak için şifreleme gerektirir.",
     "systemDefault": {
       "heading": "Sistem Varsayılan AI Sağlayıcısı Mevcut",
       "description": "Yöneticiniz tarafından merkezi bir AI sağlayıcısı yapılandırıldı",

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { BackupPasswordCipher } from "./backup-password-cipher";
+import { EncryptionService } from "../common/encryption/encryption.service";
 import { User } from "../users/entities/user.entity";
 import { BackupExportService } from "./backup-export.service";
 import { BackupRestoreService } from "./backup-restore.service";
@@ -49,7 +49,7 @@ export class BackupService {
   private readonly logger = new Logger(BackupService.name);
 
   constructor(
-    private readonly backupPasswordCipher: BackupPasswordCipher,
+    private readonly encryption: EncryptionService,
     private readonly exportService: BackupExportService,
     private readonly restoreService: BackupRestoreService,
   ) {}
@@ -69,11 +69,7 @@ export class BackupService {
    * Returns null when encryption is disabled or no password is stored.
    */
   resolveStoredBackupPassword(user: User): string | null {
-    return resolveStoredBackupPassword(
-      user,
-      this.backupPasswordCipher,
-      this.logger,
-    );
+    return resolveStoredBackupPassword(user, this.encryption, this.logger);
   }
 
   /**

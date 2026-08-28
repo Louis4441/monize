@@ -25,8 +25,7 @@ import { buildExportTableQueries } from "./export-table-queries";
 import { ATTACHMENT_EXPORT_SQL } from "./export-attachments";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
-import { AiEncryptionService } from "../ai/ai-encryption.service";
-import { BackupPasswordCipher } from "./backup-password-cipher";
+import { EncryptionService } from "../common/encryption/encryption.service";
 import { encryptBackup } from "./backup-crypto.util";
 import * as bcrypt from "bcryptjs";
 import {
@@ -677,17 +676,17 @@ describe("BackupService", () => {
         // survived (P2-005).
         OidcReauthService,
         userMaintenanceProvider(maintenance),
-        // Two ciphers, deliberately: `AiEncryptionService` still owns the
+        // Two ciphers, deliberately: `EncryptionService` still owns the
         // provider API keys the export carries, while the stored backup password
-        // moved to `BackupPasswordCipher` (whose key does not depend on optional
+        // moved to `EncryptionService` (whose key does not depend on optional
         // configuration). Both doubles behave identically, so a test that
         // mistakes one for the other still fails on the provider list.
         {
-          provide: AiEncryptionService,
+          provide: EncryptionService,
           useValue: aiEncryptionDouble(),
         },
         {
-          provide: BackupPasswordCipher,
+          provide: EncryptionService,
           useValue: aiEncryptionDouble(),
         },
         {
@@ -1365,7 +1364,7 @@ describe("BackupService", () => {
   });
 
   /**
-   * `AI_ENCRYPTION_KEY` is server configuration and never travels in a backup,
+   * `ENCRYPTION_KEY` is server configuration and never travels in a backup,
    * so exporting `api_key_enc` verbatim produced a row that restores onto any
    * other instance populated and unreadable. The key is therefore decrypted on
    * the way out and re-encrypted on the way in. The cost is that the artifact
@@ -1642,7 +1641,7 @@ describe("BackupService", () => {
       expect(service.resolveStoredBackupPassword(user)).toBeNull();
     });
 
-    it("decrypts the stored password via BackupPasswordCipher", () => {
+    it("decrypts the stored password via EncryptionService", () => {
       const user = {
         ...mockUser,
         backupEncryptionEnabled: true,
@@ -1655,9 +1654,9 @@ describe("BackupService", () => {
       // The mock decrypt throws when called -- this also exercises the catch
       // block that maps a thrown error to a null return value.
       const failingService = service as unknown as {
-        backupPasswordCipher: { decrypt: jest.Mock };
+        encryption: { decrypt: jest.Mock };
       };
-      failingService.backupPasswordCipher.decrypt = jest.fn(() => {
+      failingService.encryption.decrypt = jest.fn(() => {
         throw new Error("bad ciphertext");
       });
       const user = {
@@ -2035,7 +2034,7 @@ describe("BackupService", () => {
 
     /**
      * A backup carries `ai_provider_configs.api_key_enc`; it does not carry
-     * `AI_ENCRYPTION_KEY`, and must not. So a restore onto another instance --
+     * `ENCRYPTION_KEY`, and must not. So a restore onto another instance --
      * or onto the same one after that variable was rotated -- writes rows whose
      * key column is populated and unreadable. Every "is a key configured?" check
      * then says yes, the provider row shows a mask, and the only symptom is that

@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Cần khóa mã hóa",
-      "body": "Truy cập khẩn cấp cần AI_ENCRYPTION_KEY được thiết lập trên máy chủ. Việc cấp quyền lưu liên kết truy cập của từng liên hệ ở dạng mã hóa để lần thử lại có thể gửi lại đúng liên kết đó; không có khóa này thì hoàn toàn không thể gửi liên kết nào."
+      "body": "Truy cập khẩn cấp cần ENCRYPTION_KEY được thiết lập trên máy chủ. Việc cấp quyền lưu liên kết truy cập của từng liên hệ ở dạng mã hóa để lần thử lại có thể gửi lại đúng liên kết đó; không có khóa này thì hoàn toàn không thể gửi liên kết nào."
     },
     "alreadyGranted": {
       "heading": "Quyền truy cập khẩn cấp đã được cấp",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "Nhà cung cấp AI",
     "addButton": "Thêm nhà cung cấp",
-    "encryptionWarning": "AI_ENCRYPTION_KEY chưa được cấu hình. Bạn có thể sử dụng Ollama (cục bộ, không cần khóa API) nhưng các nhà cung cấp đám mây yêu cầu mã hóa để lưu trữ khóa API an toàn.",
+    "encryptionWarning": "ENCRYPTION_KEY chưa được cấu hình. Bạn có thể sử dụng Ollama (cục bộ, không cần khóa API) nhưng các nhà cung cấp đám mây yêu cầu mã hóa để lưu trữ khóa API an toàn.",
     "systemDefault": {
       "heading": "Nhà cung cấp AI mặc định của hệ thống có sẵn",
       "description": "Một nhà cung cấp AI trung tâm đã được quản trị viên cấu hình",

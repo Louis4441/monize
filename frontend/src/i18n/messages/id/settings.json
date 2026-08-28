@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Kunci enkripsi diperlukan",
-      "body": "Akses darurat memerlukan AI_ENCRYPTION_KEY yang diatur di server. Pemberian akses menyimpan tautan akses setiap kontak secara terenkripsi agar percobaan ulang dapat mengirim ulang tautan yang sama; tanpa kunci itu tidak ada tautan yang dapat dikirim sama sekali."
+      "body": "Akses darurat memerlukan ENCRYPTION_KEY yang diatur di server. Pemberian akses menyimpan tautan akses setiap kontak secara terenkripsi agar percobaan ulang dapat mengirim ulang tautan yang sama; tanpa kunci itu tidak ada tautan yang dapat dikirim sama sekali."
     },
     "alreadyGranted": {
       "heading": "Akses darurat sudah diberikan",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "Penyedia AI",
     "addButton": "Tambah Penyedia",
-    "encryptionWarning": "AI_ENCRYPTION_KEY tidak dikonfigurasi. Anda dapat menggunakan Ollama (lokal, tidak perlu kunci API) tetapi penyedia cloud memerlukan enkripsi untuk menyimpan kunci API dengan aman.",
+    "encryptionWarning": "ENCRYPTION_KEY tidak dikonfigurasi. Anda dapat menggunakan Ollama (lokal, tidak perlu kunci API) tetapi penyedia cloud memerlukan enkripsi untuk menyimpan kunci API dengan aman.",
     "systemDefault": {
       "heading": "Penyedia AI Bawaan Sistem Tersedia",
       "description": "Penyedia AI pusat telah dikonfigurasi oleh administrator Anda",

@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Versleutelingssleutel vereist",
-      "body": "Noodtoegang vereist dat AI_ENCRYPTION_KEY op de server is ingesteld. Een toekenning slaat de toegangslink van elk contact versleuteld op zodat een nieuwe poging dezelfde link opnieuw kan versturen; zonder die sleutel kan er helemaal geen link worden verstuurd."
+      "body": "Noodtoegang vereist dat ENCRYPTION_KEY op de server is ingesteld. Een toekenning slaat de toegangslink van elk contact versleuteld op zodat een nieuwe poging dezelfde link opnieuw kan versturen; zonder die sleutel kan er helemaal geen link worden verstuurd."
     },
     "alreadyGranted": {
       "heading": "Noodtoegang al verleend",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "AI-providers",
     "addButton": "Provider toevoegen",
-    "encryptionWarning": "AI_ENCRYPTION_KEY is niet geconfigureerd. Je kunt Ollama gebruiken (lokaal, geen API-sleutel nodig), maar cloudproviders vereisen versleuteling om API-sleutels veilig op te slaan.",
+    "encryptionWarning": "ENCRYPTION_KEY is niet geconfigureerd. Je kunt Ollama gebruiken (lokaal, geen API-sleutel nodig), maar cloudproviders vereisen versleuteling om API-sleutels veilig op te slaan.",
     "systemDefault": {
       "heading": "Standaard AI-provider beschikbaar",
       "description": "Een centrale AI-provider is geconfigureerd door jouw beheerder",

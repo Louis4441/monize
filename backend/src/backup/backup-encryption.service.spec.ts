@@ -8,7 +8,7 @@ import {
 import * as bcrypt from "bcryptjs";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { User } from "../users/entities/user.entity";
-import { BackupPasswordCipher } from "./backup-password-cipher";
+import { EncryptionService } from "../common/encryption/encryption.service";
 import { PasswordBreachService } from "../auth/password-breach.service";
 import { ConfigService } from "@nestjs/config";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
@@ -22,7 +22,7 @@ jest.mock("bcryptjs");
 describe("BackupEncryptionService", () => {
   let service: BackupEncryptionService;
   let usersRepo: Record<string, jest.Mock>;
-  let cipher: Record<string, jest.Mock>;
+  let encryption: Record<string, jest.Mock>;
   let passwordBreach: Record<string, jest.Mock>;
   let scopedDataSource: { transaction: jest.Mock };
 
@@ -45,7 +45,7 @@ describe("BackupEncryptionService", () => {
       save: jest.fn().mockImplementation((u) => Promise.resolve(u)),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
-    cipher = {
+    encryption = {
       isConfigured: jest.fn().mockReturnValue(true),
       encrypt: jest.fn((s: string) => `enc:${s}`),
       decrypt: jest.fn((s: string) => s.replace(/^enc:/, "")),
@@ -64,7 +64,7 @@ describe("BackupEncryptionService", () => {
           useValue: scopedDataSource,
         },
         BackupEncryptionService,
-        { provide: BackupPasswordCipher, useValue: cipher },
+        { provide: EncryptionService, useValue: encryption },
         { provide: PasswordBreachService, useValue: passwordBreach },
       ],
     }).compile();
@@ -113,7 +113,7 @@ describe("BackupEncryptionService", () => {
       // not turned it on" are two different facts with two different fixes, and
       // a screen that shows only `enabled` cannot tell them apart -- which is
       // how issue #1269 stayed invisible on the Settings page.
-      cipher.isConfigured.mockReturnValue(false);
+      encryption.isConfigured.mockReturnValue(false);
       usersRepo.findOne.mockResolvedValue(makeUser());
 
       expect(await service.getStatus(userId)).toEqual({
@@ -161,7 +161,7 @@ describe("BackupEncryptionService", () => {
       ).rejects.toThrow(UnauthorizedException);
 
       expect(usersRepo.update).not.toHaveBeenCalled();
-      expect(cipher.encrypt).not.toHaveBeenCalled();
+      expect(encryption.encrypt).not.toHaveBeenCalled();
     });
 
     it("refuses an OIDC account, which has no login password of ours", async () => {
@@ -178,7 +178,7 @@ describe("BackupEncryptionService", () => {
     });
 
     it("refuses when the server holds no key, rather than storing something unreadable", async () => {
-      cipher.isConfigured.mockReturnValue(false);
+      encryption.isConfigured.mockReturnValue(false);
       usersRepo.findOne.mockResolvedValue(makeUser());
 
       await expect(
@@ -203,7 +203,7 @@ describe("BackupEncryptionService", () => {
 
       await service.rememberLoginPassword(userId, "hunter2hunter2");
 
-      expect(cipher.encrypt).toHaveBeenCalledWith("hunter2hunter2");
+      expect(encryption.encrypt).toHaveBeenCalledWith("hunter2hunter2");
       // A targeted update, not a full-entity save. `save` on a loaded entity
       // writes every column from the snapshot, so it silently reverted any
       // concurrent change to the users row -- `last_activity_at`, a lockout
@@ -258,7 +258,7 @@ describe("BackupEncryptionService", () => {
         { id: userId },
         expect.objectContaining({ backupPasswordEnc: "enc:hunter2hunter2" }),
       );
-      expect(cipher.decrypt).not.toHaveBeenCalled();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
     });
 
     it("stores nothing for an OIDC account", async () => {
@@ -273,7 +273,7 @@ describe("BackupEncryptionService", () => {
     });
 
     it("stores nothing when the server has no encryption key", async () => {
-      cipher.isConfigured.mockReturnValue(false);
+      encryption.isConfigured.mockReturnValue(false);
       usersRepo.findOne.mockResolvedValue(makeUser());
 
       await service.rememberLoginPassword(userId, "hunter2hunter2");
@@ -352,7 +352,7 @@ describe("BackupEncryptionService", () => {
     });
 
     it("reports 'unrecoverable' when the stored copy cannot be decrypted", async () => {
-      cipher.decrypt.mockImplementation(() => {
+      encryption.decrypt.mockImplementation(() => {
         throw new Error("bad key");
       });
 
@@ -461,7 +461,7 @@ describe("BackupEncryptionService", () => {
 
     it("refuses when the server has no encryption key", async () => {
       usersRepo.findOne.mockResolvedValue(oidcUser());
-      cipher.isConfigured.mockReturnValue(false);
+      encryption.isConfigured.mockReturnValue(false);
 
       await expect(
         service.setBackupPasswordForOidcUser(userId, "a-strong-password"),
@@ -599,17 +599,23 @@ describe("BackupEncryptionService", () => {
 });
 
 /**
- * The defect issue #1269 was reported from, held against the real cipher rather
- * than a double.
+ * The defect issue #1269 was reported from, held against the real
+ * `EncryptionService` rather than a double.
  *
- * Every test above provides a `BackupPasswordCipher` mock whose `isConfigured()`
- * returns true, so none of them can see what actually broke: the real cipher was
- * `AiEncryptionService`, keyed on the optional `AI_ENCRYPTION_KEY`, and on a
- * deployment that never configured an AI provider the capture returned early
- * every time. The suite stayed green while automatic backups were written in
- * plaintext.
+ * Every test above provides a mock whose `isConfigured()` returns true, so none
+ * of them can see what actually broke: the key was `AI_ENCRYPTION_KEY`, an
+ * optional variable documented as being for cloud AI providers, and on a
+ * deployment that configured none the capture returned early every time. The
+ * suite stayed green while automatic backups were written in plaintext.
+ *
+ * Both variable names are exercised, because both are live: a new deployment
+ * sets `ENCRYPTION_KEY`, and one that predates the rename keeps its
+ * `AI_ENCRYPTION_KEY` and must go on capturing without re-keying a column.
  */
-describe("BackupEncryptionService on a server with no AI_ENCRYPTION_KEY", () => {
+describe.each([
+  ["ENCRYPTION_KEY", "e".repeat(40)],
+  ["AI_ENCRYPTION_KEY", "a".repeat(40)],
+])("BackupEncryptionService keyed by %s", (envVar, keyValue) => {
   const userId = "user-1";
   let service: BackupEncryptionService;
   let usersRepo: Record<string, jest.Mock>;
@@ -627,14 +633,13 @@ describe("BackupEncryptionService on a server with no AI_ENCRYPTION_KEY", () => 
       providers: [
         { provide: DataSource, useValue: scopedDataSource },
         BackupEncryptionService,
-        // The real cipher, over an environment holding only the variable every
-        // deployment is required to set.
-        BackupPasswordCipher,
+        // The real service, over an environment holding only this one variable.
+        EncryptionService,
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string, fallback?: string) =>
-              key === "JWT_SECRET" ? "j".repeat(48) : (fallback ?? ""),
+              key === envVar ? keyValue : (fallback ?? ""),
             ),
           },
         },

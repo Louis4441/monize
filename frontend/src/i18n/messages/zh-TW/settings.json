@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "需要加密金鑰",
-      "body": "緊急存取需要在伺服器上設定 AI_ENCRYPTION_KEY。授予存取權時會加密儲存每位聯絡人的存取連結，讓重試能重新傳送同一個連結；沒有該金鑰，就完全無法傳送任何連結。"
+      "body": "緊急存取需要在伺服器上設定 ENCRYPTION_KEY。授予存取權時會加密儲存每位聯絡人的存取連結，讓重試能重新傳送同一個連結；沒有該金鑰，就完全無法傳送任何連結。"
     },
     "alreadyGranted": {
       "heading": "緊急存取已授予",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "AI 提供者",
     "addButton": "新增提供者",
-    "encryptionWarning": "未設定 AI_ENCRYPTION_KEY。您可以使用 Ollama（本機，無需 API 金鑰），但雲端提供者需要加密以安全儲存 API 金鑰。",
+    "encryptionWarning": "未設定 ENCRYPTION_KEY。您可以使用 Ollama（本機，無需 API 金鑰），但雲端提供者需要加密以安全儲存 API 金鑰。",
     "systemDefault": {
       "heading": "可使用系統預設 AI 提供者",
       "description": "管理員已設定中央 AI 提供者",

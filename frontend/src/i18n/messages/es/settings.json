@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Se requiere una clave de cifrado",
-      "body": "El acceso de emergencia necesita que AI_ENCRYPTION_KEY esté establecida en el servidor. Una concesión almacena cifrado el enlace de acceso de cada contacto para que un reintento pueda reenviar el mismo enlace; sin esa clave no se puede enviar ningún enlace."
+      "body": "El acceso de emergencia necesita que ENCRYPTION_KEY esté establecida en el servidor. Una concesión almacena cifrado el enlace de acceso de cada contacto para que un reintento pueda reenviar el mismo enlace; sin esa clave no se puede enviar ningún enlace."
     },
     "alreadyGranted": {
       "heading": "Acceso de emergencia ya otorgado",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "Proveedores de IA",
     "addButton": "Agregar proveedor",
-    "encryptionWarning": "AI_ENCRYPTION_KEY no está configurado. Puedes usar Ollama (local, sin clave de API necesaria) pero los proveedores en la nube requieren cifrado para almacenar las claves de API de forma segura.",
+    "encryptionWarning": "ENCRYPTION_KEY no está configurado. Puedes usar Ollama (local, sin clave de API necesaria) pero los proveedores en la nube requieren cifrado para almacenar las claves de API de forma segura.",
     "systemDefault": {
       "heading": "Proveedor de IA predeterminado del sistema disponible",
       "description": "Tu administrador ha configurado un proveedor de IA central",

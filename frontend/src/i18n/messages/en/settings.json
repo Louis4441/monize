@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Encryption key required",
-      "body": "Emergency access needs AI_ENCRYPTION_KEY set on the server. A grant stores each contact's access link encrypted so a retry can resend the same link, and without that key no link can be sent at all."
+      "body": "Emergency access needs ENCRYPTION_KEY set on the server. A grant stores each contact's access link encrypted so a retry can resend the same link, and without that key no link can be sent at all."
     },
     "alreadyGranted": {
       "heading": "Emergency access already granted",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "AI Providers",
     "addButton": "Add Provider",
-    "encryptionWarning": "AI_ENCRYPTION_KEY is not configured. You can use Ollama (local, no API key needed) but cloud providers require encryption to store API keys securely.",
+    "encryptionWarning": "ENCRYPTION_KEY is not configured. You can use Ollama (local, no API key needed) but cloud providers require encryption to store API keys securely.",
     "systemDefault": {
       "heading": "System Default AI Provider Available",
       "description": "A central AI provider has been configured by your administrator",

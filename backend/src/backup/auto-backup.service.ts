@@ -1082,7 +1082,7 @@ export class AutoBackupService {
     const resolution = await this.backupEncryption.resolveBackupPassword(user);
     if (resolution.status === "unrecoverable") {
       // A password is stored but cannot be decrypted (typically
-      // AI_ENCRYPTION_KEY was rotated). Their previous backups are encrypted,
+      // ENCRYPTION_KEY was rotated). Their previous backups are encrypted,
       // so quietly writing this one in plaintext would be a downgrade nobody
       // sees. Fail loud instead.
       throw new BadRequestException(

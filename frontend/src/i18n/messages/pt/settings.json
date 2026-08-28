@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Chave de encriptação necessária",
-      "body": "O acesso de emergência precisa de AI_ENCRYPTION_KEY definida no servidor. Uma concessão armazena encriptada a ligação de acesso de cada contacto para que uma nova tentativa possa reenviar a mesma ligação; sem essa chave não é possível enviar ligação nenhuma."
+      "body": "O acesso de emergência precisa de ENCRYPTION_KEY definida no servidor. Uma concessão armazena encriptada a ligação de acesso de cada contacto para que uma nova tentativa possa reenviar a mesma ligação; sem essa chave não é possível enviar ligação nenhuma."
     },
     "alreadyGranted": {
       "heading": "Acesso de emergência já concedido",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "Fornecedores de IA",
     "addButton": "Adicionar Fornecedor",
-    "encryptionWarning": "AI_ENCRYPTION_KEY não está configurada. Pode utilizar o Ollama (local, sem necessidade de chave de API), mas os fornecedores na nuvem requerem encriptação para armazenar chaves de API de forma segura.",
+    "encryptionWarning": "ENCRYPTION_KEY não está configurada. Pode utilizar o Ollama (local, sem necessidade de chave de API), mas os fornecedores na nuvem requerem encriptação para armazenar chaves de API de forma segura.",
     "systemDefault": {
       "heading": "Fornecedor de IA Predefinido do Sistema Disponível",
       "description": "Um fornecedor de IA central foi configurado pelo seu administrador",

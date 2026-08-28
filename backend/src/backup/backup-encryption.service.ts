@@ -9,7 +9,7 @@ import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import { User } from "../users/entities/user.entity";
-import { BackupPasswordCipher } from "./backup-password-cipher";
+import { EncryptionService } from "../common/encryption/encryption.service";
 import { PasswordBreachService } from "../auth/password-breach.service";
 import { tr } from "../i18n/translate";
 
@@ -71,8 +71,8 @@ export type BackupPasswordResolution =
  * login, because that is where the copy is captured.
  *
  * Storage shape: `users.backup_password_enc` holds the password ciphertext
- * written by `BackupPasswordCipher`, and `backup_encryption_enabled` records
- * that a usable copy is there.
+ * written by `EncryptionService` under `ENCRYPTION_KEY`, and
+ * `backup_encryption_enabled` records that a usable copy is there.
  */
 @Injectable()
 export class BackupEncryptionService {
@@ -80,7 +80,7 @@ export class BackupEncryptionService {
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly cipher: BackupPasswordCipher,
+    private readonly encryption: EncryptionService,
     private readonly passwordBreach: PasswordBreachService,
   ) {}
 
@@ -119,7 +119,7 @@ export class BackupEncryptionService {
       manageable: user.authProvider === "oidc",
       method:
         user.authProvider === "oidc" ? "backup-password" : "login-password",
-      available: this.cipher.isConfigured(),
+      available: this.encryption.isConfigured(),
     };
   }
 
@@ -161,7 +161,7 @@ export class BackupEncryptionService {
           ),
         );
       }
-      this.requireCipherConfigured();
+      this.requireEncryptionConfigured();
       const matches = await bcrypt.compare(loginPassword, user.passwordHash);
       if (!matches) {
         throw new UnauthorizedException(
@@ -195,7 +195,7 @@ export class BackupEncryptionService {
       // Re-read inside the transaction the write runs in: the manageability
       // check has to hold against the state the write lands on.
       await this.requireManageableUser(repo, userId);
-      this.requireCipherConfigured();
+      this.requireEncryptionConfigured();
       await this.storeBackupPassword(repo, userId, newBackupPassword);
     });
   }
@@ -225,7 +225,7 @@ export class BackupEncryptionService {
   async rememberLoginPassword(userId: string, password: string): Promise<void> {
     try {
       if (!password) return;
-      if (!this.cipher.isConfigured()) {
+      if (!this.encryption.isConfigured()) {
         // Unreachable on a booted server (`JWT_SECRET` is enforced at startup),
         // and logged rather than swallowed because this returning quietly is the
         // exact shape of issue #1269: the capture stopped happening and every
@@ -279,9 +279,9 @@ export class BackupEncryptionService {
 
     let password: string;
     try {
-      password = this.cipher.decrypt(user.backupPasswordEnc);
+      password = this.encryption.decrypt(user.backupPasswordEnc);
     } catch (err) {
-      // Typically AI_ENCRYPTION_KEY was rotated. The user's other backups are
+      // Typically ENCRYPTION_KEY was rotated. The user's other backups are
       // encrypted, so writing this one in plaintext instead would be a silent
       // downgrade: report it and let the caller refuse.
       this.logger.error(
@@ -341,7 +341,7 @@ export class BackupEncryptionService {
     await repo.update(
       { id: userId },
       {
-        backupPasswordEnc: this.cipher.encrypt(password),
+        backupPasswordEnc: this.encryption.encrypt(password),
         backupEncryptionEnabled: true,
       },
     );
@@ -384,8 +384,8 @@ export class BackupEncryptionService {
    * refuses to boot -- it is here so the two write paths cannot drift into
    * storing a value that `resolveBackupPassword` would later call unrecoverable.
    */
-  private requireCipherConfigured(): void {
-    if (!this.cipher.isConfigured()) {
+  private requireEncryptionConfigured(): void {
+    if (!this.encryption.isConfigured()) {
       throw new BadRequestException(
         tr(
           "errors.backup.encryptionNotConfigured",

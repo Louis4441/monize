@@ -53,7 +53,7 @@ export interface RestoreResult {
    * Restored AI provider rows left without a usable API key. Keys normally
    * travel decrypted and are re-encrypted on arrival, so this covers only a
    * backup written before that (its ciphertext belongs to another instance's
-   * `AI_ENCRYPTION_KEY`) or a server with no `AI_ENCRYPTION_KEY` at all. The
+   * `ENCRYPTION_KEY`) or a server with no `ENCRYPTION_KEY` at all. The
    * rows *were* written, so this stays outside `restored` rather than being
    * deducted from it. Absent when none.
    */

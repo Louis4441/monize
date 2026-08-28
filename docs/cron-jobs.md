@@ -41,7 +41,7 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 The 9 AM sweep does three separable things, and the order matters. **Revocation runs
 first**, ahead of both delivery gates: voiding a returned owner's outstanding links needs
 only the database, and an install whose SMTP or encryption key has gone away must still be
-able to kill a link it already delivered. The SMTP and `AI_ENCRYPTION_KEY` gates then stop
+able to kill a link it already delivered. The SMTP and `ENCRYPTION_KEY` gates then stop
 the *delivery* sweep, which is inert rather than failing per contact.
 
 **Delivery is derived, not scheduled.** A grant advances the owner's

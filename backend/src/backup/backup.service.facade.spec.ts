@@ -1,9 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BackupPasswordCipher } from "./backup-password-cipher";
 import { BackupService } from "./backup.service";
 import { BackupExportService } from "./backup-export.service";
 import { BackupRestoreService } from "./backup-restore.service";
 import { User } from "../users/entities/user.entity";
+import { EncryptionService } from "../common/encryption/encryption.service";
 
 /**
  * `BackupService` forwards, and forwards *verbatim*.
@@ -74,7 +74,7 @@ describe("BackupService (facade)", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BackupService,
-        { provide: BackupPasswordCipher, useValue: passwordCipher },
+        { provide: EncryptionService, useValue: passwordCipher },
         { provide: BackupExportService, useValue: exportService },
         { provide: BackupRestoreService, useValue: restoreService },
       ],

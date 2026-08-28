@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "Verschlüsselungsschlüssel erforderlich",
-      "body": "Der Notfallzugang benötigt einen auf dem Server gesetzten AI_ENCRYPTION_KEY. Eine Gewährung speichert den Zugangslink jedes Kontakts verschlüsselt, damit ein erneuter Versuch denselben Link noch einmal senden kann, und ohne diesen Schlüssel kann überhaupt kein Link gesendet werden."
+      "body": "Der Notfallzugang benötigt einen auf dem Server gesetzten ENCRYPTION_KEY. Eine Gewährung speichert den Zugangslink jedes Kontakts verschlüsselt, damit ein erneuter Versuch denselben Link noch einmal senden kann, und ohne diesen Schlüssel kann überhaupt kein Link gesendet werden."
     },
     "alreadyGranted": {
       "heading": "Notfallzugang bereits gewährt",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "KI-Anbieter",
     "addButton": "Anbieter hinzufügen",
-    "encryptionWarning": "AI_ENCRYPTION_KEY ist nicht konfiguriert. Sie können Ollama (lokal, kein API-Schlüssel erforderlich) verwenden, aber Cloud-Anbieter benötigen Verschlüsselung zur sicheren Speicherung von API-Schlüsseln.",
+    "encryptionWarning": "ENCRYPTION_KEY ist nicht konfiguriert. Sie können Ollama (lokal, kein API-Schlüssel erforderlich) verwenden, aber Cloud-Anbieter benötigen Verschlüsselung zur sicheren Speicherung von API-Schlüsseln.",
     "systemDefault": {
       "heading": "System-Standard-KI-Anbieter verfügbar",
       "description": "Ein zentraler KI-Anbieter wurde von Ihrem Administrator konfiguriert",

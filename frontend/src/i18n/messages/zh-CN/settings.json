@@ -777,7 +777,7 @@
     },
     "encryptionNotConfigured": {
       "heading": "需要加密密钥",
-      "body": "紧急访问需要在服务器上设置 AI_ENCRYPTION_KEY。授予访问权限时会加密存储每位联系人的访问链接，以便重试时能重新发送同一链接；没有该密钥，任何链接都无法发送。"
+      "body": "紧急访问需要在服务器上设置 ENCRYPTION_KEY。授予访问权限时会加密存储每位联系人的访问链接，以便重试时能重新发送同一链接；没有该密钥，任何链接都无法发送。"
     },
     "alreadyGranted": {
       "heading": "紧急访问已授权",
@@ -883,7 +883,7 @@
   "aiProviders": {
     "heading": "AI 提供商",
     "addButton": "添加提供商",
-    "encryptionWarning": "未配置 AI_ENCRYPTION_KEY。您可以使用 Ollama（本地，无需 API 密钥），但云提供商需要加密来安全存储 API 密钥。",
+    "encryptionWarning": "未配置 ENCRYPTION_KEY。您可以使用 Ollama（本地，无需 API 密钥），但云提供商需要加密来安全存储 API 密钥。",
     "systemDefault": {
       "heading": "系统默认 AI 提供商可用",
       "description": "您的管理员已配置中央 AI 提供商",
