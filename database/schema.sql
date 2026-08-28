@@ -852,6 +852,27 @@ CREATE TABLE market_index_sync (
     last_error TEXT
 );
 
+-- Outbound market-data provider availability, and what has already been said
+-- about it by email. The in-process circuit breaker decides whether to call
+-- out; this row is what survives a restart (an outage that restarts the
+-- container must not reset the clock the alert gate reads) and what serializes
+-- the alert across replicas via a conditional UPDATE on the notification
+-- columns. See backend/src/provider-health/ and docs/specs/provider-outage-alerts.md.
+CREATE TABLE provider_health (
+    provider VARCHAR(64) PRIMARY KEY,
+    state VARCHAR(16) NOT NULL DEFAULT 'up',
+    recent_failures INTEGER NOT NULL DEFAULT 0,
+    outage_started_at TIMESTAMPTZ,
+    last_failure_at TIMESTAMPTZ,
+    last_failure_reason TEXT,
+    last_success_at TIMESTAMPTZ,
+    outage_notified_at TIMESTAMPTZ,
+    last_notified_at TIMESTAMPTZ,
+    CONSTRAINT provider_health_state_check CHECK (state IN ('up', 'down'))
+);
+
+CREATE INDEX idx_provider_health_down ON provider_health (provider) WHERE state = 'down';
+
 -- Investment Holdings
 CREATE TABLE holdings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2726,6 +2747,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: market_index_prices
 -- rls-exempt: market_index_sync
 -- rls-exempt: oauth_payloads
+-- rls-exempt: provider_health
 -- rls-exempt: schema_migrations
 -- ---------------------------------------------------------------------------
 

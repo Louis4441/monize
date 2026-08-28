@@ -75,6 +75,7 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "exchange_rates", // global shared reference data, not per-user
   "market_index_prices", // global market reference data, refetched from the provider
   "market_index_sync", // provider fetch bookkeeping for the above
+  "provider_health", // deployment-wide provider availability + alert bookkeeping
   "account_delegates", // cross-user sharing relationship
   "account_delegate_grants", // cross-user sharing relationship
   "delegate_account_favourites", // cross-user sharing state
