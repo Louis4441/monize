@@ -28,8 +28,15 @@ test.describe('Backup & restore', () => {
     // reports encryption as on and the download asks for it before writing a
     // file only that password can open.
     await expect(page.getByText('Backup Encryption')).toBeVisible();
+    // `exact` is load-bearing, not decoration: the panel's description ("Your
+    // backups are encrypted with your login password. Nothing else to
+    // remember...") CONTAINS the badge note, and getByText matches substrings,
+    // so a loose locator resolves to two elements and fails strict mode. Match
+    // the note's whole text and only the note matches.
     await expect(
-      page.getByText('Backups are encrypted with your login password.'),
+      page.getByText('Backups are encrypted with your login password.', {
+        exact: true,
+      }),
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Download Backup' }).click();
