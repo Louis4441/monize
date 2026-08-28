@@ -16,6 +16,8 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { accountsApi } from '@/lib/accounts';
+import { loanRateChangesApi, supportsRateChanges } from '@/lib/loan-rate-changes';
+import type { LoanRateChange } from '@/types/loan-rate-change';
 import { Transaction } from '@/types/transaction';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
 import {
@@ -23,6 +25,7 @@ import {
   deriveLoanPaymentHistory,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
+  resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
@@ -90,6 +93,7 @@ export function DebtPayoffTimelineReport() {
   // (API limit is 200 per page).
   const {
     data: transactionsData,
+    dataKey: transactionsKey,
     isLoading: transactionsLoading,
     error: transactionsError,
     reload: reloadTransactions,
@@ -99,16 +103,28 @@ export function DebtPayoffTimelineReport() {
       return fetchAllAccountTransactions(selectedAccountId);
     },
     [selectedAccountId],
+    { requestKey: selectedAccountId },
   );
 
-  const transactions = useMemo<Transaction[]>(() => transactionsData ?? [], [transactionsData]);
+  // Each payload carries the account it answers for. Without that, the one
+  // render between a selection change and the effect that refetches draws the
+  // previous loan's rows -- and for the rate history that means projecting one
+  // loan's rate onto another. The sibling LoanAmortizationReport guards the same
+  // way.
+  const transactions = useMemo<Transaction[]>(
+    () => (transactionsKey === selectedAccountId ? (transactionsData ?? []) : []),
+    [transactionsData, transactionsKey, selectedAccountId],
+  );
 
   // The loan's separately-booked interest expenses, so derived interest matches
   // the loan detail page (see #893). Folded into the combined isLoading/error/
-  // reload below like the other loaders, so the schedule never paints with the
-  // analytic interest estimate and then snaps to the booked interest.
+  // reload below like the other loaders: an interest list that has not arrived
+  // is indistinguishable from one that is genuinely empty, so the schedule must
+  // not paint at zero interest and then snap to the booked figures -- and a
+  // failed fetch must reach the error state rather than settle at that zero.
   const {
     data: interestData,
+    dataKey: interestKey,
     isLoading: interestLoading,
     error: interestError,
     reload: reloadInterest,
@@ -119,16 +135,69 @@ export function DebtPayoffTimelineReport() {
       return fetchLoanInterestTransactions(account);
     },
     [selectedAccountId, accounts],
+    { requestKey: selectedAccountId },
   );
-  const interestTransactions = useMemo<Transaction[]>(() => interestData ?? [], [interestData]);
+  const interestTransactions = useMemo<Transaction[]>(
+    () => (interestKey === selectedAccountId ? (interestData ?? []) : []),
+    [interestData, interestKey, selectedAccountId],
+  );
 
-  const isLoading = accountsLoading || transactionsLoading || interestLoading;
-  const error = accountsError || transactionsError || interestError;
+  // The recorded rate history. Load-bearing for the projection, not decoration:
+  // recording a rate change never writes the account's own interestRate, so
+  // without these rows this report projects at whatever stale scalar the account
+  // still holds while the loan detail page projects at the real one -- the same
+  // loan, two payoff dates. Folded into the shared error/retry state for the
+  // same reason as the interest list: [] is a claim, not a neutral default.
+  const {
+    data: rateChangeData,
+    dataKey: rateChangesKey,
+    isLoading: rateChangesLoading,
+    error: rateChangesError,
+    reload: reloadRateChanges,
+  } = useReportData(
+    async () => {
+      // A line of credit has no rate history and the endpoint answers 400 for
+      // one, which would replace this whole report with its error state.
+      const account = accounts.find((a) => a.id === selectedAccountId);
+      if (!selectedAccountId || !supportsRateChanges(account)) {
+        return [] as LoanRateChange[];
+      }
+      return loanRateChangesApi.getAll(selectedAccountId);
+    },
+    [selectedAccountId, accounts],
+    { requestKey: selectedAccountId },
+  );
+  const rateChanges = useMemo<LoanRateChange[]>(
+    () => (rateChangesKey === selectedAccountId ? (rateChangeData ?? []) : []),
+    [rateChangeData, rateChangesKey, selectedAccountId],
+  );
+
+  const isLoading =
+    accountsLoading || transactionsLoading || interestLoading || rateChangesLoading;
+  const error = accountsError || transactionsError || interestError || rateChangesError;
   const reload = () => {
     reloadAccounts();
     reloadTransactions();
     reloadInterest();
+    reloadRateChanges();
   };
+
+  // One derivation for both readers below. Replaying the register twice per
+  // render is not merely wasted work: the curve and the terms strip beside it
+  // would be two independent answers, so a change to how history is derived
+  // could move one and leave the other.
+  const history = useMemo(
+    () =>
+      selectedAccount
+        ? deriveLoanPaymentHistory(
+            selectedAccount,
+            transactions,
+            rateChanges,
+            interestTransactions,
+          )
+        : null,
+    [selectedAccount, transactions, rateChanges, interestTransactions],
+  );
 
   // Build payment timeline from actual transactions + projected future payments
   const { payoffSchedule, projectionStartLabel, projectionPaidOff } = useMemo((): {
@@ -139,11 +208,12 @@ export function DebtPayoffTimelineReport() {
     projectionPaidOff: boolean;
     projectionStartLabel: string | null;
   } => {
-    if (!selectedAccount)
+    // Both guards: upstream's `projectionPaidOff` must be in every return, and
+    // `history` is now a hoisted memo that is null until an account is selected.
+    if (!selectedAccount || !history)
       return { payoffSchedule: [], projectionStartLabel: null, projectionPaidOff: false };
 
     // --- Historical payments from actual transactions ---
-    const history = deriveLoanPaymentHistory(selectedAccount, transactions, [], interestTransactions);
     const schedule: PayoffScheduleItem[] = history.events.map((event) => ({
       date: event.date,
       label: formatChartDate(event.date, 'MMM yyyy'),
@@ -157,7 +227,11 @@ export function DebtPayoffTimelineReport() {
 
     // --- Project future payments ---
     let projectionPaidOff = false;
-    const projectionInput = buildLoanProjectionInput(selectedAccount, history);
+    // `rateChanges` is this branch's addition and is not optional decoration:
+    // without it the projection runs at whatever stale scalar the account still
+    // holds, so this report and the loan detail page gave the same loan two
+    // different payoff dates.
+    const projectionInput = buildLoanProjectionInput(selectedAccount, history, rateChanges);
     if (projectionInput) {
       const projection = generateLoanSchedule({
         ...projectionInput,
@@ -243,7 +317,18 @@ export function DebtPayoffTimelineReport() {
       projectionStartLabel: startLabel,
       projectionPaidOff,
     };
-  }, [selectedAccount, transactions, interestTransactions, formatChartDate]);
+    // `history` replaces the raw `transactions`/`interestTransactions` deps: the
+    // register is now replayed once in a hoisted memo that both this schedule and
+    // the terms strip below read, so a change to how history is derived cannot
+    // move one and leave the other. `rateChanges` is a dep because the projection
+    // above is built from it.
+  }, [selectedAccount, history, rateChanges, formatChartDate]);
+
+  // The terms in effect, from the same history the curve is projected from.
+  const currentTerms = useMemo(() => {
+    if (!selectedAccount || !history) return { annualRate: null, payment: null };
+    return resolveCurrentLoanTerms(selectedAccount, history, rateChanges);
+  }, [selectedAccount, history, rateChanges]);
 
   const summary = useMemo(() => {
     if (payoffSchedule.length === 0 || !selectedAccount) return null;
@@ -344,8 +429,10 @@ export function DebtPayoffTimelineReport() {
         ? t('accountBalances.accountTypes.LINE_OF_CREDIT' as Parameters<typeof t>[0])
         : selectedAccount.accountType.charAt(0) + selectedAccount.accountType.slice(1).toLowerCase(),
       formatCurrency(Math.abs(selectedAccount.currentBalance)),
-      selectedAccount.interestRate ? `${selectedAccount.interestRate}%` : t('debtPayoff.notSet'),
-      selectedAccount.paymentAmount ? formatCurrency(selectedAccount.paymentAmount) : t('debtPayoff.notSet'),
+      currentTerms.annualRate != null
+        ? `${currentTerms.annualRate}%`
+        : t('debtPayoff.notSet'),
+      currentTerms.payment ? formatCurrency(currentTerms.payment) : t('debtPayoff.notSet'),
     ]] : [];
     await exportToPdf({
       title: t('page.names.debt-payoff-timeline' as Parameters<typeof t>[0]),
@@ -709,7 +796,9 @@ export function DebtPayoffTimelineReport() {
             <div>
               <span className="text-gray-500 dark:text-gray-400">{t('debtPayoff.colInterestRate')}</span>
               <p className="font-medium text-gray-900 dark:text-gray-100">
-                {selectedAccount.interestRate ? `${selectedAccount.interestRate}%` : t('debtPayoff.notSet')}
+                {currentTerms.annualRate != null
+                  ? `${currentTerms.annualRate}%`
+                  : t('debtPayoff.notSet')}
               </p>
             </div>
             <div>

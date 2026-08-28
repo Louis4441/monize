@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act } from '@/test/render';
+import { render, screen, act, fireEvent } from '@/test/render';
 import AccountDetailPage from './page';
 import { Account } from '@/types/account';
 
@@ -124,7 +124,8 @@ vi.mock('@/lib/loan-scenarios', async (importOriginal) => {
 });
 
 const mockGetAllRateChanges = vi.fn();
-vi.mock('@/lib/loan-rate-changes', () => ({
+vi.mock('@/lib/loan-rate-changes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/loan-rate-changes')>()),
   loanRateChangesApi: {
     getAll: (...args: unknown[]) => mockGetAllRateChanges(...args),
     create: vi.fn(),
@@ -245,10 +246,11 @@ describe('AccountDetailPage', () => {
     expect(section).toHaveAttribute('data-account-id', 'loan-1');
   });
 
-  it('surfaces a scenarios/rate-history load failure instead of a silent empty list (issue: saved scenario "gone" but re-save hits 409)', async () => {
+  it('surfaces a scenarios load failure instead of a silent empty list (issue: saved scenario "gone" but re-save hits 409)', async () => {
+    // Scenarios feed no headline figure, so the page degrades to an empty panel
+    // and says so. The rate history is a different case -- see below.
     mockGetById.mockResolvedValue(makeAccount());
     mockGetAllScenarios.mockRejectedValue(new Error('throttled'));
-    mockGetAllRateChanges.mockRejectedValue(new Error('throttled'));
 
     await renderPage();
 
@@ -256,11 +258,64 @@ describe('AccountDetailPage', () => {
     expect(toast.error).toHaveBeenCalledWith(
       expect.stringContaining("Couldn't load the saved scenarios"),
     );
-    expect(toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("Couldn't load the rate history"),
-    );
     // The page itself stays usable
     expect(screen.getByText('Car Loan')).toBeInTheDocument();
+    expect(screen.getByText('Loan Schedule')).toBeInTheDocument();
+  });
+
+  it('refuses to project after a failed rate-history load rather than using the stale scalar', async () => {
+    // The rate history holds the loan's CURRENT rate: recording a rate change
+    // deliberately leaves account.interestRate alone, and the projection
+    // resolves both its rate and its payment from those rows. Substituting []
+    // for a failed read prices the payoff at a stale scalar -- at 5% against a
+    // real 12% a payment short of the interest looks comfortably amortizing --
+    // so the failure has to reach the page's retryable error state instead.
+    mockGetById.mockResolvedValue(makeAccount());
+    mockGetAllRateChanges.mockRejectedValue(new Error('throttled'));
+
+    await renderPage();
+
+    expect(screen.getByText('Failed to load account details')).toBeInTheDocument();
+    expect(screen.queryByText('Loan Schedule')).not.toBeInTheDocument();
+  });
+
+  it('refuses to keep the old payoff live after a rate mutation whose reload fails', async () => {
+    // The mutation SUCCEEDED, so the rows on screen are known-stale -- and the
+    // projection resolves its rate and payment from them, so the payoff, the
+    // scenarios and the PDF export would all stay live over terms the user has
+    // just replaced. A toast disappears; the page's retryable error state does
+    // not, and it is the same treatment a failed initial load gets because it is
+    // the same prerequisite.
+    const { loanRateChangesApi } = await import('@/lib/loan-rate-changes');
+    (loanRateChangesApi.detect as ReturnType<typeof vi.fn>).mockResolvedValue({
+      created: [],
+      warnings: [],
+    });
+    mockGetById.mockResolvedValue(makeAccount());
+    await renderPage();
+    expect(screen.getByText('Loan Schedule')).toBeInTheDocument();
+
+    // Detection succeeds, the follow-up authoritative reload does not.
+    mockGetAllRateChanges.mockRejectedValue(new Error('throttled'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Detect from history'));
+    });
+    // The confirm dialog reuses the trigger's label, so there are two; the
+    // dialog's is the later one.
+    const confirms = screen.getAllByText('Detect from history');
+    await act(async () => {
+      fireEvent.click(confirms[confirms.length - 1]);
+    });
+
+    expect(screen.getByText(/Couldn't load the rate history/)).toBeInTheDocument();
+    expect(screen.queryByText('Loan Schedule')).not.toBeInTheDocument();
+
+    // "Retryable" has to mean there is a retry: the only control used to be
+    // Back to Accounts, which is leaving the page, not trying again.
+    mockGetAllRateChanges.mockResolvedValue([]);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Try again'));
+    });
     expect(screen.getByText('Loan Schedule')).toBeInTheDocument();
   });
 

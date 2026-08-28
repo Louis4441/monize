@@ -60,6 +60,8 @@ Before writing a UI control, a data access path, or anything a user interacts wi
 
 **Prefer the rule the machine can check.** Ranked by how well they hold: a type the compiler enforces, a lint rule, a test that scans the source, a paragraph in a `CLAUDE.md`. A rule in prose gets read, agreed with, and violated anyway; reach for the highest form the mistake allows.
 
+**A source scan reads code, so strip the comments before matching.** A guard that bans a pattern is documented by prose that has to *name* that pattern, so scanning raw text makes the explanation fail the guard -- and the cheap way out is weakening the comment, which is the opposite of the point. `frontend/src/lib/loan-history.guard.test.ts` blanks comments while preserving line numbers (so the offender report still points at the right line) and tests the stripper in both directions: a scan that prose can trip is also a scan that prose can satisfy.
+
 **A green suite after a behaviour change is a finding.** Either the change is a no-op or the suite had no case for it. Say which in the change description, and if it is the second, add the case in the same commit. `docs/financial-calculation-contract.md` section 8.1 has the long form; it applies everywhere, not only to money.
 
 **Asynchronous data belongs to the request that produced it.** Keep the payload and its request key together, adopt a mutation's response only when its captured origin still matches the current selection, and never treat a failed lookup as an empty result. `frontend/CLAUDE.md` has the full rule and the regression matrix.
