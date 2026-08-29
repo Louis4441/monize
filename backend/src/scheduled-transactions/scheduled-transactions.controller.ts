@@ -184,6 +184,30 @@ export class ScheduledTransactionsController {
     return this.filterForDelegate(req, rows);
   }
 
+  // Also before `:id`: "loan-anchor" is a literal path segment.
+  @Get("loan-anchor/:accountId")
+  @ApiOperation({
+    summary: "Get the next-installment projection anchor for a loan account",
+    description:
+      "The next scheduled installment's due date and the loan's debt measured " +
+      "from the ledger through that date -- the same balance boundary the " +
+      "scheduled bill's interest is calculated from, so an amortization " +
+      "projection anchored here agrees with the next bill (issue #1253). " +
+      "Both fields are null when the account has no active scheduled payment.",
+  })
+  @ApiParam({ name: "accountId", description: "Loan account UUID" })
+  @ApiResponse({ status: 200, description: "Projection anchor retrieved" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  getLoanProjectionAnchor(
+    @Request() req,
+    @Param("accountId", ParseUUIDPipe) accountId: string,
+  ) {
+    return this.scheduledTransactionsService.getLoanProjectionAnchor(
+      req.user.id,
+      accountId,
+    );
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Get a specific scheduled transaction by ID" })
   @ApiParam({ name: "id", description: "Scheduled transaction UUID" })

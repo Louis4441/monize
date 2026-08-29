@@ -21,6 +21,7 @@ describe("ScheduledTransactionsController", () => {
       remove: jest.fn(),
       post: jest.fn(),
       skip: jest.fn(),
+      getLoanProjectionAnchor: jest.fn(),
       findOverrides: jest.fn(),
       hasOverrides: jest.fn(),
       findOverrideByDate: jest.fn(),
@@ -281,6 +282,24 @@ describe("ScheduledTransactionsController", () => {
 
       expect(result).toEqual(expected);
       expect(mockService.post).toHaveBeenCalledWith("user-1", "st-1", dto);
+    });
+  });
+
+  describe("getLoanProjectionAnchor()", () => {
+    it("delegates to service.getLoanProjectionAnchor with userId and accountId", async () => {
+      const expected = { nextDueDate: "2026-08-01", debt: 198500 };
+      mockService.getLoanProjectionAnchor.mockResolvedValue(expected);
+
+      const result = await controller.getLoanProjectionAnchor(
+        mockReq,
+        "acc-loan",
+      );
+
+      expect(result).toEqual(expected);
+      expect(mockService.getLoanProjectionAnchor).toHaveBeenCalledWith(
+        "user-1",
+        "acc-loan",
+      );
     });
   });
 

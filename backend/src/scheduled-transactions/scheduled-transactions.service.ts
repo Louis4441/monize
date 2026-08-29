@@ -3053,6 +3053,60 @@ export class ScheduledTransactionsService {
             ),
           );
         }
+
+        // A loan template's stored P/I split is derived state, computed when
+        // the PREVIOUS occurrence posted; a principal movement committed since
+        // (a standalone overpayment, a void, an import) leaves it stale, and no
+        // mutation path recalculates it. So the occurrence being posted
+        // re-resolves its allocation from the ledger through its own due date,
+        // here at the consumption boundary -- under the parent lock, inside
+        // this transaction (issue #1253, finding PR-1254-01). When nothing
+        // moved in between this resolves to the persisted amounts exactly.
+        //
+        // Only the plain base-split path resolves: an inline or override
+        // amount is the user's explicit statement for this occurrence, an FX
+        // schedule prices in another currency, and investments/transfers do
+        // not carry the loan template shape. The resolver itself returns null
+        // for anything that is not a managed loan template.
+        if (
+          !current.isInvestment &&
+          !preparedTransfer &&
+          !fx &&
+          !hasInlineAmount &&
+          (storedOverride?.amount === null ||
+            storedOverride?.amount === undefined) &&
+          Array.isArray(transactionPayload.splits) &&
+          transactionPayload.splits.length > 0
+        ) {
+          const loanAllocation =
+            await this.loanService.resolvePostingAllocation(
+              current,
+              currentSplits,
+              nextDueDateStr,
+            );
+          if (loanAllocation) {
+            // The payload rows were mapped 1:1 (in order) from the pre-lock
+            // scheduled.splits, which the basis guard above just proved
+            // identical to the locked set -- so the source split id addresses
+            // each payload row.
+            transactionPayload.splits = transactionPayload.splits.map(
+              (payloadSplit: any, index: number) => {
+                const sourceId = scheduled.splits?.[index]?.id;
+                const resolvedAmount = sourceId
+                  ? loanAllocation.amountsBySplitId.get(sourceId)
+                  : undefined;
+                return resolvedAmount !== undefined
+                  ? { ...payloadSplit, amount: resolvedAmount }
+                  : payloadSplit;
+              },
+            );
+            // A re-resolved child moves the parent with it, or the split
+            // validator's exact-4dp equality refuses the whole post.
+            transactionPayload.amount = sumMoney(
+              transactionPayload.splits.map((s: any) => Number(s.amount)),
+            );
+          }
+        }
       }
 
       // Claim the occurrence. The unique key on
@@ -3550,6 +3604,13 @@ export class ScheduledTransactionsService {
     return this.loanService.recalculateLoanPaymentSplits(
       scheduledTransactionId,
     );
+  }
+
+  async getLoanProjectionAnchor(
+    userId: string,
+    loanAccountId: string,
+  ): Promise<{ nextDueDate: string | null; debt: number | null }> {
+    return this.loanService.getLoanProjectionAnchor(userId, loanAccountId);
   }
 }
 

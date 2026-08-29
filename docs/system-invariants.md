@@ -102,6 +102,7 @@ implied.
 | INV-LOAN-003 | One named compounding convention, from preview to projection to displayed EAR | enforced |
 | INV-LOAN-004 | The final payment is the residual payoff, not another installment | enforced |
 | INV-LOAN-005 | The first payment date is payment number 1 | enforced |
+| INV-LOAN-006 | A scheduled loan installment prices the ledger debt through its own due date | enforced |
 | INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
@@ -943,6 +944,57 @@ Required tests      Present: the calculateEndDate and calculateMortgageEndDate
                     one-payment and zero-payment cases;
                     payment-frequency.timezone.spec.ts walks the offsets in child
                     processes and scans the three helpers for a local accessor.
+Status              enforced
+```
+### INV-LOAN-006 -- a scheduled loan installment prices the ledger debt through its own due date
+
+```text
+Statement           The interest of a scheduled loan installment is
+                    roundMoney(debt x periodic rate), where debt is the opening
+                    balance plus every non-void, top-level transaction dated on
+                    or before that installment's due date -- never a value
+                    advanced from the previously stored (4dp-rounded) split, and
+                    never accounts.current_balance, which is a through-today
+                    read model that excludes future-dated rows. The next
+                    scheduled bill, the amounts an occurrence actually posts,
+                    and the amortization report's first projected row all price
+                    that one balance (issue #1253).
+Source of truth     The transactions ledger plus accounts.opening_balance
+                    (INV-BALANCE-001's source), bounded by the schedule's
+                    next_due_date.
+Enforcement         ScheduledTransactionLoanService.resolveInstallment is the
+                    one pricing path: datedLoanDebt runs the canonical as-of
+                    ledger sum, the periodic-rate rules (Canadian semi-annual
+                    compounding included) are unchanged, and allocateLoanPayment
+                    stays the shared waterfall. recalculateLoanPaymentSplits
+                    (template advancement after a posting) and
+                    resolvePostingAllocation (called by the posting path inside
+                    its transaction, under the parent lock, immediately before
+                    the financial write) both resolve through it -- the stored
+                    split is a template/read model, so a principal movement
+                    committed between occurrences reaches the amounts actually
+                    posted without any mutation path having to invalidate it.
+                    The amortization report anchors its projection on
+                    GET /scheduled-transactions/loan-anchor/:accountId (the same
+                    due-date-bounded debt) through buildLoanProjectionInput's
+                    anchor parameter.
+Concurrency scope   The scheduled transaction's pessimistic parent lock, shared
+                    by the posting path and the recalculation.
+Failure response    A template shape the resolver cannot account for (an
+                    escrow line, no identifiable interest line) declines: the
+                    posting proceeds on the persisted amounts and the
+                    recalculation writes nothing, as before. A loan with no
+                    active scheduled payment has no anchor, and the report's
+                    projection falls back to today's balance one period ahead.
+Required tests      Present: scheduled-transaction-loan.service.spec.ts (prior
+                    rounded splits deliberately a cent off the balance; the
+                    dated query bounded by next_due_date; posting-boundary
+                    resolution including idempotence and the decline cases);
+                    scheduled-transactions.service.spec.ts (post() writes the
+                    ledger-derived allocation, honours an override amount);
+                    frontend loan-history.test.ts and
+                    LoanAmortizationReport.test.tsx (anchored first projected
+                    row equals the bill's interest; anchorless fallback).
 Status              enforced
 ```
 ### INV-LOAN-HISTORY-001 -- historical loan interest counted as paid is ledger-backed

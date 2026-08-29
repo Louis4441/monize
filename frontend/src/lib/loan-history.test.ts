@@ -724,6 +724,77 @@ describe('buildLoanProjectionInput seed payment', () => {
   });
 });
 
+describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', () => {
+  const account = (overrides: Partial<Account> = {}) =>
+    makeAccount({
+      accountType: 'LOAN',
+      openingBalance: -210000,
+      currentBalance: -200000,
+      interestRate: 6,
+      paymentAmount: 1500,
+      paymentFrequency: 'MONTHLY',
+      ...overrides,
+    });
+  const history = (acct: Account) =>
+    deriveLoanPaymentHistory(acct, [
+      withInterestSplit(
+        makeTransaction({ transactionDate: '2026-07-15', amount: 500 }),
+        'parent-1',
+        1000,
+      ),
+    ]);
+
+  it('anchors the projection on the ledger debt through the next due date', () => {
+    // `account.currentBalance` runs through today, so a 1,500 principal-only
+    // payment posted for a date before the next installment leaves it at
+    // 200,000 while the bill's own recalculation prices 198,500. The server
+    // anchor carries the bill's balance boundary, so the first projected row
+    // and the next scheduled bill calculate the same 992.50 of interest.
+    const acct = account();
+    const input = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: '2026-08-15',
+      debt: 198500,
+    });
+    expect(input).not.toBeNull();
+    expect(input!.startingBalance).toBe(198500);
+    // The first projected row is the next scheduled installment, on its date.
+    expect(input!.firstPaymentDate.getFullYear()).toBe(2026);
+    expect(input!.firstPaymentDate.getMonth()).toBe(7);
+    expect(input!.firstPaymentDate.getDate()).toBe(15);
+    const schedule = generateLoanSchedule(input!);
+    expect(schedule.rows[0].interest).toBeCloseTo(992.5, 2);
+  });
+
+  it('keeps the today-anchored fallback when the anchor has no scheduled payment', () => {
+    // {null, null} is the API's answer for a loan with no active scheduled
+    // payment: there is no bill to be in parity with, so the projection keeps
+    // projecting from today's balance one period ahead.
+    const acct = account();
+    const anchored = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: null,
+      debt: null,
+    });
+    const unanchored = buildLoanProjectionInput(acct, history(acct));
+    expect(anchored).not.toBeNull();
+    expect(anchored!.startingBalance).toBe(unanchored!.startingBalance);
+    expect(anchored!.firstPaymentDate.getTime()).toBe(
+      unanchored!.firstPaymentDate.getTime(),
+    );
+  });
+
+  it('refuses the projection when the debt through the due date is already retired', () => {
+    // A future-dated final payment has posted: today's balance still shows
+    // debt, but the installment boundary owes nothing -- projecting rows from
+    // the stale 200,000 would invent installments the bill will never charge.
+    const acct = account();
+    const input = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: '2026-08-15',
+      debt: 0,
+    });
+    expect(input).toBeNull();
+  });
+});
+
 describe('buildLoanProjectionInput rate authority', () => {
   // Recording a rate change never writes account.interestRate -- the backend
   // keeps it user-owned and says so -- so a loan whose rate rose through the

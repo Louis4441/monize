@@ -5,7 +5,9 @@ import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { format, parseISO } from 'date-fns';
 import { accountsApi } from '@/lib/accounts';
 import { loanRateChangesApi, supportsRateChanges } from '@/lib/loan-rate-changes';
+import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import type { LoanRateChange } from '@/types/loan-rate-change';
+import type { LoanProjectionAnchor } from '@/types/scheduled-transaction';
 import { Transaction } from '@/types/transaction';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
 import {
@@ -115,6 +117,7 @@ export function LoanAmortizationReport() {
           transactions: [] as Transaction[],
           interest: [] as Transaction[],
           rateChanges: [] as LoanRateChange[],
+          anchor: null as LoanProjectionAnchor | null,
         };
       }
       const account = accounts.find((a) => a.id === selectedAccountId);
@@ -122,7 +125,7 @@ export function LoanAmortizationReport() {
       // decoration: recording a rate change never writes the account's own
       // interestRate, so projecting without these rows uses a stale scalar and
       // gives the same loan a different payoff date here than on its detail page.
-      const [transactions, interest, rateChanges] = await Promise.all([
+      const [transactions, interest, rateChanges, anchor] = await Promise.all([
         fetchAllAccountTransactions(selectedAccountId),
         account ? fetchLoanInterestTransactions(account) : Promise.resolve([] as Transaction[]),
         // A line of credit is in this report's account list and the endpoint
@@ -132,8 +135,15 @@ export function LoanAmortizationReport() {
         supportsRateChanges(account)
           ? loanRateChangesApi.getAll(selectedAccountId)
           : Promise.resolve([] as LoanRateChange[]),
+        // The projection anchor is a prerequisite, not decoration, for the
+        // same reason as the rate history: without it the schedule projects
+        // from today's balance while the next bill prices the ledger through
+        // its due date, and the two disagree for exactly the future-dated
+        // principal payments issue #1253 is about. A failed fetch reaches the
+        // report's error-and-retry state rather than degrading to "no anchor".
+        scheduledTransactionsApi.getLoanProjectionAnchor(selectedAccountId),
       ]);
-      return { transactions, interest, rateChanges };
+      return { transactions, interest, rateChanges, anchor };
     },
     [selectedAccountId, accounts],
     { requestKey: selectedAccountId },
@@ -158,6 +168,10 @@ export function LoanAmortizationReport() {
   );
   const rateChanges = useMemo<LoanRateChange[]>(
     () => historyForSelection?.rateChanges ?? NO_RATE_CHANGES,
+    [historyForSelection],
+  );
+  const projectionAnchor = useMemo<LoanProjectionAnchor | null>(
+    () => historyForSelection?.anchor ?? null,
     [historyForSelection],
   );
 
@@ -202,7 +216,15 @@ export function LoanAmortizationReport() {
     }));
 
     // --- Project future payments ---
-    const projectionInput = buildLoanProjectionInput(selectedAccount, history, rateChanges);
+    // Anchored on the next scheduled installment (date + ledger debt through
+    // it) so the first projected row and the next bill price the same balance
+    // (issue #1253); a loan with no scheduled payment projects from today.
+    const projectionInput = buildLoanProjectionInput(
+      selectedAccount,
+      history,
+      rateChanges,
+      projectionAnchor,
+    );
     if (projectionInput) {
       const projection = generateLoanSchedule(projectionInput);
       projectionPaidOff = projection.paidOff;
@@ -221,7 +243,7 @@ export function LoanAmortizationReport() {
     }
 
     return { paymentHistory: payments, projectionPaidOff };
-  }, [selectedAccount, history, rateChanges]);
+  }, [selectedAccount, history, rateChanges, projectionAnchor]);
 
   // The terms in effect, from the same history the schedule above is built from.
   // `selectedAccount.interestRate` / `.paymentAmount` are the scalars a
@@ -230,9 +252,14 @@ export function LoanAmortizationReport() {
   const currentTerms = useMemo(
     () =>
       selectedAccount && history
-        ? resolveCurrentLoanTerms(selectedAccount, history, rateChanges)
+        ? resolveCurrentLoanTerms(
+            selectedAccount,
+            history,
+            rateChanges,
+            projectionAnchor,
+          )
         : { annualRate: null, payment: null },
-    [selectedAccount, history, rateChanges],
+    [selectedAccount, history, rateChanges, projectionAnchor],
   );
 
   const historicalCount = useMemo(() => paymentHistory.filter((r) => !r.isProjected).length, [paymentHistory]);

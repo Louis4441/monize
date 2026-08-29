@@ -262,6 +262,10 @@ A check capable of refusing a command belongs inside the transaction that perfor
 
 Give the operation the caller's precondition as a parameter -- the expected owner, scenario or revision -- and let it refuse before writing. Return the refusal distinguishably: "no such row", "not yours" and "done" are three answers, and folding two into `null` makes the caller guess. Tests assert the rejected response **and** the stored state; see `docs/financial-calculation-contract.md` section 7.
 
+## Scheduled loan interest prices a dated ledger balance, at the moment it is consumed
+
+A scheduled loan installment's interest is `roundMoney(debt * periodicRate)` where debt is opening balance plus every non-void, top-level transaction through the installment's due date -- never a value advanced from the previously stored split (money already rounded to 4dp, so the recurrence compounds the discarded fraction) and never `accounts.current_balance` (a through-today read model that excludes future-dated rows). And the stored P/I split is a *template*, not an executable instruction: a principal movement committed between occurrences leaves it stale with no mutation path recalculating it, so the posting path re-resolves the allocation at the consumption boundary (`resolvePostingAllocation`, inside the posting transaction, under the parent lock) and the amortization report anchors its projection on the same due-date-bounded debt (`getLoanProjectionAnchor`). One pricing path -- `ScheduledTransactionLoanService.resolveInstallment` -- serves all three, because each one answered differently is a reported drift. `docs/specs/scheduled-loan-installment-pricing.md` is the spec; INV-LOAN-006 (issue #1253).
+
 ## A category's leaf name is not its identity
 
 "Cell Phone" under **Bills** and under **Business** is an ordinary chart of accounts, so a bare leaf name identifies nothing. Both halves go through `categories/category-name.util.ts`:
