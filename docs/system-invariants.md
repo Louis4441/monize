@@ -647,9 +647,9 @@ Five of the cases above fail on the first fix and pass on the second.
 ```text
 Statement           Reducing a series so it fits a chart axis is a RENDERING
                     decision and reaches nothing else. No count, total, average,
-                    percentage, summary card or export may be derived from an
-                    aggregated or down-sampled series; each is derived from the
-                    full data the reduction was made from. Two reductions,
+                    percentage, summary card or export may be derived from a
+                    down-sampled or lossily bucketed series; each is derived from
+                    the full data the reduction was made from. Two reductions,
                     because a series is one of two kinds: a STOCK (a balance, a
                     running total) has a value at a point in time, so showing
                     every Nth point drops resolution while every point still
@@ -658,29 +658,76 @@ Statement           Reducing a series so it fits a chart axis is a RENDERING
                     the interval it stood for and the chart shows a subset
                     presented as the whole. A flow is reduced by SUMMING
                     contiguous groups.
-                    Monthly aggregation is the same rule one step earlier: a
-                    month is not a payment. Weekly and biweekly schedules, extra
-                    principal payments and two payments in one month all collapse
-                    into one bucket, so a count taken after aggregation is wrong
-                    before any sampling happens.
+                    What the ban names is a reduction that CHANGES a figure's
+                    meaning or provenance, not the word "aggregate": a rollup
+                    that preserves both is not one. The Debt Payoff Timeline's
+                    summary reads the full monthly series precisely because a
+                    month's end-of-month balance and cumulative totals are the
+                    same facts the events carry, exactly. A count is the case
+                    that is never preserved -- a month is not a payment. Weekly
+                    and biweekly schedules, extra principal payments and two
+                    payments in one month all collapse into one bucket, so a
+                    count taken after aggregation is wrong before any sampling
+                    happens.
+                    Provenance is the other thing an aggregation must preserve,
+                    and it survives only by being part of the group's IDENTITY.
+                    Which side of the history/projection line a row is on is
+                    grouped ON, never computed from the group's members
+                    afterwards: a weekly, biweekly or semi-monthly loan routinely
+                    has a real payment and a projected one in the same calendar
+                    month, so a month keyed on its label alone is a bucket that
+                    is neither measured nor predicted. One bar cannot honestly be
+                    half measured and half predicted, and neither can the row a
+                    bar is built from.
+                    A label is therefore not an identity. Two chart rows share
+                    one -- the month either side of the line, and a bucketed flow
+                    row labelled as the span it covers -- while recharts keys its
+                    category axis, its tooltip lookup and every ReferenceLine on
+                    the datum's own value, so two rows under one label collapse
+                    onto one category and a marker drawn there lands on whichever
+                    came first.
 Source of truth     The unreduced series -- for a loan, the payment events
                     frontend/src/lib/loan-history.ts derives from the ledger.
 Enforcement         One module: frontend/src/lib/chart-sampling.ts
                     (sampleStockSeries for a stock, bucketFlowSeries for a flow,
-                    CHART_MAX_POINTS the shared budget). The reduced series is
-                    bound to its OWN name and handed to a chart; the full series
-                    keeps the name every figure reads. The payment count is
-                    historicalPaymentCount (loan-history.ts), read by both the
-                    Debt Payoff Timeline and the Loan Amortization report so one
-                    loan cannot have two answers.
-                    frontend/src/lib/chart-reduction.guard.test.ts holds three
+                    CHART_MAX_POINTS the shared budget, axisKeyFor/axisTickLabel
+                    the row identity a category axis is keyed on). The reduced
+                    series is bound to its OWN name and handed to a chart; the
+                    full series keeps the name every figure reads. The payment
+                    count is historicalPaymentCount (loan-history.ts), read by
+                    both the Debt Payoff Timeline and the Loan Amortization
+                    report so one loan cannot have two answers.
+                    Monthly aggregation in DebtPayoffTimelineReport groups
+                    contiguous runs over a DATE-ORDERED series keyed on the month
+                    AND the row's side of the line, so the group's provenance is
+                    its key rather than a property derived from its members, and
+                    a future-dated posted payment landing among the projected rows
+                    opens its own run instead of being folded back into a month
+                    it no longer sits beside. Each resulting row carries an
+                    axisKey (its position, then its label) and the charts pass
+                    axisTickLabel as their tickFormatter, so the two rows of a
+                    shared month are two categories and the tick still reads the
+                    month. Whether a projection EXISTS is read from the
+                    projection's own rows, never from whether aggregation left an
+                    all-projected row: a loan paying off inside the month of its
+                    last real payment has a projection whose every row shares that
+                    month, and asking the aggregate erased the "Today" divider and
+                    the Est. Payoff card together with the forecast principal.
+                    frontend/src/lib/chart-reduction.guard.test.ts holds four
                     scans: no count taken by filtering a schedule on isProjected
-                    anywhere in src/, both loan reports reading the shared count,
-                    and no reduced series measured (.length, .reduce, .filter,
-                    .some, .every, .forEach, .flatMap) -- a lookup such as .find,
-                    which a tooltip needs, is allowed because it cannot
-                    aggregate. The measurement scan reads one file at a time, so
-                    it can only see what a reduced series is CALLED: any name a
+                    anywhere in src/, no group's provenance derived from its
+                    members (`.every(... isProjected ...)`, the exact shape that
+                    called a mixed month historical -- `.some` and `.filter` are
+                    left alone, being ordinary questions about rows nothing has
+                    merged), both loan reports reading the shared count, and no
+                    reduced series measured (.length, .reduce, .filter, .some,
+                    .every, .forEach, .flatMap) -- a lookup such as .find, which a
+                    tooltip needs, is allowed because it cannot aggregate. A fifth
+                    pins the Debt Payoff Timeline's three category axes to
+                    dataKey="axisKey" and axisTickLabel, since keying one back on
+                    the month is how two rows collapse into one. The
+                    measurement scan reads one file at a time, so it can only
+                    see what a reduced series is CALLED: any name a
                     reduced binding is ALIASED to in the same file
                     (`return { points: chartPoints }`) is banned under the same
                     rule, and a reduced series crossing a module boundary keeps
@@ -693,8 +740,9 @@ Enforcement         One module: frontend/src/lib/chart-sampling.ts
                     not to the full one: a recharts ReferenceLine whose value
                     matches no axis category is silently not drawn, so the
                     Payment Distribution chart's "Today" divider comes from the
-                    first projected BUCKET's label -- the balance chart's bare
-                    month matches no bucketed range.
+                    first projected BUCKET's own axis key -- the balance chart's
+                    key addresses a row of a different series, and a bare month
+                    matches no bucketed range.
 Concurrency scope   -- (render path)
 Retry semantics     -- (render path)
 Crash semantics     -- (render path)
@@ -702,18 +750,38 @@ Failure response    -- a chart draws; it does not refuse.
 Required tests      Present: the source scans above; the unit matrix in
                     frontend/src/lib/chart-sampling.test.ts (a stock sample keeps
                     the endpoints and every kept row and emits each index once; a
-                    flow bucket conserves the total, stays within the budget and
-                    never merges across a boundary); and the behavioural cases in
+                    flow bucket conserves the total, stays within the budget,
+                    hands each bucket its own position and never merges across a
+                    boundary -- split 101/99 rather than 100/100, so the
+                    transition falls INSIDE a group and the flush is what saves
+                    it, since an even split passes with the boundary mechanism
+                    deleted; and an axis key is unique per row, prints its label
+                    back including a label holding the separator, and passes a
+                    non-key value through); and the behavioural cases in
                     frontend/src/components/reports/DebtPayoffTimelineReport
                     .test.tsx, which assert Payments Made against a 300-payment
                     history while the chart is sampled, two payments in one month
                     counted as two, 26 biweekly payments counted as 26 rather
                     than 12, the distribution chart conserving every month's
                     principal, the distribution chart's "Today" marker naming a
-                    label its own axis has, and the history/projection transition
+                    key its own axis has, and the history/projection transition
                     surviving the stride. Each fails on the pre-fix component
                     with the figures issue #1244 reports (61, 1, 12, half the
                     money, a marker on a month no bucket is called).
+                    Four more hold the provenance rule, on a 0% weekly loan whose
+                    one real payment (100 on 3 Aug) and two projected payments
+                    (100 each, 17 and 24 Aug) all fall in August, with the clock
+                    pinned to 2026-08-10: August's historical principal is 100 and
+                    its projected principal 200 rather than 300 of history; the
+                    historical balance is the measured 200 rather than the
+                    projection's end-of-month 0; the report still knows it has a
+                    projection when the loan pays off inside that month, so the
+                    Est. Payoff card and the "Today" divider are both drawn and
+                    the two August rows are two axis keys under one label; and a
+                    future-dated posted payment interleaved with the projected
+                    rows stays in its own run, leaving the chart date-ordered with
+                    October carrying both a historical and a projected row. All
+                    four fail on the merged #1280 component.
                     Each case waits on the COUNT rather than on the chart
                     mounting: a loan carrying terms projects from its current
                     balance alone, so the chart appears on a projection-only
@@ -731,6 +799,15 @@ inherited by the count, the totals and the Payment Distribution chart because
 all four read one array. That is the shape to look for: a variable that is
 assigned its own reduced form (`points = points.filter(...)`) leaves nothing
 downstream able to tell which of the two it holds.
+
+The first fix stopped the reduction reaching a figure and left the step BEFORE
+it -- monthly aggregation -- grouping on the label alone, so the boundary-aware
+reducer that #1244 added was handed rows whose provenance had already been
+merged away (PR #1280 audit, F-1280-01). That is the second shape to look for:
+a property recomputed from a group's members (`group.every(...)`) is a property
+that was not part of what made the group, and the answer is only as good as the
+grouping. Make it part of the key, and a mixed bucket becomes unrepresentable
+rather than mislabelled.
 
 ### INV-LOAN-001 -- a recurring overpayment's cadence is a calendar
 

@@ -71,9 +71,14 @@ export function sampleStockSeries<T>(
 /**
  * A flow series reduced by SUMMING contiguous groups, so no period is dropped.
  *
- * `combine` receives each group in order and returns the row to draw -- it owns
- * the aggregation (summing the amounts, labelling the span) because only the
- * caller knows what its fields mean.
+ * `combine` receives each group in order, with the group's position among the
+ * groups, and returns the row to draw -- it owns the aggregation (summing the
+ * amounts, labelling the span) because only the caller knows what its fields
+ * mean. The position is there so a bucket can carry an identity its label
+ * cannot supply: two buckets legitimately share a label (the month a real
+ * payment and a projected one both fall in appears once on each side of the
+ * boundary), and a recharts category axis, tooltip lookup and ReferenceLine all
+ * key on the datum's own value.
  *
  * `boundary`, when supplied, forces a group break between two rows it answers
  * differently for. The payoff charts use it so a bucket never straddles the
@@ -90,7 +95,7 @@ export function sampleStockSeries<T>(
  */
 export function bucketFlowSeries<T, R>(
   rows: readonly T[],
-  combine: (group: T[]) => R,
+  combine: (group: T[], index: number) => R,
   options: {
     maxPoints?: number;
     boundary?: (row: T) => unknown;
@@ -99,7 +104,7 @@ export function bucketFlowSeries<T, R>(
   const maxPoints = options.maxPoints ?? CHART_MAX_POINTS;
   if (rows.length === 0) return [];
   if (rows.length <= maxPoints || maxPoints <= 0) {
-    return rows.map((row) => combine([row]));
+    return rows.map((row, index) => combine([row], index));
   }
 
   const groupSize = Math.ceil(rows.length / maxPoints);
@@ -117,5 +122,43 @@ export function bucketFlowSeries<T, R>(
     current.push(row);
   }
   if (current.length > 0) groups.push(current);
-  return groups.map(combine);
+  return groups.map((group, index) => combine(group, index));
+}
+
+/**
+ * Separates a chart row's position from its label inside an axis key.
+ *
+ * The position comes FIRST so the separator is unambiguous whatever the label
+ * holds: `axisTickLabel` cuts at the first occurrence, and no label -- a
+ * localized month, a range spanning two of them -- begins with one.
+ */
+const AXIS_KEY_SEPARATOR = '|';
+
+/**
+ * A chart row's identity on a category axis: its position, then its label.
+ *
+ * A label is not an identity. Two rows legitimately share one -- the month a
+ * real payment and a projected payment both fall in is one row on each side of
+ * the history/projection line, and a bucketed flow row is labelled as the span
+ * it covers -- while recharts keys its category axis, its tooltip lookup and
+ * every ReferenceLine on the datum's own value. Two rows under one label
+ * collapse onto one category, and a marker drawn there lands on whichever came
+ * first. Give the chart `axisKey` as its `dataKey` and `axisTickLabel` as its
+ * `tickFormatter`: the identity is unique, the tick still reads "Aug 2026".
+ */
+export function axisKeyFor(position: number, label: string): string {
+  return `${position}${AXIS_KEY_SEPARATOR}${label}`;
+}
+
+/**
+ * The label an axis key prints.
+ *
+ * A value that is not an axis key comes back unchanged: recharts hands a tick
+ * formatter whatever the axis holds, and a formatter that throws takes the
+ * chart with it.
+ */
+export function axisTickLabel(value: string | number): string {
+  const key = String(value);
+  const separator = key.indexOf(AXIS_KEY_SEPARATOR);
+  return separator === -1 ? key : key.slice(separator + 1);
 }

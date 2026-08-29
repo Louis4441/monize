@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { DebtPayoffTimelineReport } from './DebtPayoffTimelineReport';
+import { axisTickLabel } from '@/lib/chart-sampling';
 
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({
@@ -1234,11 +1235,12 @@ describe('DebtPayoffTimelineReport', () => {
       ]);
     });
 
-    it('marks today on the distribution chart with a label that axis has', async () => {
-      // A bucketed bar is labelled as a RANGE, so the balance chart's bare
-      // "Sep 2026" matches no category here and recharts draws nothing --
-      // silently, on exactly the long loans bucketing exists for, under a
-      // caption that still says the dashed line marks today.
+    it('marks today on the distribution chart with a key that axis has', async () => {
+      // A bucketed bar is labelled as a RANGE and addressed by its own position
+      // among the buckets, so the balance chart's key for "Sep 2026" matches no
+      // category here and recharts draws nothing -- silently, on exactly the
+      // long loans bucketing exists for, under a caption that still says the
+      // dashed line marks today.
       mockGetAllAccounts.mockResolvedValue([{
         id: 'loan-1',
         name: 'Long Mortgage',
@@ -1260,7 +1262,8 @@ describe('DebtPayoffTimelineReport', () => {
       await renderAwaitingHistory('120');
       fireEvent.click(screen.getByText('Principal vs Interest'));
 
-      const bars: Array<{ label: string; isProjected: boolean }> = chartRows('bar-chart');
+      const bars: Array<{ label: string; axisKey: string; isProjected: boolean }> =
+        chartRows('bar-chart');
       // Long enough to bucket, and carrying both sides of the transition.
       expect(bars.some((bar) => bar.label.includes('\u2013'))).toBe(true);
       expect(bars.some((bar) => bar.isProjected)).toBe(true);
@@ -1269,9 +1272,13 @@ describe('DebtPayoffTimelineReport', () => {
       expect(markers).toHaveLength(1);
       const markerX = markers[0].getAttribute('data-x');
       // The value has to BE an axis category, or the marker is not drawn.
-      expect(bars.map((bar) => bar.label)).toContain(markerX);
+      expect(bars.map((bar) => bar.axisKey)).toContain(markerX);
       // And it is the transition: the first bucket on the projected side.
-      expect(bars.find((bar) => bar.isProjected)?.label).toBe(markerX);
+      const transition = bars.find((bar) => bar.isProjected);
+      expect(transition?.axisKey).toBe(markerX);
+      // The identity is unique, and the tick still prints the bucket's span.
+      expect(new Set(bars.map((bar) => bar.axisKey)).size).toBe(bars.length);
+      expect(axisTickLabel(markerX ?? '')).toBe(transition?.label);
     });
 
     it('draws the projection marker on the real transition month', async () => {
@@ -1303,6 +1310,164 @@ describe('DebtPayoffTimelineReport', () => {
       // The two rows either side of the transition are adjacent in the drawn
       // series, so the "Today" line and the area join sit on the real boundary.
       expect(drawn[firstProjected - 1].isProjected).toBe(false);
+    });
+  });
+
+  // --- Issue #1280 audit F-1280-01: provenance survives monthly aggregation --
+  //
+  // A weekly, biweekly or semi-monthly loan routinely has a real payment and a
+  // projected one in the SAME calendar month. Grouping by month alone merges
+  // them, and the merged row was labelled historical whenever it held any
+  // historical entry -- so forecast principal was drawn as measured history,
+  // a projected end-of-month balance was published as the historical balance,
+  // and a loan that pays off inside that month lost its projection entirely.
+  describe('a month holding both a real and a projected payment (F-1280-01)', () => {
+    // The overlap is decided against TODAY, so the clock is pinned. Only `Date`
+    // is faked: RTL's `waitFor` cannot drive Vitest's fake timers.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-08-10T12:00:00Z'));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** The number under the "Payments Made" heading in Account Details. */
+    const paymentsMade = () =>
+      screen.getByText('Payments Made').parentElement?.querySelector('p')?.textContent;
+
+    const chartRows = (testId: 'area-chart' | 'bar-chart') =>
+      JSON.parse(screen.getByTestId(testId).getAttribute('data-rows') ?? '[]');
+
+    const renderAwaitingHistory = async (expected: string) => {
+      render(<DebtPayoffTimelineReport />);
+      await waitFor(() => expect(paymentsMade()).toBe(expected));
+    };
+
+    /**
+     * A 0% weekly loan so every figure below is exact and independent of
+     * rounding: 300 opened, 100 paid on 3 Aug, 200 owing, and two projected
+     * 100s on 17 and 24 Aug. All four rows format to "Aug 2026".
+     */
+    const weeklyLoanPayingOffThisMonth = () => {
+      mockGetAllAccounts.mockResolvedValue([{
+        id: 'loan-1',
+        name: 'Short Weekly Loan',
+        accountType: 'LOAN',
+        currentBalance: -200,
+        openingBalance: -300,
+        interestRate: 0,
+        paymentAmount: 100,
+        paymentFrequency: 'WEEKLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      }]);
+      mockGetAllTransactions.mockResolvedValue({
+        data: [
+          { id: 'actual-aug-03', transactionDate: '2026-08-03', amount: 100, linkedTransaction: null },
+        ],
+        pagination: { hasMore: false },
+      });
+    };
+
+    it('keeps the projected principal out of the historical bar', async () => {
+      weeklyLoanPayingOffThisMonth();
+      await renderAwaitingHistory('1');
+      fireEvent.click(screen.getByText('Principal vs Interest'));
+
+      const bars: Array<{ principalPaid: number; isProjected: boolean }> =
+        chartRows('bar-chart');
+      const sum = (projected: boolean) =>
+        bars
+          .filter((bar) => bar.isProjected === projected)
+          .reduce((total, bar) => total + bar.principalPaid, 0);
+
+      // 100 was paid; 200 is forecast. Merged, August read 300 of history.
+      expect(sum(false)).toBe(100);
+      expect(sum(true)).toBe(200);
+    });
+
+    it('never publishes a projected balance as the historical one', async () => {
+      weeklyLoanPayingOffThisMonth();
+      await renderAwaitingHistory('1');
+
+      const rows: Array<{
+        historicalBalance?: number;
+        projectedBalance?: number;
+        balance: number;
+        isProjected: boolean;
+      }> = chartRows('area-chart');
+
+      // The measured debt is 200. The merged row carried the projection's
+      // end-of-month 0 under `historicalBalance`.
+      const historical = rows.filter((row) => row.historicalBalance !== undefined);
+      expect(historical).not.toHaveLength(0);
+      expect(historical[historical.length - 1].historicalBalance).toBe(200);
+      expect(rows.some((row) => row.isProjected)).toBe(true);
+      expect(rows[rows.length - 1].balance).toBe(0);
+    });
+
+    it('keeps a future-dated posted payment in its own run among the projected rows', async () => {
+      // A repayment posted ahead of its date is a HISTORICAL event dated after
+      // the projection starts, so the two interleave. Grouping by a month key
+      // would fold it back into a month it no longer sits beside; grouping
+      // contiguous runs over a date-ordered series gives it its own row.
+      mockGetAllAccounts.mockResolvedValue([{
+        id: 'loan-1',
+        name: 'Prepaid Loan',
+        accountType: 'LOAN',
+        currentBalance: -300,
+        openingBalance: -600,
+        interestRate: 0,
+        paymentAmount: 100,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      }]);
+      mockGetAllTransactions.mockResolvedValue({
+        data: [
+          { id: 'past', transactionDate: '2026-07-15', amount: 100, linkedTransaction: null },
+          { id: 'ahead', transactionDate: '2026-10-15', amount: 100, linkedTransaction: null },
+        ],
+        pagination: { hasMore: false },
+      });
+
+      await renderAwaitingHistory('2');
+
+      const rows: Array<{ date: string; label: string; axisKey: string; isProjected: boolean }> =
+        chartRows('area-chart');
+      // Date order, and one identity per row.
+      expect(rows.map((row) => row.date.slice(0, 10))).toEqual(
+        [...rows].map((row) => row.date.slice(0, 10)).sort(),
+      );
+      expect(new Set(rows.map((row) => row.axisKey)).size).toBe(rows.length);
+      // October holds a posted payment and projected ones, and they are not one
+      // row: the historical run sits between two projected runs.
+      const october = rows.filter((row) => row.label === 'Oct 2026');
+      expect(october.length).toBeGreaterThan(1);
+      expect(october.some((row) => !row.isProjected)).toBe(true);
+      expect(october.some((row) => row.isProjected)).toBe(true);
+    });
+
+    it('still knows it has a projection when the loan pays off in the transition month', async () => {
+      weeklyLoanPayingOffThisMonth();
+      await renderAwaitingHistory('1');
+
+      // The Today divider and the Est. Payoff card both come from the
+      // projection; merged into a single historical August row, neither drew.
+      expect(screen.getByText('Est. Payoff')).toBeInTheDocument();
+      const markers = screen.getAllByTestId('reference-line');
+      expect(markers).toHaveLength(1);
+      const drawn: Array<{ label: string; axisKey: string; isProjected: boolean }> =
+        chartRows('area-chart');
+      const transition = drawn.find((row) => row.isProjected);
+      expect(transition?.axisKey).toBe(markers[0].getAttribute('data-x'));
+      // Both August rows are on the axis, under one label and two identities.
+      expect(drawn.map((row) => row.label)).toEqual(['Aug 2026', 'Aug 2026']);
+      expect(new Set(drawn.map((row) => row.axisKey)).size).toBe(2);
+      expect(axisTickLabel(transition?.axisKey ?? '')).toBe('Aug 2026');
     });
   });
 });

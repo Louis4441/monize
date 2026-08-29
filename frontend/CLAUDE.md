@@ -567,11 +567,34 @@ own events, and two payments in one month are two. The count is
 `historicalPaymentCount(history)` (`lib/loan-history.ts`), read by both loan
 reports so one loan cannot have two answers.
 
+**Provenance is part of an aggregation's identity, never computed from its
+members.** A weekly, biweekly or semi-monthly loan routinely has a real payment
+and a projected one in the same calendar month. Grouped on the month alone and
+then asked `group.every((item) => item.isProjected)`, August came out
+*historical* while holding two thirds forecast principal and the projection's
+end-of-month balance -- and when the loan paid off inside that month, no
+projected row survived at all, so the "Today" divider and the Est. Payoff card
+went with it. `bucketFlowSeries`'s `boundary` cannot repair that: by the time it
+runs the two sides are one row. Group on the month *and* the side of the line,
+over a date-ordered series and as contiguous runs, so a future-dated posted
+payment landing among the projected rows opens its own run. And ask the
+projection whether a projection exists -- not the buckets.
+
+**A label is not an identity.** Two chart rows share one -- the month either
+side of the line, and a bucketed flow row labelled as the span it covers --
+while recharts keys its category axis, its tooltip lookup and every
+`ReferenceLine` on the datum's own value. Give each row an `axisKey`
+(`axisKeyFor` in `lib/chart-sampling.ts`: its position, then its label), key the
+axis on that, and pass `axisTickLabel` as the `tickFormatter` so the tick still
+reads "Aug 2026". Keyed on the label, the two rows collapse onto one category
+and the divider lands on whichever came first.
+
 **A marker drawn on a reduced series is keyed to that series.** A recharts
 `ReferenceLine` whose value matches no axis category is silently not drawn, so
 the Payment Distribution chart's "Today" divider comes from the first projected
-*bucket's* label -- the balance chart's bare month matches no bucketed range,
-and the divider disappears on exactly the long loans bucketing exists for.
+*bucket's own axis key* -- the balance chart's key addresses a row of a
+different series, and the divider disappears on exactly the long loans bucketing
+exists for.
 
 Assigning a reduced series back over its source (`points = points.filter(...)`)
 is how this happens -- once the two are one variable, nothing downstream can
@@ -582,7 +605,9 @@ taken by filtering a schedule on `isProjected`, for both reports reading the
 shared count, and for any reduced series -- or any name one is aliased to in the
 same file -- being *measured* (`.length`, `.reduce`, `.filter`, `.some`,
 `.every`, `.forEach`); a `.find` for the row a tooltip hovers is allowed,
-because a lookup cannot aggregate. INV-REPORT-002.
+because a lookup cannot aggregate. It also scans for a group's provenance
+derived from its members (`.every(... isProjected ...)`) and pins the Debt
+Payoff Timeline's three axes to `dataKey="axisKey"`. INV-REPORT-002.
 
 ### An unknown value must not render as a measured zero
 
