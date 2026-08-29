@@ -1213,7 +1213,7 @@ describe('DebtPayoffTimelineReport', () => {
       expect(bars.reduce((sum: number, bar: { months: number }) => sum + bar.months, 0)).toBe(120);
       // A bucket spanning more than one month says so rather than borrowing the
       // first month's name.
-      expect(bars[0].label).toMatch(/ - /);
+      expect(bars[0].label).toMatch(/ \u2013 /);
     });
 
     it('leaves a short distribution one bar per month', async () => {

@@ -450,7 +450,7 @@
     "colPaymentsMade": "[XX-Payments Made-XX]",
     "colAccount": "[XX-Account-XX]",
     "colPayment": "[XX-Payment-XX]",
-    "periodRange": "[XX-{start} - {end}-XX]",
+    "periodRange": "[XX-{start} – {end}-XX]",
     "projectionNote": "[XX-Dashed line marks today. Values after this point are projected...-XX]",
     "projected": "[XX-(Projected)-XX]",
     "today": "[XX-Today-XX]",
