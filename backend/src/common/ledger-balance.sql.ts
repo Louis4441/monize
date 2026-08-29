@@ -26,6 +26,30 @@ export const LEDGER_EXCLUDES_VOID = `(t.status IS NULL OR t.status != 'VOID')`;
 export const LEDGER_TOP_LEVEL_ONLY = `t.parent_transaction_id IS NULL`;
 
 /**
+ * "Which rows are a movement of money" -- the pair above, as one conjunct.
+ *
+ * This is the fragment nearly every ledger read needs, and the one whose drift
+ * actually costs something: a new status value, or a refinement of what a split
+ * child means, has to reach every query at once or the balance, the forecast,
+ * the statement cycle, the undo recalculation and the scheduled loan bill start
+ * disagreeing about the same account. Not every caller sums a balance -- some
+ * take MAX(date), some sum only future rows, some sum a CASE -- but they all
+ * ask this same question first, so this is what is shared rather than a whole
+ * query shape that only the balance reads would fit.
+ *
+ * Most callers alias the table `t`, which `LEDGER_MOVEMENT_PREDICATE` assumes;
+ * a query that does not alias it at all passes `""`.
+ * `ledger-balance-sql.spec.ts` fails a hand-written copy.
+ */
+export function ledgerMovementPredicate(alias = "t"): string {
+  const col = alias ? `${alias}.` : "";
+  return `((${col}status IS NULL OR ${col}status != 'VOID') AND ${col}parent_transaction_id IS NULL)`;
+}
+
+/** The `t`-aliased form, which is what nearly every ledger query uses. */
+export const LEDGER_MOVEMENT_PREDICATE = ledgerMovementPredicate();
+
+/**
  * The join a balance sums over, bounded at `asOfDateParam`.
  *
  * @param asOfDateParam the placeholder holding the as-of date (e.g. `"$2"`).
@@ -37,8 +61,7 @@ export function ledgerBalanceJoin(
 ): string {
   return [
     `LEFT JOIN transactions t ON t.account_id = a.id`,
-    `  AND ${LEDGER_EXCLUDES_VOID}`,
-    `  AND ${LEDGER_TOP_LEVEL_ONLY}`,
+    `  AND ${LEDGER_MOVEMENT_PREDICATE}`,
     ...extra.map((clause) => `  AND ${clause}`),
     `  AND t.transaction_date <= ${asOfDateParam}`,
   ].join("\n");

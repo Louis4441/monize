@@ -4,6 +4,7 @@ import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.se
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
+import { LoanRateChange } from "../loan-rate-changes/entities/loan-rate-change.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -15,6 +16,7 @@ describe("ScheduledTransactionLoanService", () => {
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let splitsRepository: Record<string, jest.Mock>;
   let accountsRepository: Record<string, jest.Mock>;
+  let rateChangesRepository: Record<string, jest.Mock>;
   let manager: Record<string, jest.Mock>;
 
   const loanAccountId = "acc-loan";
@@ -88,10 +90,17 @@ describe("ScheduledTransactionLoanService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
+    // Most loans have no recorded rate history, so the bill falls back to the
+    // account's own scalar; the rate-timeline tests override this.
+    rateChangesRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     const scopedDb = createScopedDbMocks([
       [ScheduledTransaction, scheduledTransactionsRepository],
       [ScheduledTransactionSplit, splitsRepository],
       [Account, accountsRepository],
+      [LoanRateChange, rateChangesRepository],
     ]);
     manager = scopedDb.manager;
     // The dated ledger balance comes from a raw as-of query; by default answer
@@ -1070,6 +1079,60 @@ describe("ScheduledTransactionLoanService", () => {
         (call: any) => call[0].transferAccountId === loanAccountId,
       );
       expect(principalSave[0].amount).toBe(-402);
+    });
+
+    it("prices at the rate in effect on the due date, not the account's stale scalar", async () => {
+      // Recording a rate change deliberately does not write
+      // `accounts.interest_rate`, so a loan whose rate moved to 7.2% still
+      // carries 6 in that column. Pricing the bill at the scalar charges a rate
+      // nobody pays -- and disagrees with the amortization report, which reads
+      // the timeline (issue #1253, INV-LOAN-006).
+      accountsRepository.findOne.mockResolvedValue(
+        makeLoanAccount({
+          currentBalance: -200000,
+          interestRate: 6,
+          paymentFrequency: "MONTHLY",
+          paymentAmount: 1500,
+        }),
+      );
+      rateChangesRepository.find.mockResolvedValue([
+        { effectiveDate: "2026-01-01", annualRate: "7.2000" },
+      ]);
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction({ amount: -1500, nextDueDate: "2026-08-01" }),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      // 200,000 x (7.2 / 100 / 12) = 1,200.00, not the scalar's 1,000.00.
+      const interestSave = splitsRepository.save.mock.calls.find(
+        (call: any) => call[0].categoryId === "cat-interest",
+      );
+      expect(interestSave[0].amount).toBe(-1200);
+    });
+
+    it("leaves a rate change dated after the due date to a later installment", async () => {
+      accountsRepository.findOne.mockResolvedValue(
+        makeLoanAccount({
+          currentBalance: -200000,
+          interestRate: 6,
+          paymentFrequency: "MONTHLY",
+          paymentAmount: 1500,
+        }),
+      );
+      rateChangesRepository.find.mockResolvedValue([
+        { effectiveDate: "2026-09-01", annualRate: "7.2000" },
+      ]);
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction({ amount: -1500, nextDueDate: "2026-08-01" }),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      const interestSave = splitsRepository.save.mock.calls.find(
+        (call: any) => call[0].categoryId === "cat-interest",
+      );
+      expect(interestSave[0].amount).toBe(-1000);
     });
 
     it("measures the balance from the ledger through the next due date", async () => {

@@ -4,6 +4,7 @@ import { gitListFiles } from "./repo-tree.util";
 import {
   ACCOUNT_BALANCE_AS_OF_SQL,
   LEDGER_EXCLUDES_VOID,
+  LEDGER_MOVEMENT_PREDICATE,
   LEDGER_TOP_LEVEL_ONLY,
   ledgerBalanceJoin,
 } from "./ledger-balance.sql";
@@ -24,23 +25,26 @@ import {
 const SOURCE_ROOT = join(__dirname, "..");
 
 /**
- * The copies that predate the shared fragment. **This list may only shrink.**
+ * The BALANCE family: every module that answers "what is this account worth",
+ * and therefore has to agree with every other one. All of their copies are
+ * converted, so this scan runs over them with nothing exempted.
  *
- * Every one of these is the same measurement -- opening balance plus the
- * account's non-VOID, top-level rows -- reached by a different caller, some
- * scoping the join by `user_id` and some not. Converting them is a change to
- * how eight surfaces read a balance and belongs in its own review; what this
- * guard buys today is that the count cannot grow while they wait.
+ * Reports are deliberately NOT in scope. A report asking which rows to count
+ * is asking a different question with a different answer -- several read split
+ * *children* on purpose, because a parent's amount is not the cash meaning of
+ * its lines (root CLAUDE.md, "A report that reads only the parent row cannot
+ * exclude a line, so it excludes an amount"). That family has its own single
+ * source in `common/investment-filter.util.ts` and its own guard; folding the
+ * two together would make one of them wrong.
  */
-const GRANDFATHERED = new Set([
-  "accounts/accounts.service.ts",
-  "accounts/account-balances-report.service.ts",
-  "accounts/balance-forecast.service.ts",
-  "accounts/statement-cycle.service.ts",
-  "action-history/action-history.service.ts",
-  "delegation/joint-accounts.service.ts",
-  "import/import-post-processing.service.ts",
-]);
+const BALANCE_FAMILY = [
+  "accounts/",
+  "action-history/",
+  "delegation/",
+  "import/",
+  "net-worth/",
+  "scheduled-transactions/",
+];
 
 function stripComments(source: string): string {
   return source
@@ -67,40 +71,55 @@ describe("as-of ledger balance SQL", () => {
     );
   });
 
-  it("has no new hand-written copy of the join", () => {
+  it("has no hand-written copy of the movement predicate", () => {
+    // The subject is the PREDICATE, not a whole query shape: most callers do
+    // not sum a balance (some take MAX(date), some sum future rows only, some
+    // sum a CASE) but every one of them asks this same question first, and it
+    // is the answer drifting between them that costs money.
     const offenders: string[] = [];
     for (const relative of gitListFiles(SOURCE_ROOT)) {
       if (!relative.endsWith(".ts") || relative.endsWith(".spec.ts")) continue;
       if (relative === "common/ledger-balance.sql.ts") continue;
-      if (GRANDFATHERED.has(relative)) continue;
+      if (!BALANCE_FAMILY.some((dir) => relative.startsWith(dir))) continue;
       const source = stripComments(
         readFileSync(join(SOURCE_ROOT, relative), "utf8"),
       );
-      // The fingerprint of the join: the split-child exclusion beside a
-      // transactions join. Either alone is ordinary; together they are a
-      // balance being summed.
-      if (
-        source.includes("parent_transaction_id IS NULL") &&
-        /LEFT JOIN\s+transactions/i.test(source)
-      ) {
+      if (/parent_transaction_id IS NULL/.test(source)) {
         offenders.push(relative);
       }
     }
     expect(offenders).toEqual([]);
   });
 
-  it("keeps the grandfather list honest -- every entry still holds a copy", () => {
-    // A stale exemption is how a guard quietly stops guarding: an entry whose
-    // copy is gone would keep a converted file exempt forever.
-    const stale = [...GRANDFATHERED].filter((relative) => {
-      const source = stripComments(
-        readFileSync(join(SOURCE_ROOT, relative), "utf8"),
-      );
-      return !(
-        source.includes("parent_transaction_id IS NULL") &&
-        /LEFT JOIN\s+transactions/i.test(source)
-      );
-    });
-    expect(stale).toEqual([]);
+  it("scans a family that actually exists", () => {
+    // A directory renamed out from under this list would silently scan
+    // nothing, which looks exactly like compliance.
+    const files = gitListFiles(SOURCE_ROOT).filter((relative) =>
+      relative.endsWith(".ts"),
+    );
+    for (const dir of BALANCE_FAMILY) {
+      expect(files.some((relative) => relative.startsWith(dir))).toBe(true);
+    }
+  });
+
+  it("covers the balance readers, including the ones that do not sum a balance", () => {
+    // The predicate reaches queries taking MAX(date) and summing only future
+    // rows; if the scan only recognised balance sums those would drift freely.
+    const scanned = gitListFiles(SOURCE_ROOT).filter(
+      (relative) =>
+        relative.endsWith(".ts") &&
+        !relative.endsWith(".spec.ts") &&
+        BALANCE_FAMILY.some((dir) => relative.startsWith(dir)) &&
+        stripComments(
+          readFileSync(join(SOURCE_ROOT, relative), "utf8"),
+        ).includes("LEDGER_MOVEMENT_PREDICATE"),
+    );
+    expect(scanned.length).toBeGreaterThanOrEqual(7);
+  });
+
+  it("states the predicate once, and the balance query composes it", () => {
+    expect(LEDGER_MOVEMENT_PREDICATE).toContain(LEDGER_EXCLUDES_VOID);
+    expect(LEDGER_MOVEMENT_PREDICATE).toContain(LEDGER_TOP_LEVEL_ONLY);
+    expect(ACCOUNT_BALANCE_AS_OF_SQL).toContain(LEDGER_MOVEMENT_PREDICATE);
   });
 });

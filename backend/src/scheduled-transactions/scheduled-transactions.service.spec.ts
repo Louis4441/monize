@@ -12,6 +12,7 @@ import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
 import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
 import { Account } from "../accounts/entities/account.entity";
+import { LoanRateChange } from "../loan-rate-changes/entities/loan-rate-change.entity";
 import { Tag } from "../tags/entities/tag.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { FALLBACK_DEFAULT_CURRENCY } from "../common/default-currency.util";
@@ -220,6 +221,10 @@ describe("ScheduledTransactionsService", () => {
       [ScheduledTransactionSplit, splitsRepo],
       [ScheduledTransactionOverride, overridesRepo],
       [Account, accountsRepo],
+      // The loan bill prices at the rate in effect on its due date, so the
+      // loan service reads the rate timeline; no fixture here records one, so
+      // every loan falls back to its account scalar (INV-LOAN-006).
+      [LoanRateChange, { find: jest.fn().mockResolvedValue([]) }],
       [Tag, tagRepo],
       [UserPreference, preferencesRepo],
     ]);

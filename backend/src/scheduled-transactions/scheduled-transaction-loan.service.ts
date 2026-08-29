@@ -18,6 +18,8 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { ensureYMD } from "../common/recurrence";
 import { tr } from "../i18n/translate";
 import { ACCOUNT_BALANCE_AS_OF_SQL } from "../common/ledger-balance.sql";
+import { LoanRateChange } from "../loan-rate-changes/entities/loan-rate-change.entity";
+import { effectiveAnnualRateOn } from "../accounts/effective-loan-rate.util";
 import {
   DEFAULT_PERIODS_PER_YEAR,
   periodsPerYearForStoredFrequency,
@@ -69,6 +71,8 @@ type ResolvedInstallment =
       allocation: LoanPaymentAllocation;
       template: LoanTemplateSplits;
       debt: number;
+      /** The rate actually priced at -- the timeline's, not the scalar. */
+      annualRate: number;
       templateAmount: number;
       templateExtraAmount: number;
     };
@@ -174,7 +178,7 @@ export class ScheduledTransactionLoanService {
       const requiredParentAmount = allocation.total;
 
       this.logger.log(
-        `Recalculate loan splits: balance=${debt}, rate=${Number(loanAccount.interestRate) || 0}%, ` +
+        `Recalculate loan splits: balance=${debt}, rate=${installment.annualRate}%, ` +
           `freq=${loanAccount.paymentFrequency || scheduledTransaction.frequency}, ` +
           `extra final ${finalExtraPrincipal}, ` +
           `newPrincipal=${newPrincipal}, newInterest=${newInterest}, ` +
@@ -456,6 +460,31 @@ export class ScheduledTransactionLoanService {
    * the loan. Account type still decides the COMPOUNDING (Canadian
    * semi-annual); it never decided the count.
    */
+  /**
+   * The annual rate this loan carries on `asOfDate`, from its recorded rate
+   * history, falling back to the account's own scalar when no row applies.
+   *
+   * Recording a rate change deliberately does not write `accounts.interest_rate`
+   * (see `effectiveAnnualRateOn`), so pricing an installment at that column
+   * charges a rate nobody pays -- and made the bill disagree with the
+   * amortization report even once the two priced the same balance. The rate is
+   * dated for the same reason the balance is: a change recorded for next month
+   * belongs to next month's installment, not this one.
+   */
+  private async datedAnnualRate(
+    m: EntityManager,
+    loanAccount: Account,
+    asOfDate: string,
+  ): Promise<number> {
+    const scalar = Number(loanAccount.interestRate);
+    const fallback = Number.isFinite(scalar) ? scalar : 0;
+    const rows = await m.getRepository(LoanRateChange).find({
+      where: { accountId: loanAccount.id },
+      order: { effectiveDate: "ASC" },
+    });
+    return effectiveAnnualRateOn(rows, asOfDate, fallback) ?? fallback;
+  }
+
   private periodicRateFor(
     loanAccount: Account,
     frequency: PaymentFrequency,
@@ -511,7 +540,7 @@ export class ScheduledTransactionLoanService {
     }
 
     const templateAmount = Math.abs(Number(scheduledTransaction.amount));
-    const interestRate = Number(loanAccount.interestRate) || 0;
+    const interestRate = await this.datedAnnualRate(m, loanAccount, asOfDate);
     const frequency = (loanAccount.paymentFrequency ||
       scheduledTransaction.frequency) as PaymentFrequency;
 
@@ -634,6 +663,7 @@ export class ScheduledTransactionLoanService {
       allocation,
       template: { principalSplit, interestSplit, extraPrincipalSplit },
       debt,
+      annualRate: interestRate,
       templateAmount,
       templateExtraAmount,
     };

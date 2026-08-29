@@ -20,7 +20,9 @@ debt(d)   = max(0, -(opening_balance + SUM(amount)
                 AND (status IS NULL OR status <> 'VOID')
                 AND parent_transaction_id IS NULL
                 AND transaction_date <= d))
-interest  = roundMoney(debt(d) * periodicRate)
+rate(d)   = latest loan_rate_changes row with effective_date <= d,
+              else accounts.interest_rate
+interest  = roundMoney(debt(d) * periodicRate(rate(d)))
 principal = payment - interest, through allocateLoanPayment's waterfall
 ```
 
@@ -32,7 +34,10 @@ non-Canadian mortgages, the semi-annual-compounding effective rate for a
 Canadian fixed-rate mortgage, `periodsPerYearForStoredFrequency` for the
 count in both spellings of the frequency column.
 
-Two sources are explicitly **not** inputs:
+Both inputs are dated at `d`, for the same reason: a payment or a rate change
+recorded for next month belongs to next month's installment.
+
+Three sources are explicitly **not** inputs:
 
 - **The previously stored split.** `next = prev_interest - prev_principal *
   rate` is algebraically equivalent to pricing from balance only at full
@@ -42,6 +47,13 @@ Two sources are explicitly **not** inputs:
 - **`accounts.current_balance`.** It is a through-today read model and
   deliberately excludes future-dated rows, so after a future-dated payment
   posts it repeats the old balance and the old interest.
+- **`accounts.interest_rate` alone.** Recording a rate change deliberately does
+  not write that column -- it stays user-owned, settable only from the account
+  edit form -- so it holds the OLD terms after any change entered through the
+  rate-history UI. It is the *fallback* when no timeline row applies, never the
+  first answer. `effectiveAnnualRateOn` is the rule, and its truth table
+  (`backend/src/accounts/loan-rate-timeline-cases.json`) is asserted by both
+  layers because they cannot import each other.
 
 ## 2. Where it is priced
 
@@ -120,14 +132,15 @@ fetch reaches the report's error state; "no anchor" is not a fallback for an
 outage) and hands it to `buildLoanProjectionInput`, so the first projected
 row and the next bill are measured at the same date against the same balance.
 
-**The rate is a known remaining gap.** This service prices the bill at
-`accounts.interest_rate`; the report prices its rows at the rate timeline
-(`loan_rate_changes`), which recording a rate change deliberately does not
-write back to that column. For a loan whose rate was changed through the
-rate-history UI the two can still disagree -- the balance boundary is closed,
-the rate source is not. That is why INV-LOAN-006 is recorded as `partial`
-rather than `enforced`, and it is the next thing to fix here: the bill should
-resolve its rate through the same timeline the projection uses.
+Both the balance and the rate are now shared, so the first projected row and
+the next bill agree on both inputs. Which surface passes the anchor is
+enumerated by `frontend/src/lib/loan-projection-anchor.guard.test.ts` rather
+than left to an optional argument nobody has to think about.
+
+The **payment** is deliberately outside this: a rate change reaches the
+schedule's installment through `LoanRateChangesService.syncScheduledTransaction`,
+which asks the user first, so a declined sync leaves the bill at the old
+payment by their decision. Interest is unaffected -- it is debt x rate.
 
 Both fields null means the loan has no active scheduled payment; there is no
 bill to be in parity with, and the projection keeps its today-anchored
