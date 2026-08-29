@@ -15,6 +15,7 @@ import {
   deriveLoanPaymentHistory,
   fetchAllAccountTransactions,
   fetchLoanInterestTransactions,
+  historicalPaymentCount,
   resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -262,7 +263,14 @@ export function LoanAmortizationReport() {
     [selectedAccount, history, rateChanges, projectionAnchor],
   );
 
-  const historicalCount = useMemo(() => paymentHistory.filter((r) => !r.isProjected).length, [paymentHistory]);
+  // The shared derivation, so this report and the Debt Payoff Timeline cannot
+  // give one loan two answers to "Payments Made". A no-op here -- this report
+  // already lists one row per event -- and the point of moving it: the count
+  // now comes from the events rather than from whatever the rows happen to be.
+  const historicalCount = useMemo(
+    () => (history ? historicalPaymentCount(history) : 0),
+    [history],
+  );
   const hasProjection = useMemo(() => paymentHistory.some((r) => r.isProjected), [paymentHistory]);
 
   const summary = useMemo(() => {

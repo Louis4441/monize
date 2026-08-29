@@ -97,6 +97,7 @@ implied.
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
+| INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
 | INV-LOAN-002 | A schedule truncated by the projection horizon yields no lifetime total | enforced |
 | INV-LOAN-003 | One named compounding convention, from preview to projection to displayed EAR | enforced |
@@ -640,6 +641,72 @@ The parent-only half was found by a second audit, of the fix itself
 was hiding too much exposes every row it was also hiding *correctly*. The
 account-type predicate had been doing two jobs, and only one of them was wrong.
 Five of the cases above fail on the first fix and pass on the second.
+
+### INV-REPORT-002 -- a chart reduction never reaches a figure
+
+```text
+Statement           Reducing a series so it fits a chart axis is a RENDERING
+                    decision and reaches nothing else. No count, total, average,
+                    percentage, summary card or export may be derived from an
+                    aggregated or down-sampled series; each is derived from the
+                    full data the reduction was made from. Two reductions,
+                    because a series is one of two kinds: a STOCK (a balance, a
+                    running total) has a value at a point in time, so showing
+                    every Nth point drops resolution while every point still
+                    drawn means what it meant; a FLOW (what a period paid) only
+                    means anything over an interval, so dropping a point deletes
+                    the interval it stood for and the chart shows a subset
+                    presented as the whole. A flow is reduced by SUMMING
+                    contiguous groups.
+                    Monthly aggregation is the same rule one step earlier: a
+                    month is not a payment. Weekly and biweekly schedules, extra
+                    principal payments and two payments in one month all collapse
+                    into one bucket, so a count taken after aggregation is wrong
+                    before any sampling happens.
+Source of truth     The unreduced series -- for a loan, the payment events
+                    frontend/src/lib/loan-history.ts derives from the ledger.
+Enforcement         One module: frontend/src/lib/chart-sampling.ts
+                    (sampleStockSeries for a stock, bucketFlowSeries for a flow,
+                    CHART_MAX_POINTS the shared budget). The reduced series is
+                    bound to its OWN name and handed to a chart; the full series
+                    keeps the name every figure reads. The payment count is
+                    historicalPaymentCount (loan-history.ts), read by both the
+                    Debt Payoff Timeline and the Loan Amortization report so one
+                    loan cannot have two answers.
+                    frontend/src/lib/chart-reduction.guard.test.ts holds three
+                    scans: no count taken by filtering a schedule on isProjected
+                    anywhere in src/, both loan reports reading the shared count,
+                    and no reduced series measured (.length, .reduce, .filter,
+                    .some, .every, .forEach, .flatMap) -- a lookup such as .find,
+                    which a tooltip needs, is allowed because it cannot
+                    aggregate. The binding scan is pinned to an exact list, so a
+                    rename cannot silently make the measurement scan scan
+                    nothing, and it carries a planted-violation control.
+Concurrency scope   -- (render path)
+Retry semantics     -- (render path)
+Crash semantics     -- (render path)
+Failure response    -- a chart draws; it does not refuse.
+Required tests      Present: the source scans above; the unit matrix in
+                    frontend/src/lib/chart-sampling.test.ts (a stock sample keeps
+                    the endpoints and every kept row and emits each index once; a
+                    flow bucket conserves the total, stays within the budget and
+                    never merges across a boundary); and the behavioural cases in
+                    frontend/src/components/reports/DebtPayoffTimelineReport
+                    .test.tsx, which assert Payments Made against a 300-payment
+                    history while the chart is sampled, two payments in one month
+                    counted as two, 26 biweekly payments counted as 26 rather
+                    than 12, the distribution chart conserving every month's
+                    principal, and the history/projection transition surviving the
+                    stride. Each fails on the pre-fix component with the figures
+                    issue #1244 reports (61, 1, 12, half the money).
+Status              enforced
+```
+
+The reduction was written for the balance curve, where it is correct, and then
+inherited by the count, the totals and the Payment Distribution chart because
+all four read one array. That is the shape to look for: a variable that is
+assigned its own reduced form (`points = points.filter(...)`) leaves nothing
+downstream able to tell which of the two it holds.
 
 ### INV-LOAN-001 -- a recurring overpayment's cadence is a calendar
 

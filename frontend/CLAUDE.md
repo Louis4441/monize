@@ -537,6 +537,44 @@ The writer's ambiguous case resolves differently from the reader's on purpose, a
 
 **In `lib/loan-history.ts` an empty list is a claim, so nothing in that module catches.** An empty `interestTransactions` is what tells the derivation "these payments booked no interest"; a `catch { return [] }` in `fetchLoanInterestTransactions` therefore turned a timeout into a confident Interest Paid of $0.00. Every failure propagates to a caller that owns an error-and-retry state -- `useReportData` in the three loan reports, `failedAccountId` in `useLoanProjection`, the page error on the account detail route. `lib/loan-history.guard.test.ts` fails on any `catch` reappearing in the module.
 
+### A chart reduction is rendering; it never reaches a count, a total or an export
+
+A long series is reduced before it can be drawn, and that reduction is the only
+thing it is for. The Debt Payoff Timeline built **one** array -- payment events,
+aggregated by month, then sampled down to about 60 points for the axis -- and
+read "Payments Made" off it, so a loan with 300 payments reported 61 (issue
+#1244). Keep the sets apart and name them apart: the full data every figure is
+derived from, and the reduced series a chart is handed.
+
+Which reduction depends on what the series *is*, and `lib/chart-sampling.ts`
+holds both:
+
+- **A stock** (a balance, a running total) has a value at a point in time, so
+  `sampleStockSeries` draws every Nth point: resolution drops, and every point
+  still drawn means exactly what it meant. Pass `keep` for the points that carry
+  meaning beyond their value -- the last historical row and the first projected
+  one, which the "Today" line and the area join sit on.
+- **A flow** (what a period paid) only means anything over an interval, so
+  dropping a point *deletes* the months it stood for and the chart shows a
+  subset presented as the whole. `bucketFlowSeries` sums contiguous groups
+  instead, and its `boundary` keeps a bucket from straddling the
+  history/projection line -- one bar cannot honestly be half measured and half
+  predicted.
+
+**Monthly aggregation is the same mistake one step earlier: a month is not a
+payment.** A biweekly loan makes 26 a year, extra principal payments are their
+own events, and two payments in one month are two. The count is
+`historicalPaymentCount(history)` (`lib/loan-history.ts`), read by both loan
+reports so one loan cannot have two answers.
+
+Assigning a reduced series back over its source (`points = points.filter(...)`)
+is how this happens -- once the two are one variable, nothing downstream can
+tell which it holds. `lib/chart-reduction.guard.test.ts` scans for a count taken
+by filtering a schedule on `isProjected`, for both reports reading the shared
+count, and for any reduced series being *measured* (`.length`, `.reduce`,
+`.filter`, `.some`, `.every`, `.forEach`); a `.find` for the row a tooltip
+hovers is allowed, because a lookup cannot aggregate. INV-REPORT-002.
+
 ### An unknown value must not render as a measured zero
 
 The server sends `null` rather than `0` for anything it could not work out (`docs/financial-calculation-contract.md`), and the last hundred pixels are where that gets thrown away:

@@ -13,8 +13,15 @@ vi.mock('@/hooks/useNumberFormat', () => ({
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
-  AreaChart: ({ children }: any) => <div data-testid="area-chart">{children}</div>,
+  // `data` is serialized onto the node so a test can assert on what the chart
+  // was actually handed. Issue #1244 was a figure derived from that array, and
+  // a mock that swallows it cannot tell a sampled series from a full one.
+  BarChart: ({ children, data }: any) => (
+    <div data-testid="bar-chart" data-rows={JSON.stringify(data ?? [])}>{children}</div>
+  ),
+  AreaChart: ({ children, data }: any) => (
+    <div data-testid="area-chart" data-rows={JSON.stringify(data ?? [])}>{children}</div>
+  ),
   Bar: () => null,
   Area: () => null,
   XAxis: ({ tickFormatter }: any) => <div data-testid="x-axis">{tickFormatter ? tickFormatter(100) : ''}</div>,
@@ -1067,6 +1074,205 @@ describe('DebtPayoffTimelineReport', () => {
     render(<DebtPayoffTimelineReport />);
     await waitFor(() => {
       expect(screen.getByRole('combobox')).toHaveValue('loan-1');
+    });
+  });
+
+  // --- Issue #1244: chart reduction must not reach a count or a total --------
+  //
+  // The report used to build ONE array: payment events, aggregated by month,
+  // then sampled down to ~60 points for the axis -- and "Payments Made" counted
+  // what survived. Each case below fails on that shape.
+  describe('a chart reduction never reaches a figure (issue #1244)', () => {
+    /** The number under the "Payments Made" heading in Account Details. */
+    const paymentsMade = () =>
+      screen.getByText('Payments Made').parentElement?.querySelector('p')?.textContent;
+
+    /** The rows a chart was actually handed. */
+    const chartRows = (testId: 'area-chart' | 'bar-chart') =>
+      JSON.parse(screen.getByTestId(testId).getAttribute('data-rows') ?? '[]');
+
+    const monthlyPayments = (count: number, amount = 100) =>
+      Array.from({ length: count }, (_, i) => {
+        const year = 2000 + Math.floor(i / 12);
+        const month = ((i % 12) + 1).toString().padStart(2, '0');
+        return {
+          id: `tx-${i}`,
+          transactionDate: `${year}-${month}-15`,
+          amount,
+          linkedTransaction: null,
+        };
+      });
+
+    /** A loan with no terms, so nothing is projected and every row is history. */
+    const historyOnlyLoan = (currentBalance: number, openingBalance: number) => [{
+      id: 'loan-1',
+      name: 'Long Mortgage',
+      accountType: 'MORTGAGE',
+      currentBalance,
+      openingBalance,
+      interestRate: null,
+      paymentAmount: null,
+      paymentFrequency: null,
+      isCanadianMortgage: false,
+      isVariableRate: false,
+      isClosed: false,
+    }];
+
+    it('counts every payment when the chart is sampled', async () => {
+      // 300 monthly payments: five times the axis budget, so the balance chart
+      // is sampled and the count must not be.
+      mockGetAllAccounts.mockResolvedValue(historyOnlyLoan(-2000, -32000));
+      mockGetAllTransactions.mockResolvedValue({
+        data: monthlyPayments(300),
+        pagination: { hasMore: false },
+      });
+
+      render(<DebtPayoffTimelineReport />);
+      // The chart mounts only once the schedule has rows -- waiting on the
+      // static "Account Details" heading would assert against the render
+      // between the account arriving and its transactions being adopted.
+      await screen.findByTestId('area-chart');
+
+      expect(paymentsMade()).toBe('300');
+      // The reduction is still doing its job -- this is not "sampling removed".
+      const drawn = chartRows('area-chart');
+      expect(drawn.length).toBeLessThanOrEqual(61);
+      expect(drawn.length).toBeLessThan(300);
+    });
+
+    it('counts two payments in one month as two, though the chart draws one bar', async () => {
+      mockGetAllAccounts.mockResolvedValue(historyOnlyLoan(-700, -1000));
+      mockGetAllTransactions.mockResolvedValue({
+        data: [
+          { id: 'tx-1', transactionDate: '2024-01-05', amount: 100, linkedTransaction: null },
+          { id: 'tx-2', transactionDate: '2024-01-19', amount: 100, linkedTransaction: null },
+          { id: 'tx-3', transactionDate: '2024-01-28', amount: 100, linkedTransaction: null },
+        ],
+        pagination: { hasMore: false },
+      });
+
+      render(<DebtPayoffTimelineReport />);
+      // The chart mounts only once the schedule has rows -- waiting on the
+      // static "Account Details" heading would assert against the render
+      // between the account arriving and its transactions being adopted.
+      await screen.findByTestId('area-chart');
+
+      expect(paymentsMade()).toBe('3');
+      // One month, one point -- and the month's principal is all three payments.
+      const drawn = chartRows('area-chart');
+      expect(drawn).toHaveLength(1);
+      expect(drawn[0].principalPaid).toBe(300);
+    });
+
+    it('counts biweekly payments individually rather than by month', async () => {
+      // 26 payments across 2024, two in most months: monthly aggregation would
+      // report 12.
+      const biweekly = Array.from({ length: 26 }, (_, i) => {
+        const date = new Date(Date.UTC(2024, 0, 5 + i * 14));
+        return {
+          id: `tx-${i}`,
+          transactionDate: date.toISOString().slice(0, 10),
+          amount: 100,
+          linkedTransaction: null,
+        };
+      });
+      mockGetAllAccounts.mockResolvedValue(historyOnlyLoan(-400, -3000));
+      mockGetAllTransactions.mockResolvedValue({ data: biweekly, pagination: { hasMore: false } });
+
+      render(<DebtPayoffTimelineReport />);
+      // The chart mounts only once the schedule has rows -- waiting on the
+      // static "Account Details" heading would assert against the render
+      // between the account arriving and its transactions being adopted.
+      await screen.findByTestId('area-chart');
+
+      expect(paymentsMade()).toBe('26');
+      expect(chartRows('area-chart').length).toBeLessThanOrEqual(12);
+    });
+
+    it('draws every month in Payment Distribution, summed rather than dropped', async () => {
+      // 120 months at 100 each. Sampling drew every other month and lost half
+      // the money; bucketing sums the months into one bar apiece.
+      mockGetAllAccounts.mockResolvedValue(historyOnlyLoan(-1000, -13000));
+      mockGetAllTransactions.mockResolvedValue({
+        data: monthlyPayments(120),
+        pagination: { hasMore: false },
+      });
+
+      render(<DebtPayoffTimelineReport />);
+      // The chart mounts only once the schedule has rows -- waiting on the
+      // static "Account Details" heading would assert against the render
+      // between the account arriving and its transactions being adopted.
+      await screen.findByTestId('area-chart');
+      fireEvent.click(screen.getByText('Principal vs Interest'));
+
+      const bars = chartRows('bar-chart');
+      expect(bars.length).toBeGreaterThan(0);
+      expect(bars.length).toBeLessThanOrEqual(60);
+      // Conservation: no month is missing from the chart.
+      expect(bars.reduce((sum: number, bar: { principalPaid: number }) => sum + bar.principalPaid, 0)).toBe(12000);
+      expect(bars.reduce((sum: number, bar: { months: number }) => sum + bar.months, 0)).toBe(120);
+      // A bucket spanning more than one month says so rather than borrowing the
+      // first month's name.
+      expect(bars[0].label).toMatch(/ - /);
+    });
+
+    it('leaves a short distribution one bar per month', async () => {
+      mockGetAllAccounts.mockResolvedValue(historyOnlyLoan(-1000, -1300));
+      mockGetAllTransactions.mockResolvedValue({
+        data: monthlyPayments(3),
+        pagination: { hasMore: false },
+      });
+
+      render(<DebtPayoffTimelineReport />);
+      // The chart mounts only once the schedule has rows -- waiting on the
+      // static "Account Details" heading would assert against the render
+      // between the account arriving and its transactions being adopted.
+      await screen.findByTestId('area-chart');
+      fireEvent.click(screen.getByText('Principal vs Interest'));
+
+      const bars = chartRows('bar-chart');
+      expect(bars).toHaveLength(3);
+      expect(bars.map((bar: { label: string }) => bar.label)).toEqual([
+        'Jan 2000',
+        'Feb 2000',
+        'Mar 2000',
+      ]);
+    });
+
+    it('draws the projection marker on the real transition month', async () => {
+      // With 300 historical months a stride of 6 would put "today" up to five
+      // months off; the sampler keeps the boundary rows whatever the stride.
+      mockGetAllAccounts.mockResolvedValue([{
+        id: 'loan-1',
+        name: 'Long Mortgage',
+        accountType: 'MORTGAGE',
+        currentBalance: -2000,
+        openingBalance: -32000,
+        interestRate: 5.0,
+        paymentAmount: 500,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      }]);
+      mockGetAllTransactions.mockResolvedValue({
+        data: monthlyPayments(300),
+        pagination: { hasMore: false },
+      });
+
+      render(<DebtPayoffTimelineReport />);
+      // The chart mounts only once the schedule has rows -- waiting on the
+      // static "Account Details" heading would assert against the render
+      // between the account arriving and its transactions being adopted.
+      await screen.findByTestId('area-chart');
+
+      const drawn: Array<{ isProjected: boolean }> = chartRows('area-chart');
+      const firstProjected = drawn.findIndex((row) => row.isProjected);
+      expect(firstProjected).toBeGreaterThan(0);
+      // The two rows either side of the transition are adjacent in the drawn
+      // series, so the "Today" line and the area join sit on the real boundary.
+      expect(drawn[firstProjected - 1].isProjected).toBe(false);
+      expect(paymentsMade()).toBe('300');
     });
   });
 });
