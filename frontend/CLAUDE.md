@@ -197,6 +197,10 @@ Whether a picker *offers* to create is a property of the surface, not the field:
 
 `balanceColor` (`lib/format.ts`) is the one rule: negative is red, everything else neutral. Do not add `|| isLiability` (or any `accountType` test) -- a credit card at a credit balance is not in the red, and the sign already carries the meaning. `gainLossColor` is the sibling for a *change* in value (green when up), not for a balance.
 
+### A chart over values of both signs keeps the sign beside the magnitude
+
+A pie can only size a slice from `Math.abs`, but the abs is presentation, never the value: carry the signed figure with the datum, print it in the legend and tooltip, colour the two sides from the semantic pair (`CHART_COLOURS_ASSETS` / `CHART_COLOURS_LIABILITIES` in `lib/chart-colours.ts`), and net a mixed group the way the table beside it does. The footer of a mixed chart is the signed net figure under its honest name (Net Worth) -- a sum of absolute values labelled "Total" reports assets plus debt as if both increased financial value (issue #1243). `AccountBalancesReport`'s chart is the worked example.
+
 ### A scheduled occurrence's amount is `nextOccurrenceEffectiveAmount`, never `nextOverride?.amount ?? amount`
 
 `ScheduledTransaction.amount` was computed at whatever FX rate was current when it was written, so for a top-level investment schedule (whose `amount` is the *security-currency* cash impact) or a split parent carrying an investment line it is a stale snapshot -- and it is labelled with the brokerage account's `currencyCode`, not the settlement currency the cash lands in. Read `effectiveAmount` / `effectiveAmountComplete` / `effectiveCurrencyCode` through `lib/scheduled-effective-amount.ts` (`scheduleEffectiveAmount`, `overrideEffectiveAmount`, `nextOccurrenceEffectiveAmount`, `sumEffectiveOccurrences`).
