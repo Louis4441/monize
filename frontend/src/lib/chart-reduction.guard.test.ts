@@ -6,8 +6,8 @@ import { describe, it, expect } from 'vitest';
  *
  * The Debt Payoff Timeline built one array -- payment events, aggregated by
  * month, then sampled down to fit the axis -- and read "Payments Made" off it,
- * so a loan with 300 payments reported 61. Two rules keep that shut, and both
- * are scans because both mistakes are mechanical:
+ * so a loan with 300 payments reported 61. Four rules keep that shut, all of
+ * them scans because every one of these mistakes is mechanical:
  *
  *  1. A payment count comes from `historicalPaymentCount`, never from filtering
  *     a schedule on `isProjected`. That filter is indistinguishable, at the
@@ -17,6 +17,13 @@ import { describe, it, expect } from 'vitest';
  *     looked up in (a tooltip finding the row it hovers), but never MEASURED:
  *     a `.length`, `.reduce`, `.filter`, `.some`, `.every` or `.forEach` over a
  *     reduced series answers a question about pixels.
+ *  3. Which side of the history/projection line an aggregate is on is part of
+ *     the group's IDENTITY, never computed from its members afterwards -- the
+ *     defect the PR #1280 audit found, one step upstream of the reduction the
+ *     first two rules govern.
+ *  4. A chart keys its category axis on the row's own identity, because a label
+ *     is not one: a month holding a real payment and a projected payment is two
+ *     rows under one name.
  *
  * The second scan reads one file at a time, so it can only see what a reduced
  * series is CALLED. An alias is therefore part of the rule rather than a hole
@@ -56,6 +63,24 @@ const productionSources = Object.entries(allSources).filter(
 
 /** A count of historical rows taken by filtering a schedule. */
 const COUNT_BY_FILTER = /\.filter\([^\n]*isProjected[^\n]*\)\s*\.length/;
+
+/**
+ * A group's side of the history/projection line, computed from its members.
+ *
+ * The Debt Payoff Timeline collapsed its rows into calendar months and then
+ * asked `group.every((item) => item.isProjected)` which side the month was on.
+ * A weekly, biweekly or semi-monthly loan routinely has a real payment and a
+ * projected one in the same month, so the month was called historical while
+ * holding forecast principal and a forecast end-of-month balance -- and a loan
+ * paying off inside that month left no projected row at all, taking the "Today"
+ * divider and the Est. Payoff card with it (PR #1280 audit, F-1280-01).
+ *
+ * Provenance is part of an aggregation's IDENTITY: group on it, and the group's
+ * answer comes with every member. `.some` and `.filter` are left alone -- asking
+ * whether a series contains a projection, or reading the historical rows out of
+ * one, are ordinary questions about rows nothing has merged.
+ */
+const PROVENANCE_BY_EVERY = /\.every\([^\n]*isProjected[^\n]*\)/;
 
 /** Aggregating over a series -- as opposed to drawing it or looking a row up. */
 const MEASURED = ['length', 'reduce', 'filter', 'some', 'every', 'forEach', 'flatMap'];
@@ -110,6 +135,47 @@ describe('a chart reduction never reaches a figure (issue #1244)', () => {
         .map(({ number, line }) => `${path}:${number}: ${line.trim()}`),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it('never asks a group which side of the line it is on', () => {
+    const offenders = productionSources.flatMap(([path, content]) =>
+      withoutComments(content)
+        .split('\n')
+        .map((line, index) => ({ line, number: index + 1 }))
+        .filter(({ line }) => PROVENANCE_BY_EVERY.test(line))
+        .map(({ number, line }) => `${path}:${number}: ${line.trim()}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('detects a planted group-provenance derivation', () => {
+    // Negative control: without it, deleting the regex leaves the scan above
+    // passing over anything.
+    const planted = withoutComments(
+      [
+        '// isProjected: group.every((item) => item.isProjected),',
+        'isProjected: group.every((item) => item.isProjected),',
+        'const any = rows.some((row) => row.isProjected);',
+      ].join('\n'),
+    ).split('\n');
+    expect(PROVENANCE_BY_EVERY.test(planted[0])).toBe(false);
+    expect(PROVENANCE_BY_EVERY.test(planted[1])).toBe(true);
+    // A question about rows nothing merged is not the banned shape.
+    expect(PROVENANCE_BY_EVERY.test(planted[2])).toBe(false);
+  });
+
+  it('keys the Debt Payoff Timeline axes on the row identity, not the month', () => {
+    // Two rows share a month -- the one a real payment and a projected payment
+    // both fall in. Recharts keys its category axis, its tooltip lookup and
+    // every ReferenceLine on the datum's own value, so keyed on the month the
+    // two collapse onto one category and the "Today" divider lands on whichever
+    // came first. `axisKey` is the identity; `axisTickLabel` prints the month.
+    const report = withoutComments(
+      allSources['/src/components/reports/DebtPayoffTimelineReport.tsx'],
+    );
+    expect(report).not.toContain('dataKey="label"');
+    expect(report.match(/dataKey="axisKey"/g) ?? []).toHaveLength(3);
+    expect(report.match(/tickFormatter=\{axisTickLabel\}/g) ?? []).toHaveLength(3);
   });
 
   it('has both loan reports reading the shared count', () => {
