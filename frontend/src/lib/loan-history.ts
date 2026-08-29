@@ -279,6 +279,28 @@ export function deriveLoanPaymentHistory(
 }
 
 /**
+ * How many payments the borrower has actually made -- the count every surface
+ * that says "Payments Made" reports.
+ *
+ * It is the length of the derived event list and nothing else. The reports draw
+ * their curves from series that have been aggregated by month and then reduced
+ * to fit a chart axis, and counting either of those answers a question about
+ * pixels: the Debt Payoff Timeline counted retained chart samples, so a loan
+ * with three hundred payments reported about sixty (issue #1244). Monthly
+ * aggregation is wrong for the same reason one step earlier -- weekly and
+ * biweekly loans, extra principal payments, and two payments in one month all
+ * collapse into a single bucket.
+ *
+ * One line, exported, because it is the figure two reports must agree on: the
+ * Loan Amortization report lists one row per event and counts those rows, and a
+ * user opening both reports on the same loan is comparing two answers to one
+ * question.
+ */
+export function historicalPaymentCount(history: LoanHistoryResult): number {
+  return history.events.length;
+}
+
+/**
  * Debt owed for a signed account balance. Debt accounts store the balance
  * negative, so the outstanding amount is `-balance`, floored at zero so an
  * overpaid balance (in credit) reads as paid off rather than as fresh debt.
