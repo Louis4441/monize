@@ -50,7 +50,7 @@ export function buildPayoffComparisonSeries(
   baseline: LoanScheduleResult | null,
   scenario: LoanScheduleResult | null,
   original: LoanScheduleResult | null = null,
-): { points: PayoffChartPoint[]; projectionStartKey: string | null } {
+): { chartPoints: PayoffChartPoint[]; projectionStartKey: string | null } {
   const byMonth = new Map<string, PayoffChartPoint>();
 
   const setValue = (
@@ -168,7 +168,11 @@ export function buildPayoffComparisonSeries(
       Boolean(point.overpayment),
   });
 
-  return { points: chartPoints, projectionStartKey };
+  // Returned under the name it was BOUND to. Renaming it back to `points` on
+  // the way out is how a reduced series reaches a caller that cannot tell it
+  // from the full one -- and it puts the alias beyond the reach of the scan in
+  // chart-reduction.guard.test.ts, which reads one file at a time.
+  return { chartPoints, projectionStartKey };
 }
 
 interface PayoffComparisonChartProps {
@@ -199,18 +203,18 @@ export function PayoffComparisonChart({
   const { formatCurrencyCompact, formatCurrencyAxis } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const { points, projectionStartKey } = useMemo(
+  const { chartPoints, projectionStartKey } = useMemo(
     () => buildPayoffComparisonSeries(historyEvents, baseline, scenario, original),
     [historyEvents, baseline, scenario, original],
   );
 
   const chartData = useMemo(
     () =>
-      points.map((point) => ({
+      chartPoints.map((point) => ({
         ...point,
         label: formatChartDate(`${point.monthKey}-01`, 'MMM yyyy'),
       })),
-    [points, formatChartDate],
+    [chartPoints, formatChartDate],
   );
 
   const projectionStartLabel = projectionStartKey

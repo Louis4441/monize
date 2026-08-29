@@ -80,10 +80,13 @@ export function sampleStockSeries<T>(
  * history/projection line: one bar cannot honestly be half measured and half
  * predicted.
  *
- * Groups are sized so the result never exceeds `maxPoints`, boundaries
- * included -- a series with more boundary-delimited runs than the budget still
- * yields one bar per run, since merging across a boundary is the one thing this
- * may not do.
+ * The group size is `ceil(rows.length / maxPoints)`, so a series with no
+ * boundaries lands within the budget. Boundaries are the one thing that may
+ * push past it: each run is grouped from its own start, so the bound is
+ * `maxPoints + (runs - 1)` -- and a series with more runs than the budget
+ * yields one bar per run, because merging across a boundary is the one thing
+ * this may not do. Both reductions therefore hand back a budget, never a
+ * count.
  */
 export function bucketFlowSeries<T, R>(
   rows: readonly T[],

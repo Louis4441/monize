@@ -289,6 +289,10 @@ export function DebtPayoffTimelineReport() {
       else monthGroups.set(item.label, [item]);
     }
     const monthlySchedule: PayoffScheduleItem[] = [...monthGroups.values()].map((group) => {
+      // Spread the month's LAST entry: `balance` and the cumulative totals are
+      // end-of-month values, and `date` travels with them so every field on the
+      // row describes the same moment. (Nothing reads `date` today; the label is
+      // what the charts key on.)
       const last = group[group.length - 1];
       return {
         ...last,
@@ -362,7 +366,6 @@ export function DebtPayoffTimelineReport() {
     const projectedPayoffDate = projectionComplete ? lastItem.label : null;
     return {
       lastPaymentDate: lastItem.label,
-      paymentsMade,
       // Interest over the rows shown: a lifetime total only when the projection
       // completed, which is why the headline reads it through `hasLifetimeTotal`.
       totalInterest: lastItem.cumulativeInterest,
@@ -374,7 +377,7 @@ export function DebtPayoffTimelineReport() {
       hasProjection,
       projectedPayoffDate,
     };
-  }, [payoffSchedule, selectedAccount, projectionPaidOff, paymentsMade]);
+  }, [payoffSchedule, selectedAccount, projectionPaidOff]);
 
   // The interest figure's caption has to match what the figure is: history alone,
   // a lifetime estimate, or -- when the projection stopped at the horizon -- the
@@ -427,6 +430,17 @@ export function DebtPayoffTimelineReport() {
         { boundary: (item) => item.isProjected },
       ),
     [distributionMonths, t],
+  );
+
+  // The distribution chart's "Today" divider. It cannot reuse
+  // `projectionStartLabel`: that is a bare month, while a bucket spanning more
+  // than one month is labelled as a RANGE, so a recharts ReferenceLine keyed on
+  // the month matches no category on this axis and is silently not drawn --
+  // exactly on the long loans bucketing exists for. A bucket never straddles the
+  // boundary, so the first projected bucket's own label is the transition.
+  const distributionProjectionStartLabel = useMemo(
+    () => distributionData.find((bucket) => bucket.isProjected)?.label ?? null,
+    [distributionData],
   );
 
   const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string; dataKey: string }>; label?: string }) => {
@@ -794,9 +808,9 @@ export function DebtPayoffTimelineReport() {
                       fill={chartColors.warning}
                       name={t('debtPayoff.seriesInterest')}
                     />
-                    {projectionStartLabel && (
+                    {distributionProjectionStartLabel && (
                       <ReferenceLine
-                        x={projectionStartLabel}
+                        x={distributionProjectionStartLabel}
                         stroke={chartColors.axis}
                         strokeDasharray="4 4"
                         strokeWidth={2}

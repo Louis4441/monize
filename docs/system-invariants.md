@@ -679,9 +679,22 @@ Enforcement         One module: frontend/src/lib/chart-sampling.ts
                     and no reduced series measured (.length, .reduce, .filter,
                     .some, .every, .forEach, .flatMap) -- a lookup such as .find,
                     which a tooltip needs, is allowed because it cannot
-                    aggregate. The binding scan is pinned to an exact list, so a
+                    aggregate. The measurement scan reads one file at a time, so
+                    it can only see what a reduced series is CALLED: any name a
+                    reduced binding is ALIASED to in the same file
+                    (`return { points: chartPoints }`) is banned under the same
+                    rule, and a reduced series crossing a module boundary keeps
+                    its name so the consuming file is scanned for the name it
+                    uses. The binding scan is pinned to an exact list, so a
                     rename cannot silently make the measurement scan scan
-                    nothing, and it carries a planted-violation control.
+                    nothing, and both the alias rule and the measurement scan
+                    carry planted-violation controls.
+                    A marker drawn ON a reduced series is keyed to that series,
+                    not to the full one: a recharts ReferenceLine whose value
+                    matches no axis category is silently not drawn, so the
+                    Payment Distribution chart's "Today" divider comes from the
+                    first projected BUCKET's label -- the balance chart's bare
+                    month matches no bucketed range.
 Concurrency scope   -- (render path)
 Retry semantics     -- (render path)
 Crash semantics     -- (render path)
@@ -696,9 +709,20 @@ Required tests      Present: the source scans above; the unit matrix in
                     history while the chart is sampled, two payments in one month
                     counted as two, 26 biweekly payments counted as 26 rather
                     than 12, the distribution chart conserving every month's
-                    principal, and the history/projection transition surviving the
-                    stride. Each fails on the pre-fix component with the figures
-                    issue #1244 reports (61, 1, 12, half the money).
+                    principal, the distribution chart's "Today" marker naming a
+                    label its own axis has, and the history/projection transition
+                    surviving the stride. Each fails on the pre-fix component
+                    with the figures issue #1244 reports (61, 1, 12, half the
+                    money, a marker on a month no bucket is called).
+                    Each case waits on the COUNT rather than on the chart
+                    mounting: a loan carrying terms projects from its current
+                    balance alone, so the chart appears on a projection-only
+                    schedule one render before the transactions are adopted, and
+                    a test barrier that resolves there measures the wrong render.
+                    The recharts test mock serializes each chart's `data` and
+                    each ReferenceLine's `x`, since a mock that discards either
+                    cannot tell a sampled series from a full one, nor see a
+                    marker vanish.
 Status              enforced
 ```
 

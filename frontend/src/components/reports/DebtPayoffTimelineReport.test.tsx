@@ -48,7 +48,10 @@ vi.mock('recharts', () => ({
     return null;
   },
   Legend: () => null,
-  ReferenceLine: () => null,
+  // `x` is serialized: a ReferenceLine whose value matches no axis category is
+  // silently not drawn by recharts, so a mock that discards it cannot see the
+  // marker disappear.
+  ReferenceLine: ({ x }: any) => <div data-testid="reference-line" data-x={String(x)} />,
 }));
 
 const mockGetAllAccounts = vi.fn();
@@ -1091,6 +1094,21 @@ describe('DebtPayoffTimelineReport', () => {
     const chartRows = (testId: 'area-chart' | 'bar-chart') =>
       JSON.parse(screen.getByTestId(testId).getAttribute('data-rows') ?? '[]');
 
+    /**
+     * Render, and wait for the loan's HISTORY to be adopted -- which is what
+     * `expected` proves, since the count is derived from the events.
+     *
+     * Waiting on the chart mounting is not the same barrier: a loan carrying
+     * terms projects from its current balance alone, so the area chart appears
+     * on a projection-only schedule one render before the transactions are
+     * adopted. The wait is an assertion, so it cannot mask a failure -- a count
+     * that never arrives times out.
+     */
+    const renderAwaitingHistory = async (expected: string) => {
+      render(<DebtPayoffTimelineReport />);
+      await waitFor(() => expect(paymentsMade()).toBe(expected));
+    };
+
     const monthlyPayments = (count: number, amount = 100) =>
       Array.from({ length: count }, (_, i) => {
         const year = 2000 + Math.floor(i / 12);
@@ -1127,13 +1145,8 @@ describe('DebtPayoffTimelineReport', () => {
         pagination: { hasMore: false },
       });
 
-      render(<DebtPayoffTimelineReport />);
-      // The chart mounts only once the schedule has rows -- waiting on the
-      // static "Account Details" heading would assert against the render
-      // between the account arriving and its transactions being adopted.
-      await screen.findByTestId('area-chart');
+      await renderAwaitingHistory('300');
 
-      expect(paymentsMade()).toBe('300');
       // The reduction is still doing its job -- this is not "sampling removed".
       const drawn = chartRows('area-chart');
       expect(drawn.length).toBeLessThanOrEqual(61);
@@ -1151,13 +1164,8 @@ describe('DebtPayoffTimelineReport', () => {
         pagination: { hasMore: false },
       });
 
-      render(<DebtPayoffTimelineReport />);
-      // The chart mounts only once the schedule has rows -- waiting on the
-      // static "Account Details" heading would assert against the render
-      // between the account arriving and its transactions being adopted.
-      await screen.findByTestId('area-chart');
+      await renderAwaitingHistory('3');
 
-      expect(paymentsMade()).toBe('3');
       // One month, one point -- and the month's principal is all three payments.
       const drawn = chartRows('area-chart');
       expect(drawn).toHaveLength(1);
@@ -1179,13 +1187,8 @@ describe('DebtPayoffTimelineReport', () => {
       mockGetAllAccounts.mockResolvedValue(historyOnlyLoan(-400, -3000));
       mockGetAllTransactions.mockResolvedValue({ data: biweekly, pagination: { hasMore: false } });
 
-      render(<DebtPayoffTimelineReport />);
-      // The chart mounts only once the schedule has rows -- waiting on the
-      // static "Account Details" heading would assert against the render
-      // between the account arriving and its transactions being adopted.
-      await screen.findByTestId('area-chart');
+      await renderAwaitingHistory('26');
 
-      expect(paymentsMade()).toBe('26');
       expect(chartRows('area-chart').length).toBeLessThanOrEqual(12);
     });
 
@@ -1198,11 +1201,7 @@ describe('DebtPayoffTimelineReport', () => {
         pagination: { hasMore: false },
       });
 
-      render(<DebtPayoffTimelineReport />);
-      // The chart mounts only once the schedule has rows -- waiting on the
-      // static "Account Details" heading would assert against the render
-      // between the account arriving and its transactions being adopted.
-      await screen.findByTestId('area-chart');
+      await renderAwaitingHistory('120');
       fireEvent.click(screen.getByText('Principal vs Interest'));
 
       const bars = chartRows('bar-chart');
@@ -1223,11 +1222,7 @@ describe('DebtPayoffTimelineReport', () => {
         pagination: { hasMore: false },
       });
 
-      render(<DebtPayoffTimelineReport />);
-      // The chart mounts only once the schedule has rows -- waiting on the
-      // static "Account Details" heading would assert against the render
-      // between the account arriving and its transactions being adopted.
-      await screen.findByTestId('area-chart');
+      await renderAwaitingHistory('3');
       fireEvent.click(screen.getByText('Principal vs Interest'));
 
       const bars = chartRows('bar-chart');
@@ -1237,6 +1232,46 @@ describe('DebtPayoffTimelineReport', () => {
         'Feb 2000',
         'Mar 2000',
       ]);
+    });
+
+    it('marks today on the distribution chart with a label that axis has', async () => {
+      // A bucketed bar is labelled as a RANGE, so the balance chart's bare
+      // "Sep 2026" matches no category here and recharts draws nothing --
+      // silently, on exactly the long loans bucketing exists for, under a
+      // caption that still says the dashed line marks today.
+      mockGetAllAccounts.mockResolvedValue([{
+        id: 'loan-1',
+        name: 'Long Mortgage',
+        accountType: 'MORTGAGE',
+        currentBalance: -5000,
+        openingBalance: -17000,
+        interestRate: 5.0,
+        paymentAmount: 200,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      }]);
+      mockGetAllTransactions.mockResolvedValue({
+        data: monthlyPayments(120),
+        pagination: { hasMore: false },
+      });
+
+      await renderAwaitingHistory('120');
+      fireEvent.click(screen.getByText('Principal vs Interest'));
+
+      const bars: Array<{ label: string; isProjected: boolean }> = chartRows('bar-chart');
+      // Long enough to bucket, and carrying both sides of the transition.
+      expect(bars.some((bar) => bar.label.includes('\u2013'))).toBe(true);
+      expect(bars.some((bar) => bar.isProjected)).toBe(true);
+
+      const markers = screen.getAllByTestId('reference-line');
+      expect(markers).toHaveLength(1);
+      const markerX = markers[0].getAttribute('data-x');
+      // The value has to BE an axis category, or the marker is not drawn.
+      expect(bars.map((bar) => bar.label)).toContain(markerX);
+      // And it is the transition: the first bucket on the projected side.
+      expect(bars.find((bar) => bar.isProjected)?.label).toBe(markerX);
     });
 
     it('draws the projection marker on the real transition month', async () => {
@@ -1260,11 +1295,7 @@ describe('DebtPayoffTimelineReport', () => {
         pagination: { hasMore: false },
       });
 
-      render(<DebtPayoffTimelineReport />);
-      // The chart mounts only once the schedule has rows -- waiting on the
-      // static "Account Details" heading would assert against the render
-      // between the account arriving and its transactions being adopted.
-      await screen.findByTestId('area-chart');
+      await renderAwaitingHistory('300');
 
       const drawn: Array<{ isProjected: boolean }> = chartRows('area-chart');
       const firstProjected = drawn.findIndex((row) => row.isProjected);
@@ -1272,7 +1303,6 @@ describe('DebtPayoffTimelineReport', () => {
       // The two rows either side of the transition are adjacent in the drawn
       // series, so the "Today" line and the area join sit on the real boundary.
       expect(drawn[firstProjected - 1].isProjected).toBe(false);
-      expect(paymentsMade()).toBe('300');
     });
   });
 });

@@ -17,6 +17,15 @@ import { describe, it, expect } from 'vitest';
  *     looked up in (a tooltip finding the row it hovers), but never MEASURED:
  *     a `.length`, `.reduce`, `.filter`, `.some`, `.every` or `.forEach` over a
  *     reduced series answers a question about pixels.
+ *
+ * The second scan reads one file at a time, so it can only see what a reduced
+ * series is CALLED. An alias is therefore part of the rule rather than a hole
+ * in it: a builder returning `{ points: chartPoints }` hands its caller a
+ * reduced series under the name the unreduced one had, which is the same
+ * conflation in a different place. Any name a reduced binding is aliased to,
+ * inside the same file, is measured under the same ban -- and where a reduced
+ * series crosses a module boundary it keeps its name, so the file that consumes
+ * it is scanned for the name it actually uses.
  */
 const allSources = import.meta.glob('/src/**/*.{ts,tsx}', {
   query: '?raw',
@@ -51,11 +60,23 @@ const COUNT_BY_FILTER = /\.filter\([^\n]*isProjected[^\n]*\)\s*\.length/;
 /** Aggregating over a series -- as opposed to drawing it or looking a row up. */
 const MEASURED = ['length', 'reduce', 'filter', 'some', 'every', 'forEach', 'flatMap'];
 
-/** Names bound to the result of a chart reduction, in one file. */
-function reducedSeriesNames(source: string): string[] {
+/** Names bound directly to the result of a chart reduction, in one file. */
+function reducedSeriesBindings(source: string): string[] {
   const binding =
     /(?:const|let)\s+(\w+)\s*=\s*(?:useMemo\(\s*\(\)\s*=>\s*)?(?:sampleStockSeries|bucketFlowSeries)\(/g;
   return [...source.matchAll(binding)].map((match) => match[1]);
+}
+
+/**
+ * Those names plus any object field one of them is aliased to in the same file
+ * (`return { points: chartPoints }`), since the alias is what a caller reads.
+ */
+function reducedSeriesNames(source: string): string[] {
+  const bound = reducedSeriesBindings(source);
+  const aliases = bound.flatMap((name) => [
+    ...source.matchAll(new RegExp(`(\\w+)\\s*:\\s*${name}\\b`, 'g')),
+  ].map((match) => match[1]));
+  return [...new Set([...bound, ...aliases])];
 }
 
 describe('a chart reduction never reaches a figure (issue #1244)', () => {
@@ -106,10 +127,11 @@ describe('a chart reduction never reaches a figure (issue #1244)', () => {
     // Positive control: a rename or a deleted call site must not quietly make
     // the measurement scan below scan nothing.
     const bound = productionSources.flatMap(([path, content]) =>
-      reducedSeriesNames(withoutComments(content)).map((name) => `${path}: ${name}`),
+      reducedSeriesBindings(withoutComments(content)).map((name) => `${path}: ${name}`),
     );
     expect(bound).toEqual([
       '/src/components/accounts/loan-detail/PayoffComparisonChart.tsx: chartPoints',
+      '/src/components/accounts/loan-detail/ScenarioComparisonChart.tsx: indices',
       '/src/components/reports/DebtPayoffTimelineReport.tsx: chartSchedule',
       '/src/components/reports/DebtPayoffTimelineReport.tsx: distributionData',
     ]);
@@ -130,6 +152,22 @@ describe('a chart reduction never reaches a figure (issue #1244)', () => {
         .map(({ number, line }) => `${path}:${number}: ${line.trim()}`);
     });
     expect(offenders).toEqual([]);
+  });
+
+  it('measures an aliased reduced series under the same ban', () => {
+    // `buildPayoffComparisonSeries` returned `{ points: chartPoints }` for one
+    // commit, which put the caller's `points.length` beyond this scan.
+    const planted = withoutComments(
+      [
+        'const chartRows = sampleStockSeries(rows);',
+        'return { points: chartRows };',
+        'const n = points.length;',
+      ].join('\n'),
+    );
+    const names = reducedSeriesNames(planted);
+    expect(names).toEqual(['chartRows', 'points']);
+    const measured = new RegExp(`\\b(${names.join('|')})\\s*\\.\\s*(${MEASURED.join('|')})\\b`);
+    expect(planted.split('\n').some((line) => measured.test(line))).toBe(true);
   });
 
   it('detects a planted measurement', () => {

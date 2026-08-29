@@ -567,13 +567,22 @@ own events, and two payments in one month are two. The count is
 `historicalPaymentCount(history)` (`lib/loan-history.ts`), read by both loan
 reports so one loan cannot have two answers.
 
+**A marker drawn on a reduced series is keyed to that series.** A recharts
+`ReferenceLine` whose value matches no axis category is silently not drawn, so
+the Payment Distribution chart's "Today" divider comes from the first projected
+*bucket's* label -- the balance chart's bare month matches no bucketed range,
+and the divider disappears on exactly the long loans bucketing exists for.
+
 Assigning a reduced series back over its source (`points = points.filter(...)`)
 is how this happens -- once the two are one variable, nothing downstream can
-tell which it holds. `lib/chart-reduction.guard.test.ts` scans for a count taken
-by filtering a schedule on `isProjected`, for both reports reading the shared
-count, and for any reduced series being *measured* (`.length`, `.reduce`,
-`.filter`, `.some`, `.every`, `.forEach`); a `.find` for the row a tooltip
-hovers is allowed, because a lookup cannot aggregate. INV-REPORT-002.
+tell which it holds. So is renaming it on the way out
+(`return { points: chartPoints }`), which hands a caller the reduced series
+under the full one's name. `lib/chart-reduction.guard.test.ts` scans for a count
+taken by filtering a schedule on `isProjected`, for both reports reading the
+shared count, and for any reduced series -- or any name one is aliased to in the
+same file -- being *measured* (`.length`, `.reduce`, `.filter`, `.some`,
+`.every`, `.forEach`); a `.find` for the row a tooltip hovers is allowed,
+because a lookup cannot aggregate. INV-REPORT-002.
 
 ### An unknown value must not render as a measured zero
 
