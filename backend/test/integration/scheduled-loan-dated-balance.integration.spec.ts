@@ -225,10 +225,11 @@ describe("Scheduled loan dated ledger balance (integration)", () => {
       service.resolvePostingAllocation(scheduled!, splits, "2026-08-01"),
     );
 
-    expect(allocation).not.toBeNull();
-    expect(allocation!.amountsBySplitId.get(interestSplitId)).toBe(-990);
-    expect(allocation!.amountsBySplitId.get(principalSplitId)).toBe(-510);
-    expect(allocation!.parentAmount).toBe(-1500);
+    expect(allocation.kind).toBe("allocation");
+    if (allocation.kind !== "allocation") throw new Error("unreachable");
+    expect(allocation.amountsBySplitId.get(interestSplitId)).toBe(-990);
+    expect(allocation.amountsBySplitId.get(principalSplitId)).toBe(-510);
+    expect(allocation.parentAmount).toBe(-1500);
   });
 
   it("anchors the amortization projection on the schedule's due date and its debt", async () => {

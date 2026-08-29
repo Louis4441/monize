@@ -1559,10 +1559,15 @@ describe("ScheduledTransactionLoanService", () => {
         expect.stringContaining("t.transaction_date <= $3"),
         [loanAccountId, userId, "2026-06-01"],
       );
-      expect(result).not.toBeNull();
-      expect(result!.amountsBySplitId.get("split-interest")).toBe(-992.5);
-      expect(result!.amountsBySplitId.get("split-principal")).toBe(-507.5);
-      expect(result!.parentAmount).toBe(-1500);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-interest")).toBe(-992.5);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-principal")).toBe(-507.5);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.parentAmount).toBe(-1500);
     });
 
     it("resolves to exactly the persisted amounts when nothing moved in between", async () => {
@@ -1584,9 +1589,15 @@ describe("ScheduledTransactionLoanService", () => {
         "2026-06-01",
       );
 
-      expect(result!.amountsBySplitId.get("split-interest")).toBe(-1000);
-      expect(result!.amountsBySplitId.get("split-principal")).toBe(-500);
-      expect(result!.parentAmount).toBe(-1500);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-interest")).toBe(-1000);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-principal")).toBe(-500);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.parentAmount).toBe(-1500);
     });
 
     it("writes nothing while resolving", async () => {
@@ -1623,7 +1634,7 @@ describe("ScheduledTransactionLoanService", () => {
         "2026-06-01",
       );
 
-      expect(result).toBeNull();
+      expect(result.kind).toBe("not-applicable");
     });
 
     it("returns null for a template shape the recalculation would decline", async () => {
@@ -1650,7 +1661,7 @@ describe("ScheduledTransactionLoanService", () => {
         "2026-06-01",
       );
 
-      expect(result).toBeNull();
+      expect(result.kind).toBe("not-applicable");
     });
 
     it("re-divides the bill it was shown and never resizes it", async () => {
@@ -1674,9 +1685,15 @@ describe("ScheduledTransactionLoanService", () => {
         "2026-06-01",
       );
 
-      expect(result!.parentAmount).toBe(-1500);
-      expect(result!.amountsBySplitId.get("split-interest")).toBe(-1000);
-      expect(result!.amountsBySplitId.get("split-principal")).toBe(-500);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.parentAmount).toBe(-1500);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-interest")).toBe(-1000);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-principal")).toBe(-500);
     });
 
     it("refuses rather than posting a stale split when the ledger cannot be read", async () => {
@@ -1696,7 +1713,11 @@ describe("ScheduledTransactionLoanService", () => {
       ).rejects.toThrow(/could not be read/i);
     });
 
-    it("returns null when the debt through the boundary is already retired", async () => {
+    it("reports a retired debt as retired, not as 'not a loan template'", async () => {
+      // These are different instructions and the caller acts on them
+      // differently. Collapsed into one answer, the posting read "not a loan
+      // template" as "use the persisted amounts" and charged the whole stale
+      // installment against a debt that no longer exists.
       accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
       manager.query.mockResolvedValue([{ balance: "0" }]);
 
@@ -1706,7 +1727,34 @@ describe("ScheduledTransactionLoanService", () => {
         "2026-06-01",
       );
 
-      expect(result).toBeNull();
+      expect(result.kind).toBe("retired");
+    });
+
+    it("does not call a retired escrow-carrying template retired", async () => {
+      // The payoff settles the mortgage principal; the escrow line is still
+      // owed. Reporting "retired" here would make the posting withhold a
+      // payment the user genuinely has to make.
+      accountsRepository.findOne.mockResolvedValue(
+        makeLoanAccount({ interestCategoryId: "cat-interest" }),
+      );
+      manager.query.mockResolvedValue([{ balance: "0" }]);
+
+      const result = await service.resolvePostingAllocation(
+        makeScheduledTransaction({ amount: -1700 }),
+        [
+          ...templateSplits(),
+          {
+            id: "split-escrow",
+            transferAccountId: null,
+            categoryId: "cat-escrow",
+            amount: -200,
+            memo: "Property tax",
+          } as unknown as ScheduledTransactionSplit,
+        ],
+        "2026-06-01",
+      );
+
+      expect(result.kind).toBe("not-applicable");
     });
 
     it("resolves the extra-principal line alongside principal and interest", async () => {
@@ -1752,10 +1800,18 @@ describe("ScheduledTransactionLoanService", () => {
         "2026-06-01",
       );
 
-      expect(result!.amountsBySplitId.get("split-interest")).toBe(-100);
-      expect(result!.amountsBySplitId.get("split-principal")).toBe(-600);
-      expect(result!.amountsBySplitId.get("split-extra")).toBe(-300);
-      expect(result!.parentAmount).toBe(-1000);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-interest")).toBe(-100);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-principal")).toBe(-600);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.amountsBySplitId.get("split-extra")).toBe(-300);
+      expect(result.kind).toBe("allocation");
+      if (result.kind !== "allocation") throw new Error("unreachable");
+      expect(result.parentAmount).toBe(-1000);
     });
   });
 

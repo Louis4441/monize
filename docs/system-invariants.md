@@ -997,8 +997,6 @@ Enforcement         ScheduledTransactionLoanService.resolveInstallment is the
                     LEDGER_MOVEMENT_PREDICATE (common/ledger-balance.sql.ts),
                     shared by every balance reader so the bill's debt and the
                     report's balance cannot disagree about which rows count.
-Concurrency scope   The scheduled transaction's pessimistic parent lock, shared
-                    by the posting path and the recalculation.
 Failure response    A template shape the resolver cannot account for (an
                     escrow line, no identifiable interest line) declines: the
                     posting proceeds on the persisted amounts and the
@@ -1017,6 +1015,32 @@ Required tests      Present: scheduled-transaction-loan.service.spec.ts (prior
                     A LINE OF CREDIT is exempt from the paid-off deactivation:
                     it is revolving, so owing nothing this period does not
                     finish it.
+                    A retired debt posts NO money -- LoanPostingDecision keeps
+                    "nothing to price here" and "the price is zero" apart,
+                    because collapsing both into null is how a paid-off loan
+                    went on charging its whole stale installment. The debt
+                    check runs after the template shape is resolved so a bill
+                    carrying a line the payoff does not settle (escrow, tax,
+                    insurance) still posts.
+Concurrency scope   The scheduled transaction's pessimistic parent lock for the
+                    template and the occurrence claim; and, for the debt
+                    itself, lockAccountsForBalanceWrite on the source and loan
+                    accounts, taken before the ledger read and held to commit
+                    (CONC-001 -- the schedule row lock serializes no ledger
+                    writer, so it cannot protect an aggregate over
+                    transactions). Proven by
+                    scheduled-loan-pricing-concurrency.integration.spec.ts
+                    (two real connections) plus pricing-lock.guard.spec.ts,
+                    which is what ties the protocol to the posting path the
+                    integration harness cannot construct.
+Scope               MANAGED templates: a principal transfer, one identifiable
+                    interest line, optionally an extra-principal transfer. Any
+                    other line and the resolver declines rather than rewriting
+                    what it cannot account for, so such a bill keeps last
+                    period's split. That is a deliberate fail-safe, not
+                    coverage -- an escrow/tax/insurance template is outside
+                    this invariant until the parent total's non-P/I lines have
+                    a defined share.
 Known gaps          The PAYMENT is not part of this invariant: a rate change
                     reaches the schedule's payment through
                     LoanRateChangesService.syncScheduledTransaction, which the

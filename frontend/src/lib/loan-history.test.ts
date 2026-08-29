@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildLoanProjectionInput,
   deriveLoanPaymentHistory,
@@ -725,6 +725,18 @@ describe('buildLoanProjectionInput seed payment', () => {
 });
 
 describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', () => {
+  // These cases are about an anchor's position relative to TODAY -- an overdue
+  // one is refused -- so the clock is pinned rather than read. Without this the
+  // suite passes until the fixture dates drift into the past and then fails
+  // with nothing changed.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-01T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const account = (overrides: Partial<Account> = {}) =>
     makeAccount({
       accountType: 'LOAN',
@@ -785,6 +797,47 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
     expect(ymd(anchored!.firstPaymentDate)).toBe(
       ymd(unanchored!.firstPaymentDate),
     );
+  });
+
+  it('refuses an overdue anchor rather than projecting through later real activity', () => {
+    // Today is 2026-07-01 (pinned). The schedule is overdue: its next due date
+    // is 2026-06-01 and the debt through THAT date is 100,000. Since then the
+    // borrower made a real 20,000 principal payment, so they stand at 80,000.
+    //
+    // Seeding the projection at 100,000 would price every future installment
+    // against a balance that never saw the repayment -- and the generated rows
+    // would be dated before the real 2026-06-15 row they are appended after.
+    const acct = account({ currentBalance: -80000, openingBalance: -100000 });
+    const hist = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2026-06-15', amount: 20000 }),
+    ]);
+
+    const overdue = buildLoanProjectionInput(acct, hist, [], {
+      nextDueDate: '2026-06-01',
+      debt: 100000,
+    });
+    const unanchored = buildLoanProjectionInput(acct, hist);
+
+    expect(overdue).not.toBeNull();
+    // It projects from where the borrower actually stands, not from the
+    // pre-repayment balance the overdue boundary measured.
+    expect(overdue!.startingBalance).toBe(80000);
+    expect(overdue!.startingBalance).toBe(unanchored!.startingBalance);
+    expect(overdue!.firstPaymentDate.getTime()).toBe(
+      unanchored!.firstPaymentDate.getTime(),
+    );
+  });
+
+  it('still anchors a due-today installment', () => {
+    // The boundary is refused only when it is BEHIND today; an installment due
+    // today is the next bill and anchors normally.
+    const acct = account();
+    const input = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: '2026-07-01',
+      debt: 198500,
+    });
+
+    expect(input!.startingBalance).toBe(198500);
   });
 
   it('refuses the projection when the debt through the due date is already retired', () => {

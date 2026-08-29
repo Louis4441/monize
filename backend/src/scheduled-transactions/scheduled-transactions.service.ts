@@ -59,6 +59,7 @@ import {
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { lockAccountsForBalanceWrite } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
 import { affectedRowCount } from "../common/db/query-result";
 import { validateSplitAmountSum } from "../common/split-amount.util";
@@ -2940,6 +2941,11 @@ export class ScheduledTransactionsService {
     // a correctness bug -- rollback still unwinds cleanly -- and is tracked as a
     // follow-up rather than reshaped here.
     let writtenTransfer: { savedFromId: string; savedToId: string } | undefined;
+    // A managed loan bill whose debt is already retired posts NO money. The
+    // occurrence is still claimed and the schedule still advances, so nothing
+    // retries it; the post-commit recalculation then deactivates the schedule
+    // (a revolving line of credit stays active, since it can be drawn again).
+    let skipFinancialWrite = false;
     const removedAfterOnce = await withScopedDb(this.dataSource, async (m) => {
       // Lock the schedule and confirm this occurrence is still the due one. A
       // poster that lost the race finds next_due_date already advanced.
@@ -3078,13 +3084,28 @@ export class ScheduledTransactionsService {
           // The boundary is the date this occurrence's money actually moves --
           // `postDate`, which an override can move off the recurrence slot --
           // because that is the date the interest accrues to.
+          // Held from here until commit, so the debt this prices cannot move
+          // underneath it.
+          await this.lockLoanLedgerForPricing(
+            m,
+            userId,
+            current.accountId,
+            currentSplits,
+          );
           const loanAllocation =
             await this.loanService.resolvePostingAllocation(
               current,
               currentSplits,
               postDate,
             );
-          if (loanAllocation) {
+          if (loanAllocation.kind === "retired") {
+            // Nothing is owed through this occurrence's boundary, and every
+            // line of this bill is one the payoff settles. Consume the
+            // occurrence without moving money: charging the stale installment
+            // would record interest against a debt that no longer exists and
+            // push the loan into credit.
+            skipFinancialWrite = true;
+          } else if (loanAllocation.kind === "allocation") {
             // The payload rows were mapped 1:1 (in order) from the pre-lock
             // scheduled.splits, which the basis guard above just proved
             // identical to the locked set -- so the source split id addresses
@@ -3164,13 +3185,21 @@ export class ScheduledTransactionsService {
             );
           });
         if (isUnchangedEcho) {
+          await this.lockLoanLedgerForPricing(
+            m,
+            userId,
+            current.accountId,
+            lockedSplits,
+          );
           const loanAllocation =
             await this.loanService.resolvePostingAllocation(
               current,
               lockedSplits,
               postDate,
             );
-          if (loanAllocation) {
+          if (loanAllocation.kind === "retired") {
+            skipFinancialWrite = true;
+          } else if (loanAllocation.kind === "allocation") {
             transactionPayload.splits = rows.map((row, index) => {
               const sourceId = postDto?.splits?.[index]?.sourceSplitId;
               const resolved = sourceId
@@ -3230,8 +3259,14 @@ export class ScheduledTransactionsService {
           preparedTransfer,
           m,
         );
-      } else {
+      } else if (!skipFinancialWrite) {
         await this.transactionsService.create(userId, transactionPayload);
+      } else {
+        this.logger.log(
+          `Scheduled loan payment ${id} posted no money: the loan owes nothing ` +
+            `through ${postDate}. The occurrence is consumed so it is not retried; ` +
+            `the schedule deactivates unless it is a revolving line of credit.`,
+        );
       }
 
       if (lockedOverride) {
@@ -3317,6 +3352,44 @@ export class ScheduledTransactionsService {
     }
 
     return this.findOne(userId, id);
+  }
+
+  /**
+   * Serialize this posting against anyone else moving the loan's ledger.
+   *
+   * The occurrence's interest is `debt(d) x rate`, and that debt is read from
+   * the `transactions` table. The schedule row lock does not protect it: no
+   * ledger writer takes that lock, so under READ COMMITTED a principal payment
+   * can commit between this posting's debt `SELECT` and its own write, and the
+   * split would be priced from a balance that was already stale when it was
+   * written (`CONC-001`: a financial input is read under the lock that
+   * authorizes the write, not merely inside the same transaction).
+   *
+   * `lockAccountsForBalanceWrite` is the existing primitive for exactly this --
+   * every balance writer already takes it, so holding it from before the read
+   * until commit forces a concurrent ledger write to queue behind this posting
+   * rather than slip inside it. Both accounts are locked because both move:
+   * the source pays and the loan receives. The primitive sorts, which is what
+   * keeps two postings over the same pair deadlock-free.
+   *
+   * Returns the loan account id when there is one, so the caller can tell a
+   * loan template from an ordinary split without asking again.
+   */
+  private async lockLoanLedgerForPricing(
+    m: EntityManager,
+    userId: string,
+    sourceAccountId: string,
+    splits: ScheduledTransactionSplit[],
+  ): Promise<string | null> {
+    const loanAccountId =
+      await this.loanService.findLoanAccountFromSplits(splits);
+    if (!loanAccountId) return null;
+    await lockAccountsForBalanceWrite(
+      m,
+      [sourceAccountId, loanAccountId],
+      userId,
+    );
+    return loanAccountId;
   }
 
   private async postInvestment(

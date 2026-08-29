@@ -389,6 +389,24 @@ function usableProjectionAnchor(
   anchor: LoanProjectionAnchor | null | undefined,
 ): UsableProjectionAnchor | null {
   if (!anchor || anchor.nextDueDate == null || anchor.debt == null) return null;
+  // An OVERDUE anchor is refused, and the projection falls back to today.
+  //
+  // The anchor's debt is measured through the installment's own date. That is
+  // exactly right while the date is ahead of us, and wrong the moment it is
+  // behind: everything the ledger did *after* that date -- a repayment, a
+  // draw, a rate change -- is real, is already on screen in the history, and
+  // is invisible to a projection seeded from the older balance. The generated
+  // rows would also be dated before history rows they are appended after, so
+  // the schedule reads out of order.
+  //
+  // Reconciling an overdue schedule properly means replaying each missed
+  // occurrence against the events that followed it, which is a product
+  // decision about what an overdue bill even means -- not something to infer
+  // here. Until then the honest answer is the one that predates the anchor:
+  // project from where the borrower stands today. The first row then no longer
+  // matches the overdue bill, which is a visible imprecision rather than a
+  // confidently wrong balance path.
+  if (anchor.nextDueDate < new Date().toISOString().slice(0, 10)) return null;
   return { nextDueDate: anchor.nextDueDate, debt: anchor.debt };
 }
 

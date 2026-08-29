@@ -65,7 +65,20 @@ type ResolvedInstallment =
   | { kind: "declined"; reason: string }
   /** The ledger could not be read -- not a zero balance, and not "not a loan". */
   | { kind: "unreadable"; reason: string }
-  | { kind: "paid-off"; debt: number }
+  | {
+      kind: "paid-off";
+      debt: number;
+      /**
+       * Whether the template is one this service manages (principal transfer +
+       * one identifiable interest line, optionally an extra-principal
+       * transfer). A retired debt is only a reason to withhold an occurrence's
+       * money when every line of the bill is one of those: a mortgage template
+       * carrying an escrow, tax or insurance line still owes those lines when
+       * the mortgage principal reaches zero, and skipping the write would
+       * silently stop paying them.
+       */
+      managed: boolean;
+    }
   | {
       kind: "ok";
       allocation: LoanPaymentAllocation;
@@ -89,6 +102,24 @@ export interface LoanPostingAllocation {
   /** Signed parent amount matching the sum of the managed children. */
   parentAmount: number;
 }
+
+/**
+ * What a posting should do with a loan template.
+ *
+ * Three answers, not two. Collapsing `retired` into "not applicable" is how a
+ * fully paid-off loan went on charging its whole stale installment: the posting
+ * read `null` as "this is not a managed loan template, use the persisted
+ * amounts" and wrote the last bill it happened to hold -- interest against a
+ * debt that no longer exists, and principal that pushes the account into
+ * credit. "There is nothing to price here" and "the price is zero" are
+ * different instructions.
+ */
+export type LoanPostingDecision =
+  /** Not a managed loan template -- post the persisted amounts, as before. */
+  | { kind: "not-applicable" }
+  /** A managed template whose debt is already retired: post no money. */
+  | { kind: "retired" }
+  | ({ kind: "allocation" } & LoanPostingAllocation);
 
 @Injectable()
 export class ScheduledTransactionLoanService {
@@ -296,11 +327,11 @@ export class ScheduledTransactionLoanService {
     scheduledTransaction: ScheduledTransaction,
     splits: ScheduledTransactionSplit[],
     asOfDate: string,
-  ): Promise<LoanPostingAllocation | null> {
+  ): Promise<LoanPostingDecision> {
     return withScopedDb(this.dataSource, async (m) => {
       const loanAccount = await this.findLoanAccount(m, splits);
       if (!loanAccount) {
-        return null;
+        return { kind: "not-applicable" } as const;
       }
 
       const installment = await this.resolveInstallment(
@@ -311,6 +342,14 @@ export class ScheduledTransactionLoanService {
         asOfDate,
         "posting",
       );
+      if (installment.kind === "paid-off") {
+        // Only a template whose every line this service accounts for. An
+        // escrow or tax line is still owed when the mortgage principal reaches
+        // zero, so that bill posts as it always has.
+        return installment.managed
+          ? ({ kind: "retired" } as const)
+          : ({ kind: "not-applicable" } as const);
+      }
       if (installment.kind === "unreadable") {
         throw new ServiceUnavailableException(
           tr(
@@ -320,7 +359,7 @@ export class ScheduledTransactionLoanService {
         );
       }
       if (installment.kind !== "ok") {
-        return null;
+        return { kind: "not-applicable" } as const;
       }
 
       const { allocation, template } = installment;
@@ -337,7 +376,11 @@ export class ScheduledTransactionLoanService {
           -allocation.extraPrincipal,
         );
       }
-      return { amountsBySplitId, parentAmount: -allocation.total };
+      return {
+        kind: "allocation" as const,
+        amountsBySplitId,
+        parentAmount: -allocation.total,
+      };
     });
   }
 
@@ -348,13 +391,10 @@ export class ScheduledTransactionLoanService {
    * interest is calculated from, so the two price the same BALANCE (issue
    * #1253).
    *
-   * The balance is what this closes, and it is the whole claim: the two still
-   * read the RATE from different places -- this service prices at
-   * `accounts.interest_rate` while the report prices at the rate timeline,
-   * which a rate change recorded through the rate-history UI deliberately
-   * does not write back. For a loan with recorded rate changes the two figures
-   * can therefore still differ; that gap is recorded against INV-LOAN-006 and
-   * is not fixed here.
+   * The RATE is shared too: `datedAnnualRate` resolves it from the same
+   * `loan_rate_changes` timeline the report reads, against a truth table both
+   * layers assert. Neither input is the account's scalar unless the timeline
+   * says nothing.
    *
    * `nextDueDate`/`debt` are null when the loan has no active scheduled payment
    * transferring to it; a projection then has no bill to be in parity with and
@@ -576,10 +616,6 @@ export class ScheduledTransactionLoanService {
       };
     }
 
-    if (debt <= 0.01) {
-      return { kind: "paid-off", debt };
-    }
-
     const templateAmount = Math.abs(Number(scheduledTransaction.amount));
     const interestRate = await this.datedAnnualRate(m, loanAccount, asOfDate);
     const frequency = (loanAccount.paymentFrequency ||
@@ -635,7 +671,18 @@ export class ScheduledTransactionLoanService {
         s !== principalSplit &&
         s !== extraPrincipalSplit,
     );
-    if (!interestSplit || unmanagedLines.length > 0) {
+    const managed = !!interestSplit && unmanagedLines.length === 0;
+
+    // The debt is checked AFTER the shape, so "paid off" can say whether this
+    // is a bill whose every line the payoff settles. The order is the whole
+    // point: read the other way round, a mortgage template with an escrow line
+    // reports the same "paid off" as a plain principal+interest one, and a
+    // posting that withholds money on it stops paying the escrow.
+    if (debt <= 0.01) {
+      return { kind: "paid-off", debt, managed };
+    }
+
+    if (!managed) {
       return {
         kind: "declined",
         reason: interestSplit

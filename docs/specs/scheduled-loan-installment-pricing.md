@@ -81,6 +81,19 @@ The posting boundary is the date the occurrence's money actually moves --
 `postDate`, which an override can move off the recurrence slot -- because that
 is the date interest accrues to.
 
+The debt is read under the lock that authorizes the write, not merely inside
+the same transaction (`CONC-001`). The scheduled-transaction row lock does not
+serialize this: no ledger writer takes it, so a principal payment could commit
+between the debt `SELECT` and the posting's own write and the split would be
+priced from a balance already stale when it was written. The posting therefore
+takes `lockAccountsForBalanceWrite` on the source and loan accounts before it
+prices and holds it to commit -- the primitive every balance writer already
+takes, which is what makes a concurrent ledger write queue behind it.
+`scheduled-loan-pricing-concurrency.integration.spec.ts` proves the protocol
+with two real connections; `pricing-lock.guard.spec.ts` proves the posting
+takes it, because the integration harness stubs the scheduled module and cannot
+construct the real `post()`.
+
 The posting-boundary resolution is what makes the stored split safely a
 **template**: a principal-only payment, void, delete or import committed
 between occurrences changes what the next posting writes without any of those
@@ -122,14 +135,32 @@ same waterfall), so the common case is byte-identical.
   endpoint answers an error rather than the `{null, null}` the report reads as
   "no scheduled payment, project from today".
 
-- **A debt already retired through the boundary** resolves nothing: the
-  posting proceeds unchanged, and the recalculation deactivates the
-  schedule -- except for a LINE OF CREDIT, which is revolving. A facility at a
-  zero or credit balance is not a finished loan; the user can draw on it again
-  tomorrow, and deactivating its schedule is not recoverable from the UI. This
-  matters since the debt became `max(0, -balance)`: an overpaid account in
-  credit now reads as owing nothing, where the old `Math.abs` read a credit
-  balance as fresh debt and kept amortizing it.
+- **A debt already retired through the boundary posts NO money** -- for a
+  template whose every line the payoff settles. The occurrence is still claimed
+  and the schedule still advances, so nothing retries it; the recalculation
+  then deactivates the schedule. Withholding the write is the point: the stale
+  template still says 1,500, and charging it would record interest against a
+  debt that no longer exists and push the loan into credit.
+
+  Two carve-outs, and both matter:
+
+  - **A template carrying a line the payoff does not settle still posts.** The
+    debt check therefore runs *after* the shape is resolved, so it can say
+    whether this is a bill this service accounts for end to end. Read the other
+    way round, a mortgage template with an escrow, tax or insurance line
+    reports the same "paid off" as a plain principal + interest one, and
+    withholding its money silently stops paying the escrow.
+  - **A LINE OF CREDIT stays active.** It is revolving: a facility at a zero or
+    credit balance is not a finished loan, the user can draw on it again
+    tomorrow, and deactivating its schedule is not recoverable from the UI.
+    This matters since the debt became `max(0, -balance)`: an overpaid account
+    in credit now reads as owing nothing, where the old `Math.abs` read a
+    credit balance as fresh debt and kept amortizing it.
+
+  `LoanPostingDecision` is what keeps this straight. "There is nothing to price
+  here" and "the price is zero" are different instructions, and collapsing both
+  into `null` is precisely how the retired case went on charging its whole
+  stale installment.
 - **FX schedules, transfers and investments** do not carry the loan template
   shape and never reach the resolver.
 
@@ -155,11 +186,29 @@ payment by their decision. Interest is unaffected -- it is debt x rate.
 
 Both fields null means the loan has no active scheduled payment; there is no
 bill to be in parity with, and the projection keeps its today-anchored
-fallback (`advanceDate(today)` against `history.currentBalance`). The other
-projection surfaces (loan detail payoff, Debt Payoff Timeline, Overpayment
-Simulator) deliberately keep that today-anchored semantics -- they project "if
-you keep paying from where you stand today" and print no per-installment
-parity claim against the bill.
+fallback (`advanceDate(today)` against `history.currentBalance`).
+
+**An OVERDUE anchor is refused, and falls back the same way.** The anchor's
+debt is measured through the installment's own date, which is right while that
+date is ahead and wrong the moment it is behind: everything the ledger did
+after it -- a repayment, a draw, a rate change -- is real, is already on screen
+in the history, and is invisible to a projection seeded from the older balance.
+The generated rows would also be dated *before* history rows they are appended
+after, so the schedule reads out of order. Reconciling an overdue schedule
+properly means replaying each missed occurrence against the events that
+followed it, which is a product decision about what an overdue bill means; the
+honest interim answer is the one that predates the anchor, and the first row
+then no longer matches the overdue bill -- a visible imprecision rather than a
+confidently wrong balance path.
+
+Which surfaces are anchored is enumerated by
+`frontend/src/lib/loan-projection-anchor.guard.test.ts`, and the guard is the
+authority: the **amortization report** and the **loan detail schedule table**
+are bill-anchored, because both print per-installment interest and would
+otherwise show two different figures for one payment. The Debt Payoff
+Timeline and `useLoanProjection` stay today-anchored -- they project an
+aggregate from where the borrower stands today and make no per-installment
+parity claim.
 
 ## 5. Numerical examples
 
