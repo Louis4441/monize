@@ -47,7 +47,8 @@
     "ambiguousBrokerage": "\"{{ query }}\" matches multiple brokerage accounts: {{ list }}. Use the exact account name.",
     "unknownInvestmentAccount": "Unknown account: {{ name }}. Use an exact name from the user's account list.",
     "notACreditCard": "Statement cycles are only available for credit card accounts",
-    "noStatementSettlementDay": "This credit card has no statement settlement day configured"
+    "noStatementSettlementDay": "This credit card has no statement settlement day configured",
+    "loanLedgerUnreadable": "This loan's balance could not be read. Try again."
   },
   "actionHistory": {
     "nothingToUndo": "Nothing to undo",
@@ -395,7 +396,8 @@
     "splitOverrideRequiresAmount": "Amount is required when creating split override",
     "overrideNotFound": "Override with ID {{ overrideId }} not found",
     "updateSplitOverrideRequiresAmount": "Amount is required for split override",
-    "dateMustBeYMD": "date must be in YYYY-MM-DD format"
+    "dateMustBeYMD": "date must be in YYYY-MM-DD format",
+    "loanLedgerUnreadable": "This loan payment could not be priced because its ledger balance could not be read. Try again."
   },
   "securities": {
     "accountMustBeInvestment": "Account must be of type INVESTMENT",

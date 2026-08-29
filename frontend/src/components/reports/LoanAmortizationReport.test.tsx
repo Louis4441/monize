@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { LoanAmortizationReport } from './LoanAmortizationReport';
 
@@ -45,6 +45,14 @@ vi.mock('@/lib/transactions', () => ({
   },
 }));
 
+const mockGetLoanProjectionAnchor = vi.fn();
+vi.mock('@/lib/scheduled-transactions', () => ({
+  scheduledTransactionsApi: {
+    getLoanProjectionAnchor: (...args: any[]) =>
+      mockGetLoanProjectionAnchor(...args),
+  },
+}));
+
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
     error: vi.fn(),
@@ -81,6 +89,12 @@ describe('LoanAmortizationReport', () => {
     vi.clearAllMocks();
     // Most cases have no recorded rate history; the ones that do override it.
     mockGetRateChanges.mockResolvedValue([]);
+    // Most cases have no scheduled payment, so the projection keeps its
+    // today-anchored fallback; the anchored cases override this.
+    mockGetLoanProjectionAnchor.mockResolvedValue({
+      nextDueDate: null,
+      debt: null,
+    });
   });
 
   it('shows loading state initially', async () => {
@@ -515,6 +529,56 @@ describe('LoanAmortizationReport', () => {
     await renderReport();
     await waitFor(() => {
       expect(screen.getByText('Projected Future Payments')).toBeInTheDocument();
+    });
+  });
+
+  describe('anchored projection (issue #1253)', () => {
+    // Whether the anchor is USED is decided by its position relative to TODAY
+    // -- an overdue one is refused -- so the clock is pinned rather than read.
+    // Without this the case passes until 2026-08-15 drifts into the past and
+    // then fails with nothing changed. Only `Date` is faked: RTL's `waitFor`
+    // cannot drive Vitest's fake timers.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-08-01T12:00:00Z'));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('prices the first projected row from the anchored ledger debt, matching the next bill (issue #1253)', async () => {
+      // Today's balance is -200,000, but a 1,500 principal-only payment already
+      // posted for a date before the next installment: the scheduled bill prices
+      // 198,500 * 0.005 = 992.50 of interest, and the report's first projected
+      // row must show the same figure -- not 1,000.00 from the stale balance.
+      mockGetAllAccounts.mockResolvedValue([
+        {
+          id: 'loan-1', name: 'Mortgage', accountType: 'LOAN',
+          currentBalance: -200000, openingBalance: -210000, interestRate: 6,
+          paymentAmount: 1500, paymentFrequency: 'MONTHLY',
+          isCanadianMortgage: false, isVariableRate: false, isClosed: false,
+        },
+      ]);
+      mockGetAllTransactions.mockResolvedValue({
+        data: [
+          { id: 'tx-1', transactionDate: '2026-07-15', amount: 1500, linkedTransaction: null },
+        ],
+        pagination: { hasMore: false },
+      });
+      mockGetLoanProjectionAnchor.mockResolvedValue({
+        nextDueDate: '2026-08-15',
+        debt: 198500,
+      });
+
+      await renderReport();
+
+      await waitFor(() => {
+        expect(screen.getByText('Projected Future Payments')).toBeInTheDocument();
+      });
+      expect(mockGetLoanProjectionAnchor).toHaveBeenCalledWith('loan-1');
+      // First projected row: the bill's own interest for the installment.
+      expect(screen.getAllByText('$992.50').length).toBeGreaterThan(0);
+      expect(screen.queryByText('$1000.00')).not.toBeInTheDocument();
     });
   });
 

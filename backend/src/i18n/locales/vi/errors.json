@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "\"{{ query }}\" khớp với nhiều tài khoản môi giới: {{ list }}. Hãy dùng tên tài khoản chính xác.",
     "unknownInvestmentAccount": "Tài khoản không xác định: {{ name }}. Hãy dùng tên chính xác từ danh sách tài khoản của người dùng.",
     "notACreditCard": "Chu kỳ sao kê chỉ khả dụng cho tài khoản thẻ tín dụng",
-    "noStatementSettlementDay": "Thẻ tín dụng này chưa được cấu hình ngày chốt sao kê"
+    "noStatementSettlementDay": "Thẻ tín dụng này chưa được cấu hình ngày chốt sao kê",
+    "loanLedgerUnreadable": "Không thể đọc số dư của khoản vay này. Vui lòng thử lại."
   },
   "actionHistory": {
     "nothingToUndo": "Không có gì để hoàn tác",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "Số tiền là bắt buộc khi tạo ghi đè chia nhỏ",
     "overrideNotFound": "Không tìm thấy ghi đè với ID {{ overrideId }}",
     "updateSplitOverrideRequiresAmount": "Số tiền là bắt buộc cho ghi đè chia nhỏ",
-    "dateMustBeYMD": "date phải có định dạng YYYY-MM-DD"
+    "dateMustBeYMD": "date phải có định dạng YYYY-MM-DD",
+    "loanLedgerUnreadable": "Không thể tính khoản thanh toán vay này vì không thể đọc số dư sổ cái của nó. Vui lòng thử lại."
   },
   "securities": {
     "exchangeRateUnavailable": "Không thể xác định tỷ giá hối đoái cho {{ from }} -> {{ to }} vào ngày giao dịch. Hãy cung cấp exchangeRate rõ ràng để bút toán vào tài khoản tiền mặt được chính xác.",

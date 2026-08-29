@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "\"{{ query }}\" corresponde a várias contas de corretagem: {{ list }}. Use o nome exato da conta.",
     "unknownInvestmentAccount": "Conta desconhecida: {{ name }}. Use um nome exato da lista de contas do usuário.",
     "notACreditCard": "Os ciclos de fatura só estão disponíveis para contas de cartão de crédito",
-    "noStatementSettlementDay": "Este cartão de crédito não tem um dia de liquidação da fatura configurado"
+    "noStatementSettlementDay": "Este cartão de crédito não tem um dia de liquidação da fatura configurado",
+    "loanLedgerUnreadable": "Não foi possível ler o saldo deste empréstimo. Tente novamente."
   },
   "actionHistory": {
     "nothingToUndo": "Nada para desfazer",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "O valor é obrigatório ao criar uma substituição de divisão",
     "overrideNotFound": "Substituição com ID {{ overrideId }} não encontrada",
     "updateSplitOverrideRequiresAmount": "O valor é obrigatório para substituição de divisão",
-    "dateMustBeYMD": "date deve estar no formato YYYY-MM-DD"
+    "dateMustBeYMD": "date deve estar no formato YYYY-MM-DD",
+    "loanLedgerUnreadable": "Não foi possível calcular este pagamento do empréstimo porque não foi possível ler o saldo do seu livro-razão. Tente novamente."
   },
   "securities": {
     "exchangeRateUnavailable": "Não foi possível determinar uma taxa de câmbio para {{ from }} -> {{ to }} na data da transação. Informe um exchangeRate explícito para que o lançamento na conta de caixa fique correto.",

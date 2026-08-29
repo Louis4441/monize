@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "\"{{ query }}\" corrisponde a più conti di intermediazione: {{ list }}. Usa il nome esatto del conto.",
     "unknownInvestmentAccount": "Conto sconosciuto: {{ name }}. Usa un nome esatto dall'elenco dei conti dell'utente.",
     "notACreditCard": "I cicli di fatturazione sono disponibili solo per i conti carta di credito",
-    "noStatementSettlementDay": "Questa carta di credito non ha un giorno di chiusura dell'estratto conto configurato"
+    "noStatementSettlementDay": "Questa carta di credito non ha un giorno di chiusura dell'estratto conto configurato",
+    "loanLedgerUnreadable": "Non è stato possibile leggere il saldo di questo prestito. Riprova."
   },
   "actionHistory": {
     "nothingToUndo": "Niente da annullare",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "L'importo è obbligatorio quando si crea una sostituzione suddivisa",
     "overrideNotFound": "Sostituzione con ID {{ overrideId }} non trovata",
     "updateSplitOverrideRequiresAmount": "L'importo è obbligatorio per la sostituzione suddivisa",
-    "dateMustBeYMD": "la data deve essere nel formato YYYY-MM-DD"
+    "dateMustBeYMD": "la data deve essere nel formato YYYY-MM-DD",
+    "loanLedgerUnreadable": "Non è stato possibile calcolare questo pagamento del prestito perché non è stato possibile leggere il saldo del suo registro. Riprova."
   },
   "securities": {
     "exchangeRateUnavailable": "Impossibile determinare un tasso di cambio per {{ from }} -> {{ to }} alla data della transazione. Fornisci un exchangeRate esplicito affinché la registrazione sul conto di liquidità sia corretta.",

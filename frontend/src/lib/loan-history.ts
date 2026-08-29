@@ -1,5 +1,7 @@
 import { Account } from '@/types/account';
 import { Transaction, TransactionSplit } from '@/types/transaction';
+import { LoanProjectionAnchor } from '@/types/scheduled-transaction';
+import { parseLocalDate } from '@/lib/utils';
 import { transactionsApi } from '@/lib/transactions';
 import {
   LoanScheduleInput,
@@ -361,12 +363,51 @@ export function resolveCurrentLoanTerms(
   account: Account,
   history: LoanHistoryResult,
   rateChanges: RateTimelineRow[] = [],
+  anchor?: LoanProjectionAnchor | null,
 ): CurrentLoanTerms {
-  const seed = resolveSeedPayment(account, history, rateChanges);
+  const seed = resolveSeedPayment(
+    account,
+    history,
+    rateChanges,
+    usableProjectionAnchor(anchor),
+  );
   return {
     annualRate: seed.annualRate,
     payment: seed.payment != null && seed.payment > 0 ? seed.payment : null,
   };
+}
+
+/**
+ * A server anchor is usable only when it states both halves: the installment
+ * date and the debt through it. A loan with no active scheduled payment gets
+ * `{null, null}` from the API, and the projection then keeps its today-anchored
+ * fallback -- there is no bill for it to be in parity with.
+ */
+type UsableProjectionAnchor = { nextDueDate: string; debt: number };
+
+function usableProjectionAnchor(
+  anchor: LoanProjectionAnchor | null | undefined,
+): UsableProjectionAnchor | null {
+  if (!anchor || anchor.nextDueDate == null || anchor.debt == null) return null;
+  // An OVERDUE anchor is refused, and the projection falls back to today.
+  //
+  // The anchor's debt is measured through the installment's own date. That is
+  // exactly right while the date is ahead of us, and wrong the moment it is
+  // behind: everything the ledger did *after* that date -- a repayment, a
+  // draw, a rate change -- is real, is already on screen in the history, and
+  // is invisible to a projection seeded from the older balance. The generated
+  // rows would also be dated before history rows they are appended after, so
+  // the schedule reads out of order.
+  //
+  // Reconciling an overdue schedule properly means replaying each missed
+  // occurrence against the events that followed it, which is a product
+  // decision about what an overdue bill even means -- not something to infer
+  // here. Until then the honest answer is the one that predates the anchor:
+  // project from where the borrower stands today. The first row then no longer
+  // matches the overdue bill, which is a visible imprecision rather than a
+  // confidently wrong balance path.
+  if (anchor.nextDueDate < new Date().toISOString().slice(0, 10)) return null;
+  return { nextDueDate: anchor.nextDueDate, debt: anchor.debt };
 }
 
 /** The resolved projection seed: the terms in effect plus the payment to use. */
@@ -431,6 +472,11 @@ function resolveSeedPayment(
   account: Account,
   history: LoanHistoryResult,
   rateChanges: RateTimelineRow[],
+  // Already normalized by the caller: "which balance does the projection
+  // price" is one decision, and spelling it here as well as in
+  // buildLoanProjectionInput is how the seed and the figure on screen drift
+  // apart (issue #1255's shape).
+  usableAnchor: UsableProjectionAnchor | null,
 ): SeedPayment {
   const frequency = (account.paymentFrequency as ScheduleFrequency) || 'MONTHLY';
   const isCanadian = account.isCanadianMortgage || false;
@@ -460,18 +506,29 @@ function resolveSeedPayment(
   // outright a few lines later on `seed.annualRate == null`. The rate itself
   // stays `number | null` (`effective.annualRate`); only this guard's input is
   // flattened.
-  const firstPaymentDate = advanceDate(new Date(), frequency);
+  // With a server anchor the first projected row IS the next scheduled bill:
+  // its date is the schedule's due date, and its interest accrues on the debt
+  // the ledger holds through that date -- the same balance boundary the bill's
+  // own recalculation uses, so the report's first row and the bill cannot
+  // disagree (issue #1253). Without one (no active scheduled payment), the
+  // projection keeps its today-anchored fallback.
+  // One spelling of row 1's date. `parseLocalDate` is the module family's
+  // helper for a YYYY-MM-DD (a bare `new Date(ymd)` reads as UTC and shifts
+  // the day west of it), and the YMD is derived once so the rate lookup and
+  // the Date cannot disagree.
+  const firstPaymentDate = usableAnchor
+    ? parseLocalDate(usableAnchor.nextDueDate)
+    : advanceDate(new Date(), frequency);
+  const firstRowYMD =
+    usableAnchor?.nextDueDate ?? firstPaymentDate.toISOString().slice(0, 10);
   const firstRowAnnualRate =
-    resolveEffectiveLoanTerms(
-      rateChanges,
-      firstPaymentDate.toISOString().slice(0, 10),
-      effective.annualRate,
-    ).annualRate ?? 0;
+    resolveEffectiveLoanTerms(rateChanges, firstRowYMD, effective.annualRate)
+      .annualRate ?? 0;
 
   const observed = observedInstallment(history);
   const contractual = account.paymentAmount ?? 0;
   const periodInterest = firstPeriodInterest(
-    history.currentBalance,
+    usableAnchor ? usableAnchor.debt : history.currentBalance,
     firstRowAnnualRate,
     frequency,
     isCanadian,
@@ -550,7 +607,15 @@ export function buildLoanProjectionInput(
   account: Account,
   history: LoanHistoryResult,
   rateChanges: RateTimelineRow[] = [],
+  // Server anchor for a loan with a scheduled payment (issue #1253): the next
+  // installment's due date and the ledger debt through it. Anchored, the first
+  // projected row prices the same balance the next bill's interest is
+  // calculated from -- today's `history.currentBalance` excludes future-dated
+  // principal the bill's own recalculation includes, so the two disagreed for
+  // exactly the payments posted ahead of their date.
+  anchor?: LoanProjectionAnchor | null,
 ): LoanScheduleInput | null {
+  const usableAnchor = usableProjectionAnchor(anchor);
   // Gated on the RESOLVED terms, not on the account's scalars. Gating on the
   // scalars asked the wrong question: this function goes on to resolve both the
   // rate and the payment from the rate history precisely because the scalars can
@@ -560,9 +625,28 @@ export function buildLoanProjectionInput(
   // the same resolution, displayed its real 6% and $1,200 beside "Est. Payoff
   // N/A". That is the disagreement this work exists to remove, with the halves
   // swapped.
-  if (history.currentBalance <= 0.01 || !account.paymentFrequency) return null;
+  const startingDebt = usableAnchor ? usableAnchor.debt : history.currentBalance;
+  // BOTH must show debt. The anchor is measured through the schedule's next
+  // due date, and nothing floors that date at today -- an overdue schedule
+  // (auto-post off, never posted) anchors on a past date, so a loan the user
+  // has since cleared with a lump sum would project a full amortization from
+  // the pre-payoff balance and print an Est. Payoff years away. Today's
+  // balance is what says the loan is finished, and it kept saying so before
+  // the anchor existed.
+  if (
+    startingDebt <= 0.01 ||
+    history.currentBalance <= 0.01 ||
+    !account.paymentFrequency
+  ) {
+    return null;
+  }
 
-  const seed = resolveSeedPayment(account, history, rateChanges);
+  const seed = resolveSeedPayment(
+    account,
+    history,
+    rateChanges,
+    usableAnchor,
+  );
   if (seed.payment == null || seed.payment <= 0 || seed.annualRate == null) {
     return null;
   }
@@ -573,7 +657,7 @@ export function buildLoanProjectionInput(
   const futureTimeline = buildRateTimeline(rateChanges, new Date().toISOString().slice(0, 10), seed.annualRate);
 
   return {
-    startingBalance: history.currentBalance,
+    startingBalance: startingDebt,
     annualRate: seed.annualRate,
     paymentAmount: seed.payment,
     frequency: account.paymentFrequency as ScheduleFrequency,

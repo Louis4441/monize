@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "« {{ query }} » correspond à plusieurs comptes de courtage : {{ list }}. Utilisez le nom exact du compte.",
     "unknownInvestmentAccount": "Compte inconnu : {{ name }}. Utilisez un nom exact de la liste des comptes de l'utilisateur.",
     "notACreditCard": "Les cycles de facturation ne sont disponibles que pour les comptes de carte de crédit",
-    "noStatementSettlementDay": "Cette carte de crédit n'a aucun jour de clôture de relevé configuré"
+    "noStatementSettlementDay": "Cette carte de crédit n'a aucun jour de clôture de relevé configuré",
+    "loanLedgerUnreadable": "Le solde de ce prêt n'a pas pu être lu. Réessayez."
   },
   "actionHistory": {
     "nothingToUndo": "Rien à annuler",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "Le montant est requis lors de la création d'un remplacement fractionné",
     "overrideNotFound": "Remplacement avec l'ID {{ overrideId }} introuvable",
     "updateSplitOverrideRequiresAmount": "Le montant est requis pour le remplacement fractionné",
-    "dateMustBeYMD": "La date doit être au format YYYY-MM-DD"
+    "dateMustBeYMD": "La date doit être au format YYYY-MM-DD",
+    "loanLedgerUnreadable": "Ce paiement de prêt n'a pas pu être calculé car le solde de son grand livre n'a pas pu être lu. Réessayez."
   },
   "securities": {
     "exchangeRateUnavailable": "Impossible de déterminer un taux de change pour {{ from }} -> {{ to }} à la date de la transaction. Fournissez un exchangeRate explicite afin que l'écriture sur le compte d'espèces soit correcte.",

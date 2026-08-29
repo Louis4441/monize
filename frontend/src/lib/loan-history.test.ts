@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildLoanProjectionInput,
   deriveLoanPaymentHistory,
@@ -721,6 +721,135 @@ describe('buildLoanProjectionInput seed payment', () => {
     const schedule = generateLoanSchedule(input!);
     expect(schedule.rows).toHaveLength(0);
     expect(schedule.paidOff).toBe(false);
+  });
+});
+
+describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', () => {
+  // These cases are about an anchor's position relative to TODAY -- an overdue
+  // one is refused -- so the clock is pinned rather than read. Without this the
+  // suite passes until the fixture dates drift into the past and then fails
+  // with nothing changed.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-01T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const account = (overrides: Partial<Account> = {}) =>
+    makeAccount({
+      accountType: 'LOAN',
+      openingBalance: -210000,
+      currentBalance: -200000,
+      interestRate: 6,
+      paymentAmount: 1500,
+      paymentFrequency: 'MONTHLY',
+      ...overrides,
+    });
+  const history = (acct: Account) =>
+    deriveLoanPaymentHistory(acct, [
+      withInterestSplit(
+        makeTransaction({ transactionDate: '2026-07-15', amount: 500 }),
+        'parent-1',
+        1000,
+      ),
+    ]);
+
+  it('anchors the projection on the ledger debt through the next due date', () => {
+    // `account.currentBalance` runs through today, so a 1,500 principal-only
+    // payment posted for a date before the next installment leaves it at
+    // 200,000 while the bill's own recalculation prices 198,500. The server
+    // anchor carries the bill's balance boundary, so the first projected row
+    // and the next scheduled bill calculate the same 992.50 of interest.
+    const acct = account();
+    const input = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: '2026-08-15',
+      debt: 198500,
+    });
+    expect(input).not.toBeNull();
+    expect(input!.startingBalance).toBe(198500);
+    // The first projected row is the next scheduled installment, on its date.
+    expect(input!.firstPaymentDate.getFullYear()).toBe(2026);
+    expect(input!.firstPaymentDate.getMonth()).toBe(7);
+    expect(input!.firstPaymentDate.getDate()).toBe(15);
+    const schedule = generateLoanSchedule(input!);
+    expect(schedule.rows[0].interest).toBeCloseTo(992.5, 2);
+  });
+
+  it('keeps the today-anchored fallback when the anchor has no scheduled payment', () => {
+    // {null, null} is the API's answer for a loan with no active scheduled
+    // payment: there is no bill to be in parity with, so the projection keeps
+    // projecting from today's balance one period ahead.
+    const acct = account();
+    const anchored = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: null,
+      debt: null,
+    });
+    const unanchored = buildLoanProjectionInput(acct, history(acct));
+    expect(anchored).not.toBeNull();
+    expect(anchored!.startingBalance).toBe(unanchored!.startingBalance);
+    // Compare the DAY, not the timestamp: both calls read the wall clock
+    // independently, so exact times differ whenever the two land in different
+    // milliseconds -- a test that fails a few runs in a hundred and looks like
+    // a regression in the code it is checking.
+    const ymd = (date: Date) => date.toISOString().slice(0, 10);
+    expect(ymd(anchored!.firstPaymentDate)).toBe(
+      ymd(unanchored!.firstPaymentDate),
+    );
+  });
+
+  it('refuses an overdue anchor rather than projecting through later real activity', () => {
+    // Today is 2026-07-01 (pinned). The schedule is overdue: its next due date
+    // is 2026-06-01 and the debt through THAT date is 100,000. Since then the
+    // borrower made a real 20,000 principal payment, so they stand at 80,000.
+    //
+    // Seeding the projection at 100,000 would price every future installment
+    // against a balance that never saw the repayment -- and the generated rows
+    // would be dated before the real 2026-06-15 row they are appended after.
+    const acct = account({ currentBalance: -80000, openingBalance: -100000 });
+    const hist = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2026-06-15', amount: 20000 }),
+    ]);
+
+    const overdue = buildLoanProjectionInput(acct, hist, [], {
+      nextDueDate: '2026-06-01',
+      debt: 100000,
+    });
+    const unanchored = buildLoanProjectionInput(acct, hist);
+
+    expect(overdue).not.toBeNull();
+    // It projects from where the borrower actually stands, not from the
+    // pre-repayment balance the overdue boundary measured.
+    expect(overdue!.startingBalance).toBe(80000);
+    expect(overdue!.startingBalance).toBe(unanchored!.startingBalance);
+    expect(overdue!.firstPaymentDate.getTime()).toBe(
+      unanchored!.firstPaymentDate.getTime(),
+    );
+  });
+
+  it('still anchors a due-today installment', () => {
+    // The boundary is refused only when it is BEHIND today; an installment due
+    // today is the next bill and anchors normally.
+    const acct = account();
+    const input = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: '2026-07-01',
+      debt: 198500,
+    });
+
+    expect(input!.startingBalance).toBe(198500);
+  });
+
+  it('refuses the projection when the debt through the due date is already retired', () => {
+    // A future-dated final payment has posted: today's balance still shows
+    // debt, but the installment boundary owes nothing -- projecting rows from
+    // the stale 200,000 would invent installments the bill will never charge.
+    const acct = account();
+    const input = buildLoanProjectionInput(acct, history(acct), [], {
+      nextDueDate: '2026-08-15',
+      debt: 0,
+    });
+    expect(input).toBeNull();
   });
 });
 

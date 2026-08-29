@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "„{{ query }}\" pasuje do wielu kont maklerskich: {{ list }}. Użyj dokładnej nazwy konta.",
     "unknownInvestmentAccount": "Nieznane konto: {{ name }}. Użyj dokładnej nazwy z listy kont użytkownika.",
     "notACreditCard": "Cykle rozliczeniowe są dostępne tylko dla kont kart kredytowych",
-    "noStatementSettlementDay": "Ta karta kredytowa nie ma skonfigurowanego dnia rozliczenia wyciągu"
+    "noStatementSettlementDay": "Ta karta kredytowa nie ma skonfigurowanego dnia rozliczenia wyciągu",
+    "loanLedgerUnreadable": "Nie można odczytać salda tego kredytu. Spróbuj ponownie."
   },
   "actionHistory": {
     "nothingToUndo": "Nie ma nic do cofnięcia",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "Kwota jest wymagana przy tworzeniu nadpisania podziału",
     "overrideNotFound": "Nie znaleziono nadpisania o ID {{ overrideId }}",
     "updateSplitOverrideRequiresAmount": "Kwota jest wymagana dla nadpisania podziału",
-    "dateMustBeYMD": "date musi być w formacie YYYY-MM-DD"
+    "dateMustBeYMD": "date musi być w formacie YYYY-MM-DD",
+    "loanLedgerUnreadable": "Nie można obliczyć tej raty kredytu, ponieważ nie udało się odczytać salda księgi. Spróbuj ponownie."
   },
   "securities": {
     "exchangeRateUnavailable": "Nie można ustalić kursu wymiany dla {{ from }} -> {{ to }} na dzień transakcji. Podaj jawny exchangeRate, aby księgowanie na koncie gotówkowym było poprawne.",
