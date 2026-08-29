@@ -2,6 +2,7 @@ import { Account } from '@/types/account';
 import { Transaction, TransactionSplit } from '@/types/transaction';
 import { LoanProjectionAnchor } from '@/types/scheduled-transaction';
 import { parseLocalDate } from '@/lib/utils';
+import { financialTodayYmd } from '@/lib/financial-today';
 import { transactionsApi } from '@/lib/transactions';
 import {
   LoanScheduleInput,
@@ -13,6 +14,7 @@ import {
   firstPeriodInterest,
   getPeriodicRate,
   getPeriodsPerYear,
+  isoDay,
   resolveEffectiveLoanTerms,
 } from '@/lib/loan-schedule';
 
@@ -386,12 +388,16 @@ export function resolveCurrentLoanTerms(
   history: LoanHistoryResult,
   rateChanges: RateTimelineRow[] = [],
   anchor?: LoanProjectionAnchor | null,
+  // The calendar day every date decision below is made against -- see
+  // `buildLoanProjectionInput`.
+  todayYmd: string = financialTodayYmd(undefined),
 ): CurrentLoanTerms {
   const seed = resolveSeedPayment(
     account,
     history,
     rateChanges,
-    usableProjectionAnchor(anchor),
+    usableProjectionAnchor(anchor, todayYmd),
+    todayYmd,
   );
   return {
     annualRate: seed.annualRate,
@@ -409,6 +415,7 @@ type UsableProjectionAnchor = { nextDueDate: string; debt: number };
 
 function usableProjectionAnchor(
   anchor: LoanProjectionAnchor | null | undefined,
+  todayYmd: string,
 ): UsableProjectionAnchor | null {
   if (!anchor || anchor.nextDueDate == null || anchor.debt == null) return null;
   // An OVERDUE anchor is refused, and the projection falls back to today.
@@ -428,7 +435,18 @@ function usableProjectionAnchor(
   // project from where the borrower stands today. The first row then no longer
   // matches the overdue bill, which is a visible imprecision rather than a
   // confidently wrong balance path.
-  if (anchor.nextDueDate < new Date().toISOString().slice(0, 10)) return null;
+  //
+  // "Behind us" is a question about the USER's calendar, so it is asked against
+  // `todayYmd` -- the day `financialTodayYmd` resolves in their timezone, which
+  // is the day the backend's `todayYMD()` resolves for the same request. Asked
+  // against `new Date().toISOString()` it was a third calendar belonging to
+  // neither: for the first two hours after midnight in Warsaw (fourteen at
+  // UTC+14) UTC still reads yesterday, so an installment the bill considers
+  // overdue was accepted and the projection went back to the stale balance path
+  // this refusal exists to prevent -- and west of Greenwich the mirror image,
+  // an installment due today rejected all evening because UTC had already
+  // rolled over.
+  if (anchor.nextDueDate < todayYmd) return null;
   return { nextDueDate: anchor.nextDueDate, debt: anchor.debt };
 }
 
@@ -499,11 +517,14 @@ function resolveSeedPayment(
   // buildLoanProjectionInput is how the seed and the figure on screen drift
   // apart (issue #1255's shape).
   usableAnchor: UsableProjectionAnchor | null,
+  // The user's calendar day, resolved once by the caller for the same reason
+  // the anchor is: two spellings of "today" in one resolution is how the rate
+  // in effect and the row it prices come apart.
+  today: string,
 ): SeedPayment {
   const frequency = (account.paymentFrequency as ScheduleFrequency) || 'MONTHLY';
   const isCanadian = account.isCanadianMortgage || false;
   const isVariableRate = account.isVariableRate || false;
-  const today = new Date().toISOString().slice(0, 10);
   // `Number(null)` is 0, and 0 is a rate. Pass the absence through so a loan
   // with no rate anywhere reads as "Not set" rather than as a measured 0%.
   const effective = resolveEffectiveLoanTerms(
@@ -538,11 +559,18 @@ function resolveSeedPayment(
   // helper for a YYYY-MM-DD (a bare `new Date(ymd)` reads as UTC and shifts
   // the day west of it), and the YMD is derived once so the rate lookup and
   // the Date cannot disagree.
+  // Unanchored, row 1 is one period past the user's own today -- `today` rather
+  // than `new Date()` so the day the fallback steps from is the same day the
+  // anchor was judged against, and `isoDay` rather than `toISOString` to read it
+  // back, because `generateLoanSchedule` dates every row it produces with
+  // `isoDay` (LOCAL components). Formatting this one Date with UTC components
+  // named a different day than the schedule then used it for, so west of
+  // Greenwich the rate looked up for row 1 was the rate of the day before the
+  // row.
   const firstPaymentDate = usableAnchor
     ? parseLocalDate(usableAnchor.nextDueDate)
-    : advanceDate(new Date(), frequency);
-  const firstRowYMD =
-    usableAnchor?.nextDueDate ?? firstPaymentDate.toISOString().slice(0, 10);
+    : advanceDate(parseLocalDate(today), frequency);
+  const firstRowYMD = usableAnchor?.nextDueDate ?? isoDay(firstPaymentDate);
   const firstRowAnnualRate =
     resolveEffectiveLoanTerms(rateChanges, firstRowYMD, effective.annualRate)
       .annualRate ?? 0;
@@ -636,8 +664,21 @@ export function buildLoanProjectionInput(
   // principal the bill's own recalculation includes, so the two disagreed for
   // exactly the payments posted ahead of their date.
   anchor?: LoanProjectionAnchor | null,
+  // The calendar day this projection is made on, in the USER's timezone --
+  // `useFinancialToday()` on a React surface, or `financialTodayYmd(pref)`
+  // outside one. Every date decision here reads it and nothing reads the clock
+  // twice: whether the anchor is overdue, which rate is in effect, and where an
+  // unanchored row 1 falls are one day's worth of answers.
+  //
+  // The default is the browser's zone, which is what the backend falls back to
+  // as well (the axios interceptor sends it as `X-Client-Timezone`), so an
+  // omitted argument is correct for every user who has not overridden the
+  // preference and never UTC for anyone. It is still an argument a surface is
+  // expected to pass -- `loan-projection-today.guard.test.ts` fails a call site
+  // that does not.
+  todayYmd: string = financialTodayYmd(undefined),
 ): LoanScheduleInput | null {
-  const usableAnchor = usableProjectionAnchor(anchor);
+  const usableAnchor = usableProjectionAnchor(anchor, todayYmd);
   // Gated on the RESOLVED terms, not on the account's scalars. Gating on the
   // scalars asked the wrong question: this function goes on to resolve both the
   // rate and the payment from the rate history precisely because the scalars can
@@ -668,6 +709,7 @@ export function buildLoanProjectionInput(
     history,
     rateChanges,
     usableAnchor,
+    todayYmd,
   );
   if (seed.payment == null || seed.payment <= 0 || seed.annualRate == null) {
     return null;
@@ -676,7 +718,7 @@ export function buildLoanProjectionInput(
   // Only the future-dated steps are taken from here; the current terms are the
   // seed's. `buildRateTimeline`'s own "starting" fields are deliberately unused
   // -- see resolveEffectiveLoanTerms.
-  const futureTimeline = buildRateTimeline(rateChanges, new Date().toISOString().slice(0, 10), seed.annualRate);
+  const futureTimeline = buildRateTimeline(rateChanges, todayYmd, seed.annualRate);
 
   return {
     startingBalance: startingDebt,

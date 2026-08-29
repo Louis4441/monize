@@ -8,7 +8,8 @@ import {
   fetchLoanInterestTransactions,
 } from './loan-history';
 import { transactionsApi } from '@/lib/transactions';
-import { generateLoanSchedule, getPeriodicRate } from '@/lib/loan-schedule';
+import { generateLoanSchedule, getPeriodicRate, isoDay } from '@/lib/loan-schedule';
+import { financialTodayYmd } from '@/lib/financial-today';
 import { Account } from '@/types/account';
 import { Transaction, TransactionSplit } from '@/types/transaction';
 
@@ -729,6 +730,14 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
   // one is refused -- so the clock is pinned rather than read. Without this the
   // suite passes until the fixture dates drift into the past and then fails
   // with nothing changed.
+  //
+  // Pinning the instant is not enough: an instant is a different calendar day
+  // in different zones, so a case that turned on 2026-07-01 read as 2026-07-02
+  // at UTC+14 and the block failed on a developer machine east of the
+  // dateline. The day each case is judged against is therefore STATED, which is
+  // also what every production surface does -- `useFinancialToday()` resolves
+  // it from the user's preference and passes it in.
+  const TODAY = '2026-07-01';
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-01T12:00:00Z'));
@@ -763,10 +772,13 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
     // anchor carries the bill's balance boundary, so the first projected row
     // and the next scheduled bill calculate the same 992.50 of interest.
     const acct = account();
-    const input = buildLoanProjectionInput(acct, history(acct), [], {
-      nextDueDate: '2026-08-15',
-      debt: 198500,
-    });
+    const input = buildLoanProjectionInput(
+      acct,
+      history(acct),
+      [],
+      { nextDueDate: '2026-08-15', debt: 198500 },
+      TODAY,
+    );
     expect(input).not.toBeNull();
     expect(input!.startingBalance).toBe(198500);
     // The first projected row is the next scheduled installment, on its date.
@@ -782,20 +794,29 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
     // payment: there is no bill to be in parity with, so the projection keeps
     // projecting from today's balance one period ahead.
     const acct = account();
-    const anchored = buildLoanProjectionInput(acct, history(acct), [], {
-      nextDueDate: null,
-      debt: null,
-    });
-    const unanchored = buildLoanProjectionInput(acct, history(acct));
+    const anchored = buildLoanProjectionInput(
+      acct,
+      history(acct),
+      [],
+      { nextDueDate: null, debt: null },
+      TODAY,
+    );
+    const unanchored = buildLoanProjectionInput(
+      acct,
+      history(acct),
+      [],
+      null,
+      TODAY,
+    );
     expect(anchored).not.toBeNull();
     expect(anchored!.startingBalance).toBe(unanchored!.startingBalance);
-    // Compare the DAY, not the timestamp: both calls read the wall clock
-    // independently, so exact times differ whenever the two land in different
-    // milliseconds -- a test that fails a few runs in a hundred and looks like
-    // a regression in the code it is checking.
-    const ymd = (date: Date) => date.toISOString().slice(0, 10);
-    expect(ymd(anchored!.firstPaymentDate)).toBe(
-      ymd(unanchored!.firstPaymentDate),
+    // Compare the DAY, not the timestamp, and with `isoDay` -- which is what
+    // `generateLoanSchedule` dates its rows with, so it is the day these two
+    // have to agree on. (Both are now derived from `TODAY` rather than read
+    // from the clock, so the millisecond skew this comparison originally
+    // guarded against is gone; the day is still the right unit.)
+    expect(isoDay(anchored!.firstPaymentDate)).toBe(
+      isoDay(unanchored!.firstPaymentDate),
     );
   });
 
@@ -812,11 +833,14 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
       makeTransaction({ transactionDate: '2026-06-15', amount: 20000 }),
     ]);
 
-    const overdue = buildLoanProjectionInput(acct, hist, [], {
-      nextDueDate: '2026-06-01',
-      debt: 100000,
-    });
-    const unanchored = buildLoanProjectionInput(acct, hist);
+    const overdue = buildLoanProjectionInput(
+      acct,
+      hist,
+      [],
+      { nextDueDate: '2026-06-01', debt: 100000 },
+      TODAY,
+    );
+    const unanchored = buildLoanProjectionInput(acct, hist, [], null, TODAY);
 
     expect(overdue).not.toBeNull();
     // It projects from where the borrower actually stands, not from the
@@ -832,12 +856,95 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
     // The boundary is refused only when it is BEHIND today; an installment due
     // today is the next bill and anchors normally.
     const acct = account();
-    const input = buildLoanProjectionInput(acct, history(acct), [], {
-      nextDueDate: '2026-07-01',
-      debt: 198500,
-    });
+    const input = buildLoanProjectionInput(
+      acct,
+      history(acct),
+      [],
+      { nextDueDate: '2026-07-01', debt: 198500 },
+      TODAY,
+    );
 
     expect(input!.startingBalance).toBe(198500);
+  });
+
+  it('refuses an anchor already overdue in the user calendar while UTC lags', () => {
+    // 00:30 on 30 August in Warsaw (UTC+2). UTC still reads 2026-08-29, so a
+    // guard written against `new Date().toISOString()` sees the 2026-08-29
+    // installment as due TODAY and anchors on it -- for the two hours after
+    // local midnight, and for fourteen at UTC+14.
+    //
+    // The bill does not: the backend prices it against `todayYMD()`, which
+    // resolves the request timezone, so it is overdue there. The projection
+    // must agree, or it seeds from a boundary that predates the 20,000 the
+    // borrower paid this morning and prices every future installment against a
+    // debt the ledger no longer holds.
+    vi.setSystemTime(new Date('2026-08-29T22:30:00Z'));
+    const todayYmd = financialTodayYmd('Europe/Warsaw');
+    expect(todayYmd).toBe('2026-08-30');
+
+    const acct = account({ currentBalance: -80000, openingBalance: -100000 });
+    const hist = deriveLoanPaymentHistory(acct, [
+      makeTransaction({ transactionDate: '2026-08-30', amount: 20000 }),
+    ]);
+
+    const overdue = buildLoanProjectionInput(
+      acct,
+      hist,
+      [],
+      { nextDueDate: '2026-08-29', debt: 100000 },
+      todayYmd,
+    );
+
+    expect(overdue).not.toBeNull();
+    expect(overdue!.startingBalance).toBe(80000);
+    // 80,000 x 0.005, not the 100,000 x 0.005 the stale anchor would price.
+    expect(
+      generateLoanSchedule(overdue!).rows[0].interest,
+    ).toBeCloseTo(400, 2);
+  });
+
+  it('still anchors a due-today installment while UTC has already moved on', () => {
+    // The mirror image: 22:30 on 29 August in New York (UTC-4), where UTC
+    // already reads 2026-08-30. A UTC comparison refuses an installment that is
+    // due TODAY for this borrower, dropping the report back to the today-
+    // anchored balance and losing the parity with the bill that the anchor
+    // exists for -- every evening, for four hours.
+    vi.setSystemTime(new Date('2026-08-30T02:30:00Z'));
+    const todayYmd = financialTodayYmd('America/New_York');
+    expect(todayYmd).toBe('2026-08-29');
+
+    const acct = account();
+    const input = buildLoanProjectionInput(
+      acct,
+      history(acct),
+      [],
+      { nextDueDate: '2026-08-29', debt: 198500 },
+      todayYmd,
+    );
+
+    expect(input).not.toBeNull();
+    expect(input!.startingBalance).toBe(198500);
+    expect(isoDay(input!.firstPaymentDate)).toBe('2026-08-29');
+  });
+
+  it('judges the anchor against the passed day, not the browser day', () => {
+    // A user whose Monize timezone differs from their browser's gets the
+    // configured one -- `useFinancialToday` resolves the preference and the
+    // browser is only its fallback, exactly as the backend resolves it. Pinning
+    // the clock proves the argument is what decides: the same instant and the
+    // same anchor come out both ways.
+    vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
+    const acct = account();
+    const anchor = { nextDueDate: '2026-08-29', debt: 198500 };
+
+    expect(
+      buildLoanProjectionInput(acct, history(acct), [], anchor, '2026-08-29')!
+        .startingBalance,
+    ).toBe(198500);
+    expect(
+      buildLoanProjectionInput(acct, history(acct), [], anchor, '2026-08-30')!
+        .startingBalance,
+    ).toBe(200000);
   });
 
   it('refuses the projection when the debt through the due date is already retired', () => {
@@ -845,10 +952,13 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
     // debt, but the installment boundary owes nothing -- projecting rows from
     // the stale 200,000 would invent installments the bill will never charge.
     const acct = account();
-    const input = buildLoanProjectionInput(acct, history(acct), [], {
-      nextDueDate: '2026-08-15',
-      debt: 0,
-    });
+    const input = buildLoanProjectionInput(
+      acct,
+      history(acct),
+      [],
+      { nextDueDate: '2026-08-15', debt: 0 },
+      TODAY,
+    );
     expect(input).toBeNull();
   });
 });

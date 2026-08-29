@@ -36,6 +36,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { chartColors } from '@/lib/chart-colors';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { useTranslations } from 'next-intl';
 
 interface PayoffScheduleItem {
@@ -58,6 +59,10 @@ export function DebtPayoffTimelineReport() {
   const formatChartDate = useChartDateFormat();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
+  // Today-anchored (see `loan-projection-anchor.guard.test.ts`), but still the
+  // USER's today: the payoff date this report draws per account is the one the
+  // loan detail page prints, and two calendars would separate them by a period.
+  const todayYmd = useFinancialToday();
   const [viewType, setViewType] = useState<'balance' | 'breakdown' | 'distribution'>('balance');
 
   const {
@@ -252,7 +257,13 @@ export function DebtPayoffTimelineReport() {
     // without it the projection runs at whatever stale scalar the account still
     // holds, so this report and the loan detail page gave the same loan two
     // different payoff dates.
-    const projectionInput = buildLoanProjectionInput(selectedAccount, history, rateChanges);
+    const projectionInput = buildLoanProjectionInput(
+      selectedAccount,
+      history,
+      rateChanges,
+      null,
+      todayYmd,
+    );
     if (projectionInput) {
       const projection = generateLoanSchedule({
         ...projectionInput,
@@ -339,13 +350,19 @@ export function DebtPayoffTimelineReport() {
     // the terms strip below read, so a change to how history is derived cannot
     // move one and leave the other. `rateChanges` is a dep because the projection
     // above is built from it.
-  }, [selectedAccount, history, rateChanges, formatChartDate]);
+  }, [selectedAccount, history, rateChanges, formatChartDate, todayYmd]);
 
   // The terms in effect, from the same history the curve is projected from.
   const currentTerms = useMemo(() => {
     if (!selectedAccount || !history) return { annualRate: null, payment: null };
-    return resolveCurrentLoanTerms(selectedAccount, history, rateChanges);
-  }, [selectedAccount, history, rateChanges]);
+    return resolveCurrentLoanTerms(
+      selectedAccount,
+      history,
+      rateChanges,
+      null,
+      todayYmd,
+    );
+  }, [selectedAccount, history, rateChanges, todayYmd]);
 
   const summary = useMemo(() => {
     if (payoffSchedule.length === 0 || !selectedAccount) return null;

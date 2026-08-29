@@ -27,6 +27,7 @@ import { buildScheduleDisplayRows, type DisplayRow } from '@/lib/loan-schedule-r
 import type { CellValue, PdfTableSection } from '@/lib/pdf-export';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { PastImpactSection } from '@/components/accounts/loan-detail/PastImpactSection';
 import { useLoanRateEditing } from '@/components/accounts/loan-detail/useLoanRateEditing';
 import {
@@ -123,6 +124,12 @@ export function LoanDetailView({
     [account, transactions, rateChanges, interestTransactions],
   );
 
+  // The user's calendar day -- what decides whether the anchor is still ahead
+  // of them. The backend prices the same installment against its own
+  // request-timezone `todayYMD()`, so reading UTC here would put the schedule
+  // table and the bill on two different calendars.
+  const todayYmd = useFinancialToday();
+
   // The borrower's real current installment (principal + interest) from the
   // payment history, shown on the summary card and used to seed the projection.
   // The stored paymentAmount is often principal-only for separately-booked
@@ -130,14 +137,28 @@ export function LoanDetailView({
   // and the same resolution the projection is seeded with, so the card and the
   // payoff beside it cannot describe two different installments.
   const currentTerms = useMemo(
-    () => resolveCurrentLoanTerms(account, history, rateChanges, projectionAnchor),
-    [account, history, rateChanges, projectionAnchor],
+    () =>
+      resolveCurrentLoanTerms(
+        account,
+        history,
+        rateChanges,
+        projectionAnchor,
+        todayYmd,
+      ),
+    [account, history, rateChanges, projectionAnchor, todayYmd],
   );
   const currentInstallment = currentTerms.payment;
 
   const projectionInput = useMemo(
-    () => buildLoanProjectionInput(account, history, rateChanges, projectionAnchor),
-    [account, history, rateChanges, projectionAnchor],
+    () =>
+      buildLoanProjectionInput(
+        account,
+        history,
+        rateChanges,
+        projectionAnchor,
+        todayYmd,
+      ),
+    [account, history, rateChanges, projectionAnchor, todayYmd],
   );
 
   const baseline = useMemo(

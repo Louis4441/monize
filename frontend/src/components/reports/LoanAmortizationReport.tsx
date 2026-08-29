@@ -19,6 +19,7 @@ import {
   resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
@@ -175,6 +176,11 @@ export function LoanAmortizationReport() {
     () => historyForSelection?.anchor ?? null,
     [historyForSelection],
   );
+  // The user's calendar day, which is what decides whether the anchor above is
+  // still ahead of them -- the backend prices the same installment against its
+  // own request-timezone `todayYMD()`, so a UTC reading here is a disagreement
+  // about money for as long as the two calendars differ.
+  const todayYmd = useFinancialToday();
 
   // One derivation, shared by the schedule and the terms shown above it. It was
   // computed twice per render, which is both wasted work over the whole ledger
@@ -225,6 +231,7 @@ export function LoanAmortizationReport() {
       history,
       rateChanges,
       projectionAnchor,
+      todayYmd,
     );
     if (projectionInput) {
       const projection = generateLoanSchedule(projectionInput);
@@ -244,7 +251,7 @@ export function LoanAmortizationReport() {
     }
 
     return { paymentHistory: payments, projectionPaidOff };
-  }, [selectedAccount, history, rateChanges, projectionAnchor]);
+  }, [selectedAccount, history, rateChanges, projectionAnchor, todayYmd]);
 
   // The terms in effect, from the same history the schedule above is built from.
   // `selectedAccount.interestRate` / `.paymentAmount` are the scalars a
@@ -258,9 +265,10 @@ export function LoanAmortizationReport() {
             history,
             rateChanges,
             projectionAnchor,
+            todayYmd,
           )
         : { annualRate: null, payment: null },
-    [selectedAccount, history, rateChanges, projectionAnchor],
+    [selectedAccount, history, rateChanges, projectionAnchor, todayYmd],
   );
 
   // The shared derivation, so this report and the Debt Payoff Timeline cannot
